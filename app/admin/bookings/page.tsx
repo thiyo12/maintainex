@@ -1,0 +1,448 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
+import toast from 'react-hot-toast'
+import { FiEye, FiTrash2, FiCheck, FiX, FiRefreshCw, FiMapPin, FiEdit2 } from 'react-icons/fi'
+import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
+
+interface Booking {
+  id: string
+  name: string
+  phone: string
+  email: string
+  district: string
+  address: string
+  date: string
+  time: string
+  status: string
+  service: { title: string }
+  branch: { id: string; name: string; location: string } | null
+  createdAt: string
+}
+
+interface Branch {
+  id: string
+  name: string
+  location: string
+  districts: string
+}
+
+const statusColors: Record<string, string> = {
+  PENDING: 'bg-yellow-100 text-yellow-700',
+  CONFIRMED: 'bg-blue-100 text-blue-700',
+  IN_PROGRESS: 'bg-purple-100 text-purple-700',
+  COMPLETED: 'bg-green-100 text-green-700',
+  CANCELLED: 'bg-red-100 text-red-700'
+}
+
+export default function AdminBookings() {
+  const { data: session } = useSession()
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [filter, setFilter] = useState('ALL')
+  const [filterBranch, setFilterBranch] = useState<string>('')
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+  const [editDistrict, setEditDistrict] = useState('')
+  const [editBranchId, setEditBranchId] = useState('')
+
+  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
+
+  useEffect(() => {
+    fetchBookings()
+    if (isSuperAdmin) {
+      fetchBranches()
+    }
+  }, [])
+
+  const fetchBookings = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filterBranch) params.append('branchId', filterBranch)
+      
+      const url = params.toString() ? `/api/bookings?${params}` : '/api/bookings'
+      const res = await fetch(url)
+      const data = await res.json()
+      setBookings(data)
+    } catch (error) {
+      toast.error('Failed to fetch bookings')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchBranches = async () => {
+    try {
+      const res = await fetch('/api/branches')
+      const data = await res.json()
+      setBranches(data)
+    } catch (error) {
+      console.error('Failed to fetch branches')
+    }
+  }
+
+  const updateStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      })
+      
+      if (!res.ok) throw new Error()
+      
+      toast.success('Booking status updated')
+      fetchBookings()
+    } catch (error) {
+      toast.error('Failed to update booking')
+    }
+  }
+
+  const updateDistrict = async () => {
+    if (!editingBooking) return
+    
+    try {
+      let branchId = null
+      if (editBranchId) {
+        branchId = editBranchId
+      } else if (editDistrict) {
+        const branch = branches.find(b => {
+          const districts: string[] = JSON.parse(b.districts || '[]')
+          return districts.includes(editDistrict)
+        })
+        branchId = branch?.id || null
+      }
+
+      const res = await fetch(`/api/bookings/${editingBooking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          district: editDistrict,
+          branchId 
+        })
+      })
+      
+      if (!res.ok) throw new Error()
+      
+      toast.success('Booking updated')
+      setEditingBooking(null)
+      fetchBookings()
+    } catch (error) {
+      toast.error('Failed to update booking')
+    }
+  }
+
+  const deleteBooking = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this booking?')) return
+    
+    try {
+      const res = await fetch(`/api/bookings/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      
+      toast.success('Booking deleted')
+      fetchBookings()
+    } catch (error) {
+      toast.error('Failed to delete booking')
+    }
+  }
+
+  const openEditModal = (booking: Booking) => {
+    setEditingBooking(booking)
+    setEditDistrict(booking.district)
+    setEditBranchId(booking.branch?.id || '')
+  }
+
+  const filteredBookings = filter === 'ALL' 
+    ? bookings 
+    : bookings.filter(b => b.status === filter)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+          <p className="text-gray-600">Manage all customer bookings</p>
+        </div>
+        <button onClick={fetchBookings} className="btn-outline flex items-center">
+          <FiRefreshCw className="mr-2" /> Refresh
+        </button>
+      </div>
+
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div className="flex flex-wrap gap-2">
+          {['ALL', 'PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(status => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === status
+                  ? 'bg-primary-500 text-dark-900'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {status.replace('_', ' ')}
+            </button>
+          ))}
+        </div>
+
+        {isSuperAdmin && (
+          <select
+            value={filterBranch}
+            onChange={(e) => {
+              setFilterBranch(e.target.value)
+              fetchBookings()
+            }}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            <option value="">All Branches</option>
+            <option value="unassigned">Unassigned</option>
+            {branches.map(branch => (
+              <option key={branch.id} value={branch.id}>{branch.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Customer</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">District</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Date & Time</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
+                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredBookings.length > 0 ? (
+                filteredBookings.map((booking) => (
+                  <tr key={booking.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-gray-900">{booking.name}</div>
+                      <div className="text-sm text-gray-500">{booking.phone}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1 text-gray-700">
+                        <FiMapPin className="text-gray-400" />
+                        {booking.district}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {booking.branch ? (
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                          {booking.branch.name}
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                          Unassigned
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{booking.service?.title}</td>
+                    <td className="px-6 py-4">
+                      <div className="text-gray-900">{new Date(booking.date).toLocaleDateString()}</div>
+                      <div className="text-sm text-gray-500">{booking.time}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[booking.status]}`}>
+                        {booking.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-end space-x-2">
+                        {isSuperAdmin && (
+                          <button
+                            onClick={() => openEditModal(booking)}
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                            title="Edit District"
+                          >
+                            <FiEdit2 />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedBooking(booking)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          title="View Details"
+                        >
+                          <FiEye />
+                        </button>
+                        {booking.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => updateStatus(booking.id, 'CONFIRMED')}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                              title="Confirm"
+                            >
+                              <FiCheck />
+                            </button>
+                            <button
+                              onClick={() => updateStatus(booking.id, 'CANCELLED')}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              title="Cancel"
+                            >
+                              <FiX />
+                            </button>
+                          </>
+                        )}
+                        {booking.status === 'CONFIRMED' && (
+                          <button
+                            onClick={() => updateStatus(booking.id, 'IN_PROGRESS')}
+                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
+                            title="Start"
+                          >
+                            <FiRefreshCw />
+                          </button>
+                        )}
+                        {booking.status === 'IN_PROGRESS' && (
+                          <button
+                            onClick={() => updateStatus(booking.id, 'COMPLETED')}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                            title="Complete"
+                          >
+                            <FiCheck />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteBooking(booking.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          title="Delete"
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    No bookings found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selectedBooking && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Booking Details</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-500">Customer Name</label>
+                <div className="font-medium">{selectedBooking.name}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Phone</label>
+                <div className="font-medium">{selectedBooking.phone}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Email</label>
+                <div className="font-medium">{selectedBooking.email}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">District</label>
+                <div className="font-medium">{selectedBooking.district}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Address</label>
+                <div className="font-medium">{selectedBooking.address}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Branch</label>
+                <div className="font-medium">{selectedBooking.branch?.name || 'Unassigned'}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Service</label>
+                <div className="font-medium">{selectedBooking.service?.title}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-500">Date</label>
+                  <div className="font-medium">{new Date(selectedBooking.date).toLocaleDateString()}</div>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500">Time</label>
+                  <div className="font-medium">{selectedBooking.time}</div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setSelectedBooking(null)}
+                className="btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingBooking && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Edit Booking</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-500">Customer</label>
+                <div className="font-medium">{editingBooking.name}</div>
+              </div>
+              <DistrictSelector
+                value={editDistrict}
+                onChange={setEditDistrict}
+                required
+              />
+              {isSuperAdmin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch Override</label>
+                  <select
+                    value={editBranchId}
+                    onChange={(e) => setEditBranchId(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Auto-assign based on district</option>
+                    {branches.map(branch => (
+                      <option key={branch.id} value={branch.id}>{branch.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Leave empty to auto-assign based on district</p>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setEditingBooking(null)}
+                className="flex-1 btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={updateDistrict}
+                className="flex-1 btn-primary"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

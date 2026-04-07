@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String?
+  role      String    @default("ADMIN")
+  branchId  String?
+  branch    Branch?   @relation(fields: [branchId], references: [id])
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([branchId])
+  @@index([role])
+}
+
+model Branch {
+  id        String    @id @default(cuid())
+  name      String
+  location  String
+  phone     String?
+  email     String?
+  address   String?
+  districts String    @default("[]")
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  admins     Admin[]
+  bookings   Booking[]
+  applications Application[]
+  services   Service[]
+
+  @@index([isActive])
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  services  Service[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Service {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  description String
+  image       String?
+  price       Float?
+  categoryId  String
+  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  branchId    String?
+  branch      Branch?   @relation(fields: [branchId], references: [id])
+  bookings    Booking[]
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([categoryId])
+  @@index([branchId])
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String
+  email      String
+  district   String
+  address    String
+  latitude   Float?
+  longitude  Float?
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id])
+  branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  subService String?
+  date       DateTime
+  time       String
+  notes      String?
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@index([serviceId])
+  @@index([branchId])
+  @@index([district])
+}
+
+model Application {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String
+  email      String
+  district   String
+  address    String
+  position   String
+  experience String
+  cvUrl      String?
+  branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  status     String   @default("NEW")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([status])
+  @@index([branchId])
+  @@index([district])
+}
+
+model Settings {
+  id             String @id @default("default")
+  companyName    String @default("Maintainex")
+  email          String @default("info@maintainex.com")
+  phone          String @default("+94 XX XXX XXXX")
+  address        String @default("Jaffna, Sri Lanka")
+  mapEmbedUrl    String?
+  whatsappNumber String?
+  facebookUrl    String?
+  instagramUrl   String?
+  workingHours   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  adminEmail  String
+  adminName   String?
+  branchId    String?
+  action      String
+  entityType  String
+  entityId    String?
+  description String
+  details     String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+  @@index([branchId])
+}
