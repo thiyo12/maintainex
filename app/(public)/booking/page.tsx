@@ -149,54 +149,54 @@ function BookingFormContent() {
         </div>
 
         {selectedService && (
-          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-6 mb-8 text-dark-900">
-            <div className="flex items-center gap-4">
+          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 text-dark-900">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
               <img
                 src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200'}
                 alt={selectedService.title}
-                className="w-20 h-20 rounded-xl object-cover"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover flex-shrink-0"
               />
-              <div className="flex-1">
-                <h3 className="font-bold text-lg">{selectedService.title}</h3>
-                <p className="text-dark-900/70 text-sm">{selectedService.description}</p>
+              <div className="text-center sm:text-left flex-1 w-full">
+                <h3 className="font-bold text-base sm:text-lg">{selectedService.title}</h3>
+                <p className="text-dark-900/70 text-xs sm:text-sm line-clamp-2">{selectedService.description}</p>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-xl">{priceDisplay}</div>
+              <div className="text-center sm:text-right flex-shrink-0">
+                <div className="font-bold text-lg sm:text-xl">{priceDisplay}</div>
                 {selectedService.duration && (
-                  <div className="text-sm text-dark-900/70">{selectedService.duration} min</div>
+                  <div className="text-xs sm:text-sm text-dark-900/70">{selectedService.duration} min</div>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-center mb-8">
+        <div className="flex items-center justify-center mb-6 sm:mb-8">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base ${
                   step >= s ? 'bg-primary-500 text-dark-900' : 'bg-gray-200 text-gray-500'
                 }`}
               >
                 {step > s ? <FiCheck /> : s}
               </div>
               {s < 3 && (
-                <div className={`w-24 h-1 mx-2 ${step > s ? 'bg-primary-500' : 'bg-gray-200'}`} />
+                <div className={`w-12 sm:w-24 h-1 mx-1 sm:mx-2 ${step > s ? 'bg-primary-500' : 'bg-gray-200'}`} />
               )}
             </div>
           ))}
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-3xl shadow-2xl p-8 md:p-12">
+        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl sm:rounded-3xl shadow-xl sm:shadow-2xl p-4 sm:p-6 md:p-10 lg:p-12">
           {step === 1 && (
-            <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-dark-900 mb-6">Select Your Service</h2>
+            <div className="space-y-5 sm:space-y-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-dark-900 mb-4 sm:mb-6">Select Your Service</h2>
               
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Service *</label>
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Service *</label>
                 <select
                   {...register('serviceId', { required: 'Please select a service' })}
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                   value={selectedService?.id || ''}
                   onChange={(e) => {
                     const service = services.find(s => s.id === e.target.value)
@@ -215,36 +215,36 @@ function BookingFormContent() {
                     </optgroup>
                   ))}
                 </select>
-                {errors.serviceId && <p className="text-red-500 text-sm mt-1">{errors.serviceId.message}</p>}
+                {errors.serviceId && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.serviceId.message}</p>}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     Preferred Date *
                   </label>
                   <input
                     type="date"
                     {...register('date', { required: 'Please select a date' })}
                     min={getMinDate()}
-                    className="input-field"
+                    className="input-field text-sm sm:text-base"
                   />
-                  {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date.message}</p>}
+                  {errors.date && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.date.message}</p>}
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     Preferred Time *
                   </label>
                   <select
                     {...register('time', { required: 'Please select a time' })}
-                    className="input-field"
+                    className="input-field text-sm sm:text-base"
                   >
                     <option value="">Choose a time</option>
                     {timeSlots.map((time) => (
                       <option key={time} value={time}>{time}</option>
                     ))}
                   </select>
-                  {errors.time && <p className="text-red-500 text-sm mt-1">{errors.time.message}</p>}
+                  {errors.time && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.time.message}</p>}
                 </div>
               </div>
 
@@ -257,7 +257,7 @@ function BookingFormContent() {
                   }
                   setStep(2)
                 }}
-                className="w-full btn-primary"
+                className="w-full btn-primary text-sm sm:text-base py-3 sm:py-4"
                 disabled={!selectedService}
               >
                 Continue to Your Details
@@ -266,17 +266,17 @@ function BookingFormContent() {
           )}
 
           {step === 2 && (
-            <div className="space-y-6">
-              <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-6">
-                <p className="text-primary-800 text-sm font-medium">
-                  <strong>Required Information:</strong> Please provide your contact details so we can reach you.
+            <div className="space-y-5 sm:space-y-6">
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
+                <p className="text-primary-800 text-xs sm:text-sm font-medium">
+                  <strong>Required:</strong> Please provide your contact details so we can reach you.
                 </p>
               </div>
 
-              <h2 className="text-2xl font-bold text-dark-900 mb-6">Your Contact Details</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-dark-900 mb-4 sm:mb-6">Your Contact Details</h2>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                   <FiUser className="inline mr-2" />
                   Full Name (English letters only) *
                 </label>
@@ -294,13 +294,13 @@ function BookingFormContent() {
                     }
                   })}
                   placeholder="Enter your full name (e.g., John Smith)"
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                 />
-                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
+                {errors.name && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.name.message}</p>}
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                   <FiPhone className="inline mr-2" />
                   Phone Number (10 digits) *
                 </label>
@@ -315,13 +315,13 @@ function BookingFormContent() {
                   })}
                   placeholder="0771234567"
                   maxLength={10}
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                 />
-                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>}
+                {errors.phone && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.phone.message}</p>}
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                   <FiMail className="inline mr-2" />
                   Email Address *
                 </label>
@@ -329,9 +329,9 @@ function BookingFormContent() {
                   type="email"
                   {...register('email', { required: 'Your email is required' })}
                   placeholder="your@email.com"
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                 />
-                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>}
+                {errors.email && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.email.message}</p>}
               </div>
 
               <DistrictSelector
@@ -342,13 +342,13 @@ function BookingFormContent() {
                 error={errors.district?.message}
                 required
               />
-              {errors.district && <p className="text-red-500 text-sm mt-1">{errors.district.message}</p>}
+              {errors.district && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.district.message}</p>}
 
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex-1 btn-outline"
+                  className="flex-1 btn-outline text-sm sm:text-base py-3"
                 >
                   Back
                 </button>
@@ -361,7 +361,7 @@ function BookingFormContent() {
                     }
                     setStep(3)
                   }}
-                  className="flex-1 btn-primary"
+                  className="flex-1 btn-primary text-sm sm:text-base py-3"
                 >
                   Continue to Address
                 </button>
@@ -370,17 +370,17 @@ function BookingFormContent() {
           )}
 
           {step === 3 && (
-            <div className="space-y-6">
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                <p className="text-gray-600 text-sm">
+            <div className="space-y-5 sm:space-y-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 sm:p-4">
+                <p className="text-gray-600 text-xs sm:text-sm">
                   <strong>Required:</strong> Provide your address for the service location in {district}.
                 </p>
               </div>
 
-              <h2 className="text-2xl font-bold text-dark-900 mb-6">Address</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-dark-900 mb-4 sm:mb-6">Address</h2>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                   <FiMapPin className="inline mr-2" />
                   Your Address *
                 </label>
@@ -388,39 +388,39 @@ function BookingFormContent() {
                   {...register('address', { required: 'Please enter your address' })}
                   placeholder="Enter your complete address (house number, street, city)"
                   rows={3}
-                  className="input-field resize-none"
+                  className="input-field resize-none text-sm sm:text-base"
                 />
-                {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address.message}</p>}
+                {errors.address && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.address.message}</p>}
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Special Instructions (Optional)</label>
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Special Instructions (Optional)</label>
                 <textarea
                   {...register('notes')}
-                  rows={3}
+                  rows={2}
                   placeholder="Any special instructions or requirements..."
-                  className="input-field resize-none"
+                  className="input-field resize-none text-sm sm:text-base"
                 />
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <p className="text-sm text-blue-800">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4">
+                <p className="text-xs sm:text-sm text-blue-800">
                   <strong>Note:</strong> Our team will call you to confirm your location and service details before the scheduled date.
                 </p>
               </div>
 
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 btn-outline"
+                  className="flex-1 btn-outline text-sm sm:text-base py-3"
                   disabled={isSubmitting}
                 >
                   Back
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 btn-primary"
+                  className="flex-1 btn-primary text-sm sm:text-base py-3"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? 'Submitting...' : 'Confirm Booking'}

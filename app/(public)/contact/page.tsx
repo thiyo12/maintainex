@@ -183,28 +183,28 @@ export default function ContactPage() {
               <p className="text-gray-600">Fill out the form below and we will get back to you as soon as possible.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-xl p-8 md:p-12 space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 md:p-10 lg:p-12 space-y-5 sm:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">Your Name *</label>
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Your Name *</label>
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className="input-field"
+                    className="input-field text-sm sm:text-base"
                     placeholder="Enter your name"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-medium mb-2">Phone Number *</label>
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Phone Number *</label>
                   <input
                     type="tel"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="input-field"
+                    className="input-field text-sm sm:text-base"
                     placeholder="077XXXXXXX"
                     required
                   />
@@ -212,25 +212,25 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Email Address *</label>
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Email Address *</label>
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                   placeholder="your@email.com"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Subject *</label>
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Subject *</label>
                 <select
                   name="subject"
                   value={formData.subject}
                   onChange={handleChange}
-                  className="input-field"
+                  className="input-field text-sm sm:text-base"
                   required
                 >
                   <option value="">Select a subject</option>
@@ -243,13 +243,13 @@ export default function ContactPage() {
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2">Message *</label>
+                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Message *</label>
                 <textarea
                   name="message"
                   value={formData.message}
                   onChange={handleChange}
-                  rows={5}
-                  className="input-field resize-none"
+                  rows={4}
+                  className="input-field resize-none text-sm sm:text-base"
                   placeholder="How can we help you?"
                   required
                 />
@@ -258,7 +258,7 @@ export default function ContactPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base py-3"
               >
                 <FiSend />
                 {isSubmitting ? 'Sending...' : 'Send Message'}
