@@ -8,7 +8,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { useRouter, useSearchParams } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiCalendar, FiClock, FiUser, FiPhone, FiMail, FiMapPin, FiCheck, FiMessageCircle, FiArrowLeft } from 'react-icons/fi'
+import { FiCalendar, FiClock, FiUser, FiPhone, FiMail, FiMapPin, FiCheck, FiMessageCircle, FiArrowLeft, FiArrowRight } from 'react-icons/fi'
 import Link from 'next/link'
 
 interface Service {
@@ -54,12 +54,13 @@ function BookingFormContent() {
   const [categories, setCategories] = useState<Category[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [serviceFromUrl, setServiceFromUrl] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState('')
+  const [selectedTime, setSelectedTime] = useState('')
+  const [showDateTime, setShowDateTime] = useState(false)
 
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<BookingFormData>()
 
   const district = watch('district')
-  const [selectedDate, setSelectedDate] = useState('')
-  const [selectedTime, setSelectedTime] = useState('')
 
   useEffect(() => {
     const serviceSlug = searchParams.get('service')
@@ -86,8 +87,7 @@ function BookingFormContent() {
           }
         }
       })
-      .catch(error => {
-        console.error('Error loading services:', error)
+      .catch(() => {
         toast.error('Failed to load services. Please refresh the page.')
       })
   }, [searchParams, setValue])
@@ -112,10 +112,10 @@ function BookingFormContent() {
         throw new Error(result.error || 'Failed to submit booking')
       }
 
-      toast.success('Booking submitted successfully! We will contact you shortly.')
+      toast.success('Booking submitted successfully!')
       router.push('/booking/confirmation')
     } catch (error: any) {
-      toast.error(error.message || 'Something went wrong. Please try again.')
+      toast.error(error.message || 'Something went wrong.')
     } finally {
       setIsSubmitting(false)
     }
@@ -128,328 +128,312 @@ function BookingFormContent() {
   }
 
   const priceDisplay = selectedService?.price 
-    ? `Rs. ${selectedService.price.toLocaleString()}+` 
+    ? `Rs. ${selectedService.price.toLocaleString()}` 
     : 'Contact for quote'
 
+  const handleContinueToStep2 = () => {
+    if (!selectedService) {
+      toast.error('Please select a service')
+      return
+    }
+    setShowDateTime(true)
+    setStep(2)
+  }
+
   return (
-    <main className="pt-20">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-8">
+    <main className="pt-20 pb-12">
+      <div className="max-w-lg mx-auto px-4">
+        
+        {/* Header */}
+        <div className="text-center mb-6">
           {serviceFromUrl && (
-            <Link href="/services" className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 mb-4">
+            <Link href="/services" className="inline-flex items-center gap-1 text-primary-600 text-sm mb-3">
               <FiArrowLeft className="w-4 h-4" />
               Back to Services
             </Link>
           )}
-          <h1 className="text-4xl font-bold text-dark-900 mb-4">Book a Service</h1>
-          <p className="text-gray-600">Fill in your details below and we will get back to you shortly.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-dark-900">Book a Service</h1>
+          <p className="text-gray-600 text-sm mt-1">Fill details below and we will contact you</p>
           
           <a
-            href="https://wa.me/94770867609?text=Hi, I would like to book a service"
+            href="https://wa.me/94770867609?text=Hi, I would like to book"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-4 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full font-semibold transition-colors"
+            className="inline-flex items-center gap-2 mt-4 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full text-sm font-medium"
           >
-            <FiMessageCircle className="text-xl" />
+            <FiMessageCircle />
             Quick Book via WhatsApp
           </a>
         </div>
 
+        {/* Selected Service Card */}
         {selectedService && (
-          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 text-dark-900">
-            <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-xl p-4 mb-4 text-dark-900">
+            <div className="flex items-center gap-3">
               <img
-                src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200'}
+                src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100'}
                 alt={selectedService.title}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover flex-shrink-0"
+                className="w-14 h-14 rounded-lg object-cover"
               />
-              <div className="text-center sm:text-left flex-1 w-full">
-                <h3 className="font-bold text-base sm:text-lg">{selectedService.title}</h3>
-                <p className="text-dark-900/70 text-xs sm:text-sm line-clamp-2">{selectedService.description}</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-sm truncate">{selectedService.title}</h3>
+                <p className="text-xs opacity-70 line-clamp-1">{selectedService.description}</p>
               </div>
-              <div className="text-center sm:text-right flex-shrink-0">
-                <div className="font-bold text-lg sm:text-xl">{priceDisplay}</div>
+              <div className="text-right flex-shrink-0">
+                <div className="font-bold">{priceDisplay}</div>
                 {selectedService.duration && (
-                  <div className="text-xs sm:text-sm text-dark-900/70">{selectedService.duration} min</div>
+                  <div className="text-xs opacity-70">{selectedService.duration} min</div>
                 )}
               </div>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-lg">
-          <h3 className="font-semibold text-dark-900 mb-4 text-sm sm:text-base flex items-center gap-2">
-            <FiCalendar className="text-primary-500" />
-            Preferred Date & Time
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Step Indicators */}
+        <div className="flex items-center justify-center mb-6">
+          {[1, 2, 3].map((s) => (
+            <div key={s} className="flex items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                  step >= s ? 'bg-primary-500 text-dark-900' : 'bg-gray-200 text-gray-500'
+                }`}
+              >
+                {step > s ? <FiCheck size={16} /> : s}
+              </div>
+              {s < 3 && (
+                <div className={`w-8 sm:w-16 h-1 mx-1 ${step > s ? 'bg-primary-500' : 'bg-gray-200'}`} />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Step 1: Service Selection */}
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
+          <h2 className="text-lg font-bold text-dark-900 mb-4">1. Select Service</h2>
+          
+          <div className="mb-4">
+            <select
+              className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm bg-white"
+              value={selectedService?.id || ''}
+              onChange={(e) => {
+                const service = services.find(s => s.id === e.target.value)
+                setSelectedService(service || null)
+                setValue('serviceId', e.target.value)
+              }}
+            >
+              <option value="">Choose a service</option>
+              {categories.map((category) => (
+                <optgroup key={category.id} label={category.name}>
+                  {category.services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.title} {service.price ? `- Rs. ${service.price.toLocaleString()}` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {/* Date & Time */}
+          <div className={`space-y-3 ${showDateTime ? 'block' : 'hidden'}`}>
             <div>
-              <label className="block text-gray-700 font-medium mb-2 text-xs sm:text-sm">
-                Select Date *
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <FiCalendar className="inline mr-1" /> Select Date *
               </label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
                 min={getMinDate()}
-                className="input-field text-sm"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
               />
             </div>
             <div>
-              <label className="block text-gray-700 font-medium mb-2 text-xs sm:text-sm">
-                Select Time *
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                <FiClock className="inline mr-1" /> Select Time *
               </label>
               <select
                 value={selectedTime}
                 onChange={(e) => setSelectedTime(e.target.value)}
-                className="input-field text-sm"
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
               >
-                <option value="">Choose a time</option>
+                <option value="">Choose time</option>
                 {timeSlots.map((time) => (
                   <option key={time} value={time}>{time}</option>
                 ))}
               </select>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleContinueToStep2}
+            className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg mt-4 flex items-center justify-center gap-2"
+          >
+            Continue <FiArrowRight />
+          </button>
         </div>
 
-        <div className="flex items-center justify-center mb-4 sm:mb-6">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center">
-              <div
-                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base ${
-                  step >= s ? 'bg-primary-500 text-dark-900' : 'bg-gray-200 text-gray-500'
-                }`}
-              >
-                {step > s ? <FiCheck /> : s}
-              </div>
-              {s < 3 && (
-                <div className={`w-12 sm:w-24 h-1 mx-1 sm:mx-2 ${step > s ? 'bg-primary-500' : 'bg-gray-200'}`} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl sm:rounded-3xl shadow-xl sm:shadow-2xl p-4 sm:p-6 md:p-10 lg:p-12">
-          {step === 1 && (
-            <div className="space-y-5 sm:space-y-6">
-              <h2 className="text-xl sm:text-2xl font-bold text-dark-900 mb-4 sm:mb-6">Select Your Service</h2>
-              
+        {/* Step 2: Contact Details */}
+        {step >= 2 && (
+          <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
+            <h2 className="text-lg font-bold text-dark-900 mb-4">2. Your Details</h2>
+            
+            <div className="space-y-3">
               <div>
-                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Service *</label>
-                <select
-                  {...register('serviceId', { required: 'Please select a service' })}
-                  className="input-field text-sm sm:text-base"
-                  value={selectedService?.id || ''}
-                  onChange={(e) => {
-                    const service = services.find(s => s.id === e.target.value)
-                    setSelectedService(service || null)
-                    setValue('serviceId', e.target.value)
-                  }}
-                >
-                  <option value="">Choose a service</option>
-                  {categories.map((category) => (
-                    <optgroup key={category.id} label={category.name}>
-                      {category.services.map((service) => (
-                        <option key={service.id} value={service.id}>
-                          {service.title} {service.price ? `- Rs. ${service.price.toLocaleString()}+` : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                {errors.serviceId && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.serviceId.message}</p>}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!selectedService) {
-                    toast.error('Please select a service')
-                    return
-                  }
-                  if (!selectedDate) {
-                    toast.error('Please select a date')
-                    return
-                  }
-                  if (!selectedTime) {
-                    toast.error('Please select a time')
-                    return
-                  }
-                  setStep(2)
-                }}
-                className="w-full btn-primary text-sm sm:text-base py-3 sm:py-4"
-                disabled={!selectedService || !selectedDate || !selectedTime}
-              >
-                Continue to Your Details
-              </button>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-5 sm:space-y-6">
-              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
-                <p className="text-primary-800 text-xs sm:text-sm font-medium">
-                  <strong>Required:</strong> Please provide your contact details so we can reach you.
-                </p>
-              </div>
-
-              <h2 className="text-xl sm:text-2xl font-bold text-dark-900 mb-4 sm:mb-6">Your Contact Details</h2>
-
-              <div>
-                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
-                  <FiUser className="inline mr-2" />
-                  Full Name (English letters only) *
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <FiUser className="inline mr-1" /> Full Name *
                 </label>
                 <input
                   type="text"
                   {...register('name', { 
-                    required: 'Your name is required',
+                    required: 'Name is required',
                     pattern: {
                       value: /^[a-zA-Z\s]+$/,
-                      message: 'Please enter only English letters'
-                    },
-                    minLength: {
-                      value: 2,
-                      message: 'Name must be at least 2 characters'
+                      message: 'English letters only'
                     }
                   })}
-                  placeholder="Enter your full name (e.g., John Smith)"
-                  className="input-field text-sm sm:text-base"
+                  placeholder="John Smith"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
                 />
-                {errors.name && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.name.message}</p>}
+                {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name.message}</p>}
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
-                  <FiPhone className="inline mr-2" />
-                  Phone Number (10 digits) *
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <FiPhone className="inline mr-1" /> Phone (10 digits) *
                 </label>
                 <input
                   type="tel"
                   {...register('phone', { 
-                    required: 'Your phone number is required',
+                    required: 'Phone is required',
                     pattern: {
                       value: /^\d{10}$/,
-                      message: 'Please enter exactly 10 digits'
+                      message: 'Enter 10 digits'
                     }
                   })}
                   placeholder="0771234567"
                   maxLength={10}
-                  className="input-field text-sm sm:text-base"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
                 />
-                {errors.phone && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.phone.message}</p>}
+                {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>}
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
-                  <FiMail className="inline mr-2" />
-                  Email Address *
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <FiMail className="inline mr-1" /> Email *
                 </label>
                 <input
                   type="email"
-                  {...register('email', { required: 'Your email is required' })}
+                  {...register('email', { required: 'Email is required' })}
                   placeholder="your@email.com"
-                  className="input-field text-sm sm:text-base"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
                 />
-                {errors.email && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.email.message}</p>}
+                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
               </div>
 
               <DistrictSelector
                 value={district || ''}
-                onChange={(value) => {
-                  setValue('district', value, { shouldValidate: true })
-                }}
+                onChange={(value) => setValue('district', value, { shouldValidate: true })}
                 error={errors.district?.message}
                 required
               />
-              {errors.district && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.district.message}</p>}
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="flex-1 btn-outline text-sm sm:text-base py-3"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!district) {
-                      toast.error('Please select your district')
-                      return
-                    }
-                    setStep(3)
-                  }}
-                  className="flex-1 btn-primary text-sm sm:text-base py-3"
-                >
-                  Continue to Address
-                </button>
-              </div>
             </div>
-          )}
 
-          {step === 3 && (
-            <div className="space-y-5 sm:space-y-6">
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 sm:p-4">
-                <p className="text-gray-600 text-xs sm:text-sm">
-                  <strong>Required:</strong> Provide your address for the service location in {district}.
-                </p>
-              </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-sm"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!district) {
+                    toast.error('Please select district')
+                    return
+                  }
+                  setStep(3)
+                }}
+                className="flex-1 bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
-              <h2 className="text-xl sm:text-2xl font-bold text-dark-900 mb-4 sm:mb-6">Address</h2>
-
+        {/* Step 3: Address */}
+        {step === 3 && (
+          <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow-lg p-4 mb-4">
+            <h2 className="text-lg font-bold text-dark-900 mb-4">3. Address</h2>
+            
+            <div className="space-y-3">
               <div>
-                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
-                  <FiMapPin className="inline mr-2" />
-                  Your Address *
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <FiMapPin className="inline mr-1" /> Address in {district} *
                 </label>
                 <textarea
-                  {...register('address', { required: 'Please enter your address' })}
-                  placeholder="Enter your complete address (house number, street, city)"
+                  {...register('address', { required: 'Address is required' })}
+                  placeholder="House number, street, city"
                   rows={3}
-                  className="input-field resize-none text-sm sm:text-base"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm resize-none"
                 />
-                {errors.address && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.address.message}</p>}
+                {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address.message}</p>}
               </div>
 
               <div>
-                <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">Special Instructions (Optional)</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notes (Optional)</label>
                 <textarea
                   {...register('notes')}
                   rows={2}
-                  placeholder="Any special instructions or requirements..."
-                  className="input-field resize-none text-sm sm:text-base"
+                  placeholder="Special instructions..."
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm resize-none"
                 />
               </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4">
-                <p className="text-xs sm:text-sm text-blue-800">
-                  <strong>Note:</strong> Our team will call you to confirm your location and service details before the scheduled date.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="flex-1 btn-outline text-sm sm:text-base py-3"
-                  disabled={isSubmitting}
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 btn-primary text-sm sm:text-base py-3"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Confirm Booking'}
-                </button>
-              </div>
             </div>
-          )}
-        </form>
+
+            <div className="bg-blue-50 rounded-lg p-3 mt-3">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> We will call to confirm your booking before the date.
+              </p>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg font-medium text-sm"
+                disabled={isSubmitting}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="flex-1 bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg text-sm"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Confirm Booking'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Summary Card */}
+        {selectedService && selectedDate && selectedTime && step < 3 && (
+          <div className="bg-gray-100 rounded-xl p-4 mt-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-2">Booking Summary</h3>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p><strong>Service:</strong> {selectedService.title}</p>
+              <p><strong>Date:</strong> {selectedDate}</p>
+              <p><strong>Time:</strong> {selectedTime}</p>
+              <p><strong>Price:</strong> {priceDisplay}</p>
+            </div>
+          </div>
+        )}
+
       </div>
     </main>
   )
