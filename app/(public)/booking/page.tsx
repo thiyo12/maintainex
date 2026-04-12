@@ -58,6 +58,8 @@ function BookingFormContent() {
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<BookingFormData>()
 
   const district = watch('district')
+  const [selectedDate, setSelectedDate] = useState('')
+  const [selectedTime, setSelectedTime] = useState('')
 
   useEffect(() => {
     const serviceSlug = searchParams.get('service')
@@ -93,10 +95,15 @@ function BookingFormContent() {
   const onSubmit = async (data: BookingFormData) => {
     setIsSubmitting(true)
     try {
+      const formData = {
+        ...data,
+        date: selectedDate,
+        time: selectedTime
+      }
       const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(formData)
       })
 
       const result = await response.json()
@@ -149,7 +156,7 @@ function BookingFormContent() {
         </div>
 
         {selectedService && (
-          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 text-dark-900">
+          <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 text-dark-900">
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <img
                 src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200'}
@@ -170,7 +177,43 @@ function BookingFormContent() {
           </div>
         )}
 
-        <div className="flex items-center justify-center mb-6 sm:mb-8">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 shadow-lg">
+          <h3 className="font-semibold text-dark-900 mb-4 text-sm sm:text-base flex items-center gap-2">
+            <FiCalendar className="text-primary-500" />
+            Preferred Date & Time
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-700 font-medium mb-2 text-xs sm:text-sm">
+                Select Date *
+              </label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                min={getMinDate()}
+                className="input-field text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-gray-700 font-medium mb-2 text-xs sm:text-sm">
+                Select Time *
+              </label>
+              <select
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="input-field text-sm"
+              >
+                <option value="">Choose a time</option>
+                {timeSlots.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center mb-4 sm:mb-6">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
               <div
@@ -218,36 +261,6 @@ function BookingFormContent() {
                 {errors.serviceId && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.serviceId.message}</p>}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
-                    Preferred Date *
-                  </label>
-                  <input
-                    type="date"
-                    {...register('date', { required: 'Please select a date' })}
-                    min={getMinDate()}
-                    className="input-field text-sm sm:text-base"
-                  />
-                  {errors.date && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.date.message}</p>}
-                </div>
-                <div>
-                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
-                    Preferred Time *
-                  </label>
-                  <select
-                    {...register('time', { required: 'Please select a time' })}
-                    className="input-field text-sm sm:text-base"
-                  >
-                    <option value="">Choose a time</option>
-                    {timeSlots.map((time) => (
-                      <option key={time} value={time}>{time}</option>
-                    ))}
-                  </select>
-                  {errors.time && <p className="text-red-500 text-xs sm:text-sm mt-1">{errors.time.message}</p>}
-                </div>
-              </div>
-
               <button
                 type="button"
                 onClick={() => {
@@ -255,10 +268,18 @@ function BookingFormContent() {
                     toast.error('Please select a service')
                     return
                   }
+                  if (!selectedDate) {
+                    toast.error('Please select a date')
+                    return
+                  }
+                  if (!selectedTime) {
+                    toast.error('Please select a time')
+                    return
+                  }
                   setStep(2)
                 }}
                 className="w-full btn-primary text-sm sm:text-base py-3 sm:py-4"
-                disabled={!selectedService}
+                disabled={!selectedService || !selectedDate || !selectedTime}
               >
                 Continue to Your Details
               </button>
