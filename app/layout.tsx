@@ -4,6 +4,7 @@ import { Providers } from './providers'
 import './globals.css'
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXTAUTH_URL || 'https://maintainex.lk'),
   title: 'Maintainex - Professional Cleaning Services in Sri Lanka',
   description: 'Premium cleaning services for homes and businesses in Sri Lanka. Home cleaning, industrial cleaning, and more.',
   keywords: 'cleaning services, Sri Lanka, home cleaning, office cleaning, deep cleaning, industrial cleaning',
