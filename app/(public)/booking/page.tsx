@@ -237,33 +237,34 @@ function BookingFormContent() {
               </select>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                <FiCalendar className="inline mr-1" /> Select Date *
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={getMinDate()}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                <FiClock className="inline mr-1" /> Select Time *
-              </label>
-              <select
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
-              >
-                <option value="">Choose time</option>
-                {timeSlots.map((time) => (
-                  <option key={time} value={time}>{time}</option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <FiCalendar className="inline mr-1" /> Date *
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  min={getMinDate()}
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  <FiClock className="inline mr-1" /> Time *
+                </label>
+                <select
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 text-sm"
+                >
+                  <option value="">Time</option>
+                  {timeSlots.map((time) => (
+                    <option key={time} value={time}>{time}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <button
