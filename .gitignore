@@ -40,6 +40,7 @@ next-env.d.ts
 
 # Database
 *.db
+!prisma/dev.db
 *.db-journal
 
 # Logs
