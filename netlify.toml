@@ -1,7 +1,0 @@
-[build]
-  command = "npx prisma generate && npx prisma db push && npx tsx prisma/seed.ts && npm run build"
-  publish = ".next"
-
-[build.environment]
-  NODE_VERSION = "20"
-  DATABASE_URL = "file:./prisma/dev.db"
