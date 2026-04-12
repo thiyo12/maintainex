@@ -85,7 +85,7 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <h3 className="font-bold text-dark-900 mb-1">Our Location</h3>
-                      <p className="text-gray-600">57/1 New Senguntha Road, Thirunelvaly, Jaffna, Sri Lanka</p>
+                      <p className="text-gray-600">57/1 New Senguntha Road, Thirunelvaly, Sri Lanka</p>
                     </div>
                   </div>
 

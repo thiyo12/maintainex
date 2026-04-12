@@ -15,7 +15,7 @@ export default function AboutPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-dark-900 mb-6">About Maintainex</h1>
             <p className="text-xl text-dark-900/80 max-w-3xl mx-auto">
-              Shine Beyond Expectations. Your trusted partner for professional cleaning services in Jaffna and surrounding areas.
+              Shine Beyond Expectations. Your trusted partner for professional cleaning services across Sri Lanka.
             </p>
           </div>
         </section>
@@ -28,13 +28,13 @@ export default function AboutPage() {
                 <span className="text-primary-600 font-semibold">OUR STORY</span>
                 <h2 className="section-title mt-2">Building Trust Through Excellence</h2>
                 <p className="text-gray-600 mb-6">
-                  Founded in 2020, Maintainex began with a simple vision: to provide reliable, professional cleaning services that make a real difference in peoples lives. What started as a small team of dedicated individuals has grown into Jaffnas most trusted cleaning service.
+                  Founded in 2020, Maintainex began with a simple vision: to provide reliable, professional cleaning services that make a real difference in people&apos;s lives. What started as a small team of dedicated individuals has grown into Sri Lanka&apos;s most trusted cleaning service.
                 </p>
                 <p className="text-gray-600 mb-6">
-                  Our journey has been driven by our commitment to excellence and our belief that everyone deserves to live and work in a clean, healthy environment. We take pride in our attention to detail and our ability to tailor our services to meet each clients unique needs.
+                  Our journey has been driven by our commitment to excellence and our belief that everyone deserves to live and work in a clean, healthy environment. We take pride in our attention to detail and our ability to tailor our services to meet each client&apos;s unique needs.
                 </p>
                 <p className="text-gray-600">
-                  Today, we serve hundreds of homes and businesses across the Jaffna peninsula, from small apartments to large industrial facilities. Our team of trained professionals is equipped with the latest cleaning technology and eco-friendly products to deliver outstanding results every time.
+                  Today, we serve hundreds of homes and businesses across Sri Lanka, from small apartments to large industrial facilities. Our team of trained professionals is equipped with the latest cleaning technology and eco-friendly products to deliver outstanding results every time.
                 </p>
               </div>
               <div className="relative">

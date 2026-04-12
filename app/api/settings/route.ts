@@ -11,17 +11,17 @@ export async function GET() {
     if (!settings) {
       settings = await prisma.settings.create({
         data: {
+          id: 'site_settings',
           companyName: 'Maintainex',
           email: 'info@maintainex.com',
           phone: '+94 XX XXX XXXX',
-          address: 'Jaffna, Sri Lanka'
+          address: 'Sri Lanka'
         }
       })
     }
 
     return NextResponse.json(settings)
-  } catch (error) {
-    console.error('Error fetching settings:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 })
   }
 }
@@ -40,10 +40,14 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     
     const settings = await prisma.settings.upsert({
-      where: { id: 'default' },
+      where: { id: 'site_settings' },
       update: body,
       create: {
-        id: 'default',
+        id: 'site_settings',
+        companyName: 'Maintainex',
+        email: 'info@maintainex.com',
+        phone: '+94 XX XXX XXXX',
+        address: 'Sri Lanka',
         ...body
       }
     })
@@ -54,14 +58,13 @@ export async function PUT(request: NextRequest) {
       adminName: session.user!.name,
       action: 'UPDATE',
       entityType: 'SETTINGS',
-      entityId: 'default',
+      entityId: 'site_settings',
       description: 'Updated company settings',
       details: { updatedFields: Object.keys(body) }
     })
 
     return NextResponse.json(settings)
-  } catch (error) {
-    console.error('Error updating settings:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
   }
 }

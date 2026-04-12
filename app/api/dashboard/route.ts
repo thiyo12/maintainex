@@ -11,10 +11,11 @@ export async function GET(request: NextRequest) {
     }
 
     const user = session.user as any
-    const userBranchId = user.branchId
+    const userBranchId = user?.branchId || null
     const isSuper = isSuperAdmin(session)
 
     const branchFilter = !isSuper && userBranchId ? { branchId: userBranchId } : {}
+    const serviceFilter = !isSuper && userBranchId ? { branchId: userBranchId } : {}
 
     const [
       totalBookings,
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
       prisma.booking.count({ where: { ...branchFilter, status: 'PENDING' } }),
       prisma.application.count({ where: branchFilter }),
       prisma.application.count({ where: { ...branchFilter, status: 'NEW' } }),
-      prisma.service.count({ where: !isSuper && userBranchId ? { branchId: userBranchId } : {} })
+      prisma.service.count({ where: serviceFilter })
     ])
 
     const recentBookings = await prisma.booking.findMany({
@@ -62,8 +63,7 @@ export async function GET(request: NextRequest) {
       currentBranch: userBranchId,
       isSuperAdmin: isSuper
     })
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
   }
 }

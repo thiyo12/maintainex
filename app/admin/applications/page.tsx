@@ -158,6 +158,9 @@ export default function AdminApplications() {
     ? applications 
     : applications.filter(a => a.status === filter)
 
+  const assignedApps = applications.filter(a => a.branch !== null)
+  const unassignedApps = applications.filter(a => a.branch === null)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -177,6 +180,71 @@ export default function AdminApplications() {
           <FiRefreshCw className="mr-2" /> Refresh
         </button>
       </div>
+
+      {isSuperAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="text-sm text-gray-500 mb-1">Total Applications</div>
+            <div className="text-3xl font-bold text-gray-900">{applications.length}</div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="text-sm text-gray-500 mb-1">Assigned</div>
+            <div className="text-3xl font-bold text-green-600">{assignedApps.length}</div>
+          </div>
+          <div className={`bg-white rounded-xl shadow-sm p-6 ${unassignedApps.length > 0 ? 'ring-2 ring-red-500' : ''}`}>
+            <div className="text-sm text-gray-500 mb-1">Unassigned</div>
+            <div className={`text-3xl font-bold ${unassignedApps.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+              {unassignedApps.length}
+            </div>
+            {unassignedApps.length > 0 && (
+              <div className="text-xs text-red-500 mt-1">⚠️ Needs attention</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isSuperAdmin && unassignedApps.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">⚠️</span>
+            <h2 className="text-lg font-bold text-red-800">Unassigned Applications - Require Branch Assignment</h2>
+          </div>
+          <div className="bg-white rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-red-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Applicant</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">District</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Position</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Applied</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-red-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-100">
+                {unassignedApps.map((app) => (
+                  <tr key={app.id} className="hover:bg-red-50">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{app.name}</div>
+                      <div className="text-sm text-gray-500">{app.email}</div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{app.district}</td>
+                    <td className="px-4 py-3 text-gray-700">{app.position}</td>
+                    <td className="px-4 py-3 text-gray-700">{new Date(app.createdAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => openEditModal(app)}
+                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium"
+                      >
+                        Assign Branch
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-4 mb-6">
         <div className="flex flex-wrap gap-2">

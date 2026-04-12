@@ -72,9 +72,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-900 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
           <Link href="/" className="flex items-center space-x-2 mb-8">
-            <div className="w-10 h-10 gradient-bg rounded-xl flex items-center justify-center">
-              <span className="text-dark-900 font-bold text-xl">M</span>
-            </div>
+            <img src="/logo.JPEG" alt="Maintainex" className="w-10 h-10 object-contain" />
             <span className="text-xl font-bold text-white">
               Main<span className="text-primary-500">tainex</span>
             </span>
@@ -124,7 +122,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <div className="lg:pl-64">
         <header className="hidden lg:block bg-white shadow-sm sticky top-0 z-30">
-          <div className="px-8 py-4 flex items-center justify-between">
+          <div className="px-6 lg:px-8 py-4 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
               {branchId && !isSuperAdmin && (
@@ -147,8 +145,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        <main className="p-4 lg:p-8">
-          {children}
+        <main className="p-4 lg:p-6 xl:p-8">
+          <div className="max-w-7xl mx-auto">
+            {children}
+          </div>
         </main>
       </div>
 

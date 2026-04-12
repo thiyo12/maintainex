@@ -27,7 +27,7 @@ export default function BookingConfirmation() {
               <ul className="space-y-3">
                 <li className="flex items-start">
                   <span className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-dark-900 text-sm font-bold mr-3 flex-shrink-0">1</span>
-                  <span className="text-gray-600">Our team will review your booking within 24 hours</span>
+                  <span className="text-gray-600">Our team will review your booking within 2 hours</span>
                 </li>
                 <li className="flex items-start">
                   <span className="w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-dark-900 text-sm font-bold mr-3 flex-shrink-0">2</span>

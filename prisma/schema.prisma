@@ -8,16 +8,17 @@ datasource db {
 }
 
 model Admin {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  name      String?
-  role      String    @default("ADMIN")
-  branchId  String?
-  branch    Branch?   @relation(fields: [branchId], references: [id])
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  name            String?
+  role            String    @default("ADMIN")
+  branchId        String?
+  branch          Branch?   @relation(fields: [branchId], references: [id])
+  canEditServices Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([branchId])
   @@index([role])
@@ -44,12 +45,15 @@ model Branch {
 }
 
 model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  slug      String    @unique
-  services  Service[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  icon        String?
+  isActive    Boolean   @default(true)
+  services    Service[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Service {
@@ -58,12 +62,14 @@ model Service {
   slug        String    @unique
   description String
   image       String?
-  price       Float?
+  price       Decimal?
+  duration    Int?
   categoryId  String
   category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   branchId    String?
   branch      Branch?   @relation(fields: [branchId], references: [id])
   bookings    Booking[]
+  reviews     Review[]
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -99,6 +105,21 @@ model Booking {
   @@index([district])
 }
 
+model Review {
+  id           String   @id @default(cuid())
+  rating       Int
+  comment      String?
+  customerName String
+  serviceId    String
+  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([serviceId])
+  @@index([status])
+}
+
 model Application {
   id         String   @id @default(cuid())
   name       String
@@ -121,18 +142,23 @@ model Application {
 }
 
 model Settings {
-  id             String @id @default("default")
-  companyName    String @default("Maintainex")
-  email          String @default("info@maintainex.com")
-  phone          String @default("+94 XX XXX XXXX")
-  address        String @default("Jaffna, Sri Lanka")
-  mapEmbedUrl    String?
-  whatsappNumber String?
-  facebookUrl    String?
-  instagramUrl   String?
-  workingHours   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String @id
+  companyName        String @default("Maintainex")
+  email              String @default("info@maintainex.com")
+  phone              String @default("+94 XX XXX XXXX")
+  address            String @default("Sri Lanka")
+  mapEmbedUrl        String?
+  whatsappNumber     String?
+  facebookUrl        String?
+  instagramUrl       String?
+  twitterUrl         String?
+  tiktokUrl         String?
+  linkedinUrl       String?
+  workingHours       String?
+  maintenanceMode    Boolean @default(false)
+  maintenanceMessage String @default("We're making things better! Our website is currently undergoing some scheduled maintenance to serve you better. We'll be back shortly. Thank you for your patience!")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 model ActivityLog {

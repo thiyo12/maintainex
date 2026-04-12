@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiUser, FiPhone, FiMail, FiMapPin, FiBriefcase, FiFileText, FiUpload, FiCheck } from 'react-icons/fi'
+import { FiUser, FiPhone, FiMail, FiMapPin, FiBriefcase, FiFileText, FiUpload, FiCheck, FiTool, FiImage, FiPackage, FiStar, FiCloud, FiZap } from 'react-icons/fi'
 
 interface ApplicationFormData {
   name: string
@@ -20,14 +20,82 @@ interface ApplicationFormData {
   experience: string
 }
 
-const positions = [
-  'Cleaning Staff',
-  'Supervisor',
-  'Team Leader',
-  'Admin Staff',
-  'Customer Service',
-  'Driver',
-  'Operations Manager'
+const jobCategories = [
+  {
+    category: 'Assembly',
+    icon: FiTool,
+    positions: [
+      'Furniture Assembly Technician',
+      'Furniture Assembly Specialist',
+      'Crib Assembly Expert',
+      'Desk & Bookshelf Assembler'
+    ]
+  },
+  {
+    category: 'Mounting',
+    icon: FiImage,
+    positions: [
+      'TV Mounting Technician',
+      'Art & Shelf Installer',
+      'Mirror Mounting Expert',
+      'Curtain Installation Technician'
+    ]
+  },
+  {
+    category: 'Moving',
+    icon: FiPackage,
+    positions: [
+      'Moving Assistant',
+      'Heavy Lifting Specialist',
+      'Furniture Removal Crew',
+      'Appliance Moving Technician'
+    ]
+  },
+  {
+    category: 'Cleaning',
+    icon: FiStar,
+    positions: [
+      'Residential Cleaner',
+      'Industrial Cleaner',
+      'Deep Cleaning Specialist',
+      'Office Cleaner',
+      'Move-in/Move-out Cleaner',
+      'Sofa & Carpet Cleaner',
+      'Window Cleaner'
+    ]
+  },
+  {
+    category: 'Outdoor',
+    icon: FiCloud,
+    positions: [
+      'Garden Maintenance Worker',
+      'Pool Cleaner',
+      'Lawn Care Technician',
+      'Gutter Cleaner'
+    ]
+  },
+  {
+    category: 'Repairs',
+    icon: FiZap,
+    positions: [
+      'Plumber',
+      'Electrician',
+      'Painter',
+      'Handyman',
+      'Door & Window Repair Technician'
+    ]
+  },
+  {
+    category: 'General',
+    icon: FiBriefcase,
+    positions: [
+      'Office Admin',
+      'Customer Support',
+      'Team Supervisor',
+      'Operations Manager',
+      'Quality Inspector'
+    ]
+  }
 ]
 
 const benefits = [
@@ -35,7 +103,8 @@ const benefits = [
   'Flexible working hours',
   'Training provided',
   'Career growth opportunities',
-  'Staff welfare programs'
+  'Staff welfare programs',
+  'Work in your district'
 ]
 
 export default function CareersForm() {
@@ -44,8 +113,9 @@ export default function CareersForm() {
   const [cvUploading, setCvUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
 
-  const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<ApplicationFormData>()
+  const { register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<ApplicationFormData>()
 
   const district = watch('district')
 
@@ -92,6 +162,11 @@ export default function CareersForm() {
   }
 
   const onSubmit = async (data: ApplicationFormData) => {
+    if (!selectedCategory) {
+      toast.error('Please select a job category')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       let cvUrl: string | null = null
@@ -107,13 +182,15 @@ export default function CareersForm() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to submit application')
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to submit application')
       }
 
       setIsSubmitted(true)
       toast.success('Application submitted successfully!')
-    } catch (error) {
-      toast.error('Something went wrong. Please try again.')
+      reset()
+    } catch (error: any) {
+      toast.error(error.message || 'Something went wrong. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -151,31 +228,45 @@ export default function CareersForm() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-dark-900 mb-4">Join Our Team</h1>
-          <p className="text-dark-900/70">Be part of Sri Lanka&apos;s leading cleaning service team</p>
+          <p className="text-dark-900/70">Be part of Sri Lanka&apos;s leading service expert team</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 mb-12">
-          <div className="bg-white rounded-2xl p-6 shadow-lg">
-            <h3 className="font-bold text-dark-900 mb-4">Why Work With Us?</h3>
-            <ul className="space-y-3">
-              {benefits.map((benefit) => (
-                <li key={benefit} className="flex items-center text-gray-600">
-                  <FiCheck className="text-primary-500 mr-2" />
-                  {benefit}
-                </li>
-              ))}
-            </ul>
+        <div className="bg-white rounded-2xl p-6 shadow-lg mb-8">
+          <h3 className="font-bold text-dark-900 mb-4">Why Work With Us?</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {benefits.map((benefit) => (
+              <div key={benefit} className="flex items-center text-gray-600 text-sm">
+                <FiCheck className="text-primary-500 mr-2 flex-shrink-0" />
+                {benefit}
+              </div>
+            ))}
           </div>
-          <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-lg">
-            <h3 className="font-bold text-dark-900 mb-4">Open Positions</h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {positions.map((position) => (
-                <div key={position} className="flex items-center text-gray-600">
-                  <FiBriefcase className="text-primary-500 mr-2" />
-                  {position}
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-lg mb-8">
+          <h3 className="font-bold text-dark-900 mb-4">Open Positions by Category</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            {jobCategories.map((cat) => (
+              <div key={cat.category} className="border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <cat.icon className="text-primary-500" />
+                  <h4 className="font-semibold text-dark-900">{cat.category}</h4>
                 </div>
-              ))}
-            </div>
+                <ul className="space-y-1">
+                  {cat.positions.slice(0, 3).map((pos) => (
+                    <li key={pos} className="text-sm text-gray-600 flex items-center">
+                      <span className="w-1.5 h-1.5 bg-primary-500 rounded-full mr-2" />
+                      {pos}
+                    </li>
+                  ))}
+                  {cat.positions.length > 3 && (
+                    <li className="text-sm text-primary-500">
+                      +{cat.positions.length - 3} more
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -187,12 +278,22 @@ export default function CareersForm() {
               <div>
                 <label className="block text-gray-700 font-medium mb-2">
                   <FiUser className="inline mr-2" />
-                  Full Name *
+                  Full Name (English letters only) *
                 </label>
                 <input
                   type="text"
-                  {...register('name', { required: 'Name is required' })}
-                  placeholder="Enter your full name"
+                  {...register('name', { 
+                    required: 'Name is required',
+                    pattern: {
+                      value: /^[a-zA-Z\s]+$/,
+                      message: 'Please enter only English letters'
+                    },
+                    minLength: {
+                      value: 2,
+                      message: 'Name must be at least 2 characters'
+                    }
+                  })}
+                  placeholder="Enter your full name (e.g., John Smith)"
                   className="input-field"
                 />
                 {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>}
@@ -201,12 +302,19 @@ export default function CareersForm() {
               <div>
                 <label className="block text-gray-700 font-medium mb-2">
                   <FiPhone className="inline mr-2" />
-                  Phone Number *
+                  Phone Number (10 digits) *
                 </label>
                 <input
                   type="tel"
-                  {...register('phone', { required: 'Phone number is required' })}
-                  placeholder="077XXXXXXX"
+                  {...register('phone', { 
+                    required: 'Phone number is required',
+                    pattern: {
+                      value: /^\d{10}$/,
+                      message: 'Please enter exactly 10 digits'
+                    }
+                  })}
+                  placeholder="0771234567"
+                  maxLength={10}
                   className="input-field"
                 />
                 {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>}
@@ -231,27 +339,48 @@ export default function CareersForm() {
               <div>
                 <label className="block text-gray-700 font-medium mb-2">
                   <FiBriefcase className="inline mr-2" />
+                  Job Category *
+                </label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    setSelectedCategory(e.target.value)
+                    setValue('position', '')
+                  }}
+                  className="input-field"
+                >
+                  <option value="">Select a category</option>
+                  {jobCategories.map((cat) => (
+                    <option key={cat.category} value={cat.category}>{cat.category}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-gray-700 font-medium mb-2">
+                  <FiBriefcase className="inline mr-2" />
                   Position Applied For *
                 </label>
                 <select
                   {...register('position', { required: 'Please select a position' })}
                   className="input-field"
+                  disabled={!selectedCategory}
                 >
                   <option value="">Select a position</option>
-                  {positions.map((pos) => (
+                  {selectedCategory && jobCategories.find(c => c.category === selectedCategory)?.positions.map((pos) => (
                     <option key={pos} value={pos}>{pos}</option>
                   ))}
                 </select>
                 {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position.message}</p>}
               </div>
-
-              <DistrictSelector
-                value={district || ''}
-                onChange={(value) => setValue('district', value, { shouldValidate: true })}
-                error={errors.district?.message}
-                required
-              />
             </div>
+
+            <DistrictSelector
+              value={district || ''}
+              onChange={(value) => setValue('district', value, { shouldValidate: true })}
+              error={errors.district?.message}
+              required
+            />
 
             <div>
               <label className="block text-gray-700 font-medium mb-2">

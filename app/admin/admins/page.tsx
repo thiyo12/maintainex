@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
-import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser } from 'react-icons/fi'
+import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings } from 'react-icons/fi'
 
 interface Branch {
   id: string
@@ -17,6 +18,7 @@ interface Admin {
   role: string
   branchId: string | null
   branch: Branch | null
+  canEditServices: boolean
   isActive: boolean
   createdAt: string
 }
@@ -30,6 +32,7 @@ interface AdminFormData {
 }
 
 export default function AdminAdmins() {
+  const { data: session } = useSession()
   const [admins, setAdmins] = useState<Admin[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,6 +47,8 @@ export default function AdminAdmins() {
   })
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'SUPER_ADMIN' | 'ADMIN'>('ALL')
+
+  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
     fetchData()
@@ -155,6 +160,23 @@ export default function AdminAdmins() {
     }
   }
 
+  const toggleServicePermission = async (admin: Admin) => {
+    try {
+      const res = await fetch(`/api/admins/${admin.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canEditServices: !admin.canEditServices })
+      })
+
+      if (!res.ok) throw new Error()
+
+      toast.success(`Service editing ${admin.canEditServices ? 'revoked' : 'granted'}!`)
+      fetchData()
+    } catch (error) {
+      toast.error('Failed to update permission')
+    }
+  }
+
   const deleteAdmin = async (id: string) => {
     if (!confirm('Are you sure you want to delete this admin?')) return
 
@@ -222,6 +244,7 @@ export default function AdminAdmins() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Admin</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Role</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service Edit</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Created</th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Actions</th>
@@ -264,6 +287,28 @@ export default function AdminAdmins() {
                       </div>
                     ) : (
                       <span className="text-gray-400 text-sm">N/A</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {admin.role === 'SUPER_ADMIN' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 flex items-center gap-1 w-fit">
+                        <FiShield size={10} /> Full Access
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => toggleServicePermission(admin)}
+                        className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                          admin.canEditServices
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title={admin.canEditServices ? 'Click to revoke' : 'Click to grant'}
+                      >
+                        <span className="flex items-center gap-1">
+                          <FiSettings size={10} />
+                          {admin.canEditServices ? 'Can Edit' : 'No Access'}
+                        </span>
+                      </button>
                     )}
                   </td>
                   <td className="px-6 py-4">

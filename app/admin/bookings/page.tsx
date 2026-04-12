@@ -109,8 +109,12 @@ export default function AdminBookings() {
         branchId = editBranchId
       } else if (editDistrict) {
         const branch = branches.find(b => {
-          const districts: string[] = JSON.parse(b.districts || '[]')
-          return districts.includes(editDistrict)
+          try {
+            const districts: string[] = JSON.parse(b.districts || '[]')
+            return Array.isArray(districts) && districts.includes(editDistrict)
+          } catch {
+            return false
+          }
         })
         branchId = branch?.id || null
       }
@@ -158,6 +162,9 @@ export default function AdminBookings() {
     ? bookings 
     : bookings.filter(b => b.status === filter)
 
+  const assignedBookings = bookings.filter(b => b.branch !== null)
+  const unassignedBookings = bookings.filter(b => b.branch === null)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -177,6 +184,74 @@ export default function AdminBookings() {
           <FiRefreshCw className="mr-2" /> Refresh
         </button>
       </div>
+
+      {isSuperAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="text-sm text-gray-500 mb-1">Total Bookings</div>
+            <div className="text-3xl font-bold text-gray-900">{bookings.length}</div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="text-sm text-gray-500 mb-1">Assigned</div>
+            <div className="text-3xl font-bold text-green-600">{assignedBookings.length}</div>
+          </div>
+          <div className={`bg-white rounded-xl shadow-sm p-6 ${unassignedBookings.length > 0 ? 'ring-2 ring-red-500' : ''}`}>
+            <div className="text-sm text-gray-500 mb-1">Unassigned</div>
+            <div className={`text-3xl font-bold ${unassignedBookings.length > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+              {unassignedBookings.length}
+            </div>
+            {unassignedBookings.length > 0 && (
+              <div className="text-xs text-red-500 mt-1">⚠️ Needs attention</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isSuperAdmin && unassignedBookings.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">⚠️</span>
+            <h2 className="text-lg font-bold text-red-800">Unassigned Bookings - Require Branch Assignment</h2>
+          </div>
+          <div className="bg-white rounded-lg overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-red-100">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Customer</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">District</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Service</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Date</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-red-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-red-100">
+                {unassignedBookings.map((booking) => (
+                  <tr key={booking.id} className="hover:bg-red-50">
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{booking.name}</div>
+                      <div className="text-sm text-gray-500">{booking.phone}</div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{booking.district}</td>
+                    <td className="px-4 py-3 text-gray-700">{booking.service?.title}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-gray-900">{new Date(booking.date).toLocaleDateString()}</div>
+                      <div className="text-sm text-gray-500">{booking.time}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => openEditModal(booking)}
+                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium"
+                      >
+                        Assign Branch
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-4 mb-6">
         <div className="flex flex-wrap gap-2">

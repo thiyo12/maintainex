@@ -38,23 +38,21 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen gradient-bg flex items-center justify-center px-4">
+    <div className="min-h-screen gradient-bg flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center space-x-2 mb-4">
-            <div className="w-12 h-12 bg-dark-900 rounded-xl flex items-center justify-center">
-              <span className="text-primary-500 font-bold text-2xl">M</span>
-            </div>
+          <a href="/" className="inline-flex items-center space-x-2 mb-4">
+            <img src="/logo.JPEG" alt="Maintainex" className="w-12 h-12 object-contain" />
             <span className="text-2xl font-bold text-dark-900">
-              Main<span className="text-white">tainex</span>
+              Main<span className="text-primary-600">tainex</span>
             </span>
-          </div>
+          </a>
           <h1 className="text-3xl font-bold text-dark-900">Admin Login</h1>
           <p className="text-dark-900/70 mt-2">Sign in to access the dashboard</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl p-8">
-          <div className="space-y-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl p-8 space-y-6">
+          <div>
             <div>
               <label className="block text-gray-700 font-medium mb-2">Email Address</label>
               <input
@@ -102,11 +100,6 @@ export default function AdminLogin() {
                 </>
               )}
             </button>
-          </div>
-
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Default credentials:</p>
-            <p className="font-mono text-xs mt-1">admin@maintainex.com / admin123</p>
           </div>
         </form>
       </div>

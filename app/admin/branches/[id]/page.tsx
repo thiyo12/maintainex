@@ -164,7 +164,13 @@ export default function BranchProfilePage() {
 
   if (!branch) return null
 
-  const branchDistricts: string[] = JSON.parse(branch.districts || '[]')
+  let branchDistricts: string[] = []
+  try {
+    branchDistricts = JSON.parse(branch.districts || '[]')
+    if (!Array.isArray(branchDistricts)) branchDistricts = []
+  } catch {
+    branchDistricts = []
+  }
 
   return (
     <div>

@@ -61,7 +61,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, email, password, role, branchId, isActive } = body
+    const { name, email, password, role, branchId, isActive, canEditServices } = body
 
     const isUpdatingSelf = (session.user as any).id === params.id
     const isSuper = isSuperAdmin(session)
@@ -89,6 +89,7 @@ export async function PUT(
     if (isSuper && role !== undefined) updateData.role = role
     if (isSuper && branchId !== undefined) updateData.branchId = branchId
     if (isSuper && isActive !== undefined) updateData.isActive = isActive
+    if (isSuper && canEditServices !== undefined) updateData.canEditServices = canEditServices
 
     const admin = await prisma.admin.update({
       where: { id: params.id },

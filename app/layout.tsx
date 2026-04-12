@@ -4,15 +4,15 @@ import { Providers } from './providers'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Maintainex - Professional Cleaning Services in Jaffna',
-  description: 'Premium cleaning services for homes and businesses in Jaffna, Sri Lanka. Home cleaning, industrial cleaning, and more.',
-  keywords: 'cleaning services, Jaffna, Sri Lanka, home cleaning, office cleaning, deep cleaning, industrial cleaning',
+  title: 'Maintainex - Professional Cleaning Services in Sri Lanka',
+  description: 'Premium cleaning services for homes and businesses in Sri Lanka. Home cleaning, industrial cleaning, and more.',
+  keywords: 'cleaning services, Sri Lanka, home cleaning, office cleaning, deep cleaning, industrial cleaning',
   icons: {
     icon: '/favicon.svg',
   },
   openGraph: {
     title: 'Maintainex - Professional Cleaning Services',
-    description: 'Premium cleaning services for homes and businesses in Jaffna',
+    description: 'Premium cleaning services for homes and businesses in Sri Lanka',
     type: 'website',
   },
 }

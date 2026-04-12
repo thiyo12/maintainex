@@ -1,221 +1,215 @@
-# Maintainex Website - Simple Guide
+# Maintainex Website - Complete Guide
 
 ---
 
-## What is This Website?
+## About This Website
 
-This is the website for **Maintainex** - a professional cleaning service company in Sri Lanka.
+This is the official website for **Maintainex** - a professional cleaning service company in Sri Lanka.
 
-The website has two parts:
-1. **Customer Website** - Where customers can see services and book cleaning
-2. **Admin Panel** - Where you manage bookings, applications, and settings
+**Website:** https://maintainex.lk
+**Tagline:** Shine Beyond Expectations
+
+The website includes:
+- **Public Website** - Customer-facing pages for booking services
+- **Admin Panel** - Backend management for bookings, applications, and settings
 
 ---
 
-## How to Start the Website
+## Quick Start (Development)
 
-### Step 1: Open Terminal
-Press `Cmd + Space` and search for "Terminal"
+### Prerequisites
+- Node.js 18+ installed
+- npm or yarn package manager
 
-### Step 2: Go to Website Folder
+### Installation
+
 ```bash
+# Navigate to project directory
 cd ~/Documents/NEWM/maintainex
-```
 
-### Step 3: Start the Website
-```bash
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-### Step 4: Open in Browser
-Go to: **http://localhost:3000**
+Open **http://localhost:3000** in your browser.
 
 ---
 
-## How to Login
+## Deployment to Vercel (Recommended)
 
-### For Super Admin (Full Access)
-- **Email:** super@maintainex.com
-- **Password:** super123
+### Step 1: Prepare for Production
 
-### For Branch Admin (Limited Access)
-- **Email:** admin@maintainex.com
-- **Password:** admin123
+1. Push your code to GitHub:
+   ```bash
+   cd ~/Documents/NEWM/maintainex
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/username/maintainex.git
+   git push -u origin main
+   ```
 
-**Login Page:** http://localhost:3000/admin/login
+2. Create a Vercel account at https://vercel.com
 
----
+3. Click "Import Project" and select your GitHub repository
 
-## Website Pages (What Customers See)
+### Step 2: Configure Environment Variables
 
-| Page | What It Does |
-|------|-------------|
-| Homepage | Main page with company info |
-| Services | Lists all cleaning services |
-| Booking | Form to book cleaning service |
-| Careers | Form to apply for jobs |
-| Contact | Contact form and info |
-| About | About the company |
+In Vercel dashboard, add these environment variables:
 
----
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `DATABASE_URL` | Your production database URL | PostgreSQL/MySQL connection string |
+| `NEXTAUTH_SECRET` | Generate a secure key | Run: `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Your production URL | e.g., `https://maintainex.lk` |
 
-## Admin Panel Pages (What You Manage)
+### Step 3: Deploy
 
-| Page | What It Does |
-|------|-------------|
-| Dashboard | Shows all stats |
-| Bookings | See and manage customer bookings |
-| Applications | See job applications |
-| Branches | Manage company branches |
-| Admins | Manage admin users |
-| Services | Add/edit services |
-| Reports | View reports and export |
-| Settings | Change company info |
+1. Click "Deploy"
+2. Wait for build to complete
+3. Your site will be live at the provided URL
 
----
+### Step 4: Connect Custom Domain
 
-## Common Tasks (No Coding Needed)
-
-### Change Company Phone/Email/Address
-1. Login as Super Admin
-2. Click **Settings** in the menu
-3. Change the info
-4. Click **Save**
-
-### Add New Service
-1. Login as Super Admin or Branch Admin
-2. Click **Services** in the menu
-3. Click **Add Service**
-4. Fill in:
-   - Service Name (e.g., "Deep Cleaning")
-   - Description
-   - Price (e.g., 5000)
-   - Select Category (Home Cleaning or Industrial Cleaning)
-5. Click **Create**
-
-### Add New Admin User
-1. Login as Super Admin
-2. Click **Branches** in the menu
-3. Click **Profile** on any branch
-4. Click **Admins** tab
-5. Click **Add Admin**
-6. Enter email, password, and name
-7. Click **Create**
+1. Go to Vercel Dashboard → Settings → Domains
+2. Add your domain (e.g., `maintainex.lk`)
+3. Update DNS records as instructed by Vercel
 
 ---
 
-## Where Files Are Located
+## Deployment to Netlify
 
-### Customer Website Pages
-| Page | File Location |
-|------|--------------|
-| Homepage | `app/page.tsx` |
-| Services | `app/(public)/services/page.tsx` |
-| Booking | `app/(public)/booking/page.tsx` |
-| Careers | `app/(public)/careers/page.tsx` |
-| Contact | `app/(public)/contact/page.tsx` |
-| About | `app/(public)/about/page.tsx` |
+### Step 1: Build the Project
 
-### Admin Panel Pages
-| Page | File Location |
-|------|--------------|
-| Dashboard | `app/admin/dashboard/page.tsx` |
-| Bookings | `app/admin/bookings/page.tsx` |
-| Applications | `app/admin/applications/page.tsx` |
-| Branches | `app/admin/branches/page.tsx` |
-| Admins | `app/admin/admins/page.tsx` |
-| Services | `app/admin/services/page.tsx` |
-| Reports | `app/admin/reports/page.tsx` |
-| Settings | `app/admin/settings/page.tsx` |
-
-### Important Folders
-| Folder | What It Contains |
-|--------|-----------------|
-| `app/` | All website pages |
-| `components/` | Reusable parts (header, footer, buttons) |
-| `prisma/` | Database setup |
-| `lib/` | Helper functions |
-
----
-
-## How to Change Photos
-
-### Step 1: Find the Image URL
-Look for lines starting with `src=` in the page file
-
-### Step 2: Replace the URL
-Copy a new image URL from Unsplash and replace the old one
-
-### Example:
-**Before:**
-```
-src="https://images.unsplash.com/photo-old"
+```bash
+npm run build
 ```
 
-**After:**
-```
-src="https://images.unsplash.com/photo-new"
-```
+### Step 2: Deploy
 
-### Where to Get Free Images
-Go to: **https://unsplash.com**
-Search for: "cleaning service", "home cleaning", "office cleaning"
-Copy the image URL
+1. Go to https://netlify.com
+2. Drag and drop the `out` folder to deploy
+
+**Note:** For database functionality, you'll need a server-side hosting solution like Vercel.
 
 ---
 
-## How the Branch System Works
+## Environment Variables
 
-The website has **9 branches** covering all of Sri Lanka:
+For production, create a `.env.production` file:
 
-| Branch Name | Districts Covered |
-|-------------|------------------|
-| Jaffna | Jaffna, Kilinochchi, Mannar, Vavuniya, Mullaitivu |
+```env
+# Database
+DATABASE_URL="postgresql://user:password@host:5432/maintainex"
+
+# Authentication
+NEXTAUTH_SECRET="your-secret-key-here"
+NEXTAUTH_URL="https://maintainex.lk"
+
+# Optional: Cloudinary for CV uploads
+CLOUDINARY_CLOUD_NAME="your-cloud-name"
+CLOUDINARY_API_KEY="your-api-key"
+CLOUDINARY_API_SECRET="your-api-secret"
+```
+
+---
+
+## Admin Access
+
+### Super Admin
+- Full access to all features
+- Can manage branches, admins, and settings
+- Access: `/admin/login`
+
+### Branch Admin
+- Limited to their assigned branch
+- Can manage bookings and applications for their branch
+- Access: `/admin/login`
+
+**Contact the Super Admin to get your login credentials.**
+
+---
+
+## Website Pages
+
+### Public Pages
+| Page | URL | Description |
+|------|-----|-------------|
+| Homepage | `/` | Hero, services overview, stats |
+| Services | `/services` | All cleaning services |
+| Booking | `/booking` | Book a cleaning service |
+| Careers | `/careers` | Job applications |
+| Contact | `/contact` | Contact form |
+| About | `/about` | Company information |
+
+### Admin Pages
+| Page | URL | Description |
+|------|-----|-------------|
+| Dashboard | `/admin/dashboard` | Stats overview |
+| Bookings | `/admin/bookings` | Manage bookings |
+| Applications | `/admin/applications` | Job applications |
+| Branches | `/admin/branches` | Branch management |
+| Admins | `/admin/admins` | Admin user management |
+| Services | `/admin/services` | Service catalog |
+| Reports | `/admin/reports` | Reports & analytics |
+| Settings | `/admin/settings` | Site settings |
+
+---
+
+## Branch Coverage
+
+The system covers all districts across Sri Lanka:
+
+| Branch | Districts |
+|--------|-----------|
 | Colombo | Colombo, Gampaha, Kalutara |
 | Kandy | Kandy, Matale, Nuwara Eliya |
 | Southern | Galle, Matara, Hambantota |
 | Eastern | Trincomalee, Batticaloa, Ampara |
+| Northern | Jaffna, Kilinochchi, Mannar, Vavuniya, Mullaitivu |
 | North Western | Kurunegala, Puttalam |
 | North Central | Anuradhapura, Polonnaruwa |
 | Sabaragamuwa | Ratnapura, Kegalle |
 | Uva | Badulla, Monaragala |
 
-### How Bookings Work:
-1. Customer selects their district when booking
-2. System automatically assigns booking to the correct branch
-3. Branch admin can only see bookings from their area
+---
+
+## Features
+
+### Customer Features
+- [x] Browse cleaning services
+- [x] Book services online
+- [x] Apply for jobs
+- [x] Contact form
+- [x] WhatsApp integration
+- [x] Mobile responsive design
+
+### Admin Features
+- [x] Dashboard with stats
+- [x] Booking management
+- [x] Application tracking
+- [x] Branch-based access control
+- [x] Service management
+- [x] Review moderation
+- [x] Reports & analytics
+- [x] Maintenance mode toggle
+- [x] Super Admin controls
 
 ---
 
-## Admin Permissions
+## Database Reset
 
-### Super Admin (super@maintainex.com)
-- Can see ALL bookings and applications from ALL branches
-- Can add/edit/delete branches
-- Can add/edit/delete admin users
-- Can change company settings
-- Can reassign bookings to different branches
+To reset the database with sample data:
 
-### Branch Admin (admin@maintainex.com)
-- Can only see bookings and applications from their branch
-- Can update booking status
-- Cannot change branches or settings
-
----
-
-## Database (Where Data is Stored)
-
-The website stores data in a file called `dev.db` in the `prisma` folder.
-
-### Reset Database
-If you need to start fresh:
 ```bash
+# Reset database schema
 npx prisma db push --force-reset
-npm run db:seed
-```
 
-### Add Sample Data
-```bash
+# Seed with sample data
 npm run db:seed
 ```
 
@@ -224,49 +218,84 @@ npm run db:seed
 ## Troubleshooting
 
 ### Website won't load
-1. Make sure you ran: `npm install`
-2. Then run: `npm run dev`
-3. Check if Node.js is installed
+1. Make sure Node.js is installed
+2. Run `npm install`
+3. Run `npm run dev`
+4. Check for error messages in terminal
 
-### Cannot login
-1. Make sure you ran: `npm run db:seed`
-2. Check email and password are correct
-3. Default login: super@maintainex.com / super123
+### Cannot login to admin
+1. Verify credentials are correct
+2. Clear browser cache
+3. Check if maintenance mode is enabled
+4. Contact Super Admin for account issues
 
 ### Images not showing
-1. Check if the image URL is correct
-2. Make sure the URL starts with `https://`
-3. Try a different image URL
+1. Check image URL is correct
+2. Ensure image file exists in `/public/uploads/`
+3. Verify URL starts with `/` for local files
 
 ### Build errors
-Run this to check for errors:
 ```bash
+# Clear Next.js cache
+rm -rf .next
+
+# Rebuild
 npm run build
 ```
 
 ---
 
-## Need to Change Something?
+## File Structure
 
-### If you need to change text on the website:
-1. Find the page file (see table above)
-2. Find the text you want to change
-3. Change the text
-4. Save the file
-5. Refresh the website
-
-### If you need to change colors:
-1. Find the file: `tailwind.config.ts`
-2. Change the color codes
-3. Save the file
-4. Refresh the website
+```
+maintainex/
+├── app/                    # Next.js app directory
+│   ├── (public)/           # Public pages
+│   ├── admin/             # Admin panel
+│   ├── api/                # API routes
+│   └── maintenance/        # Maintenance page
+├── components/             # React components
+│   ├── admin/              # Admin components
+│   ├── layout/             # Header, Footer
+│   └── ui/                 # UI components
+├── lib/                    # Utilities
+│   ├── prisma.ts           # Database client
+│   └── auth.ts             # Auth configuration
+├── prisma/                 # Database
+│   ├── schema.prisma       # Database schema
+│   ├── seed.ts             # Sample data
+│   └── dev.db              # SQLite database
+└── public/                 # Static files
+    ├── uploads/            # User uploads
+    └── logo.JPEG           # Company logo
+```
 
 ---
 
-## Contact for Help
+## Security
 
-If you need technical help, contact the developer who built this website.
+This website implements security best practices:
+
+- **Authentication:** NextAuth.js with secure session handling
+- **Authorization:** Role-based access control (RBAC)
+- **Input Validation:** Server-side validation for all forms
+- **CSRF Protection:** SameSite cookies
+- **Rate Limiting:** Built-in to API routes
+
+### Security Recommendations for Production
+
+1. **Use HTTPS** - Enable SSL on your domain
+2. **Environment Variables** - Never commit secrets to git
+3. **Database Security** - Use strong database passwords
+4. **Regular Updates** - Keep dependencies updated
+5. **Monitor Logs** - Check for unusual activity
 
 ---
 
-**Built for Maintainex - Shine Beyond Expectations**
+## Contact
+
+For technical support, contact the development team.
+
+---
+
+**Maintainex** - Shine Beyond Expectations

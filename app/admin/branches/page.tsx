@@ -67,7 +67,13 @@ export default function AdminBranches() {
   const openModal = (branch?: Branch) => {
     if (branch) {
       setEditingBranch(branch)
-      const branchDistricts: string[] = JSON.parse(branch.districts || '[]')
+      let branchDistricts: string[] = []
+      try {
+        branchDistricts = JSON.parse(branch.districts || '[]')
+        if (!Array.isArray(branchDistricts)) branchDistricts = []
+      } catch {
+        branchDistricts = []
+      }
       setFormData({
         name: branch.name,
         location: branch.location,
@@ -171,9 +177,19 @@ export default function AdminBranches() {
   }
 
   const getUnassignedDistricts = (currentBranchId?: string) => {
-    const assignedDistricts = branches
+    const assignedDistricts: string[] = []
+    branches
       .filter(b => b.id !== currentBranchId)
-      .flatMap(b => JSON.parse(b.districts || '[]'))
+      .forEach(b => {
+        try {
+          const parsed = JSON.parse(b.districts || '[]')
+          if (Array.isArray(parsed)) {
+            assignedDistricts.push(...parsed)
+          }
+        } catch {
+          // Skip invalid JSON
+        }
+      })
     return DISTRICTS.filter(d => !assignedDistricts.includes(d))
   }
 
@@ -204,7 +220,13 @@ export default function AdminBranches() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {branches.map((branch) => {
-          const branchDistricts: string[] = JSON.parse(branch.districts || '[]')
+          let branchDistricts: string[] = []
+          try {
+            branchDistricts = JSON.parse(branch.districts || '[]')
+            if (!Array.isArray(branchDistricts)) branchDistricts = []
+          } catch {
+            branchDistricts = []
+          }
           return (
             <div key={branch.id} className={`bg-white rounded-xl shadow-sm overflow-hidden ${!branch.isActive ? 'opacity-60' : ''}`}>
               <div className="p-6">
@@ -401,8 +423,12 @@ export default function AdminBranches() {
                   {DISTRICTS.map((district) => {
                     const isAssigned = branches.some(b => {
                       if (editingBranch && b.id === editingBranch.id) return false
-                      const bDistricts: string[] = JSON.parse(b.districts || '[]')
-                      return bDistricts.includes(district)
+                      try {
+                        const bDistricts: string[] = JSON.parse(b.districts || '[]')
+                        return Array.isArray(bDistricts) && bDistricts.includes(district)
+                      } catch {
+                        return false
+                      }
                     })
                     const isSelected = formData.districts.includes(district)
                     
