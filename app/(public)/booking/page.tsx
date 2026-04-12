@@ -56,7 +56,6 @@ function BookingFormContent() {
   const [serviceFromUrl, setServiceFromUrl] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState('')
   const [selectedTime, setSelectedTime] = useState('')
-  const [showDateTime, setShowDateTime] = useState(false)
 
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<BookingFormData>()
 
@@ -88,7 +87,7 @@ function BookingFormContent() {
         }
       })
       .catch(() => {
-        toast.error('Failed to load services. Please refresh the page.')
+        toast.error('Failed to load services. Please refresh.')
       })
   }, [searchParams, setValue])
 
@@ -131,15 +130,6 @@ function BookingFormContent() {
     ? `Rs. ${selectedService.price.toLocaleString()}` 
     : 'Contact for quote'
 
-  const handleContinueToStep2 = () => {
-    if (!selectedService) {
-      toast.error('Please select a service')
-      return
-    }
-    setShowDateTime(true)
-    setStep(2)
-  }
-
   return (
     <main className="pt-20 pb-12">
       <div className="max-w-lg mx-auto px-4">
@@ -153,7 +143,7 @@ function BookingFormContent() {
             </Link>
           )}
           <h1 className="text-2xl sm:text-3xl font-bold text-dark-900">Book a Service</h1>
-          <p className="text-gray-600 text-sm mt-1">Fill details below and we will contact you</p>
+          <p className="text-gray-600 text-sm mt-1">Fill details below</p>
           
           <a
             href="https://wa.me/94770867609?text=Hi, I would like to book"
@@ -166,77 +156,88 @@ function BookingFormContent() {
           </a>
         </div>
 
-        {/* Selected Service Card */}
+        {/* Service Summary Card - Always Visible */}
         {selectedService && (
           <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-xl p-4 mb-4 text-dark-900">
             <div className="flex items-center gap-3">
               <img
                 src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100'}
                 alt={selectedService.title}
-                className="w-14 h-14 rounded-lg object-cover"
+                className="w-12 h-12 rounded-lg object-cover"
               />
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-sm truncate">{selectedService.title}</h3>
-                <p className="text-xs opacity-70 line-clamp-1">{selectedService.description}</p>
+                <p className="text-xs opacity-70">{selectedService.duration ? `${selectedService.duration} min` : ''}</p>
               </div>
-              <div className="text-right flex-shrink-0">
-                <div className="font-bold">{priceDisplay}</div>
-                {selectedService.duration && (
-                  <div className="text-xs opacity-70">{selectedService.duration} min</div>
-                )}
+              <div className="font-bold text-sm">{priceDisplay}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Date & Time - Always Visible if Step > 1 */}
+        {step > 1 && (
+          <div className="bg-white rounded-xl shadow-md p-3 mb-4">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <FiCalendar className="text-primary-500" />
+                <span>{selectedDate || 'No date selected'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FiClock className="text-primary-500" />
+                <span>{selectedTime || 'No time selected'}</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Step Indicators */}
+        {/* Step Indicators - Always Visible */}
         <div className="flex items-center justify-center mb-6">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
                   step >= s ? 'bg-primary-500 text-dark-900' : 'bg-gray-200 text-gray-500'
                 }`}
               >
-                {step > s ? <FiCheck size={16} /> : s}
+                {step > s ? <FiCheck size={18} /> : s}
               </div>
               {s < 3 && (
-                <div className={`w-8 sm:w-16 h-1 mx-1 ${step > s ? 'bg-primary-500' : 'bg-gray-200'}`} />
+                <div className={`w-10 sm:w-16 h-1 mx-1 ${step > s ? 'bg-primary-500' : 'bg-gray-200'}`} />
               )}
             </div>
           ))}
         </div>
 
-        {/* Step 1: Service Selection */}
-        <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
-          <h2 className="text-lg font-bold text-dark-900 mb-4">1. Select Service</h2>
-          
-          <div className="mb-4">
-            <select
-              className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm bg-white"
-              value={selectedService?.id || ''}
-              onChange={(e) => {
-                const service = services.find(s => s.id === e.target.value)
-                setSelectedService(service || null)
-                setValue('serviceId', e.target.value)
-              }}
-            >
-              <option value="">Choose a service</option>
-              {categories.map((category) => (
-                <optgroup key={category.id} label={category.name}>
-                  {category.services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.title} {service.price ? `- Rs. ${service.price.toLocaleString()}` : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
+        {/* STEP 1: Service & Date/Time */}
+        {step === 1 && (
+          <div className="bg-white rounded-xl shadow-lg p-4">
+            <h2 className="text-lg font-bold text-dark-900 mb-4">Step 1: Service & Schedule</h2>
+            
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Select Service *</label>
+              <select
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm bg-white"
+                value={selectedService?.id || ''}
+                onChange={(e) => {
+                  const service = services.find(s => s.id === e.target.value)
+                  setSelectedService(service || null)
+                  setValue('serviceId', e.target.value)
+                }}
+              >
+                <option value="">Choose a service</option>
+                {categories.map((category) => (
+                  <optgroup key={category.id} label={category.name}>
+                    {category.services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.title} {service.price ? `- Rs. ${service.price.toLocaleString()}` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
 
-          {/* Date & Time */}
-          <div className={`space-y-3 ${showDateTime ? 'block' : 'hidden'}`}>
-            <div>
+            <div className="mb-4">
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 <FiCalendar className="inline mr-1" /> Select Date *
               </label>
@@ -248,7 +249,8 @@ function BookingFormContent() {
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 text-sm"
               />
             </div>
-            <div>
+
+            <div className="mb-4">
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 <FiClock className="inline mr-1" /> Select Time *
               </label>
@@ -263,21 +265,35 @@ function BookingFormContent() {
                 ))}
               </select>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!selectedService) {
+                  toast.error('Please select a service')
+                  return
+                }
+                if (!selectedDate) {
+                  toast.error('Please select a date')
+                  return
+                }
+                if (!selectedTime) {
+                  toast.error('Please select a time')
+                  return
+                }
+                setStep(2)
+              }}
+              className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
+            >
+              Continue to Details <FiArrowRight />
+            </button>
           </div>
+        )}
 
-          <button
-            type="button"
-            onClick={handleContinueToStep2}
-            className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg mt-4 flex items-center justify-center gap-2"
-          >
-            Continue <FiArrowRight />
-          </button>
-        </div>
-
-        {/* Step 2: Contact Details */}
-        {step >= 2 && (
-          <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
-            <h2 className="text-lg font-bold text-dark-900 mb-4">2. Your Details</h2>
+        {/* STEP 2: Contact Details */}
+        {step === 2 && (
+          <div className="bg-white rounded-xl shadow-lg p-4">
+            <h2 className="text-lg font-bold text-dark-900 mb-4">Step 2: Your Details</h2>
             
             <div className="space-y-3">
               <div>
@@ -357,23 +373,23 @@ function BookingFormContent() {
                   }
                   setStep(3)
                 }}
-                className="flex-1 bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg"
+                className="flex-1 bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-3 rounded-lg flex items-center justify-center gap-2"
               >
-                Next
+                Continue <FiArrowRight />
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Address */}
+        {/* STEP 3: Address */}
         {step === 3 && (
-          <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow-lg p-4 mb-4">
-            <h2 className="text-lg font-bold text-dark-900 mb-4">3. Address</h2>
+          <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow-lg p-4">
+            <h2 className="text-lg font-bold text-dark-900 mb-4">Step 3: Address</h2>
             
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  <FiMapPin className="inline mr-1" /> Address in {district} *
+                  <FiMapPin className="inline mr-1" /> Address in {district || 'your district'} *
                 </label>
                 <textarea
                   {...register('address', { required: 'Address is required' })}
@@ -421,18 +437,12 @@ function BookingFormContent() {
           </form>
         )}
 
-        {/* Summary Card */}
-        {selectedService && selectedDate && selectedTime && step < 3 && (
-          <div className="bg-gray-100 rounded-xl p-4 mt-4">
-            <h3 className="text-sm font-bold text-gray-700 mb-2">Booking Summary</h3>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><strong>Service:</strong> {selectedService.title}</p>
-              <p><strong>Date:</strong> {selectedDate}</p>
-              <p><strong>Time:</strong> {selectedTime}</p>
-              <p><strong>Price:</strong> {priceDisplay}</p>
-            </div>
-          </div>
-        )}
+        {/* Progress Info */}
+        <div className="mt-4 text-center">
+          <p className="text-xs text-gray-500">
+            Step {step} of 3
+          </p>
+        </div>
 
       </div>
     </main>
