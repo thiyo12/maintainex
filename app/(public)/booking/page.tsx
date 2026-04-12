@@ -237,8 +237,8 @@ function BookingFormContent() {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
+            <div className="flex flex-row gap-3 mb-4">
+              <div className="flex-1 min-w-0">
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   <FiCalendar className="inline mr-1" /> Date *
                 </label>
@@ -247,17 +247,19 @@ function BookingFormContent() {
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
                   min={getMinDate()}
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 text-sm"
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 text-sm bg-white"
+                  style={{ minWidth: 0 }}
                 />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   <FiClock className="inline mr-1" /> Time *
                 </label>
                 <select
                   value={selectedTime}
                   onChange={(e) => setSelectedTime(e.target.value)}
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 text-sm"
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 text-sm bg-white"
+                  style={{ minWidth: 0 }}
                 >
                   <option value="">Time</option>
                   {timeSlots.map((time) => (
