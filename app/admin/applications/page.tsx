@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { FiEye, FiTrash2, FiCheck, FiDownload, FiMail, FiRefreshCw, FiMapPin, FiEdit2 } from 'react-icons/fi'
 import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface Application {
   id: string
@@ -37,7 +37,7 @@ const statusColors: Record<string, string> = {
 }
 
 export default function AdminApplications() {
-  const { data: session } = useSession()
+  const { user } = useAdminSession()
   const [applications, setApplications] = useState<Application[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,7 +48,7 @@ export default function AdminApplications() {
   const [editDistrict, setEditDistrict] = useState('')
   const [editBranchId, setEditBranchId] = useState('')
 
-  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
     fetchApplications()

@@ -2,10 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { FiCalendar, FiUsers, FiClock, FiCheckCircle, FiArrowRight, FiTool, FiAlertTriangle, FiSave, FiRefreshCw, FiRotateCcw } from 'react-icons/fi'
-import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface DashboardData {
   stats: {
@@ -25,8 +24,7 @@ interface MaintenanceSettings {
 }
 
 export default function AdminDashboard() {
-  const router = useRouter()
-  const { data: session, status } = useSession()
+  const { user } = useAdminSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [maintenance, setMaintenance] = useState<MaintenanceSettings>({
@@ -36,7 +34,7 @@ export default function AdminDashboard() {
   const [saving, setSaving] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
-  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   const fetchMaintenanceSettings = useCallback(async () => {
     try {

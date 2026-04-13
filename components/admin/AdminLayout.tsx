@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck } from 'react-icons/fi'
+import { AdminSessionProvider } from './AdminSessionProvider'
 
 interface User {
   id: string
@@ -13,7 +14,7 @@ interface User {
   branchId: string | null
 }
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -30,28 +31,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     fetch('/api/auth/session')
-      .then(res => {
-        if (!res.ok) throw new Error('Not authenticated')
-        return res.json()
-      })
+      .then(res => res.json())
       .then(data => {
         if (data.user) {
           setUser(data.user)
         } else {
-          router.push('/admin/login')
+          window.location.href = '/admin/login'
         }
         setLoading(false)
       })
-      .catch(() => {
-        router.push('/admin/login')
+      .catch((err) => {
+        console.error('Session check failed:', err)
+        window.location.href = '/admin/login'
         setLoading(false)
       })
-  }, [isLoginPage, router])
+  }, [isLoginPage])
 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
-      router.push('/admin/login')
+      window.location.href = '/admin/login'
     } catch (error) {
       console.error('Logout error:', error)
     }
@@ -64,13 +63,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     )
   }
 
   if (!user) {
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Please Login</h2>
+          <button
+            onClick={() => window.location.href = '/admin/login'}
+            className="px-4 py-2 bg-primary-500 text-dark-900 rounded-lg font-medium"
+          >
+            Go to Login
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const baseNavigation = [
@@ -193,5 +207,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         />
       )}
     </div>
+  )
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AdminSessionProvider>
+      <AdminLayoutContent>{children}</AdminLayoutContent>
+    </AdminSessionProvider>
   )
 }

@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiClock, FiLock, FiEye, FiX } from 'react-icons/fi'
 import ImageUploader from '@/components/admin/ImageUploader'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface Service {
   id: string
@@ -28,7 +28,7 @@ interface Category {
 }
 
 export default function AdminServices() {
-  const { data: session } = useSession()
+  const { user } = useAdminSession()
   const [services, setServices] = useState<Service[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,8 +50,8 @@ export default function AdminServices() {
   const [newCategoryDesc, setNewCategoryDesc] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
 
-  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
-  const canEditServices = (session?.user as any)?.canEditServices === true
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const canEditServices = user?.canEditServices === true
   const hasEditPermission = isSuperAdmin || canEditServices
 
   useEffect(() => {

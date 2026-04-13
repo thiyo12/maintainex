@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
 import toast from 'react-hot-toast'
 import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface Branch {
   id: string
@@ -32,7 +32,7 @@ interface AdminFormData {
 }
 
 export default function AdminAdmins() {
-  const { data: session } = useSession()
+  const { user } = useAdminSession()
   const [admins, setAdmins] = useState<Admin[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,7 +48,7 @@ export default function AdminAdmins() {
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'SUPER_ADMIN' | 'ADMIN'>('ALL')
 
-  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
     fetchData()
