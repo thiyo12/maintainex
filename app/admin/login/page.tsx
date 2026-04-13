@@ -21,18 +21,8 @@ export default function AdminLogin() {
       const result = await signIn('credentials', {
         email,
         password,
-        redirect: false
+        redirect: true
       })
-
-      if (result?.error) {
-        toast.error('Invalid email or password')
-        setIsLoading(false)
-      } else if (result?.ok) {
-        toast.success('Login successful! Redirecting...')
-        setTimeout(() => {
-          window.location.href = '/admin/dashboard'
-        }, 500)
-      }
     } catch (error) {
       toast.error('Something went wrong')
       setIsLoading(false)

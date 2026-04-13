@@ -10,7 +10,7 @@ const securityHeaders = [
   },
   {
     key: 'X-Frame-Options',
-    value: 'DENY',
+    value: 'SAMEORIGIN',
   },
   {
     key: 'X-XSS-Protection',
@@ -44,6 +44,9 @@ const nextConfig = {
         headers: securityHeaders,
       },
     ]
+  },
+  async rewrites() {
+    return []
   },
 }
 
