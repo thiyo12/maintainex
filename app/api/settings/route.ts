@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/activity-log'
 
@@ -12,8 +11,8 @@ export async function GET() {
       settings = await prisma.settings.create({
         data: {
           id: 'site_settings',
-          companyName: 'Maintainex',
-          email: 'info@maintainex.com',
+          companyName: 'Maintain',
+          email: 'info@maintain.lk',
           phone: '+94 XX XXX XXXX',
           address: 'Sri Lanka'
         }
@@ -28,12 +27,12 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!isSuperAdmin(session)) {
+    if (session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 403 })
     }
 
@@ -44,8 +43,8 @@ export async function PUT(request: NextRequest) {
       update: body,
       create: {
         id: 'site_settings',
-        companyName: 'Maintainex',
-        email: 'info@maintainex.com',
+        companyName: 'Maintain',
+        email: 'info@maintain.lk',
         phone: '+94 XX XXX XXXX',
         address: 'Sri Lanka',
         ...body
@@ -53,9 +52,9 @@ export async function PUT(request: NextRequest) {
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'UPDATE',
       entityType: 'SETTINGS',
       entityId: 'site_settings',

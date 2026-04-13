@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { getActivityLogs, getStatsForPeriod } from '@/lib/activity-log'
 import { prisma } from '@/lib/prisma'
 
@@ -27,15 +26,14 @@ function getDateRange(period: string): { start: Date; end: Date } {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
-    const isSuper = isSuperAdmin(session)
-    const userBranchId = user.branchId
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const userBranchId = session.branchId
 
     const searchParams = request.nextUrl.searchParams
     const period = searchParams.get('period') || 'month'

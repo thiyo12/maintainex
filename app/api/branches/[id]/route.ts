@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/activity-log'
 
@@ -9,16 +8,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     const includeAdmins = searchParams.get('includeAdmins') === 'true'
-
-    const user = session.user as any
 
     const branch = await prisma.branch.findUnique({
       where: { id: params.id },
@@ -50,7 +47,7 @@ export async function GET(
       return NextResponse.json({ error: 'Branch not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && user.branchId !== params.id) {
+    if (session.role !== 'SUPER_ADMIN' && session.branchId !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -66,9 +63,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
@@ -88,9 +85,9 @@ export async function PUT(
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'UPDATE',
       entityType: 'BRANCH',
       entityId: branch.id,
@@ -110,9 +107,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
@@ -144,9 +141,9 @@ export async function DELETE(
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'DELETE',
       entityType: 'BRANCH',
       entityId: params.id,

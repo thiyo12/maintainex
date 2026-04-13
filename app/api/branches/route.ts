@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/activity-log'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const user = session.user as any
 
     const { searchParams } = new URL(request.url)
     const includeStats = searchParams.get('includeStats') === 'true'
 
     const where: any = {}
-    if (!isSuperAdmin(session)) {
-      where.id = user.branchId
+    if (session.role !== 'SUPER_ADMIN') {
+      where.id = session.branchId
     }
 
     const branches = await prisma.branch.findMany({
@@ -46,9 +43,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
@@ -70,9 +67,9 @@ export async function POST(request: NextRequest) {
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'CREATE',
       entityType: 'BRANCH',
       entityId: branch.id,

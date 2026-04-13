@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/activity-log'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
     const application = await prisma.application.findUnique({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && application.branchId !== user.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && application.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This application belongs to another branch' }, { status: 403 })
     }
 
@@ -36,24 +34,23 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
     const existingApplication = await prisma.application.findUnique({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     if (!existingApplication) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && existingApplication.branchId !== user.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && existingApplication.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This application belongs to another branch' }, { status: 403 })
     }
 
@@ -65,15 +62,15 @@ export async function PATCH(
     }
 
     const application = await prisma.application.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: { status }
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
-      branchId: user.branchId,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
+      branchId: session.branchId,
       action: 'STATUS_CHANGE',
       entityType: 'APPLICATION',
       entityId: application.id,
@@ -90,39 +87,38 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
     const application = await prisma.application.findUnique({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     if (!application) {
       return NextResponse.json({ error: 'Application not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && application.branchId !== user.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && application.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This application belongs to another branch' }, { status: 403 })
     }
 
     await prisma.application.delete({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
-      branchId: user.branchId,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
+      branchId: session.branchId,
       action: 'DELETE',
       entityType: 'APPLICATION',
-      entityId: params.id,
+      entityId: (await params).id,
       description: `Deleted application from ${application?.name}`,
       details: { applicantName: application?.name, position: application?.position }
     })

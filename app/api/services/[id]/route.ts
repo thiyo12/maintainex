@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 
 function serializeService(service: any) {
   return {
@@ -38,13 +37,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    const isSuper = isSuperAdmin(session)
-    const user = session?.user as any
-    const canEdit = user?.canEditServices === true
+    const session = await getSession(request)
+    const isSuper = session?.role === 'SUPER_ADMIN'
+    const canEdit = session?.canEditServices === true
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to edit services' }, { status: 403 })
@@ -88,13 +86,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    const isSuper = isSuperAdmin(session)
-    const user = session?.user as any
-    const canEdit = user?.canEditServices === true
+    const session = await getSession(request)
+    const isSuper = session?.role === 'SUPER_ADMIN'
+    const canEdit = session?.canEditServices === true
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to delete services' }, { status: 403 })

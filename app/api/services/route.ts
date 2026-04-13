@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 
 function serializeService(service: any) {
   return {
@@ -42,10 +41,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    const isSuper = isSuperAdmin(session)
-    const user = session?.user as any
-    const canEdit = user?.canEditServices === true
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const canEdit = session.canEditServices === true
 
     const body = await request.json()
     const { type } = body

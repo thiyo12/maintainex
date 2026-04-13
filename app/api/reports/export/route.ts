@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { getStatsForPeriod } from '@/lib/activity-log'
 import { prisma } from '@/lib/prisma'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 function getDateRange(period: string): { start: Date; end: Date } {
   const end = new Date()
@@ -29,15 +26,14 @@ function getDateRange(period: string): { start: Date; end: Date } {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
-    const isSuper = isSuperAdmin(session)
-    const userBranchId = user.branchId
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const userBranchId = session.branchId
 
     const searchParams = request.nextUrl.searchParams
     const period = searchParams.get('period') || 'month'
@@ -68,11 +64,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    const doc = new jsPDF()
+    const doc = new (require('jspdf')).jsPDF()
 
     doc.setFontSize(20)
     doc.setTextColor(30, 41, 59)
-    doc.text('Maintainex Reports', 14, 22)
+    doc.text('Maintain Reports', 14, 22)
 
     doc.setFontSize(12)
     doc.setTextColor(100, 100, 100)
@@ -89,6 +85,7 @@ export async function GET(request: NextRequest) {
     doc.setTextColor(30, 41, 59)
     doc.text('Bookings Summary', 14, 54)
 
+    const { default: autoTable } = require('jspdf-autotable')
     autoTable(doc, {
       startY: 58,
       head: [['Metric', 'Count']],
@@ -104,7 +101,7 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: [255, 195, 0], textColor: [31, 41, 55] },
     })
 
-    let currentY = (doc as any).lastAutoTable.finalY + 15
+    let currentY = doc.lastAutoTable.finalY + 15
 
     doc.setFontSize(14)
     doc.setTextColor(30, 41, 59)
@@ -125,7 +122,7 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
     })
 
-    currentY = (doc as any).lastAutoTable.finalY + 15
+    currentY = doc.lastAutoTable.finalY + 15
 
     doc.setFontSize(14)
     doc.setTextColor(30, 41, 59)
@@ -146,7 +143,7 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: [139, 92, 246], textColor: [255, 255, 255] },
     })
 
-    currentY = (doc as any).lastAutoTable.finalY + 15
+    currentY = doc.lastAutoTable.finalY + 15
 
     doc.setFontSize(14)
     doc.setTextColor(30, 41, 59)
@@ -174,12 +171,12 @@ export async function GET(request: NextRequest) {
         4: { cellWidth: 'auto' },
       },
       margin: { left: 14, right: 14 },
-      didDrawPage: function(data) {
+      didDrawPage: function(data: any) {
         if (data.pageNumber > 1) {
           doc.setFontSize(10)
           doc.setTextColor(150, 150, 150)
           doc.text(
-            `Maintainex Reports - ${periodLabel} - ${branchName} - Page ${data.pageNumber}`,
+            `Maintain Reports - ${periodLabel} - ${branchName} - Page ${data.pageNumber}`,
             14,
             285
           )
@@ -190,7 +187,7 @@ export async function GET(request: NextRequest) {
     doc.setFontSize(10)
     doc.setTextColor(150, 150, 150)
     doc.text(
-      `Generated on ${new Date().toLocaleString()} by ${session.user!.email}`,
+      `Generated on ${new Date().toLocaleString()} by ${session.email}`,
       14,
       285
     )
@@ -200,7 +197,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(pdfOutput, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="maintainex-${period}-report-${branchName.replace(/\s+/g, '-').toLowerCase()}.pdf"`,
+        'Content-Disposition': `attachment; filename="maintain-${period}-report-${branchName.replace(/\s+/g, '-').toLowerCase()}.pdf"`,
       },
     })
   } catch (error) {

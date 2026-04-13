@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { logActivity } from '@/lib/activity-log'
@@ -10,13 +9,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!isSuperAdmin(session) && (session.user as any).id !== params.id) {
+    if (session.role !== 'SUPER_ADMIN' && session.id !== params.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -54,17 +53,17 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
     const { name, email, password, role, branchId, isActive, canEditServices } = body
 
-    const isUpdatingSelf = (session.user as any).id === params.id
-    const isSuper = isSuperAdmin(session)
+    const isUpdatingSelf = session.id === params.id
+    const isSuper = session.role === 'SUPER_ADMIN'
 
     if (!isSuper && !isUpdatingSelf) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -106,9 +105,9 @@ export async function PUT(
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'UPDATE',
       entityType: 'ADMIN',
       entityId: admin.id,
@@ -133,13 +132,13 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
-    if ((session.user as any).id === params.id) {
+    if (session.id === params.id) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
@@ -156,9 +155,9 @@ export async function DELETE(
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'DELETE',
       entityType: 'ADMIN',
       entityId: params.id,

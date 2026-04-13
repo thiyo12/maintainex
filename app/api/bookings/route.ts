@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const serviceId = searchParams.get('serviceId')
     const branchId = searchParams.get('branchId')
     const district = searchParams.get('district')
 
-    const user = session?.user as any
-    const isSuper = isSuperAdmin(session)
-    const userBranchId = user?.branchId
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const userBranchId = session.branchId
 
     const where: any = {}
     if (status) where.status = status

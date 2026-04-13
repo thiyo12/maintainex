@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const isSuper = isSuperAdmin(session)
-    const user = session?.user as any
-    const canEdit = user?.canEditServices === true
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const canEdit = session.canEditServices === true
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to manage reviews' }, { status: 403 })
@@ -53,15 +51,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const isSuper = isSuperAdmin(session)
-    const user = session?.user as any
-    const canEdit = user?.canEditServices === true
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const canEdit = session.canEditServices === true
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to delete reviews' }, { status: 403 })

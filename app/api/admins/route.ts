@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { logActivity } from '@/lib/activity-log'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
@@ -40,9 +39,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
@@ -91,9 +90,9 @@ export async function POST(request: NextRequest) {
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
       action: 'CREATE',
       entityType: 'ADMIN',
       entityId: admin.id,

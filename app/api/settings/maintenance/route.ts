@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +14,8 @@ export async function GET() {
       settings = await prisma.settings.create({
         data: {
           id: 'site_settings',
-          companyName: 'Maintainex',
-          email: 'info@maintainex.com',
+          companyName: 'Maintain',
+          email: 'info@maintain.lk',
           phone: '+94 XX XXX XXXX',
           address: 'Sri Lanka',
           maintenanceMode: false,
@@ -45,9 +44,9 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user || !isSuperAdmin(session)) {
+    if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
@@ -62,8 +61,8 @@ export async function PUT(request: NextRequest) {
       },
       create: {
         id: 'site_settings',
-        companyName: 'Maintainex',
-        email: 'info@maintainex.com',
+        companyName: 'Maintain',
+        email: 'info@maintain.lk',
         phone: '+94 XX XXX XXXX',
         address: 'Sri Lanka',
         maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : false,

@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/activity-log'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
       include: {
         service: {
           include: { category: true }
@@ -28,7 +26,7 @@ export async function GET(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && booking.branchId !== user.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && booking.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
 
@@ -41,24 +39,23 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
     const existingBooking = await prisma.booking.findUnique({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     if (!existingBooking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && existingBooking.branchId !== user.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && existingBooking.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
 
@@ -70,16 +67,16 @@ export async function PATCH(
     }
 
     const booking = await prisma.booking.update({
-      where: { id: params.id },
+      where: { id: (await params).id },
       data: { status },
       include: { service: true }
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
-      branchId: user.branchId,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
+      branchId: session.branchId,
       action: 'STATUS_CHANGE',
       entityType: 'BOOKING',
       entityId: booking.id,
@@ -96,17 +93,16 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user as any
     const booking = await prisma.booking.findUnique({
-      where: { id: params.id },
+      where: { id: (await params).id },
       include: { service: true }
     })
 
@@ -114,22 +110,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    if (!isSuperAdmin(session) && booking.branchId !== user.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && booking.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
 
     await prisma.booking.delete({
-      where: { id: params.id }
+      where: { id: (await params).id }
     })
 
     await logActivity({
-      adminId: (session.user as any).id,
-      adminEmail: session.user!.email!,
-      adminName: session.user!.name,
-      branchId: user.branchId,
+      adminId: session.id,
+      adminEmail: session.email,
+      adminName: session.name,
+      branchId: session.branchId,
       action: 'DELETE',
       entityType: 'BOOKING',
-      entityId: params.id,
+      entityId: (await params).id,
       description: `Deleted booking for ${booking?.name}`,
       details: { customerName: booking?.name, service: booking?.service?.title }
     })

@@ -2,20 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, mkdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import { getServerSession } from 'next-auth'
-import { authOptions, isSuperAdmin } from '@/lib/auth'
+import { getSession } from '@/lib/auth-utils'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getSession(request)
     
-    if (!session?.user) {
+    if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const isSuper = isSuperAdmin(session)
-    const user = session?.user as any
-    const canEdit = user?.canEditServices === true
+    const isSuper = session.role === 'SUPER_ADMIN'
+    const canEdit = session.canEditServices === true
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to upload images' }, { status: 403 })
