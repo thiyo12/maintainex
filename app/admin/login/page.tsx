@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiLogIn, FiEye, FiEyeOff } from 'react-icons/fi'
@@ -33,20 +32,7 @@ export default function AdminLogin() {
       }
 
       if (data.success) {
-        toast.success('Login successful!')
-        
-        const signInResult = await signIn('credentials', {
-          email,
-          password,
-          redirect: false
-        })
-
-        if (signInResult?.error) {
-          toast.error('Session creation failed')
-          setIsLoading(false)
-          return
-        }
-
+        toast.success('Login successful! Redirecting...')
         setTimeout(() => {
           router.push('/admin/dashboard')
         }, 500)

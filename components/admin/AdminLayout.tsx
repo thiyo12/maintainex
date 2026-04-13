@@ -1,33 +1,67 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
-import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck } from 'react-icons/fi'
-import { signOut } from 'next-auth/react'
+
+interface User {
+  id: string
+  email: string
+  name: string | null
+  role: string
+  branchId: string | null
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession()
   const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const isLoginPage = pathname === '/admin/login'
-  const isSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN'
-  const branchId = (session?.user as any)?.branchId
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
-    if (status === 'unauthenticated' && !isLoginPage) {
-      router.push('/admin/login')
+    if (isLoginPage) {
+      setLoading(false)
+      return
     }
-  }, [status, router, isLoginPage])
+
+    fetch('/api/auth/session')
+      .then(res => {
+        if (!res.ok) throw new Error('Not authenticated')
+        return res.json()
+      })
+      .then(data => {
+        if (data.user) {
+          setUser(data.user)
+        } else {
+          router.push('/admin/login')
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        router.push('/admin/login')
+        setLoading(false)
+      })
+  }, [isLoginPage, router])
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      router.push('/admin/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   if (isLoginPage) {
     return <>{children}</>
   }
 
-  if (status === 'loading') {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
@@ -35,7 +69,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (!session) {
+  if (!user) {
     return null
   }
 
@@ -72,9 +106,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-900 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
           <Link href="/" className="flex items-center space-x-2 mb-8">
-            <img src="/logo.JPEG" alt="Maintainex" className="w-10 h-10 object-contain" />
+            <img src="/logo.JPEG" alt="Maintain" className="w-10 h-10 object-contain" />
             <span className="text-xl font-bold text-white">
-              Main<span className="text-primary-500">tainex</span>
+              Main<span className="text-primary-500">tain</span>
             </span>
           </Link>
 
@@ -104,14 +138,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-white/10">
           <div className="mb-2 px-4 py-2 text-xs text-gray-400">
-            {isSuperAdmin ? 'Full Access' : `Branch: ${branchId || 'N/A'}`}
+            {isSuperAdmin ? 'Full Access' : `Branch: ${user.branchId || 'N/A'}`}
           </div>
           <Link href="/" className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-white/10 hover:text-white transition-colors mb-2">
             <FiHome className="text-lg" />
             <span>View Website</span>
           </Link>
           <button
-            onClick={() => signOut({ callbackUrl: '/' })}
+            onClick={handleLogout}
             className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors"
           >
             <FiLogOut className="text-lg" />
@@ -125,12 +159,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="px-6 lg:px-8 py-4 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-800">Admin Dashboard</h2>
-              {branchId && !isSuperAdmin && (
-                <span className="text-sm text-gray-500">Branch ID: {branchId}</span>
+              {user.branchId && !isSuperAdmin && (
+                <span className="text-sm text-gray-500">Branch ID: {user.branchId}</span>
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">{session.user?.email}</span>
+              <span className="text-gray-600">{user.email}</span>
               {isSuperAdmin && (
                 <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded">
                   Super Admin
@@ -138,7 +172,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               )}
               <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center">
                 <span className="text-dark-900 font-bold">
-                  {session.user?.name?.[0] || session.user?.email?.[0] || 'A'}
+                  {user.name?.[0] || user.email?.[0] || 'A'}
                 </span>
               </div>
             </div>
