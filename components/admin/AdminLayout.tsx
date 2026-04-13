@@ -33,32 +33,38 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const storedUser = localStorage.getItem('admin_user')
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser))
+        const parsed = JSON.parse(storedUser)
+        if (parsed && parsed.id && parsed.email && parsed.role) {
+          setUser(parsed)
+          setLoading(false)
+        } else {
+          localStorage.removeItem('admin_user')
+          window.location.href = '/admin/login'
+        }
       } catch {
         localStorage.removeItem('admin_user')
+        window.location.href = '/admin/login'
       }
+      return
     }
 
     fetch('/api/auth/session', { credentials: 'include' })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Session check failed')
+        return res.json()
+      })
       .then(data => {
         if (data.user) {
           setUser(data.user)
           localStorage.setItem('admin_user', JSON.stringify(data.user))
         } else {
-          localStorage.removeItem('admin_user')
-          if (!storedUser) {
-            window.location.href = '/admin/login'
-          }
+          window.location.href = '/admin/login'
         }
         setLoading(false)
       })
       .catch((err) => {
         console.error('Session check failed:', err)
-        if (!storedUser) {
-          window.location.href = '/admin/login'
-        }
-        setLoading(false)
+        window.location.href = '/admin/login'
       })
   }, [isLoginPage])
 
