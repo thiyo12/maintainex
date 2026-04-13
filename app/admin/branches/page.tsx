@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiMapPin, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiPhone, FiMail, FiCheck, FiEye } from 'react-icons/fi'
+import { FiMapPin, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiPhone, FiMail, FiCheck, FiEye, FiAlertCircle } from 'react-icons/fi'
 import { DISTRICTS } from '@/components/ui/DistrictSelector'
 
 interface Branch {
@@ -34,8 +35,10 @@ interface BranchFormData {
 }
 
 export default function AdminBranches() {
+  const router = useRouter()
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
   const [formData, setFormData] = useState<BranchFormData>({
@@ -53,11 +56,17 @@ export default function AdminBranches() {
   }, [])
 
   const fetchBranches = async () => {
+    setError(null)
     try {
-      const res = await fetch('/api/branches?includeStats=true')
+      const res = await fetch('/api/branches?includeStats=true', { credentials: 'include' })
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
       const data = await res.json()
       setBranches(data)
     } catch (error) {
+      setError('Failed to fetch branches')
       toast.error('Failed to fetch branches')
     } finally {
       setLoading(false)
@@ -92,6 +101,7 @@ export default function AdminBranches() {
   const closeModal = () => {
     setShowModal(false)
     setEditingBranch(null)
+    setError(null)
     setFormData({ name: '', location: '', phone: '', email: '', address: '', districts: [] })
   }
 
@@ -112,6 +122,7 @@ export default function AdminBranches() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setError(null)
 
     try {
       const url = editingBranch ? `/api/branches/${editingBranch.id}` : '/api/branches'
@@ -120,11 +131,17 @@ export default function AdminBranches() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...formData,
           districts: JSON.stringify(formData.districts)
         })
       })
+
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
 
       if (!res.ok) {
         const error = await res.json()
@@ -135,6 +152,7 @@ export default function AdminBranches() {
       fetchBranches()
       closeModal()
     } catch (error: any) {
+      setError(error.message)
       toast.error(error.message)
     } finally {
       setSaving(false)
@@ -142,27 +160,42 @@ export default function AdminBranches() {
   }
 
   const toggleStatus = async (branch: Branch) => {
+    setError(null)
     try {
       const res = await fetch(`/api/branches/${branch.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ isActive: !branch.isActive })
       })
+
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
 
       if (!res.ok) throw new Error()
 
       toast.success(`Branch ${branch.isActive ? 'deactivated' : 'activated'}!`)
       fetchBranches()
     } catch (error) {
+      setError('Failed to update branch')
       toast.error('Failed to update branch')
     }
   }
 
   const deleteBranch = async (id: string) => {
     if (!confirm('Are you sure you want to delete this branch?')) return
+    setError(null)
 
     try {
-      const res = await fetch(`/api/branches/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/branches/${id}`, { method: 'DELETE', credentials: 'include' })
+
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
+
       const data = await res.json()
 
       if (!res.ok) {
@@ -172,6 +205,7 @@ export default function AdminBranches() {
       toast.success('Branch deleted!')
       fetchBranches()
     } catch (error: any) {
+      setError(error.message)
       toast.error(error.message)
     }
   }
@@ -197,6 +231,20 @@ export default function AdminBranches() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl p-8 shadow-sm">
+        <div className="flex items-center gap-3 text-red-600 mb-4">
+          <FiAlertCircle className="text-2xl" />
+          <span className="font-medium">{error}</span>
+        </div>
+        <button onClick={fetchBranches} className="btn-primary">
+          <FiRefreshCw className="inline mr-2" /> Try Again
+        </button>
       </div>
     )
   }
@@ -353,6 +401,13 @@ export default function AdminBranches() {
                 <FiX />
               </button>
             </div>
+
+            {error && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-lg mb-4">
+                <FiAlertCircle />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

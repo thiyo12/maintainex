@@ -2,20 +2,21 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { FiCalendar, FiUsers, FiClock, FiCheckCircle, FiArrowRight, FiTool, FiAlertTriangle, FiSave, FiRefreshCw, FiRotateCcw } from 'react-icons/fi'
+import { FiCalendar, FiUsers, FiClock, FiCheckCircle, FiArrowRight, FiTool, FiAlertTriangle, FiSave, FiRefreshCw, FiRotateCcw, FiAlertCircle } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface DashboardData {
-  stats: {
+  stats?: {
     totalBookings: number
     pendingBookings: number
     totalApplications: number
     newApplications: number
     totalServices: number
   }
-  recentBookings: any[]
-  recentApplications: any[]
+  recentBookings?: any[]
+  recentApplications?: any[]
+  error?: string
 }
 
 interface MaintenanceSettings {
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
   const { user } = useAdminSession()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [maintenance, setMaintenance] = useState<MaintenanceSettings>({
     maintenanceMode: false,
     maintenanceMessage: ''
@@ -38,22 +40,49 @@ export default function AdminDashboard() {
 
   const fetchMaintenanceSettings = useCallback(async () => {
     try {
-      const res = await fetch('/api/settings/maintenance?' + Date.now(), { cache: 'no-store' })
-      const result = await res.json()
-      setMaintenance(result)
+      const res = await fetch('/api/settings/maintenance?' + Date.now(), { 
+        cache: 'no-store',
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const result = await res.json()
+        setMaintenance(result)
+      }
     } catch (error) {
       console.error('Failed to fetch maintenance settings:', error)
     }
   }, [])
 
   useEffect(() => {
-    fetch('/api/dashboard')
-      .then(res => res.json())
-      .then(data => {
-        setData(data)
+    const fetchDashboard = async () => {
+      try {
+        const res = await fetch('/api/dashboard', {
+          credentials: 'include'
+        })
+        
+        if (res.status === 401) {
+          window.location.href = '/admin/login'
+          return
+        }
+        
+        const result = await res.json()
+        
+        if (!res.ok) {
+          setError(result.error || 'Failed to load dashboard')
+          setLoading(false)
+          return
+        }
+        
+        setData(result)
+        setError(null)
+      } catch (err) {
+        setError('Failed to connect to server')
+      } finally {
         setLoading(false)
-      })
-      .catch(() => setLoading(false))
+      }
+    }
+    
+    fetchDashboard()
   }, [])
 
   useEffect(() => {
@@ -68,21 +97,27 @@ export default function AdminDashboard() {
       const res = await fetch('/api/settings/maintenance', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           maintenanceMode: maintenance.maintenanceMode,
           maintenanceMessage: maintenance.maintenanceMessage
         })
       })
       
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+      
       if (!res.ok) throw new Error()
       
-      const data = await res.json()
+      const result = await res.json()
       
       setTimeout(() => {
         setReloadKey(prev => prev + 1)
         fetchMaintenanceSettings()
         
-        if (data.maintenanceMode === false) {
+        if (result.maintenanceMode === false) {
           toast.success('Maintenance disabled! Website is now live.')
         } else {
           toast.success('Maintenance mode enabled!')
@@ -108,11 +143,17 @@ export default function AdminDashboard() {
       const res = await fetch('/api/settings/maintenance', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           maintenanceMode: false,
           maintenanceMessage: "We're making things better! Our website is currently undergoing some scheduled maintenance to serve you better. We'll be back shortly. Thank you for your patience!"
         })
       })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       
       if (!res.ok) throw new Error()
       
@@ -137,6 +178,24 @@ export default function AdminDashboard() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <FiAlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary-500 text-dark-900 rounded-lg font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const stats = data?.stats || {
     totalBookings: 0,
     pendingBookings: 0,
@@ -144,6 +203,9 @@ export default function AdminDashboard() {
     newApplications: 0,
     totalServices: 0
   }
+
+  const recentBookings = data?.recentBookings || []
+  const recentApplications = data?.recentApplications || []
 
   return (
     <div>
@@ -283,8 +345,8 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="divide-y">
-            {data?.recentBookings && data.recentBookings.length > 0 ? (
-              data.recentBookings.map((booking: any) => (
+            {recentBookings.length > 0 ? (
+              recentBookings.map((booking: any) => (
                 <div key={booking.id} className="p-4 flex items-center justify-between">
                   <div>
                     <div className="font-medium text-gray-900">{booking.name}</div>
@@ -315,8 +377,8 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <div className="divide-y">
-            {data?.recentApplications && data.recentApplications.length > 0 ? (
-              data.recentApplications.map((app: any) => (
+            {recentApplications.length > 0 ? (
+              recentApplications.map((app: any) => (
                 <div key={app.id} className="p-4 flex items-center justify-between">
                   <div>
                     <div className="font-medium text-gray-900">{app.name}</div>

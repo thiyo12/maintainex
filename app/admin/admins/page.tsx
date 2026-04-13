@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings } from 'react-icons/fi'
+import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings, FiAlertCircle } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface Branch {
@@ -47,6 +47,7 @@ export default function AdminAdmins() {
   })
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'SUPER_ADMIN' | 'ADMIN'>('ALL')
+  const [error, setError] = useState<string | null>(null)
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
@@ -55,11 +56,18 @@ export default function AdminAdmins() {
   }, [])
 
   const fetchData = async () => {
+    setLoading(true)
+    setError(null)
     try {
       const [adminsRes, branchesRes] = await Promise.all([
-        fetch('/api/admins'),
-        fetch('/api/branches')
+        fetch('/api/admins', { credentials: 'include' }),
+        fetch('/api/branches', { credentials: 'include' })
       ])
+
+      if (adminsRes.status === 401 || branchesRes.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       
       const adminsData = await adminsRes.json()
       const branchesData = await branchesRes.json()
@@ -68,6 +76,7 @@ export default function AdminAdmins() {
       setBranches(branchesData)
     } catch (error) {
       toast.error('Failed to fetch data')
+      setError('Failed to fetch data')
     } finally {
       setLoading(false)
     }
@@ -125,8 +134,14 @@ export default function AdminAdmins() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        credentials: 'include'
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) {
         const error = await res.json()
@@ -148,8 +163,14 @@ export default function AdminAdmins() {
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !admin.isActive })
+        body: JSON.stringify({ isActive: !admin.isActive }),
+        credentials: 'include'
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 
@@ -165,8 +186,14 @@ export default function AdminAdmins() {
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ canEditServices: !admin.canEditServices })
+        body: JSON.stringify({ canEditServices: !admin.canEditServices }),
+        credentials: 'include'
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 
@@ -181,7 +208,12 @@ export default function AdminAdmins() {
     if (!confirm('Are you sure you want to delete this admin?')) return
 
     try {
-      const res = await fetch(`/api/admins/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admins/${id}`, { method: 'DELETE', credentials: 'include' })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) {
         const data = await res.json()
@@ -199,6 +231,18 @@ export default function AdminAdmins() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <FiAlertCircle className="text-red-500 text-4xl mb-4" />
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button onClick={fetchData} className="btn-primary">
+          <FiRefreshCw className="mr-2" /> Try Again
+        </button>
       </div>
     )
   }

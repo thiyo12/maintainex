@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiEye, FiTrash2, FiCheck, FiDownload, FiMail, FiRefreshCw, FiMapPin, FiEdit2 } from 'react-icons/fi'
+import { FiEye, FiTrash2, FiCheck, FiDownload, FiMail, FiRefreshCw, FiMapPin, FiEdit2, FiAlertCircle } from 'react-icons/fi'
 import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
@@ -41,6 +41,7 @@ export default function AdminApplications() {
   const [applications, setApplications] = useState<Application[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedApp, setSelectedApp] = useState<Application | null>(null)
   const [filter, setFilter] = useState('ALL')
   const [filterBranch, setFilterBranch] = useState<string>('')
@@ -63,10 +64,29 @@ export default function AdminApplications() {
       if (filterBranch) params.append('branchId', filterBranch)
       
       const url = params.toString() ? `/api/applications?${params}` : '/api/applications'
-      const res = await fetch(url)
+      const res = await fetch(url, { credentials: 'include' })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+      
       const data = await res.json()
-      setApplications(data)
-    } catch (error) {
+      
+      if (!res.ok) {
+        setError(data.error || 'Failed to fetch applications')
+        toast.error(data.error || 'Failed to fetch applications')
+        return
+      }
+      
+      if (Array.isArray(data)) {
+        setApplications(data)
+        setError(null)
+      } else {
+        setApplications([])
+      }
+    } catch (err) {
+      setError('Failed to connect to server')
       toast.error('Failed to fetch applications')
     } finally {
       setLoading(false)
@@ -75,9 +95,15 @@ export default function AdminApplications() {
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch('/api/branches')
+      const res = await fetch('/api/branches', { credentials: 'include' })
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       const data = await res.json()
-      setBranches(data)
+      if (Array.isArray(data)) {
+        setBranches(data)
+      }
     } catch (error) {
       console.error('Failed to fetch branches')
     }
@@ -88,8 +114,14 @@ export default function AdminApplications() {
       const res = await fetch(`/api/applications/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status })
       })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       
       if (!res.ok) throw new Error()
       
@@ -118,11 +150,17 @@ export default function AdminApplications() {
       const res = await fetch(`/api/applications/${editingApp.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           district: editDistrict,
           branchId 
         })
       })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       
       if (!res.ok) throw new Error()
       
@@ -138,7 +176,16 @@ export default function AdminApplications() {
     if (!confirm('Are you sure you want to delete this application?')) return
     
     try {
-      const res = await fetch(`/api/applications/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/applications/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+      
       if (!res.ok) throw new Error()
       
       toast.success('Application deleted')
@@ -165,6 +212,24 @@ export default function AdminApplications() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <FiAlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Applications</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchApplications}
+            className="px-4 py-2 bg-primary-500 text-dark-900 rounded-lg font-medium"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }

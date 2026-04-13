@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FiBarChart2, FiCalendar, FiUsers, FiBriefcase, FiTrendingUp, FiTrendingDown, FiRefreshCw, FiDownload } from 'react-icons/fi'
+import { FiBarChart2, FiCalendar, FiUsers, FiBriefcase, FiTrendingUp, FiTrendingDown, FiRefreshCw, FiDownload, FiAlertCircle } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 
 interface ReportData {
@@ -103,7 +103,7 @@ export default function AdminReports() {
       const params = new URLSearchParams({ period })
       if (filterEntity) params.append('entityType', filterEntity)
       
-      const res = await fetch(`/api/reports?${params}`)
+      const res = await fetch(`/api/reports?${params}`, { credentials: 'include' })
       
       if (!res.ok) {
         if (res.status === 401) {
@@ -126,9 +126,13 @@ export default function AdminReports() {
   const exportPDF = async () => {
     setExporting(true)
     try {
-      const response = await fetch(`/api/reports/export?period=${period}`)
+      const response = await fetch(`/api/reports/export?period=${period}`, { credentials: 'include' })
       
       if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/admin/login'
+          return
+        }
         throw new Error('Failed to export')
       }
       

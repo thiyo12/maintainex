@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiClock, FiLock, FiEye, FiX } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiClock, FiLock, FiEye, FiX, FiAlertCircle } from 'react-icons/fi'
 import ImageUploader from '@/components/admin/ImageUploader'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
@@ -28,10 +29,12 @@ interface Category {
 }
 
 export default function AdminServices() {
+  const router = useRouter()
   const { user } = useAdminSession()
   const [services, setServices] = useState<Service[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [viewingService, setViewingService] = useState<Service | null>(null)
   const [editingService, setEditingService] = useState<Service | null>(null)
@@ -60,15 +63,21 @@ export default function AdminServices() {
 
   const fetchData = async () => {
     try {
+      setError(null)
       const [servicesRes, categoriesRes] = await Promise.all([
-        fetch('/api/services'),
-        fetch('/api/categories')
+        fetch('/api/services', { credentials: 'include' }),
+        fetch('/api/categories', { credentials: 'include' })
       ])
+      if (servicesRes.status === 401 || categoriesRes.status === 401) {
+        router.push('/admin/login')
+        return
+      }
       const servicesData = await servicesRes.json()
       const categoriesData = await categoriesRes.json()
       setServices(servicesData)
       setCategories(categoriesData)
     } catch (error) {
+      setError('Failed to fetch data')
       toast.error('Failed to fetch data')
     } finally {
       setLoading(false)
@@ -90,6 +99,7 @@ export default function AdminServices() {
       const res = await fetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           type: 'category',
           name: newCategoryName,
@@ -97,6 +107,10 @@ export default function AdminServices() {
         })
       })
       
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
       if (!res.ok) throw new Error()
       
       toast.success('Category added successfully!')
@@ -136,9 +150,14 @@ export default function AdminServices() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(bodyData)
       })
 
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
       if (!res.ok) {
         const errorData = await res.json()
         throw new Error(errorData.error || 'Failed to save')
@@ -158,7 +177,11 @@ export default function AdminServices() {
     if (!confirm('Are you sure you want to delete this service?')) return
 
     try {
-      const res = await fetch(`/api/services/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/services/${id}`, { method: 'DELETE', credentials: 'include' })
+      if (res.status === 401) {
+        router.push('/admin/login')
+        return
+      }
       if (!res.ok) {
         const errorData = await res.json()
         throw new Error(errorData.error || 'Failed to delete')
@@ -221,6 +244,18 @@ export default function AdminServices() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <FiAlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <p className="text-gray-900 font-medium mb-2">{error}</p>
+        <button onClick={fetchData} className="btn-outline">
+          Try Again
+        </button>
       </div>
     )
   }
