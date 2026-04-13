@@ -14,7 +14,7 @@ export interface ExtendedUser {
   isActive: boolean
 }
 
-export const authOptions: NextAuthOptions = {
+const baseAuthOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -84,6 +84,11 @@ export const authOptions: NextAuthOptions = {
     }
   }
 }
+
+export const authOptions = {
+  ...baseAuthOptions,
+  trustHost: true,
+} as NextAuthOptions
 
 export function isSuperAdmin(session: any): boolean {
   return session?.user?.role === 'SUPER_ADMIN'
