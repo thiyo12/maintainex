@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    console.log('Dashboard API called by:', session.email, 'role:', session.role)
 
     const userBranchId = session.branchId || null
     const isSuper = session.role === 'SUPER_ADMIN'
@@ -61,7 +63,8 @@ export async function GET(request: NextRequest) {
       currentBranch: userBranchId,
       isSuperAdmin: isSuper
     })
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
+  } catch (error) {
+    console.error('Dashboard API error:', error)
+    return NextResponse.json({ error: 'Failed to fetch dashboard data', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
   }
 }

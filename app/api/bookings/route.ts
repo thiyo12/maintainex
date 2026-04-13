@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
+    console.log('Bookings API called by:', session.email, 'role:', session.role)
+    
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const serviceId = searchParams.get('serviceId')
