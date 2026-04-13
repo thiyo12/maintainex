@@ -1,45 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import { NextRequest } from 'next/server'
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key'
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
 
-async function createToken(payload: any): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(JSON.stringify(payload))
-  const key = encoder.encode(JWT_SECRET)
-  
-  const hashBuffer = await crypto.subtle.digest('SHA-256', key)
-  const signature = Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-  
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const body = btoa(JSON.stringify(payload))
-  
-  return `${header}.${body}.${signature}`
-}
-
-async function verifyToken(token: string): Promise<any> {
+function verifySimpleToken(token: string): any {
   try {
-    const [header, body, signature] = token.split('.')
-    const encoder = new TextEncoder()
-    const key = encoder.encode(JWT_SECRET)
+    const [encoded, signature] = token.split('.')
+    if (!encoded || !signature) return null
     
-    const hashBuffer = await crypto.subtle.digest('SHA-256', key)
-    const expectedSignature = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
+    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+    if (signature !== expectedSig) return null
     
-    if (signature !== expectedSignature) {
-      return null
-    }
+    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
     
-    const payload = JSON.parse(atob(body))
-    
-    if (payload.exp && Date.now() > payload.exp) {
-      return null
-    }
+    const maxAge = 30 * 24 * 60 * 60 * 1000
+    if (Date.now() - payload.created > maxAge) return null
     
     return payload
   } catch {
@@ -54,19 +28,5 @@ export async function getSession(request: NextRequest) {
     return null
   }
   
-  const payload = await verifyToken(token)
-  
-  if (!payload) {
-    return null
-  }
-  
-  return payload
+  return verifySimpleToken(token)
 }
-
-export async function logout(request: NextRequest) {
-  const response = NextResponse.json({ success: true })
-  response.cookies.delete('admin_token')
-  return response
-}
-
-export { createToken, verifyToken }

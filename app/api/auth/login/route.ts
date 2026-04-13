@@ -1,42 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { cookies } from 'next/headers'
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key'
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
 
-async function createToken(payload: any): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(JSON.stringify(payload))
-  const key = encoder.encode(JWT_SECRET)
-  
-  const hashBuffer = await crypto.subtle.digest('SHA-256', key)
-  const signature = Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-  
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const body = btoa(JSON.stringify(payload))
-  
-  return `${header}.${body}.${signature}`
+function createSimpleToken(data: any): string {
+  const payload = {
+    ...data,
+    created: Date.now()
+  }
+  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64')
+  const signature = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+  return `${encoded}.${signature}`
 }
 
-async function verifyToken(token: string): Promise<any> {
+function verifySimpleToken(token: string): any {
   try {
-    const [header, body, signature] = token.split('.')
-    const encoder = new TextEncoder()
-    const key = encoder.encode(JWT_SECRET)
+    const [encoded, signature] = token.split('.')
+    if (!encoded || !signature) return null
     
-    const hashBuffer = await crypto.subtle.digest('SHA-256', key)
-    const expectedSignature = Array.from(new Uint8Array(hashBuffer))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
+    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+    if (signature !== expectedSig) return null
     
-    if (signature !== expectedSignature) {
-      return null
-    }
+    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
     
-    return JSON.parse(atob(body))
+    const maxAge = 30 * 24 * 60 * 60 * 1000
+    if (Date.now() - payload.created > maxAge) return null
+    
+    return payload
   } catch {
     return null
   }
@@ -69,12 +60,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    const token = await createToken({
+    const token = createSimpleToken({
       id: admin.id,
       email: admin.email,
       role: admin.role,
       branchId: admin.branchId,
-      exp: Date.now() + 30 * 24 * 60 * 60 * 1000
+      name: admin.name
     })
 
     const response = NextResponse.json({
@@ -88,9 +79,12 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    const isProduction = process.env.NODE_ENV === 'production'
+    const isHttpUrl = process.env.NEXTAUTH_URL?.startsWith('http://')
+
     response.cookies.set('admin_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction && !isHttpUrl,
       sameSite: 'lax',
       path: '/',
       maxAge: 30 * 24 * 60 * 60

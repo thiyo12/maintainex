@@ -27,11 +27,24 @@ export function AdminSessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/auth/session')
+    const storedUser = localStorage.getItem('admin_user')
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch {
+        localStorage.removeItem('admin_user')
+      }
+    }
+
+    fetch('/api/auth/session', { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (data.user) {
           setUser(data.user)
+          localStorage.setItem('admin_user', JSON.stringify(data.user))
+        } else {
+          localStorage.removeItem('admin_user')
+          setUser(null)
         }
         setLoading(false)
       })

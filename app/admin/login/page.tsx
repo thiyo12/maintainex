@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiLogIn, FiEye, FiEyeOff } from 'react-icons/fi'
 
 export default function AdminLogin() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -20,6 +18,7 @@ export default function AdminLogin() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password })
       })
 
@@ -31,11 +30,10 @@ export default function AdminLogin() {
         return
       }
 
-      if (data.success) {
-        toast.success('Login successful! Redirecting...')
-        setTimeout(() => {
-          router.push('/admin/dashboard')
-        }, 500)
+      if (data.success && data.user) {
+        localStorage.setItem('admin_user', JSON.stringify(data.user))
+        toast.success('Login successful!')
+        window.location.href = '/admin/dashboard'
       }
     } catch (error) {
       toast.error('Something went wrong')

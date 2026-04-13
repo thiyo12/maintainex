@@ -30,19 +30,34 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       return
     }
 
-    fetch('/api/auth/session')
+    const storedUser = localStorage.getItem('admin_user')
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch {
+        localStorage.removeItem('admin_user')
+      }
+    }
+
+    fetch('/api/auth/session', { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (data.user) {
           setUser(data.user)
+          localStorage.setItem('admin_user', JSON.stringify(data.user))
         } else {
-          window.location.href = '/admin/login'
+          localStorage.removeItem('admin_user')
+          if (!storedUser) {
+            window.location.href = '/admin/login'
+          }
         }
         setLoading(false)
       })
       .catch((err) => {
         console.error('Session check failed:', err)
-        window.location.href = '/admin/login'
+        if (!storedUser) {
+          window.location.href = '/admin/login'
+        }
         setLoading(false)
       })
   }, [isLoginPage])
@@ -50,6 +65,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' })
+      localStorage.removeItem('admin_user')
       window.location.href = '/admin/login'
     } catch (error) {
       console.error('Logout error:', error)
