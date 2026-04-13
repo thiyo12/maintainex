@@ -1,0 +1,19 @@
+# Environment files - use Docker/Dokploy env vars instead
+.env
+.env.local
+.env.production
+
+# Keep .env.example for reference
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+*.pem
+
+# IDE
+.vscode/
+.idea/
