@@ -1,5 +1,0 @@
-[phases.setup]
-nixPackages = ["nodejs_22", "npm", "prisma"]
-
-[variables]
-ENV_PATH = "/app/.env"
