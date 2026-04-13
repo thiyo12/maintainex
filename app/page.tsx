@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
