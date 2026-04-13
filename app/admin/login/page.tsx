@@ -26,13 +26,13 @@ export default function AdminLogin() {
 
       if (result?.error) {
         toast.error('Invalid email or password')
+        setIsLoading(false)
       } else {
         toast.success('Login successful!')
-        router.push('/admin/dashboard')
+        window.location.href = '/admin/dashboard'
       }
     } catch (error) {
       toast.error('Something went wrong')
-    } finally {
       setIsLoading(false)
     }
   }
