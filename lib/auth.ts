@@ -63,6 +63,7 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/admin/login',
   },
+  trustHost: true,
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
