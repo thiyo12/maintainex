@@ -12,9 +12,6 @@ RUN npx prisma generate
 
 COPY . .
 
-ENV NODE_ENV=production
-ENV TRUST_HOST=true
-
 RUN npm run build
 
 EXPOSE 3000

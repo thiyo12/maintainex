@@ -18,11 +18,39 @@ export default function AdminLogin() {
     setIsLoading(true)
 
     try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: true
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error || 'Invalid credentials')
+        setIsLoading(false)
+        return
+      }
+
+      if (data.success) {
+        toast.success('Login successful!')
+        
+        const signInResult = await signIn('credentials', {
+          email,
+          password,
+          redirect: false
+        })
+
+        if (signInResult?.error) {
+          toast.error('Session creation failed')
+          setIsLoading(false)
+          return
+        }
+
+        setTimeout(() => {
+          router.push('/admin/dashboard')
+        }, 500)
+      }
     } catch (error) {
       toast.error('Something went wrong')
       setIsLoading(false)
@@ -34,9 +62,9 @@ export default function AdminLogin() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <a href="/" className="inline-flex items-center space-x-2 mb-4">
-            <img src="/logo.JPEG" alt="Maintainex" className="w-12 h-12 object-contain" />
+            <img src="/logo.JPEG" alt="Maintain" className="w-12 h-12 object-contain" />
             <span className="text-2xl font-bold text-dark-900">
-              Main<span className="text-primary-600">tainex</span>
+              Main<span className="text-primary-600">tain</span>
             </span>
           </a>
           <h1 className="text-3xl font-bold text-dark-900">Admin Login</h1>
@@ -52,12 +80,12 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
-                placeholder="admin@maintainex.com"
+                placeholder="admin@maintain.lk"
                 required
               />
             </div>
 
-            <div>
+            <div className="mt-4">
               <label className="block text-gray-700 font-medium mb-2">Password</label>
               <div className="relative">
                 <input
@@ -81,7 +109,7 @@ export default function AdminLogin() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn-primary flex items-center justify-center"
+              className="w-full btn-primary mt-6 flex items-center justify-center"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-dark-900 border-t-transparent rounded-full animate-spin" />
