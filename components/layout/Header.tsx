@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiMenu, FiX, FiPhone } from 'react-icons/fi'
 
 const navigation = [
@@ -21,9 +22,9 @@ export default function Header() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           <Link href="/" className="flex items-center space-x-2">
-            <img src="/logo.JPEG" alt="Maintainex" className="w-10 h-10 object-contain" />
+            <Image src="/logo.JPEG" alt="Maintain" width={40} height={40} className="object-contain" />
             <span className="text-2xl font-bold text-dark-900">
-              Main<span className="text-primary-500">tainex</span>
+              Main<span className="text-primary-500">tain</span>
             </span>
           </Link>
 

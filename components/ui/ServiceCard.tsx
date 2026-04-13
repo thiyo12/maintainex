@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiArrowRight } from 'react-icons/fi'
 
 interface ServiceCardProps {
@@ -13,9 +14,11 @@ export function ServiceCard({ title, description, image, slug, price }: ServiceC
   return (
     <div className="card group">
       <div className="relative h-48 overflow-hidden">
-        <img
+        <Image
           src={image}
           alt={title}
+          width={400}
+          height={192}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

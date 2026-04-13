@@ -4,6 +4,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import DistrictSelector from '@/components/ui/DistrictSelector'
+import Image from 'next/image'
 import { useState, useEffect, Suspense } from 'react'
 import { useForm } from 'react-hook-form'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -160,9 +161,11 @@ function BookingFormContent() {
         {selectedService && (
           <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-xl p-4 mb-4 text-dark-900">
             <div className="flex items-center gap-3">
-              <img
+              <Image
                 src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100'}
                 alt={selectedService.title}
+                width={48}
+                height={48}
                 className="w-12 h-12 rounded-lg object-cover"
               />
               <div className="flex-1 min-w-0">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import toast from 'react-hot-toast'
 import { FiLogIn, FiEye, FiEyeOff } from 'react-icons/fi'
 import { setStoredUser } from '@/lib/auth-client'
@@ -46,7 +47,7 @@ export default function AdminLogin() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <a href="/" className="inline-flex items-center space-x-2 mb-4">
-            <img src="/logo.JPEG" alt="Maintain" className="w-12 h-12 object-contain" />
+            <Image src="/logo.JPEG" alt="Maintain" width={48} height={48} className="object-contain" />
             <span className="text-2xl font-bold text-dark-900">
               Main<span className="text-primary-600">tain</span>
             </span>

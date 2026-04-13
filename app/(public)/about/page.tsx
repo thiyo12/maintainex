@@ -1,6 +1,7 @@
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
+import Image from 'next/image'
 import { FiTarget, FiEye, FiHeart, FiUsers, FiAward, FiClock, FiThumbsUp } from 'react-icons/fi'
 
 export default function AboutPage() {
@@ -38,10 +39,13 @@ export default function AboutPage() {
                 </p>
               </div>
               <div className="relative">
-                <img
+                <Image
                   src="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800"
                   alt="Our team"
+                  width={800}
+                  height={600}
                   className="rounded-2xl shadow-2xl"
+                  style={{ objectFit: 'cover' }}
                 />
                 <div className="absolute -bottom-8 -left-8 bg-primary-500 text-dark-900 p-8 rounded-2xl shadow-xl">
                   <div className="text-4xl font-bold">5+</div>

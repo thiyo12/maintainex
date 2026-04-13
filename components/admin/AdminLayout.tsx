@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck } from 'react-icons/fi'
 import { AdminSessionProvider } from './AdminSessionProvider'
 import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
@@ -100,7 +101,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-900 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6">
           <Link href="/" className="flex items-center space-x-2 mb-8">
-            <img src="/logo.JPEG" alt="Maintain" className="w-10 h-10 object-contain" />
+            <Image src="/logo.JPEG" alt="Maintain" width={40} height={40} className="object-contain" />
             <span className="text-xl font-bold text-white">
               Main<span className="text-primary-500">tain</span>
             </span>

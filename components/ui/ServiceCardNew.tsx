@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiArrowRight } from 'react-icons/fi'
 
 interface Service {
@@ -32,9 +33,11 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
       className="group block bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
     >
       <div className="relative h-48 overflow-hidden">
-        <img
+        <Image
           src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
           alt={service.title}
+          width={600}
+          height={192}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />

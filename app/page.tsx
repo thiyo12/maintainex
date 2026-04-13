@@ -7,6 +7,7 @@ import AnimatedHero from '@/components/ui/AnimatedHero'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import HomeServices from '@/components/ui/HomeServices'
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi'
 import { prisma } from '@/lib/prisma'
 
@@ -115,10 +116,13 @@ export default async function HomePage() {
               
               <div className="relative hidden lg:block">
                 <div className="absolute -top-8 -left-8 w-full h-full bg-primary-200/30 rounded-3xl" />
-                <img
+                <Image
                   src="/uploads/Teamwork on the checklist.png"
                   alt="Teamwork"
-                  className="relative rounded-3xl shadow-2xl w-full animate-float"
+                  fill
+                  className="relative rounded-3xl shadow-2xl object-cover animate-float"
+                  sizes="(max-width: 1024px) 0px, 50vw"
+                  priority
                 />
               </div>
             </div>

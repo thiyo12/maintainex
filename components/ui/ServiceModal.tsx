@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { FiX, FiStar, FiClock, FiCheck, FiArrowRight } from 'react-icons/fi'
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface Review {
   id: string
@@ -69,10 +70,12 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
           </button>
 
           <div className="relative h-56">
-            <img
+            <Image
               src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
               alt={service.title}
               className="w-full h-full object-cover"
+              width={800}
+              height={400}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-6 left-6 right-6">

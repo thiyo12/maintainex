@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { FiUpload, FiX, FiCheck, FiAlertCircle } from 'react-icons/fi'
+import Image from 'next/image'
 import toast from 'react-hot-toast'
 
 interface ImageUploaderProps {
@@ -117,14 +118,12 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     return (
       <div className="space-y-3">
         <div className="relative w-full h-48 rounded-xl overflow-hidden border-2 border-green-200 bg-green-50">
-          <img
+          <Image
             src={currentValue}
             alt="Uploaded"
+            width={400}
+            height={200}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              console.error('Image load error:', currentValue)
-              ;(e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=Image+Error'
-            }}
           />
           <div className="absolute top-2 left-2 px-2 py-1 bg-green-500 text-white text-xs rounded-full flex items-center gap-1">
             <FiCheck className="w-3 h-3" />

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiMail, FiPhone, FiMapPin, FiX, FiSmartphone } from 'react-icons/fi'
 import { FaFacebookF, FaTwitter, FaInstagram, FaTiktok, FaLinkedinIn } from 'react-icons/fa'
 
@@ -44,9 +45,9 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           <div className="lg:col-span-1">
             <div className="flex items-center space-x-2 mb-6">
-              <img src="/logo.JPEG" alt="Maintainex" className="w-10 h-10 object-contain" />
+              <Image src="/logo.JPEG" alt="Maintain" width={40} height={40} className="object-contain" />
               <span className="text-2xl font-bold">
-                Main<span className="text-primary-500">tainex</span>
+                Main<span className="text-primary-500">tain</span>
               </span>
             </div>
             <p className="text-gray-400 mb-6">

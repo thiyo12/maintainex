@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import Image from 'next/image'
 import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiClock, FiLock, FiEye, FiX, FiAlertCircle } from 'react-icons/fi'
 import ImageUploader from '@/components/admin/ImageUploader'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
@@ -317,9 +318,11 @@ export default function AdminServices() {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         {service.image ? (
-                          <img
+                          <Image
                             src={service.image}
                             alt={service.title}
+                            width={48}
+                            height={48}
                             className="w-12 h-12 rounded-lg object-cover mr-4"
                           />
                         ) : (
@@ -409,9 +412,11 @@ export default function AdminServices() {
             <h2 className="text-xl font-bold text-gray-900 mb-6">Service Details</h2>
             
             {viewingService.image && (
-              <img
+              <Image
                 src={viewingService.image}
                 alt={viewingService.title}
+                width={600}
+                height={192}
                 className="w-full h-48 object-cover rounded-xl mb-4"
               />
             )}

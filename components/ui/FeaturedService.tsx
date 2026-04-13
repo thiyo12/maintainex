@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { FiArrowRight, FiClock } from 'react-icons/fi'
 
 interface Category {
@@ -38,10 +39,11 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
     <div className="bg-white rounded-3xl overflow-hidden shadow-xl mb-12">
       <div className="grid lg:grid-cols-2">
         <div className="relative h-64 lg:h-auto">
-          <img
+          <Image
             src={firstService?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
             alt={category.name}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />
         </div>
