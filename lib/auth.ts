@@ -14,7 +14,7 @@ export interface ExtendedUser {
   isActive: boolean
 }
 
-const baseAuthOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -52,7 +52,7 @@ const baseAuthOptions: NextAuthOptions = {
           role: admin.role,
           branchId: admin.branchId,
           isActive: admin.isActive
-        } as any
+        }
       }
     })
   ],
@@ -64,12 +64,12 @@ const baseAuthOptions: NextAuthOptions = {
     signIn: '/admin/login',
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: any) {
       if (user) {
-        token.id = (user as any).id
-        token.role = (user as any).role
-        token.branchId = (user as any).branchId
-        token.isActive = (user as any).isActive
+        token.id = user.id
+        token.role = user.role
+        token.branchId = user.branchId
+        token.isActive = user.isActive
       }
       return token
     },
@@ -84,11 +84,6 @@ const baseAuthOptions: NextAuthOptions = {
     }
   }
 }
-
-export const authOptions = {
-  ...baseAuthOptions,
-  trustHost: true,
-} as NextAuthOptions
 
 export function isSuperAdmin(session: any): boolean {
   return session?.user?.role === 'SUPER_ADMIN'
