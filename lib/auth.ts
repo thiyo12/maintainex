@@ -14,6 +14,10 @@ export interface ExtendedUser {
   isActive: boolean
 }
 
+const isSecureUrl = (url: string) => {
+  return url && (url.startsWith('https://') || url.includes('localhost'))
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -62,6 +66,17 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/admin/login',
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: isSecureUrl(process.env.NEXTAUTH_URL || ''),
+      },
+    },
   },
   callbacks: {
     async jwt({ token, user }) {
