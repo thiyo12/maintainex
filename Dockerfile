@@ -1,27 +1,18 @@
-FROM node:20-alpine AS builder
+FROM node:20-slim
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --production
 
 COPY . .
 
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
+RUN npx prisma generate
 
-RUN npx prisma generate && npm run build
-
-FROM node:20-alpine
-
-WORKDIR /app
-
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
+RUN npm run build
 
 EXPOSE 3000
+
+ENV NODE_ENV=production
 
 CMD ["npm", "start"]
