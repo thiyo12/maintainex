@@ -5,8 +5,8 @@ import './globals.css'
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
-  title: 'Maintain - Professional Cleaning Services in Sri Lanka',
-  description: 'Premium cleaning services for homes and businesses in Sri Lanka. Home cleaning, industrial cleaning, and more.',
+  title: 'Maintain - Shine Beyond Expectations',
+  description: 'Professional cleaning services in Sri Lanka. Home cleaning, office cleaning, industrial cleaning, and more.',
   keywords: 'cleaning services, Sri Lanka, home cleaning, office cleaning, deep cleaning, industrial cleaning',
   icons: {
     icon: '/favicon.svg',
