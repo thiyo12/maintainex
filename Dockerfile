@@ -13,8 +13,7 @@ RUN npx prisma generate
 COPY . .
 
 ENV NODE_ENV=production
-ENV NEXTAUTH_URL=http://localhost:3000
-ENV NEXTAUTH_TRUST_HOST=true
+ENV TRUST_HOST=true
 
 RUN npm run build
 
