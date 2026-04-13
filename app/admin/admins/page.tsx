@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings, FiAlertCircle } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Branch {
   id: string
@@ -36,6 +37,7 @@ export default function AdminAdmins() {
   const [admins, setAdmins] = useState<Admin[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
+  const authHeaders = getAuthHeader()
   const [showModal, setShowModal] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null)
   const [formData, setFormData] = useState<AdminFormData>({
@@ -60,8 +62,8 @@ export default function AdminAdmins() {
     setError(null)
     try {
       const [adminsRes, branchesRes] = await Promise.all([
-        fetch('/api/admins', { credentials: 'include' }),
-        fetch('/api/branches', { credentials: 'include' })
+        fetch('/api/admins', { headers: authHeaders }),
+        fetch('/api/branches', { headers: authHeaders })
       ])
 
       if (adminsRes.status === 401 || branchesRes.status === 401) {
@@ -133,9 +135,8 @@ export default function AdminAdmins() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        credentials: 'include'
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify(body)
       })
 
       if (res.status === 401) {
@@ -162,9 +163,8 @@ export default function AdminAdmins() {
     try {
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !admin.isActive }),
-        credentials: 'include'
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ isActive: !admin.isActive })
       })
 
       if (res.status === 401) {
@@ -185,9 +185,8 @@ export default function AdminAdmins() {
     try {
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ canEditServices: !admin.canEditServices }),
-        credentials: 'include'
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ canEditServices: !admin.canEditServices })
       })
 
       if (res.status === 401) {
@@ -208,7 +207,7 @@ export default function AdminAdmins() {
     if (!confirm('Are you sure you want to delete this admin?')) return
 
     try {
-      const res = await fetch(`/api/admins/${id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(`/api/admins/${id}`, { method: 'DELETE', headers: authHeaders })
 
       if (res.status === 401) {
         window.location.href = '/admin/login'

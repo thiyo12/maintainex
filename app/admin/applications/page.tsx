@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { FiEye, FiTrash2, FiCheck, FiDownload, FiMail, FiRefreshCw, FiMapPin, FiEdit2, FiAlertCircle } from 'react-icons/fi'
 import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Application {
   id: string
@@ -49,6 +50,8 @@ export default function AdminApplications() {
   const [editDistrict, setEditDistrict] = useState('')
   const [editBranchId, setEditBranchId] = useState('')
 
+  const authHeaders = getAuthHeader()
+
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
@@ -64,7 +67,7 @@ export default function AdminApplications() {
       if (filterBranch) params.append('branchId', filterBranch)
       
       const url = params.toString() ? `/api/applications?${params}` : '/api/applications'
-      const res = await fetch(url, { credentials: 'include' })
+      const res = await fetch(url, { headers: { ...authHeaders } })
       
       if (res.status === 401) {
         window.location.href = '/admin/login'
@@ -95,7 +98,7 @@ export default function AdminApplications() {
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch('/api/branches', { credentials: 'include' })
+      const res = await fetch('/api/branches', { headers: { ...authHeaders } })
       if (res.status === 401) {
         window.location.href = '/admin/login'
         return
@@ -113,8 +116,7 @@ export default function AdminApplications() {
     try {
       const res = await fetch(`/api/applications/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ status })
       })
       
@@ -149,8 +151,7 @@ export default function AdminApplications() {
 
       const res = await fetch(`/api/applications/${editingApp.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ 
           district: editDistrict,
           branchId 
@@ -178,7 +179,7 @@ export default function AdminApplications() {
     try {
       const res = await fetch(`/api/applications/${id}`, { 
         method: 'DELETE',
-        credentials: 'include'
+        headers: { ...authHeaders }
       })
       
       if (res.status === 401) {

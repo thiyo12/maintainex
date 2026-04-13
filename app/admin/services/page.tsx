@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiClock, FiLock, FiEye, FiX, FiAlertCircle } from 'react-icons/fi'
 import ImageUploader from '@/components/admin/ImageUploader'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Service {
   id: string
@@ -35,6 +36,7 @@ export default function AdminServices() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const authHeaders = getAuthHeader()
   const [showModal, setShowModal] = useState(false)
   const [viewingService, setViewingService] = useState<Service | null>(null)
   const [editingService, setEditingService] = useState<Service | null>(null)
@@ -65,8 +67,8 @@ export default function AdminServices() {
     try {
       setError(null)
       const [servicesRes, categoriesRes] = await Promise.all([
-        fetch('/api/services', { credentials: 'include' }),
-        fetch('/api/categories', { credentials: 'include' })
+        fetch('/api/services', { headers: { ...authHeaders } }),
+        fetch('/api/categories', { headers: { ...authHeaders } })
       ])
       if (servicesRes.status === 401 || categoriesRes.status === 401) {
         router.push('/admin/login')
@@ -98,8 +100,7 @@ export default function AdminServices() {
     try {
       const res = await fetch('/api/services', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'category',
           name: newCategoryName,
@@ -149,8 +150,7 @@ export default function AdminServices() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify(bodyData)
       })
 
@@ -177,7 +177,7 @@ export default function AdminServices() {
     if (!confirm('Are you sure you want to delete this service?')) return
 
     try {
-      const res = await fetch(`/api/services/${id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(`/api/services/${id}`, { method: 'DELETE', headers: { ...authHeaders } })
       if (res.status === 401) {
         router.push('/admin/login')
         return

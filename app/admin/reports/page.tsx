@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { FiBarChart2, FiCalendar, FiUsers, FiBriefcase, FiTrendingUp, FiTrendingDown, FiRefreshCw, FiDownload, FiAlertCircle } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface ReportData {
   period: string
@@ -91,6 +92,7 @@ export default function AdminReports() {
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month')
   const [filterEntity, setFilterEntity] = useState<string>('')
   const [exporting, setExporting] = useState(false)
+  const authHeaders = getAuthHeader()
 
   useEffect(() => {
     fetchReport()
@@ -103,7 +105,7 @@ export default function AdminReports() {
       const params = new URLSearchParams({ period })
       if (filterEntity) params.append('entityType', filterEntity)
       
-      const res = await fetch(`/api/reports?${params}`, { credentials: 'include' })
+      const res = await fetch(`/api/reports?${params}`, { headers: { ...authHeaders } })
       
       if (!res.ok) {
         if (res.status === 401) {
@@ -126,7 +128,7 @@ export default function AdminReports() {
   const exportPDF = async () => {
     setExporting(true)
     try {
-      const response = await fetch(`/api/reports/export?period=${period}`, { credentials: 'include' })
+      const response = await fetch(`/api/reports/export?period=${period}`, { headers: { ...authHeaders } })
       
       if (!response.ok) {
         if (response.status === 401) {

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiLogIn, FiEye, FiEyeOff } from 'react-icons/fi'
+import { setStoredUser } from '@/lib/auth-client'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -18,7 +19,6 @@ export default function AdminLogin() {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ email, password })
       })
 
@@ -31,7 +31,7 @@ export default function AdminLogin() {
       }
 
       if (data.success && data.user) {
-        localStorage.setItem('admin_user', JSON.stringify(data.user))
+        setStoredUser(data.user)
         toast.success('Login successful!')
         window.location.href = '/admin/dashboard'
       }

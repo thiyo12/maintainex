@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { FiEye, FiTrash2, FiCheck, FiX, FiRefreshCw, FiMapPin, FiEdit2, FiAlertCircle } from 'react-icons/fi'
 import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Booking {
   id: string
@@ -49,6 +50,7 @@ export default function AdminBookings() {
   const [editDistrict, setEditDistrict] = useState('')
   const [editBranchId, setEditBranchId] = useState('')
 
+  const authHeaders = getAuthHeader()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function AdminBookings() {
       if (filterBranch) params.append('branchId', filterBranch)
       
       const url = params.toString() ? `/api/bookings?${params}` : '/api/bookings'
-      const res = await fetch(url, { credentials: 'include' })
+      const res = await fetch(url, { headers: { ...authHeaders } })
       
       if (res.status === 401) {
         window.location.href = '/admin/login'
@@ -95,7 +97,7 @@ export default function AdminBookings() {
 
   const fetchBranches = async () => {
     try {
-      const res = await fetch('/api/branches', { credentials: 'include' })
+      const res = await fetch('/api/branches', { headers: { ...authHeaders } })
       if (res.status === 401) {
         window.location.href = '/admin/login'
         return
@@ -113,8 +115,7 @@ export default function AdminBookings() {
     try {
       const res = await fetch(`/api/bookings/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ status })
       })
       
@@ -153,8 +154,7 @@ export default function AdminBookings() {
 
       const res = await fetch(`/api/bookings/${editingBooking.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ 
           district: editDistrict,
           branchId 
@@ -182,7 +182,7 @@ export default function AdminBookings() {
     try {
       const res = await fetch(`/api/bookings/${id}`, { 
         method: 'DELETE',
-        credentials: 'include'
+        headers: { ...authHeaders }
       })
       
       if (res.status === 401) {

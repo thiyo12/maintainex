@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiMapPin, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiPhone, FiMail, FiCheck, FiEye, FiAlertCircle } from 'react-icons/fi'
 import { DISTRICTS } from '@/components/ui/DistrictSelector'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Branch {
   id: string
@@ -50,6 +51,7 @@ export default function AdminBranches() {
     districts: []
   })
   const [saving, setSaving] = useState(false)
+  const authHeaders = getAuthHeader()
 
   useEffect(() => {
     fetchBranches()
@@ -58,7 +60,7 @@ export default function AdminBranches() {
   const fetchBranches = async () => {
     setError(null)
     try {
-      const res = await fetch('/api/branches?includeStats=true', { credentials: 'include' })
+      const res = await fetch('/api/branches?includeStats=true', { headers: { ...authHeaders } })
       if (res.status === 401) {
         router.push('/admin/login')
         return
@@ -130,8 +132,7 @@ export default function AdminBranches() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           ...formData,
           districts: JSON.stringify(formData.districts)
@@ -164,8 +165,7 @@ export default function AdminBranches() {
     try {
       const res = await fetch(`/api/branches/${branch.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ isActive: !branch.isActive })
       })
 
@@ -189,7 +189,7 @@ export default function AdminBranches() {
     setError(null)
 
     try {
-      const res = await fetch(`/api/branches/${id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(`/api/branches/${id}`, { method: 'DELETE', headers: { ...authHeaders } })
 
       if (res.status === 401) {
         router.push('/admin/login')

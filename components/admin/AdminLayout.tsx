@@ -1,24 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck } from 'react-icons/fi'
 import { AdminSessionProvider } from './AdminSessionProvider'
-
-interface User {
-  id: string
-  email: string
-  name: string | null
-  role: string
-  branchId: string | null
-}
+import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
 
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
-  const router = useRouter()
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<StoredUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   const isLoginPage = pathname === '/admin/login'
@@ -30,55 +22,18 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const storedUser = localStorage.getItem('admin_user')
+    const storedUser = getStoredUser()
     if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser)
-        if (parsed && parsed.id && parsed.email && parsed.role) {
-          setUser(parsed)
-          setLoading(false)
-        } else {
-          localStorage.removeItem('admin_user')
-          window.location.href = '/admin/login'
-        }
-      } catch {
-        localStorage.removeItem('admin_user')
-        window.location.href = '/admin/login'
-      }
-      return
+      setUser(storedUser)
+      setLoading(false)
+    } else {
+      window.location.href = '/admin/login'
     }
-
-    fetch('/api/auth/session', { credentials: 'include' })
-      .then(res => {
-        if (!res.ok) throw new Error('Session check failed')
-        return res.json()
-      })
-      .then(data => {
-        if (data.user) {
-          setUser(data.user)
-          localStorage.setItem('admin_user', JSON.stringify(data.user))
-        } else {
-          window.location.href = '/admin/login'
-        }
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error('Session check failed:', err)
-        window.location.href = '/admin/login'
-      })
   }, [isLoginPage])
 
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { 
-        method: 'POST',
-        credentials: 'include'
-      })
-      localStorage.removeItem('admin_user')
-      window.location.href = '/admin/login'
-    } catch (error) {
-      console.error('Logout error:', error)
-    }
+  const handleLogout = () => {
+    clearStoredUser()
+    window.location.href = '/admin/login'
   }
 
   if (isLoginPage) {

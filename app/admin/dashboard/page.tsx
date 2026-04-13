@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { FiCalendar, FiUsers, FiClock, FiCheckCircle, FiArrowRight, FiTool, FiAlertTriangle, FiSave, FiRefreshCw, FiRotateCcw, FiAlertCircle } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface DashboardData {
   stats?: {
@@ -38,11 +39,15 @@ export default function AdminDashboard() {
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
+  const authHeaders = getAuthHeader()
+
   const fetchMaintenanceSettings = useCallback(async () => {
     try {
       const res = await fetch('/api/settings/maintenance?' + Date.now(), { 
         cache: 'no-store',
-        credentials: 'include'
+        headers: {
+          ...authHeaders
+        }
       })
       if (res.ok) {
         const result = await res.json()
@@ -51,13 +56,15 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Failed to fetch maintenance settings:', error)
     }
-  }, [])
+  }, [authHeaders])
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
         const res = await fetch('/api/dashboard', {
-          credentials: 'include'
+          headers: {
+            ...authHeaders
+          }
         })
         
         if (res.status === 401) {
@@ -83,7 +90,7 @@ export default function AdminDashboard() {
     }
     
     fetchDashboard()
-  }, [])
+  }, [authHeaders])
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -96,8 +103,10 @@ export default function AdminDashboard() {
     try {
       const res = await fetch('/api/settings/maintenance', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({
           maintenanceMode: maintenance.maintenanceMode,
           maintenanceMessage: maintenance.maintenanceMessage
@@ -142,8 +151,10 @@ export default function AdminDashboard() {
     try {
       const res = await fetch('/api/settings/maintenance', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({
           maintenanceMode: false,
           maintenanceMessage: "We're making things better! Our website is currently undergoing some scheduled maintenance to serve you better. We'll be back shortly. Thank you for your patience!"

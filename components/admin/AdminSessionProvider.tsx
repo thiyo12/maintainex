@@ -1,18 +1,10 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-
-interface User {
-  id: string
-  email: string
-  name: string | null
-  role: string
-  branchId: string | null
-  canEditServices?: boolean
-}
+import { getStoredUser, setStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
 
 interface SessionContextType {
-  user: User | null
+  user: StoredUser | null
   loading: boolean
 }
 
@@ -23,34 +15,15 @@ export function useAdminSession() {
 }
 
 export function AdminSessionProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<StoredUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('admin_user')
+    const storedUser = getStoredUser()
     if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser))
-      } catch {
-        localStorage.removeItem('admin_user')
-      }
+      setUser(storedUser)
     }
-
-    fetch('/api/auth/session', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        if (data.user) {
-          setUser(data.user)
-          localStorage.setItem('admin_user', JSON.stringify(data.user))
-        } else {
-          localStorage.removeItem('admin_user')
-          setUser(null)
-        }
-        setLoading(false)
-      })
-      .catch(() => {
-        setLoading(false)
-      })
+    setLoading(false)
   }, [])
 
   return (
