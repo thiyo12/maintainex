@@ -251,12 +251,14 @@ async function main() {
     where: { id: 'branch-jaffna-branch' }
   })
 
-  const superAdminPassword = await bcrypt.hash('super123', 10)
+  const superAdminEmail = process.env.ADMIN_EMAIL || 'super@maintain.lk'
+  const superAdminPasswordPlain = process.env.ADMIN_PASSWORD || 'M@int@in2024!'
+  const superAdminPassword = await bcrypt.hash(superAdminPasswordPlain, 12)
   const superAdmin = await prisma.admin.upsert({
-    where: { email: 'super@maintainex.com' },
+    where: { email: superAdminEmail },
     update: {},
     create: {
-      email: 'super@maintainex.com',
+      email: superAdminEmail,
       password: superAdminPassword,
       name: 'Super Admin',
       role: 'SUPER_ADMIN',
@@ -266,12 +268,14 @@ async function main() {
   console.log(`Created Super Admin: ${superAdmin.email}`)
 
   if (jaffnaBranch) {
-    const adminPassword = await bcrypt.hash('admin123', 10)
+    const adminEmail = 'admin@maintain.lk'
+    const adminPasswordPlain = 'Adm1n@M4int@in!'
+    const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
     const branchAdmin = await prisma.admin.upsert({
-      where: { email: 'admin@maintainex.com' },
+      where: { email: adminEmail },
       update: {},
       create: {
-        email: 'admin@maintainex.com',
+        email: adminEmail,
         password: adminPassword,
         name: 'Jaffna Admin',
         role: 'ADMIN',
@@ -287,9 +291,11 @@ async function main() {
   console.log('')
   console.log('Login Credentials:')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Super Admin:  super@maintainex.com / super123')
-  console.log('Branch Admin: admin@maintainex.com / admin123')
+  console.log('Super Admin:  super@maintain.lk / M@int@in2024!')
+  console.log('Branch Admin: admin@maintain.lk / Adm1n@M4int@in!')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('⚠️  Change these passwords immediately in production!')
+  console.log('⚠️  Use environment variables: ADMIN_EMAIL, ADMIN_PASSWORD')
   console.log('')
   console.log('Categories Created:')
   categoriesData.forEach(c => {

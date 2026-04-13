@@ -23,9 +23,11 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local env files
-.env*.local
-.env
+# Local env files - NEVER commit these
+.env.local
+.env.production.local
+.env.test.local
+.env.development.local
 
 # Vercel
 .vercel
@@ -40,9 +42,11 @@ next-env.d.ts
 
 # Database
 *.db
-!prisma/dev.db
 *.db-journal
 
 # Logs
 *.log
 logs/
+
+# Uploads (if not using cloud storage)
+uploads/

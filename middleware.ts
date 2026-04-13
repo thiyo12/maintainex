@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const securityHeaders = {
+  'X-DNS-Prefetch-Control': 'on',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'X-Content-Type-Options': 'nosniff',
+  'X-XSS-Protection': '1; mode=block',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
@@ -9,7 +18,11 @@ export async function middleware(request: NextRequest) {
     pathname === '/maintenance' ||
     pathname.startsWith('/api/')
   ) {
-    return NextResponse.next()
+    const response = NextResponse.next()
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value)
+    })
+    return response
   }
 
   try {
@@ -35,7 +48,11 @@ export async function middleware(request: NextRequest) {
     console.error('Maintenance check failed:', error)
   }
 
-  return NextResponse.next()
+  const response = NextResponse.next()
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+  return response
 }
 
 export const config = {
