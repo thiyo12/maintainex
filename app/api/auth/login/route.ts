@@ -67,6 +67,8 @@ export async function POST(request: NextRequest) {
       branchId: admin.branchId,
       name: admin.name
     })
+    
+    console.log('Login successful for:', admin.email, 'role:', admin.role)
 
     const response = NextResponse.json({
       success: true,

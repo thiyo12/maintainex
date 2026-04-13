@@ -25,8 +25,16 @@ export async function getSession(request: NextRequest) {
   const token = request.cookies.get('admin_token')?.value
   
   if (!token) {
+    console.log('getSession: No token found in cookies')
     return null
   }
   
-  return verifySimpleToken(token)
+  const payload = verifySimpleToken(token)
+  if (!payload) {
+    console.log('getSession: Token verification failed')
+    return null
+  }
+  
+  console.log('getSession: Token valid for', payload.email)
+  return payload
 }
