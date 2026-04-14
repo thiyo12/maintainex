@@ -1,37 +1,38 @@
-import type { Config } from 'tailwindcss'
+import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
-    './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
       colors: {
         primary: {
-          50: '#FFFBEB',
-          100: '#FEF3C7',
-          200: '#FDE68A',
-          300: '#FCD34D',
-          400: '#FBBF24',
-          500: '#FFC300',
-          600: '#D97706',
-          700: '#B45309',
-          800: '#92400E',
-          900: '#78350F',
+          DEFAULT: "#FFC300",
+          light: "#FFE199",
+          dark: "#CC9900",
         },
         dark: {
-          900: '#1F2937',
-          800: '#374151',
-          700: '#4B5563',
-        }
+          DEFAULT: "#1F2937",
+          mid: "#374151",
+        },
+        neutral: {
+          DEFAULT: "#FFFFFF",
+          card: "#F3F4F6",
+          placeholder: "#9CA3AF",
+          text: "#374151",
+        },
+        success: "#059669",
+        error: "#DC2626",
+        warning: "#F59E0B",
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ["Inter", "system-ui", "sans-serif"],
       },
     },
   },
   plugins: [],
-}
-export default config
+};
+export default config;

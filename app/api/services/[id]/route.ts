@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth-utils'
 function serializeService(service: any) {
   return {
     ...service,
-    price: service.price ? Number(service.price) : null,
+    price: service.price !== null && service.price !== undefined ? Number(service.price) : null,
   }
 }
 
@@ -40,43 +40,57 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('Service PUT called')
-    console.log('Headers:', Object.fromEntries(request.headers.entries()))
+    console.log('=== Service PUT called ===')
     
     const session = await getSession(request)
     console.log('Session:', session)
     
     const isSuper = session?.role === 'SUPER_ADMIN'
     const canEdit = session?.canEditServices === true
-    console.log('Permissions - isSuper:', isSuper, 'canEdit:', canEdit)
 
     if (!isSuper && !canEdit) {
+      console.log('Permission denied - isSuper:', isSuper, 'canEdit:', canEdit)
       return NextResponse.json({ error: 'You do not have permission to edit services' }, { status: 403 })
     }
 
     const { id } = await params
     const body = await request.json()
+    console.log('Request body:', JSON.stringify(body, null, 2))
+    
     const { title, description, image, price, duration, categoryId, isActive } = body
 
-    const updateData: any = {
-      title,
-      description,
-      isActive
-    }
+    const updateData: any = {}
+
+    if (title !== undefined) updateData.title = title
+    if (description !== undefined) updateData.description = description
+    if (isActive !== undefined) updateData.isActive = isActive
 
     if (image !== undefined && image !== null && image !== '') {
       updateData.image = image
+      console.log('Updating image to:', image)
     }
 
-    if (price !== undefined) {
-      updateData.price = price ? parseFloat(price) : null
+    if (price !== undefined && price !== null && price !== '') {
+      updateData.price = parseFloat(String(price))
+      console.log('Updating price to:', updateData.price)
+    } else if (price === '' || price === null) {
+      updateData.price = null
+      console.log('Setting price to null')
     }
-    if (duration !== undefined) {
-      updateData.duration = duration ? parseInt(duration) : null
+
+    if (duration !== undefined && duration !== null && duration !== '') {
+      updateData.duration = parseInt(String(duration))
+      console.log('Updating duration to:', updateData.duration)
+    } else if (duration === '' || duration === null) {
+      updateData.duration = null
+      console.log('Setting duration to null')
     }
+
     if (categoryId !== undefined && isSuper) {
       updateData.categoryId = categoryId
     }
+
+    console.log('updateData:', JSON.stringify(updateData, null, 2))
 
     const service = await prisma.service.update({
       where: { id },
@@ -84,8 +98,10 @@ export async function PUT(
       include: { category: true }
     })
 
+    console.log('Service updated successfully:', service.id)
     return NextResponse.json(serializeService(service))
-  } catch {
+  } catch (error) {
+    console.error('Error updating service:', error)
     return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
   }
 }

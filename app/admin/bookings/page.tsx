@@ -424,42 +424,27 @@ export default function AdminBookings() {
                         >
                           <FiEye />
                         </button>
-                        {booking.status === 'PENDING' && (
-                          <>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map(status => (
                             <button
-                              onClick={() => updateStatus(booking.id, 'CONFIRMED')}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
-                              title="Confirm"
+                              key={status}
+                              onClick={() => {
+                                if (booking.status !== status) {
+                                  updateStatus(booking.id, status)
+                                }
+                              }}
+                              className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                                booking.status === status
+                                  ? statusColors[status]
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer'
+                              }`}
+                              disabled={booking.status === status}
+                              title={booking.status === status ? 'Current status' : `Change to ${status.replace('_', ' ')}`}
                             >
-                              <FiCheck />
+                              {status.replace('_', ' ')}
                             </button>
-                            <button
-                              onClick={() => updateStatus(booking.id, 'CANCELLED')}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              title="Cancel"
-                            >
-                              <FiX />
-                            </button>
-                          </>
-                        )}
-                        {booking.status === 'CONFIRMED' && (
-                          <button
-                            onClick={() => updateStatus(booking.id, 'IN_PROGRESS')}
-                            className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
-                            title="Start"
-                          >
-                            <FiRefreshCw />
-                          </button>
-                        )}
-                        {booking.status === 'IN_PROGRESS' && (
-                          <button
-                            onClick={() => updateStatus(booking.id, 'COMPLETED')}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
-                            title="Complete"
-                          >
-                            <FiCheck />
-                          </button>
-                        )}
+                          ))}
+                        </div>
                         <button
                           onClick={() => deleteBooking(booking.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
@@ -485,7 +470,7 @@ export default function AdminBookings() {
 
       {selectedBooking && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Booking Details</h2>
             <div className="space-y-4">
               <div>
@@ -524,6 +509,32 @@ export default function AdminBookings() {
                 <div>
                   <label className="text-sm text-gray-500">Time</label>
                   <div className="font-medium">{selectedBooking.time}</div>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 block mb-2">Status</label>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[selectedBooking.status]}`}>
+                    {selectedBooking.status.replace('_', ' ')}
+                  </span>
+                  <span className="text-sm text-gray-500">→</span>
+                  <select
+                    value={selectedBooking.status}
+                    onChange={async (e) => {
+                      const newStatus = e.target.value
+                      if (newStatus !== selectedBooking.status) {
+                        await updateStatus(selectedBooking.id, newStatus)
+                        setSelectedBooking(null)
+                      }
+                    }}
+                    className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="PENDING">PENDING</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="IN_PROGRESS">IN PROGRESS</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
                 </div>
               </div>
             </div>

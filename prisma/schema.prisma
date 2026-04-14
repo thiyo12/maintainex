@@ -3,182 +3,171 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-model Admin {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  password        String
-  name            String?
-  role            String    @default("ADMIN")
-  branchId        String?
-  branch          Branch?   @relation(fields: [branchId], references: [id])
-  canEditServices Boolean   @default(false)
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  role          String     @default("CUSTOMER")
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  @@index([branchId])
-  @@index([role])
+  sessions        Session[]
+  otps            OTP[]
+  loginActivities LoginActivity[]
+  bookings        Booking[]
+  reviews         Review[]
 }
 
-model Branch {
-  id        String    @id @default(cuid())
-  name      String
-  location  String
-  phone     String?
-  email     String?
-  address   String?
-  districts String    @default("[]")
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress    String
+  userAgent    String
+  isValid      Boolean  @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
 
-  admins     Admin[]
-  bookings   Booking[]
-  applications Application[]
-  services   Service[]
+  @@index([userId])
+}
 
-  @@index([isActive])
+model OTP {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  purpose   String
+  attempts  Int      @default(0)
+  isUsed    Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model LoginActivity {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email       String
+  ipAddress   String
+  userAgent   String
+  location   String?
+  isNewIP     Boolean  @default(false)
+  isNewDevice Boolean  @default(false)
+  isSuspicious Boolean @default(false)
+  reason     String?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([isSuspicious])
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  slug        String    @unique
-  description String?
-  icon        String?
-  isActive    Boolean   @default(true)
-  services    Service[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  icon      String?
+  image     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  services  Service[]
 }
 
 model Service {
-  id          String    @id @default(cuid())
-  title       String
-  slug        String    @unique
+  id          String     @id @default(cuid())
+  name        String
   description String
-  image       String?
-  price       Decimal?
-  duration    Int?
   categoryId  String
-  category    Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  branchId    String?
-  branch      Branch?   @relation(fields: [branchId], references: [id])
-  bookings    Booking[]
-  reviews     Review[]
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  category    Category    @relation(fields: [categoryId], references: [id])
+  price       Float
+  duration    Int
+  isActive    Boolean    @default(true)
+  image       String?
+  createdAt   DateTime    @default(now())
+
+  bookings  Booking[]
+  reviews   Review[]
 
   @@index([categoryId])
-  @@index([branchId])
+}
+
+model Branch {
+  id       String    @id @default(cuid())
+  name     String
+  address  String
+  city     String
+  phone    String?
+  isActive Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  bookings Booking[]
+
+  @@index([city])
 }
 
 model Booking {
-  id         String   @id @default(cuid())
-  name       String
-  phone      String
-  email      String
-  district   String
-  address    String
-  latitude   Float?
-  longitude  Float?
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   serviceId  String
-  service    Service  @relation(fields: [serviceId], references: [id])
-  branchId   String?
-  branch     Branch?  @relation(fields: [branchId], references: [id])
-  subService String?
+  service    Service    @relation(fields: [serviceId], references: [id])
+  branchId   String
+  branch     Branch     @relation(fields: [branchId], references: [id])
   date       DateTime
-  time       String
+  timeSlot   String
+  status     String     @default("PENDING")
   notes      String?
-  status     String   @default("PENDING")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  totalPrice Float
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
-  @@index([status])
+  @@index([userId])
   @@index([serviceId])
   @@index([branchId])
-  @@index([district])
-}
-
-model Review {
-  id           String   @id @default(cuid())
-  rating       Int
-  comment      String?
-  customerName String
-  serviceId    String
-  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  status       String   @default("PENDING")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([serviceId])
   @@index([status])
+  @@index([date])
 }
 
 model Application {
   id         String   @id @default(cuid())
   name       String
-  phone      String
   email      String
-  district   String
-  address    String
-  position   String
+  phone      String
+  service    String
   experience String
-  cvUrl      String?
-  branchId   String?
-  branch     Branch?  @relation(fields: [branchId], references: [id])
-  status     String   @default("NEW")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  resumeUrl  String?
+  status     String   @default("PENDING")
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([status])
-  @@index([branchId])
-  @@index([district])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  rating    Int
+  comment   String?
+  createdAt DateTime  @default(now())
+
+  @@index([serviceId])
 }
 
 model Settings {
-  id                 String @id
-  companyName        String @default("Maintain")
-  email              String @default("info@maintain.lk")
-  phone              String @default("+94 XX XXX XXXX")
-  address            String @default("Sri Lanka")
-  mapEmbedUrl        String?
-  whatsappNumber     String?
-  facebookUrl        String?
-  instagramUrl       String?
-  twitterUrl         String?
-  tiktokUrl         String?
-  linkedinUrl       String?
-  workingHours       String?
-  maintenanceMode    Boolean @default(false)
-  maintenanceMessage String @default("We're making things better! Our website is currently undergoing some scheduled maintenance to serve you better. We'll be back shortly. Thank you for your patience!")
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-}
-
-model ActivityLog {
-  id          String   @id @default(cuid())
-  adminId     String
-  adminEmail  String
-  adminName   String?
-  branchId    String?
-  action      String
-  entityType  String
-  entityId    String?
-  description String
-  details     String?
-  ipAddress   String?
-  userAgent   String?
-  createdAt   DateTime @default(now())
-
-  @@index([adminId])
-  @@index([action])
-  @@index([entityType])
-  @@index([createdAt])
-  @@index([branchId])
+  id    String  @id @default(cuid())
+  key   String  @unique
+  value String
 }
