@@ -1,17 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, readdir } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
 import { getSession } from '@/lib/auth-utils'
+import { randomBytes } from 'crypto'
+
+export async function GET(request: NextRequest) {
+  try {
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
+    
+    if (!existsSync(uploadDir)) {
+      return NextResponse.json({ 
+        exists: false, 
+        message: 'Upload directory does not exist',
+        uploadDir 
+      })
+    }
+    
+    const files = await readdir(uploadDir)
+    return NextResponse.json({ 
+      exists: true, 
+      fileCount: files.length,
+      files: files.slice(0, 10),
+      uploadDir
+    })
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Upload request received')
     const session = await getSession(request)
-    console.log('Session:', session ? `User: ${session.email}, Role: ${session.role}` : 'No session')
     
     if (!session) {
-      console.log('Unauthorized - no session')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -19,7 +41,6 @@ export async function POST(request: NextRequest) {
     const canEdit = session.canEditServices === true
 
     if (!isSuper && !canEdit) {
-      console.log('Forbidden - no permission')
       return NextResponse.json({ error: 'You do not have permission to upload images' }, { status: 403 })
     }
 
@@ -27,21 +48,16 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
 
     if (!file) {
-      console.log('No file provided')
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    console.log('File received:', file.name, file.size, file.type)
-
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!validTypes.includes(file.type)) {
-      console.log('Invalid file type:', file.type)
       return NextResponse.json({ error: 'Invalid file type. Please upload jpg, png, or webp images.' }, { status: 400 })
     }
 
     const maxSize = 20 * 1024 * 1024
     if (file.size > maxSize) {
-      console.log('File too large:', file.size)
       return NextResponse.json({ error: 'File size exceeds 20MB limit' }, { status: 400 })
     }
 
@@ -49,29 +65,27 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
 
     const timestamp = Date.now()
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '-')
-    const fileName = `service-${timestamp}-${originalName}`
+    const uniqueId = randomBytes(8).toString('hex')
+    const fileExt = path.extname(file.name).toLowerCase() || '.jpg'
+    const baseName = path.basename(file.name, fileExt).replace(/[^a-zA-Z0-9]/g, '-').substring(0, 30)
+    const fileName = `${timestamp}-${uniqueId}-${baseName}${fileExt}`
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
-    console.log('Upload directory:', uploadDir)
     
     if (!existsSync(uploadDir)) {
-      console.log('Creating upload directory...')
       await mkdir(uploadDir, { recursive: true })
     }
 
     const filePath = path.join(uploadDir, fileName)
-    console.log('Writing file to:', filePath)
     await writeFile(filePath, buffer)
-    console.log('File written successfully')
 
     const imageUrl = `/uploads/services/${fileName}`
-    console.log('Returning URL:', imageUrl)
 
     return NextResponse.json({ 
       success: true, 
       url: imageUrl,
-      fileName: fileName
+      fileName: fileName,
+      savedPath: filePath
     })
   } catch (error) {
     console.error('Upload error:', error)
