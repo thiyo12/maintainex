@@ -11,15 +11,18 @@ interface ServiceCardProps {
 }
 
 export function ServiceCard({ title, description, image, slug, price }: ServiceCardProps) {
+  const imageSrc = image.startsWith('/uploads/') ? `${image}?v=${Date.now()}` : image
+  
   return (
     <div className="card group">
       <div className="relative h-48 overflow-hidden">
         <Image
-          src={image}
+          src={imageSrc}
           alt={title}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          unoptimized={image.startsWith('/uploads/')}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         {price && (

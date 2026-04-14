@@ -162,12 +162,13 @@ function BookingFormContent() {
           <div className="bg-gradient-to-r from-primary-500 to-primary-400 rounded-xl p-4 mb-4 text-dark-900">
             <div className="flex items-center gap-3">
               <Image
-                src={selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100'}
+                src={selectedService.image?.startsWith('/uploads/') ? `${selectedService.image}?v=${Date.now()}` : (selectedService.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100')}
                 alt={selectedService.title}
                 width={48}
                 height={48}
                 sizes="48px"
                 className="w-12 h-12 rounded-lg object-cover"
+                unoptimized={selectedService.image?.startsWith('/uploads/')}
               />
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-sm truncate">{selectedService.title}</h3>

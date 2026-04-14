@@ -27,6 +27,10 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
     ? `${service.duration} min` 
     : null
 
+  const imageSrc = service.image?.startsWith('/uploads/') 
+    ? `${service.image}?v=${Date.now()}` 
+    : (service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600')
+
   return (
     <Link
       href={`/booking?service=${service.slug}`}
@@ -34,11 +38,12 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
     >
       <div className="relative h-48 overflow-hidden">
         <Image
-          src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
+          src={imageSrc}
           alt={service.title}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          unoptimized={service.image?.startsWith('/uploads/')}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         

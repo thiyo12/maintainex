@@ -48,6 +48,10 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
     ? `Rs. ${service.price.toLocaleString()}+` 
     : 'Contact for quote'
 
+  const imageSrc = service.image?.startsWith('/uploads/')
+    ? `${service.image}?v=${Date.now()}`
+    : (service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')
+  
   const reviews = service.reviews || []
   const avgRating = reviews.length > 0
     ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
@@ -71,11 +75,12 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
 
           <div className="relative h-56">
             <Image
-              src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
+              src={imageSrc}
               alt={service.title}
               fill
               sizes="(max-width: 768px) 100vw, 50vw"
               className="w-full h-full object-cover"
+              unoptimized={service.image?.startsWith('/uploads/')}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-6 left-6 right-6">

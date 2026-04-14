@@ -18,10 +18,12 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [currentValue, setCurrentValue] = useState(value)
+  const [imageKey, setImageKey] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setCurrentValue(value)
+    setImageKey(prev => prev + 1)
   }, [value])
 
   const handleUpload = async (file: File) => {
@@ -75,7 +77,10 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
 
       const data = await response.json()
       
-      onChange(data.url)
+      const newUrl = data.url
+      setCurrentValue(newUrl)
+      setImageKey(prev => prev + 1)
+      onChange(newUrl)
       toast.success('Image uploaded successfully!')
       setUploadProgress(100)
     } catch (error: any) {
@@ -116,9 +121,13 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     if (file) {
       handleUpload(file)
     }
+    if (inputRef.current) {
+      inputRef.current.value = ''
+    }
   }
 
   const removeImage = () => {
+    setCurrentValue('')
     onChange('')
     setError(null)
   }
@@ -129,15 +138,17 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
   }
 
   if (currentValue) {
+    const displayUrl = `${currentValue}?v=${imageKey}`
     return (
       <div className="space-y-3">
         <div className="relative w-full h-48 rounded-xl overflow-hidden border-2 border-green-200 bg-green-50">
           <Image
-            src={currentValue}
+            key={imageKey}
+            src={displayUrl}
             alt="Uploaded"
-            width={400}
-            height={200}
+            fill
             className="w-full h-full object-cover"
+            unoptimized
           />
           <div className="absolute top-2 left-2 px-2 py-1 bg-green-500 text-white text-xs rounded-full flex items-center gap-1">
             <FiCheck className="w-3 h-3" />

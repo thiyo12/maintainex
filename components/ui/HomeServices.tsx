@@ -102,12 +102,13 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
             <div className="grid lg:grid-cols-2">
               <div className="relative h-48 lg:h-auto">
                 <Image
-                  src={featuredServices[0]?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
+                  src={featuredServices[0]?.image?.startsWith('/uploads/') ? `${featuredServices[0]?.image}?v=${Date.now()}` : (featuredServices[0]?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')}
                   alt={featuredCategory?.name || 'Featured service'}
                   fill
                   priority
                   sizes="(max-width: 1024px) 100vw, 50vw"
                   className="w-full h-full object-cover"
+                  unoptimized={featuredServices[0]?.image?.startsWith('/uploads/')}
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />
               </div>
@@ -160,11 +161,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
             >
               <div className="relative h-40 overflow-hidden">
                   <Image
-                    src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
+                    src={service.image?.startsWith('/uploads/') ? `${service.image}?v=${Date.now()}` : (service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600')}
                     alt={service.title}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    unoptimized={service.image?.startsWith('/uploads/')}
                   />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                 
