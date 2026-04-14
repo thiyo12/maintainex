@@ -47,6 +47,3 @@ next-env.d.ts
 # Logs
 *.log
 logs/
-
-# Uploads (if not using cloud storage)
-uploads/
