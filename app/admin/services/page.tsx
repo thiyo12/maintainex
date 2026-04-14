@@ -131,6 +131,19 @@ export default function AdminServices() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    console.log('Form submission started')
+    console.log('Form data:', JSON.stringify(formData, null, 2))
+    
+    if (!formData.title || formData.title.trim().length < 2) {
+      toast.error('Service title is required (at least 2 characters)')
+      return
+    }
+    
+    if (!formData.categoryId && isSuperAdmin) {
+      toast.error('Please select a category')
+      return
+    }
+    
     try {
       const url = editingService ? `/api/services/${editingService.id}` : '/api/services'
       const method = editingService ? 'PUT' : 'POST'
@@ -150,6 +163,9 @@ export default function AdminServices() {
         bodyData.categoryId = formData.categoryId
       }
 
+      console.log('Sending request to:', url)
+      console.log('Request body:', JSON.stringify(bodyData, null, 2))
+
       const authHeaders = getAuthHeader()
       const res = await fetch(url, {
         method,
@@ -157,13 +173,19 @@ export default function AdminServices() {
         body: JSON.stringify(bodyData)
       })
 
+      console.log('Response status:', res.status)
+
       if (res.status === 401) {
+        console.log('Unauthorized - redirecting to login')
         router.push('/admin/login')
         return
       }
+      
+      const responseData = await res.json()
+      console.log('Response data:', JSON.stringify(responseData, null, 2))
+
       if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.error || 'Failed to save')
+        throw new Error(responseData.error || 'Failed to save')
       }
 
       toast.success(editingService ? 'Service updated successfully' : 'Service created successfully')
@@ -172,6 +194,7 @@ export default function AdminServices() {
       resetForm()
       fetchData()
     } catch (error: any) {
+      console.error('Save error:', error)
       toast.error(error.message || 'Failed to save service')
     }
   }

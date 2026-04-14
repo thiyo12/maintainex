@@ -49,34 +49,45 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     setUploadProgress(0)
     
     try {
+      console.log('Starting upload for file:', file.name, file.size)
       const formData = new FormData()
       formData.append('file', file)
 
       const authHeaders = getAuthHeader()
+      console.log('Auth headers:', authHeaders)
+      
       const response = await fetch('/api/upload/service', {
         method: 'POST',
         headers: { ...authHeaders },
         body: formData
       })
 
+      console.log('Upload response status:', response.status)
+
       if (response.status === 401) {
+        console.log('Unauthorized - redirecting to login')
         toast.error('Session expired. Please login again.')
         window.location.href = '/admin/login'
         return
       }
 
       if (response.status === 403) {
+        console.log('Forbidden - no permission')
         toast.error('You do not have permission to upload images.')
         return
       }
 
       if (!response.ok) {
         const errorData = await response.json()
+        console.log('Upload error response:', errorData)
         throw new Error(errorData.error || 'Upload failed')
       }
 
       const data = await response.json()
+      console.log('Upload success response:', data)
+      
       const newUrl = data.url
+      console.log('New image URL:', newUrl)
       
       setCurrentValue(newUrl)
       onChange(newUrl)
