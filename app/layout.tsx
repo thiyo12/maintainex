@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   keywords: 'cleaning services, Sri Lanka, home cleaning, office cleaning, deep cleaning, industrial cleaning',
   icons: {
     icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
   },
   openGraph: {
     title: 'Maintainex - Professional Cleaning Services',
