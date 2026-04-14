@@ -35,23 +35,31 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
 
   const totalJobs = Math.floor(Math.random() * 5000) + 1000
 
-  const imageSrc = firstService?.image?.startsWith('/uploads/')
-    ? `${firstService.image}?v=${Date.now()}`
+  const isUploadedImage = firstService?.image?.startsWith('/uploads/')
+  const imageSrc = isUploadedImage 
+    ? `${firstService.image}?t=${Date.now()}` 
     : (firstService?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')
 
   return (
     <div className="bg-white rounded-3xl overflow-hidden shadow-xl mb-12">
       <div className="grid lg:grid-cols-2">
         <div className="relative h-64 lg:h-auto">
-          <Image
-            src={imageSrc}
-            alt={category.name}
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-cover"
-            unoptimized={firstService?.image?.startsWith('/uploads/')}
-          />
+          {isUploadedImage ? (
+            <img
+              src={imageSrc}
+              alt={category.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Image
+              src={imageSrc}
+              alt={category.name}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 50vw"
+              className="object-cover"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />
         </div>
 

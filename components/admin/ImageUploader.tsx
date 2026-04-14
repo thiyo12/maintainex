@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { FiUpload, FiX, FiCheck, FiAlertCircle } from 'react-icons/fi'
-import Image from 'next/image'
 import toast from 'react-hot-toast'
 import { getAuthHeader } from '@/lib/auth-client'
 
@@ -18,18 +17,19 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [currentValue, setCurrentValue] = useState(value)
-  const [imageKey, setImageKey] = useState(0)
+  const [imageError, setImageError] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setCurrentValue(value)
-    setImageKey(prev => prev + 1)
+    setImageError(false)
   }, [value])
 
   const handleUpload = async (file: File) => {
     if (disabled) return
 
     setError(null)
+    setImageError(false)
     
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
     if (!validTypes.includes(file.type)) {
@@ -76,17 +76,16 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       }
 
       const data = await response.json()
-      
       const newUrl = data.url
+      
       setCurrentValue(newUrl)
-      setImageKey(prev => prev + 1)
       onChange(newUrl)
       toast.success('Image uploaded successfully!')
       setUploadProgress(100)
-    } catch (error: any) {
-      console.error('Upload error:', error)
-      toast.error(error.message || 'Failed to upload image')
-      setError(error.message || 'Upload failed')
+    } catch (err: any) {
+      console.error('Upload error:', err)
+      toast.error(err.message || 'Failed to upload image')
+      setError(err.message || 'Upload failed')
     } finally {
       setUploading(false)
     }
@@ -126,8 +125,19 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     }
   }
 
+  const handleImageError = () => {
+    setImageError(true)
+    setError('Failed to load image')
+  }
+
+  const handleImageLoad = () => {
+    setImageError(false)
+    setError(null)
+  }
+
   const removeImage = () => {
     setCurrentValue('')
+    setImageError(false)
     onChange('')
     setError(null)
   }
@@ -137,18 +147,16 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     inputRef.current?.click()
   }
 
-  if (currentValue) {
-    const displayUrl = `${currentValue}?v=${imageKey}`
+  if (currentValue && !imageError) {
     return (
       <div className="space-y-3">
         <div className="relative w-full h-48 rounded-xl overflow-hidden border-2 border-green-200 bg-green-50">
-          <Image
-            key={imageKey}
-            src={displayUrl}
+          <img
+            src={currentValue}
             alt="Uploaded"
-            fill
             className="w-full h-full object-cover"
-            unoptimized
+            onError={handleImageError}
+            onLoad={handleImageLoad}
           />
           <div className="absolute top-2 left-2 px-2 py-1 bg-green-500 text-white text-xs rounded-full flex items-center gap-1">
             <FiCheck className="w-3 h-3" />

@@ -321,14 +321,21 @@ export default function AdminServices() {
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         {service.image ? (
-                          <Image
-                            src={service.image.startsWith('/uploads/') ? `${service.image}?v=${Date.now()}` : service.image}
-                            alt={service.title}
-                            width={48}
-                            height={48}
-                            className="w-12 h-12 rounded-lg object-cover mr-4"
-                            unoptimized={service.image.startsWith('/uploads/')}
-                          />
+                          service.image.startsWith('/uploads/') ? (
+                            <img
+                              src={`${service.image}?t=${Date.now()}`}
+                              alt={service.title}
+                              className="w-12 h-12 rounded-lg object-cover mr-4"
+                            />
+                          ) : (
+                            <Image
+                              src={service.image}
+                              alt={service.title}
+                              width={48}
+                              height={48}
+                              className="w-12 h-12 rounded-lg object-cover mr-4"
+                            />
+                          )
                         ) : (
                           <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center mr-4">
                             <FiImage className="text-gray-400" />
@@ -416,14 +423,21 @@ export default function AdminServices() {
             <h2 className="text-xl font-bold text-gray-900 mb-6">Service Details</h2>
             
             {viewingService.image && (
-              <Image
-                src={viewingService.image.startsWith('/uploads/') ? `${viewingService.image}?v=${Date.now()}` : viewingService.image}
-                alt={viewingService.title}
-                width={600}
-                height={192}
-                className="w-full h-48 object-cover rounded-xl mb-4"
-                unoptimized={viewingService.image.startsWith('/uploads/')}
-              />
+              viewingService.image.startsWith('/uploads/') ? (
+                <img
+                  src={`${viewingService.image}?t=${Date.now()}`}
+                  alt={viewingService.title}
+                  className="w-full h-48 object-cover rounded-xl mb-4"
+                />
+              ) : (
+                <Image
+                  src={viewingService.image}
+                  alt={viewingService.title}
+                  width={600}
+                  height={192}
+                  className="w-full h-48 object-cover rounded-xl mb-4"
+                />
+              )
             )}
             
             <div className="space-y-4">

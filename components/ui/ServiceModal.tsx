@@ -48,8 +48,9 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
     ? `Rs. ${service.price.toLocaleString()}+` 
     : 'Contact for quote'
 
-  const imageSrc = service.image?.startsWith('/uploads/')
-    ? `${service.image}?v=${Date.now()}`
+  const isUploadedImage = service.image?.startsWith('/uploads/')
+  const imageSrc = isUploadedImage 
+    ? `${service.image}?t=${Date.now()}` 
     : (service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')
   
   const reviews = service.reviews || []
@@ -74,14 +75,21 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
           </button>
 
           <div className="relative h-56">
-            <Image
-              src={imageSrc}
-              alt={service.title}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="w-full h-full object-cover"
-              unoptimized={service.image?.startsWith('/uploads/')}
-            />
+            {isUploadedImage ? (
+              <img
+                src={imageSrc}
+                alt={service.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Image
+                src={imageSrc}
+                alt={service.title}
+                fill
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="w-full h-full object-cover"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-6 left-6 right-6">
               <h2 className="text-2xl font-bold text-white">{service.title}</h2>
