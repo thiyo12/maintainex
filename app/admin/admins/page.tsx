@@ -211,7 +211,7 @@ export default function AdminAdmins() {
 
     try {
       const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admins/${id}`, { method: 'DELETE', headers: authHeaders })
+      const res = await fetch(`/api/admins/${id}`, { method: 'DELETE', headers: { ...authHeaders } })
 
       if (res.status === 401) {
         window.location.href = '/admin/login'

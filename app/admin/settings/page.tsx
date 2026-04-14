@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiSave, FiMail, FiPhone, FiMapPin, FiMessageCircle } from 'react-icons/fi'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Settings {
   companyName: string
@@ -37,7 +38,14 @@ export default function AdminSettings() {
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('/api/settings')
+      const authHeaders = getAuthHeader()
+      const res = await fetch('/api/settings', { headers: { ...authHeaders } })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+      
       const data = await res.json()
       setSettings({
         companyName: data.companyName || 'Maintainex',
@@ -62,11 +70,17 @@ export default function AdminSettings() {
     setSaving(true)
 
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch('/api/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify(settings)
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiStar, FiCheck, FiTrash2, FiRefreshCw, FiClock } from 'react-icons/fi'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Review {
   id: string
@@ -29,9 +30,16 @@ export default function AdminReviews() {
 
   const fetchReviews = async () => {
     try {
-      const res = await fetch('/api/reviews')
+      const authHeaders = getAuthHeader()
+      const res = await fetch('/api/reviews', { headers: { ...authHeaders } })
+      
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+      
       const data = await res.json()
-      setReviews(data)
+      setReviews(data || [])
     } catch (error) {
       toast.error('Failed to fetch reviews')
     } finally {
@@ -41,11 +49,17 @@ export default function AdminReviews() {
 
   const approveReview = async (id: string) => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/reviews/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ status: 'APPROVED' })
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 
@@ -58,11 +72,17 @@ export default function AdminReviews() {
 
   const rejectReview = async (id: string) => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/reviews/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ status: 'REJECTED' })
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 
@@ -77,7 +97,16 @@ export default function AdminReviews() {
     if (!confirm('Are you sure you want to delete this review?')) return
 
     try {
-      const res = await fetch(`/api/reviews/${id}`, { method: 'DELETE' })
+      const authHeaders = getAuthHeader()
+      const res = await fetch(`/api/reviews/${id}`, { 
+        method: 'DELETE',
+        headers: { ...authHeaders }
+      })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 

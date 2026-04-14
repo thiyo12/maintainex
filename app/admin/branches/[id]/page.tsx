@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiArrowLeft, FiMapPin, FiPhone, FiMail, FiUsers, FiEdit2, FiTrash2, FiPlus, FiX, FiRefreshCw, FiEye, FiEyeOff } from 'react-icons/fi'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface Admin {
   id: string
@@ -58,7 +59,14 @@ export default function BranchProfilePage() {
 
   const fetchBranch = async () => {
     try {
-      const res = await fetch(`/api/branches/${branchId}?includeAdmins=true`)
+      const authHeaders = getAuthHeader()
+      const res = await fetch(`/api/branches/${branchId}?includeAdmins=true`, {
+        headers: { ...authHeaders }
+      })
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
       if (!res.ok) throw new Error('Branch not found')
       const data = await res.json()
       setBranch(data)
@@ -93,6 +101,7 @@ export default function BranchProfilePage() {
     setSavingAdmin(true)
 
     try {
+      const authHeaders = getAuthHeader()
       const url = editingAdmin ? `/api/admins/${editingAdmin.id}` : '/api/admins'
       const method = editingAdmin ? 'PUT' : 'POST'
 
@@ -102,9 +111,14 @@ export default function BranchProfilePage() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify(body)
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) {
         const error = await res.json()
@@ -123,11 +137,17 @@ export default function BranchProfilePage() {
 
   const toggleAdminStatus = async (admin: Admin) => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ isActive: !admin.isActive, branchId })
       })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
 
       if (!res.ok) throw new Error()
 
@@ -142,7 +162,17 @@ export default function BranchProfilePage() {
     if (!confirm('Are you sure you want to delete this admin?')) return
 
     try {
-      const res = await fetch(`/api/admins/${adminId}`, { method: 'DELETE' })
+      const authHeaders = getAuthHeader()
+      const res = await fetch(`/api/admins/${adminId}`, { 
+        method: 'DELETE',
+        headers: { ...authHeaders }
+      })
+
+      if (res.status === 401) {
+        window.location.href = '/admin/login'
+        return
+      }
+
       const data = await res.json()
 
       if (!res.ok) throw new Error(data.error || 'Failed to delete')

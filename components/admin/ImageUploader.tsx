@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { FiUpload, FiX, FiCheck, FiAlertCircle } from 'react-icons/fi'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
+import { getAuthHeader } from '@/lib/auth-client'
 
 interface ImageUploaderProps {
   value: string
@@ -49,10 +50,23 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       const formData = new FormData()
       formData.append('file', file)
 
+      const authHeaders = getAuthHeader()
       const response = await fetch('/api/upload/service', {
         method: 'POST',
+        headers: { ...authHeaders },
         body: formData
       })
+
+      if (response.status === 401) {
+        toast.error('Session expired. Please login again.')
+        window.location.href = '/admin/login'
+        return
+      }
+
+      if (response.status === 403) {
+        toast.error('You do not have permission to upload images.')
+        return
+      }
 
       if (!response.ok) {
         const errorData = await response.json()
