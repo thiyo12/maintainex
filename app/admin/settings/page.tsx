@@ -19,8 +19,8 @@ interface Settings {
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState<Settings>({
-    companyName: 'Maintainex',
-    email: 'info@maintainex.com',
+    companyName: 'Maintain',
+    email: 'info@maintain.lk',
     phone: '+94 XX XXX XXXX',
     address: 'Jaffna, Sri Lanka',
     mapEmbedUrl: '',
@@ -48,8 +48,8 @@ export default function AdminSettings() {
       
       const data = await res.json()
       setSettings({
-        companyName: data.companyName || 'Maintainex',
-        email: data.email || 'info@maintainex.com',
+        companyName: data.companyName || 'Maintain',
+        email: data.email || 'info@maintain.lk',
         phone: data.phone || '+94 XX XXX XXXX',
         address: data.address || 'Jaffna, Sri Lanka',
         mapEmbedUrl: data.mapEmbedUrl || '',

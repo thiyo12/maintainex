@@ -143,8 +143,8 @@ model Application {
 
 model Settings {
   id                 String @id
-  companyName        String @default("Maintainex")
-  email              String @default("info@maintainex.com")
+  companyName        String @default("Maintain")
+  email              String @default("info@maintain.lk")
   phone              String @default("+94 XX XXX XXXX")
   address            String @default("Sri Lanka")
   mapEmbedUrl        String?
