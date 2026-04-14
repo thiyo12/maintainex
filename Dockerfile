@@ -12,6 +12,8 @@ RUN npx prisma generate
 
 COPY . .
 
+RUN mkdir -p public/uploads/services && chmod 755 public/uploads/services
+
 RUN npm run build
 
 EXPOSE 3000
