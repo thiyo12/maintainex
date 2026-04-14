@@ -166,6 +166,7 @@ function BookingFormContent() {
                 alt={selectedService.title}
                 width={48}
                 height={48}
+                sizes="48px"
                 className="w-12 h-12 rounded-lg object-cover"
               />
               <div className="flex-1 min-w-0">

@@ -50,7 +50,6 @@ export default function AdminBookings() {
   const [editDistrict, setEditDistrict] = useState('')
   const [editBranchId, setEditBranchId] = useState('')
 
-  const authHeaders = getAuthHeader()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
@@ -62,6 +61,7 @@ export default function AdminBookings() {
 
   const fetchBookings = async () => {
     try {
+      const authHeaders = getAuthHeader()
       const params = new URLSearchParams()
       if (filterBranch) params.append('branchId', filterBranch)
       
@@ -97,6 +97,7 @@ export default function AdminBookings() {
 
   const fetchBranches = async () => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch('/api/branches', { headers: { ...authHeaders } })
       if (res.status === 401) {
         window.location.href = '/admin/login'
@@ -113,6 +114,7 @@ export default function AdminBookings() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
@@ -137,6 +139,7 @@ export default function AdminBookings() {
     if (!editingBooking) return
     
     try {
+      const authHeaders = getAuthHeader()
       let branchId = null
       if (editBranchId) {
         branchId = editBranchId
@@ -180,6 +183,7 @@ export default function AdminBookings() {
     if (!confirm('Are you sure you want to delete this booking?')) return
     
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/bookings/${id}`, { 
         method: 'DELETE',
         headers: { ...authHeaders }

@@ -104,8 +104,9 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                 <Image
                   src={featuredServices[0]?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
                   alt={featuredCategory?.name || 'Featured service'}
-                  width={800}
-                  height={600}
+                  fill
+                  priority
+                  sizes="(max-width: 1024px) 100vw, 50vw"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />
@@ -157,12 +158,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               href={`/booking?service=${service.slug}`}
               className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
             >
-<div className="relative h-40 overflow-hidden">
+              <div className="relative h-40 overflow-hidden">
                   <Image
                     src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
                     alt={service.title}
-                    width={600}
-                    height={400}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />

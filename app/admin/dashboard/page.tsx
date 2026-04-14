@@ -39,10 +39,9 @@ export default function AdminDashboard() {
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
-  const authHeaders = getAuthHeader()
-
   const fetchMaintenanceSettings = useCallback(async () => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch('/api/settings/maintenance?' + Date.now(), { 
         cache: 'no-store',
         headers: {
@@ -56,11 +55,12 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Failed to fetch maintenance settings:', error)
     }
-  }, [authHeaders])
+  }, [])
 
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
+        const authHeaders = getAuthHeader()
         const res = await fetch('/api/dashboard', {
           headers: {
             ...authHeaders
@@ -90,7 +90,7 @@ export default function AdminDashboard() {
     }
     
     fetchDashboard()
-  }, [authHeaders])
+  }, [])
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -101,6 +101,7 @@ export default function AdminDashboard() {
   const saveMaintenance = async () => {
     setSaving(true)
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch('/api/settings/maintenance', {
         method: 'PUT',
         headers: { 
@@ -149,6 +150,7 @@ export default function AdminDashboard() {
     
     setSaving(true)
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch('/api/settings/maintenance', {
         method: 'PUT',
         headers: { 

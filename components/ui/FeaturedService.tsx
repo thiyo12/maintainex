@@ -43,6 +43,8 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
             src={firstService?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
             alt={category.name}
             fill
+            priority
+            sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />

@@ -36,8 +36,8 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
         <Image
           src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
           alt={service.title}
-          width={600}
-          height={192}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />

@@ -73,9 +73,9 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
             <Image
               src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800'}
               alt={service.title}
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
               className="w-full h-full object-cover"
-              width={800}
-              height={400}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
             <div className="absolute bottom-6 left-6 right-6">

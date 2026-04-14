@@ -51,7 +51,6 @@ export default function AdminBranches() {
     districts: []
   })
   const [saving, setSaving] = useState(false)
-  const authHeaders = getAuthHeader()
 
   useEffect(() => {
     fetchBranches()
@@ -60,7 +59,7 @@ export default function AdminBranches() {
   const fetchBranches = async () => {
     setError(null)
     try {
-      const res = await fetch('/api/branches?includeStats=true', { headers: { ...authHeaders } })
+      const res = await fetch('/api/branches?includeStats=true', { headers: { ...getAuthHeader() } })
       if (res.status === 401) {
         router.push('/admin/login')
         return
@@ -132,7 +131,7 @@ export default function AdminBranches() {
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({
           ...formData,
           districts: JSON.stringify(formData.districts)
@@ -165,7 +164,7 @@ export default function AdminBranches() {
     try {
       const res = await fetch(`/api/branches/${branch.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({ isActive: !branch.isActive })
       })
 
@@ -189,7 +188,7 @@ export default function AdminBranches() {
     setError(null)
 
     try {
-      const res = await fetch(`/api/branches/${id}`, { method: 'DELETE', headers: { ...authHeaders } })
+      const res = await fetch(`/api/branches/${id}`, { method: 'DELETE', headers: { ...getAuthHeader() } })
 
       if (res.status === 401) {
         router.push('/admin/login')

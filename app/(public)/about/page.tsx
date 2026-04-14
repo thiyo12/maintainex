@@ -44,6 +44,8 @@ export default function AboutPage() {
                   alt="Our team"
                   width={800}
                   height={600}
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  priority
                   className="rounded-2xl shadow-2xl"
                   style={{ objectFit: 'cover' }}
                 />

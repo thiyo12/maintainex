@@ -50,8 +50,6 @@ export default function AdminApplications() {
   const [editDistrict, setEditDistrict] = useState('')
   const [editBranchId, setEditBranchId] = useState('')
 
-  const authHeaders = getAuthHeader()
-
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
@@ -62,6 +60,7 @@ export default function AdminApplications() {
   }, [])
 
   const fetchApplications = async () => {
+    const authHeaders = getAuthHeader()
     try {
       const params = new URLSearchParams()
       if (filterBranch) params.append('branchId', filterBranch)
@@ -97,6 +96,7 @@ export default function AdminApplications() {
   }
 
   const fetchBranches = async () => {
+    const authHeaders = getAuthHeader()
     try {
       const res = await fetch('/api/branches', { headers: { ...authHeaders } })
       if (res.status === 401) {
@@ -113,6 +113,7 @@ export default function AdminApplications() {
   }
 
   const updateStatus = async (id: string, status: string) => {
+    const authHeaders = getAuthHeader()
     try {
       const res = await fetch(`/api/applications/${id}`, {
         method: 'PATCH',
@@ -137,6 +138,7 @@ export default function AdminApplications() {
   const updateDistrict = async () => {
     if (!editingApp) return
     
+    const authHeaders = getAuthHeader()
     try {
       let branchId = null
       if (editBranchId) {
@@ -176,6 +178,7 @@ export default function AdminApplications() {
   const deleteApplication = async (id: string) => {
     if (!confirm('Are you sure you want to delete this application?')) return
     
+    const authHeaders = getAuthHeader()
     try {
       const res = await fetch(`/api/applications/${id}`, { 
         method: 'DELETE',

@@ -92,7 +92,6 @@ export default function AdminReports() {
   const [period, setPeriod] = useState<'week' | 'month' | 'year'>('month')
   const [filterEntity, setFilterEntity] = useState<string>('')
   const [exporting, setExporting] = useState(false)
-  const authHeaders = getAuthHeader()
 
   useEffect(() => {
     fetchReport()
@@ -102,6 +101,7 @@ export default function AdminReports() {
     setLoading(true)
     setError(null)
     try {
+      const authHeaders = getAuthHeader()
       const params = new URLSearchParams({ period })
       if (filterEntity) params.append('entityType', filterEntity)
       
@@ -128,6 +128,7 @@ export default function AdminReports() {
   const exportPDF = async () => {
     setExporting(true)
     try {
+      const authHeaders = getAuthHeader()
       const response = await fetch(`/api/reports/export?period=${period}`, { headers: { ...authHeaders } })
       
       if (!response.ok) {

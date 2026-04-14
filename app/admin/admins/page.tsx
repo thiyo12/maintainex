@@ -37,7 +37,6 @@ export default function AdminAdmins() {
   const [admins, setAdmins] = useState<Admin[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
-  const authHeaders = getAuthHeader()
   const [showModal, setShowModal] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null)
   const [formData, setFormData] = useState<AdminFormData>({
@@ -61,6 +60,7 @@ export default function AdminAdmins() {
     setLoading(true)
     setError(null)
     try {
+      const authHeaders = getAuthHeader()
       const [adminsRes, branchesRes] = await Promise.all([
         fetch('/api/admins', { headers: authHeaders }),
         fetch('/api/branches', { headers: authHeaders })
@@ -116,6 +116,7 @@ export default function AdminAdmins() {
     setSaving(true)
 
     try {
+      const authHeaders = getAuthHeader()
       const url = editingAdmin ? `/api/admins/${editingAdmin.id}` : '/api/admins'
       const method = editingAdmin ? 'PUT' : 'POST'
 
@@ -161,6 +162,7 @@ export default function AdminAdmins() {
 
   const toggleStatus = async (admin: Admin) => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
@@ -183,6 +185,7 @@ export default function AdminAdmins() {
 
   const toggleServicePermission = async (admin: Admin) => {
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admins/${admin.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
@@ -207,6 +210,7 @@ export default function AdminAdmins() {
     if (!confirm('Are you sure you want to delete this admin?')) return
 
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admins/${id}`, { method: 'DELETE', headers: authHeaders })
 
       if (res.status === 401) {

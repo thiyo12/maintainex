@@ -37,7 +37,6 @@ export default function AdminServices() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const authHeaders = getAuthHeader()
   const [showModal, setShowModal] = useState(false)
   const [viewingService, setViewingService] = useState<Service | null>(null)
   const [editingService, setEditingService] = useState<Service | null>(null)
@@ -67,6 +66,7 @@ export default function AdminServices() {
   const fetchData = async () => {
     try {
       setError(null)
+      const authHeaders = getAuthHeader()
       const [servicesRes, categoriesRes] = await Promise.all([
         fetch('/api/services', { headers: { ...authHeaders } }),
         fetch('/api/categories', { headers: { ...authHeaders } })
@@ -99,6 +99,7 @@ export default function AdminServices() {
     
     setAddingCategory(true)
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch('/api/services', {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
@@ -149,6 +150,7 @@ export default function AdminServices() {
         bodyData.categoryId = formData.categoryId
       }
 
+      const authHeaders = getAuthHeader()
       const res = await fetch(url, {
         method,
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
@@ -178,6 +180,7 @@ export default function AdminServices() {
     if (!confirm('Are you sure you want to delete this service?')) return
 
     try {
+      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/services/${id}`, { method: 'DELETE', headers: { ...authHeaders } })
       if (res.status === 401) {
         router.push('/admin/login')
