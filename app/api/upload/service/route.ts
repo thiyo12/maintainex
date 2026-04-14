@@ -31,14 +31,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Upload API called')
+    console.log('Headers:', Object.fromEntries(request.headers.entries()))
+    
     const session = await getSession(request)
+    console.log('Session:', session)
     
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', debug: 'No session found' }, { status: 401 })
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
     const canEdit = session.canEditServices === true
+    console.log('Permissions - isSuper:', isSuper, 'canEdit:', canEdit)
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to upload images' }, { status: 403 })

@@ -40,9 +40,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('Service PUT called')
+    console.log('Headers:', Object.fromEntries(request.headers.entries()))
+    
     const session = await getSession(request)
+    console.log('Session:', session)
+    
     const isSuper = session?.role === 'SUPER_ADMIN'
     const canEdit = session?.canEditServices === true
+    console.log('Permissions - isSuper:', isSuper, 'canEdit:', canEdit)
 
     if (!isSuper && !canEdit) {
       return NextResponse.json({ error: 'You do not have permission to edit services' }, { status: 403 })
