@@ -31,14 +31,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Upload API called')
+    console.log('=== Upload API called ===')
     console.log('Headers:', Object.fromEntries(request.headers.entries()))
     
     const session = await getSession(request)
-    console.log('Session:', session)
+    console.log('Session result:', session)
     
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized', debug: 'No session found' }, { status: 401 })
+      console.log('=== AUTH FAILED ===')
+      return NextResponse.json({ error: 'Unauthorized', reason: 'No valid session' }, { status: 401 })
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
@@ -46,11 +47,14 @@ export async function POST(request: NextRequest) {
     console.log('Permissions - isSuper:', isSuper, 'canEdit:', canEdit)
 
     if (!isSuper && !canEdit) {
-      return NextResponse.json({ error: 'You do not have permission to upload images' }, { status: 403 })
+      console.log('=== PERMISSION DENIED ===')
+      return NextResponse.json({ error: 'You do not have permission to upload images', isSuper, canEdit }, { status: 403 })
     }
 
+    console.log('Parsing form data...')
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    console.log('File received:', file?.name, file?.size, file?.type)
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -66,8 +70,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size exceeds 20MB limit' }, { status: 400 })
     }
 
+    console.log('Reading file buffer...')
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
+    console.log('Buffer size:', buffer.length)
 
     const timestamp = Date.now()
     const uniqueId = randomBytes(8).toString('hex')
@@ -76,15 +82,20 @@ export async function POST(request: NextRequest) {
     const fileName = `${timestamp}-${uniqueId}-${baseName}${fileExt}`
 
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
+    console.log('Upload dir:', uploadDir)
     
     if (!existsSync(uploadDir)) {
+      console.log('Creating upload directory...')
       await mkdir(uploadDir, { recursive: true })
     }
 
     const filePath = path.join(uploadDir, fileName)
+    console.log('Writing to:', filePath)
     await writeFile(filePath, buffer)
+    console.log('File written successfully!')
 
     const imageUrl = `/uploads/services/${fileName}`
+    console.log('Image URL:', imageUrl)
 
     return NextResponse.json({ 
       success: true, 
@@ -93,7 +104,8 @@ export async function POST(request: NextRequest) {
       savedPath: filePath
     })
   } catch (error) {
-    console.error('Upload error:', error)
-    return NextResponse.json({ error: 'Failed to upload file', details: String(error) }, { status: 500 })
+    console.error('=== UPLOAD ERROR ===')
+    console.error(error)
+    return NextResponse.json({ error: 'Failed to upload file', details: String(error), stack: error instanceof Error ? error.stack : '' }, { status: 500 })
   }
 }

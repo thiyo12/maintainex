@@ -80,7 +80,7 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       if (!response.ok) {
         const errorData = await response.json()
         console.log('Upload error response:', errorData)
-        throw new Error(errorData.error || 'Upload failed')
+        throw new Error(errorData.error || errorData.reason || 'Upload failed')
       }
 
       const data = await response.json()
