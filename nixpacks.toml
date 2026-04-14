@@ -1,0 +1,15 @@
+[phases.setup]
+nix_channel = "nixos-23.11"
+
+[nixpacks.env]
+NODE_VERSION = "20"
+
+[phases.build]
+cmds = [
+  "npm install",
+  "npx prisma generate",
+  "npm run build"
+]
+
+[start]
+cmd = "npm start"
