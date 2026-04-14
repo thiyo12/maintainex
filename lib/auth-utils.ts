@@ -22,7 +22,8 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
           email: decoded.email,
           role: decoded.role,
           branchId: decoded.branchId || null,
-          name: decoded.name || null
+          name: decoded.name || null,
+          canEditServices: decoded.canEditServices || false
         }
       }
     } catch {
@@ -68,6 +69,7 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
     email: payload.email,
     role: payload.role,
     branchId: payload.branchId,
-    name: payload.name
+    name: payload.name,
+    canEditServices: payload.canEditServices || false
   }
 }

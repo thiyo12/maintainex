@@ -65,10 +65,11 @@ export async function POST(request: NextRequest) {
       email: admin.email,
       role: admin.role,
       branchId: admin.branchId,
-      name: admin.name
+      name: admin.name,
+      canEditServices: admin.canEditServices
     })
     
-    console.log('Login successful for:', admin.email, 'role:', admin.role)
+    console.log('Login successful for:', admin.email, 'role:', admin.role, 'canEditServices:', admin.canEditServices)
 
     const response = NextResponse.json({
       success: true,
@@ -77,7 +78,8 @@ export async function POST(request: NextRequest) {
         email: admin.email,
         name: admin.name,
         role: admin.role,
-        branchId: admin.branchId
+        branchId: admin.branchId,
+        canEditServices: admin.canEditServices
       }
     })
 
