@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     shortcut: '/favicon.svg',
   },
   openGraph: {
-    title: 'Maintainex - Professional Cleaning Services',
+    title: 'Maintain - Professional Cleaning Services',
     description: 'Premium cleaning services for homes and businesses in Sri Lanka',
     type: 'website',
   },
