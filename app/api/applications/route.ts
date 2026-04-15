@@ -26,14 +26,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const branchId = searchParams.get('branchId')
-    const district = searchParams.get('district')
 
     const isSuper = session.role === 'SUPER_ADMIN'
     const userBranchId = session.branchId
 
     const where: any = {}
     if (status) where.status = status
-    if (district) where.district = district
 
     if (!isSuper && userBranchId) {
       where.branchId = userBranchId
@@ -43,15 +41,6 @@ export async function GET(request: NextRequest) {
 
     const applications = await prisma.application.findMany({
       where,
-      include: {
-        branch: {
-          select: {
-            id: true,
-            name: true,
-            location: true
-          }
-        }
-      },
       orderBy: { createdAt: 'desc' }
     })
 
@@ -65,18 +54,16 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    let { name, phone, email, district, address, position, experience } = body
+    let { name, phone, email, service, experience, branchId } = body
 
-    if (!name || !phone || !email || !district || !address || !position || !experience) {
+    if (!name || !phone || !email || !service || !experience) {
       return NextResponse.json({ error: 'Please fill in all required fields' }, { status: 400 })
     }
 
     name = sanitizeString(name)
     phone = sanitizeString(phone)
     email = sanitizeString(email)
-    district = sanitizeString(district)
-    address = sanitizeString(address)
-    position = sanitizeString(position)
+    service = sanitizeString(service)
     experience = sanitizeString(experience)
 
     if (name.length < 2 || name.length > 100) {
@@ -91,29 +78,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
     }
 
-    if (address.length < 5) {
-      return NextResponse.json({ error: 'Please enter a complete address' }, { status: 400 })
-    }
-
     if (experience.length < 10) {
       return NextResponse.json({ error: 'Please describe your experience in at least 10 characters' }, { status: 400 })
     }
 
-    const branches = await prisma.branch.findMany({
-      where: { isActive: true }
-    })
-
-    let branchId = null
-    for (const branch of branches) {
-      try {
-        const branchDistricts: string[] = JSON.parse(branch.districts || '[]')
-        if (Array.isArray(branchDistricts) && branchDistricts.includes(district)) {
-          branchId = branch.id
-          break
-        }
-      } catch {
-        continue
-      }
+    if (!branchId) {
+      const branches = await prisma.branch.findMany({
+        where: { isActive: true },
+        take: 1
+      })
+      branchId = branches[0]?.id || null
     }
 
     const application = await prisma.application.create({
@@ -121,12 +95,10 @@ export async function POST(request: NextRequest) {
         name,
         phone,
         email,
-        district,
-        address,
-        position,
+        service,
         experience,
         branchId,
-        cvUrl: body.cvUrl || null,
+        resumeUrl: body.resumeUrl || null,
       }
     })
 

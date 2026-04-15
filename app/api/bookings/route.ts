@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
+import bcrypt from 'bcryptjs'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +24,6 @@ export async function GET(request: NextRequest) {
     const where: any = {}
     if (status) where.status = status
     if (serviceId) where.serviceId = serviceId
-    if (district) where.district = district
 
     if (!isSuper && userBranchId) {
       where.branchId = userBranchId
@@ -110,41 +110,50 @@ export async function POST(request: NextRequest) {
     let serviceId = body.serviceId
     if (!serviceId || serviceId === '1' || serviceId === '2') {
       const generalService = await prisma.service.findFirst({
-        where: { title: 'Deep Cleaning' }
+        where: { name: 'Deep Cleaning' }
       })
       serviceId = generalService?.id || null
     }
 
-    const branches = await prisma.branch.findMany({
-      where: { isActive: true }
-    })
-
-    let branchId = null
-    for (const branch of branches) {
-      try {
-        const districts: string[] = JSON.parse(branch.districts || '[]')
-        if (Array.isArray(districts) && districts.includes(district)) {
-          branchId = branch.id
-          break
-        }
-      } catch {
-        continue
-      }
+    let branchId = body.branchId
+    if (!branchId) {
+      const branches = await prisma.branch.findMany({
+        where: { isActive: true },
+        take: 1
+      })
+      branchId = branches[0]?.id || null
     }
 
+    let user = await prisma.user.findUnique({ where: { email } })
+    
+    if (!user) {
+      const hashedPassword = await bcrypt.hash('temp-password-123', 10)
+      user = await prisma.user.create({
+        data: {
+          email,
+          name,
+          phone,
+          passwordHash: hashedPassword,
+          role: 'CUSTOMER'
+        }
+      })
+    }
+
+    if (!serviceId || !branchId) {
+      return NextResponse.json({ error: 'Service and branch are required' }, { status: 400 })
+    }
+
+    const service = await prisma.service.findUnique({ where: { id: serviceId } })
+    
     const booking = await prisma.booking.create({
       data: {
-        name,
-        phone,
-        email,
-        district,
-        address,
+        userId: user.id,
         serviceId,
         branchId,
-        subService: subService || null,
         date: new Date(date),
-        time,
+        timeSlot: time,
         notes: notes ? sanitizeString(notes) : null,
+        totalPrice: service?.price || 0,
         status: 'PENDING'
       }
     })
