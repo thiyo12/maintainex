@@ -17,6 +17,7 @@ const config: Config = {
         dark: {
           DEFAULT: "#1F2937",
           mid: "#374151",
+          900: "#111827",
         },
         neutral: {
           DEFAULT: "#FFFFFF",

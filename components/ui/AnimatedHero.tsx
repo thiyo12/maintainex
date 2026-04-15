@@ -47,15 +47,9 @@ export default function AnimatedHero() {
                 : 'opacity-0 translate-y-full'
             } ${isAnimating ? 'duration-500' : ''}`}
             style={{
-              color: '#FFFFFF',
+              color: '#1a365d',
               textShadow: `
-                0 0 10px rgba(255, 255, 255, 0.8),
-                0 0 20px rgba(255, 255, 255, 0.5),
-                0 0 30px rgba(255, 255, 255, 0.3),
-                2px 2px 4px rgba(0, 0, 0, 0.8),
-                -2px -2px 4px rgba(0, 0, 0, 0.8),
-                2px -2px 4px rgba(0, 0, 0, 0.8),
-                -2px 2px 4px rgba(0, 0, 0, 0.8)
+                1px 1px 2px rgba(0, 0, 0, 0.1)
               `
             }}
           >
