@@ -5,6 +5,7 @@ export interface SessionUser {
   email: string
   role: string
   branchId?: string | null
+  province?: string | null
   name?: string | null
   canEditServices?: boolean
 }
@@ -26,6 +27,7 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
           email: decoded.email,
           role: decoded.role,
           branchId: decoded.branchId || null,
+          province: decoded.province || null,
           name: decoded.name || null,
           canEditServices: decoded.canEditServices || false
         }
@@ -74,6 +76,7 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
     email: payload.email,
     role: payload.role,
     branchId: payload.branchId,
+    province: payload.province || null,
     name: payload.name,
     canEditServices: payload.canEditServices || false
   }
