@@ -165,10 +165,12 @@ model Application {
   resumeUrl  String?
   status     String   @default("PENDING")
   notes      String?
+  branchId   String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
   @@index([status])
+  @@index([branchId])
 }
 
 model Review {
