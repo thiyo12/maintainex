@@ -15,7 +15,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const service = await prisma.service.findUnique({
+    const { searchParams } = new URL(request.url)
+    const includeRelated = searchParams.get('includeRelated') !== 'false'
+
+    let service = await prisma.service.findUnique({
       where: { id },
       include: { 
         category: true,
@@ -26,7 +29,40 @@ export async function GET(
     })
 
     if (!service) {
+      service = await prisma.service.findFirst({
+        where: { 
+          slug: id,
+          isActive: true
+        },
+        include: { 
+          category: true,
+          reviews: {
+            where: { status: 'APPROVED' }
+          }
+        }
+      })
+    }
+
+    if (!service) {
       return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+    }
+
+    if (includeRelated && service.categoryId) {
+      const relatedServices = await prisma.service.findMany({
+        where: { 
+          categoryId: service.categoryId,
+          isActive: true,
+          id: { not: service.id }
+        },
+        include: { category: true },
+        take: 4,
+        orderBy: { createdAt: 'desc' }
+      })
+
+      return NextResponse.json({
+        ...serializeService(service),
+        relatedServices: relatedServices.map(serializeService)
+      })
     }
 
     return NextResponse.json(serializeService(service))
