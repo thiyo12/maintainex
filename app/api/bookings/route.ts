@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
+import { getProvinceFromDistrict } from '@/lib/provinces'
 import bcrypt from 'bcryptjs'
 
 export async function GET(request: NextRequest) {
@@ -43,7 +44,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            location: true
+            location: true,
+            province: true
           }
         }
       },
@@ -107,6 +109,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a complete address' }, { status: 400 })
     }
 
+    // Calculate province from district
+    const province = getProvinceFromDistrict(district)
+
+    if (!province) {
+      return NextResponse.json({ error: 'Invalid district. Please select a valid district from Sri Lanka.' }, { status: 400 })
+    }
+
     let serviceId = body.serviceId
     if (!serviceId || serviceId === '1' || serviceId === '2') {
       const generalService = await prisma.service.findFirst({
@@ -115,13 +124,13 @@ export async function POST(request: NextRequest) {
       serviceId = generalService?.id || null
     }
 
+    // Find branch by province
     let branchId = body.branchId
     if (!branchId) {
-      const branches = await prisma.branch.findMany({
-        where: { isActive: true },
-        take: 1
+      const branch = await prisma.branch.findFirst({
+        where: { province, isActive: true }
       })
-      branchId = branches[0]?.id || null
+      branchId = branch?.id || null
     }
 
     let user = await prisma.user.findUnique({ where: { email } })
@@ -159,6 +168,7 @@ export async function POST(request: NextRequest) {
         phone,
         email,
         district,
+        province,
         address,
         time
       }

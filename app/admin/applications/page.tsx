@@ -7,6 +7,49 @@ import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
 
+// Province to Districts mapping for Sri Lanka
+const DISTRICT_TO_PROVINCE: Record<string, string> = {
+  // Western Province
+  'Colombo': 'Western',
+  'Gampaha': 'Western',
+  'Kalutara': 'Western',
+  // Central Province
+  'Kandy': 'Central',
+  'Matale': 'Central',
+  'Nuwara Eliya': 'Central',
+  // Northern Province
+  'Jaffna': 'Northern',
+  'Kilinochchi': 'Northern',
+  'Mannar': 'Northern',
+  'Mullaitivu': 'Northern',
+  'Vavuniya': 'Northern',
+  // Eastern Province
+  'Ampara': 'Eastern',
+  'Batticaloa': 'Eastern',
+  'Trincomalee': 'Eastern',
+  // North Central Province
+  'Anuradhapura': 'North Central',
+  'Polonnaruwa': 'North Central',
+  // North Western Province
+  'Kurunegala': 'North Western',
+  'Puttalam': 'North Western',
+  // Southern Province
+  'Galle': 'Southern',
+  'Hambantota': 'Southern',
+  'Matara': 'Southern',
+  // Uva Province
+  'Badulla': 'Uva',
+  'Monaragala': 'Uva',
+  // Sabaragamuwa Province
+  'Kegalle': 'Sabaragamuwa',
+  'Ratnapura': 'Sabaragamuwa'
+}
+
+function getProvince(district: string | null): string | null {
+  if (!district) return null
+  return DISTRICT_TO_PROVINCE[district] || null
+}
+
 interface Application {
   id: string
   name: string
@@ -19,6 +62,7 @@ interface Application {
   status: string
   notes: string | null
   district: string | null
+  province: string | null
   address: string | null
   position: string | null
   branch: { id: string; name: string; location: string } | null
@@ -54,6 +98,15 @@ export default function AdminApplications() {
   const [editBranchId, setEditBranchId] = useState('')
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isBranchAdmin = user?.role === 'BRANCH_ADMIN'
+  const userBranchId = user?.branchId || null
+
+  useEffect(() => {
+    // Set initial branch filter for branch admins
+    if (isBranchAdmin && userBranchId) {
+      setFilterBranch(userBranchId)
+    }
+  }, [isBranchAdmin, userBranchId])
 
   useEffect(() => {
     fetchApplications()
@@ -66,7 +119,13 @@ export default function AdminApplications() {
     const authHeaders = getAuthHeader()
     try {
       const params = new URLSearchParams()
-      if (filterBranch) params.append('branchId', filterBranch)
+      
+      // For branch admins, always filter by their branchId
+      if (isBranchAdmin && userBranchId) {
+        params.append('branchId', userBranchId)
+      } else if (filterBranch) {
+        params.append('branchId', filterBranch)
+      }
       
       const url = params.toString() ? `/api/applications?${params}` : '/api/applications'
       const res = await fetch(url, { headers: { ...authHeaders } })
@@ -85,7 +144,12 @@ export default function AdminApplications() {
       }
       
       if (Array.isArray(data)) {
-        setApplications(data)
+        // Add province field to each application based on district
+        const appsWithProvince = data.map((app: Application) => ({
+          ...app,
+          province: app.province || getProvince(app.district)
+        }))
+        setApplications(appsWithProvince)
         setError(null)
       } else {
         setApplications([])
@@ -159,7 +223,8 @@ export default function AdminApplications() {
         headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ 
           district: editDistrict,
-          branchId 
+          branchId,
+          province: getProvince(editDistrict)
         })
       })
       
@@ -253,7 +318,7 @@ export default function AdminApplications() {
         </button>
       </div>
 
-      {isSuperAdmin && (
+      {(isSuperAdmin || isBranchAdmin) && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="text-sm text-gray-500 mb-1">Total Applications</div>
@@ -269,7 +334,7 @@ export default function AdminApplications() {
               {unassignedApps.length}
             </div>
             {unassignedApps.length > 0 && (
-              <div className="text-xs text-red-500 mt-1">⚠️ Needs attention</div>
+              <div className="text-xs text-red-500 mt-1">Needs attention</div>
             )}
           </div>
         </div>
@@ -278,7 +343,7 @@ export default function AdminApplications() {
       {isSuperAdmin && unassignedApps.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <span className="text-2xl">⚠️</span>
+            <span className="text-2xl">!</span>
             <h2 className="text-lg font-bold text-red-800">Unassigned Applications - Require Branch Assignment</h2>
           </div>
           <div className="bg-white rounded-lg overflow-hidden">
@@ -287,6 +352,7 @@ export default function AdminApplications() {
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Applicant</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">District</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Province</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Position</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Applied</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-red-900">Actions</th>
@@ -300,6 +366,7 @@ export default function AdminApplications() {
                       <div className="text-sm text-gray-500">{app.email}</div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{app.district}</td>
+                    <td className="px-4 py-3 text-gray-700">{app.province}</td>
                     <td className="px-4 py-3 text-gray-700">{app.service}</td>
                     <td className="px-4 py-3 text-gray-700">{new Date(app.createdAt).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
@@ -351,6 +418,12 @@ export default function AdminApplications() {
             ))}
           </select>
         )}
+        
+        {isBranchAdmin && (
+          <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+            <span className="text-blue-700">Showing applications for your branch</span>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -360,6 +433,7 @@ export default function AdminApplications() {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Applicant</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">District</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Province</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Position</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
@@ -380,6 +454,9 @@ export default function AdminApplications() {
                         <FiMapPin className="text-gray-400" />
                         {app.district}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-700">
+                      {app.province || '-'}
                     </td>
                     <td className="px-6 py-4">
                       {app.branch ? (
@@ -450,7 +527,7 @@ export default function AdminApplications() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No applications found
                   </td>
                 </tr>
@@ -481,7 +558,11 @@ export default function AdminApplications() {
               </div>
               <div>
                 <label className="text-sm text-gray-500">District</label>
-                <div className="font-medium">{selectedApp.district}</div>
+                <div className="font-medium">{selectedApp.district || 'Not specified'}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Province</label>
+                <div className="font-medium">{selectedApp.province || 'Not specified'}</div>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Address</label>

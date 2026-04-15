@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
+import { getProvinceFromDistrict } from '@/lib/provinces'
 
 function sanitizeString(str: string): string {
   return str.replace(/<[^>]*>/g, '').trim()
@@ -54,17 +55,36 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    let { name, phone, email, service, experience, branchId } = body
+    let { 
+      name, 
+      phone, 
+      email, 
+      position, 
+      service, 
+      district, 
+      address,
+      experience,
+      cvUrl,
+      resumeUrl 
+    } = body
 
-    if (!name || !phone || !email || !service || !experience) {
+    // Support both 'position' (from careers form) and 'service' (legacy)
+    const appliedPosition = position || service
+
+    if (!name || !phone || !email || !appliedPosition || !district) {
       return NextResponse.json({ error: 'Please fill in all required fields' }, { status: 400 })
     }
 
     name = sanitizeString(name)
     phone = sanitizeString(phone)
     email = sanitizeString(email)
-    service = sanitizeString(service)
-    experience = sanitizeString(experience)
+    position = sanitizeString(position || '')
+    service = sanitizeString(service || '')
+    experience = sanitizeString(experience || '')
+    district = sanitizeString(district)
+    address = sanitizeString(address || '')
+    cvUrl = sanitizeString(cvUrl || '')
+    resumeUrl = sanitizeString(resumeUrl || '')
 
     if (name.length < 2 || name.length > 100) {
       return NextResponse.json({ error: 'Name must be between 2 and 100 characters' }, { status: 400 })
@@ -78,27 +98,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
     }
 
-    if (experience.length < 10) {
-      return NextResponse.json({ error: 'Please describe your experience in at least 10 characters' }, { status: 400 })
-    }
+    // Auto-calculate province from district
+    const province = getProvinceFromDistrict(district)
 
-    if (!branchId) {
-      const branches = await prisma.branch.findMany({
-        where: { isActive: true },
-        take: 1
-      })
-      branchId = branches[0]?.id || null
-    }
+    // Find branch for this province
+    const branch = await prisma.branch.findFirst({
+      where: { province, isActive: true }
+    })
+
+    const branchId = branch?.id || null
 
     const application = await prisma.application.create({
       data: {
         name,
         phone,
         email,
-        service,
+        position: appliedPosition,
+        service: appliedPosition, // Store position as service for backward compatibility
         experience,
+        district,
+        province,
+        address,
+        cvUrl: cvUrl || resumeUrl || null, // Support both cvUrl and resumeUrl
+        resumeUrl: resumeUrl || cvUrl || null,
         branchId,
-        resumeUrl: body.resumeUrl || null,
       }
     })
 

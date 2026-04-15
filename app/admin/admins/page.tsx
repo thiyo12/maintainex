@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings, FiAlertCircle } from 'react-icons/fi'
+import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiUser, FiSettings, FiAlertCircle, FiMapPin } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
+import { PROVINCES } from '@/lib/provinces'
 
 interface Branch {
   id: string
@@ -19,6 +20,7 @@ interface Admin {
   role: string
   branchId: string | null
   branch: Branch | null
+  province: string | null
   canEditServices: boolean
   isActive: boolean
   createdAt: string
@@ -30,6 +32,7 @@ interface AdminFormData {
   name: string
   role: string
   branchId: string
+  province: string
 }
 
 export default function AdminAdmins() {
@@ -44,7 +47,8 @@ export default function AdminAdmins() {
     password: '',
     name: '',
     role: 'ADMIN',
-    branchId: ''
+    branchId: '',
+    province: ''
   })
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'SUPER_ADMIN' | 'ADMIN'>('ALL')
@@ -96,11 +100,12 @@ export default function AdminAdmins() {
         password: '',
         name: admin.name || '',
         role: admin.role,
-        branchId: admin.branchId || ''
+        branchId: admin.branchId || '',
+        province: admin.province || ''
       })
     } else {
       setEditingAdmin(null)
-      setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '' })
+      setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '', province: '' })
     }
     setShowModal(true)
   }
@@ -108,7 +113,7 @@ export default function AdminAdmins() {
   const closeModal = () => {
     setShowModal(false)
     setEditingAdmin(null)
-    setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '' })
+    setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '', province: '' })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,6 +133,7 @@ export default function AdminAdmins() {
 
       if (formData.role === 'ADMIN') {
         body.branchId = formData.branchId || null
+        body.province = formData.province || null
       }
 
       if (formData.password) {
@@ -290,6 +296,7 @@ export default function AdminAdmins() {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Admin</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Role</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Province</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service Edit</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
@@ -325,6 +332,18 @@ export default function AdminAdmins() {
                         <><FiUser size={12} /> Admin</>
                       )}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {admin.province ? (
+                      <div className="flex items-center gap-2 text-gray-900">
+                        <FiMapPin size={14} className="text-gray-400" />
+                        <span className="font-medium">{admin.province}</span>
+                      </div>
+                    ) : admin.role === 'SUPER_ADMIN' ? (
+                      <span className="text-purple-600 text-sm">All Provinces</span>
+                    ) : (
+                      <span className="text-gray-400 text-sm">N/A</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     {admin.branch ? (
@@ -484,22 +503,44 @@ export default function AdminAdmins() {
               </div>
 
               {formData.role === 'ADMIN' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch *</label>
-                  <select
-                    value={formData.branchId}
-                    onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                    className="input-field"
-                    required
-                  >
-                    <option value="">Select a branch</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name} - {branch.location}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
+                    <select
+                      value={formData.province}
+                      onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                      className="input-field"
+                      required
+                    >
+                      <option value="">Select a province</option>
+                      {PROVINCES.map((province) => (
+                        <option key={province} value={province}>
+                          {province}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select the province this admin will manage
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Branch *</label>
+                    <select
+                      value={formData.branchId}
+                      onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                      className="input-field"
+                      required
+                    >
+                      <option value="">Select a branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name} - {branch.location}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
 
               <div className="flex gap-3 pt-4">

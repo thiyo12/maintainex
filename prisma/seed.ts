@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { PROVINCES, DISTRICT_TO_PROVINCE } from '../lib/provinces'
 
 const prisma = new PrismaClient()
 
@@ -133,76 +134,85 @@ async function main() {
 
   const branchesData = [
     {
-      name: 'Jaffna Branch',
-      location: 'Jaffna, Sri Lanka',
-      phone: '0770867609',
-      email: 'jaffna@maintainex.com',
-      address: '57/1 New Senguntha Road, Thirunelvaly, Jaffna, Sri Lanka',
-      districts: ['Jaffna', 'Kilinochchi', 'Mannar', 'Vavuniya', 'Mullaitivu']
-    },
-    {
-      name: 'Colombo Branch',
+      name: 'Western Province Branch',
       location: 'Colombo, Sri Lanka',
       phone: '0770867601',
-      email: 'colombo@maintainex.com',
+      email: 'western@maintainex.com',
       address: 'Colombo, Sri Lanka',
+      province: 'Western Province',
       districts: ['Colombo', 'Gampaha', 'Kalutara']
     },
     {
-      name: 'Kandy Branch',
+      name: 'Central Province Branch',
       location: 'Kandy, Sri Lanka',
       phone: '0770867602',
-      email: 'kandy@maintainex.com',
+      email: 'central@maintainex.com',
       address: 'Kandy, Sri Lanka',
+      province: 'Central Province',
       districts: ['Kandy', 'Matale', 'Nuwara Eliya']
     },
     {
-      name: 'Southern Branch',
+      name: 'Southern Province Branch',
       location: 'Galle, Sri Lanka',
       phone: '0770867603',
       email: 'southern@maintainex.com',
       address: 'Galle, Sri Lanka',
+      province: 'Southern Province',
       districts: ['Galle', 'Matara', 'Hambantota']
     },
     {
-      name: 'Eastern Branch',
+      name: 'Northern Province Branch',
+      location: 'Jaffna, Sri Lanka',
+      phone: '0770867609',
+      email: 'northern@maintainex.com',
+      address: '57/1 New Senguntha Road, Thirunelvaly, Jaffna, Sri Lanka',
+      province: 'Northern Province',
+      districts: ['Jaffna', 'Kilinochchi', 'Mannar', 'Mullaitivu', 'Vavuniya']
+    },
+    {
+      name: 'Eastern Province Branch',
       location: 'Trincomalee, Sri Lanka',
       phone: '0770867604',
       email: 'eastern@maintainex.com',
       address: 'Trincomalee, Sri Lanka',
+      province: 'Eastern Province',
       districts: ['Trincomalee', 'Batticaloa', 'Ampara']
     },
     {
-      name: 'North Western Branch',
+      name: 'North Western Province Branch',
       location: 'Kurunegala, Sri Lanka',
       phone: '0770867605',
       email: 'northwest@maintainex.com',
       address: 'Kurunegala, Sri Lanka',
+      province: 'North Western Province',
       districts: ['Kurunegala', 'Puttalam']
     },
     {
-      name: 'North Central Branch',
+      name: 'North Central Province Branch',
       location: 'Anuradhapura, Sri Lanka',
       phone: '0770867606',
       email: 'northcentral@maintainex.com',
       address: 'Anuradhapura, Sri Lanka',
+      province: 'North Central Province',
       districts: ['Anuradhapura', 'Polonnaruwa']
     },
     {
-      name: 'Sabaragamuwa Branch',
-      location: 'Ratnapura, Sri Lanka',
-      phone: '0770867607',
-      email: 'sabaragamuwa@maintainex.com',
-      address: 'Ratnapura, Sri Lanka',
-      districts: ['Ratnapura', 'Kegalle']
-    },
-    {
-      name: 'Uva Branch',
+      name: 'Uva Province Branch',
       location: 'Badulla, Sri Lanka',
       phone: '0770867608',
       email: 'uva@maintainex.com',
       address: 'Badulla, Sri Lanka',
+      province: 'Uva Province',
       districts: ['Badulla', 'Monaragala']
+    },
+    {
+      name: 'Sabaragamuwa Province Branch',
+      location: 'Ratnapura, Sri Lanka',
+      phone: '0770867607',
+      email: 'sabaragamuwa@maintainex.com',
+      address: 'Ratnapura, Sri Lanka',
+      province: 'Sabaragamuwa Province',
+      districts: ['Ratnapura', 'Kegalle']
     }
   ]
 
@@ -213,6 +223,7 @@ async function main() {
         phone: branchData.phone,
         address: branchData.address,
         location: branchData.location,
+        province: branchData.province,
         districts: JSON.stringify(branchData.districts)
       },
       create: {
@@ -222,6 +233,7 @@ async function main() {
         phone: branchData.phone,
         address: branchData.address,
         city: branchData.location.split(',')[0].trim(),
+        province: branchData.province,
         districts: JSON.stringify(branchData.districts),
         isActive: true
       }
@@ -229,8 +241,8 @@ async function main() {
     console.log(`Created/Updated: ${branchData.name}`)
   }
 
-  const jaffnaBranch = await prisma.branch.findUnique({
-    where: { id: 'branch-jaffna-branch' }
+  const northernBranch = await prisma.branch.findUnique({
+    where: { id: 'branch-northern-province-branch' }
   })
 
   const superAdminEmail = process.env.ADMIN_EMAIL || 'super@maintain.lk'
@@ -249,7 +261,7 @@ async function main() {
   })
   console.log(`Created Super Admin: ${superAdmin.email}`)
 
-  if (jaffnaBranch) {
+  if (northernBranch) {
     const adminEmail = 'admin@maintain.lk'
     const adminPasswordPlain = 'Adm1n@M4int@in!'
     const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
@@ -259,9 +271,9 @@ async function main() {
       create: {
         email: adminEmail,
         password: adminPassword,
-        name: 'Jaffna Admin',
+        name: 'Northern Admin',
         role: 'ADMIN',
-        branchId: jaffnaBranch.id,
+        branchId: northernBranch.id,
         isActive: true
       }
     })

@@ -5,6 +5,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiSend, FiCheck, FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase } from 'react-icons/fi'
+import { DISTRICTS } from '@/lib/districts'
 
 export default function CareersPage() {
   const [submitting, setSubmitting] = useState(false)
@@ -256,17 +257,9 @@ export default function CareersPage() {
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                     >
                       <option value="">Select your district</option>
-                      <option value="Colombo">Colombo</option>
-                      <option value="Gampaha">Gampaha</option>
-                      <option value="Kalutara">Kalutara</option>
-                      <option value="Kandy">Kandy</option>
-                      <option value="Jaffna">Jaffna</option>
-                      <option value="Galle">Galle</option>
-                      <option value="Matara">Matara</option>
-                      <option value="Hambantota">Hambantota</option>
-                      <option value="Kurunegala">Kurunegala</option>
-                      <option value="Anuradhapura">Anuradhapura</option>
-                      <option value="Other">Other</option>
+                      {DISTRICTS.map(district => (
+                        <option key={district} value={district}>{district}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
