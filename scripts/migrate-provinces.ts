@@ -21,7 +21,7 @@ async function findBranchByProvince(province: string): Promise<{ id: string } | 
 /**
  * Get the first district from a branch's districts array
  */
-function getFirstDistrictFromBranch(districts: string | undefined): string | null {
+function getFirstDistrictFromBranch(districts: string | null | undefined): string | null {
   if (!districts) return null
   try {
     const districtsArray = JSON.parse(districts)
