@@ -9,6 +9,7 @@ import { FiMapPin, FiPhone, FiMail, FiClock, FiSend, FiCheck } from 'react-icons
 export default function ContactPage() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -25,13 +26,27 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
+    setError('')
     
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    setSuccess(true)
-    setFormData({ name: '', email: '', phone: '', subject: '', message: '' })
-    setSubmitting(false)
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      if (res.ok) {
+        setSuccess(true)
+        setFormData({ name: '', email: '', phone: '', subject: '', message: '' })
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to send message')
+      }
+    } catch (err) {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (success) {
@@ -126,6 +141,12 @@ export default function ContactPage() {
               {/* Contact Form */}
               <div className="bg-white rounded-2xl shadow-xl p-8">
                 <h2 className="text-2xl font-bold text-dark-900 mb-6">Send us a Message</h2>
+                
+                {error && (
+                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+                    {error}
+                  </div>
+                )}
                 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">

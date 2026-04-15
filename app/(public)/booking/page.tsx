@@ -248,7 +248,7 @@ export default function BookingPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address *
+                    Address
                   </label>
                   <div className="relative">
                     <FiMapPin className="absolute left-3 top-3 text-gray-400" />
@@ -256,10 +256,9 @@ export default function BookingPage() {
                       name="address"
                       value={formData.address}
                       onChange={handleChange}
-                      required
                       rows={3}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all resize-none"
-                      placeholder="Enter your full address"
+                      placeholder="Enter your full address (optional)"
                     />
                   </div>
                 </div>
