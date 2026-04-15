@@ -39,7 +39,6 @@ const config: Config = {
           900: '#09101A',
           DEFAULT: "#1F2937",
           mid: "#374151",
-          900: "#111827",
         },
         neutral: {
           DEFAULT: "#FFFFFF",
