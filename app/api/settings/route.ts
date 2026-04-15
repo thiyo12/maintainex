@@ -5,21 +5,14 @@ import { logActivity } from '@/lib/activity-log'
 
 export async function GET() {
   try {
-    let settings = await prisma.settings.findFirst()
+    const settings = await prisma.settings.findMany()
+    
+    const settingsObj: Record<string, string> = {}
+    settings.forEach(s => {
+      settingsObj[s.key] = s.value
+    })
 
-    if (!settings) {
-      settings = await prisma.settings.create({
-        data: {
-          id: 'site_settings',
-          companyName: 'Maintain',
-          email: 'info@maintain.lk',
-          phone: '+94 XX XXX XXXX',
-          address: 'Sri Lanka'
-        }
-      })
-    }
-
-    return NextResponse.json(settings)
+    return NextResponse.json(settingsObj)
   } catch {
     return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 })
   }
@@ -38,18 +31,13 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     
-    const settings = await prisma.settings.upsert({
-      where: { id: 'site_settings' },
-      update: body,
-      create: {
-        id: 'site_settings',
-        companyName: 'Maintain',
-        email: 'info@maintain.lk',
-        phone: '+94 XX XXX XXXX',
-        address: 'Sri Lanka',
-        ...body
-      }
-    })
+    for (const [key, value] of Object.entries(body)) {
+      await prisma.settings.upsert({
+        where: { key },
+        update: { value: String(value) },
+        create: { key, value: String(value) }
+      })
+    }
 
     await logActivity({
       adminId: session.id,
@@ -62,7 +50,7 @@ export async function PUT(request: NextRequest) {
       details: { updatedFields: Object.keys(body) }
     })
 
-    return NextResponse.json(settings)
+    return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
   }

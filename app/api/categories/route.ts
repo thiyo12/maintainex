@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 function serializeService(service: any) {
   return {
     ...service,
+    title: service.name,
     price: service.price ? Number(service.price) : null,
   }
 }

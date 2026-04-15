@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
           select: {
             admins: true,
             bookings: true,
-            applications: true,
-            services: true
+            applications: true
           }
         }
       } : undefined,
@@ -60,8 +59,8 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         location,
+        city: location.split(',')[0]?.trim() || location,
         phone: phone || null,
-        email: email || null,
         address: address || null
       }
     })

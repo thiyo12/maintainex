@@ -362,8 +362,8 @@ export default function AdminDashboard() {
               recentBookings.map((booking: any) => (
                 <div key={booking.id} className="p-4 flex items-center justify-between">
                   <div>
-                    <div className="font-medium text-gray-900">{booking.name}</div>
-                    <div className="text-sm text-gray-500">{booking.service?.title}</div>
+                    <div className="font-medium text-gray-900">{booking.name || booking.user?.name || 'N/A'}</div>
+                    <div className="text-sm text-gray-500">{booking.service?.name}</div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
@@ -395,7 +395,7 @@ export default function AdminDashboard() {
                 <div key={app.id} className="p-4 flex items-center justify-between">
                   <div>
                     <div className="font-medium text-gray-900">{app.name}</div>
-                    <div className="text-sm text-gray-500">{app.position}</div>
+                    <div className="text-sm text-gray-500">{app.service}</div>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     app.status === 'NEW' ? 'bg-blue-100 text-blue-700' :

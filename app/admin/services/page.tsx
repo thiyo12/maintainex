@@ -11,8 +11,8 @@ import { getAuthHeader } from '@/lib/auth-client'
 
 interface Service {
   id: string
-  title: string
-  slug: string
+  name: string
+  slug: string | null
   description: string
   image: string | null
   price: number | null
@@ -41,7 +41,7 @@ export default function AdminServices() {
   const [viewingService, setViewingService] = useState<Service | null>(null)
   const [editingService, setEditingService] = useState<Service | null>(null)
   const [formData, setFormData] = useState({
-    title: '',
+    name: '',
     slug: '',
     description: '',
     image: '',
@@ -134,7 +134,7 @@ export default function AdminServices() {
     console.log('Form submission started')
     console.log('Form data:', JSON.stringify(formData, null, 2))
     
-    if (!formData.title || formData.title.trim().length < 2) {
+    if (!formData.name || formData.name.trim().length < 2) {
       toast.error('Service title is required (at least 2 characters)')
       return
     }
@@ -150,8 +150,8 @@ export default function AdminServices() {
       
       const bodyData: any = {
         type: 'service',
-        title: formData.title,
-        slug: formData.slug || generateSlug(formData.title),
+        name: formData.name,
+        slug: formData.slug || generateSlug(formData.name),
         description: formData.description,
         image: formData.image || null,
         price: formData.price ? parseFloat(formData.price) : null,
@@ -228,7 +228,7 @@ export default function AdminServices() {
     }
     setEditingService(service)
     setFormData({
-      title: service.title,
+      title: service.name,
       slug: service.slug,
       description: service.description,
       image: service.image || '',
@@ -347,13 +347,13 @@ export default function AdminServices() {
                           service.image.startsWith('/uploads/') ? (
                             <img
                               src={`${service.image}?t=${Date.now()}`}
-                              alt={service.title}
+                              alt={service.name}
                               className="w-12 h-12 rounded-lg object-cover mr-4"
                             />
                           ) : (
                             <Image
                               src={service.image}
-                              alt={service.title}
+                              alt={service.name}
                               width={48}
                               height={48}
                               className="w-12 h-12 rounded-lg object-cover mr-4"
@@ -365,7 +365,7 @@ export default function AdminServices() {
                           </div>
                         )}
                         <div>
-                          <div className="font-medium text-gray-900">{service.title}</div>
+                          <div className="font-medium text-gray-900">{service.name}</div>
                           <div className="text-sm text-gray-500 line-clamp-1">{service.description}</div>
                         </div>
                       </div>
@@ -449,13 +449,13 @@ export default function AdminServices() {
               viewingService.image.startsWith('/uploads/') ? (
                 <img
                   src={`${viewingService.image}?t=${Date.now()}`}
-                  alt={viewingService.title}
+                  alt={viewingService.name}
                   className="w-full h-48 object-cover rounded-xl mb-4"
                 />
               ) : (
                 <Image
                   src={viewingService.image}
-                  alt={viewingService.title}
+                  alt={viewingService.name}
                   width={600}
                   height={192}
                   className="w-full h-48 object-cover rounded-xl mb-4"
@@ -466,7 +466,7 @@ export default function AdminServices() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">Title</label>
-                <div className="font-medium">{viewingService.title}</div>
+                <div className="font-medium">{viewingService.name}</div>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Category</label>
@@ -527,7 +527,7 @@ export default function AdminServices() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
                 <input
                   type="text"
-                  value={formData.title}
+                  value={formData.name}
                   onChange={(e) => {
                     setFormData(prev => ({ 
                       ...prev, 

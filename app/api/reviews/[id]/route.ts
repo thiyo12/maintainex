@@ -34,7 +34,7 @@ export async function PUT(
       include: {
         service: {
           select: {
-            title: true
+            name: true
           }
         }
       }

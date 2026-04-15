@@ -9,15 +9,14 @@ import { getAuthHeader } from '@/lib/auth-client'
 
 interface Booking {
   id: string
-  name: string
-  phone: string
-  email: string
-  district: string
-  address: string
-  date: string
-  time: string
+  name: string | null
+  phone: string | null
+  email: string | null
+  district: string | null
+  address: string | null
+  time: string | null
   status: string
-  service: { title: string }
+  service: { name: string }
   branch: { id: string; name: string; location: string } | null
   createdAt: string
 }
@@ -301,7 +300,7 @@ export default function AdminBookings() {
                       <div className="text-sm text-gray-500">{booking.phone}</div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{booking.district}</td>
-                    <td className="px-4 py-3 text-gray-700">{booking.service?.title}</td>
+                    <td className="px-4 py-3 text-gray-700">{booking.service?.name}</td>
                     <td className="px-4 py-3">
                       <div className="text-gray-900">{new Date(booking.date).toLocaleDateString()}</div>
                       <div className="text-sm text-gray-500">{booking.time}</div>
@@ -396,7 +395,7 @@ export default function AdminBookings() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{booking.service?.title}</td>
+                    <td className="px-6 py-4 text-gray-600">{booking.service?.name}</td>
                     <td className="px-6 py-4">
                       <div className="text-gray-900">{new Date(booking.date).toLocaleDateString()}</div>
                       <div className="text-sm text-gray-500">{booking.time}</div>

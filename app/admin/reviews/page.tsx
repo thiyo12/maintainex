@@ -9,13 +9,13 @@ interface Review {
   id: string
   rating: number
   comment: string | null
-  customerName: string
   status: string
+  customerName: string | null
   createdAt: string
   service: {
     id: string
-    title: string
-    slug: string
+    name: string
+    slug: string | null
   }
 }
 
@@ -198,7 +198,7 @@ export default function AdminReviews() {
                   </div>
 
                   <p className="text-sm text-gray-500 mb-2">
-                    Service: <span className="text-gray-700 font-medium">{review.service.title}</span>
+                    Service: <span className="text-gray-700 font-medium">{review.service.name}</span>
                   </p>
 
                   {review.comment && (

@@ -154,7 +154,13 @@ export async function POST(request: NextRequest) {
         timeSlot: time,
         notes: notes ? sanitizeString(notes) : null,
         totalPrice: service?.price || 0,
-        status: 'PENDING'
+        status: 'PENDING',
+        name,
+        phone,
+        email,
+        district,
+        address,
+        time
       }
     })
 

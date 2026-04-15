@@ -12,12 +12,14 @@ interface Application {
   name: string
   phone: string
   email: string
-  district: string
-  address: string
-  position: string
+  service: string
   experience: string
-  cvUrl: string | null
+  resumeUrl: string | null
   status: string
+  notes: string | null
+  district: string | null
+  address: string | null
+  position: string | null
   branch: { id: string; name: string; location: string } | null
   createdAt: string
 }
@@ -297,7 +299,7 @@ export default function AdminApplications() {
                       <div className="text-sm text-gray-500">{app.email}</div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">{app.district}</td>
-                    <td className="px-4 py-3 text-gray-700">{app.position}</td>
+                    <td className="px-4 py-3 text-gray-700">{app.service}</td>
                     <td className="px-4 py-3 text-gray-700">{new Date(app.createdAt).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -389,7 +391,7 @@ export default function AdminApplications() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{app.position}</td>
+                    <td className="px-6 py-4 text-gray-600">{app.service}</td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[app.status]}`}>
                         {app.status}
