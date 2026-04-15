@@ -179,6 +179,7 @@ model Application {
   address    String?
   position   String?
   branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
