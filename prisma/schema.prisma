@@ -25,6 +25,22 @@ model User {
   reviews         Review[]
 }
 
+model Admin {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  password        String
+  name            String?
+  role            String   @default("ADMIN")
+  branchId        String?
+  branch          Branch?  @relation(fields: [branchId], references: [id])
+  canEditServices Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([branchId])
+}
+
 model Session {
   id           String   @id @default(cuid())
   userId       String
@@ -106,6 +122,7 @@ model Branch {
   address  String
   city     String
   phone    String?
+  location String?
   isActive Boolean   @default(true)
   createdAt DateTime  @default(now())
 
@@ -170,4 +187,25 @@ model Settings {
   id    String  @id @default(cuid())
   key   String  @unique
   value String
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  adminEmail  String
+  adminName   String?
+  branchId    String?
+  action      String
+  entityType  String
+  entityId    String?
+  description String
+  details     String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
 }

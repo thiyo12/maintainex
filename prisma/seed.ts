@@ -12,7 +12,6 @@ async function main() {
       name: 'Assembly',
       slug: 'assembly',
       icon: 'wrench',
-      description: 'Assemble or disassemble furniture items by unboxing, building, and any cleanup.',
       services: [
         { title: 'Furniture Assembly', slug: 'furniture-assembly', description: 'Professional assembly of all types of furniture including wardrobes, tables, and storage units', price: 3500, duration: 120, image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600' },
         { title: 'Crib Assembly', slug: 'crib-assembly', description: 'Safe and secure assembly of baby cribs and nursery furniture', price: 2500, duration: 60, image: 'https://images.unsplash.com/photo-1590165482129-1b8b27698780?w=600' },
@@ -25,7 +24,6 @@ async function main() {
       name: 'Mounting',
       slug: 'mounting',
       icon: 'image',
-      description: 'Mount TVs, art, shelves, mirrors, and more to your walls securely.',
       services: [
         { title: 'TV Mounting', slug: 'tv-mounting', description: 'Secure TV wall mounting with cable management and perfect alignment', price: 3000, duration: 60, image: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=600' },
         { title: 'Art & Shelf Mounting', slug: 'art-shelf-mounting', description: 'Professional mounting of artwork, picture frames, and floating shelves', price: 1500, duration: 30, image: 'https://images.unsplash.com/photo-1513519245088-0e12902e35a6?w=600' },
@@ -38,7 +36,6 @@ async function main() {
       name: 'Moving',
       slug: 'moving',
       icon: 'package',
-      description: 'Help with moving, heavy lifting, furniture removal, and logistics.',
       services: [
         { title: 'Help Moving', slug: 'help-moving', description: 'Professional moving assistance for homes and offices', price: 5000, duration: 180, image: 'https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=600' },
         { title: 'Heavy Lifting', slug: 'heavy-lifting', description: 'Safe heavy lifting and repositioning of large items', price: 2500, duration: 90, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600' },
@@ -51,7 +48,6 @@ async function main() {
       name: 'Cleaning',
       slug: 'cleaning',
       icon: 'sparkles',
-      description: 'Professional cleaning services for homes, offices, and commercial spaces.',
       services: [
         { title: 'Residential Cleaning', slug: 'residential-cleaning', description: 'Complete home cleaning including all rooms, kitchen, and bathrooms', price: 3000, duration: 120, image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600' },
         { title: 'Industrial Cleaning', slug: 'industrial-cleaning', description: 'Heavy-duty cleaning for factories, warehouses, and industrial facilities', price: 8000, duration: 240, image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=600' },
@@ -67,7 +63,6 @@ async function main() {
       name: 'Outdoor',
       slug: 'outdoor',
       icon: 'tree',
-      description: 'Garden maintenance, lawn care, and outdoor cleaning services.',
       services: [
         { title: 'Garden Maintenance', slug: 'garden-maintenance', description: 'Regular garden upkeep including weeding, trimming, and planting', price: 2500, duration: 120, image: 'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600' },
         { title: 'Lawn Care', slug: 'lawn-care', description: 'Lawn mowing, edging, and fertilization services', price: 3000, duration: 90, image: 'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=600' },
@@ -80,7 +75,6 @@ async function main() {
       name: 'Repairs',
       slug: 'repairs',
       icon: 'plug',
-      description: 'Minor plumbing, electrical help, and home repair services.',
       services: [
         { title: 'Minor Plumbing', slug: 'minor-plumbing', description: 'Leak repairs, faucet replacement, and minor plumbing fixes', price: 2000, duration: 60, image: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=600' },
         { title: 'Electrical Help', slug: 'electrical-help', description: 'Light fixture installation, outlet repairs, and electrical troubleshooting', price: 2500, duration: 60, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600' },
@@ -94,7 +88,6 @@ async function main() {
       name: 'Trending',
       slug: 'trending',
       icon: 'trending',
-      description: 'Popular services that are trending right now.',
       services: [
         { title: 'Full House Deep Clean', slug: 'full-house-deep-clean', description: 'Complete deep cleaning of your entire home including all rooms', price: 8500, duration: 300, image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600' },
         { title: 'Post-Party Cleaning', slug: 'post-party-cleaning', description: 'Quick and thorough cleaning after events and parties', price: 4500, duration: 120, image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600' },
@@ -107,15 +100,11 @@ async function main() {
   for (const categoryData of categoriesData) {
     await prisma.category.upsert({
       where: { id: categoryData.id },
-      update: {
-        description: categoryData.description,
-        icon: categoryData.icon
-      },
+      update: {},
       create: {
         id: categoryData.id,
         name: categoryData.name,
         slug: categoryData.slug,
-        description: categoryData.description,
         icon: categoryData.icon,
         isActive: true
       }
@@ -124,19 +113,11 @@ async function main() {
 
     for (const serviceData of categoryData.services) {
       await prisma.service.upsert({
-        where: { slug: serviceData.slug },
-        update: {
-          title: serviceData.title,
-          description: serviceData.description,
-          price: serviceData.price,
-          duration: serviceData.duration,
-          image: serviceData.image,
-          categoryId: categoryData.id,
-          isActive: true
-        },
+        where: { id: serviceData.slug },
+        update: {},
         create: {
-          title: serviceData.title,
-          slug: serviceData.slug,
+          id: serviceData.slug,
+          name: serviceData.title,
           description: serviceData.description,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -228,19 +209,17 @@ async function main() {
     await prisma.branch.upsert({
       where: { id: `branch-${branchData.name.toLowerCase().replace(/\s+/g, '-')}` },
       update: {
-        districts: JSON.stringify(branchData.districts),
         phone: branchData.phone,
-        email: branchData.email,
-        address: branchData.address
+        address: branchData.address,
+        location: branchData.location
       },
       create: {
         id: `branch-${branchData.name.toLowerCase().replace(/\s+/g, '-')}`,
         name: branchData.name,
         location: branchData.location,
         phone: branchData.phone,
-        email: branchData.email,
         address: branchData.address,
-        districts: JSON.stringify(branchData.districts),
+        city: branchData.location.split(',')[0].trim(),
         isActive: true
       }
     })
