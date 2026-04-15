@@ -127,6 +127,7 @@ model Branch {
   createdAt DateTime  @default(now())
 
   bookings Booking[]
+  admins   Admin[]
 
   @@index([city])
 }
