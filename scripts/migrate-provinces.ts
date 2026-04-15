@@ -179,9 +179,9 @@ async function migrateProvinces() {
 
   const bookingsWithoutBranch = await prisma.booking.findMany({
     where: {
-      branchId: null,
+      branchId: { equals: null },
       province: { not: null },
-    },
+    } as any,
     select: { id: true, province: true },
   })
 
@@ -208,9 +208,9 @@ async function migrateProvinces() {
 
   const applicationsWithoutBranch = await prisma.application.findMany({
     where: {
-      branchId: null,
+      branchId: { equals: null },
       province: { not: null },
-    },
+    } as any,
     select: { id: true, province: true },
   })
 
