@@ -12,7 +12,7 @@ export async function GET() {
         service: {
           select: {
             id: true,
-            title: true,
+            name: true,
             slug: true
           }
         }

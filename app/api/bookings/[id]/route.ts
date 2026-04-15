@@ -18,7 +18,8 @@ export async function GET(
       include: {
         service: {
           include: { category: true }
-        }
+        },
+        user: true
       }
     })
 
@@ -69,7 +70,7 @@ export async function PATCH(
     const booking = await prisma.booking.update({
       where: { id: (await params).id },
       data: { status },
-      include: { service: true }
+      include: { service: true, user: true }
     })
 
     await logActivity({

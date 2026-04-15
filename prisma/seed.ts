@@ -118,6 +118,7 @@ async function main() {
         create: {
           id: serviceData.slug,
           name: serviceData.title,
+          slug: serviceData.slug,
           description: serviceData.description,
           price: serviceData.price,
           duration: serviceData.duration,
@@ -211,7 +212,8 @@ async function main() {
       update: {
         phone: branchData.phone,
         address: branchData.address,
-        location: branchData.location
+        location: branchData.location,
+        districts: JSON.stringify(branchData.districts)
       },
       create: {
         id: `branch-${branchData.name.toLowerCase().replace(/\s+/g, '-')}`,
@@ -220,6 +222,7 @@ async function main() {
         phone: branchData.phone,
         address: branchData.address,
         city: branchData.location.split(',')[0].trim(),
+        districts: JSON.stringify(branchData.districts),
         isActive: true
       }
     })

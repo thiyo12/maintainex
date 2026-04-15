@@ -101,6 +101,7 @@ model Category {
 model Service {
   id          String     @id @default(cuid())
   name        String
+  slug        String?
   description String
   categoryId  String
   category    Category    @relation(fields: [categoryId], references: [id])
@@ -123,6 +124,7 @@ model Branch {
   city     String
   phone    String?
   location String?
+  districts String?
   isActive Boolean   @default(true)
   createdAt DateTime  @default(now())
 
@@ -145,6 +147,12 @@ model Booking {
   status     String     @default("PENDING")
   notes      String?
   totalPrice Float
+  name       String?
+  phone      String?
+  email      String?
+  district   String?
+  address    String?
+  time       String?
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
@@ -163,8 +171,12 @@ model Application {
   service    String
   experience String
   resumeUrl  String?
+  cvUrl      String?
   status     String   @default("PENDING")
   notes      String?
+  district   String?
+  address    String?
+  position   String?
   branchId   String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -174,14 +186,16 @@ model Application {
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  serviceId String
-  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  rating    Int
-  comment   String?
-  createdAt DateTime  @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceId    String
+  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  rating       Int
+  comment      String?
+  status       String   @default("PENDING")
+  customerName String?
+  createdAt    DateTime  @default(now())
 
   @@index([serviceId])
 }
