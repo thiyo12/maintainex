@@ -61,7 +61,7 @@ export async function PUT(
 
     const updateData: any = {}
 
-    if (title !== undefined) updateData.title = title
+    if (title !== undefined) updateData.name = title
     if (description !== undefined) updateData.description = description
     if (isActive !== undefined) updateData.isActive = isActive
 

@@ -127,7 +127,7 @@ export async function DELETE(
       entityType: 'BOOKING',
       entityId: (await params).id,
       description: `Deleted booking for ${booking?.name}`,
-      details: { customerName: booking?.name, service: booking?.service?.title }
+      details: { customerName: booking?.name, service: booking?.service?.name }
     })
 
     return NextResponse.json({ message: 'Booking deleted successfully' })

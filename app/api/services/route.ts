@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'You do not have permission to add services' }, { status: 403 })
       }
 
-      if (!body.title || body.title.trim().length < 2) {
-        return NextResponse.json({ error: 'Service title must be at least 2 characters' }, { status: 400 })
+      if (!body.name || body.name.trim().length < 2) {
+        return NextResponse.json({ error: 'Service name must be at least 2 characters' }, { status: 400 })
       }
 
       if (!body.categoryId) {
@@ -93,17 +93,14 @@ export async function POST(request: NextRequest) {
       if (body.duration && (isNaN(parseInt(body.duration)) || parseInt(body.duration) < 0)) {
         return NextResponse.json({ error: 'Duration must be a positive number' }, { status: 400 })
       }
-
-      const slug = body.slug?.toLowerCase().replace(/\s+/g, '-') || body.title.toLowerCase().replace(/\s+/g, '-')
       
       const service = await prisma.service.create({
         data: {
-          title: body.title,
-          slug,
-          description: body.description,
+          name: body.name,
+          description: body.description || '',
           image: body.image || null,
-          price: body.price ? parseFloat(body.price) : null,
-          duration: body.duration ? parseInt(body.duration) : null,
+          price: body.price ? parseFloat(body.price) : 0,
+          duration: body.duration ? parseInt(body.duration) : 0,
           categoryId: body.categoryId,
           isActive: body.isActive ?? true
         },
