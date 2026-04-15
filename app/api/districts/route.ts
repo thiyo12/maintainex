@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all branches with their districts
     const branches = await prisma.branch.findMany({
-      where: session.role !== 'SUPER_ADMIN' ? { id: session.branchId } : undefined,
+      where: session.role !== 'SUPER_ADMIN' && session.branchId ? { id: session.branchId } : undefined,
       select: {
         id: true,
         name: true,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       by: ['district'],
       where: {
         status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
-        ...(session.role !== 'SUPER_ADMIN' ? { branchId: session.branchId } : {})
+        ...(session.role !== 'SUPER_ADMIN' && session.branchId ? { branchId: session.branchId } : {})
       },
       _count: true
     })
