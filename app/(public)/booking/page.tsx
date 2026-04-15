@@ -1,15 +1,17 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
-import { FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiClock, FiCheck } from 'react-icons/fi'
+import { FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiClock, FiCheck, FiChevronRight, FiChevronLeft, FiMessageCircle } from 'react-icons/fi'
 
 interface Service {
   id: string
   name: string
   price: number
+  description?: string
 }
 
 interface Category {
@@ -18,20 +20,36 @@ interface Category {
   services: Service[]
 }
 
+const WHATSAPP_NUMBER = '94770867609'
+
+const TIME_SLOTS = [
+  '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+  '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'
+]
+
+const DISTRICTS = [
+  'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Jaffna',
+  'Galle', 'Matara', 'Hambantota', 'Kurunegala', 'Anuradhapura', 'Other'
+]
+
 export default function BookingPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [step, setStep] = useState(1)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [showServiceSelector, setShowServiceSelector] = useState(false)
   
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     email: '',
-    address: '',
-    district: '',
     serviceId: '',
+    district: '',
+    address: '',
     date: '',
     time: '',
     notes: ''
@@ -40,6 +58,13 @@ export default function BookingPage() {
   useEffect(() => {
     fetchServices()
   }, [])
+
+  useEffect(() => {
+    const serviceId = searchParams.get('serviceId')
+    if (serviceId) {
+      setFormData(prev => ({ ...prev, serviceId }))
+    }
+  }, [searchParams])
 
   const fetchServices = async () => {
     try {
@@ -55,12 +80,34 @@ export default function BookingPage() {
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+  const selectedService = categories
+    .flatMap(c => c.services)
+    .find(s => s.id === formData.serviceId)
+
+  const selectedCategory = categories.find(c => 
+    c.services.some(s => s.id === formData.serviceId)
+  )
+
+  const handleServiceSelect = (serviceId: string) => {
+    setFormData({ ...formData, serviceId })
+    setShowServiceSelector(false)
+    setStep(2)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const canProceed = () => {
+    switch (step) {
+      case 1:
+        return formData.name.trim() && formData.phone.trim()
+      case 2:
+        return formData.serviceId && formData.district
+      case 3:
+        return formData.date && formData.time
+      default:
+        return true
+    }
+  }
+
+  const handleSubmit = async () => {
     setSubmitting(true)
     setError('')
 
@@ -73,17 +120,6 @@ export default function BookingPage() {
 
       if (res.ok) {
         setSuccess(true)
-        setFormData({
-          name: '',
-          phone: '',
-          email: '',
-          address: '',
-          district: '',
-          serviceId: '',
-          date: '',
-          time: '',
-          notes: ''
-        })
       } else {
         const data = await res.json()
         setError(data.error || 'Failed to submit booking')
@@ -95,32 +131,77 @@ export default function BookingPage() {
     }
   }
 
-  const selectedService = categories
-    .flatMap(c => c.services)
-    .find(s => s.id === formData.serviceId)
+  const generateWhatsAppLink = () => {
+    const message = `🏠 *NEW BOOKING - Maintain*
+
+👤 *Name:* ${formData.name}
+📱 *Phone:* ${formData.phone}
+${formData.email ? `✉️ *Email:* ${formData.email}` : ''}
+
+🧹 *Service:* ${selectedService?.name || 'Not selected'}
+💰 *Price:* Rs. ${selectedService?.price?.toLocaleString() || 'TBD'}
+
+📍 *District:* ${formData.district}
+${formData.address ? `📍 *Address:* ${formData.address}` : ''}
+📅 *Date:* ${formData.date}
+⏰ *Time:* ${formData.time}
+${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
+
+─────────────────────
+Sent from maintain.lk`
+
+    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+  }
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+  }
 
   if (success) {
     return (
       <>
         <Header />
         <WhatsAppButton />
-        <main className="pt-20 min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="max-w-md mx-auto px-4 text-center">
-            <div className="bg-white rounded-2xl shadow-xl p-8">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <FiCheck className="text-4xl text-green-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-dark-900 mb-4">Booking Submitted!</h2>
-              <p className="text-gray-600 mb-6">
-                Thank you for your booking! We'll contact you shortly to confirm your appointment.
-              </p>
-              <button
-                onClick={() => setSuccess(false)}
-                className="bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold px-6 py-3 rounded-lg transition-all duration-300"
-              >
-                Book Another Service
-              </button>
+        <main className="pt-20 min-h-screen bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center px-4">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
+            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+              <FiCheck className="text-5xl text-green-600" />
             </div>
+            <h2 className="text-3xl font-bold text-dark-900 mb-4">Booking Submitted!</h2>
+            <p className="text-gray-600 mb-8">
+              Thank you for your booking! We'll call you shortly to confirm.
+            </p>
+            
+            <div className="space-y-4 mb-8">
+              <a 
+                href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`}
+                className="block w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all"
+              >
+                📞 Call Us: {WHATSAPP_NUMBER.replace('94', '0')}
+              </a>
+              <a 
+                href={generateWhatsAppLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all"
+              >
+                💬 Chat on WhatsApp
+              </a>
+            </div>
+            
+            <button
+              onClick={() => router.push('/')}
+              className="w-full text-gray-600 hover:text-dark-900 font-medium py-3"
+            >
+              ← Back to Home
+            </button>
           </div>
         </main>
         <Footer />
@@ -133,258 +214,398 @@ export default function BookingPage() {
       <Header />
       <WhatsAppButton />
       
-      <main className="pt-20">
-        {/* Hero Section */}
-        <section className="bg-gradient-to-br from-primary-400 to-primary-600 py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-dark-900 mb-4">
-              Book Your Service
-            </h1>
-            <p className="text-xl text-dark-900/80">
-              Easy online booking. Instant confirmation.
-            </p>
+      <main className="pt-20 min-h-screen bg-gray-50">
+        {/* Hero */}
+        <section className="bg-gradient-to-br from-primary-400 to-primary-600 py-8 px-4">
+          <div className="max-w-lg mx-auto text-center">
+            <h1 className="text-3xl font-bold text-dark-900 mb-2">Book Your Service</h1>
+            <p className="text-dark-900/80">Easy booking in 4 simple steps</p>
           </div>
         </section>
 
-        {/* Booking Form */}
-        <section className="py-16 bg-gray-50">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-2xl shadow-xl p-8">
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Personal Info */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Your Name *
-                    </label>
-                    <div className="relative">
-                      <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        required
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                        placeholder="Enter your name"
-                      />
-                    </div>
+        {/* Progress Bar */}
+        <div className="bg-white shadow-sm sticky top-16 z-40">
+          <div className="max-w-lg mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              {[1, 2, 3, 4].map((s) => (
+                <div key={s} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                    step >= s 
+                      ? 'bg-primary-500 text-dark-900' 
+                      : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {step > s ? <FiCheck className="text-lg" /> : s}
                   </div>
+                  {s < 4 && (
+                    <div className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 ${
+                      step > s ? 'bg-primary-500' : 'bg-gray-200'
+                    }`} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between mt-2 text-xs sm:text-sm text-gray-500">
+              <span className={step >= 1 ? 'text-dark-900 font-medium' : ''}>Your Info</span>
+              <span className={step >= 2 ? 'text-dark-900 font-medium' : ''}>Service</span>
+              <span className={step >= 3 ? 'text-dark-900 font-medium' : ''}>Schedule</span>
+              <span className={step >= 4 ? 'text-dark-900 font-medium' : ''}>Confirm</span>
+            </div>
+          </div>
+        </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Phone Number *
-                    </label>
-                    <div className="relative">
-                      <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        required
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                        placeholder="0771234567"
-                      />
-                    </div>
+        {/* Form Content */}
+        <div className="max-w-lg mx-auto px-4 py-6">
+          
+          {/* Step 1: Basic Info */}
+          {step === 1 && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-dark-900 mb-6">Your Information</h2>
+              
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Name *
+                  </label>
+                  <div className="relative">
+                    <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      placeholder="Enter your name"
+                    />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
+                    Phone Number *
                   </label>
                   <div className="relative">
-                    <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      placeholder="0771234567"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email (Optional)
+                  </label>
+                  <div className="relative">
+                    <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type="email"
-                      name="email"
                       value={formData.email}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
                       placeholder="your@email.com"
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
 
+          {/* Step 2: Service Selection */}
+          {step === 2 && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
+              
+              {/* Selected Service Display */}
+              {selectedService && (
+                <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-primary-600 font-medium">{selectedCategory?.name}</p>
+                      <p className="text-lg font-bold text-dark-900">{selectedService.name}</p>
+                      <p className="text-2xl font-bold text-primary-600">Rs. {selectedService.price?.toLocaleString()}</p>
+                    </div>
+                    <button
+                      onClick={() => setShowServiceSelector(true)}
+                      className="text-primary-600 font-medium text-sm hover:text-primary-700"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Service Selector Modal */}
+              {showServiceSelector && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+                  <div className="bg-white w-full sm:max-w-lg max-h-[80vh] rounded-t-3xl sm:rounded-2xl overflow-hidden">
+                    <div className="p-4 border-b flex items-center justify-between sticky top-0 bg-white">
+                      <h3 className="text-lg font-bold">Select a Service</h3>
+                      <button 
+                        onClick={() => setShowServiceSelector(false)}
+                        className="text-gray-500 text-2xl"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto max-h-[60vh] p-4 space-y-4">
+                      {categories.map(category => (
+                        <div key={category.id}>
+                          <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>
+                          <div className="space-y-2">
+                            {category.services.map(service => (
+                              <button
+                                key={service.id}
+                                onClick={() => handleServiceSelect(service.id)}
+                                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                                  formData.serviceId === service.id 
+                                    ? 'border-primary-500 bg-primary-50' 
+                                    : 'border-gray-200 hover:border-primary-300'
+                                }`}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium">{service.name}</span>
+                                  <span className="font-bold text-primary-600">Rs. {service.price?.toLocaleString()}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* District */}
+              <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Service *
+                    District *
                   </label>
-                  <select
-                    name="serviceId"
-                    value={formData.serviceId}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                  >
-                    <option value="">Select a service</option>
-                    {loading ? (
-                      <option>Loading services...</option>
-                    ) : (
-                      categories.map(category => (
-                        <optgroup key={category.id} label={category.name}>
-                          {category.services.map(service => (
-                            <option key={service.id} value={service.id}>
-                              {service.name} - Rs. {service.price.toLocaleString()}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))
-                    )}
-                  </select>
-                  {selectedService && (
-                    <p className="mt-2 text-sm text-primary-600 font-medium">
-                      Selected: {selectedService.name} - Rs. {selectedService.price.toLocaleString()}
-                    </p>
-                  )}
+                  <div className="relative">
+                    <FiMapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <select
+                      value={formData.district}
+                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
+                    >
+                      <option value="">Select District</option>
+                      {DISTRICTS.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address
+                    Address (Optional)
                   </label>
                   <div className="relative">
-                    <FiMapPin className="absolute left-3 top-3 text-gray-400" />
+                    <FiMapPin className="absolute left-4 top-4 text-gray-400" />
                     <textarea
-                      name="address"
                       value={formData.address}
-                      onChange={handleChange}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       rows={3}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all resize-none"
-                      placeholder="Enter your full address (optional)"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all resize-none"
+                      placeholder="Enter your address"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Schedule */}
+          {step === 3 && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-dark-900 mb-6">Schedule</h2>
+              
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preferred Date *
+                  </label>
+                  <div className="relative">
+                    <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    District *
+                    Preferred Time *
                   </label>
-                  <select
-                    name="district"
-                    value={formData.district}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                  >
-                    <option value="">Select district</option>
-                    <option value="Colombo">Colombo</option>
-                    <option value="Gampaha">Gampaha</option>
-                    <option value="Kalutara">Kalutara</option>
-                    <option value="Kandy">Kandy</option>
-                    <option value="Jaffna">Jaffna</option>
-                    <option value="Galle">Galle</option>
-                    <option value="Matara">Matara</option>
-                    <option value="Hambantota">Hambantota</option>
-                    <option value="Kurunegala">Kurunegala</option>
-                    <option value="Anuradhapura">Anuradhapura</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Preferred Date *
-                    </label>
-                    <div className="relative">
-                      <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="date"
-                        name="date"
-                        value={formData.date}
-                        onChange={handleChange}
-                        required
-                        min={new Date().toISOString().split('T')[0]}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Preferred Time *
-                    </label>
-                    <div className="relative">
-                      <FiClock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                      <select
-                        name="time"
-                        value={formData.time}
-                        onChange={handleChange}
-                        required
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                      >
-                        <option value="">Select time</option>
-                        <option value="08:00 AM">08:00 AM</option>
-                        <option value="09:00 AM">09:00 AM</option>
-                        <option value="10:00 AM">10:00 AM</option>
-                        <option value="11:00 AM">11:00 AM</option>
-                        <option value="12:00 PM">12:00 PM</option>
-                        <option value="01:00 PM">01:00 PM</option>
-                        <option value="02:00 PM">02:00 PM</option>
-                        <option value="03:00 PM">03:00 PM</option>
-                        <option value="04:00 PM">04:00 PM</option>
-                        <option value="05:00 PM">05:00 PM</option>
-                      </select>
-                    </div>
+                  <div className="relative">
+                    <FiClock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <select
+                      value={formData.time}
+                      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
+                    >
+                      <option value="">Select Time</option>
+                      {TIME_SLOTS.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Additional Notes
+                    Notes (Optional)
                   </label>
                   <textarea
-                    name="notes"
                     value={formData.notes}
-                    onChange={handleChange}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     rows={3}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all resize-none"
-                    placeholder="Any special instructions or requirements..."
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all resize-none"
+                    placeholder="Any special requirements..."
                   />
                 </div>
+              </div>
+            </div>
+          )}
 
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+          {/* Step 4: Confirmation */}
+          {step === 4 && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-dark-900 mb-6">Booking Summary</h2>
+              
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-6">
+                  {error}
+                </div>
+              )}
+
+              <div className="bg-gray-50 rounded-xl p-5 space-y-3 mb-6">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Name</span>
+                  <span className="font-medium">{formData.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Phone</span>
+                  <span className="font-medium">{formData.phone}</span>
+                </div>
+                {formData.email && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Email</span>
+                    <span className="font-medium">{formData.email}</span>
+                  </div>
+                )}
+                <div className="border-t pt-3 flex justify-between">
+                  <span className="text-gray-600">Service</span>
+                  <span className="font-bold text-primary-600">{selectedService?.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">District</span>
+                  <span className="font-medium">{formData.district}</span>
+                </div>
+                {formData.address && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Address</span>
+                    <span className="font-medium text-right max-w-[60%] text-right">{formData.address}</span>
+                  </div>
+                )}
+                <div className="border-t pt-3 flex justify-between">
+                  <span className="text-gray-600">Date</span>
+                  <span className="font-medium">{formatDate(formData.date)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Time</span>
+                  <span className="font-medium">{formData.time}</span>
+                </div>
+                {formData.notes && (
+                  <div className="border-t pt-3">
+                    <span className="text-gray-600 block mb-1">Notes</span>
+                    <span className="font-medium">{formData.notes}</span>
+                  </div>
+                )}
+                <div className="border-t pt-3 flex justify-between items-center">
+                  <span className="text-lg font-bold">Total</span>
+                  <span className="text-2xl font-bold text-primary-600">
+                    Rs. {selectedService?.price?.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* WhatsApp Option */}
+              <div className="mb-4">
+                <a
+                  href={generateWhatsAppLink()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all text-lg"
                 >
-                  {submitting ? 'Submitting...' : 'Submit Booking'}
-                </button>
-              </form>
-            </div>
-          </div>
-        </section>
+                  <FiMessageCircle className="text-2xl" />
+                  Complete via WhatsApp
+                </a>
+                <p className="text-center text-sm text-gray-500 mt-2">
+                  Quick & direct booking via chat
+                </p>
+              </div>
 
-        {/* Info Section */}
-        <section className="py-12 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid md:grid-cols-3 gap-8 text-center">
-              <div className="p-6">
-                <div className="text-4xl mb-4">📞</div>
-                <h3 className="font-bold text-dark-900 mb-2">Call Us</h3>
-                <p className="text-gray-600">0770867609</p>
-              </div>
-              <div className="p-6">
-                <div className="text-4xl mb-4">💬</div>
-                <h3 className="font-bold text-dark-900 mb-2">WhatsApp</h3>
-                <p className="text-gray-600">0770867609</p>
-              </div>
-              <div className="p-6">
-                <div className="text-4xl mb-4">✉️</div>
-                <h3 className="font-bold text-dark-900 mb-2">Email</h3>
-                <p className="text-gray-600">info@maintain.lk</p>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-gray-50 text-gray-500">or</span>
+                </div>
               </div>
             </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div className="flex gap-4 mt-6">
+            {step > 1 && (
+              <button
+                onClick={() => setStep(step - 1)}
+                className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-4 rounded-xl transition-all"
+              >
+                <FiChevronLeft />
+                Back
+              </button>
+            )}
+            
+            {step < 4 ? (
+              <button
+                onClick={() => setStep(step + 1)}
+                disabled={!canProceed()}
+                className={`flex-1 flex items-center justify-center gap-2 font-semibold py-4 rounded-xl transition-all ${
+                  canProceed()
+                    ? 'bg-primary-500 hover:bg-primary-600 text-dark-900'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Next
+                <FiChevronRight />
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
+              >
+                {submitting ? 'Submitting...' : '✅ Submit Booking'}
+              </button>
+            )}
           </div>
-        </section>
+
+          {/* Help Text */}
+          <div className="text-center mt-6 text-gray-500 text-sm">
+            Need help? <a href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`} className="text-primary-600 font-medium">Call {WHATSAPP_NUMBER.replace('94', '0')}</a>
+          </div>
+        </div>
       </main>
 
       <Footer />

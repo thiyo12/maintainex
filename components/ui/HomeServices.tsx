@@ -163,7 +163,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           {filteredServices.slice(0, 8).map((service) => (
             <Link
               key={service.id}
-              href={`/booking?service=${service.slug}`}
+              href={`/booking?serviceId=${service.id}`}
               className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
             >
               <div className="relative h-40 overflow-hidden">

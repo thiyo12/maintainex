@@ -73,7 +73,7 @@ export default async function ServicesPage() {
                             Rs. {service.price.toLocaleString()}
                           </span>
                           <a 
-                            href="/booking" 
+                            href={`/booking?serviceId=${service.id}`}
                             className="bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold px-4 py-2 rounded-lg transition-all duration-300"
                           >
                             Book Now
