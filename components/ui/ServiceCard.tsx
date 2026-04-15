@@ -42,12 +42,20 @@ export function ServiceCard({ title, description, image, slug, price }: ServiceC
       <div className="p-6">
         <h3 className="text-xl font-bold text-dark-900 mb-2">{title}</h3>
         <p className="text-gray-600 mb-4 line-clamp-2">{description}</p>
-        <Link
-          href={`/booking?service=${slug}`}
-          className="inline-flex items-center text-primary-600 font-semibold hover:text-primary-700 transition-colors"
-        >
-          Book Now <FiArrowRight className="ml-2" />
-        </Link>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <Link
+            href={`/services/${slug}`}
+            className="inline-flex items-center justify-center text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+          >
+            View Details <FiArrowRight className="ml-2" />
+          </Link>
+          <Link
+            href={`/booking?service=${slug}`}
+            className="inline-flex items-center justify-center bg-primary-500 text-dark-900 px-4 py-2 rounded-lg font-semibold hover:bg-primary-600 transition-colors"
+          >
+            Book Now
+          </Link>
+        </div>
       </div>
     </div>
   )

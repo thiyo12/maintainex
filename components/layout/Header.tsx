@@ -7,9 +7,8 @@ import { FiMenu, FiX, FiPhone } from 'react-icons/fi'
 
 const navigation = [
   { name: 'Home', href: '/' },
-  { name: 'About', href: '/about' },
   { name: 'Services', href: '/services' },
-  { name: 'Booking', href: '/booking' },
+  { name: 'About', href: '/about' },
   { name: 'Careers', href: '/careers' },
   { name: 'Contact', href: '/contact' },
 ]

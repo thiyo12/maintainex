@@ -143,7 +143,33 @@ function BookingContent() {
       })
 
       if (res.ok) {
-        setSuccess(true)
+        const data = await res.json()
+        
+        // Save booking data to localStorage
+        if (data.booking) {
+          const bookingData = {
+            id: data.booking.id,
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            service: selectedService?.name,
+            serviceId: formData.serviceId,
+            district: formData.district,
+            address: formData.address,
+            date: formData.date,
+            time: formData.time,
+            notes: formData.notes,
+            price: selectedService?.price,
+            status: data.booking.status,
+            createdAt: data.booking.createdAt
+          }
+          localStorage.setItem('lastBooking', JSON.stringify(bookingData))
+          
+          // Redirect to confirmation page with booking ID
+          router.push(`/booking/confirmation?id=${data.booking.id}`)
+        } else {
+          setSuccess(true)
+        }
       } else {
         const data = await res.json()
         setError(data.error || 'Failed to submit booking')

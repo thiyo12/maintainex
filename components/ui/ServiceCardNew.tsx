@@ -33,7 +33,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
 
   return (
     <Link
-      href={`/booking?service=${service.slug}`}
+      href={`/services/${service.slug}`}
       className="group block bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
     >
       <div className="relative h-48 overflow-hidden">
@@ -75,7 +75,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
             {priceDisplay}
           </span>
           <span className="flex items-center gap-1 text-sm font-medium text-gray-600 group-hover:text-primary-600 transition-colors">
-            Book
+            Details
             <FiArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </span>
         </div>

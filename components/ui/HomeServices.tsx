@@ -147,12 +147,20 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   </div>
                 </div>
 
-                <Link
-                  href={`/booking?service=${featuredServices[0]?.slug || ''}`}
-                  className="inline-flex items-center gap-2 bg-primary-500 text-dark-900 font-bold px-6 py-3 rounded-xl hover:bg-primary-600 transition-colors w-fit"
-                >
-                  Book Now <FiArrowRight className="w-5 h-5" />
-                </Link>
+                <div className="flex items-center gap-3">
+                  <Link
+                    href={`/services/${featuredServices[0]?.slug || ''}`}
+                    className="inline-flex items-center gap-2 bg-primary-500 text-dark-900 font-bold px-6 py-3 rounded-xl hover:bg-primary-600 transition-colors"
+                  >
+                    View Details <FiArrowRight className="w-5 h-5" />
+                  </Link>
+                  <Link
+                    href={`/booking?service=${featuredServices[0]?.slug || ''}`}
+                    className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 font-bold px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors"
+                  >
+                    Book Now
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
@@ -163,7 +171,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           {filteredServices.slice(0, 8).map((service) => (
             <Link
               key={service.id}
-              href={`/booking?serviceId=${service.id}`}
+              href={`/services/${service.slug}`}
               className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
             >
               <div className="relative h-40 overflow-hidden">
@@ -208,7 +216,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                       : 'Contact for quote'}
                   </span>
                   <span className="text-xs text-gray-500 group-hover:text-primary-600 transition-colors">
-                    Book →
+                    Details →
                   </span>
                 </div>
               </div>

@@ -114,7 +114,7 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
             {services.slice(0, 4).map((service) => (
               <Link
                 key={service.id}
-                href={`/booking?service=${service.slug}`}
+                href={`/services/${service.slug}`}
                 className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-primary-100 hover:text-primary-700 transition-colors"
               >
                 {service.title}
@@ -127,13 +127,21 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
             )}
           </div>
 
-          <Link
-            href={`/booking?service=${firstService?.slug || ''}`}
-            className="mt-8 inline-flex items-center justify-center gap-2 bg-primary-500 text-dark-900 font-bold px-8 py-4 rounded-xl hover:bg-primary-600 transition-colors w-fit"
-          >
-            Book Now
-            <FiArrowRight className="w-5 h-5" />
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href={`/services/${firstService?.slug || ''}`}
+              className="inline-flex items-center justify-center gap-2 bg-primary-500 text-dark-900 font-bold px-8 py-4 rounded-xl hover:bg-primary-600 transition-colors"
+            >
+              View Details
+              <FiArrowRight className="w-5 h-5" />
+            </Link>
+            <Link
+              href={`/booking?service=${firstService?.slug || ''}`}
+              className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold px-8 py-4 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Book Now
+            </Link>
+          </div>
         </div>
       </div>
     </div>

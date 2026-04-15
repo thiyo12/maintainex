@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiMail, FiPhone, FiMapPin, FiX, FiSmartphone } from 'react-icons/fi'
-import { FaFacebookF, FaTwitter, FaInstagram, FaTiktok, FaLinkedinIn } from 'react-icons/fa'
+import { FaFacebookF, FaTwitter, FaInstagram, FaTiktok, FaLinkedinIn, FaWhatsapp } from 'react-icons/fa'
 
 export default function Footer() {
   const [showAppMessage, setShowAppMessage] = useState(false)
@@ -17,7 +17,7 @@ export default function Footer() {
     <footer className="bg-dark-900 text-white">
       {showAppMessage && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center relative">
             <button
               onClick={() => setShowAppMessage(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
@@ -42,8 +42,9 @@ export default function Footer() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12">
+          {/* Brand Section */}
+          <div className="lg:col-span-2">
             <div className="flex items-center space-x-2 mb-6">
               <Image src="/logo.JPEG" alt="Maintain" width={40} height={40} className="object-contain" />
               <span className="text-2xl font-bold">
@@ -105,17 +106,33 @@ export default function Footer() {
             </div>
           </div>
 
+          {/* Quick Links */}
           <div>
             <h3 className="text-lg font-semibold mb-6">Quick Links</h3>
             <ul className="space-y-3">
               <li><Link href="/" className="text-gray-400 hover:text-primary-500 transition-colors">Home</Link></li>
+              <li><Link href="/services" className="text-gray-400 hover:text-primary-500 transition-colors">Services</Link></li>
               <li><Link href="/about" className="text-gray-400 hover:text-primary-500 transition-colors">About Us</Link></li>
-              <li><Link href="/booking" className="text-gray-400 hover:text-primary-500 transition-colors">Book Now</Link></li>
               <li><Link href="/careers" className="text-gray-400 hover:text-primary-500 transition-colors">Careers</Link></li>
               <li><Link href="/contact" className="text-gray-400 hover:text-primary-500 transition-colors">Contact</Link></li>
+              <li><Link href="/booking" className="text-gray-400 hover:text-primary-500 transition-colors">Booking</Link></li>
             </ul>
           </div>
 
+          {/* Services Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-6">Services</h3>
+            <ul className="space-y-3">
+              <li><Link href="/services#home-cleaning" className="text-gray-400 hover:text-primary-500 transition-colors">Home Cleaning</Link></li>
+              <li><Link href="/services#office-cleaning" className="text-gray-400 hover:text-primary-500 transition-colors">Office Cleaning</Link></li>
+              <li><Link href="/services#deep-cleaning" className="text-gray-400 hover:text-primary-500 transition-colors">Deep Cleaning</Link></li>
+              <li><Link href="/services#post-construction" className="text-gray-400 hover:text-primary-500 transition-colors">Post Construction</Link></li>
+              <li><Link href="/services#pest-control" className="text-gray-400 hover:text-primary-500 transition-colors">Pest Control</Link></li>
+              <li><Link href="/services#landscape" className="text-gray-400 hover:text-primary-500 transition-colors">Landscaping</Link></li>
+            </ul>
+          </div>
+
+          {/* Contact Info */}
           <div>
             <h3 className="text-lg font-semibold mb-6">Contact Info</h3>
             <ul className="space-y-4">
@@ -131,12 +148,16 @@ export default function Footer() {
                 <FiMail className="text-primary-500 flex-shrink-0" />
                 <a href="mailto:maintainex.lk@gmail.com" className="text-gray-400 hover:text-primary-500 transition-colors">maintainex.lk@gmail.com</a>
               </li>
+              <li className="flex items-center space-x-3">
+                <FaWhatsapp className="text-primary-500 flex-shrink-0" />
+                <a href="https://wa.me/94770867609" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary-500 transition-colors">WhatsApp Us</a>
+              </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-500">
-          <p>&copy; {new Date().getFullYear()} Maintainex. All rights reserved. | Shine Beyond Expectations</p>
+          <p>&copy; {new Date().getFullYear()} Maintainex. All rights reserved. | Shine Beyond Expectations | Made with care in Sri Lanka</p>
         </div>
       </div>
     </footer>
