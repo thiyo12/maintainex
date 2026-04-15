@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
@@ -33,6 +33,30 @@ const DISTRICTS = [
 ]
 
 export default function BookingPage() {
+  return (
+    <Suspense fallback={<BookingLoading />}>
+      <BookingContent />
+    </Suspense>
+  )
+}
+
+function BookingLoading() {
+  return (
+    <>
+      <Header />
+      <WhatsAppButton />
+      <main className="pt-20 min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </main>
+      <Footer />
+    </>
+  )
+}
+
+function BookingContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [step, setStep] = useState(1)
