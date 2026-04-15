@@ -49,12 +49,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
     }
 
+    let guestUser = await prisma.user.findFirst({ where: { email: 'guest@maintain.lk' } })
+    
+    if (!guestUser) {
+      guestUser = await prisma.user.create({
+        data: {
+          email: 'guest@maintain.lk',
+          passwordHash: 'guest',
+          name: 'Guest User'
+        }
+      })
+    }
+
     const review = await prisma.review.create({
       data: {
         rating: parsedRating,
         comment: comment ? sanitizeString(comment) : null,
         customerName: sanitizeString(customerName),
         serviceId,
+        userId: guestUser.id,
         status: 'PENDING'
       }
     })

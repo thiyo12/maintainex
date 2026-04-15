@@ -6,27 +6,16 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    let settings = await prisma.settings.findUnique({
-      where: { id: 'site_settings' }
+    const maintenanceModeSetting = await prisma.settings.findUnique({
+      where: { key: 'maintenanceMode' }
+    })
+    const maintenanceMessageSetting = await prisma.settings.findUnique({
+      where: { key: 'maintenanceMessage' }
     })
 
-    if (!settings) {
-      settings = await prisma.settings.create({
-        data: {
-          id: 'site_settings',
-          companyName: 'Maintain',
-          email: 'info@maintain.lk',
-          phone: '+94 XX XXX XXXX',
-          address: 'Sri Lanka',
-          maintenanceMode: false,
-          maintenanceMessage: "We're making things better! Our website is currently undergoing some scheduled maintenance to serve you better. We'll be back shortly. Thank you for your patience!"
-        }
-      })
-    }
-
     const response = NextResponse.json({
-      maintenanceMode: settings.maintenanceMode,
-      maintenanceMessage: settings.maintenanceMessage
+      maintenanceMode: maintenanceModeSetting?.value === 'true',
+      maintenanceMessage: maintenanceMessageSetting?.value || "We're making things better!"
     })
     
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
@@ -53,26 +42,21 @@ export async function PUT(request: NextRequest) {
     const body = await request.json()
     const { maintenanceMode, maintenanceMessage } = body
 
-    const settings = await prisma.settings.upsert({
-      where: { id: 'site_settings' },
-      update: {
-        maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : false,
-        maintenanceMessage: maintenanceMessage !== undefined ? maintenanceMessage : "We're making things better!"
-      },
-      create: {
-        id: 'site_settings',
-        companyName: 'Maintain',
-        email: 'info@maintain.lk',
-        phone: '+94 XX XXX XXXX',
-        address: 'Sri Lanka',
-        maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : false,
-        maintenanceMessage: maintenanceMessage || "We're making things better!"
-      }
+    await prisma.settings.upsert({
+      where: { key: 'maintenanceMode' },
+      update: { value: maintenanceMode !== undefined ? String(maintenanceMode) : 'false' },
+      create: { key: 'maintenanceMode', value: maintenanceMode !== undefined ? String(maintenanceMode) : 'false' }
+    })
+
+    await prisma.settings.upsert({
+      where: { key: 'maintenanceMessage' },
+      update: { value: maintenanceMessage || "We're making things better!" },
+      create: { key: 'maintenanceMessage', value: maintenanceMessage || "We're making things better!" }
     })
 
     const response = NextResponse.json({
-      maintenanceMode: settings.maintenanceMode,
-      maintenanceMessage: settings.maintenanceMessage
+      maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : false,
+      maintenanceMessage: maintenanceMessage || "We're making things better!"
     })
     
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')

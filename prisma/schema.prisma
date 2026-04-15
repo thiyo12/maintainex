@@ -87,13 +87,14 @@ model LoginActivity {
 }
 
 model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  slug      String    @unique
-  icon      String?
-  image     String?
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  icon        String?
+  image       String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
 
   services  Service[]
 }

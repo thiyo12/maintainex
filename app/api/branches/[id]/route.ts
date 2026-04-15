@@ -36,8 +36,7 @@ export async function GET(
           select: {
             admins: true,
             bookings: true,
-            applications: true,
-            services: true
+            applications: true
           }
         }
       }

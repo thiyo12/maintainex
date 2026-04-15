@@ -22,12 +22,21 @@ async function getServicesByCategory() {
   })
   
   return categories.map(cat => ({
-    ...cat,
+    id: cat.id,
+    name: cat.name,
+    slug: cat.slug,
+    description: cat.description || '',
+    icon: cat.icon,
     services: cat.services.map(svc => ({
-      ...svc,
-      price: svc.price ? Number(svc.price) : null
+      id: svc.id,
+      title: svc.name,
+      slug: svc.slug || '',
+      description: svc.description,
+      image: svc.image,
+      price: svc.price ? Number(svc.price) : null,
+      duration: svc.duration ? Number(svc.duration) : null
     }))
-  }))
+  })) as any[]
 }
 
 export default async function HomePage() {

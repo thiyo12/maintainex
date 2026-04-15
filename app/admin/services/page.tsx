@@ -228,8 +228,8 @@ export default function AdminServices() {
     }
     setEditingService(service)
     setFormData({
-      title: service.name,
-      slug: service.slug,
+      name: service.name,
+      slug: service.slug || '',
       description: service.description,
       image: service.image || '',
       price: service.price?.toString() || '',
@@ -256,7 +256,7 @@ export default function AdminServices() {
 
   const resetForm = () => {
     setFormData({
-      title: '',
+      name: '',
       slug: '',
       description: '',
       image: '',

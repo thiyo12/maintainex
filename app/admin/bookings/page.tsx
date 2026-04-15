@@ -19,6 +19,7 @@ interface Booking {
   service: { name: string }
   branch: { id: string; name: string; location: string } | null
   createdAt: string
+  date: string | null
 }
 
 interface Branch {
@@ -204,7 +205,7 @@ export default function AdminBookings() {
 
   const openEditModal = (booking: Booking) => {
     setEditingBooking(booking)
-    setEditDistrict(booking.district)
+    setEditDistrict(booking.district || '')
     setEditBranchId(booking.branch?.id || '')
   }
 
@@ -302,7 +303,7 @@ export default function AdminBookings() {
                     <td className="px-4 py-3 text-gray-700">{booking.district}</td>
                     <td className="px-4 py-3 text-gray-700">{booking.service?.name}</td>
                     <td className="px-4 py-3">
-                      <div className="text-gray-900">{new Date(booking.date).toLocaleDateString()}</div>
+                      <div className="text-gray-900">{booking.date ? new Date(booking.date).toLocaleDateString() : '-'}</div>
                       <div className="text-sm text-gray-500">{booking.time}</div>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -397,7 +398,7 @@ export default function AdminBookings() {
                     </td>
                     <td className="px-6 py-4 text-gray-600">{booking.service?.name}</td>
                     <td className="px-6 py-4">
-                      <div className="text-gray-900">{new Date(booking.date).toLocaleDateString()}</div>
+                      <div className="text-gray-900">{booking.date ? new Date(booking.date).toLocaleDateString() : '-'}</div>
                       <div className="text-sm text-gray-500">{booking.time}</div>
                     </td>
                     <td className="px-6 py-4">
@@ -498,12 +499,12 @@ export default function AdminBookings() {
               </div>
               <div>
                 <label className="text-sm text-gray-500">Service</label>
-                <div className="font-medium">{selectedBooking.service?.title}</div>
+                <div className="font-medium">{selectedBooking.service?.name}</div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-gray-500">Date</label>
-                  <div className="font-medium">{new Date(selectedBooking.date).toLocaleDateString()}</div>
+                  <div className="font-medium">{selectedBooking.date ? new Date(selectedBooking.date).toLocaleDateString() : '-'}</div>
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">Time</label>

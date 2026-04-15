@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const isSuper = session.role === 'SUPER_ADMIN'
 
     const branchFilter = !isSuper && userBranchId ? { branchId: userBranchId } : {}
-    const serviceFilter = !isSuper && userBranchId ? { branchId: userBranchId } : {}
+    const serviceFilter = {}
 
     const [
       totalBookings,

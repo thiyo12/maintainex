@@ -15,6 +15,7 @@ interface Application {
   service: string
   experience: string
   resumeUrl: string | null
+  cvUrl: string | null
   status: string
   notes: string | null
   district: string | null
@@ -203,7 +204,7 @@ export default function AdminApplications() {
 
   const openEditModal = (app: Application) => {
     setEditingApp(app)
-    setEditDistrict(app.district)
+    setEditDistrict(app.district || '')
     setEditBranchId(app.branch?.id || '')
   }
 

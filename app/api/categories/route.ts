@@ -3,9 +3,13 @@ import { prisma } from '@/lib/prisma'
 
 function serializeService(service: any) {
   return {
-    ...service,
+    id: service.id,
     title: service.name,
+    slug: service.slug || '',
+    description: service.description || '',
+    image: service.image || null,
     price: service.price ? Number(service.price) : null,
+    duration: service.duration ? Number(service.duration) : null
   }
 }
 
@@ -28,7 +32,7 @@ export async function GET() {
       services: cat.services.map(serializeService)
     }))
 
-    return NextResponse.json(serializedCategories)
+    return NextResponse.json(serializedCategories as any[])
   } catch {
     return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 })
   }
