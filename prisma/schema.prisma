@@ -130,6 +130,7 @@ model Branch {
 
   bookings Booking[]
   admins   Admin[]
+  applications Application[]
 
   @@index([city])
 }
