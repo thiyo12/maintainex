@@ -75,7 +75,7 @@ export async function PATCH(
       entityType: 'APPLICATION',
       entityId: application.id,
       description: `Updated application status to ${status}`,
-      details: { applicantName: application.name, position: application.position, newStatus: status }
+      details: { applicantName: application.name, service: application.service, newStatus: status }
     })
 
     return NextResponse.json(application)
@@ -120,7 +120,7 @@ export async function DELETE(
       entityType: 'APPLICATION',
       entityId: (await params).id,
       description: `Deleted application from ${application?.name}`,
-      details: { applicantName: application?.name, position: application?.position }
+      details: { applicantName: application?.name, service: application?.service }
     })
 
     return NextResponse.json({ message: 'Application deleted successfully' })
