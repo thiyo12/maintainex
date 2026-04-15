@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
         data: {
           name: body.name,
           slug: body.slug?.toLowerCase().replace(/\s+/g, '-') || body.name.toLowerCase().replace(/\s+/g, '-'),
-          description: body.description || null,
           icon: body.icon || null,
+          image: body.image || null,
           isActive: body.isActive ?? true
         }
       })
