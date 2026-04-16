@@ -3,9 +3,6 @@ import { DISTRICT_TO_PROVINCE, PROVINCES } from "../lib/provinces"
 
 const prisma = new PrismaClient()
 
-/**
- * Find the first active branch that matches the given province
- */
 async function findBranchByProvince(province: string): Promise<{ id: string } | null> {
   const branch = await prisma.branch.findFirst({
     where: {
@@ -18,34 +15,10 @@ async function findBranchByProvince(province: string): Promise<{ id: string } | 
   return branch
 }
 
-/**
- * Get the first district from a branch's districts array
- */
-function getFirstDistrictFromBranch(districts: string | null | undefined): string | null {
-  if (!districts) return null
-  try {
-    const districtsArray = JSON.parse(districts)
-    if (Array.isArray(districtsArray) && districtsArray.length > 0) {
-      return districtsArray[0]
-    }
-  } catch {
-    // If it's not JSON, treat it as a single district
-    return districts
-  }
-  return null
-}
-
-/**
- * Main migration function to assign provinces to existing data
- */
 async function migrateProvinces() {
   console.log("Starting province migration...\n")
 
-  // ============================================================
-  // 1. Migrate branches - assign province based on name or districts
-  // ============================================================
   console.log("1. Migrating branches...")
-
   const branches = await prisma.branch.findMany({
     select: { id: true, name: true, province: true, districts: true },
   })
@@ -55,18 +28,19 @@ async function migrateProvinces() {
     if (branch.province) continue
 
     let targetProvince: string | null = null
-
-    // Try to match branch name to province name
     const matchingProvince = PROVINCES.find((p) =>
       branch.name.toLowerCase().includes(p.toLowerCase())
     )
     if (matchingProvince) {
       targetProvince = matchingProvince
-    } else {
-      // Try to get province from first district
-      const firstDistrict = getFirstDistrictFromBranch(branch.districts)
-      if (firstDistrict) {
-        targetProvince = DISTRICT_TO_PROVINCE[firstDistrict] || null
+    } else if (branch.districts) {
+      try {
+        const districtsArray = JSON.parse(branch.districts)
+        if (Array.isArray(districtsArray) && districtsArray.length > 0) {
+          targetProvince = DISTRICT_TO_PROVINCE[districtsArray[0]] || null
+        }
+      } catch {
+        targetProvince = DISTRICT_TO_PROVINCE[branch.districts] || null
       }
     }
 
@@ -78,31 +52,21 @@ async function migrateProvinces() {
       branchCount++
     }
   }
-
   console.log(`   Updated ${branchCount} branches with provinces`)
 
-  // ============================================================
-  // 2. Migrate admins - assign province from their branch
-  // ============================================================
   console.log("\n2. Migrating admins...")
-
   const admins = await prisma.admin.findMany({
-    where: {
-      branchId: { not: null },
-      province: null,
-    },
+    where: { branchId: { not: null }, province: null },
     select: { id: true, branchId: true },
   })
 
   let adminCount = 0
   for (const admin of admins) {
     if (!admin.branchId) continue
-
     const branch = await prisma.branch.findUnique({
       where: { id: admin.branchId },
       select: { province: true },
     })
-
     if (branch?.province) {
       await prisma.admin.update({
         where: { id: admin.id },
@@ -111,26 +75,17 @@ async function migrateProvinces() {
       adminCount++
     }
   }
-
   console.log(`   Updated ${adminCount} admins with provinces from their branches`)
 
-  // ============================================================
-  // 3. Migrate bookings - assign province from district (if missing)
-  // ============================================================
   console.log("\n3. Migrating bookings without province...")
-
   const bookings = await prisma.booking.findMany({
-    where: {
-      province: null,
-      district: { not: null },
-    },
+    where: { province: null, district: { not: null } },
     select: { id: true, district: true },
   })
 
   let bookingCount = 0
   for (const booking of bookings) {
     if (!booking.district) continue
-
     const province = DISTRICT_TO_PROVINCE[booking.district]
     if (province) {
       await prisma.booking.update({
@@ -140,26 +95,17 @@ async function migrateProvinces() {
       bookingCount++
     }
   }
-
   console.log(`   Updated ${bookingCount} bookings with provinces from districts`)
 
-  // ============================================================
-  // 4. Migrate applications - assign province from district (if missing)
-  // ============================================================
   console.log("\n4. Migrating applications without province...")
-
   const applications = await prisma.application.findMany({
-    where: {
-      province: null,
-      district: { not: null },
-    },
+    where: { province: null, district: { not: null } },
     select: { id: true, district: true },
   })
 
   let applicationCount = 0
   for (const app of applications) {
     if (!app.district) continue
-
     const province = DISTRICT_TO_PROVINCE[app.district]
     if (province) {
       await prisma.application.update({
@@ -169,24 +115,16 @@ async function migrateProvinces() {
       applicationCount++
     }
   }
-
   console.log(`   Updated ${applicationCount} applications with provinces from districts`)
 
-  // ============================================================
-  // 5. Migrate bookings - assign branchId where missing (using province)
-  // ============================================================
-  console.log("\n5. Migrating bookings without branchId...")
-
-  const bookingsWithoutBranch = await prisma.booking.findMany({
-    where: {
-      branchId: null,
-      province: { not: null },
-    },
-    select: { id: true, province: true },
+  console.log("\n5. Assigning branchIds to bookings...")
+  const allBookings = await prisma.booking.findMany({
+    select: { id: true, province: true, branchId: true },
   })
 
   let bookingsBranchCount = 0
-  for (const booking of bookingsWithoutBranch) {
+  for (const booking of allBookings) {
+    if (booking.branchId) continue
     if (!booking.province) continue
 
     const branch = await findBranchByProvince(booking.province)
@@ -198,24 +136,16 @@ async function migrateProvinces() {
       bookingsBranchCount++
     }
   }
-
   console.log(`   Updated ${bookingsBranchCount} bookings with branchIds from provinces`)
 
-  // ============================================================
-  // 6. Migrate applications - assign branchId where missing (using province)
-  // ============================================================
-  console.log("\n6. Migrating applications without branchId...")
-
-  const applicationsWithoutBranch = await prisma.application.findMany({
-    where: {
-      branchId: { equals: null },
-      province: { not: null },
-    } as any,
-    select: { id: true, province: true },
+  console.log("\n6. Assigning branchIds to applications...")
+  const allApps = await prisma.application.findMany({
+    select: { id: true, province: true, branchId: true },
   })
 
   let applicationsBranchCount = 0
-  for (const app of applicationsWithoutBranch) {
+  for (const app of allApps) {
+    if (app.branchId) continue
     if (!app.province) continue
 
     const branch = await findBranchByProvince(app.province)
@@ -227,16 +157,10 @@ async function migrateProvinces() {
       applicationsBranchCount++
     }
   }
-
   console.log(`   Updated ${applicationsBranchCount} applications with branchIds from provinces`)
 
-  // ============================================================
-  // Final summary
-  // ============================================================
-  console.log("\n" + "=".repeat(50))
-  console.log("Migration complete!")
-  console.log("=".repeat(50))
-  console.log(`Total updates:`)
+  console.log("\n✅ Migration completed!")
+  console.log("Summary:")
   console.log(`  - Branches: ${branchCount}`)
   console.log(`  - Admins: ${adminCount}`)
   console.log(`  - Bookings (province): ${bookingCount}`)
@@ -245,18 +169,9 @@ async function migrateProvinces() {
   console.log(`  - Applications (branchId): ${applicationsBranchCount}`)
 }
 
-/**
- * Run the migration
- */
-async function main() {
-  try {
-    await migrateProvinces()
-  } catch (error) {
-    console.error("Migration failed:", error)
+migrateProvinces()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error("Migration failed:", e)
     process.exit(1)
-  } finally {
-    await prisma.$disconnect()
-  }
-}
-
-main()
+  })
