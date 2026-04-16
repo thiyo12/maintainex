@@ -14,8 +14,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const categorySlug = searchParams.get('category')
     const includeReviews = searchParams.get('reviews') === 'true'
+    const includeAll = searchParams.get('all') === 'true'
 
-    const where: any = { isActive: true }
+    // Public API: only active services
+    // Admin API (all=true): include all services
+    const where: any = includeAll ? {} : { isActive: true }
     if (categorySlug) {
       where.category = { slug: categorySlug }
     }

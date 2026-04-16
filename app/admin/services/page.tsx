@@ -68,7 +68,7 @@ export default function AdminServices() {
       setError(null)
       const authHeaders = getAuthHeader()
       const [servicesRes, categoriesRes] = await Promise.all([
-        fetch('/api/services', { headers: { ...authHeaders } }),
+        fetch('/api/services?all=true', { headers: { ...authHeaders } }),
         fetch('/api/categories', { headers: { ...authHeaders } })
       ])
       if (servicesRes.status === 401 || categoriesRes.status === 401) {
