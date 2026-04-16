@@ -24,6 +24,7 @@ interface BookingData {
   reference?: string
   category?: string
   price?: number
+  status?: string
 }
 
 export default function BookingConfirmationPage() {
