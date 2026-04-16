@@ -117,13 +117,25 @@ function BookingContent() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        return formData.name.trim() && formData.phone.trim()
+        const step1Valid = formData.name.trim().length >= 2 && formData.phone.trim().length >= 10
+        console.log('Step 1 check:', { name: formData.name, phone: formData.phone, valid: step1Valid })
+        return step1Valid
       case 2:
-        return formData.serviceId && formData.district
+        const step2Valid = !!formData.serviceId && !!formData.district
+        console.log('Step 2 check:', { serviceId: formData.serviceId, district: formData.district, valid: step2Valid })
+        return step2Valid
       case 3:
-        return formData.date && formData.time
+        return !!formData.date && !!formData.time
       default:
         return true
+    }
+  }
+
+  const handleNext = () => {
+    console.log('handleNext called, current step:', step, 'canProceed:', canProceed())
+    if (canProceed()) {
+      setStep(step + 1)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
@@ -625,7 +637,7 @@ Sent from maintain.lk`
             
             {step < 4 ? (
               <button
-                onClick={() => setStep(step + 1)}
+                onClick={handleNext}
                 disabled={!canProceed()}
                 className={`flex-1 flex items-center justify-center gap-2 font-semibold py-4 rounded-xl transition-all ${
                   canProceed()
