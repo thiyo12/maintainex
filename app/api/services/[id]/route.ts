@@ -93,40 +93,51 @@ export async function PUT(
     const body = await request.json()
     console.log('Request body:', JSON.stringify(body, null, 2))
     
-    const { name, title, description, image, price, duration, categoryId, isActive } = body
+    const { name, title, slug, description, image, price, duration, categoryId, isActive } = body
+
+    // Check if service exists first
+    const existingService = await prisma.service.findUnique({
+      where: { id }
+    })
+    
+    if (!existingService) {
+      console.log('Service not found:', id)
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+    }
 
     const updateData: any = {}
 
     if (name !== undefined) updateData.name = name
     else if (title !== undefined) updateData.name = title
+    
+    if (slug !== undefined && slug !== null && slug !== '') {
+      updateData.slug = slug
+    }
+    
     if (description !== undefined) updateData.description = description
     if (isActive !== undefined) updateData.isActive = isActive
 
     if (image !== undefined && image !== null && image !== '') {
       updateData.image = image
-      console.log('Updating image to:', image)
     }
 
     if (price !== undefined && price !== null && price !== '') {
       updateData.price = parseFloat(String(price))
-      console.log('Updating price to:', updateData.price)
     } else if (price === '' || price === null) {
       updateData.price = null
-      console.log('Setting price to null')
     }
 
     if (duration !== undefined && duration !== null && duration !== '') {
       updateData.duration = parseInt(String(duration))
-      console.log('Updating duration to:', updateData.duration)
     } else if (duration === '' || duration === null) {
       updateData.duration = null
-      console.log('Setting duration to null')
     }
 
     if (categoryId !== undefined && isSuper) {
       updateData.categoryId = categoryId
     }
 
+    console.log('Updating service:', id)
     console.log('updateData:', JSON.stringify(updateData, null, 2))
 
     const service = await prisma.service.update({
@@ -137,9 +148,15 @@ export async function PUT(
 
     console.log('Service updated successfully:', service.id)
     return NextResponse.json(serializeService(service))
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating service:', error)
-    return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
+    
+    // Return more specific error message
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 })
+    }
+    
+    return NextResponse.json({ error: 'Failed to update service: ' + (error.message || 'Unknown error') }, { status: 500 })
   }
 }
 
