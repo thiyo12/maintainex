@@ -93,11 +93,12 @@ export async function PUT(
     const body = await request.json()
     console.log('Request body:', JSON.stringify(body, null, 2))
     
-    const { title, description, image, price, duration, categoryId, isActive } = body
+    const { name, title, description, image, price, duration, categoryId, isActive } = body
 
     const updateData: any = {}
 
-    if (title !== undefined) updateData.name = title
+    if (name !== undefined) updateData.name = name
+    else if (title !== undefined) updateData.name = title
     if (description !== undefined) updateData.description = description
     if (isActive !== undefined) updateData.isActive = isActive
 
