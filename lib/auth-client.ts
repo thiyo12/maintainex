@@ -7,6 +7,7 @@ export interface StoredUser {
   name: string | null
   role: string
   branchId: string | null
+  province: string | null
   canEditServices?: boolean
 }
 
