@@ -83,8 +83,8 @@ export async function POST(request: NextRequest) {
     
     let { name, phone, email, district, address, subService, date, time, notes } = body
 
-    if (!name || !phone || !email || !district || !address || !date || !time) {
-      return NextResponse.json({ error: 'Please fill in all required fields: Name, Phone, Email, District, Address, Date, and Time' }, { status: 400 })
+    if (!name || !phone || !email || !district || !date || !time) {
+      return NextResponse.json({ error: 'Please fill in all required fields: Name, Phone, Email, District, Date, and Time' }, { status: 400 })
     }
 
     name = sanitizeString(name)
@@ -105,9 +105,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
     }
 
-    if (address.length < 5) {
-      return NextResponse.json({ error: 'Please enter a complete address' }, { status: 400 })
-    }
+    // Address is optional
+    address = address || ''
 
     // Calculate province from district
     const province = getProvinceFromDistrict(district)

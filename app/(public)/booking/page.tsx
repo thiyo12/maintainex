@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiClock, FiCheck, FiChevronRight, FiChevronLeft, FiMessageCircle } from 'react-icons/fi'
+import { DISTRICTS } from '@/lib/districts'
 
 interface Service {
   id: string
@@ -25,11 +26,6 @@ const WHATSAPP_NUMBER = '94770867609'
 const TIME_SLOTS = [
   '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
   '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM'
-]
-
-const DISTRICTS = [
-  'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Jaffna',
-  'Galle', 'Matara', 'Hambantota', 'Kurunegala', 'Anuradhapura', 'Other'
 ]
 
 export default function BookingPage() {

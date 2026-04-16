@@ -2,17 +2,32 @@
 
 import { useState, useEffect } from 'react'
 
+const WELCOME_KEY = 'maintain_welcome_shown'
+
 export default function WelcomeBanner() {
-  const [isVisible, setIsVisible] = useState(true)
+  const [isVisible, setIsVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [showStep, setShowStep] = useState(1)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    
+    const hasSeen = localStorage.getItem(WELCOME_KEY)
+    if (hasSeen) {
+      setIsVisible(false)
+      return
+    }
+
+    setIsVisible(true)
+    
     const timers = [
       setTimeout(() => setShowStep(2), 150),
       setTimeout(() => setShowStep(3), 400),
       setTimeout(() => setIsExiting(true), 1800),
-      setTimeout(() => setIsVisible(false), 2500),
+      setTimeout(() => {
+        setIsVisible(false)
+        localStorage.setItem(WELCOME_KEY, 'true')
+      }, 2500),
     ]
     return () => timers.forEach(clearTimeout)
   }, [])
