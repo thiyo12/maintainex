@@ -80,6 +80,12 @@ function BookingContent() {
   }, [])
 
   useEffect(() => {
+    if (step === 2 && !formData.serviceId) {
+      setShowServiceSelector(true)
+    }
+  }, [step])
+
+  useEffect(() => {
     const serviceId = searchParams.get('serviceId')
     if (serviceId) {
       setFormData(prev => ({ ...prev, serviceId }))
