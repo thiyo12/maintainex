@@ -104,7 +104,7 @@ function ConfirmationContent() {
 
     // Try API first (if we have booking ID), then localStorage
     const loadData = async () => {
-      let data = await fetchBookingFromAPI()
+      let data: BookingData | null = await fetchBookingFromAPI()
       if (!data) {
         data = getBookingDataFromStorage()
       }
