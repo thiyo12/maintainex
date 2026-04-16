@@ -30,30 +30,30 @@ export default function ServiceCardClient({ service }: ServiceCardClientProps) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group">
-      {service.image && (
-        <div className="h-48 overflow-hidden">
+    <div className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300">
+      <div className="relative h-40 overflow-hidden">
+        {service.image && (
           <img 
             src={service.image} 
             alt={service.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
-        </div>
-      )}
-      <div className="p-6">
-        <h3 className="text-xl font-bold text-dark-900 mb-2">
+        )}
+      </div>
+      <div className="p-4">
+        <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-1 group-hover:text-primary-600 transition-colors">
           {service.name}
         </h3>
-        <p className="text-gray-600 mb-4 line-clamp-2">
+        <p className="text-gray-500 text-sm mb-3 line-clamp-2">
           {service.description || 'Professional cleaning service'}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold text-primary-600">
+          <span className="text-primary-600 font-bold">
             Rs. {service.price.toLocaleString()}
           </span>
           <button 
             onClick={handleBookNow}
-            className="bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold px-4 py-2 rounded-lg transition-all duration-300"
+            className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
           >
             Book Now
           </button>

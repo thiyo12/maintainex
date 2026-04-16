@@ -322,6 +322,22 @@ function ConfirmationContent() {
             </div>
 
             {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <Link
+                href="/contact"
+                className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-all text-sm"
+              >
+                Contact Us
+              </Link>
+              <Link
+                href="/"
+                className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-all text-sm"
+              >
+                <FiHome className="w-4 h-4" />
+                Go to Home
+              </Link>
+            </div>
+            
             <div className="space-y-3">
               <button
                 onClick={handleCallClick}
@@ -338,14 +354,6 @@ function ConfirmationContent() {
                 <FiMessageCircle className="text-xl" />
                 WhatsApp Us
               </button>
-
-              <Link
-                href="/"
-                className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-4 sm:py-5 rounded-xl transition-all text-lg"
-              >
-                <FiHome className="inline mr-2" />
-                Back to Home
-              </Link>
             </div>
 
             {/* Additional Help */}

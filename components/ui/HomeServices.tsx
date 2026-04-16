@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiTool, FiImage, FiPackage, FiStar, FiCloud, FiZap, FiTrendingUp, FiArrowRight, FiClock } from 'react-icons/fi'
+import { FiTool, FiImage, FiPackage, FiStar, FiCloud, FiZap, FiTrendingUp, FiArrowRight, FiCheck } from 'react-icons/fi'
 
 interface Service {
   id: string
@@ -12,7 +12,6 @@ interface Service {
   description: string
   image: string | null
   price: number | null
-  duration: number | null
 }
 
 interface Category {
@@ -39,6 +38,21 @@ const iconMap: Record<string, React.ReactNode> = {
   trending: <FiTrendingUp className="w-5 h-5" />,
 }
 
+const categoryIcons: Record<string, string> = {
+  assembly: '🔧',
+  mounting: '🖼️',
+  moving: '📦',
+  cleaning: '✨',
+  outdoor: '🌿',
+  repairs: '🔌',
+  trending: '🔥',
+  pestcontrol: '🪳',
+  acservice: '❄️',
+  watertank: '💧',
+  disinfection: '🦠',
+  homecare: '🏠',
+}
+
 export default function HomeServices({ initialCategories, initialServices }: HomeServicesProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const categories = initialCategories
@@ -54,26 +68,38 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
 
   const featuredServices = featuredCategory?.services || []
 
+  const handleBookNow = (service: Service) => {
+    localStorage.setItem('selectedService', JSON.stringify({
+      id: service.id,
+      name: service.title,
+      price: service.price,
+      category: featuredCategory?.name
+    }))
+    window.location.href = `/booking?serviceId=${service.id}`
+  }
+
   return (
-    <section className="py-16 bg-gray-50">
+    <section className="py-12 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
         <div className="text-center mb-8">
-          <span className="text-primary-600 font-semibold">OUR SERVICES</span>
-          <h2 className="section-title">Book trusted help for home tasks</h2>
-          <p className="section-subtitle">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+            Book trusted help for home tasks
+          </h2>
+          <p className="text-gray-600 max-w-2xl mx-auto">
             Professional services at your fingertips. From assembly to cleaning, we have you covered.
           </p>
         </div>
 
-        {/* Category Pills */}
+        {/* Category Pills - TaskRabbit Style */}
         <div className="w-full overflow-x-auto pb-4 mb-8">
-          <div className="flex gap-3 min-w-max px-4 justify-center">
+          <div className="flex gap-2 min-w-max px-2 justify-start md:justify-center">
             <button
               onClick={() => setSelectedCategory(null)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-full font-medium transition-all duration-300 whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all duration-200 whitespace-nowrap text-sm ${
                 selectedCategory === null
-                  ? 'bg-primary-500 text-dark-900 shadow-lg shadow-primary-500/30'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                  ? 'bg-primary-500 text-white shadow-md'
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
               }`}
             >
               All Services
@@ -83,24 +109,24 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.slug)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-full font-medium transition-all duration-300 whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all duration-200 whitespace-nowrap text-sm ${
                   selectedCategory === category.slug
-                    ? 'bg-primary-500 text-dark-900 shadow-lg shadow-primary-500/30'
-                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
+                    ? 'bg-primary-500 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
-                {iconMap[category.icon || 'wrench'] || <FiStar className="w-5 h-5" />}
+                <span>{categoryIcons[category.slug] || '📋'}</span>
                 <span>{category.name}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Featured Service */}
+        {/* Featured Service Card - TaskRabbit Style */}
         {featuredServices.length > 0 && (
-          <div className="bg-white rounded-3xl overflow-hidden shadow-xl mb-8">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-lg mb-8 border border-gray-100">
             <div className="grid lg:grid-cols-2">
-              <div className="relative h-48 lg:h-auto">
+              <div className="relative h-56 lg:h-72">
                 {featuredServices[0]?.image?.startsWith('/uploads/') ? (
                   <img
                     src={`${featuredServices[0]?.image}?t=${Date.now()}`}
@@ -117,110 +143,113 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     className="w-full h-full object-cover"
                   />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <div className="absolute bottom-4 left-4">
+                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-sm font-medium text-gray-800">
+                    <FiCheck className="w-4 h-4 text-green-500" />
+                    Popular
+                  </span>
+                </div>
               </div>
 
-              <div className="p-8 lg:p-10 flex flex-col justify-center">
-                <div className="inline-block px-4 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-semibold mb-4 w-fit">
-                  Popular Category
+              <div className="p-6 lg:p-8 flex flex-col justify-center">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">{categoryIcons[featuredCategory?.slug || ''] || '📋'}</span>
+                  <h3 className="text-xl lg:text-2xl font-bold text-gray-900">
+                    {featuredCategory?.name}
+                  </h3>
                 </div>
 
-                <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-3">
-                  {featuredCategory?.name}
-                </h3>
-
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 mb-4 text-sm lg:text-base">
                   {featuredCategory?.description || `Professional ${featuredCategory?.name?.toLowerCase()} services.`}
                 </p>
 
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-gray-900">
-                      {featuredServices.length}
+                <div className="flex items-center gap-6 mb-5">
+                  <div>
+                    <div className="text-lg font-bold text-gray-900">
+                      {featuredServices.length} Services
                     </div>
-                    <div className="text-xs text-gray-500">Services</div>
+                    <div className="text-xs text-gray-500">Available</div>
                   </div>
                   <div className="h-8 w-px bg-gray-200" />
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-gray-900">4.8</div>
-                    <div className="text-xs text-gray-500">Rating</div>
+                  <div>
+                    <div className="text-lg font-bold text-gray-900">
+                      Starting at
+                    </div>
+                    <div className="text-sm font-bold text-primary-600">
+                      Rs. {Math.min(...featuredServices.filter(s => s.price).map(s => s.price!)).toLocaleString()}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap gap-3">
                   <Link
                     href={`/services/${featuredServices[0]?.slug || ''}`}
-                    className="inline-flex items-center gap-2 bg-primary-500 text-dark-900 font-bold px-6 py-3 rounded-xl hover:bg-primary-600 transition-colors"
+                    className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm"
                   >
-                    View Details <FiArrowRight className="w-5 h-5" />
+                    View Details <FiArrowRight className="w-4 h-4" />
                   </Link>
-                  <Link
-                    href={`/booking?service=${featuredServices[0]?.slug || ''}`}
-                    className="inline-flex items-center gap-2 bg-gray-100 text-gray-700 font-bold px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors"
+                  <button
+                    onClick={() => handleBookNow(featuredServices[0])}
+                    className="inline-flex items-center gap-2 bg-dark-900 hover:bg-gray-800 text-white font-semibold px-5 py-2.5 rounded-xl transition-colors text-sm"
                   >
                     Book Now
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Services Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {/* Services Grid - 2 Column Mobile */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {filteredServices.slice(0, 8).map((service) => (
-            <Link
+            <div
               key={service.id}
-              href={`/services/${service.slug}`}
-              className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
+              className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
             >
-              <div className="relative h-40 overflow-hidden">
-                  {service.image?.startsWith('/uploads/') ? (
-                    <img
-                      src={`${service.image}?t=${Date.now()}`}
-                      alt={service.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  ) : (
-                    <Image
-                      src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
-                      alt={service.title}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                
-                {service.duration && (
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-gray-700 flex items-center gap-1">
-                    <FiClock className="w-3 h-3" />
-                    {service.duration} min
-                  </div>
+              <div className="relative h-32 md:h-40 overflow-hidden">
+                {service.image?.startsWith('/uploads/') ? (
+                  <img
+                    src={`${service.image}?t=${Date.now()}`}
+                    alt={service.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <Image
+                    src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
+                    alt={service.title}
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
                 )}
               </div>
 
-              <div className="p-4">
-                <h4 className="font-bold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors">
+              <div className="p-3 md:p-4">
+                <h4 className="font-bold text-gray-900 text-sm md:text-base mb-1 line-clamp-1 group-hover:text-primary-600 transition-colors">
                   {service.title}
                 </h4>
                 
-                <p className="text-gray-500 text-xs mb-3 line-clamp-2">
+                <p className="text-gray-500 text-xs mb-3 line-clamp-2 hidden md:block">
                   {service.description}
                 </p>
 
                 <div className="flex items-center justify-between">
                   <span className="text-primary-600 font-bold text-sm">
                     {service.price 
-                      ? `Rs. ${service.price.toLocaleString()}+` 
-                      : 'Contact for quote'}
+                      ? `Rs. ${service.price.toLocaleString()}` 
+                      : 'Contact'}
                   </span>
-                  <span className="text-xs text-gray-500 group-hover:text-primary-600 transition-colors">
-                    Details →
-                  </span>
+                  <button
+                    onClick={() => handleBookNow(service)}
+                    className="text-xs font-semibold text-white bg-primary-500 hover:bg-primary-600 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Book
+                  </button>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
 
@@ -228,7 +257,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         <div className="text-center mt-10">
           <Link
             href="/services"
-            className="inline-flex items-center gap-2 bg-primary-500 text-dark-900 font-bold px-8 py-4 rounded-xl hover:bg-primary-600 transition-colors"
+            className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold px-8 py-4 rounded-xl transition-colors"
           >
             View All Services
             <FiArrowRight className="w-5 h-5" />
