@@ -21,6 +21,13 @@ interface Category {
   services: Service[]
 }
 
+interface StoredService {
+  id: string
+  name: string
+  price: number
+  category?: string
+}
+
 const WHATSAPP_NUMBER = '94770867609'
 
 const TIME_SLOTS = [
@@ -62,6 +69,7 @@ function BookingContent() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [showServiceSelector, setShowServiceSelector] = useState(false)
+  const [storedService, setStoredService] = useState<StoredService | null>(null)
   
   const [formData, setFormData] = useState({
     name: '',
@@ -76,6 +84,19 @@ function BookingContent() {
   })
 
   useEffect(() => {
+    // Read service from localStorage immediately
+    try {
+      const stored = localStorage.getItem('selectedService')
+      if (stored) {
+        const serviceData = JSON.parse(stored) as StoredService
+        setStoredService(serviceData)
+        setFormData(prev => ({ ...prev, serviceId: serviceData.id }))
+      }
+    } catch (err) {
+      console.error('Error reading stored service:', err)
+    }
+    
+    // Fetch categories in background for the selector
     fetchServices()
   }, [])
 
@@ -113,6 +134,15 @@ function BookingContent() {
   const selectedCategory = categories.find(c => 
     c.services.some(s => s.id === formData.serviceId)
   )
+
+  // Use stored service for immediate display, fallback to API data
+  const displayService = storedService || (selectedService ? {
+    id: selectedService.id,
+    name: selectedService.name,
+    price: selectedService.price
+  } : null)
+  
+  const displayCategory = storedService?.category || selectedCategory?.name || ''
 
   const handleServiceSelect = (serviceId: string) => {
     setFormData({ ...formData, serviceId })
@@ -167,19 +197,22 @@ function BookingContent() {
             name: formData.name,
             phone: formData.phone,
             email: formData.email,
-            service: selectedService?.name || formData.serviceId,
-            category: selectedCategory?.name,
+            service: displayService?.name || formData.serviceId,
+            category: displayCategory,
             serviceId: formData.serviceId,
             district: formData.district,
             address: formData.address,
             date: formData.date,
             time: formData.time,
             notes: formData.notes,
-            price: selectedService?.price || data.booking.totalPrice,
+            price: displayService?.price || data.booking.totalPrice,
             status: data.booking.status,
             createdAt: data.booking.createdAt
           }
           localStorage.setItem('lastBookingConfirmation', JSON.stringify(bookingData))
+          
+          // Clear selectedService from localStorage after booking
+          localStorage.removeItem('selectedService')
           
           // Redirect to confirmation page with booking ID
           router.push(`/booking/confirmation?id=${data.booking.id}`)
@@ -204,8 +237,8 @@ function BookingContent() {
 📱 *Phone:* ${formData.phone}
 ${formData.email ? `✉️ *Email:* ${formData.email}` : ''}
 
-🧹 *Service:* ${selectedService?.name || 'Not selected'}
-💰 *Price:* Rs. ${selectedService?.price?.toLocaleString() || 'TBD'}
+🧹 *Service:* ${displayService?.name || 'Not selected'}
+💰 *Price:* Rs. ${displayService?.price?.toLocaleString() || 'TBD'}
 
 📍 *District:* ${formData.district}
 ${formData.address ? `📍 *Address:* ${formData.address}` : ''}
@@ -385,13 +418,15 @@ Sent from maintain.lk`
               <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
               
               {/* Selected Service Display */}
-              {selectedService && (
+              {displayService && (
                 <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-primary-600 font-medium">{selectedCategory?.name}</p>
-                      <p className="text-lg font-bold text-dark-900">{selectedService.name}</p>
-                      <p className="text-2xl font-bold text-primary-600">Rs. {selectedService.price?.toLocaleString()}</p>
+                      {displayCategory && (
+                        <p className="text-sm text-primary-600 font-medium">{displayCategory}</p>
+                      )}
+                      <p className="text-lg font-bold text-dark-900">{displayService.name}</p>
+                      <p className="text-2xl font-bold text-primary-600">Rs. {displayService.price?.toLocaleString()}</p>
                     </div>
                     <button
                       onClick={() => setShowServiceSelector(true)}
@@ -570,7 +605,7 @@ Sent from maintain.lk`
                 )}
                 <div className="border-t pt-3 flex justify-between">
                   <span className="text-gray-600">Service</span>
-                  <span className="font-bold text-primary-600">{selectedService?.name}</span>
+                  <span className="font-bold text-primary-600">{displayService?.name || 'Not selected'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">District</span>
@@ -599,7 +634,7 @@ Sent from maintain.lk`
                 <div className="border-t pt-3 flex justify-between items-center">
                   <span className="text-lg font-bold">Total</span>
                   <span className="text-2xl font-bold text-primary-600">
-                    Rs. {selectedService?.price?.toLocaleString()}
+                    Rs. {displayService?.price?.toLocaleString() || 'TBD'}
                   </span>
                 </div>
               </div>

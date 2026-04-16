@@ -48,6 +48,7 @@ interface RelatedService {
 
 export default function ServiceDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params.slug as string
   const [service, setService] = useState<Service | null>(null)
   const [relatedServices, setRelatedServices] = useState<RelatedService[]>([])
@@ -400,12 +401,20 @@ export default function ServiceDetailPage() {
                   </div>
 
                   {/* Book Now Button - Large Touch Target */}
-                  <Link
-                    href={`/booking?serviceId=${service.id}`}
-                    className="block w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-center text-lg mb-4"
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('selectedService', JSON.stringify({
+                        id: service.id,
+                        name: service.name,
+                        price: service.price,
+                        category: service.category?.name
+                      }))
+                      router.push(`/booking?serviceId=${service.id}`)
+                    }}
+                    className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-center text-lg mb-4"
                   >
                     Book Now
-                  </Link>
+                  </button>
 
                   {/* WhatsApp Button - Large Touch Target */}
                   <a
