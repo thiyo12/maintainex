@@ -163,21 +163,23 @@ function BookingContent() {
         if (data.booking) {
           const bookingData = {
             id: data.booking.id,
+            reference: data.booking.id?.slice(-8).toUpperCase() || 'MNT' + Date.now(),
             name: formData.name,
             phone: formData.phone,
             email: formData.email,
-            service: selectedService?.name,
+            service: selectedService?.name || formData.serviceId,
+            category: selectedCategory?.name,
             serviceId: formData.serviceId,
             district: formData.district,
             address: formData.address,
             date: formData.date,
             time: formData.time,
             notes: formData.notes,
-            price: selectedService?.price,
+            price: selectedService?.price || data.booking.totalPrice,
             status: data.booking.status,
             createdAt: data.booking.createdAt
           }
-          localStorage.setItem('lastBooking', JSON.stringify(bookingData))
+          localStorage.setItem('lastBookingConfirmation', JSON.stringify(bookingData))
           
           // Redirect to confirmation page with booking ID
           router.push(`/booking/confirmation?id=${data.booking.id}`)

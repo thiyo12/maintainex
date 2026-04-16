@@ -56,36 +56,33 @@ function ConfirmationContent() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Try to get booking data from URL params first
-    const getBookingDataFromParams = (): BookingData | null => {
-      const ref = searchParams.get('ref')
-      const name = searchParams.get('name')
-      const phone = searchParams.get('phone')
-      const email = searchParams.get('email')
-      const service = searchParams.get('service')
-      const district = searchParams.get('district')
-      const address = searchParams.get('address')
-      const date = searchParams.get('date')
-      const time = searchParams.get('time')
-      const notes = searchParams.get('notes')
-      const category = searchParams.get('category')
-      const price = searchParams.get('price')
-
-      // If we have at least a reference, we can show confirmation
-      if (ref) {
-        return {
-          reference: ref,
-          name: name || undefined,
-          phone: phone || undefined,
-          email: email || undefined,
-          service: service || undefined,
-          district: district || undefined,
-          address: address || undefined,
-          date: date || undefined,
-          time: time || undefined,
-          notes: notes || undefined,
-          category: category || undefined,
-          price: price ? parseFloat(price) : undefined
+    // Try to get booking data from URL params first (booking ID)
+    const bookingId = searchParams.get('id')
+    
+    const fetchBookingFromAPI = async () => {
+      if (bookingId) {
+        try {
+          const res = await fetch(`/api/bookings/${bookingId}`)
+          if (res.ok) {
+            const booking = await res.json()
+            return {
+              reference: booking.id?.slice(-8).toUpperCase() || 'MNT' + Date.now(),
+              name: booking.name,
+              phone: booking.phone,
+              email: booking.email,
+              service: booking.service?.name,
+              category: booking.service?.category?.name,
+              district: booking.district,
+              address: booking.address,
+              date: booking.date,
+              time: booking.time,
+              notes: booking.notes,
+              price: booking.totalPrice,
+              status: booking.status
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching booking:', err)
         }
       }
       return null
@@ -104,23 +101,27 @@ function ConfirmationContent() {
       return null
     }
 
-    // Try URL params first, then localStorage
-    let data = getBookingDataFromParams()
-    if (!data) {
-      data = getBookingDataFromStorage()
-    }
-
-    if (data) {
-      setBookingData(data)
-      // Clear localStorage after reading
-      try {
-        localStorage.removeItem('lastBookingConfirmation')
-      } catch (err) {
-        console.error('Error clearing localStorage:', err)
+    // Try API first (if we have booking ID), then localStorage
+    const loadData = async () => {
+      let data = await fetchBookingFromAPI()
+      if (!data) {
+        data = getBookingDataFromStorage()
       }
+
+      if (data) {
+        setBookingData(data)
+        // Clear localStorage after reading
+        try {
+          localStorage.removeItem('lastBookingConfirmation')
+        } catch (err) {
+          console.error('Error clearing localStorage:', err)
+        }
+      }
+
+      setLoading(false)
     }
 
-    setLoading(false)
+    loadData()
   }, [searchParams])
 
   const formatDate = (dateStr: string) => {
