@@ -25,6 +25,14 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     setImageError(false)
   }, [value])
 
+  const getImageUrl = (url: string) => {
+    if (!url) return url
+    if (url.startsWith('/uploads/')) {
+      return `/api/files${url}`
+    }
+    return url
+  }
+
   const handleUpload = async (file: File) => {
     if (disabled) return
 
@@ -159,11 +167,12 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
   }
 
   if (currentValue && !imageError) {
+    const displayUrl = getImageUrl(currentValue)
     return (
       <div className="space-y-3">
         <div className="relative w-full h-48 rounded-xl overflow-hidden border-2 border-green-200 bg-green-50">
           <img
-            src={currentValue}
+            src={displayUrl}
             alt="Uploaded"
             className="w-full h-full object-cover"
             onError={handleImageError}

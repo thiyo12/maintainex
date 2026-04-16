@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiArrowRight, FiClock } from 'react-icons/fi'
+import { getImageUrl } from '@/lib/images'
 
 interface Category {
   id: string
@@ -37,7 +38,7 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
 
   const isUploadedImage = firstService?.image?.startsWith('/uploads/')
   const imageSrc = isUploadedImage 
-    ? `${firstService.image}?t=${Date.now()}` 
+    ? getImageUrl(firstService.image)
     : (firstService?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')
 
   return (

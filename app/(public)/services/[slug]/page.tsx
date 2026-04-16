@@ -8,6 +8,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiClock, FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone } from 'react-icons/fi'
+import { getImageUrl } from '@/lib/images'
 
 const WHATSAPP_NUMBER = '94770867609'
 
@@ -119,7 +120,7 @@ export default function ServiceDetailPage() {
   const isUploadedImage = (imagePath: string | null) => imagePath?.startsWith('/uploads/')
   const getImageSrc = (imagePath: string | null) => {
     if (!imagePath) return 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200'
-    if (isUploadedImage(imagePath)) return `${imagePath}?t=${Date.now()}`
+    if (isUploadedImage(imagePath)) return getImageUrl(imagePath)
     return imagePath
   }
 

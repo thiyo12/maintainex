@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { getImageUrl } from '@/lib/images'
 
 interface ServiceCardClientProps {
   service: {
@@ -34,7 +35,7 @@ export default function ServiceCardClient({ service }: ServiceCardClientProps) {
       <div className="relative h-40 overflow-hidden">
         {service.image && (
           <img 
-            src={service.image} 
+            src={getImageUrl(service.image)} 
             alt={service.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />

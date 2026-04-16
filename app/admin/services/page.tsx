@@ -332,7 +332,6 @@ export default function AdminServices() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Category</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Price</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Duration</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Actions</th>
               </tr>
@@ -380,14 +379,6 @@ export default function AdminServices() {
                     </td>
                     <td className="px-6 py-4 text-gray-600">
                       {service.price ? `Rs. ${service.price.toLocaleString()}+` : 'Contact for quote'}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">
-                      {service.duration ? (
-                        <span className="flex items-center gap-1">
-                          <FiClock className="w-4 h-4" />
-                          {service.duration} min
-                        </span>
-                      ) : '-'}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -481,12 +472,6 @@ export default function AdminServices() {
                   <label className="text-sm text-gray-500">Price</label>
                   <div className="font-medium">
                     {viewingService.price ? `Rs. ${viewingService.price.toLocaleString()}+` : 'Contact for quote'}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Duration</label>
-                  <div className="font-medium">
-                    {viewingService.duration ? `${viewingService.duration} min` : '-'}
                   </div>
                 </div>
               </div>
@@ -682,16 +667,7 @@ export default function AdminServices() {
                   />
                   <p className="text-xs text-gray-500 mt-1">Leave empty for &quot;Contact for quote&quot;</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (min)</label>
-                  <input
-                    type="number"
-                    value={formData.duration}
-                    onChange={(e) => setFormData(prev => ({ ...prev, duration: e.target.value }))}
-                    className="input-field"
-                    placeholder="e.g., 120"
-                  />
-                </div>
+
               </div>
 
               <div>

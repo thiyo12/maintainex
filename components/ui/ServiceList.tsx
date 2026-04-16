@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { getImageUrl } from '@/lib/images'
 
 interface Service {
   id: string
@@ -39,7 +40,7 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
           <div className="relative h-36 md:h-44 overflow-hidden">
             {service.image ? (
               <img
-                src={service.image}
+                src={getImageUrl(service.image)}
                 alt={service.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />

@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { FiX, FiStar, FiClock, FiCheck, FiArrowRight } from 'react-icons/fi'
 import Link from 'next/link'
 import Image from 'next/image'
+import { getImageUrl } from '@/lib/images'
 
 interface Review {
   id: string
@@ -50,7 +51,7 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
 
   const isUploadedImage = service.image?.startsWith('/uploads/')
   const imageSrc = isUploadedImage 
-    ? `${service.image}?t=${Date.now()}` 
+    ? getImageUrl(service.image)
     : (service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')
   
   const reviews = service.reviews || []

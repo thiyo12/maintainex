@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiArrowRight } from 'react-icons/fi'
+import { getImageUrl } from '@/lib/images'
 
 interface Service {
   id: string
@@ -29,7 +30,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
 
   const isUploadedImage = service.image?.startsWith('/uploads/')
   const fallbackImage = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'
-  const imageSrc = isUploadedImage ? `${service.image}?t=${Date.now()}` : (service.image || fallbackImage)
+  const imageSrc = isUploadedImage ? getImageUrl(service.image) : (service.image || fallbackImage)
 
   return (
     <Link

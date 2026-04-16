@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiTool, FiImage, FiPackage, FiStar, FiCloud, FiZap, FiTrendingUp, FiArrowRight, FiCheck } from 'react-icons/fi'
+import { getImageUrl } from '@/lib/images'
 
 interface Service {
   id: string
@@ -129,7 +130,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               <div className="relative h-56 lg:h-72">
                 {featuredServices[0]?.image?.startsWith('/uploads/') ? (
                   <img
-                    src={`${featuredServices[0]?.image}?t=${Date.now()}`}
+                    src={getImageUrl(featuredServices[0]?.image)}
                     alt={featuredCategory?.name || 'Featured service'}
                     className="w-full h-full object-cover"
                   />
@@ -211,7 +212,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               <div className="relative h-32 md:h-40 overflow-hidden">
                 {service.image?.startsWith('/uploads/') ? (
                   <img
-                    src={`${service.image}?t=${Date.now()}`}
+                    src={getImageUrl(service.image)}
                     alt={service.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
