@@ -516,7 +516,7 @@ export default function AdminServices() {
                   onChange={(e) => {
                     setFormData(prev => ({ 
                       ...prev, 
-                      title: e.target.value,
+                      name: e.target.value,
                       slug: prev.slug || generateSlug(e.target.value)
                     }))
                   }}
