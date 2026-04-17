@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import Image from 'next/image'
 import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiClock, FiLock, FiEye, FiX, FiAlertCircle } from 'react-icons/fi'
 import ImageUploader from '@/components/admin/ImageUploader'
+import PriceSuggestion, { PriceSuggestionButton } from '@/components/admin/PriceSuggestion'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
 
@@ -54,6 +55,7 @@ export default function AdminServices() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryDesc, setNewCategoryDesc] = useState('')
   const [addingCategory, setAddingCategory] = useState(false)
+  const [showPriceSuggestion, setShowPriceSuggestion] = useState(false)
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
   const canEditServices = user?.canEditServices === true
@@ -655,19 +657,33 @@ export default function AdminServices() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price (Rs.)</label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Price (Rs.)</label>
+                <div className="flex gap-2">
                   <input
                     type="number"
                     value={formData.price}
                     onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
-                    className="input-field"
+                    className="input-field flex-1"
                     placeholder="e.g., 3500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Leave empty for &quot;Contact for quote&quot;</p>
+                  <PriceSuggestionButton onClick={() => setShowPriceSuggestion(true)} />
                 </div>
-
+                <p className="text-xs text-gray-500 mt-1">Leave empty for &quot;Contact for quote&quot;</p>
+                
+                {showPriceSuggestion && (
+                  <PriceSuggestion
+                    serviceName={formData.name}
+                    categorySlug={categories.find(c => c.id === formData.categoryId)?.slug || null}
+                    description={formData.description}
+                    currentPrice={formData.price ? parseFloat(formData.price) : null}
+                    onAccept={(price) => {
+                      setFormData(prev => ({ ...prev, price: price.toString() }))
+                      setShowPriceSuggestion(false)
+                    }}
+                    onReject={() => setShowPriceSuggestion(false)}
+                  />
+                )}
               </div>
 
               <div>
