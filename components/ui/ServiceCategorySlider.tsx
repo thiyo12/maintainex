@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { getImageUrl } from '@/lib/images'
 
 interface Category {
   id: string
   name: string
   slug: string
   icon: string | null
+  image: string | null
   services: {
     id: string
     image: string | null
@@ -25,8 +27,13 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
   const [isHovering, setIsHovering] = useState(false)
+  const [imageKey, setImageKey] = useState(Date.now())
 
   const activeCategories = categories.filter(cat => cat.services.length > 0)
+
+  useEffect(() => {
+    setImageKey(Date.now())
+  }, [categories])
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % activeCategories.length)
@@ -58,8 +65,9 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   if (activeCategories.length === 0) return null
 
   const getCategoryImage = (category: Category) => {
+    if (category.image) return getImageUrl(category.image)
     const serviceWithImage = category.services.find(s => s.image)
-    return serviceWithImage?.image || null
+    return serviceWithImage ? getImageUrl(serviceWithImage.image) : null
   }
 
   const currentCategory = activeCategories[currentIndex]
@@ -76,12 +84,13 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
       <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl">
         {categoryImage ? (
           <Image
-            src={categoryImage}
+            src={`${categoryImage}?t=${imageKey}`}
             alt={currentCategory.name}
             fill
             className="object-cover transition-all duration-700 ease-in-out"
             sizes="(max-width: 1024px) 0px, 50vw"
             priority
+            key={imageKey}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-400 flex items-center justify-center">

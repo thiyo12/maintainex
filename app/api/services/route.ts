@@ -36,7 +36,13 @@ export async function GET(request: NextRequest) {
 
     const serializedServices = services.map(serializeService)
 
-    return NextResponse.json(serializedServices)
+    return NextResponse.json(serializedServices, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
   }
