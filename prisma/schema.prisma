@@ -23,6 +23,7 @@ model User {
   loginActivities LoginActivity[]
   bookings        Booking[]
   reviews         Review[]
+  customerProfile CustomerProfile?
 }
 
 model Admin {
@@ -231,5 +232,445 @@ model ActivityLog {
   @@index([adminId])
   @@index([action])
   @@index([entityType])
+  @@index([createdAt])
+}
+
+// ============================================
+// CRM MODELS - Customer Relationship Management
+// ============================================
+
+model CustomerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Customer Classification
+  customerType    String   @default("REGULAR")  // REGULAR, VIP, CORPORATE, POTENTIAL
+  status          String   @default("ACTIVE")     // ACTIVE, INACTIVE, BLACKLISTED
+  
+  // Preferences
+  preferredContact String? // EMAIL, PHONE, WHATSAPP
+  smsOptIn        Boolean  @default(true)
+  emailOptIn      Boolean  @default(true)
+  whatsappOptIn   Boolean  @default(true)
+  
+  // Source tracking
+  source          String?  // WEBSITE, REFERRAL, CAMPAIGN, WALK_IN
+  sourceDetails   String?
+  
+  // Lifetime value
+  totalBookings   Int      @default(0)
+  totalSpent      Float    @default(0)
+  lifetimeValue   Float    @default(0)
+  
+  // First & last interactions
+  firstBooking    DateTime?
+  lastBooking     DateTime?
+  
+  // Notes & blacklist
+  summary         String?   // Short summary/notes about customer
+  blacklistReason String?
+  blacklistDate   DateTime?
+  
+  // Province (for query performance and province-based access)
+  province        String?
+  
+  // Metadata
+  metadata        String?  // JSON for additional data
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  tags            CustomerTag[]
+  addresses       CustomerAddress[]
+  activities      CustomerActivity[]
+  notes           CustomerNote[]
+  communications  CustomerCommunication[]
+  segments        CustomerSegmentCustomer[]
+
+  @@index([userId])
+  @@index([customerType])
+  @@index([status])
+  @@index([province])
+  @@index([createdAt])
+}
+
+model CustomerTag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String   @default("#6366f1")  // Hex color for UI
+  description String?
+  
+  // Tag type
+  type        String   @default("GENERAL") // GENERAL, BEHAVIOR, VALUE, PREFERENCE
+  
+  // Usage stats
+  usageCount  Int      @default(0)
+  
+  isSystem    Boolean  @default(false)  // System tags can't be deleted
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  customers   CustomerProfile[]
+
+  @@index([name])
+  @@index([type])
+}
+
+model CustomerSegment {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  
+  // Segment criteria (JSON)
+  criteria    String   // {"province": "Western", "minBookings": 3}
+  
+  // Segment type
+  type        String   @default("DYNAMIC") // DYNAMIC, STATIC
+  
+  // Stats
+  memberCount Int      @default(0)
+  
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  customers   CustomerSegmentCustomer[]
+
+  @@index([name])
+  @@index([type])
+}
+
+model CustomerSegmentCustomer {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  segmentId   String
+  segment     CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  
+  addedAt     DateTime @default(now())
+  addedBy     String?  // Admin ID who added
+  
+  @@unique([customerId, segmentId])
+  @@index([customerId])
+  @@index([segmentId])
+}
+
+model CustomerAddress {
+  id            String   @id @default(cuid())
+  customerId    String
+  customer      CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  label         String   // Home, Office, Other
+  address       String
+  district      String
+  province      String
+  postalCode    String?
+  instructions  String?  // Delivery/access instructions
+  
+  // Contact person at address
+  contactName   String?
+  contactPhone  String?
+  
+  isDefault     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+model CustomerNote {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  content     String
+  type        String   @default("GENERAL") // GENERAL, COMPLAINT, FEEDBACK, INTERNAL
+  
+  // Author tracking
+  createdById String?
+  createdByName String?
+  
+  isPrivate   Boolean  @default(false)  // Private notes only visible to creator
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([createdById])
+}
+
+model CustomerActivity {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  type        String   // BOOKING_CREATED, BOOKING_COMPLETED, CALL_MADE, CALL_RECEIVED, 
+                      // EMAIL_SENT, EMAIL_OPENED, WHATSAPP_SENT, WHATSAPP_RECEIVED,
+                      // NOTE_ADDED, TAG_ADDED, TAG_REMOVED, SEGMENT_ADDED, SEGMENT_REMOVED,
+                      // STATUS_CHANGED, PROFILE_UPDATED, ADDRESS_ADDED, LOGIN
+  
+  // Activity details
+  title       String
+  description String?
+  metadata    String?  // JSON for additional data
+  
+  // Related entities
+  relatedId   String?  // Booking ID, etc.
+  relatedType String?  // BOOKING, SERVICE, etc.
+  
+  // Author tracking
+  createdById String?
+  createdByName String?
+  createdByEmail String?
+  
+  ipAddress   String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+  @@index([type])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model CustomerCommunication {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  // Communication details
+  channel     String   // EMAIL, SMS, WHATSAPP, NOTIFICATION, CALL
+  direction   String   // OUTBOUND, INBOUND
+  
+  subject     String?
+  content     String
+  
+  // Status tracking
+  status      String   @default("PENDING") // PENDING, SENT, DELIVERED, READ, FAILED, CANCELLED
+  statusDetails String?
+  
+  // External reference
+  externalId  String?  // Third-party message ID (WhatsApp message ID, etc.)
+  externalStatus String? // Status from WhatsApp API, etc.
+  
+  // Sending details
+  sentById    String?
+  sentByEmail String?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  
+  // Error handling
+  errorMessage String?
+  retryCount  Int      @default(0)
+  
+  // Template reference
+  templateId  String?
+  templateName String?
+  
+  // Metadata
+  metadata    String?  // JSON for additional data
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([channel])
+  @@index([direction])
+  @@index([status])
+  @@index([sentById])
+  @@index([createdAt])
+}
+
+// ============================================
+// SECURITY MODELS
+// ============================================
+
+model SecurityAudit {
+  id          String   @id @default(cuid())
+  
+  // Action details
+  action      String   // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, EXPORT, API_CALL
+  category    String   // AUTH, CUSTOMER, BOOKING, SERVICE, REPORT, ADMIN, SYSTEM
+  
+  // Who
+  userId      String?
+  userEmail   String?
+  userRole    String?
+  userProvince String?
+  
+  // What
+  entityType  String?
+  entityId    String?
+  entityName  String?
+  
+  // Details
+  description String
+  oldValue   String?  // JSON of previous state
+  newValue   String?  // JSON of new state
+  
+  // Context
+  ipAddress   String?
+  userAgent   String?
+  sessionId   String?
+  
+  // Result
+  success     Boolean  @default(true)
+  errorMessage String?
+  
+  // Risk assessment
+  riskLevel   String   @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  isSuspicious Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+
+  @@index([action])
+  @@index([category])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([ipAddress])
+  @@index([isSuspicious])
+  @@index([createdAt])
+  @@index([riskLevel])
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  key         String   @unique  // Hashed version
+  
+  // Key metadata (unhashed prefix stored for identification)
+  prefix      String   // First 8 chars of key for identification
+  version     Int      @default(1)
+  
+  // Permissions
+  permissions String[] // READ, WRITE, DELETE, ADMIN
+  
+  // Scoping
+  scope       String   @default("FULL") // FULL, CUSTOMERS, BOOKINGS, REPORTS
+  province    String?  // If set, key only works for this province
+  
+  // Status
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  lastIp      String?
+  
+  // Usage limits
+  rateLimit   Int      @default(100)  // Requests per minute
+  requestCount Int     @default(0)
+  
+  // Owner
+  createdById String
+  createdByEmail String
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+  @@index([createdById])
+  @@index([isActive])
+}
+
+model RateLimitLog {
+  id          String   @id @default(cuid())
+  
+  // What was rate limited
+  identifier  String   // IP address, API key, or user ID
+  type        String   // IP, API_KEY, USER
+  
+  // Endpoint
+  endpoint    String
+  method      String
+  
+  // Request details
+  requestCount Int     @default(1)
+  
+  // Window
+  windowStart DateTime
+  windowEnd   DateTime
+  
+  // Result
+  limited     Boolean  @default(false)
+  blockUntil  DateTime?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([identifier, windowStart])
+  @@index([limited])
+}
+
+model FailedLogin {
+  id          String   @id @default(cuid())
+  
+  // Who tried to login
+  email       String
+  ipAddress   String
+  userAgent   String?
+  
+  // Attempt details
+  attemptCount Int     @default(1)
+  blocked      Boolean  @default(false)
+  blockUntil   DateTime?
+  
+  // Why it failed
+  reason      String?  // INVALID_PASSWORD, INVALID_OTP, ACCOUNT_LOCKED, etc.
+  
+  // Location
+  location    String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([email, ipAddress])
+  @@index([blocked])
+  @@index([createdAt])
+}
+
+model DataExport {
+  id          String   @id @default(cuid())
+  
+  // Export details
+  type        String   // CUSTOMERS, BOOKINGS, REPORTS, FULL
+  format      String   @default("CSV") // CSV, JSON, EXCEL
+  
+  // Filters applied
+  filters     String?  // JSON of filters used
+  
+  // File info
+  fileName    String?
+  fileSize    Int?
+  filePath    String?
+  
+  // Status
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  progress    Int      @default(0)
+  
+  // Requester
+  requestedById String
+  requestedByEmail String
+  
+  // Download
+  downloadUrl  String?
+  expiresAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+  updatedAt   DateTime @updatedAt
+
+  @@index([requestedById])
+  @@index([status])
   @@index([createdAt])
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck, FiMap, FiGrid } from 'react-icons/fi'
+import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck, FiMap, FiGrid, FiTrendingUp, FiTag, FiSend, FiTarget, FiChevronDown, FiChevronRight } from 'react-icons/fi'
 import { AdminSessionProvider } from './AdminSessionProvider'
 import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
 
@@ -86,10 +86,21 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
     { name: 'Services', href: '/admin/services', icon: FiSettings },
     { name: 'Categories', href: '/admin/categories', icon: FiGrid },
+  ]
+
+  const crmNavigation = [
+    { name: 'Customers', href: '/admin/customers', icon: FiUsers },
+    { name: 'Dashboard', href: '/admin/crm', icon: FiTrendingUp },
+    { name: 'Segments', href: '/admin/crm/segments', icon: FiTarget },
+    { name: 'Tags', href: '/admin/crm/tags', icon: FiTag },
+    { name: 'Messages', href: '/admin/crm/messages', icon: FiSend },
+  ]
+
+  const settingsNavigation = [
     { name: 'Settings', href: '/admin/settings', icon: FiSettings },
   ]
 
-  const navigation = isSuperAdmin ? superAdminNavigation : baseNavigation
+  const navigation = isSuperAdmin ? [...superAdminNavigation, ...crmNavigation, ...settingsNavigation] : baseNavigation
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -115,12 +126,57 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          <nav className="space-y-2">
-            {navigation.map((item) => (
+          <nav className="space-y-1">
+            {/* Main Navigation */}
+            {(isSuperAdmin ? superAdminNavigation : baseNavigation).map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
+                  pathname === item.href
+                    ? 'bg-primary-500/20 text-primary-400'
+                    : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <item.icon className="text-lg" />
+                <span>{item.name}</span>
+              </Link>
+            ))}
+
+            {/* CRM Section Header */}
+            {isSuperAdmin && (
+              <div className="pt-4 pb-2">
+                <div className="px-4 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  CRM
+                </div>
+              </div>
+            )}
+
+            {/* CRM Navigation */}
+            {isSuperAdmin && crmNavigation.map((item) => {
+              const isActive = pathname === item.href || (item.href !== '/admin/crm' && pathname.startsWith(item.href))
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-primary-500/20 text-primary-400'
+                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <item.icon className="text-lg" />
+                  <span>{item.name}</span>
+                </Link>
+              )
+            })}
+
+            {/* Settings Section */}
+            {isSuperAdmin && settingsNavigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
                   pathname === item.href
                     ? 'bg-primary-500/20 text-primary-400'
                     : 'text-gray-300 hover:bg-white/10 hover:text-white'
