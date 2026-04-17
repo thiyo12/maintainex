@@ -247,7 +247,7 @@ ${formData.address ? `📍 *Address:* ${formData.address}` : ''}
 ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
 ─────────────────────
-Sent from maintain.lk`
+      Sent from maintainex.lk`
 
     return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
   }

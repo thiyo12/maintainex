@@ -6,6 +6,7 @@ import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import HomeServices from '@/components/ui/HomeServices'
+import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi'
@@ -124,15 +125,7 @@ export default async function HomePage() {
               </div>
               
               <div className="relative hidden lg:block">
-                <div className="absolute -top-8 -left-8 w-full h-full bg-primary-200/30 rounded-3xl" />
-                <Image
-                  src="/uploads/Teamwork on the checklist.png"
-                  alt="Teamwork"
-                  fill
-                  className="relative rounded-3xl shadow-2xl object-cover animate-float"
-                  sizes="(max-width: 1024px) 0px, 50vw"
-                  priority
-                />
+                <ServiceCategorySlider categories={categories} />
               </div>
             </div>
           </div>

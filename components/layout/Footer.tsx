@@ -46,9 +46,9 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <div className="flex items-center space-x-2 mb-6">
-              <Image src="/logo.JPEG" alt="Maintain" width={40} height={40} className="object-contain" />
+              <Image src="/logo.JPEG" alt="Maintainex" width={40} height={40} className="object-contain" />
               <span className="text-2xl font-bold">
-                Main<span className="text-primary-500">tain</span>
+                Main<span className="text-primary-500">tainex</span>
               </span>
             </div>
             <p className="text-gray-400 mb-6">

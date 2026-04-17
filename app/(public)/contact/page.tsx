@@ -117,8 +117,8 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-xl font-bold text-dark-900 mb-2">Email</h3>
                 <p className="text-gray-600 mb-2">We reply within 24h</p>
-                <a href="mailto:info@maintain.lk" className="text-primary-600 font-semibold hover:text-primary-700">
-                  info@maintain.lk
+                <a href="mailto:info@maintainex.lk" className="text-primary-600 font-semibold hover:text-primary-700">
+                  info@maintainex.lk
                 </a>
               </div>
 

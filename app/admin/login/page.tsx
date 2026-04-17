@@ -47,9 +47,9 @@ export default function AdminLogin() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <a href="/" className="inline-flex items-center space-x-2 mb-4">
-            <Image src="/logo.JPEG" alt="Maintain" width={48} height={48} className="object-contain" />
+            <Image src="/logo.JPEG" alt="Maintainex" width={48} height={48} className="object-contain" />
             <span className="text-2xl font-bold text-dark-900">
-              Main<span className="text-primary-600">tain</span>
+              Main<span className="text-primary-600">tainex</span>
             </span>
           </a>
           <h1 className="text-3xl font-bold text-dark-900">Admin Login</h1>
@@ -65,7 +65,7 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
-                placeholder="admin@maintain.lk"
+                placeholder="admin@maintainex.lk"
                 required
               />
             </div>
