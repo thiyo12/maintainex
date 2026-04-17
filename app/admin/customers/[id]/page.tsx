@@ -8,7 +8,8 @@ import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { 
   CustomerProfile, 
   ActivityTimeline, 
-  CustomerNotes
+  CustomerNotes,
+  WhatsAppModal
 } from '@/components/admin'
 import type { CustomerProfileData } from '@/components/admin/CustomerProfile'
 import type { Activity } from '@/components/admin/ActivityTimeline'
@@ -363,10 +364,11 @@ export default function CustomerDetailPage() {
 
       {showWhatsApp && customer.phone && (
         <WhatsAppModal
-          isOpen={showWhatsApp}
+          customer={{ name: customer.name, phone: customer.phone, email: customer.email }}
           onClose={() => setShowWhatsApp(false)}
-          phoneNumber={customer.phone}
-          customerName={customer.name}
+          onSend={async (message) => {
+            toast.success('WhatsApp message feature coming soon!')
+          }}
         />
       )}
     </div>

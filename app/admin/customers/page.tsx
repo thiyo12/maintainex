@@ -10,7 +10,6 @@ import {
   CustomerStats,
   CustomerFilters as CustomerFiltersComponent
 } from '@/components/admin'
-import type { CustomerFilters, CustomerStats as StatsType } from '@/components/admin'
 import { getAuthHeader } from '@/lib/auth-client'
 
 interface Customer {
@@ -42,7 +41,7 @@ export default function CustomersPage() {
   const { user } = useAdminSession()
   
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [stats, setStats] = useState<StatsType | null>(null)
+  const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -52,7 +51,7 @@ export default function CustomersPage() {
   })
   const [sortField, setSortField] = useState('createdAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-  const [filters, setFilters] = useState<CustomerFilters>({
+  const [filters, setFilters] = useState<any>({
     query: '',
     status: '',
     customerType: '',
@@ -157,7 +156,7 @@ export default function CustomersPage() {
     setPagination(prev => ({ ...prev, page }))
   }
 
-  const handleFiltersChange = (newFilters: CustomerFilters) => {
+  const handleFiltersChange = (newFilters: any) => {
     setFilters(newFilters)
     setPagination(prev => ({ ...prev, page: 1 }))
   }
