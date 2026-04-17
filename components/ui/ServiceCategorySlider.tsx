@@ -67,7 +67,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const getCategoryImage = (category: Category) => {
     if (category.image) return getImageUrl(category.image)
     const serviceWithImage = category.services.find(s => s.image)
-    return serviceWithImage ? getImageUrl(serviceWithImage.image) : null
+    return serviceWithImage ? getImageUrl(serviceWithImage.image) : ''
   }
 
   const currentCategory = activeCategories[currentIndex]

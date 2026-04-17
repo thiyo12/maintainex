@@ -28,12 +28,14 @@ async function getServicesByCategory() {
     slug: cat.slug,
     description: cat.description || '',
     icon: cat.icon,
+    image: cat.image,
     services: cat.services.map(svc => ({
       id: svc.id,
       title: svc.name,
       slug: svc.slug || '',
       description: svc.description,
       image: svc.image,
+      name: svc.name,
       price: svc.price ? Number(svc.price) : null,
       duration: svc.duration ? Number(svc.duration) : null
     }))
