@@ -126,7 +126,7 @@ export default async function HomePage() {
                 </div>
               </div>
               
-              <div className="relative hidden lg:block">
+              <div className="relative">
                 <ServiceCategorySlider categories={categories} />
               </div>
             </div>

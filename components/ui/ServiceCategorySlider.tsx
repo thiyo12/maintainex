@@ -62,7 +62,16 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
-  if (activeCategories.length === 0) return null
+  if (activeCategories.length === 0) {
+    return (
+      <div className="w-full h-full min-h-[400px] flex items-center justify-center bg-gray-100 rounded-3xl">
+        <div className="text-center p-8">
+          <p className="text-gray-500 text-lg">No service categories available</p>
+          <p className="text-gray-400 text-sm mt-2">Add categories with services in the admin panel</p>
+        </div>
+      </div>
+    )
+  }
 
   const getCategoryImage = (category: Category) => {
     if (category.image) return getImageUrl(category.image)
@@ -75,7 +84,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
 
   return (
     <div 
-      className="relative w-full h-full min-h-[500px] lg:min-h-[600px]"
+      className="relative w-full h-full min-h-[300px] sm:min-h-[400px] lg:min-h-[500px]"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
