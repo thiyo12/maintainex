@@ -67,7 +67,7 @@ async function getServicesByCategory() {
 }
 
 export default async function HomePage() {
-  const { categories, services } = await getServicesByCategory()
+  const { categories = [], services = [] } = await getServicesByCategory()
 
   const features = [
     { icon: FiCheck, title: 'Professional Team', description: 'Trained and vetted cleaning professionals' },
