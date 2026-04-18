@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import toast from 'react-hot-toast'
-import Link from 'next/link'
-import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUsers, FiUserPlus, FiMessageSquare, FiSend } from 'react-icons/fi'
+import { FiUser, FiSearch, FiEdit2, FiTrash2, FiPlus, FiMessageSquare, FiPhone, FiMail } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
 
@@ -12,10 +10,8 @@ interface Customer {
   name: string
   email: string
   phone: string | null
-  role: string
   isActive: boolean
   createdAt: Date
-  _count?: { bookings: number }
 }
 
 export default function CustomersPage() {
@@ -27,8 +23,6 @@ export default function CustomersPage() {
   const [total, setTotal] = useState(0)
   const limit = 20
 
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-
   useEffect(() => {
     fetchCustomers()
   }, [page])
@@ -36,7 +30,7 @@ export default function CustomersPage() {
   const fetchCustomers = async () => {
     try {
       const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/customers?page=${page}&limit=${limit}`, {
+      const res = await fetch(`/api/users?role=CUSTOMER&page=${page}&limit=${limit}`, {
         headers: { ...authHeaders }
       })
 
@@ -47,41 +41,14 @@ export default function CustomersPage() {
 
       const data = await res.json()
       
-      // Handle different response structures
-      if (Array.isArray(data)) {
-        setCustomers(data)
-        setTotal(data.length)
-      } else if (data.customers) {
-        setCustomers(data.customers)
-        setTotal(data.pagination?.total || data.customers.length)
-      } else {
-        // Need to fetch from users
-        await fetchUsers()
+      if (data.users) {
+        setCustomers(data.users)
+        setTotal(data.total || 0)
       }
     } catch (error) {
       console.error('Fetch error:', error)
-      // Fallback to users endpoint
-      await fetchUsers()
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchUsers = async () => {
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/users?role=CUSTOMER&page=${page}&limit=${limit}`, {
-        headers: { ...authHeaders }
-      })
-      
-      if (res.ok) {
-        const data = await res.json()
-        setCustomers(data.users || [])
-        if (data.total) setTotal(data.total)
-      }
-    } catch (error) {
-      console.error('Users fetch error:', error)
-      setCustomers([])
     }
   }
 
@@ -91,8 +58,6 @@ export default function CustomersPage() {
     c.email?.toLowerCase().includes(search.toLowerCase()) ||
     c.phone?.includes(search)
   )
-
-  const totalPages = Math.ceil(total / limit)
 
   if (loading) {
     return (
@@ -107,12 +72,8 @@ export default function CustomersPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Customers</h1>
-          <p className="text-gray-600 mt-1 text-sm">Manage your customer database</p>
+          <p className="text-gray-600 mt-1 text-sm">Customers who have booked servicios</p>
         </div>
-        <button className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
-          <FiUserPlus size={20} />
-          Add Customer
-        </button>
       </div>
 
       {/* Search */}
@@ -121,7 +82,7 @@ export default function CustomersPage() {
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search customers..."
+            placeholder="Search by name, email or phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input-field pl-10"
@@ -129,44 +90,50 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Customer Cards - Better for mobile */}
+      {/* Empty State */}
       {filteredCustomers.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
-          <div className="text-4xl md:text-6xl mb-4">👥</div>
+          <div className="text-5xl mb-4">👥</div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Customers Yet</h3>
-          <p className="text-gray-500 mb-4">Customers will appear here after booking services.</p>
+          <p className="text-gray-500">Customers will appear here after booking services.</p>
         </div>
       ) : (
         <>
+          {/* Customer Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {filteredCustomers.map((customer) => (
-              <div key={customer.id} className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                      <span className="text-primary-600 font-semibold">
-                        {customer.name?.[0]?.toUpperCase() || '?'}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{customer.name || 'Unknown'}</h3>
-                      <p className="text-sm text-gray-500">{customer.email}</p>
-                    </div>
+              <div key={customer.id} className="bg-white rounded-xl shadow-sm p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-primary-600 font-bold text-lg">
+                      {customer.name?.[0]?.toUpperCase() || '?'}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">{customer.name || 'Unknown'}</h3>
+                    <p className="text-sm text-gray-500 truncate">{customer.email}</p>
                   </div>
                 </div>
                 
-                <div className="text-sm text-gray-600 mb-3">
-                  {customer.phone && <p>📱 {customer.phone}</p>}
+                <div className="text-sm text-gray-600 mb-3 space-y-1">
+                  {customer.phone && (
+                    <p className="flex items-center gap-2">
+                      <FiPhone size={14} />
+                      {customer.phone}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400">
                     Joined: {new Date(customer.createdAt).toLocaleDateString()}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 border-t">
-                  <button className="flex-1 text-sm text-primary-600 hover:text-primary-700 py-1">
-                    View
+                <div className="flex gap-2 pt-3 border-t">
+                  <button className="flex-1 text-sm text-primary-600 hover:bg-primary-50 py-2 rounded flex items-center justify-center gap-1">
+                    <FiEdit2 size={14} />
+                    Edit
                   </button>
-                  <button className="flex-1 text-sm text-green-600 hover:text-green-700 py-1">
+                  <button className="flex-1 text-sm text-green-600 hover:bg-green-50 py-2 rounded flex items-center justify-center gap-1">
+                    <FiMessageSquare size={14} />
                     Message
                   </button>
                 </div>
@@ -175,7 +142,7 @@ export default function CustomersPage() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
+          {total > limit && (
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
@@ -185,11 +152,11 @@ export default function CustomersPage() {
                 Previous
               </button>
               <span className="text-gray-600">
-                Page {page} of {totalPages}
+                Page {page} of {Math.ceil(total / limit)}
               </span>
               <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                onClick={() => setPage(p => p + 1)}
+                disabled={page >= Math.ceil(total / limit)}
                 className="btn-secondary disabled:opacity-50"
               >
                 Next
@@ -197,21 +164,6 @@ export default function CustomersPage() {
             </div>
           )}
         </>
-      )}
-
-      {/* CRM Link - Only visible to Super Admin */}
-      {isSuperAdmin && (
-        <div className="mt-8 p-4 bg-purple-50 rounded-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-purple-900">Advanced CRM</h3>
-              <p className="text-sm text-purple-700">Tags, segments, and bulk messaging</p>
-            </div>
-            <Link href="/admin/crm" className="btn-primary">
-              Open CRM
-            </Link>
-          </div>
-        </div>
       )}
     </div>
   )

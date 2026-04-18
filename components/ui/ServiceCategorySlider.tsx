@@ -12,6 +12,8 @@ interface Category {
   slug: string
   icon: string | null
   image: string | null
+  description: string | null
+  isActive: boolean
   services: {
     id: string
     image: string | null
@@ -29,7 +31,8 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const [isHovering, setIsHovering] = useState(false)
   const [imageKey, setImageKey] = useState(Date.now())
 
-  const activeCategories = categories.filter(cat => cat.services.length > 0)
+  // Show ALL active categories (even without services)
+  const activeCategories = categories.filter(cat => cat.isActive !== false && cat.isActive !== null)
 
   useEffect(() => {
     setImageKey(Date.now())
@@ -67,7 +70,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
       <div className="w-full h-full min-h-[400px] flex items-center justify-center bg-gray-100 rounded-3xl">
         <div className="text-center p-8">
           <p className="text-gray-500 text-lg">No service categories available</p>
-          <p className="text-gray-400 text-sm mt-2">Add categories with services in the admin panel</p>
+          <p className="text-gray-400 text-sm mt-2">Add categories in the admin panel</p>
         </div>
       </div>
     )
