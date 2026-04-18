@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
-import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiCheck } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiCheck, FiImage } from 'react-icons/fi'
 import Image from 'next/image'
 import { getAuthHeader } from '@/lib/auth-client'
+import { getImageUrl } from '@/lib/images'
 
 interface Category {
   id: string
@@ -45,30 +46,26 @@ export default function AdminCategories() {
     isActive: true
   })
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     fetchCategories()
   }, [])
 
   const fetchCategories = async () => {
     try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/categories', { headers: { ...authHeaders } })
-      
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-      
+      const res = await fetch('/api/categories')
       const data = await res.json()
       setCategories(data)
     } catch (error) {
+      console.error('Fetch error:', error)
       toast.error('Failed to fetch categories')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
     setFormData(prev => ({
       ...prev,
@@ -111,9 +108,9 @@ export default function AdminCategories() {
 
       const data = await res.json()
       setFormData(prev => ({ ...prev, image: data.url }))
-      toast.success('Image uploaded successfully')
+      toast.success('Image uploaded')
     } catch (error) {
-      toast.error('Failed to upload image')
+      toast.error('Failed to upload')
     } finally {
       setUploading(false)
     }
@@ -129,26 +126,20 @@ export default function AdminCategories() {
 
     try {
       const authHeaders = getAuthHeader()
-      const url = editingCategory 
-        ? '/api/categories'
-        : '/api/categories'
-      const method = editingCategory ? 'PUT' : 'POST'
-      const body = editingCategory 
-        ? { id: editingCategory.id, ...formData }
-        : formData
-
-      const res = await fetch(url, {
-        method,
+      const isEdit = !!editingCategory
+      
+      const res = await fetch('/api/categories', {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify(body)
+        body: JSON.stringify(isEdit ? { id: editingCategory.id, ...formData } : formData)
       })
 
       if (!res.ok) {
         const error = await res.json()
-        throw new Error(error.error || 'Failed to save category')
+        throw new Error(error.error || 'Failed to save')
       }
 
-      toast.success(editingCategory ? 'Category updated successfully' : 'Category created successfully')
+      toast.success(isEdit ? 'Updated' : 'Created')
       setShowModal(false)
       resetForm()
       fetchCategories()
@@ -173,11 +164,11 @@ export default function AdminCategories() {
   const handleDelete = async (id: string) => {
     const category = categories.find(c => c.id === id)
     if (category && category._count.services > 0) {
-      toast.error('Cannot delete category with existing services')
+      toast.error('Cannot delete with services')
       return
     }
 
-    if (!confirm('Are you sure you want to delete this category?')) return
+    if (!confirm('Delete this category?')) return
 
     try {
       const authHeaders = getAuthHeader()
@@ -186,15 +177,11 @@ export default function AdminCategories() {
         headers: { ...authHeaders }
       })
 
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to delete category')
-      }
-
-      toast.success('Category deleted successfully')
+      if (!res.ok) throw new Error('Failed')
+      toast.success('Deleted')
       fetchCategories()
-    } catch (error: any) {
-      toast.error(error.message)
+    } catch (error) {
+      toast.error('Failed to delete')
     }
   }
 
@@ -210,9 +197,12 @@ export default function AdminCategories() {
     })
   }
 
-  const openModal = () => {
-    resetForm()
-    setShowModal(true)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -220,87 +210,80 @@ export default function AdminCategories() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Categories</h1>
-          <p className="text-gray-600 mt-1 text-sm md:text-base">Manage service categories with cover images for the slider</p>
+          <p className="text-gray-600 mt-1 text-sm">Categories show on homepage slider</p>
         </div>
-        <button onClick={openModal} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
+        <button 
+          onClick={() => { resetForm(); setShowModal(true) }} 
+          className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center"
+        >
           <FiPlus size={20} />
           Add Category
         </button>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48 md:h-64">
-          <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : categories.length === 0 ? (
+      {categories.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
-          <div className="text-4xl md:text-6xl mb-4">📋</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Categories Yet</h3>
-          <p className="text-gray-500 mb-4">Create your first service category to get started.</p>
-          <button onClick={openModal} className="btn-primary inline-flex items-center gap-2">
-            <FiPlus size={20} />
+          <div className="text-5xl mb-4">📋</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Categories</h3>
+          <p className="text-gray-500 mb-4">Create your first category.</p>
+          <button onClick={() => { resetForm(); setShowModal(true) }} className="btn-primary">
             Add First Category
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {categories.map((category) => (
-            <div key={category.id} className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start gap-3 md:gap-4 mb-3 md:mb-4">
-                <span className="text-3xl md:text-4xl">{category.icon || '📋'}</span>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{category.name}</h3>
-                  <p className="text-xs md:text-sm text-gray-500">{category.slug}</p>
-                </div>
-              </div>
-              
-              <div className="mb-3 md:mb-4">
+            <div key={category.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              {/* Image */}
+              <div className="relative h-32 bg-gray-100">
                 {category.image ? (
-                  <div className="relative w-full h-24 md:h-32 rounded-lg overflow-hidden">
-                    <Image
-                      src={category.image}
-                      alt={category.name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
+                  <Image
+                    src={getImageUrl(category.image)}
+                    alt={category.name}
+                    fill
+                    className="object-cover"
+                  />
                 ) : (
-                  <div className="w-full h-24 md:h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">
-                    No image
+                  <div className="w-full h-full flex items-center justify-center text-4xl">
+                    {category.icon || '📋'}
                   </div>
                 )}
+                <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
+                  category.isActive ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'
+                }`}>
+                  {category.isActive ? 'Active' : 'Inactive'}
+                </div>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+
+              {/* Content */}
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">{category.icon || '📋'}</span>
+                  <h3 className="font-semibold text-gray-900 truncate">{category.name}</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-3">{category.slug}</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm bg-primary-100 text-primary-700 px-2 py-1 rounded">
                     {category._count.services} services
                   </span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    category.isActive 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {category.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleEdit(category)}
-                    className="text-primary-600 hover:text-primary-900 p-2"
-                    title="Edit"
-                  >
-                    <FiEdit2 size={18} />
-                  </button>
-                  {category._count.services === 0 && (
-                    <button
-                      onClick={() => handleDelete(category.id)}
-                      className="text-red-600 hover:text-red-900 p-2"
-                      title="Delete"
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleEdit(category)}
+                      className="p-2 text-primary-600 hover:bg-primary-50 rounded"
+                      title="Edit"
                     >
-                      <FiTrash2 size={18} />
+                      <FiEdit2 size={18} />
                     </button>
-                  )}
+                    {category._count.services === 0 && (
+                      <button 
+                        onClick={() => handleDelete(category.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded"
+                        title="Delete"
+                      >
+                        <FiTrash2 size={18} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -308,21 +291,22 @@ export default function AdminCategories() {
         </div>
       )}
 
+      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b flex items-center justify-between">
-              <h2 className="text-xl font-bold">
-                {editingCategory ? 'Edit Category' : 'Add New Category'}
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-4 md:p-6 border-b flex items-center justify-between sticky top-0 bg-white">
+              <h2 className="text-lg font-bold">
+                {editingCategory ? 'Edit' : 'New'} Category
               </h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
-                <FiX size={24} />
+              <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded">
+                <FiX size={20} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-4 md:p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                 <input
                   type="text"
                   name="name"
@@ -335,7 +319,7 @@ export default function AdminCategories() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
                 <input
                   type="text"
                   name="slug"
@@ -354,13 +338,13 @@ export default function AdminCategories() {
                   value={formData.description}
                   onChange={handleInputChange}
                   className="input-field"
-                  rows={3}
-                  placeholder="Professional deep cleaning services..."
+                  rows={2}
+                  placeholder="Description..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Icon</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Icon</label>
                 <div className="flex flex-wrap gap-2">
                   {EMOJI_OPTIONS.map((emoji) => (
                     <button
@@ -381,12 +365,12 @@ export default function AdminCategories() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
-                <div className="mt-1 flex items-start gap-4">
-                  <div className="flex-shrink-0">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-24 h-24 relative rounded-lg overflow-hidden bg-gray-100">
                     {formData.image ? (
-                      <div className="relative w-32 h-32 rounded-lg overflow-hidden">
+                      <>
                         <Image
-                          src={formData.image}
+                          src={getImageUrl(formData.image)}
                           alt="Cover"
                           fill
                           className="object-cover"
@@ -394,32 +378,31 @@ export default function AdminCategories() {
                         <button
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, image: '' }))}
-                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center"
+                          className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
                         >
-                          <FiX size={14} />
+                          ✕
                         </button>
-                      </div>
+                      </>
                     ) : (
-                      <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400">
-                        No image
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <FiImage size={24} />
                       </div>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
-                      <FiUpload size={18} />
-                      {uploading ? 'Uploading...' : 'Upload Image'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={uploading}
-                      />
-                    </label>
-                    <p className="text-xs text-gray-500 mt-2">Recommended: 800x600px, Max 5MB</p>
-                  </div>
+                  <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
+                    <FiUpload size={18} />
+                    {uploading ? 'Uploading...' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      disabled={uploading}
+                      ref={fileInputRef}
+                    />
+                  </label>
                 </div>
+                <p className="text-xs text-gray-500 mt-1">Recommended: 800x600px</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -429,14 +412,12 @@ export default function AdminCategories() {
                   id="isActive"
                   checked={formData.isActive}
                   onChange={handleInputChange}
-                  className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                  className="w-4 h-4 rounded"
                 />
-                <label htmlFor="isActive" className="text-sm text-gray-700">
-                  Active (visible on website)
-                </label>
+                <label htmlFor="isActive" className="text-sm">Active</label>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">
                   Cancel
                 </button>

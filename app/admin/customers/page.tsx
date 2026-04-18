@@ -1,208 +1,218 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiRefreshCw } from 'react-icons/fi'
+import Link from 'next/link'
+import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUsers, FiUserPlus, FiMessageSquare, FiSend } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { 
-  CustomerTable, 
-  CustomerStats,
-  CustomerFilters as CustomerFiltersComponent
-} from '@/components/admin'
 import { getAuthHeader } from '@/lib/auth-client'
 
 interface Customer {
   id: string
-  userId: string
   name: string
   email: string
   phone: string | null
-  customerType: 'REGULAR' | 'VIP' | 'CORPORATE' | 'POTENTIAL'
-  status: 'ACTIVE' | 'INACTIVE' | 'BLACKLISTED'
-  totalBookings: number
-  totalSpent: number
-  province: string | null
-  createdAt: string
-  lastBooking: string | null
-  tags?: { id: string; name: string; color: string; slug: string }[]
-  _count?: { notes: number; activities: number }
-}
-
-interface PaginationInfo {
-  page: number
-  limit: number
-  total: number
-  totalPages: number
+  role: string
+  isActive: boolean
+  createdAt: Date
+  _count?: { bookings: number }
 }
 
 export default function CustomersPage() {
-  const router = useRouter()
   const { user } = useAdminSession()
-  
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0
-  })
-  const [sortField, setSortField] = useState('createdAt')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-  const [filters, setFilters] = useState<any>({
-    query: '',
-    status: '',
-    customerType: '',
-    province: '',
-    source: '',
-    dateFrom: '',
-    dateTo: ''
-  })
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const limit = 20
 
-  const fetchCustomers = useCallback(async () => {
-    setLoading(true)
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+
+  useEffect(() => {
+    fetchCustomers()
+  }, [page])
+
+  const fetchCustomers = async () => {
     try {
       const authHeaders = getAuthHeader()
-      const params = new URLSearchParams()
-      
-      params.append('page', pagination.page.toString())
-      params.append('limit', pagination.limit.toString())
-      params.append('sortBy', sortField)
-      params.append('sortOrder', sortDirection)
-      
-      if (filters.query) params.append('query', filters.query)
-      if (filters.status) params.append('status', filters.status)
-      if (filters.customerType) params.append('customerType', filters.customerType)
-      if (filters.province) params.append('province', filters.province)
-      if (filters.source) params.append('source', filters.source)
-      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom)
-      if (filters.dateTo) params.append('dateTo', filters.dateTo)
+      const res = await fetch(`/api/customers?page=${page}&limit=${limit}`, {
+        headers: { ...authHeaders }
+      })
 
-      const res = await fetch(`/api/customers?${params}`, { headers: { ...authHeaders } })
-      
       if (res.status === 401) {
         window.location.href = '/admin/login'
         return
       }
-      
+
       const data = await res.json()
       
-      if (!res.ok) {
-        toast.error(data.error || 'Failed to fetch customers')
-        return
+      // Handle different response structures
+      if (Array.isArray(data)) {
+        setCustomers(data)
+        setTotal(data.length)
+      } else if (data.customers) {
+        setCustomers(data.customers)
+        setTotal(data.pagination?.total || data.customers.length)
+      } else {
+        // Need to fetch from users
+        await fetchUsers()
       }
-      
-      const mappedCustomers = data.customers.map((c: any) => ({
-        id: c.id,
-        userId: c.user.id,
-        name: c.user.name || 'Unknown',
-        email: c.user.email || '',
-        phone: c.user.phone,
-        customerType: c.customerType || 'REGULAR',
-        status: c.status || 'ACTIVE',
-        totalBookings: c.totalBookings || 0,
-        totalSpent: c.totalSpent || 0,
-        province: c.province,
-        createdAt: c.user.createdAt,
-        lastBooking: c.lastBooking,
-        tags: c.tags,
-        _count: c._count
-      }))
-      
-      setCustomers(mappedCustomers)
-      setPagination(prev => ({
-        ...prev,
-        ...data.pagination
-      }))
     } catch (error) {
-      toast.error('Failed to connect to server')
+      console.error('Fetch error:', error)
+      // Fallback to users endpoint
+      await fetchUsers()
     } finally {
       setLoading(false)
     }
-  }, [pagination.page, pagination.limit, sortField, sortDirection, filters])
+  }
 
-  const fetchStats = async () => {
+  const fetchUsers = async () => {
     try {
       const authHeaders = getAuthHeader()
-      const res = await fetch('/api/customers?limit=1', { headers: { ...authHeaders } })
+      const res = await fetch(`/api/users?role=CUSTOMER&page=${page}&limit=${limit}`, {
+        headers: { ...authHeaders }
+      })
       
       if (res.ok) {
         const data = await res.json()
-        setStats({
-          total: data.pagination.total || 0,
-          active: Math.floor((data.pagination.total || 0) * 0.7),
-          vip: Math.floor((data.pagination.total || 0) * 0.1),
-          newThisMonth: Math.floor((data.pagination.total || 0) * 0.15)
-        })
+        setCustomers(data.users || [])
+        if (data.total) setTotal(data.total)
       }
     } catch (error) {
-      console.error('Failed to fetch stats')
+      console.error('Users fetch error:', error)
+      setCustomers([])
     }
   }
 
-  useEffect(() => {
-    fetchCustomers()
-    fetchStats()
-  }, [fetchCustomers])
+  const filteredCustomers = customers.filter(c => 
+    !search || 
+    c.name?.toLowerCase().includes(search.toLowerCase()) ||
+    c.email?.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone?.includes(search)
+  )
 
-  const handleSort = (field: string, direction: 'asc' | 'desc') => {
-    setSortField(field)
-    setSortDirection(direction)
-  }
+  const totalPages = Math.ceil(total / limit)
 
-  const handlePageChange = (page: number) => {
-    setPagination(prev => ({ ...prev, page }))
-  }
-
-  const handleFiltersChange = (newFilters: any) => {
-    setFilters(newFilters)
-    setPagination(prev => ({ ...prev, page: 1 }))
-  }
-
-  const handleRowClick = (customer: Customer) => {
-    router.push(`/admin/customers/${customer.id}`)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-          <p className="text-gray-600">Manage customer profiles and information</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Customers</h1>
+          <p className="text-gray-600 mt-1 text-sm">Manage your customer database</p>
         </div>
-        <button 
-          onClick={() => { fetchCustomers(); fetchStats(); }}
-          className="btn-outline flex items-center"
-        >
-          <FiRefreshCw className="mr-2" /> Refresh
+        <button className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
+          <FiUserPlus size={20} />
+          Add Customer
         </button>
       </div>
 
-      {stats && (
-        <div className="mb-6">
-          <CustomerStats {...stats} />
-        </div>
-      )}
-
+      {/* Search */}
       <div className="mb-6">
-        <CustomerFiltersComponent 
-          filters={filters}
-          onFilterChange={handleFiltersChange}
-        />
+        <div className="relative">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search customers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="input-field pl-10"
+          />
+        </div>
       </div>
 
-      <CustomerTable
-        customers={customers}
-        loading={loading}
-        pagination={pagination}
-        onSort={handleSort}
-        onPageChange={handlePageChange}
-        onRowClick={handleRowClick}
-        sortField={sortField}
-        sortDirection={sortDirection}
-      />
+      {/* Customer Cards - Better for mobile */}
+      {filteredCustomers.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
+          <div className="text-4xl md:text-6xl mb-4">👥</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Customers Yet</h3>
+          <p className="text-gray-500 mb-4">Customers will appear here after booking services.</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {filteredCustomers.map((customer) => (
+              <div key={customer.id} className="bg-white rounded-xl shadow-sm p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                      <span className="text-primary-600 font-semibold">
+                        {customer.name?.[0]?.toUpperCase() || '?'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{customer.name || 'Unknown'}</h3>
+                      <p className="text-sm text-gray-500">{customer.email}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="text-sm text-gray-600 mb-3">
+                  {customer.phone && <p>📱 {customer.phone}</p>}
+                  <p className="text-xs text-gray-400">
+                    Joined: {new Date(customer.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <button className="flex-1 text-sm text-primary-600 hover:text-primary-700 py-1">
+                    View
+                  </button>
+                  <button className="flex-1 text-sm text-green-600 hover:text-green-700 py-1">
+                    Message
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-gray-600">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="btn-secondary disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* CRM Link - Only visible to Super Admin */}
+      {isSuperAdmin && (
+        <div className="mt-8 p-4 bg-purple-50 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-purple-900">Advanced CRM</h3>
+              <p className="text-sm text-purple-700">Tags, segments, and bulk messaging</p>
+            </div>
+            <Link href="/admin/crm" className="btn-primary">
+              Open CRM
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

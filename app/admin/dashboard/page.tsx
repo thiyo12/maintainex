@@ -1,185 +1,57 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
-import { FiCalendar, FiUsers, FiClock, FiCheckCircle, FiArrowRight, FiTool, FiAlertTriangle, FiSave, FiRefreshCw, FiRotateCcw, FiAlertCircle } from 'react-icons/fi'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { FiUsers, FiCheckCircle, FiClock, FiActivity } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
 
-interface DashboardData {
-  stats?: {
-    totalBookings: number
-    pendingBookings: number
-    totalApplications: number
-    newApplications: number
-    totalServices: number
-  }
-  recentBookings?: any[]
-  recentApplications?: any[]
-  error?: string
-}
-
-interface MaintenanceSettings {
-  maintenanceMode: boolean
-  maintenanceMessage: string
+interface DashboardStats {
+  totalBookings: number
+  pendingBookings: number
+  completedBookings: number
+  totalCustomers: number
+  totalServices: number
+  recentBookings: Array<{
+    id: string
+    name: string
+    service: string
+    date: string
+    status: string
+    totalPrice: number
+  }>
 }
 
 export default function AdminDashboard() {
   const { user } = useAdminSession()
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [maintenance, setMaintenance] = useState<MaintenanceSettings>({
-    maintenanceMode: false,
-    maintenanceMessage: ''
-  })
-  const [saving, setSaving] = useState(false)
-  const [reloadKey, setReloadKey] = useState(0)
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
-  const fetchMaintenanceSettings = useCallback(async () => {
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/settings/maintenance?' + Date.now(), { 
-        cache: 'no-store',
-        headers: {
-          ...authHeaders
-        }
-      })
-      if (res.ok) {
-        const result = await res.json()
-        setMaintenance(result)
-      }
-    } catch (error) {
-      console.error('Failed to fetch maintenance settings:', error)
-    }
-  }, [])
-
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const authHeaders = getAuthHeader()
-        const res = await fetch('/api/dashboard', {
-          headers: {
-            ...authHeaders
-          }
-        })
-        
-        if (res.status === 401) {
-          window.location.href = '/admin/login'
-          return
-        }
-        
-        const result = await res.json()
-        
-        if (!res.ok) {
-          setError(result.error || 'Failed to load dashboard')
-          setLoading(false)
-          return
-        }
-        
-        setData(result)
-        setError(null)
-      } catch (err) {
-        setError('Failed to connect to server')
-      } finally {
-        setLoading(false)
-      }
-    }
-    
     fetchDashboard()
   }, [])
 
-  useEffect(() => {
-    if (isSuperAdmin) {
-      fetchMaintenanceSettings()
-    }
-  }, [isSuperAdmin, fetchMaintenanceSettings, reloadKey])
-
-  const saveMaintenance = async () => {
-    setSaving(true)
+  const fetchDashboard = async () => {
     try {
       const authHeaders = getAuthHeader()
-      const res = await fetch('/api/settings/maintenance', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify({
-          maintenanceMode: maintenance.maintenanceMode,
-          maintenanceMessage: maintenance.maintenanceMessage
-        })
+      const res = await fetch('/api/dashboard', {
+        headers: { ...authHeaders }
       })
-      
+
       if (res.status === 401) {
         window.location.href = '/admin/login'
         return
       }
-      
-      if (!res.ok) throw new Error()
-      
-      const result = await res.json()
-      
-      setTimeout(() => {
-        setReloadKey(prev => prev + 1)
-        fetchMaintenanceSettings()
-        
-        if (result.maintenanceMode === false) {
-          toast.success('Maintenance disabled! Website is now live.')
-        } else {
-          toast.success('Maintenance mode enabled!')
-        }
-      }, 500)
-    } catch (error) {
-      toast.error('Failed to save settings')
-    } finally {
-      setSaving(false)
-    }
-  }
 
-  const refreshSettings = async () => {
-    await fetchMaintenanceSettings()
-    toast.success('Settings refreshed!')
-  }
-
-  const resetToDefaults = async () => {
-    if (!confirm('Reset maintenance settings to defaults?')) return
-    
-    setSaving(true)
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/settings/maintenance', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          ...authHeaders
-        },
-        body: JSON.stringify({
-          maintenanceMode: false,
-          maintenanceMessage: "We're making things better! Our website is currently undergoing some scheduled maintenance to serve you better. We'll be back shortly. Thank you for your patience!"
-        })
-      })
-      
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-      
-      if (!res.ok) throw new Error()
-      
-      toast.success('Settings reset! Website is now live.')
-      
-      setTimeout(() => {
-        setReloadKey(prev => prev + 1)
-        fetchMaintenanceSettings()
-      }, 500)
+      const data = await res.json()
+      setStats(data)
     } catch (error) {
-      toast.error('Failed to reset settings')
+      console.error('Dashboard error:', error)
+      toast.error('Failed to load dashboard')
     } finally {
-      setSaving(false)
+      setLoading(false)
     }
   }
 
@@ -191,226 +63,107 @@ export default function AdminDashboard() {
     )
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <FiAlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Dashboard</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-primary-500 text-dark-900 rounded-lg font-medium"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const stats = data?.stats || {
-    totalBookings: 0,
-    pendingBookings: 0,
-    totalApplications: 0,
-    newApplications: 0,
-    totalServices: 0
-  }
-
-  const recentBookings = data?.recentBookings || []
-  const recentApplications = data?.recentApplications || []
-
   return (
-    <div>
-      <div className="mb-8">
+    <div className="p-4 md:p-6">
+      <div className="mb-6 md:mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome back! Heres an overview of your business.</p>
+        <p className="text-gray-600 mt-1">Welcome back! Here's your business overview.</p>
       </div>
-
-      {isSuperAdmin && (
-        <div className="bg-gradient-to-r from-dark-900 to-dark-800 rounded-xl p-6 mb-8 text-white">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${maintenance.maintenanceMode ? 'bg-red-500' : 'bg-green-500'}`}>
-                <FiAlertTriangle className="text-white text-2xl" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold">Maintenance Mode</h3>
-                <p className="text-gray-300 text-sm">
-                  {maintenance.maintenanceMode ? 'Website is showing maintenance page' : 'Website is live and accessible'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={refreshSettings}
-                className="px-3 py-1.5 text-sm bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2"
-                title="Refresh settings"
-              >
-                <FiRefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
-              <button
-                onClick={resetToDefaults}
-                disabled={saving}
-                className="px-3 py-1.5 text-sm bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
-                title="Reset to defaults"
-              >
-                <FiRotateCcw className="w-4 h-4" />
-                Reset Default
-              </button>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={maintenance.maintenanceMode}
-                  onChange={(e) => setMaintenance({ ...maintenance, maintenanceMode: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-14 h-7 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-red-500"></div>
-                <span className="ml-3 text-sm font-medium">
-                  {maintenance.maintenanceMode ? 'ON' : 'OFF'}
-                </span>
-              </label>
-            </div>
-          </div>
-          
-          <div className="mt-4 pt-4 border-t border-white/20">
-            <label className="block text-sm text-gray-300 mb-2">Maintenance Message</label>
-            <textarea
-              value={maintenance.maintenanceMessage}
-              onChange={(e) => setMaintenance({ ...maintenance, maintenanceMessage: e.target.value })}
-              rows={2}
-              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="Enter maintenance message..."
-            />
-            <div className="mt-3 flex items-center gap-3">
-              <button
-                onClick={saveMaintenance}
-                disabled={saving}
-                className="flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-              >
-                <FiSave className="w-4 h-4" />
-                {saving ? 'Saving...' : 'Save Changes'}
-              </button>
-              <span className="text-sm text-gray-400">
-                {maintenance.maintenanceMode 
-                  ? 'Visitors will see the maintenance page until you turn it off'
-                  : 'Turn ON to enable maintenance mode'
-                }
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Stats Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-              <FiCalendar className="text-primary-600 text-xl" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+              <FiClock className="text-primary-600 text-lg md:text-xl" />
             </div>
-            <span className="text-sm text-green-600 font-medium">+12%</span>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.totalBookings}</div>
-          <div className="text-gray-600">Total Bookings</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.pendingBookings || 0}</div>
+          <div className="text-gray-500 text-sm">Pending Bookings</div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-              <FiClock className="text-yellow-600 text-xl" />
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-xl flex items-center justify-center">
+              <FiCheckCircle className="text-green-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.pendingBookings}</div>
-          <div className="text-gray-600">Pending Bookings</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.completedBookings || 0}</div>
+          <div className="text-gray-500 text-sm">Completed</div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-              <FiUsers className="text-blue-600 text-xl" />
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <FiUsers className="text-blue-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.totalApplications}</div>
-          <div className="text-gray-600">Job Applications</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.totalCustomers || 0}</div>
+          <div className="text-gray-500 text-sm">Customers</div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-              <FiCheckCircle className="text-purple-600 text-xl" />
+        <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+              <FiActivity className="text-purple-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-3xl font-bold text-gray-900">{stats.newApplications}</div>
-          <div className="text-gray-600">New Applications</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.totalServices || 0}</div>
+          <div className="text-gray-500 text-sm">Services</div>
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent Bookings */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-6 border-b flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
-            <Link href="/admin/bookings" className="text-primary-600 text-sm font-medium hover:text-primary-700 flex items-center">
-              View All <FiArrowRight className="ml-1" />
-            </Link>
-          </div>
-          <div className="divide-y">
-            {recentBookings.length > 0 ? (
-              recentBookings.map((booking: any) => (
-                <div key={booking.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-gray-900">{booking.name || booking.user?.name || 'N/A'}</div>
-                    <div className="text-sm text-gray-500">{booking.service?.name}</div>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                    booking.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' :
-                    booking.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {booking.status}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center text-gray-500">No bookings yet</div>
-            )}
-          </div>
+      {/* Recent Bookings */}
+      <div className="bg-white rounded-xl shadow-sm">
+        <div className="p-4 md:p-6 border-b">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
         </div>
-
-        {/* Recent Applications */}
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-6 border-b flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Applications</h2>
-            <Link href="/admin/applications" className="text-primary-600 text-sm font-medium hover:text-primary-700 flex items-center">
-              View All <FiArrowRight className="ml-1" />
-            </Link>
-          </div>
-          <div className="divide-y">
-            {recentApplications.length > 0 ? (
-              recentApplications.map((app: any) => (
-                <div key={app.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-medium text-gray-900">{app.name}</div>
-                    <div className="text-sm text-gray-500">{app.service}</div>
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    app.status === 'NEW' ? 'bg-blue-100 text-blue-700' :
-                    app.status === 'REVIEWED' ? 'bg-purple-100 text-purple-700' :
-                    app.status === 'INTERVIEW' ? 'bg-green-100 text-green-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
-                    {app.status}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center text-gray-500">No applications yet</div>
-            )}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {stats?.recentBookings && stats.recentBookings.length > 0 ? (
+                stats.recentBookings.slice(0, 10).map((booking) => (
+                  <tr key={booking.id} className="hover:bg-gray-50">
+                    <td className="px-4 md:px-6 py-4">
+                      <div className="font-medium text-gray-900">{booking.name || 'N/A'}</div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 text-gray-600">{booking.service}</td>
+                    <td className="px-4 md:px-6 py-4 text-gray-600">
+                      {new Date(booking.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 md:px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        booking.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                        booking.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                        booking.status === 'CONFIRMED' ? 'bg-primary-100 text-primary-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {booking.status}
+                      </span>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 font-medium">
+                      ฿{booking.totalPrice?.toLocaleString() || 0}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-4 md:px-6 py-8 text-center text-gray-500">
+                    No bookings found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
