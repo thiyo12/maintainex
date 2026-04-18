@@ -216,95 +216,95 @@ export default function AdminCategories() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
-          <p className="text-gray-600 mt-1">Manage service categories with cover images for the slider</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Categories</h1>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">Manage service categories with cover images for the slider</p>
         </div>
-        <button onClick={openModal} className="btn-primary flex items-center gap-2">
+        <button onClick={openModal} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
           <FiPlus size={20} />
           Add Category
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-48 md:h-64">
           <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : categories.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
+          <div className="text-4xl md:text-6xl mb-4">📋</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Categories Yet</h3>
+          <p className="text-gray-500 mb-4">Create your first service category to get started.</p>
+          <button onClick={openModal} className="btn-primary inline-flex items-center gap-2">
+            <FiPlus size={20} />
+            Add First Category
+          </button>
+        </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cover Image</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Services</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {categories.map((category) => (
-                  <tr key={category.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{category.icon || '📋'}</span>
-                        <div>
-                          <p className="font-medium text-gray-900">{category.name}</p>
-                          <p className="text-sm text-gray-500">{category.slug}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {category.image ? (
-                        <div className="relative w-16 h-16 rounded-lg overflow-hidden">
-                          <Image
-                            src={category.image}
-                            alt={category.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm">No image</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                        {category._count.services} services
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        category.isActive 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {category.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="text-primary-600 hover:text-primary-900 mr-4"
-                      >
-                        <FiEdit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(category.id)}
-                        className="text-red-600 hover:text-red-900"
-                        disabled={category._count.services > 0}
-                      >
-                        <FiTrash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          {categories.map((category) => (
+            <div key={category.id} className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition-shadow">
+              <div className="flex items-start gap-3 md:gap-4 mb-3 md:mb-4">
+                <span className="text-3xl md:text-4xl">{category.icon || '📋'}</span>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 truncate">{category.name}</h3>
+                  <p className="text-xs md:text-sm text-gray-500">{category.slug}</p>
+                </div>
+              </div>
+              
+              <div className="mb-3 md:mb-4">
+                {category.image ? (
+                  <div className="relative w-full h-24 md:h-32 rounded-lg overflow-hidden">
+                    <Image
+                      src={category.image}
+                      alt={category.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-24 md:h-32 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-sm">
+                    No image
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                    {category._count.services} services
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    category.isActive 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {category.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleEdit(category)}
+                    className="text-primary-600 hover:text-primary-900 p-2"
+                    title="Edit"
+                  >
+                    <FiEdit2 size={18} />
+                  </button>
+                  {category._count.services === 0 && (
+                    <button
+                      onClick={() => handleDelete(category.id)}
+                      className="text-red-600 hover:text-red-900 p-2"
+                      title="Delete"
+                    >
+                      <FiTrash2 size={18} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
