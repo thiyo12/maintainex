@@ -7,18 +7,20 @@ import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
 
 interface DashboardStats {
-  totalBookings: number
-  pendingBookings: number
-  completedBookings: number
-  totalCustomers: number
-  totalServices: number
+  stats: {
+    totalBookings: number
+    pendingBookings: number
+    totalApplications: number
+    newApplications: number
+    totalServices: number
+  }
   recentBookings: Array<{
     id: string
-    name: string
-    service: string
-    date: string
+    createdAt: Date
     status: string
     totalPrice: number
+    service?: { name: string }
+    user?: { name: string | null }
   }>
 }
 
@@ -26,8 +28,6 @@ export default function AdminDashboard() {
   const { user } = useAdminSession()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
-
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
 
   useEffect(() => {
     fetchDashboard()
@@ -46,6 +46,11 @@ export default function AdminDashboard() {
       }
 
       const data = await res.json()
+      
+      if (data.error) {
+        toast.error(data.error)
+      }
+      
       setStats(data)
     } catch (error) {
       console.error('Dashboard error:', error)
@@ -78,7 +83,7 @@ export default function AdminDashboard() {
               <FiClock className="text-primary-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.pendingBookings || 0}</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.stats?.pendingBookings || 0}</div>
           <div className="text-gray-500 text-sm">Pending Bookings</div>
         </div>
 
@@ -88,8 +93,8 @@ export default function AdminDashboard() {
               <FiCheckCircle className="text-green-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.completedBookings || 0}</div>
-          <div className="text-gray-500 text-sm">Completed</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.stats?.totalBookings || 0}</div>
+          <div className="text-gray-500 text-sm">Total Bookings</div>
         </div>
 
         <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
@@ -98,8 +103,8 @@ export default function AdminDashboard() {
               <FiUsers className="text-blue-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.totalCustomers || 0}</div>
-          <div className="text-gray-500 text-sm">Customers</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.stats?.newApplications || 0}</div>
+          <div className="text-gray-500 text-sm">New Applications</div>
         </div>
 
         <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
@@ -108,12 +113,12 @@ export default function AdminDashboard() {
               <FiActivity className="text-purple-600 text-lg md:text-xl" />
             </div>
           </div>
-          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.totalServices || 0}</div>
+          <div className="text-2xl md:text-3xl font-bold text-gray-900">{stats?.stats?.totalServices || 0}</div>
           <div className="text-gray-500 text-sm">Services</div>
         </div>
       </div>
 
-      {/* Recent Bookings */}
+      {/* Recent Bookings Table */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="p-4 md:p-6 border-b">
           <h2 className="text-lg font-semibold text-gray-900">Recent Bookings</h2>
@@ -134,11 +139,11 @@ export default function AdminDashboard() {
                 stats.recentBookings.slice(0, 10).map((booking) => (
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="px-4 md:px-6 py-4">
-                      <div className="font-medium text-gray-900">{booking.name || 'N/A'}</div>
+                      <div className="font-medium text-gray-900">{booking.user?.name || 'N/A'}</div>
                     </td>
-                    <td className="px-4 md:px-6 py-4 text-gray-600">{booking.service}</td>
+                    <td className="px-4 md:px-6 py-4 text-gray-600">{booking.service?.name || 'N/A'}</td>
                     <td className="px-4 md:px-6 py-4 text-gray-600">
-                      {new Date(booking.date).toLocaleDateString()}
+                      {new Date(booking.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 md:px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
