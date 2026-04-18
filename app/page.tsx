@@ -86,47 +86,47 @@ export default async function HomePage() {
           <div className="absolute top-20 right-10 w-72 h-72 bg-white/20 rounded-full blur-3xl" />
           <div className="absolute bottom-20 left-10 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
           
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <div className="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-20 relative z-10">
+            <div className="grid lg:grid-cols-2 gap-6 md:gap-10 lg:gap-12 items-center">
+              <div className="order-2 lg:order-1">
+                <div className="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 md:px-4 py-1.5 md:py-2 mb-4 md:mb-8">
                   <span className="text-dark-900 mr-2">✨</span>
-                  <span className="text-dark-900 font-medium">#1 Service Experts in Sri Lanka</span>
+                  <span className="text-dark-900 font-medium text-sm md:text-base">#1 Service Experts in Sri Lanka</span>
                 </div>
                 
                 <AnimatedHero />
                 
-                <p className="text-xl text-dark-900/80 mb-8 max-w-lg mt-8">
-                  Professional cleaning and maintenance services for homes and businesses across Sri Lanka. Experience the difference of a truly clean space.
+                <p className="text-base md:text-xl text-dark-900/80 mb-6 md:mb-8 mt-4 md:mt-8 max-w-lg">
+                  Professional cleaning and maintenance services for homes and businesses across Sri Lanka.
                 </p>
-                <div className="flex flex-col md:flex-row gap-4 justify-center md:justify-start">
-                  <Link href="/booking" className="btn-secondary inline-flex items-center justify-center text-center">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:justify-start">
+                  <Link href="/booking" className="btn-secondary inline-flex items-center justify-center text-center text-sm md:text-base">
                     Book a Service <FiArrowRight className="ml-2" />
                   </Link>
-                  <Link href="/services" className="bg-white/20 backdrop-blur-sm text-dark-900 font-semibold px-6 py-3 rounded-lg hover:bg-white/30 transition-all inline-flex items-center justify-center text-center">
+                  <Link href="/services" className="bg-white/20 backdrop-blur-sm text-dark-900 font-semibold px-5 md:px-6 py-2.5 md:py-3 rounded-lg hover:bg-white/30 transition-all inline-flex items-center justify-center text-center text-sm md:text-base">
                     View Services
                   </Link>
                 </div>
                 
-                <div className="mt-12 flex flex-wrap items-center justify-center md:justify-start gap-6 md:gap-8">
-                  <div className="text-center md:text-left">
+                <div className="mt-8 md:mt-12 flex flex-wrap items-center justify-center sm:justify-start gap-4 md:gap-8">
+                  <div className="text-center sm:text-left">
                     <AnimatedCounter end={500} duration={3000} />
-                    <div className="text-dark-900/70 text-sm md:text-base">Happy Clients</div>
+                    <div className="text-dark-900/70 text-xs md:text-sm">Happy Clients</div>
                   </div>
-                  <div className="hidden md:block h-12 w-px bg-dark-900/20" />
-                  <div className="text-center md:text-left">
+                  <div className="hidden sm:block h-8 md:h-12 w-px bg-dark-900/20" />
+                  <div className="text-center sm:text-left">
                     <AnimatedCounter end={1000} duration={4000} />
-                    <div className="text-dark-900/70 text-sm md:text-base">Transactions</div>
+                    <div className="text-dark-900/70 text-xs md:text-sm">Transactions</div>
                   </div>
-                  <div className="hidden md:block h-12 w-px bg-dark-900/20" />
-                  <div className="text-center md:text-left">
+                  <div className="hidden sm:block h-8 md:h-12 w-px bg-dark-900/20" />
+                  <div className="text-center sm:text-left">
                     <AnimatedCounter end={24} suffix=":00" duration={2000} />
-                    <div className="text-dark-900/70 text-sm md:text-base">Support</div>
+                    <div className="text-dark-900/70 text-xs md:text-sm">Support</div>
                   </div>
                 </div>
               </div>
               
-              <div className="relative">
+              <div className="relative order-1 lg:order-2 w-full max-w-md lg:max-w-none mx-auto">
                 <ServiceCategorySlider categories={categories} />
               </div>
             </div>

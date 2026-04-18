@@ -84,46 +84,46 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
 
   return (
     <div 
-      className="relative w-full h-full min-h-[300px] sm:min-h-[400px] lg:min-h-[500px]"
+      className="relative w-full h-full min-h-[250px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-[500px] mx-auto"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <div className="absolute -top-8 -left-8 w-full h-full bg-primary-200/30 rounded-3xl" />
+      <div className="absolute -top-4 -left-4 w-full h-full bg-primary-200/30 rounded-2xl md:rounded-3xl" />
       
-      <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl">
+      <div className="relative w-full h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl">
         {categoryImage ? (
           <Image
             src={`${categoryImage}?t=${imageKey}`}
             alt={currentCategory.name}
             fill
             className="object-cover transition-all duration-700 ease-in-out"
-            sizes="(max-width: 1024px) 0px, 50vw"
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 80vw, 60vw"
             priority
             key={imageKey}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-400 flex items-center justify-center">
-            <span className="text-8xl">{currentCategory.icon || '📋'}</span>
+            <span className="text-5xl md:text-7xl lg:text-8xl">{currentCategory.icon || '📋'}</span>
           </div>
         )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        <div className="absolute inset-0 flex flex-col justify-end p-6 lg:p-8">
+        <div className="absolute inset-0 flex flex-col justify-end p-3 md:p-5 lg:p-8">
           <Link 
             href={`/services#${currentCategory.slug}`}
-            className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 lg:p-6 hover:bg-white/30 transition-all duration-300 group"
+            className="bg-white/20 backdrop-blur-sm rounded-xl md:rounded-2xl p-3 md:p-4 lg:p-6 hover:bg-white/30 transition-all duration-300 group"
           >
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl lg:text-4xl">{currentCategory.icon || '📋'}</span>
-              <h3 className="text-xl lg:text-2xl font-bold text-white group-hover:text-primary-300 transition-colors">
+            <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
+              <span className="text-2xl md:text-3xl lg:text-4xl">{currentCategory.icon || '📋'}</span>
+              <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-white group-hover:text-primary-300 transition-colors">
                 {currentCategory.name.toUpperCase()}
               </h3>
             </div>
-            <p className="text-white/80 text-sm lg:text-base">
+            <p className="text-white/80 text-xs md:text-sm lg:text-base">
               {currentCategory.services.length}+ Professional Services
             </p>
-            <p className="text-white/60 text-xs lg:text-sm mt-1">
+            <p className="text-white/60 text-xs md:text-sm mt-0.5 md:mt-1">
               Click to explore →
             </p>
           </Link>
@@ -131,18 +131,18 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
 
         <button
           onClick={prevSlide}
-          className="absolute left-2 lg:left-4 top-1/2 -translate-y-1/2 w-10 h-10 lg:w-12 lg:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-all duration-300"
+          className="absolute left-1 md:left-2 lg:left-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 lg:w-12 md:h-10 lg:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-all duration-300"
           aria-label="Previous slide"
         >
-          <FiChevronLeft className="text-white text-xl lg:text-2xl" />
+          <FiChevronLeft className="text-white text-lg md:text-xl lg:text-2xl" />
         </button>
 
         <button
           onClick={nextSlide}
-          className="absolute right-2 lg:right-4 top-1/2 -translate-y-1/2 w-10 h-10 lg:w-12 lg:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-all duration-300"
+          className="absolute right-1 md:right-2 lg:right-4 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 lg:w-12 md:h-10 lg:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/40 transition-all duration-300"
           aria-label="Next slide"
         >
-          <FiChevronRight className="text-white text-xl lg:text-2xl" />
+          <FiChevronRight className="text-white text-lg md:text-xl lg:text-2xl" />
         </button>
 
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
