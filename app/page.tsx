@@ -13,38 +13,61 @@ import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi
 import { prisma } from '@/lib/prisma'
 
 async function getServicesByCategory() {
+  // Get categories for slider
   const categories = await prisma.category.findMany({
-    include: {
-      services: {
-        where: { isActive: true }
-      }
-    },
+    where: { isActive: true },
     orderBy: { name: 'asc' }
   })
   
-  return categories.map(cat => ({
-    id: cat.id,
-    name: cat.name,
-    slug: cat.slug,
-    description: cat.description || '',
-    icon: cat.icon,
-    image: cat.image,
-    services: cat.services.map(svc => ({
-      id: svc.id,
-      title: svc.name,
-      slug: svc.slug || '',
-      description: svc.description,
-      image: svc.image,
-      name: svc.name,
-      price: svc.price ? Number(svc.price) : null,
-      duration: svc.duration ? Number(svc.duration) : null
-    }))
+  // Get all active services
+  const allServices = await prisma.service.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' }
+  })
+  
+  // Map categories with services included (for HomeServices)
+  const categoriesWithServices = categories.map(cat => {
+    const catServices = allServices
+      .filter(svc => svc.categoryId === cat.id)
+      .map(svc => ({
+        id: svc.id,
+        title: svc.name,
+        slug: svc.slug || '',
+        description: svc.description,
+        image: svc.image,
+        price: svc.price ? Number(svc.price) : null,
+        duration: svc.duration ? Number(svc.duration) : null
+      }))
+    
+    return {
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description || '',
+      icon: cat.icon,
+      image: cat.image,
+      isActive: cat.isActive,
+      services: catServices
+    }
+  }) as any[]
+  
+  // Map all services flat
+  const services = allServices.map(svc => ({
+    id: svc.id,
+    title: svc.name,
+    slug: svc.slug || '',
+    description: svc.description,
+    image: svc.image,
+    name: svc.name,
+    price: svc.price ? Number(svc.price) : null,
+    duration: svc.duration ? Number(svc.duration) : null
   })) as any[]
+  
+  return { categories: categoriesWithServices, services }
 }
 
 export default async function HomePage() {
-  const categories = await getServicesByCategory()
-  const allServices = categories.flatMap(c => c.services)
+  const { categories, services } = await getServicesByCategory()
 
   const features = [
     { icon: FiCheck, title: 'Professional Team', description: 'Trained and vetted cleaning professionals' },
@@ -133,7 +156,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <HomeServices initialCategories={categories} initialServices={allServices} />
+        <HomeServices initialCategories={categories} initialServices={services} />
 
         <section className="py-24 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
