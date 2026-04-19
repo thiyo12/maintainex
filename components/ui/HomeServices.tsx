@@ -126,8 +126,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         {/* Featured Service Card - TaskRabbit Style */}
         {featuredServices.length > 0 && (
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg mb-8 border border-gray-100">
-            <div className="grid lg:grid-cols-2">
-              <div className="relative h-56 lg:h-72">
+            <div className="grid sm:grid-cols-1 md:grid-cols-2">
+              <div className="relative h-48 sm:h-56 md:h-64 lg:h-72">
                 {featuredServices[0]?.image?.startsWith('/uploads/') ? (
                   <img
                     src={getImageUrl(featuredServices[0]?.image)}
@@ -202,14 +202,14 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           </div>
         )}
 
-        {/* Services Grid - 2 Column Mobile */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+        {/* Services Grid - Responsive */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
           {filteredServices.slice(0, 8).map((service) => (
             <div
               key={service.id}
               className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
             >
-              <div className="relative h-32 md:h-40 overflow-hidden">
+              <div className="relative h-28 sm:h-32 md:h-40 lg:h-48 overflow-hidden">
                 {service.image?.startsWith('/uploads/') ? (
                   <img
                     src={getImageUrl(service.image)}

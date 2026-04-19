@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiArrowRight } from 'react-icons/fi'
@@ -20,6 +21,8 @@ interface ServiceCardNewProps {
 }
 
 export default function ServiceCardNew({ service }: ServiceCardNewProps) {
+  const [imgError, setImgError] = useState(false)
+  
   const priceDisplay = service.price 
     ? `Rs. ${service.price.toLocaleString()}+` 
     : 'Contact for quote'
@@ -28,7 +31,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
     ? `${service.duration} min` 
     : null
 
-  const isUploadedImage = service.image?.startsWith('/uploads/')
+  const isUploadedImage = service.image?.startsWith('/uploads/') && !imgError
   const fallbackImage = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'
   const imageSrc = isUploadedImage ? getImageUrl(service.image) : (service.image || fallbackImage)
 
@@ -37,11 +40,12 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
       href={`/services/${service.slug}`}
       className="group block bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
     >
-      <div className="relative h-48 overflow-hidden">
+      <div className="relative h-32 sm:h-40 md:h-48 overflow-hidden">
         {isUploadedImage ? (
           <img
             src={imageSrc}
             alt={service.title}
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
@@ -50,6 +54,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
             alt={service.title}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            onError={() => setImgError(true)}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         )}

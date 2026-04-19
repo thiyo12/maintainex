@@ -53,7 +53,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
 
   return (
     <div 
-      className="relative w-full h-48 sm:h-56 md:h-64 lg:h-80"
+      className="relative w-full aspect-[16/9] sm:aspect-[2/1] md:aspect-[21/9] lg:aspect-[3/1]"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
