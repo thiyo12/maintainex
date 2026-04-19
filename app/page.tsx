@@ -122,6 +122,13 @@ export default async function HomePage() {
                 <p className="text-base md:text-xl text-dark-900/80 mb-6 md:mb-8 mt-4 md:mt-8 max-w-lg">
                   Professional cleaning and maintenance services for homes and businesses across Sri Lanka.
                 </p>
+                
+                {/* Services Slider - Below Hero Text, Above Buttons */}
+                <div className="mb-6 md:mb-8">
+                  <h3 className="text-lg md:text-xl font-bold text-dark-900 mb-3 md:mb-4">Our Services</h3>
+                  <ServiceCategorySlider categories={categories} />
+                </div>
+                
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:justify-start">
                   <Link href="/booking" className="btn-secondary inline-flex items-center justify-center text-center text-sm md:text-base">
                     Book a Service <FiArrowRight className="ml-2" />
@@ -147,10 +154,6 @@ export default async function HomePage() {
                     <div className="text-dark-900/70 text-xs md:text-sm">Support</div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="relative order-1 lg:order-2 w-full max-w-md lg:max-w-none mx-auto">
-                <ServiceCategorySlider categories={categories} />
               </div>
             </div>
           </div>

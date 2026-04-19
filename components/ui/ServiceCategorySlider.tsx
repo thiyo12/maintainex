@@ -6,6 +6,17 @@ import Link from 'next/link'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 
+const defaultCategoryImages = [
+  'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200',
+  'https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=1200', 
+  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200',
+  'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=1200',
+  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=1200',
+  'https://images.unsplash.com/photo-1563453392312-cef7d3fe93d1?w=1200',
+  'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=1200',
+  'https://images.unsplash.com/photo-1585232004423-244e0e62b3a1?w=1200',
+]
+
 interface Category {
   id: string
   name: string
@@ -23,8 +34,12 @@ interface ServiceCategorySliderProps {
 export default function ServiceCategorySlider({ categories }: ServiceCategorySliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
+  const [imgError, setImgError] = useState(false)
 
-  const activeCategories = categories.filter(cat => cat.isActive !== false && cat.isActive !== null)
+  const activeCategories = categories.filter(cat => cat.isActive !== false && cat.isActive !== null).map((cat, idx) => ({
+    ...cat,
+    image: cat.image || defaultCategoryImages[idx % defaultCategoryImages.length]
+  }))
 
   useEffect(() => {
     if (activeCategories.length === 0) return
@@ -49,11 +64,16 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   }
 
   const currentCategory = activeCategories[currentIndex]
-  const categoryImage = currentCategory.image ? getImageUrl(currentCategory.image) : null
+  const getCategoryImage = (cat: typeof currentCategory) => {
+    if (cat.image?.startsWith('http')) return cat.image
+    if (cat.image) return getImageUrl(cat.image)
+    return defaultCategoryImages[0]
+  }
+  const categoryImage = !imgError ? getCategoryImage(currentCategory) : null
 
   return (
     <div 
-      className="relative w-full aspect-[16/9] sm:aspect-[2/1] md:aspect-[21/9] lg:aspect-[3/1]"
+      className="relative w-full h-48 sm:h-64 md:h-80 lg:h-[500px] xl:h-[600px]"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
@@ -67,6 +87,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
             fill
             className="object-cover"
             sizes="100vw"
+            onError={() => setImgError(true)}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
