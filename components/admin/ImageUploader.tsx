@@ -200,10 +200,15 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       if (typeof fileOrUrl === 'string' && fileOrUrl.startsWith('blob:')) {
         const response = await fetch(fileOrUrl)
         const blob = await response.blob()
-        formData.append('file', blob, 'cropped-image.jpg')
+        const fileName = `cropped-${Date.now()}.jpg`
+        const croppedFile = new File([blob], fileName, { type: 'image/jpeg' })
+        formData.append('file', croppedFile)
+        console.log('Uploading cropped blob:', croppedFile.name, croppedFile.size, croppedFile.type)
       } else if (fileOrUrl instanceof File) {
         formData.append('file', fileOrUrl)
+        console.log('Uploading file:', fileOrUrl.name, fileOrUrl.size, fileOrUrl.type)
       } else {
+        console.error('Invalid fileOrUrl type:', fileOrUrl)
         return
       }
 
@@ -214,6 +219,8 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
         headers: { ...authHeaders },
         body: formData
       })
+
+      console.log('Upload response status:', response.status)
 
       if (response.status === 401) {
         toast.error('Session expired. Please login again.')
@@ -227,8 +234,14 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       }
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || errorData.reason || 'Upload failed')
+        const errorText = await response.text()
+        console.log('Upload error response:', errorText)
+        try {
+          const errorData = JSON.parse(errorText)
+          throw new Error(errorData.error || errorData.reason || 'Upload failed')
+        } catch {
+          throw new Error(errorText || 'Upload failed')
+        }
       }
 
       const data = await response.json()
