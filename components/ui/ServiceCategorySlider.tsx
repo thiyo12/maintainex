@@ -85,7 +85,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
             <img
               src={categoryImage}
               alt={currentCategory.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-center"
               loading="lazy"
             />
           ) : (

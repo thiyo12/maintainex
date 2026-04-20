@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { FiUpload, FiX, FiCheck, FiAlertCircle } from 'react-icons/fi'
+import { FiUpload, FiX, FiCheck, FiAlertCircle, FiCrop } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { getAuthHeader } from '@/lib/auth-client'
+import ImageCropper from './ImageCropper'
 
 interface ImageUploaderProps {
   value: string
@@ -18,6 +19,8 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
   const [error, setError] = useState<string | null>(null)
   const [currentValue, setCurrentValue] = useState(value)
   const [imageError, setImageError] = useState(false)
+  const [showCropper, setShowCropper] = useState(false)
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -134,10 +137,21 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     setDragging(false)
   }, [])
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      handleUpload(file)
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+      if (!validTypes.includes(file.type)) {
+        toast.error('Invalid file type. Please upload jpg, png, or webp images.')
+        return
+      }
+      
+      const reader = new FileReader()
+      reader.onload = () => {
+        setCropImageSrc(reader.result as string)
+        setShowCropper(true)
+      }
+      reader.readAsDataURL(file)
     }
     if (inputRef.current) {
       inputRef.current.value = ''
@@ -166,6 +180,89 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     inputRef.current?.click()
   }
 
+  const handleCropComplete = async (croppedUrl: string) => {
+    setShowCropper(false)
+    setCropImageSrc(null)
+    
+    await handleUploadFile(croppedUrl)
+  }
+
+  const handleUploadFile = async (fileOrUrl: File | string) => {
+    setError(null)
+    setImageError(false)
+    
+    setUploading(true)
+    setUploadProgress(0)
+    
+    try {
+      const formData = new FormData()
+      
+      if (typeof fileOrUrl === 'string' && fileOrUrl.startsWith('blob:')) {
+        const response = await fetch(fileOrUrl)
+        const blob = await response.blob()
+        formData.append('file', blob, 'cropped-image.jpg')
+      } else if (fileOrUrl instanceof File) {
+        formData.append('file', fileOrUrl)
+      } else {
+        return
+      }
+
+      const authHeaders = getAuthHeader()
+      
+      const response = await fetch('/api/upload/service', {
+        method: 'POST',
+        headers: { ...authHeaders },
+        body: formData
+      })
+
+      if (response.status === 401) {
+        toast.error('Session expired. Please login again.')
+        window.location.href = '/admin/login'
+        return
+      }
+
+      if (response.status === 403) {
+        toast.error('You do not have permission to upload images.')
+        return
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || errorData.reason || 'Upload failed')
+      }
+
+      const data = await response.json()
+      const newUrl = data.url
+      
+      setCurrentValue(newUrl)
+      onChange(newUrl)
+      toast.success('Image uploaded successfully!')
+      setUploadProgress(100)
+    } catch (err: any) {
+      console.error('Upload error:', err)
+      toast.error(err.message || 'Failed to upload image')
+      setError(err.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (typeof fileOrUrl === 'string' && fileOrUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(fileOrUrl)
+      }
+    }
+  }
+
+  if (showCropper && cropImageSrc) {
+    return (
+      <ImageCropper
+        imageSrc={cropImageSrc}
+        onCropComplete={handleCropComplete}
+        onCancel={() => {
+          setShowCropper(false)
+          setCropImageSrc(null)
+        }}
+      />
+    )
+  }
+
   if (currentValue && !imageError) {
     const displayUrl = getImageUrl(currentValue)
     return (
@@ -183,23 +280,51 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
             Uploaded
           </div>
           {!disabled && (
-            <button
-              type="button"
-              onClick={removeImage}
-              className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-colors"
-            >
-              <FiX className="w-4 h-4" />
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  const displayUrl = getImageUrl(currentValue)
+                  setCropImageSrc(displayUrl)
+                  setShowCropper(true)
+                }}
+                className="absolute top-2 right-2 p-2 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg transition-colors"
+                title="Crop image"
+              >
+                <FiCrop className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={removeImage}
+                className="absolute top-10 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-colors"
+              >
+                <FiX className="w-4 h-4" />
+              </button>
+            </>
           )}
         </div>
         {currentValue.startsWith('/uploads/') && !disabled && (
-          <button
-            type="button"
-            onClick={openFileDialog}
-            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-          >
-            Change Image
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const displayUrl = getImageUrl(currentValue)
+                setCropImageSrc(displayUrl)
+                setShowCropper(true)
+              }}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+            >
+              <FiCrop className="w-3 h-3" />
+              Crop
+            </button>
+            <button
+              type="button"
+              onClick={openFileDialog}
+              className="text-sm text-gray-500 hover:text-gray-700 font-medium"
+            >
+              Change
+            </button>
+          </div>
         )}
       </div>
     )
