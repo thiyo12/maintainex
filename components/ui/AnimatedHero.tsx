@@ -50,7 +50,7 @@ export default function AnimatedHero() {
           </span>
         </span>
       </h1>
-      <p className="text-base md:text-lg text-white/90 mt-2">Easy way to care for your space</p>
+      <p className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-dark-900 mt-2">Easy way to care for your space</p>
       
       {/* Decorative line under the animated text */}
       <div className="flex items-center gap-4 mt-6">
