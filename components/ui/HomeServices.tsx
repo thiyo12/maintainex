@@ -128,12 +128,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         {featuredServices.length > 0 && (
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg mb-8 border border-gray-100">
             <div className="grid sm:grid-cols-1 md:grid-cols-2">
-              <div className="relative h-48 sm:h-56 md:h-64 lg:h-72">
+              <div className="relative h-auto max-h-[60vh] aspect-video">
                 {featuredServices[0]?.image?.startsWith('/uploads/') ? (
                   <img
                     src={getImageUrl(featuredServices[0]?.image)}
                     alt={featuredCategory?.name || 'Featured service'}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                     onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                   />
@@ -144,7 +144,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     fill
                     priority
                     sizes="(max-width: 1024px) 100vw, 50vw"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                     onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                   />
@@ -217,12 +217,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               key={service.id}
               className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-[275ms] hover:scale-105 hover:z-10"
             >
-              <div className="relative h-24 sm:h-32 md:h-40 lg:h-48 overflow-hidden">
+              <div className="relative h-auto max-h-[40vh] aspect-video overflow-hidden">
                 {service.image?.startsWith('/uploads/') ? (
                   <img
                     src={getImageUrl(service.image)}
                     alt={service.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
                   <Image
@@ -230,7 +230,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     alt={service.title}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                   />
                 )}
               </div>

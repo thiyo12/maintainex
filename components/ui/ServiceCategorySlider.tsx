@@ -73,7 +73,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
 
   return (
     <div 
-      className="relative w-full h-48 sm:h-64 md:h-80 lg:h-[500px] xl:h-[600px]"
+      className="relative w-full h-auto max-h-[70vh] aspect-video"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
@@ -85,7 +85,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
             <img
               src={categoryImage}
               alt={currentCategory.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
               loading="lazy"
             />
           ) : (
