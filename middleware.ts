@@ -13,6 +13,14 @@ const securityHeaders = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
 
+const coconutSecurityHeaders = {
+  ...securityHeaders,
+  'X-Robots-Tag': 'noindex, nofollow',
+  'X-Frame-Options': 'DENY',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  'Pragma': 'no-cache',
+}
+
 const RATE_LIMITS = {
   default: { maxRequests: 100, windowSeconds: 60 },
   auth: { maxRequests: 5, windowSeconds: 60 },
@@ -185,6 +193,18 @@ function applyRateLimitHeaders(response: NextResponse, remaining: number, resetA
   return response
 }
 
+function applyCoconutHeaders(response: NextResponse, remaining: number, resetAt: Date): NextResponse {
+  Object.entries(securityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+  Object.entries(coconutSecurityHeaders).forEach(([key, value]) => {
+    response.headers.set(key, value)
+  })
+  response.headers.set('X-RateLimit-Remaining', remaining.toString())
+  response.headers.set('X-RateLimit-Reset', Math.floor(resetAt.getTime() / 1000).toString())
+  return response
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
@@ -197,7 +217,14 @@ export async function middleware(request: NextRequest) {
   
   let response: NextResponse
 
-  if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
+  if (pathname.startsWith('/coconut/login') || pathname.startsWith('/coconut/api/auth')) {
+    response = NextResponse.next()
+    return applySecurityHeaders(
+      applyCoconutHeaders(response, rateLimit.remaining, rateLimit.resetAt)
+    )
+  }
+
+  if (pathname.startsWith('/coconut') && !pathname.startsWith('/coconut/login')) {
     const session = await getSession(request)
     
     if (!session) {
@@ -211,7 +238,7 @@ export async function middleware(request: NextRequest) {
         'MEDIUM'
       )
       
-      const loginUrl = new URL('/admin/login', request.url)
+      const loginUrl = new URL('/coconut/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       
       response = NextResponse.redirect(loginUrl)
@@ -229,7 +256,7 @@ export async function middleware(request: NextRequest) {
         'HIGH'
       )
       
-      response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
+      response = NextResponse.redirect(new URL('/coconut/login?error=unauthorized', request.url))
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
@@ -237,7 +264,7 @@ export async function middleware(request: NextRequest) {
     response.headers.set('X-Admin-Id', session.id)
     response.headers.set('X-Admin-Role', session.role)
     
-    if (pathname.startsWith('/admin/api/') || pathname.startsWith('/api/')) {
+    if (pathname.startsWith('/coconut/api/') || pathname.startsWith('/api/')) {
       response.headers.set('Cache-Control', 'no-store, must-revalidate')
     }
     

@@ -61,7 +61,7 @@ const authOptions: AuthOptions = {
     maxAge: 30 * 24 * 60 * 60
   },
   pages: {
-    signIn: '/admin/login',
+    signIn: '/coconut/login',
   },
   callbacks: {
     async jwt({ token, user }: any) {
