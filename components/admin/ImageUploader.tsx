@@ -180,14 +180,24 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     inputRef.current?.click()
   }
 
-  const handleCropComplete = async (croppedUrl: string) => {
+  const handleCropComplete = async (croppedFile: File) => {
     setShowCropper(false)
     setCropImageSrc(null)
     
-    await handleUploadFile(croppedUrl)
+    await uploadFile(croppedFile)
   }
 
-  const handleUploadFile = async (fileOrUrl: File | string) => {
+  const loadImageAsSrc = async (url: string): Promise<string> => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      return URL.createObjectURL(blob)
+    } catch {
+      return url
+    }
+  }
+
+  const uploadFile = async (file: File) => {
     setError(null)
     setImageError(false)
     
@@ -196,21 +206,8 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     
     try {
       const formData = new FormData()
-      
-      if (typeof fileOrUrl === 'string' && fileOrUrl.startsWith('blob:')) {
-        const response = await fetch(fileOrUrl)
-        const blob = await response.blob()
-        const fileName = `cropped-${Date.now()}.jpg`
-        const croppedFile = new File([blob], fileName, { type: 'image/jpeg' })
-        formData.append('file', croppedFile)
-        console.log('Uploading cropped blob:', croppedFile.name, croppedFile.size, croppedFile.type)
-      } else if (fileOrUrl instanceof File) {
-        formData.append('file', fileOrUrl)
-        console.log('Uploading file:', fileOrUrl.name, fileOrUrl.size, fileOrUrl.type)
-      } else {
-        console.error('Invalid fileOrUrl type:', fileOrUrl)
-        return
-      }
+      formData.append('file', file)
+      console.log('Uploading file:', file.name, file.size, file.type)
 
       const authHeaders = getAuthHeader()
       
@@ -257,9 +254,6 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       setError(err.message || 'Upload failed')
     } finally {
       setUploading(false)
-      if (typeof fileOrUrl === 'string' && fileOrUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(fileOrUrl)
-      }
     }
   }
 
@@ -296,9 +290,10 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
             <>
               <button
                 type="button"
-                onClick={() => {
-                  const displayUrl = getImageUrl(currentValue)
-                  setCropImageSrc(displayUrl)
+                onClick={async () => {
+                  const url = getImageUrl(currentValue)
+                  const src = await loadImageAsSrc(url)
+                  setCropImageSrc(src)
                   setShowCropper(true)
                 }}
                 className="absolute top-2 right-2 p-2 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg transition-colors"
@@ -320,9 +315,10 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => {
-                const displayUrl = getImageUrl(currentValue)
-                setCropImageSrc(displayUrl)
+              onClick={async () => {
+                const url = getImageUrl(currentValue)
+                const src = await loadImageAsSrc(url)
+                setCropImageSrc(src)
                 setShowCropper(true)
               }}
               className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"

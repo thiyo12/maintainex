@@ -6,7 +6,7 @@ import { FiX, FiCheck, FiRotateCw } from 'react-icons/fi'
 
 interface ImageCropperProps {
   imageSrc: string
-  onCropComplete: (croppedUrl: string) => void
+  onCropComplete: (file: File) => void
   onCancel: () => void
 }
 
@@ -37,7 +37,10 @@ export default function ImageCropper({ imageSrc, onCropComplete, onCancel }: Ima
 
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      if (!ctx) return
+      if (!ctx) {
+        setCropping(false)
+        return
+      }
 
       const rotRad = (rotation * Math.PI) / 180
       const sin = Math.abs(Math.sin(rotRad))
@@ -66,9 +69,12 @@ export default function ImageCropper({ imageSrc, onCropComplete, onCancel }: Ima
       ctx.putImageData(data, 0, 0)
 
       canvas.toBlob((blob) => {
-        if (!blob) return
-        const url = URL.createObjectURL(blob)
-        onCropComplete(url)
+        if (!blob) {
+          setCropping(false)
+          return
+        }
+        const file = new File([blob], `cropped-${Date.now()}.jpg`, { type: 'image/jpeg' })
+        onCropComplete(file)
       }, 'image/jpeg', 0.95)
     } catch (error) {
       console.error('Error creating cropped image:', error)
