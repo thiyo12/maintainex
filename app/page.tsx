@@ -123,8 +123,8 @@ export default async function HomePage() {
                   Professional cleaning and maintenance services for homes and businesses across Sri Lanka.
                 </p>
                 
-                {/* Services Slider - Below Hero Text, Above Buttons */}
-                <div className="mb-6 md:mb-8">
+                {/* Mobile: Services Slider - Below Hero Text, Above Buttons */}
+                <div className="lg:hidden mb-6 md:mb-8">
                   <h3 className="text-lg md:text-xl font-bold text-dark-900 mb-3 md:mb-4">Our Services</h3>
                   <ServiceCategorySlider categories={categories} />
                 </div>
