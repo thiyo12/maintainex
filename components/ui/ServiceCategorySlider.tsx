@@ -35,7 +35,6 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [imgError, setImgError] = useState(false)
-  const [imgLoading, setImgLoading] = useState(true)
 
   const activeCategories = categories.filter(cat => cat.isActive !== false && cat.isActive !== null).map((cat, idx) => ({
     ...cat,
@@ -52,9 +51,9 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     return () => clearInterval(interval)
   }, [activeCategories.length])
 
-  const nextSlide = () => { setImgLoading(true); setImgError(false); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
-  const prevSlide = () => { setImgLoading(true); setImgError(false); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
-  const goToSlide = (index: number) => { setImgLoading(true); setImgError(false); setCurrentIndex(index) }
+  const nextSlide = () => { setImgError(false); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
+  const prevSlide = () => { setImgError(false); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
+  const goToSlide = (index: number) => { setImgError(false); setCurrentIndex(index) }
 
   if (activeCategories.length === 0) {
     return (
@@ -81,45 +80,30 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
       <div className="absolute -top-2 -left-2 w-full h-full bg-primary-200/30 rounded-2xl" />
       
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-        {imgLoading && (
-          <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-        {categoryImage ? (
-          <Image
-            key={currentIndex}
-            src={categoryImage}
-            alt={currentCategory.name}
-            fill
-            priority
-            className={`object-cover transition-opacity duration-[275ms] ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
-            sizes="100vw"
-            onLoad={() => setImgLoading(false)}
-            onError={() => { setImgError(true); setImgLoading(false); }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
-            <span className="text-5xl sm:text-6xl md:text-7xl">{currentCategory.icon || '📋'}</span>
-          </div>
-        )}
+        <Link href={`/services#${currentCategory.slug}`} className="block w-full h-full">
+          {categoryImage ? (
+            <img
+              src={categoryImage}
+              alt={currentCategory.name}
+              className="w-full h-full object-cover"
+              loading="eager"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
+              <span className="text-5xl sm:text-6xl md:text-7xl">{currentCategory.icon || '📋'}</span>
+            </div>
+          )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent transition-opacity duration-[275ms]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6">
-          <Link 
-            href={`/services#${currentCategory.slug}`}
-            className="bg-white/20 backdrop-blur-sm rounded-xl p-3 md:p-4 hover:bg-white/30 transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-2xl md:text-3xl">{currentCategory.icon || '📋'}</span>
+          <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 md:p-4">
               <h3 className="text-lg md:text-xl font-bold text-white">
                 {currentCategory.name?.toUpperCase()}
               </h3>
             </div>
-            <p className="text-white/70 text-sm">Click to explore</p>
-          </Link>
-        </div>
+          </div>
+        </Link>
 
         {/* Navigation Arrows */}
         <button
