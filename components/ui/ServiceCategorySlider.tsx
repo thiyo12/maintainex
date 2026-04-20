@@ -82,10 +82,11 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
         {categoryImage ? (
           <Image
+            key={currentIndex}
             src={categoryImage}
             alt={currentCategory.name}
             fill
-            className="object-cover"
+            className="object-cover transition-opacity duration-[275ms]"
             sizes="100vw"
             onError={() => setImgError(true)}
           />
@@ -95,7 +96,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent transition-opacity duration-[275ms]" />
 
         <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6">
           <Link 
@@ -115,14 +116,14 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
         {/* Navigation Arrows */}
         <button
           onClick={prevSlide}
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center"
+          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40"
         >
           <FiChevronLeft className="text-white" />
         </button>
         
         <button
           onClick={nextSlide}
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center"
+          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40"
         >
           <FiChevronRight className="text-white" />
         </button>
@@ -133,8 +134,8 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
             <button
               key={index}
               onClick={() => goToSlide(index)}
-              className={`w-2 h-2 rounded-full transition-all ${
-                index === currentIndex ? 'bg-white w-5' : 'bg-white/50'
+              className={`h-2 rounded-full transition-all duration-[425ms] ${
+                index === currentIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
               }`}
             />
           ))}

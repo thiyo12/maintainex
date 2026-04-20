@@ -203,13 +203,13 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         )}
 
         {/* Services Grid - Responsive */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 lg:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
           {filteredServices.slice(0, 8).map((service) => (
             <div
               key={service.id}
-              className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
+              className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-[275ms] hover:scale-105 hover:z-10"
             >
-              <div className="relative h-28 sm:h-32 md:h-40 lg:h-48 overflow-hidden">
+              <div className="relative h-24 sm:h-32 md:h-40 lg:h-48 overflow-hidden">
                 {service.image?.startsWith('/uploads/') ? (
                   <img
                     src={getImageUrl(service.image)}
