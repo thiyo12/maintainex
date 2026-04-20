@@ -34,7 +34,7 @@ export default function AdminLogin() {
       if (data.success && data.user) {
         setStoredUser(data.user)
         toast.success('Login successful!')
-        window.location.href = '/admin/dashboard'
+        window.location.href = '/coconut/dashboard'
       }
     } catch (error) {
       toast.error('Something went wrong')
