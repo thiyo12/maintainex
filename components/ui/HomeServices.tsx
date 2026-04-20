@@ -133,7 +133,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   <img
                     src={getImageUrl(featuredServices[0]?.image)}
                     alt={featuredCategory?.name || 'Featured service'}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
                     onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                     onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                   />
@@ -144,7 +144,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     fill
                     priority
                     sizes="(max-width: 1024px) 100vw, 50vw"
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
                     onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                     onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                   />
@@ -222,7 +222,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   <img
                     src={getImageUrl(service.image)}
                     alt={service.title}
-                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
                   <Image
@@ -230,7 +230,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     alt={service.title}
                     fill
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 )}
               </div>

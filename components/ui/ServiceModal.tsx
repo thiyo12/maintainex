@@ -80,7 +80,7 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
               <img
                 src={imageSrc}
                 alt={service.title}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
               />
             ) : (
               <Image
@@ -88,7 +88,7 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
                 alt={service.title}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />

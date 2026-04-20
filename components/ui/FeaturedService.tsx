@@ -49,7 +49,7 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
             <img
               src={imageSrc}
               alt={category.name}
-              className="w-full h-full object-contain"
+              className="w-full h-full object-cover"
             />
           ) : (
             <Image
@@ -58,7 +58,7 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
               fill
               priority
               sizes="(max-width: 1024px) 100vw, 50vw"
-              className="object-contain"
+              className="object-cover"
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/30" />

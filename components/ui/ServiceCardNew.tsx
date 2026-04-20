@@ -46,7 +46,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
             src={imageSrc}
             alt={service.title}
             onError={() => setImgError(true)}
-            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
           <Image
@@ -55,7 +55,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             onError={() => setImgError(true)}
-            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
