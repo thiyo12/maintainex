@@ -35,6 +35,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [imgLoading, setImgLoading] = useState(true)
 
   const activeCategories = categories.filter(cat => cat.isActive !== false && cat.isActive !== null).map((cat, idx) => ({
     ...cat,
@@ -51,9 +52,9 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     return () => clearInterval(interval)
   }, [activeCategories.length])
 
-  const nextSlide = () => setCurrentIndex(prev => (prev + 1) % activeCategories.length)
-  const prevSlide = () => setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length)
-  const goToSlide = (index: number) => setCurrentIndex(index)
+  const nextSlide = () => { setImgLoading(true); setImgError(false); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
+  const prevSlide = () => { setImgLoading(true); setImgError(false); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
+  const goToSlide = (index: number) => { setImgLoading(true); setImgError(false); setCurrentIndex(index) }
 
   if (activeCategories.length === 0) {
     return (
@@ -80,15 +81,22 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
       <div className="absolute -top-2 -left-2 w-full h-full bg-primary-200/30 rounded-2xl" />
       
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
+        {imgLoading && (
+          <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+            <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
         {categoryImage ? (
           <Image
             key={currentIndex}
             src={categoryImage}
             alt={currentCategory.name}
             fill
-            className="object-cover transition-opacity duration-[275ms]"
+            priority
+            className={`object-cover transition-opacity duration-[275ms] ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
             sizes="100vw"
-            onError={() => setImgError(true)}
+            onLoad={() => setImgLoading(false)}
+            onError={() => { setImgError(true); setImgLoading(false); }}
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">

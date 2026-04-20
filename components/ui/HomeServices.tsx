@@ -56,6 +56,7 @@ const categoryIcons: Record<string, string> = {
 
 export default function HomeServices({ initialCategories, initialServices }: HomeServicesProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [imgLoading, setImgLoading] = useState<Record<string, boolean>>({})
   const categories = initialCategories
   const allServices = initialServices
 
@@ -133,6 +134,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     src={getImageUrl(featuredServices[0]?.image)}
                     alt={featuredCategory?.name || 'Featured service'}
                     className="w-full h-full object-cover"
+                    onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
+                    onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                   />
                 ) : (
                   <Image
@@ -142,7 +145,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     priority
                     sizes="(max-width: 1024px) 100vw, 50vw"
                     className="w-full h-full object-cover"
+                    onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
+                    onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                   />
+                )}
+                {imgLoading.featured !== false && (
+                  <div className="absolute inset-0 bg-gray-200 animate-pulse" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-4 left-4">
