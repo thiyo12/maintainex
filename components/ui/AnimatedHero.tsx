@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react'
 
 const phrases = [
-  "NOW IT'S ABOUT VERIFIED PROFESSIONALS.",
-  "NO MORE GUESSING. ONLY TRUSTED SERVICE.",
-  "SKILLS > CONNECTIONS.",
-  "REAL WORK. REAL REVIEWS. REAL TRUST.",
-  "BOOK BASED ON QUALITY, NOT CONTACTS.",
-  "FROM 'I KNOW A GUY' → TO 'I TRUST THE SYSTEM'",
-  "SMART HIRING STARTS HERE.",
-  "BUILT FOR RELIABILITY.",
+  "PROFESSIONAL CLEANING SERVICES",
+  "TRUSTED BY THOUSANDS",
+  "BOOK IN SECONDS",
+  "QUALITY GUARANTEED",
+  "24/7 SUPPORT AVAILABLE",
+  "SERVING ALL OF SRI LANKA",
+  "SATISFACTION ASSURED",
+  "EXPERTS YOU CAN TRUST",
 ]
 
 export default function AnimatedHero() {
@@ -38,29 +38,25 @@ export default function AnimatedHero() {
   return (
     <div className="text-left">
       <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight mb-4">
-        <span className="text-dark-900">The </span>
         <span className="relative inline-block min-h-[1.2em] overflow-hidden">
           <span 
-            className={`transition-all duration-500 ease-in-out ${
+            className={`transition-all duration-500 ease-in-out text-white ${
               isVisible 
                 ? 'opacity-100 translate-y-0' 
                 : 'opacity-0 translate-y-full'
             } ${isAnimating ? 'duration-500' : ''}`}
-            style={{
-              color: '#ffffff'
-            }}
           >
             {phrases[currentPhraseIndex]}
           </span>
         </span>
-        <span className="text-dark-900"> Era is officially over.</span>
       </h1>
+      <p className="text-lg md:text-xl text-white/90 mt-2">Easy way to care for your space</p>
       
       {/* Decorative line under the animated text */}
       <div className="flex items-center gap-4 mt-6">
-        <div className="w-16 md:w-24 h-0.5 bg-gradient-to-r from-dark-900/50 to-transparent" />
+        <div className="w-16 md:w-24 h-0.5 bg-gradient-to-r from-white/50 to-transparent" />
         <span 
-          className="text-dark-900 font-semibold tracking-widest uppercase text-sm md:text-base"
+          className="text-white font-semibold tracking-widest uppercase text-sm md:text-base"
         >
           Maintainex
         </span>
