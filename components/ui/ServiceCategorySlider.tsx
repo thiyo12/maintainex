@@ -7,14 +7,14 @@ import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 
 const defaultCategoryImages = [
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2322c55e" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3ECleaning Service%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2310b981" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EHome Cleaning%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%230d9488" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EOffice Cleaning%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2314b8a6" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EDeep Cleaning%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2306b6d4" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3ECarpet Cleaning%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%233b82f6" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EWindow Cleaning%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%236365f1" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EFurniture Cleaning%3C/text%3E%3C/svg%3E',
-  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%238b5cf6" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EMove In/Out%3C/text%3E%3C/svg%3E',
+  'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&h=675&fit=crop',
+  'https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=1200&h=675&fit=crop', 
+  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=675&fit=crop',
+  'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=1200&h=675&fit=crop',
+  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=1200&h=675&fit=crop',
+  'https://images.unsplash.com/photo-1563453392312-cef7d3fe93d1?w=1200&h=675&fit=crop',
+  'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=1200&h=675&fit=crop',
+  'https://images.unsplash.com/photo-1585232004423-244e0e62b3a1?w=1200&h=675&fit=crop',
 ]
 
 interface Category {
@@ -34,7 +34,6 @@ interface ServiceCategorySliderProps {
 export default function ServiceCategorySlider({ categories }: ServiceCategorySliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
-  const [imgError, setImgError] = useState(false)
 
   const activeCategories = categories.map((cat, idx) => ({
     ...cat,
@@ -54,13 +53,16 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     return () => clearInterval(interval)
   }, [activeCategories.length, isHovering])
 
-  const nextSlide = () => { setImgError(false); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
-  const prevSlide = () => { setImgError(false); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
-  const goToSlide = (index: number) => { setImgError(false); setCurrentIndex(index) }
-  const handleImageError = () => { setImgError(true) }
+  const nextSlide = () => { setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
+  const prevSlide = () => { setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
+  const goToSlide = (index: number) => { 
+    if (index >= 0 && index < activeCategories.length) {
+      setCurrentIndex(index) 
+    }
+  }
 
   // Ensure currentIndex is valid
-  const safeCurrentIndex = activeCategories.length > 0 ? currentIndex % activeCategories.length : 0
+  const safeCurrentIndex = activeCategories.length > 0 && currentIndex >= 0 ? currentIndex % activeCategories.length : 0
 
   if (activeCategories.length === 0) {
 return (
@@ -74,11 +76,11 @@ return (
   const getCategoryImage = (cat: typeof currentCategory, idx: number) => {
     if (cat.image) {
       if (cat.image.startsWith('http') || cat.image.startsWith('data:')) return cat.image
-      return getImageUrl(cat.image)
+      if (cat.image.startsWith('/uploads/') || cat.image.startsWith('/')) return getImageUrl(cat.image)
     }
     return defaultCategoryImages[idx % defaultCategoryImages.length]
   }
-  const categoryImage = !imgError ? getCategoryImage(currentCategory, safeCurrentIndex) : null
+  const categoryImage = getCategoryImage(currentCategory, safeCurrentIndex)
 
   return (
     <div 
@@ -89,14 +91,13 @@ return (
       <div className="absolute -top-2 -left-2 w-full h-full bg-primary-200/30 rounded-2xl" />
       
       <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-        <Link href={`/services#${currentCategory.slug}`} className="block w-full h-full">
+        <Link href={`/services?category=${currentCategory.slug}`} className="block w-full h-full">
           {categoryImage ? (
             <img
               src={categoryImage}
-              alt={currentCategory.name}
+              alt={currentCategory.name || 'Service Category'}
               className="w-full h-full object-cover object-center"
               loading="lazy"
-              onError={handleImageError}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
