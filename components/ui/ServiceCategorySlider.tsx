@@ -7,14 +7,14 @@ import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 
 const defaultCategoryImages = [
-  'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200',
-  'https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=1200', 
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200',
-  'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=1200',
-  'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=1200',
-  'https://images.unsplash.com/photo-1563453392312-cef7d3fe93d1?w=1200',
-  'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=1200',
-  'https://images.unsplash.com/photo-1585232004423-244e0e62b3a1?w=1200',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2322c55e" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3ECleaning Service%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2310b981" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EHome Cleaning%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%230d9488" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EOffice Cleaning%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2314b8a6" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EDeep Cleaning%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%2306b6d4" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3ECarpet Cleaning%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%233b82f6" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EWindow Cleaning%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%236365f1" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EFurniture Cleaning%3C/text%3E%3C/svg%3E',
+  'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675"%3E%3Crect fill="%238b5cf6" width="1200" height="675"/%3E%3Ctext fill="white" font-family="sans-serif" font-size="48" x="50%25" y="50%25" text-anchor="middle"%3EMove In/Out%3C/text%3E%3C/svg%3E',
 ]
 
 interface Category {
@@ -36,7 +36,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const [isHovering, setIsHovering] = useState(false)
   const [imgError, setImgError] = useState(false)
 
-  const activeCategories = categories.filter(cat => cat.isActive !== false && cat.isActive !== null).map((cat, idx) => ({
+  const activeCategories = categories.map((cat, idx) => ({
     ...cat,
     image: cat.image || defaultCategoryImages[idx % defaultCategoryImages.length]
   }))
@@ -63,20 +63,22 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const safeCurrentIndex = activeCategories.length > 0 ? currentIndex % activeCategories.length : 0
 
   if (activeCategories.length === 0) {
-    return (
-      <div className="w-full h-full min-h-[200px] aspect-video flex items-center justify-center bg-gradient-to-br from-primary-300 to-primary-500 rounded-2xl">
+return (
+    <div className="w-full min-h-[200px] aspect-video bg-gradient-to-br from-primary-300 to-primary-500 rounded-2xl flex items-center justify-center">
         <p className="text-white font-medium">Loading services...</p>
       </div>
     )
   }
 
   const currentCategory = activeCategories[safeCurrentIndex]
-  const getCategoryImage = (cat: typeof currentCategory) => {
-    if (cat.image?.startsWith('http')) return cat.image
-    if (cat.image) return getImageUrl(cat.image)
-    return defaultCategoryImages[0]
+  const getCategoryImage = (cat: typeof currentCategory, idx: number) => {
+    if (cat.image) {
+      if (cat.image.startsWith('http') || cat.image.startsWith('data:')) return cat.image
+      return getImageUrl(cat.image)
+    }
+    return defaultCategoryImages[idx % defaultCategoryImages.length]
   }
-  const categoryImage = !imgError ? getCategoryImage(currentCategory) : null
+  const categoryImage = !imgError ? getCategoryImage(currentCategory, safeCurrentIndex) : null
 
   return (
     <div 
