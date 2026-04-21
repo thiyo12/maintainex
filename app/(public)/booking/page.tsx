@@ -153,13 +153,9 @@ function BookingContent() {
   const canProceed = () => {
     switch (step) {
       case 1:
-        const step1Valid = formData.name.trim().length >= 2 && formData.phone.trim().length >= 10
-        console.log('Step 1 check:', { name: formData.name, phone: formData.phone, valid: step1Valid })
-        return step1Valid
+        return formData.name.trim().length >= 1 && formData.phone.trim().length >= 9
       case 2:
-        const step2Valid = !!formData.serviceId && !!formData.district
-        console.log('Step 2 check:', { serviceId: formData.serviceId, district: formData.district, valid: step2Valid })
-        return step2Valid
+        return !!formData.district
       case 3:
         return !!formData.date && !!formData.time
       default:
@@ -168,10 +164,19 @@ function BookingContent() {
   }
 
   const handleNext = () => {
-    console.log('handleNext called, current step:', step, 'canProceed:', canProceed())
     if (canProceed()) {
       setStep(step + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      if (step === 1 && formData.name.trim().length < 1) {
+        alert('Please enter your name')
+      } else if (step === 1 && formData.phone.trim().length < 9) {
+        alert('Please enter a valid phone number (at least 9 digits)')
+      } else if (step === 2 && !formData.district) {
+        alert('Please select a district')
+      } else if (step === 3 && (!formData.date || !formData.time)) {
+        alert('Please select date and time')
+      }
     }
   }
 

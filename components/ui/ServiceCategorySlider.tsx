@@ -41,14 +41,13 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     image: cat.image || defaultCategoryImages[idx % defaultCategoryImages.length]
   }))
 
-  console.log('Slider categories:', activeCategories.length, 'current:', currentIndex)
-
   useEffect(() => {
-    if (activeCategories.length === 0) return
+    const length = activeCategories.length
+    if (length === 0) return
 
     const interval = setInterval(() => {
       if (!isHovering) {
-        setCurrentIndex(prev => (prev + 1) % activeCategories.length)
+        setCurrentIndex(prev => (prev + 1) % length)
       }
     }, 3000)
 
@@ -60,15 +59,18 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
   const goToSlide = (index: number) => { setImgError(false); setCurrentIndex(index) }
   const handleImageError = () => { setImgError(true) }
 
+  // Ensure currentIndex is valid
+  const safeCurrentIndex = activeCategories.length > 0 ? currentIndex % activeCategories.length : 0
+
   if (activeCategories.length === 0) {
     return (
-      <div className="w-full h-64 flex items-center justify-center bg-gray-100 rounded-2xl">
-        <p className="text-gray-500">No categories available</p>
+      <div className="w-full h-full min-h-[200px] aspect-video flex items-center justify-center bg-gradient-to-br from-primary-300 to-primary-500 rounded-2xl">
+        <p className="text-white font-medium">Loading services...</p>
       </div>
     )
   }
 
-  const currentCategory = activeCategories[currentIndex]
+  const currentCategory = activeCategories[safeCurrentIndex]
   const getCategoryImage = (cat: typeof currentCategory) => {
     if (cat.image?.startsWith('http')) return cat.image
     if (cat.image) return getImageUrl(cat.image)
@@ -133,7 +135,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
               key={index}
               onClick={() => goToSlide(index)}
               className={`h-2 rounded-full transition-all duration-[425ms] ${
-                index === currentIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
+                index === safeCurrentIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
               }`}
             />
           ))}
