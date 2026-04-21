@@ -73,8 +73,7 @@ function isValidPhone(phone: string): boolean {
 }
 
 function isValidName(name: string): boolean {
-  const englishOnly = /^[a-zA-Z\s]+$/
-  return englishOnly.test(name) && name.length >= 2 && name.length <= 100
+  return name.length >= 2 && name.length <= 100
 }
 
 export async function POST(request: NextRequest) {
@@ -94,7 +93,7 @@ export async function POST(request: NextRequest) {
     address = sanitizeString(address)
 
     if (!isValidName(name)) {
-      return NextResponse.json({ error: 'Please enter a valid name (English letters only, 2-100 characters)' }, { status: 400 })
+      return NextResponse.json({ error: 'Please enter your name (2-100 characters)' }, { status: 400 })
     }
 
     if (!isValidPhone(phone)) {

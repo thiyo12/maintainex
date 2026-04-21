@@ -41,19 +41,24 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     image: cat.image || defaultCategoryImages[idx % defaultCategoryImages.length]
   }))
 
+  console.log('Slider categories:', activeCategories.length, 'current:', currentIndex)
+
   useEffect(() => {
     if (activeCategories.length === 0) return
 
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % activeCategories.length)
+      if (!isHovering) {
+        setCurrentIndex(prev => (prev + 1) % activeCategories.length)
+      }
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [activeCategories.length])
+  }, [activeCategories.length, isHovering])
 
   const nextSlide = () => { setImgError(false); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
   const prevSlide = () => { setImgError(false); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
   const goToSlide = (index: number) => { setImgError(false); setCurrentIndex(index) }
+  const handleImageError = () => { setImgError(true) }
 
   if (activeCategories.length === 0) {
     return (
@@ -87,6 +92,7 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
               alt={currentCategory.name}
               className="w-full h-full object-cover object-center"
               loading="lazy"
+              onError={handleImageError}
             />
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
