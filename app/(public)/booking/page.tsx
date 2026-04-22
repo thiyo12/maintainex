@@ -180,10 +180,11 @@ function BookingContent() {
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     setSubmitting(true)
     setError('')
-    console.log('Submitting booking formData:', formData)
+    console.log('Submitting booking...', formData)
 
     try {
       const res = await fetch('/api/bookings', {
@@ -192,13 +193,12 @@ function BookingContent() {
         body: JSON.stringify(formData)
       })
 
-      console.log('Submit response status:', res.status)
+      console.log('Response status:', res.status)
 
       if (res.ok) {
         const data = await res.json()
-        console.log('Submit response data:', data)
+        console.log('Response data:', data)
         
-        // Save booking data to localStorage
         if (data.booking) {
           const bookingData = {
             id: data.booking.id,
@@ -219,28 +219,26 @@ function BookingContent() {
             createdAt: data.booking.createdAt
           }
           localStorage.setItem('lastBookingConfirmation', JSON.stringify(bookingData))
-          
-          // Clear selectedService from localStorage after booking
           localStorage.removeItem('selectedService')
           
-          // Redirect to confirmation page with booking ID
-          router.push(`/booking/confirmation?id=${data.booking.id}`)
+          // Use window.location for mobile compatibility
+          const confirmUrl = `/booking/confirmation?id=${data.booking.id}`
+          if (typeof window !== 'undefined') {
+            window.location.href = confirmUrl
+          } else {
+            router.push(confirmUrl)
+          }
         } else {
           setSuccess(true)
         }
       } else {
         const errorText = await res.text()
-        console.log('Submit error:', errorText)
-        try {
-          const data = JSON.parse(errorText)
-          setError(data.error || 'Failed to submit booking')
-        } catch {
-          setError('Failed to submit. Please use WhatsApp to book.')
-        }
+        console.log('Error response:', errorText)
+        setError(errorText || 'Failed to submit booking')
       }
     } catch (err: any) {
-      console.error('Submit catch error:', err)
-      setError('Booking failed. Please use WhatsApp button to book.')
+      console.error('Submit error:', err)
+      setError('Failed to submit. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -708,24 +706,13 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 <FiChevronRight />
               </button>
             ) : (
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="w-full flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
-                >
-                  {submitting ? '⏳ Submitting...' : '✅ Submit Booking'}
-                </button>
-                
-                {/* WhatsApp fallback for mobile */}
-                <a
-                  href={generateWhatsAppLink()}
-                  className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all"
-                >
-                  💬 Book via WhatsApp
-                </a>
-              </div>
+              <button
+                type="button"
+                disabled={submitting}
+                className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
+              >
+                {submitting ? '⏳ Submitting...' : '✅ Submit Booking'}
+              </button>
             )}
           </div>
 
