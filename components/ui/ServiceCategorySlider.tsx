@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Image from 'next/image'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
@@ -34,14 +33,31 @@ interface ServiceCategorySliderProps {
 export default function ServiceCategorySlider({ categories }: ServiceCategorySliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const activeCategories = categories.map((cat, idx) => ({
     ...cat,
     image: cat.image || defaultCategoryImages[idx % defaultCategoryImages.length]
   }))
 
+  // Ensure we have categories - use default placeholder if none
+  const displayCategories = activeCategories.length > 0 ? activeCategories : [{
+    id: '1',
+    name: 'Cleaning Services',
+    slug: 'cleaning',
+    icon: '🧹',
+    image: defaultCategoryImages[0],
+    description: 'Professional cleaning services',
+    isActive: true
+  }]
+
   useEffect(() => {
-    const length = activeCategories.length
+    if (!mounted) return
+    const length = displayCategories.length
     if (length === 0) return
 
     const interval = setInterval(() => {
@@ -51,29 +67,28 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [activeCategories.length, isHovering])
+  }, [displayCategories.length, isHovering, mounted])
 
-  const nextSlide = (e: React.MouseEvent) => { e.preventDefault(); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
-  const prevSlide = (e: React.MouseEvent) => { e.preventDefault(); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
-  const goToSlide = (e: React.MouseEvent, index: number) => { 
+  const nextSlide = useCallback((e?: React.MouseEvent) => { 
+    if (e) { e.preventDefault(); e.stopPropagation() }
+    setCurrentIndex(prev => (prev + 1) % displayCategories.length) 
+  }, [displayCategories.length])
+
+  const prevSlide = useCallback((e?: React.MouseEvent) => { 
+    if (e) { e.preventDefault(); e.stopPropagation() }
+    setCurrentIndex(prev => (prev - 1 + displayCategories.length) % displayCategories.length) 
+  }, [displayCategories.length])
+
+  const goToSlide = useCallback((e: React.MouseEvent, index: number) => { 
     e.preventDefault()
-    if (index >= 0 && index < activeCategories.length) {
+    e.stopPropagation()
+    if (index >= 0 && index < displayCategories.length) {
       setCurrentIndex(index) 
     }
-  }
+  }, [displayCategories.length])
 
-  // Ensure currentIndex is valid
-  const safeCurrentIndex = activeCategories.length > 0 && currentIndex >= 0 ? currentIndex % activeCategories.length : 0
-
-  if (activeCategories.length === 0) {
-return (
-    <div className="w-full min-h-[200px] aspect-video bg-gradient-to-br from-primary-300 to-primary-500 rounded-2xl flex items-center justify-center">
-        <p className="text-white font-medium">Loading services...</p>
-      </div>
-    )
-  }
-
-  const currentCategory = activeCategories[safeCurrentIndex]
+  const safeDisplayIndex = Math.min(currentIndex, displayCategories.length - 1)
+  const currentCategory = displayCategories[safeDisplayIndex]
   const getCategoryImage = (cat: typeof currentCategory, idx: number) => {
     if (cat.image) {
       if (cat.image.startsWith('http') || cat.image.startsWith('data:')) return cat.image
@@ -81,7 +96,7 @@ return (
     }
     return defaultCategoryImages[idx % defaultCategoryImages.length]
   }
-  const categoryImage = getCategoryImage(currentCategory, safeCurrentIndex)
+  const categoryImage = getCategoryImage(currentCategory, safeDisplayIndex)
 
   return (
     <div 
@@ -114,29 +129,32 @@ return (
         </div>
       </Link>
 
-      {/* Navigation Arrows - outside Link so they work on mobile */}
+      {/* Navigation Arrows */}
       <button
-        onClick={prevSlide}
-        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40 z-20"
+        onClick={() => prevSlide()}
+        aria-label="Previous slide"
+        className="absolute left-2 top-1/2 -translate-y-1/2 w-12 h-12 md:w-10 md:h-10 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center transition-all z-20"
       >
-        <FiChevronLeft className="text-white" />
+        <FiChevronLeft className="text-white w-6 h-6" />
       </button>
       
       <button
-        onClick={nextSlide}
-        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40 z-20"
+        onClick={() => nextSlide()}
+        aria-label="Next slide"
+        className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 md:w-10 md:h-10 bg-black/30 hover:bg-black/50 rounded-full flex items-center justify-center transition-all z-20"
       >
-        <FiChevronRight className="text-white" />
+        <FiChevronRight className="text-white w-6 h-6" />
       </button>
 
 {/* Dots */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
-        {activeCategories.map((_, index) => (
+        {displayCategories.map((_, index) => (
           <button
             key={index}
             onClick={(e) => goToSlide(e, index)}
+            aria-label={`Go to slide ${index + 1}`}
             className={`h-2 rounded-full transition-all duration-[425ms] ${
-              index === safeCurrentIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
+              index === safeDisplayIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
             }`}
           />
         ))}
