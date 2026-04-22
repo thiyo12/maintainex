@@ -683,7 +683,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex gap-4 mt-6">
+          <div className="flex flex-col sm:flex-row gap-3 mt-6">
             {step > 1 && (
               <button
                 onClick={() => setStep(step - 1)}
@@ -710,9 +710,13 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             ) : (
               <button
                 type="button"
-                onClick={handleSubmit}
+                onClick={(e) => {
+                  console.log('Button clicked!')
+                  handleSubmit()
+                }}
                 disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50 active:bg-primary-700"
+                style={{ touchAction: 'manipulation' }}
               >
                 {submitting ? '⏳ Submitting...' : '✅ Submit Booking'}
               </button>
@@ -720,8 +724,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
           </div>
 
           {/* Help Text */}
-          <div className="text-center mt-6 text-gray-500 text-sm">
-            Need help? <a href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`} className="text-primary-600 font-medium">Call {WHATSAPP_NUMBER.replace('94', '0')}</a>
+          <div className="text-center mt-6 text-gray-500 text-sm space-y-2">
+            <p>Need help? <a href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`} className="text-primary-600 font-medium">Call {WHATSAPP_NUMBER.replace('94', '0')}</a></p>
+            <p className="text-xs text-gray-400">or book via WhatsApp</p>
           </div>
         </div>
       </main>
