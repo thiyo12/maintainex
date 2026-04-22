@@ -135,6 +135,8 @@ model Branch {
   bookings Booking[]
   admins   Admin[]
   applications Application[]
+  staff     Staff[]
+  vacancies JobVacancy[]
 
   @@index([city])
 }
@@ -673,4 +675,39 @@ model DataExport {
   @@index([requestedById])
   @@index([status])
   @@index([createdAt])
+}
+
+// Job Vacancies for Careers page
+model JobVacancy {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  isActive    Boolean  @default(true)
+  branchId    String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([branchId])
+}
+
+// Staff managed by branch admins
+model Staff {
+  id          String   @id @default(cuid())
+  staffId     String   @unique  // Auto-generated: EMP-001, EMP-002...
+  name        String
+  phone       String?
+  email       String?
+  position    String?
+  photo       String?
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([staffId])
 }

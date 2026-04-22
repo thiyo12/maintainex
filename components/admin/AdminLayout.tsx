@@ -86,6 +86,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Categories', href: '/admin/categories', icon: FiGrid },
     { name: 'Branches', href: '/admin/branches', icon: FiMapPin },
     { name: 'Districts', href: '/admin/districts', icon: FiMap },
+    { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
+    { name: 'Careers', href: '/admin/careers', icon: FiShield },
     { name: 'Admins', href: '/admin/admins', icon: FiUserCheck },
     { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
     { name: 'Settings', href: '/admin/settings', icon: FiSettings },
@@ -96,6 +98,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Dashboard', href: '/admin/dashboard', icon: FiHome },
     { name: 'Bookings', href: '/admin/bookings', icon: FiCalendar },
     { name: 'Applications', href: '/admin/applications', icon: FiUsers },
+    { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
+    { name: 'Careers', href: '/admin/careers', icon: FiShield },
     { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
     { name: 'Services', href: '/admin/services', icon: FiSettings },
   ]
