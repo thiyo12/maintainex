@@ -1,43 +1,109 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
-import { FiSend, FiCheck, FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase } from 'react-icons/fi'
+import { FiSend, FiCheck, FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase, FiUpload, FiFile } from 'react-icons/fi'
 import { DISTRICTS } from '@/lib/districts'
 
+interface Vacancy {
+  id: string
+  title: string
+  description: string | null
+  location: string | null
+  isActive: boolean
+}
+
 export default function CareersPage() {
+  const [vacancies, setVacancies] = useState<Vacancy[]>([])
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [cvUrl, setCvUrl] = useState('')
   
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    position: 'cleaning_staff',
+    position: '',
     district: '',
     address: '',
-    experience: '',
-    cvUrl: ''
+    experience: ''
   })
 
-  const positions = [
-    { value: 'cleaning_staff', label: 'Cleaning Staff' },
-    { value: 'supervisor', label: 'Supervisor' },
-    { value: 'team_leader', label: 'Team Leader' },
-    { value: 'manager', label: 'Branch Manager' },
-    { value: 'driver', label: 'Driver' },
-    { value: 'other', label: 'Other' }
-  ]
+  useEffect(() => {
+    fetchVacancies()
+  }, [])
+
+  const fetchVacancies = async () => {
+    try {
+      const res = await fetch('/api/vacancies?isActive=true')
+      if (res.ok) {
+        const data = await res.json()
+        setVacancies(data)
+      }
+    } catch (err) {
+      console.error('Error fetching vacancies:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.type !== 'application/pdf') {
+      setError('Please upload a PDF file only')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be less than 5MB')
+      return
+    }
+
+    setUploading(true)
+    setError('')
+
+    try {
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+
+      const res = await fetch('/api/upload/cv', {
+        method: 'POST',
+        body: uploadFormData
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setCvUrl(data.url)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to upload CV')
+      }
+    } catch (err) {
+      setError('Failed to upload CV')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!formData.name || !formData.email || !formData.phone || !formData.position || !formData.district) {
+      setError('Please fill in all required fields')
+      return
+    }
+
     setSubmitting(true)
     setError('')
 
@@ -45,7 +111,11 @@ export default function CareersPage() {
       const res = await fetch('/api/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          cvUrl: cvUrl,
+          status: 'PENDING'
+        })
       })
 
       if (res.ok) {
@@ -54,12 +124,12 @@ export default function CareersPage() {
           name: '',
           email: '',
           phone: '',
-          position: 'cleaning_staff',
+          position: '',
           district: '',
           address: '',
-          experience: '',
-          cvUrl: ''
+          experience: ''
         })
+        setCvUrl('')
       } else {
         const data = await res.json()
         setError(data.error || 'Failed to submit application')
@@ -117,6 +187,28 @@ export default function CareersPage() {
             </p>
           </div>
         </section>
+
+        {/* Open Positions */}
+        {!loading && vacancies.length > 0 && (
+          <section className="py-12 bg-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <h2 className="text-2xl font-bold text-dark-900 mb-6 text-center">Open Positions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {vacancies.map((vacancy) => (
+                  <div key={vacancy.id} className="bg-primary-50 rounded-xl p-5 border border-primary-200">
+                    <h3 className="font-bold text-dark-900 mb-2">{vacancy.title}</h3>
+                    {vacancy.location && (
+                      <p className="text-sm text-gray-600 mb-2">📍 {vacancy.location}</p>
+                    )}
+                    {vacancy.description && (
+                      <p className="text-sm text-gray-600 line-clamp-2">{vacancy.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Benefits Section */}
         <section className="py-16 bg-white">
@@ -236,9 +328,11 @@ export default function CareersPage() {
                       required
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                     >
-                      {positions.map(pos => (
-                        <option key={pos.value} value={pos.value}>{pos.label}</option>
+                      <option value="">Select position</option>
+                      {vacancies.map(v => (
+                        <option key={v.id} value={v.title}>{v.title}</option>
                       ))}
+                      <option value="other">Other</option>
                     </select>
                   </div>
                 </div>
@@ -266,7 +360,7 @@ export default function CareersPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Your Address *
+                    Your Address
                   </label>
                   <div className="relative">
                     <FiMapPin className="absolute left-3 top-3 text-gray-400" />
@@ -274,7 +368,6 @@ export default function CareersPage() {
                       name="address"
                       value={formData.address}
                       onChange={handleChange}
-                      required
                       rows={2}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all resize-none"
                       placeholder="Your full address"
@@ -290,24 +383,51 @@ export default function CareersPage() {
                     name="experience"
                     value={formData.experience}
                     onChange={handleChange}
-                    rows={4}
+                    rows={3}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all resize-none"
-                    placeholder="Tell us about any relevant experience and why you'd like to join Maintain..."
+                    placeholder="Tell us about any relevant experience..."
                   />
                 </div>
 
+                {/* CV Upload */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    CV Link (Google Drive, Dropbox, etc.)
+                    Upload CV (PDF only, max 5MB)
                   </label>
-                  <input
-                    type="url"
-                    name="cvUrl"
-                    value={formData.cvUrl}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-                    placeholder="https://drive.google.com/..."
-                  />
+                  <div className={`border-2 border-dashed rounded-lg p-4 ${cvUrl ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}>
+                    {cvUrl ? (
+                      <div className="flex items-center gap-3 text-green-700">
+                        <FiFile className="w-8 h-8" />
+                        <span className="font-medium">CV uploaded successfully!</span>
+                        <button
+                          type="button"
+                          onClick={() => setCvUrl('')}
+                          className="ml-auto text-red-600 text-sm hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          onChange={handleFileChange}
+                          className="hidden"
+                          id="cv-upload"
+                          disabled={uploading}
+                        />
+                        <label
+                          htmlFor="cv-upload"
+                          className={`cursor-pointer flex items-center justify-center gap-2 text-primary-600 font-medium ${uploading ? 'opacity-50' : ''}`}
+                        >
+                          <FiUpload className="w-5 h-5" />
+                          {uploading ? 'Uploading...' : 'Click to upload CV (PDF)'}
+                        </label>
+                        <p className="text-sm text-gray-500 mt-2">PDF files only, max 5MB</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <button

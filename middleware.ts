@@ -289,6 +289,12 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
+  // Allow public access to vacancies API for careers page
+  if (pathname.startsWith('/api/vacancies')) {
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
   if (
     pathname.startsWith('/api/') &&
     pathname !== '/api/auth/login' &&
