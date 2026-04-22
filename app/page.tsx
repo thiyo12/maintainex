@@ -157,7 +157,7 @@ export default async function HomePage() {
               </div>
               
               {/* Desktop: Slider on Right Side */}
-              <div className="hidden lg:block relative order-1 lg:order-2 w-full h-full">
+              <div className="hidden lg:block relative order-1 lg:order-2 w-full h-full min-h-[500px]">
                 <ServiceCategorySlider categories={categories} />
               </div>
             </div>
