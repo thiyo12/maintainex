@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 
-const SLIDER_IMAGES = [
+const FALLBACK_IMAGES = [
   'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&h=675&fit=crop',
   'https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=1200&h=675&fit=crop', 
   'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&h=675&fit=crop',
@@ -29,62 +29,104 @@ interface ServiceCategorySliderProps {
   categories: Category[]
 }
 
+function getImageUrl(url: string | null | undefined): string {
+  if (!url) return ''
+  if (url.startsWith('/uploads/')) {
+    return `/api/files${url}`
+  }
+  if (url.startsWith('/api/')) {
+    return url
+  }
+  if (url.startsWith('http')) {
+    return url
+  }
+  if (url.startsWith('/')) {
+    return `/api/files${url}`
+  }
+  return `/api/files/${url}`
+}
+
 export default function ServiceCategorySlider({ categories = [] }: ServiceCategorySliderProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [isReady, setIsReady] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
-    setIsReady(true)
+    setLoaded(true)
   }, [])
 
   useEffect(() => {
-    if (!isReady) return
+    if (!loaded || categories.length === 0) return
     const timer = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % SLIDER_IMAGES.length)
+      setCurrentIndex(prev => (prev + 1) % categories.length)
     }, 4000)
     return () => clearInterval(timer)
-  }, [isReady])
-
-  // Get category info or use default
-  const getCategoryInfo = (index: number) => {
-    const cat = categories[index]
-    return {
-      name: cat?.name || 'Our Services',
-      slug: cat?.slug || 'services',
-      icon: cat?.icon || '✨'
-    }
-  }
+  }, [loaded, categories.length])
 
   const handlePrev = () => {
-    setCurrentIndex(prev => (prev - 1 + SLIDER_IMAGES.length) % SLIDER_IMAGES.length)
+    if (categories.length === 0) return
+    setCurrentIndex(prev => (prev - 1 + categories.length) % categories.length)
   }
 
   const handleNext = () => {
-    setCurrentIndex(prev => (prev + 1) % SLIDER_IMAGES.length)
+    if (categories.length === 0) return
+    setCurrentIndex(prev => (prev + 1) % categories.length)
   }
 
-  const catInfo = getCategoryInfo(currentIndex)
-  const imageUrl = SLIDER_IMAGES[currentIndex]
+  const handleImageError = (idx: number) => {
+    setImageErrors(prev => ({ ...prev, [idx]: true }))
+  }
+
+  // If no categories, show fallback
+  if (!loaded || categories.length === 0) {
+    return (
+      <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-primary-400 to-primary-600">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="text-4xl mb-2">🏠</div>
+            <p className="font-medium">Loading services...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const currentCat = categories[currentIndex]
+  const rawImage = currentCat?.image
+  const catImage = rawImage
+    ? (rawImage.startsWith('http') ? rawImage : getImageUrl(rawImage))
+    : FALLBACK_IMAGES[currentIndex % FALLBACK_IMAGES.length]
+    
+  const showFallback = imageErrors[currentIndex] || !rawImage
 
   return (
     <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl bg-gray-900">
       <Link 
-        href={`/services?category=${catInfo.slug}`}
+        href={`/services?category=${currentCat.slug}`}
         className="block w-full h-full relative"
       >
-        <img
-          src={imageUrl}
-          alt={catInfo.name}
-          className="w-full h-full object-cover"
-          crossOrigin="anonymous"
-        />
+        {showFallback ? (
+          <img
+            src={FALLBACK_IMAGES[currentIndex % FALLBACK_IMAGES.length]}
+            alt={currentCat.name}
+            className="w-full h-full object-cover"
+            crossOrigin="anonymous"
+          />
+        ) : (
+          <img
+            src={catImage}
+            alt={currentCat.name}
+            className="w-full h-full object-cover"
+            onError={() => handleImageError(currentIndex)}
+          />
+        )}
         
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
         
         <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
           <div className="bg-black/40 backdrop-blur-sm rounded-xl p-3 md:p-4 inline-block">
             <h3 className="text-lg md:text-xl font-bold text-white">
-              {catInfo.name.toUpperCase()}
+              {currentCat.name.toUpperCase()}
             </h3>
           </div>
         </div>
@@ -106,12 +148,12 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
         <FiChevronRight className="text-white w-6 h-6" />
       </button>
 
-      <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-        {SLIDER_IMAGES.map((_, idx) => (
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        {categories.map((_, idx) => (
           <button
             key={idx}
             onClick={() => setCurrentIndex(idx)}
-            aria-label={`Go to slide ${idx + 1}`}
+            aria-label={`Go to ${categories[idx].name}`}
             className={`h-2 rounded-full transition-all ${
               idx === currentIndex ? 'bg-white w-6' : 'bg-white/50 w-2 hover:bg-white/80'
             }`}
