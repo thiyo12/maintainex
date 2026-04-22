@@ -180,10 +180,12 @@ function BookingContent() {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     setSubmitting(true)
     setError('')
+    
+    // Debug
+    alert('Submit clicked! Sending booking...')
     console.log('Submitting booking...', formData)
 
     try {
@@ -194,10 +196,12 @@ function BookingContent() {
       })
 
       console.log('Response status:', res.status)
+      alert('Got response: ' + res.status)
 
       if (res.ok) {
         const data = await res.json()
         console.log('Response data:', data)
+        alert('Booking success! Redirecting...')
         
         if (data.booking) {
           const bookingData = {
@@ -221,23 +225,21 @@ function BookingContent() {
           localStorage.setItem('lastBookingConfirmation', JSON.stringify(bookingData))
           localStorage.removeItem('selectedService')
           
-          // Use window.location for mobile compatibility
           const confirmUrl = `/booking/confirmation?id=${data.booking.id}`
-          if (typeof window !== 'undefined') {
-            window.location.href = confirmUrl
-          } else {
-            router.push(confirmUrl)
-          }
+          window.location.href = confirmUrl
         } else {
+          alert('Booking submitted but no ID returned')
           setSuccess(true)
         }
       } else {
         const errorText = await res.text()
         console.log('Error response:', errorText)
+        alert('Error: ' + errorText)
         setError(errorText || 'Failed to submit booking')
       }
     } catch (err: any) {
       console.error('Submit error:', err)
+      alert('Catch error: ' + err.message)
       setError('Failed to submit. Please try again.')
     } finally {
       setSubmitting(false)
@@ -708,6 +710,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             ) : (
               <button
                 type="button"
+                onClick={handleSubmit}
                 disabled={submitting}
                 className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
               >
