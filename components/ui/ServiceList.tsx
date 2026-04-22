@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { getImageUrl } from '@/lib/images'
 
 interface Service {
@@ -20,7 +21,9 @@ interface ServiceListProps {
 export default function ServiceList({ services, categoryName }: ServiceListProps) {
   const router = useRouter()
 
-  const handleBookNow = (service: Service) => {
+  const handleBookNow = (e: React.MouseEvent, service: Service) => {
+    e.preventDefault()
+    e.stopPropagation()
     localStorage.setItem('selectedService', JSON.stringify({
       id: service.id,
       name: service.name,
@@ -30,12 +33,19 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
     router.push(`/booking?serviceId=${service.id}`)
   }
 
+  const handleViewDetails = (e: React.MouseEvent, service: Service) => {
+    e.preventDefault()
+    e.stopPropagation()
+    router.push(`/services/${service.slug || service.id}`)
+  }
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {services.map((service) => (
-        <div
+        <Link
           key={service.id}
-          className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
+          href={`/services/${service.slug || service.id}`}
+          className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300 touch-manipulation"
         >
           <div className="relative h-36 md:h-44 overflow-hidden">
             {service.image ? (
@@ -60,19 +70,27 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
               {service.description || 'Professional service'}
             </p>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-primary-600 font-bold text-sm">
                 Rs. {service.price.toLocaleString()}
               </span>
-              <button
-                onClick={() => handleBookNow(service)}
-                className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors text-xs"
-              >
-                Book
-              </button>
+              <div className="flex gap-1">
+                <button
+                  onClick={(e) => handleViewDetails(e, service)}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-2 py-1.5 rounded-lg transition-colors text-xs"
+                >
+                  Details
+                </button>
+                <button
+                  onClick={(e) => handleBookNow(e, service)}
+                  className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-3 py-1.5 rounded-lg transition-colors text-xs"
+                >
+                  Book
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Link>
       ))}
     </div>
   )

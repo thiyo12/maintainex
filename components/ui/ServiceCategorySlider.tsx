@@ -53,9 +53,10 @@ export default function ServiceCategorySlider({ categories }: ServiceCategorySli
     return () => clearInterval(interval)
   }, [activeCategories.length, isHovering])
 
-  const nextSlide = () => { setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
-  const prevSlide = () => { setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
-  const goToSlide = (index: number) => { 
+  const nextSlide = (e: React.MouseEvent) => { e.preventDefault(); setCurrentIndex(prev => (prev + 1) % activeCategories.length) }
+  const prevSlide = (e: React.MouseEvent) => { e.preventDefault(); setCurrentIndex(prev => (prev - 1 + activeCategories.length) % activeCategories.length) }
+  const goToSlide = (e: React.MouseEvent, index: number) => { 
+    e.preventDefault()
     if (index >= 0 && index < activeCategories.length) {
       setCurrentIndex(index) 
     }
@@ -84,65 +85,61 @@ return (
 
   return (
     <div 
-      className="relative w-full h-auto max-h-[70vh] aspect-video"
+      className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl"
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      <div className="absolute -top-2 -left-2 w-full h-full bg-primary-200/30 rounded-2xl" />
-      
-      <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-        <Link href={`/services?category=${currentCategory.slug}`} className="block w-full h-full">
-          {categoryImage ? (
-            <img
-              src={categoryImage}
-              alt={currentCategory.name || 'Service Category'}
-              className="w-full h-full object-cover object-center"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
-              <span className="text-5xl sm:text-6xl md:text-7xl">{currentCategory.icon || '📋'}</span>
-            </div>
-          )}
-
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-
-          <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6">
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 md:p-4">
-              <h3 className="text-lg md:text-xl font-bold text-white">
-                {currentCategory.name?.toUpperCase()}
-              </h3>
-            </div>
+      <Link href={`/services?category=${currentCategory.slug}`} className="block w-full h-full touch-manipulation">
+        {categoryImage ? (
+          <img
+            src={categoryImage}
+            alt={currentCategory.name || 'Service Category'}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary-300 to-primary-500 flex items-center justify-center">
+            <span className="text-5xl sm:text-6xl md:text-7xl">{currentCategory.icon || '📋'}</span>
           </div>
-        </Link>
+        )}
 
-        {/* Navigation Arrows */}
-        <button
-          onClick={prevSlide}
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40"
-        >
-          <FiChevronLeft className="text-white" />
-        </button>
-        
-        <button
-          onClick={nextSlide}
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40"
-        >
-          <FiChevronRight className="text-white" />
-        </button>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-        {/* Dots */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-          {activeCategories.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => goToSlide(index)}
-              className={`h-2 rounded-full transition-all duration-[425ms] ${
-                index === safeCurrentIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
-              }`}
-            />
-          ))}
+        <div className="absolute inset-0 flex flex-col justify-end p-4 md:p-6">
+          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-3 md:p-4">
+            <h3 className="text-lg md:text-xl font-bold text-white">
+              {currentCategory.name?.toUpperCase()}
+            </h3>
+          </div>
         </div>
+      </Link>
+
+      {/* Navigation Arrows - outside Link so they work on mobile */}
+      <button
+        onClick={prevSlide}
+        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40 z-20"
+      >
+        <FiChevronLeft className="text-white" />
+      </button>
+      
+      <button
+        onClick={nextSlide}
+        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center transition-all duration-[600ms] hover:bg-white/40 z-20"
+      >
+        <FiChevronRight className="text-white" />
+      </button>
+
+{/* Dots */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+        {activeCategories.map((_, index) => (
+          <button
+            key={index}
+            onClick={(e) => goToSlide(e, index)}
+            className={`h-2 rounded-full transition-all duration-[425ms] ${
+              index === safeCurrentIndex ? 'bg-white w-5' : 'bg-white/50 hover:bg-white/80'
+            }`}
+          />
+        ))}
       </div>
     </div>
   )
