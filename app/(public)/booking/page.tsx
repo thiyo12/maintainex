@@ -185,23 +185,23 @@ function BookingContent() {
     setError('')
     
     // Debug
-    alert('Submit clicked! Sending booking...')
     console.log('Submitting booking...', formData)
 
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData),
+        credentials: 'same-origin'
       })
 
       console.log('Response status:', res.status)
-      alert('Got response: ' + res.status)
 
       if (res.ok) {
         const data = await res.json()
         console.log('Response data:', data)
-        alert('Booking success! Redirecting...')
         
         if (data.booking) {
           const bookingData = {
@@ -228,18 +228,15 @@ function BookingContent() {
           const confirmUrl = `/booking/confirmation?id=${data.booking.id}`
           window.location.href = confirmUrl
         } else {
-          alert('Booking submitted but no ID returned')
           setSuccess(true)
         }
       } else {
         const errorText = await res.text()
         console.log('Error response:', errorText)
-        alert('Error: ' + errorText)
         setError(errorText || 'Failed to submit booking')
       }
     } catch (err: any) {
       console.error('Submit error:', err)
-      alert('Catch error: ' + err.message)
       setError('Failed to submit. Please try again.')
     } finally {
       setSubmitting(false)

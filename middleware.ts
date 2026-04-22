@@ -282,6 +282,14 @@ export async function middleware(request: NextRequest) {
   }
 
   if (
+    pathname.startsWith('/api/bookings') &&
+    !pathname.includes('admin')
+  ) {
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
+  if (
     pathname.startsWith('/api/') &&
     pathname !== '/api/auth/login' &&
     pathname !== '/api/auth/logout'
