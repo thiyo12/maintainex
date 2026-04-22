@@ -183,6 +183,7 @@ function BookingContent() {
   const handleSubmit = async () => {
     setSubmitting(true)
     setError('')
+    console.log('Submitting booking formData:', formData)
 
     try {
       const res = await fetch('/api/bookings', {
@@ -191,8 +192,11 @@ function BookingContent() {
         body: JSON.stringify(formData)
       })
 
+      console.log('Submit response status:', res.status)
+
       if (res.ok) {
         const data = await res.json()
+        console.log('Submit response data:', data)
         
         // Save booking data to localStorage
         if (data.booking) {
@@ -225,11 +229,18 @@ function BookingContent() {
           setSuccess(true)
         }
       } else {
-        const data = await res.json()
-        setError(data.error || 'Failed to submit booking')
+        const errorText = await res.text()
+        console.log('Submit error:', errorText)
+        try {
+          const data = JSON.parse(errorText)
+          setError(data.error || 'Failed to submit booking')
+        } catch {
+          setError('Failed to submit. Please use WhatsApp to book.')
+        }
       }
-    } catch (err) {
-      setError('Something went wrong. Please try again.')
+    } catch (err: any) {
+      console.error('Submit catch error:', err)
+      setError('Booking failed. Please use WhatsApp button to book.')
     } finally {
       setSubmitting(false)
     }
@@ -697,13 +708,24 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 <FiChevronRight />
               </button>
             ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
-              >
-                {submitting ? 'Submitting...' : '✅ Submit Booking'}
-              </button>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50"
+                >
+                  {submitting ? '⏳ Submitting...' : '✅ Submit Booking'}
+                </button>
+                
+                {/* WhatsApp fallback for mobile */}
+                <a
+                  href={generateWhatsAppLink()}
+                  className="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all"
+                >
+                  💬 Book via WhatsApp
+                </a>
+              </div>
             )}
           </div>
 
