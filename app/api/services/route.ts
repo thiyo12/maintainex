@@ -16,6 +16,10 @@ export async function GET(request: NextRequest) {
     const includeReviews = searchParams.get('reviews') === 'true'
     const includeAll = searchParams.get('all') === 'true'
 
+    // Test simple query first
+    const testCount = await prisma.service.count()
+    console.log('Service count:', testCount)
+
     // Public API: only active services
     // Admin API (all=true): include all services
     const where: any = includeAll ? {} : { isActive: true }
