@@ -66,14 +66,14 @@ export default function ServicesPage() {
       const categoriesData = await categoriesRes.json()
       const servicesData = await servicesRes.json()
 
-      // Add service count to categories
-      const categoriesWithCount = categoriesData.categories?.map((cat: Category) => ({
+      const services = servicesData.services || []
+      const categoriesWithCount = (categoriesData.categories || []).map((cat: Category) => ({
         ...cat,
-        _count: { services: cat.services?.length || 0 }
-      })) || []
+        _count: { services: services.filter((s: Service) => s.category?.slug === cat.slug).length }
+      }))
 
       setCategories(categoriesWithCount)
-      setServices(servicesData)
+      setServices(services)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
