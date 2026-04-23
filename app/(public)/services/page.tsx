@@ -36,6 +36,14 @@ interface Category {
 }
 
 export default function ServicesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><span className="text-lg">Loading...</span></div>}>
+      <ServicesContent />
+    </Suspense>
+  )
+}
+
+function ServicesContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const categoryParam = searchParams.get('category')
@@ -249,4 +257,5 @@ export default function ServicesPage() {
       <Footer />
     </>
   )
+}
 }
