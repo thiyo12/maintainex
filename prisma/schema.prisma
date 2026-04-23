@@ -112,12 +112,17 @@ model Service {
   duration    Int
   isActive    Boolean    @default(true)
   image       String?
+  displayOrder Int     @default(0)
+  views       Int      @default(0)
+  isTrending  Boolean  @default(false)
   createdAt   DateTime    @default(now())
 
   bookings  Booking[]
   reviews   Review[]
 
   @@index([categoryId])
+  @@index([views])
+  @@index([isTrending])
 }
 
 model Branch {

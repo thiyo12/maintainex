@@ -54,6 +54,11 @@ export async function GET(
       return NextResponse.json({ error: 'Service not found' }, { status: 404 })
     }
 
+    await prisma.service.update({
+      where: { id: params.id },
+      data: { views: { increment: 1 } }
+    })
+
     return NextResponse.json({
       ...service,
       price: service.price ? Number(service.price) : null,
@@ -81,7 +86,7 @@ export async function PATCH(
     }
 
     const body = await request.json()
-    const { name, description, image, price, duration, categoryId, isActive } = body
+    const { name, description, image, price, duration, categoryId, isActive, isTrending, displayOrder } = body
 
     const service = await prisma.service.update({
       where: { id: params.id },
@@ -92,7 +97,9 @@ export async function PATCH(
         ...(price !== undefined && { price: parseFloat(price) || 0 }),
         ...(duration !== undefined && { duration: parseInt(duration) || 0 }),
         ...(categoryId && { categoryId }),
-        ...(isActive !== undefined && { isActive })
+        ...(isActive !== undefined && { isActive }),
+        ...(isTrending !== undefined && { isTrending }),
+        ...(displayOrder !== undefined && { displayOrder: parseInt(displayOrder) || 0 })
       },
       include: { category: true }
     })

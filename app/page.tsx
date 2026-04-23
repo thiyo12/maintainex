@@ -7,25 +7,23 @@ import AnimatedHero from '@/components/ui/AnimatedHero'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import HomeServices from '@/components/ui/HomeServices'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
+import TrendingServices from '@/components/ui/TrendingServices'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi'
 import { prisma } from '@/lib/prisma'
 
 async function getServicesByCategory() {
-  // Get categories for slider
   const categories = await prisma.category.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' }
   })
   
-  // Get all active services
   const allServices = await prisma.service.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' }
   })
   
-  // Map categories with services included (for HomeServices)
   const categoriesWithServices = categories.map(cat => {
     const catServices = allServices
       .filter(svc => svc.categoryId === cat.id)
@@ -51,7 +49,6 @@ async function getServicesByCategory() {
     }
   }) as any[]
   
-  // Map all services flat
   const services = allServices.map(svc => ({
     id: svc.id,
     title: svc.name,
@@ -60,14 +57,40 @@ async function getServicesByCategory() {
     image: svc.image,
     name: svc.name,
     price: svc.price ? Number(svc.price) : null,
-    duration: svc.duration ? Number(svc.duration) : null
+    duration: svc.duration ? Number(svc.duration) : null,
+    views: svc.views || 0,
+    isTrending: svc.isTrending || false
   })) as any[]
   
   return { categories: categoriesWithServices, services }
 }
 
+async function getTrendingServices() {
+  const trending = await prisma.service.findMany({
+    where: { isActive: true },
+    orderBy: [
+      { isTrending: 'desc' },
+      { views: 'desc' }
+    ],
+    take: 5
+  })
+  
+  return trending.map(svc => ({
+    id: svc.id,
+    name: svc.name,
+    slug: svc.slug,
+    description: svc.description,
+    image: svc.image,
+    price: svc.price ? Number(svc.price) : null,
+    duration: svc.duration ? Number(svc.duration) : null,
+    views: svc.views || 0,
+    isTrending: svc.isTrending || false
+  })) as any[]
+}
+
 export default async function HomePage() {
   const { categories = [], services = [] } = await getServicesByCategory()
+  const trendingServices = await getTrendingServices()
 
   const features = [
     { icon: FiCheck, title: 'Professional Team', description: 'Trained and vetted cleaning professionals' },
@@ -165,6 +188,10 @@ export default async function HomePage() {
         </section>
 
         <HomeServices initialCategories={categories} initialServices={services} />
+
+        {trendingServices.length > 0 && (
+          <TrendingServices services={trendingServices} />
+        )}
 
         <section className="py-24 bg-gray-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
