@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir, readdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import path from 'path'
 import { getSession } from '@/lib/auth-utils'
+import cloudinary from '@/lib/cloudinary'
 import { randomBytes } from 'crypto'
 
 export async function GET(request: NextRequest) {
@@ -75,33 +73,35 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     console.log('Buffer size:', buffer.length)
 
-    const timestamp = Date.now()
-    const uniqueId = randomBytes(8).toString('hex')
     const fileExt = path.extname(file.name).toLowerCase() || '.jpg'
-    const baseName = path.basename(file.name, fileExt).replace(/[^a-zA-Z0-9]/g, '-').substring(0, 30)
-    const fileName = `${timestamp}-${uniqueId}-${baseName}${fileExt}`
-
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
-    console.log('Upload dir:', uploadDir)
     
-    if (!existsSync(uploadDir)) {
-      console.log('Creating upload directory...')
-      await mkdir(uploadDir, { recursive: true })
-    }
-
-    const filePath = path.join(uploadDir, fileName)
-    console.log('Writing to:', filePath)
-    await writeFile(filePath, buffer)
-    console.log('File written successfully!')
-
-    const imageUrl = `/uploads/services/${fileName}`
-    console.log('Image URL:', imageUrl)
-
+    console.log('Uploading to Cloudinary...')
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { 
+          folder: 'maintainex/services',
+          resource_type: 'auto',
+          transformation: [
+            { width: 1200, height: 800, crop: 'limit' },
+            { quality: 'auto:good' },
+            { fetch_format: 'auto' }
+          ]
+        },
+        (error, result) => {
+          if (error) reject(error)
+          else resolve(result)
+        }
+      )
+      uploadStream.end(buffer)
+    }) as any
+    
+    console.log('Cloudinary upload successful:', result.secure_url)
+    
     return NextResponse.json({ 
       success: true, 
-      url: imageUrl,
-      fileName: fileName,
-      savedPath: filePath
+      url: result.secure_url,
+      publicId: result.public_id,
+      savedPath: result.secure_url
     })
   } catch (error) {
     console.error('=== UPLOAD ERROR ===')

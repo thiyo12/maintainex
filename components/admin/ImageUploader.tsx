@@ -30,6 +30,9 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
 
   const getImageUrl = (url: string) => {
     if (!url) return url
+    if (url.startsWith('http')) {
+      return url
+    }
     if (url.startsWith('/uploads/')) {
       return `/api/files${url}`
     }
