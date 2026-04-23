@@ -224,6 +224,14 @@ export async function middleware(request: NextRequest) {
     )
   }
 
+  // Allow auto-seed API without auth
+  if (pathname === '/api/seed/auto') {
+    response = NextResponse.next()
+    return applySecurityHeaders(
+      applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
+    )
+  }
+
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const session = await getSession(request)
     
