@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import Image from 'next/image'
-import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiEye, FiX, FiAlertCircle, FiTrendingUp, FiTrendingDown, FiGripVertical } from 'react-icons/fi'
+import { FiPlus, FiEdit2, FiTrash2, FiImage, FiRefreshCw, FiEye, FiX, FiAlertCircle, FiTrendingUp, FiTrendingDown, FiMenu } from 'react-icons/fi'
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -77,7 +77,7 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, hasE
             {...listeners}
             className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600"
           >
-            <FiGripVertical className="w-5 h-5" />
+            <FiMenu className="w-5 h-5" />
           </button>
         )}
         
