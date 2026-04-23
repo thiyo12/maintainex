@@ -83,7 +83,6 @@ async function seed() {
           name: s.name,
           slug: s.name.toLowerCase().replace(/\s+/g, '-'),
           description: s.description,
-          shortDescription: s.description,
           price: s.price,
           duration: s.duration,
           categoryId: cat.id
