@@ -1,30 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
 import cloudinary from '@/lib/cloudinary'
-import { randomBytes } from 'crypto'
 
-export async function GET(request: NextRequest) {
-  try {
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
-    
-    if (!existsSync(uploadDir)) {
-      return NextResponse.json({ 
-        exists: false, 
-        message: 'Upload directory does not exist',
-        uploadDir 
-      })
-    }
-    
-    const files = await readdir(uploadDir)
-    return NextResponse.json({ 
-      exists: true, 
-      fileCount: files.length,
-      files: files.slice(0, 10),
-      uploadDir
-    })
-  } catch (error) {
-    return NextResponse.json({ error: String(error) }, { status: 500 })
-  }
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'Upload endpoint - use POST to upload images',
+    uploadTo: 'Cloudinary CDN'
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -73,8 +55,6 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     console.log('Buffer size:', buffer.length)
 
-    const fileExt = path.extname(file.name).toLowerCase() || '.jpg'
-    
     console.log('Uploading to Cloudinary...')
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
