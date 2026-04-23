@@ -6,7 +6,6 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import CategoryTabs from '@/components/ui/CategoryTabs'
-import ServiceCard from '@/components/ui/ServiceCard'
 import { getImageUrl } from '@/lib/images'
 
 interface Service {
