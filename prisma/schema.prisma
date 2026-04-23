@@ -95,6 +95,8 @@ model Category {
   description String?
   icon        String?
   image       String?
+  coverImage  String?
+  displayOrder Int     @default(0)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
@@ -106,15 +108,17 @@ model Service {
   name        String
   slug        String?
   description String
+  shortDescription String?
   categoryId  String
   category    Category    @relation(fields: [categoryId], references: [id])
   price       Float
   duration    Int
-  isActive    Boolean    @default(true)
+  features    String[]
   image       String?
   displayOrder Int     @default(0)
   views       Int      @default(0)
   isTrending  Boolean  @default(false)
+  isActive    Boolean    @default(true)
   createdAt   DateTime    @default(now())
 
   bookings  Booking[]

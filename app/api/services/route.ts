@@ -31,7 +31,10 @@ export async function GET(request: NextRequest) {
           where: { status: 'APPROVED' }
         } : false
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [
+        { category: { displayOrder: 'asc' } },
+        { displayOrder: 'asc' }
+      ]
     })
 
     const serializedServices = services.map(serializeService)
@@ -107,10 +110,13 @@ export async function POST(request: NextRequest) {
         data: {
           name: body.name,
           description: body.description || '',
+          shortDescription: body.shortDescription || body.description || null,
           image: body.image || null,
           price: body.price ? parseFloat(body.price) : 0,
           duration: body.duration ? parseInt(body.duration) : 0,
           categoryId: body.categoryId,
+          displayOrder: body.displayOrder ? parseInt(body.displayOrder) : 0,
+          features: body.features || [],
           isActive: body.isActive ?? true
         },
         include: { category: true }

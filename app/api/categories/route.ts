@@ -25,7 +25,7 @@ export async function GET() {
           select: { services: true }
         }
       },
-      orderBy: { name: 'asc' }
+      orderBy: { displayOrder: 'asc' }
     })
 
     const serializedCategories = categories.map(cat => ({
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, slug, description, icon, image } = body
+    const { name, slug, description, icon, image, displayOrder } = body
 
     if (!name || !slug) {
       return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 })
@@ -72,6 +72,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Category with this name or slug already exists' }, { status: 400 })
     }
 
+    // Get max displayOrder if not provided
+    let order = displayOrder
+    if (order === undefined) {
+      const maxOrder = await prisma.category.aggregate({
+        _max: { displayOrder: true }
+      })
+      order = (maxOrder._max.displayOrder || 0) + 1
+    }
+
     const category = await prisma.category.create({
       data: {
         name,
@@ -79,6 +88,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         icon: icon || null,
         image: image || null,
+        displayOrder: order,
         isActive: true
       },
       include: {
@@ -102,7 +112,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, slug, description, icon, image, isActive } = body
+    const { id, name, slug, description, icon, image, isActive, displayOrder } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
@@ -116,7 +126,8 @@ export async function PUT(request: NextRequest) {
         ...(description !== undefined && { description }),
         ...(icon !== undefined && { icon }),
         ...(image !== undefined && { image }),
-        ...(isActive !== undefined && { isActive })
+        ...(isActive !== undefined && { isActive }),
+        ...(displayOrder !== undefined && { displayOrder })
       },
       include: {
         services: true,

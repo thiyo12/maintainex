@@ -16,12 +16,12 @@ import { prisma } from '@/lib/prisma'
 async function getServicesByCategory() {
   const categories = await prisma.category.findMany({
     where: { isActive: true },
-    orderBy: { name: 'asc' }
+    orderBy: { displayOrder: 'asc' }
   })
   
   const allServices = await prisma.service.findMany({
     where: { isActive: true },
-    orderBy: { name: 'asc' }
+    orderBy: { displayOrder: 'asc' }
   })
   
   const categoriesWithServices = categories.map(cat => {
