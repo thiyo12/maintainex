@@ -117,8 +117,9 @@ function ServicesContent() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
       </div>
     )
+  }
 
-    return (
+  return (
     <>
       <Header />
       <WhatsAppButton />
