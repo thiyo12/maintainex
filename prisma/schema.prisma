@@ -146,6 +146,8 @@ model Branch {
   applications Application[]
   staff     Staff[]
   vacancies JobVacancy[]
+  invoices  Invoice[]
+  quotations Quotation[]
 
   @@index([city])
 }
@@ -719,4 +721,76 @@ model Staff {
 
   @@index([branchId])
   @@index([staffId])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  type            String   @default("INVOICE")
+  branchId        String
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  customerAddress String?
+  subtotal        Float
+  tax             Float    @default(0)
+  total           Float
+  status          String   @default("DRAFT")
+  paymentStatus   String   @default("UNPAID")
+  amountPaid      Float    @default(0)
+  dueDate         DateTime?
+  notes           String?
+  createdBy       String
+  isDeleted       Boolean  @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  items     InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Quotation {
+  id               String   @id @default(cuid())
+  quotationNumber String   @unique
+  type             String   @default("QUOTATION")
+  branchId         String
+  customerName     String
+  customerEmail    String?
+  customerPhone   String?
+  customerAddress String?
+  subtotal        Float
+  tax             Float    @default(0)
+  total           Float
+  validUntil      DateTime
+  status          String   @default("DRAFT")
+  notes           String?
+  createdBy       String
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  items     QuotationItem[]
+}
+
+model QuotationItem {
+  id           String  @id @default(cuid())
+  quotationId   String
+  description  String
+  quantity    Float   @default(1)
+  unitPrice    Float
+  totalPrice   Float
+
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 }
