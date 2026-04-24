@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
-import cloudinary from '@/lib/cloudinary'
+import fs from 'fs'
+import path from 'path'
 
 export async function GET() {
   return NextResponse.json({ 
     message: 'Upload endpoint - use POST to upload images',
-    uploadTo: 'Cloudinary CDN'
+    uploadTo: 'Local VPS Storage'
   })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== Upload API called ===')
-    console.log('Headers:', Object.fromEntries(request.headers.entries()))
+    console.log('=== Upload API called (Local Storage) ===')
     
     const session = await getSession(request)
     console.log('Session result:', session)
@@ -40,14 +40,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']
     if (!validTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type. Please upload jpg, png, or webp images.' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid file type. Allowed: jpg, png, webp, gif, pdf' }, { status: 400 })
     }
 
-    const maxSize = 20 * 1024 * 1024
+    const maxSize = 5 * 1024 * 1024
     if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size exceeds 20MB limit' }, { status: 400 })
+      return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 })
     }
 
     console.log('Reading file buffer...')
@@ -55,33 +55,29 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     console.log('Buffer size:', buffer.length)
 
-    console.log('Uploading to Cloudinary...')
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { 
-          folder: 'maintainex/services',
-          resource_type: 'auto',
-          transformation: [
-            { width: 1200, height: 800, crop: 'limit' },
-            { quality: 'auto:good' },
-            { fetch_format: 'auto' }
-          ]
-        },
-        (error, result) => {
-          if (error) reject(error)
-          else resolve(result)
-        }
-      )
-      uploadStream.end(buffer)
-    }) as any
+    const timestamp = Date.now()
+    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const fileName = `${timestamp}-${originalName}`
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
     
-    console.log('Cloudinary upload successful:', result.secure_url)
+    console.log('Upload directory:', uploadDir)
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+      console.log('Created upload directory')
+    }
+
+    const filePath = path.join(uploadDir, fileName)
+    fs.writeFileSync(filePath, buffer)
+    console.log('File saved to:', filePath)
+
+    const savedPath = `/uploads/services/${fileName}`
     
     return NextResponse.json({ 
       success: true, 
-      url: result.secure_url,
-      publicId: result.public_id,
-      savedPath: result.secure_url
+      url: savedPath,
+      fileName: fileName,
+      savedPath: savedPath
     })
   } catch (error) {
     console.error('=== UPLOAD ERROR ===')

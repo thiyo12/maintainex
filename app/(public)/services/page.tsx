@@ -66,22 +66,36 @@ function ServicesContent() {
 
   const fetchData = async () => {
     try {
+      setLoading(true)
       const [categoriesRes, servicesRes] = await Promise.all([
         fetch('/api/categories'),
         fetch('/api/services')
       ])
       
+      if (!categoriesRes.ok || !servicesRes.ok) {
+        console.error('API errors:', categoriesRes.status, servicesRes.status)
+        setLoading(false)
+        return
+      }
+      
       const categoriesData = await categoriesRes.json()
       const servicesData = await servicesRes.json()
 
-      const services = servicesData.services || []
-      const categoriesWithCount = (categoriesData.categories || []).map((cat: Category) => ({
+      console.log('Categories API:', categoriesData)
+      console.log('Services API:', servicesData)
+
+      // Handle both array and {services: []} formats
+      const services = Array.isArray(servicesData) ? servicesData : (servicesData.services || [])
+      const categories = Array.isArray(categoriesData) ? categoriesData : (categoriesData.categories || [])
+      
+      const categoriesWithCount = categories.map((cat: Category) => ({
         ...cat,
         _count: { services: services.filter((s: Service) => s.category?.slug === cat.slug).length }
       }))
 
       setCategories(categoriesWithCount)
       setServices(services)
+      console.log('Loaded:', services.length, 'services,', categories.length, 'categories')
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -92,7 +106,7 @@ function ServicesContent() {
   // Filter services based on selected category and search
   const filteredServices = services.filter(service => {
     const matchesCategory = selectedCategory 
-      ? service.category.slug === selectedCategory
+      ? service.category?.slug === selectedCategory
       : true
     const matchesSearch = searchQuery
       ? service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

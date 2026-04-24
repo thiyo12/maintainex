@@ -22,9 +22,8 @@ export async function GET(request: NextRequest) {
     const isSuper = session.role === 'SUPER_ADMIN'
     const userBranchId = session.branchId
 
-    const where: any = {}
+    const where: any = serviceId ? { serviceId } : {}
     if (status) where.status = status
-    if (serviceId) where.serviceId = serviceId
 
     if (!isSuper && userBranchId) {
       where.branchId = userBranchId
