@@ -398,7 +398,7 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
           ref={inputRef}
           type="file"
           className="hidden"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
+          accept="image/*"
           onChange={handleFileSelect}
           disabled={disabled}
         />
