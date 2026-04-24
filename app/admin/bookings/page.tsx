@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { FiEye, FiTrash2, FiCheck, FiX, FiRefreshCw, FiMapPin, FiEdit2, FiAlertCircle } from 'react-icons/fi'
+import { FiEye, FiTrash2, FiCheck, FiX, FiRefreshCw, FiMapPin, FiEdit2, FiAlertCircle, FiFileText } from 'react-icons/fi'
 import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
@@ -34,7 +34,8 @@ const statusColors: Record<string, string> = {
   CONFIRMED: 'bg-blue-100 text-blue-700',
   IN_PROGRESS: 'bg-purple-100 text-purple-700',
   COMPLETED: 'bg-green-100 text-green-700',
-  CANCELLED: 'bg-red-100 text-red-700'
+  CANCELLED: 'bg-red-100 text-red-700',
+  INVOICED: 'bg-teal-100 text-teal-700'
 }
 
 export default function AdminBookings() {
@@ -200,6 +201,33 @@ export default function AdminBookings() {
       fetchBookings()
     } catch (error) {
       toast.error('Failed to delete booking')
+    }
+  }
+
+  const createInvoiceFromBooking = async (bookingId: string, booking: Booking) => {
+    if (!confirm('Create invoice from this booking?')) return
+    
+    try {
+      const authHeaders = getAuthHeader()
+      const res = await fetch(`/api/bookings/${bookingId}/invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          items: [{
+            description: booking.service?.name || 'Service',
+            quantity: 1,
+            unitPrice: 0,
+            totalPrice: 0
+          }]
+        })
+      })
+      
+      if (!res.ok) throw new Error()
+      
+      toast.success('Invoice created')
+      fetchBookings()
+    } catch (error) {
+      toast.error('Failed to create invoice')
     }
   }
 
@@ -417,6 +445,13 @@ export default function AdminBookings() {
                             <FiEdit2 />
                           </button>
                         )}
+                        <button
+                          onClick={() => createInvoiceFromBooking(booking.id, booking)}
+                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
+                          title="Create Invoice"
+                        >
+                          <FiFileText />
+                        </button>
                         <button
                           onClick={() => setSelectedBooking(booking)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
