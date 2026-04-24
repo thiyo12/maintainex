@@ -55,21 +55,38 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     console.log('Buffer size:', buffer.length)
 
+    // Sanitize filename - only allow safe characters
     const timestamp = Date.now()
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const fileName = `${timestamp}-${originalName}`
+    const originalName = file.name || 'file'
+    // Remove any unsafe characters, keep only alphanumeric, dot, dash, underscore
+    const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const fileName = `${timestamp}_${safeName}`
+    
+    // Write to /app/public/uploads/services/
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
     
     console.log('Upload directory:', uploadDir)
+    console.log('CWD:', process.cwd())
 
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true })
-      console.log('Created upload directory')
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true })
+        console.log('Created upload directory')
+      }
+    } catch (dirError) {
+      console.error('Failed to create directory:', dirError)
+      return NextResponse.json({ error: 'Failed to create upload directory' }, { status: 500 })
     }
 
     const filePath = path.join(uploadDir, fileName)
-    fs.writeFileSync(filePath, buffer)
-    console.log('File saved to:', filePath)
+    
+    try {
+      fs.writeFileSync(filePath, buffer)
+      console.log('File saved to:', filePath)
+    } catch (writeError) {
+      console.error('Failed to write file:', writeError)
+      return NextResponse.json({ error: 'Failed to save file: ' + String(writeError) }, { status: 500 })
+    }
 
     const savedPath = `/uploads/services/${fileName}`
     

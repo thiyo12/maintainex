@@ -31,8 +31,15 @@ export async function GET(request: NextRequest) {
       where.branchId = branchId
     }
 
+    // Handle NULL serviceId - use OR condition
     const bookings = await prisma.booking.findMany({
-      where,
+      where: {
+        ...where,
+        OR: [
+          { serviceId: { not: null } },
+          { serviceId: null }
+        ]
+      },
       include: {
         service: {
           include: {
