@@ -31,10 +31,26 @@ export async function GET(request: NextRequest) {
       where.branchId = branchId
     }
 
-    // Handle NULL serviceId - fetch all bookings regardless
-    const bookings = await prisma.booking.findMany({
+    // Handle NULL serviceId - fetch all bookings and handle null service gracefully
+    const bookingsRaw = await prisma.booking.findMany({
       orderBy: { createdAt: 'desc' }
     })
+    
+    // Map bookings to include service only if it exists
+    const bookings = await Promise.all(bookingsRaw.map(async (booking: any) => {
+      if (booking.serviceId) {
+        const service = await prisma.service.findUnique({
+          where: { id: booking.serviceId },
+          include: { category: true }
+        })
+        const branch = await prisma.branch.findUnique({
+          where: { id: booking.branchId },
+          select: { id: true, name: true, location: true, province: true }
+        })
+        return { ...booking, service, branch }
+      }
+      return { ...booking, service: null, branch: null }
+    }))
 
     return NextResponse.json(bookings)
   } catch (error) {
