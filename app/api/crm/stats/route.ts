@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
         select: { userId: true, totalPrice: true }
       })
       
-      const userIds = [...new Set(bookingsWithUsers.map(b => b.userId).filter(Boolean))]
+      const userIds = Array.from(new Set(bookingsWithUsers.map(b => b.userId).filter(Boolean)))
       const users = userIds.length > 0 ? await prisma.user.findMany({
         where: { id: { in: userIds } },
         select: { id: true, name: true }
