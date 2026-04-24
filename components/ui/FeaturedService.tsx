@@ -31,7 +31,7 @@ interface FeaturedServiceProps {
 export default function FeaturedService({ category, services }: FeaturedServiceProps) {
   const firstService = services[0]
   const priceDisplay = firstService?.price 
-    ? `Rs. ${firstService.price.toLocaleString()}+` 
+    ? `Starting from LKR ${firstService.price.toLocaleString()}+` 
     : 'Contact for quote'
 
   const totalJobs = Math.floor(Math.random() * 5000) + 1000

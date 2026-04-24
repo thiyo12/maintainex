@@ -35,7 +35,7 @@ export function ServiceCard({ title, description, image, slug, price }: ServiceC
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         {price && (
           <div className="absolute top-4 right-4 bg-primary-500 text-dark-900 px-3 py-1 rounded-full font-semibold">
-            From LKR {price.toLocaleString()}
+            Starting from LKR {price.toLocaleString()}+
           </div>
         )}
       </div>

@@ -46,7 +46,7 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
   if (!isOpen || !service) return null
 
   const priceDisplay = service.price 
-    ? `Rs. ${service.price.toLocaleString()}+` 
+    ? `Starting from LKR ${service.price.toLocaleString()}+` 
     : 'Contact for quote'
 
   const isUploadedImage = service.image?.startsWith('/uploads/')

@@ -98,7 +98,7 @@ export default function ServiceDetailPage() {
 
   const formatPrice = (price: number | null) => {
     if (price === null || price === undefined) return 'Contact for quote'
-    return `Rs. ${price.toLocaleString()}`
+    return `Starting from LKR ${price.toLocaleString()}+`
   }
 
   const formatDuration = (duration: number | null) => {

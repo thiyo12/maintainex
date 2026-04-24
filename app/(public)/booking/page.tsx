@@ -481,7 +481,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                               >
                                 <div className="flex justify-between items-center">
                                   <span className="font-medium">{service.name}</span>
-                                  <span className="font-bold text-primary-600">Rs. {service.price?.toLocaleString()}</span>
+                                  <span className="font-bold text-primary-600">Starting from LKR {service.price?.toLocaleString()}+</span>
                                 </div>
                               </button>
                             ))}

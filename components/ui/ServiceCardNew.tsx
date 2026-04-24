@@ -24,7 +24,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
   const [imgError, setImgError] = useState(false)
   
   const priceDisplay = service.price 
-    ? `Rs. ${service.price.toLocaleString()}+` 
+    ? `Starting from LKR ${service.price.toLocaleString()}+` 
     : 'Contact for quote'
 
   const durationDisplay = service.duration 

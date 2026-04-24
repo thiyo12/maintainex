@@ -72,7 +72,7 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
 
             <div className="flex items-center justify-between gap-2">
               <span className="text-primary-600 font-bold text-sm">
-                Rs. {service.price.toLocaleString()}
+                Starting from LKR {service.price.toLocaleString()}+
               </span>
               <div className="flex gap-1">
                 <button

@@ -247,7 +247,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                 <div className="flex items-center justify-between">
                   <span className="text-primary-600 font-bold text-sm">
                     {service.price 
-                      ? `Rs. ${service.price.toLocaleString()}` 
+                      ? `Starting from LKR ${service.price.toLocaleString()}+` 
                       : 'Contact'}
                   </span>
                   <button
