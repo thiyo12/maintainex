@@ -33,23 +33,30 @@ export async function GET(request: NextRequest) {
 
     // Handle NULL serviceId - fetch all bookings and handle null service gracefully
     const bookingsRaw = await prisma.booking.findMany({
+      where,
       orderBy: { createdAt: 'desc' }
     })
     
-    // Map bookings to include service only if it exists
+    // Map bookings to include service and branch only if they exist
     const bookings = await Promise.all(bookingsRaw.map(async (booking: any) => {
+      let service = null
+      let branch = null
+      
       if (booking.serviceId) {
-        const service = await prisma.service.findUnique({
+        service = await prisma.service.findUnique({
           where: { id: booking.serviceId },
           include: { category: true }
         })
-        const branch = await prisma.branch.findUnique({
+      }
+      
+      if (booking.branchId) {
+        branch = await prisma.branch.findUnique({
           where: { id: booking.branchId },
           select: { id: true, name: true, location: true, province: true }
         })
-        return { ...booking, service, branch }
       }
-      return { ...booking, service: null, branch: null }
+      
+      return { ...booking, service, branch }
     }))
 
     return NextResponse.json(bookings)
