@@ -37,7 +37,11 @@ interface Category {
 
 export default function ServicesPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><span className="text-lg">Loading...</span></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+      </div>
+    }>
       <ServicesContent />
     </Suspense>
   )
@@ -81,21 +85,14 @@ function ServicesContent() {
       const categoriesData = await categoriesRes.json()
       const servicesData = await servicesRes.json()
 
-      console.log('Categories API:', categoriesData)
-      console.log('Services API:', servicesData)
-
       // Handle both array and {services: []} formats
-      const services = Array.isArray(servicesData) ? servicesData : (servicesData.services || [])
-      const categories = Array.isArray(categoriesData) ? categoriesData : (categoriesData.categories || [])
+      const servicesArr = Array.isArray(servicesData) ? servicesData : (servicesData.services || [])
+      const categoriesArr = Array.isArray(categoriesData) ? categoriesData : (categoriesData.categories || [])
       
-      const categoriesWithCount = categories.map((cat: Category) => ({
-        ...cat,
-        _count: { services: services.filter((s: Service) => s.category?.slug === cat.slug).length }
-      }))
-
-      setCategories(categoriesWithCount)
-      setServices(services)
-      console.log('Loaded:', services.length, 'services,', categories.length, 'categories')
+      console.log('Loaded:', servicesArr.length, 'services,', categoriesArr.length, 'categories')
+      
+      setCategories(categoriesArr)
+      setServices(servicesArr)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -103,14 +100,15 @@ function ServicesContent() {
     }
   }
 
-  // Filter services based on selected category and search
+  // Filter services
   const filteredServices = services.filter(service => {
+    if (!service.category) return false
     const matchesCategory = selectedCategory 
-      ? service.category?.slug === selectedCategory
+      ? service.category.slug === selectedCategory
       : true
     const matchesSearch = searchQuery
       ? service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        service.description?.toLowerCase().includes(searchQuery.toLowerCase())
+        (service.description?.toLowerCase().includes(searchQuery.toLowerCase()))
       : true
     return matchesCategory && matchesSearch
   })
@@ -120,7 +118,7 @@ function ServicesContent() {
       id: service.id,
       name: service.name,
       price: service.price,
-      category: service.category.name
+      category: service.category?.name || 'Unknown'
     }))
     router.push(`/booking?serviceId=${service.id}`)
   }
@@ -128,7 +126,7 @@ function ServicesContent() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
       </div>
     )
   }
@@ -140,19 +138,19 @@ function ServicesContent() {
       
       <main className="pt-20 min-h-screen bg-gray-50">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-primary-400 to-primary-600 py-12 md:py-16">
+        <section className="bg-gradient-to-br from-yellow-400 to-yellow-500 py-12 md:py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-dark-900 mb-3 text-center">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 text-center">
               Our Services
             </h1>
-            <p className="text-dark-900/80 text-center max-w-2xl mx-auto mb-6">
+            <p className="text-gray-800 text-center max-w-2xl mx-auto mb-6">
               Professional home services at your fingertips. Choose a service to get started.
             </p>
             
             {/* Search */}
             <div className="max-w-md mx-auto">
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
@@ -162,7 +160,7 @@ function ServicesContent() {
                   placeholder="Search services..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-full border-2 border-white/50 bg-white/90 text-dark-900 placeholder-gray-500 focus:outline-none focus:border-white"
+                  className="w-full pl-12 pr-4 py-3 rounded-full border-2 border-white/50 bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:border-white"
                 />
               </div>
             </div>
@@ -182,7 +180,6 @@ function ServicesContent() {
         {/* Services Grid */}
         <section id="services-section" className="py-8 md:py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Section Title */}
             <div className="mb-6">
               <h2 className="text-xl md:text-2xl font-bold text-gray-900">
                 {selectedCategory 
@@ -195,17 +192,15 @@ function ServicesContent() {
               </p>
             </div>
 
-            {/* Services Grid - 3 columns on mobile, 4 on desktop */}
             {filteredServices.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
                 {filteredServices.map((service) => (
                   <div 
                     key={service.id}
                     onClick={() => handleServiceClick(service)}
-                    className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300 cursor-pointer"
+                    className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-yellow-300 hover:shadow-lg transition-all duration-300 cursor-pointer"
                   >
-                    {/* Image */}
-                    <div className="relative h-40 md:h-44 overflow-hidden">
+                    <div className="relative h-40 md:h-44 overflow-hidden bg-gray-100">
                       {service.image ? (
                         <img
                           src={getImageUrl(service.image)}
@@ -213,21 +208,20 @@ function ServicesContent() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-                          <span className="text-4xl">🧹</span>
+                        <div className="w-full h-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                          <span className="text-4xl">🔧</span>
                         </div>
                       )}
                     </div>
 
-                    {/* Content */}
                     <div className="p-4">
                       <h3 className="font-bold text-gray-900 mb-1 line-clamp-1">
                         {service.name}
                       </h3>
                       <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                        {service.description || service.shortDescription}
+                        {service.description}
                       </p>
-                      <button className="w-full bg-primary-500 hover:bg-primary-600 text-white font-semibold py-2 rounded-lg transition-colors text-sm">
+                      <button className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm">
                         Book Now
                       </button>
                     </div>
@@ -250,17 +244,17 @@ function ServicesContent() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-12 bg-gradient-to-br from-primary-400 to-primary-600">
+        <section className="py-12 bg-gradient-to-br from-yellow-400 to-yellow-500">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-2xl md:text-3xl font-bold text-dark-900 mb-4">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
               Need Help Choosing?
             </h2>
-            <p className="text-dark-900/80 mb-6">
+            <p className="text-gray-800 mb-6">
               Contact us and we will help you find the right service.
             </p>
             <a 
               href="/contact" 
-              className="inline-block bg-dark-900 hover:bg-dark-800 text-white font-semibold px-8 py-3 rounded-xl transition-colors"
+              className="inline-block bg-gray-900 hover:bg-gray-800 text-white font-semibold px-8 py-3 rounded-xl transition-colors"
             >
               Contact Us
             </a>
