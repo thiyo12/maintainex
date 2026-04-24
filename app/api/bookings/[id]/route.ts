@@ -21,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    if (session.role !== 'SUPER_ADMIN' && booking.branchId !== session.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && booking.branchId && booking.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
 
@@ -33,9 +33,12 @@ export async function GET(
       })
     }
     
-    const user = await prisma.user.findUnique({
-      where: { id: booking.userId }
-    })
+    let user = null
+    if (booking.userId) {
+      user = await prisma.user.findUnique({
+        where: { id: booking.userId }
+      })
+    }
 
     return NextResponse.json({ ...booking, service: serviceWithCategory, user })
   } catch (error) {
@@ -129,7 +132,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
-    if (session.role !== 'SUPER_ADMIN' && booking.branchId !== session.branchId) {
+    if (session.role !== 'SUPER_ADMIN' && booking.branchId && booking.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
 
