@@ -309,7 +309,7 @@ export default function CustomerDetailPage() {
                     <div key={booking.id} className="p-4 hover:bg-gray-50">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium text-gray-900">{booking.service.name}</div>
+                          <div className="font-medium text-gray-900">{booking.service?.name || 'Unknown Service'}</div>
                           <div className="text-sm text-gray-500">
                             {booking.date ? new Date(booking.date).toLocaleDateString('en-LK') : 'No date'}
                           </div>

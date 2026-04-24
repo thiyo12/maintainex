@@ -93,7 +93,7 @@ export async function GET(
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
     }
 
-    const recentBookings = await prisma.booking.findMany({
+    const recentBookingsRaw = await prisma.booking.findMany({
       where: { userId: customer.userId },
       take: 10,
       orderBy: { createdAt: 'desc' },
@@ -102,11 +102,20 @@ export async function GET(
         status: true,
         date: true,
         totalPrice: true,
-        service: {
-          select: { id: true, name: true }
-        }
+        serviceId: true
       }
     })
+    
+    const recentBookings = await Promise.all(recentBookingsRaw.map(async (booking: any) => {
+      let service = null
+      if (booking.serviceId) {
+        service = await prisma.service.findUnique({
+          where: { id: booking.serviceId },
+          select: { id: true, name: true }
+        })
+      }
+      return { ...booking, service }
+    }))
 
     if (!customer) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 })

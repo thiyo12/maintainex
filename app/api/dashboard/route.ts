@@ -31,12 +31,22 @@ export async function GET(request: NextRequest) {
       prisma.service.count({ where: serviceFilter })
     ])
 
-    const recentBookings = await prisma.booking.findMany({
+    const recentBookingsRaw = await prisma.booking.findMany({
       where: branchFilter,
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      include: { service: true }
+      take: 10,
+      orderBy: { createdAt: 'desc' }
     })
+    
+    const recentBookings = await Promise.all(recentBookingsRaw.map(async (booking: any) => {
+      let service = null
+      if (booking.serviceId) {
+        service = await prisma.service.findUnique({
+          where: { id: booking.serviceId },
+          select: { id: true, name: true, price: true }
+        })
+      }
+      return { ...booking, service }
+    }))
 
     const recentApplications = await prisma.application.findMany({
       where: branchFilter,

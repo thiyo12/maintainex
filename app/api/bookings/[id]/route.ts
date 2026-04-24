@@ -14,13 +14,7 @@ export async function GET(
     }
 
     const booking = await prisma.booking.findUnique({
-      where: { id: (await params).id },
-      include: {
-        service: {
-          include: { category: true }
-        },
-        user: true
-      }
+      where: { id: (await params).id }
     })
 
     if (!booking) {
@@ -31,7 +25,19 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
 
-    return NextResponse.json(booking)
+    let serviceWithCategory = null
+    if (booking.serviceId) {
+      serviceWithCategory = await prisma.service.findUnique({
+        where: { id: booking.serviceId },
+        include: { category: true }
+      })
+    }
+    
+    const user = await prisma.user.findUnique({
+      where: { id: booking.userId }
+    })
+
+    return NextResponse.json({ ...booking, service: serviceWithCategory, user })
   } catch (error) {
     console.error('Error fetching booking:', error)
     return NextResponse.json({ error: 'Failed to fetch booking' }, { status: 500 })
@@ -69,9 +75,22 @@ export async function PATCH(
 
     const booking = await prisma.booking.update({
       where: { id: (await params).id },
-      data: { status },
-      include: { service: true, user: true }
+      data: { status }
     })
+
+    let service = null
+    if (booking.serviceId) {
+      service = await prisma.service.findUnique({
+        where: { id: booking.serviceId }
+      })
+    }
+    
+    let user = null
+    if (booking.userId) {
+      user = await prisma.user.findUnique({
+        where: { id: booking.userId }
+      })
+    }
 
     await logActivity({
       adminId: session.id,
@@ -85,7 +104,7 @@ export async function PATCH(
       details: { previousStatus: existingBooking.status, newStatus: status, customerName: booking.name }
     })
 
-    return NextResponse.json(booking)
+    return NextResponse.json({ ...booking, service, user })
   } catch (error) {
     console.error('Error updating booking:', error)
     return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 })
@@ -103,8 +122,7 @@ export async function DELETE(
     }
 
     const booking = await prisma.booking.findUnique({
-      where: { id: (await params).id },
-      include: { service: true }
+      where: { id: (await params).id }
     })
 
     if (!booking) {
@@ -126,12 +144,12 @@ export async function DELETE(
       branchId: session.branchId,
       action: 'DELETE',
       entityType: 'BOOKING',
-      entityId: (await params).id,
+      entityId: booking.id,
       description: `Deleted booking`,
-      details: { service: booking?.service?.name }
+      details: { customerName: booking.name }
     })
 
-    return NextResponse.json({ message: 'Booking deleted successfully' })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting booking:', error)
     return NextResponse.json({ error: 'Failed to delete booking' }, { status: 500 })

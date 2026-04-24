@@ -16,7 +16,7 @@ interface Booking {
   address: string | null
   time: string | null
   status: string
-  service: { name: string }
+  service: { name: string } | null
   branch: { id: string; name: string; location: string } | null
   createdAt: string
   date: string | null
