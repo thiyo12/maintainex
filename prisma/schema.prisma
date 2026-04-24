@@ -152,26 +152,26 @@ model Branch {
 
 model Booking {
   id          String     @id @default(cuid())
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  serviceId  String
-  service    Service    @relation(fields: [serviceId], references: [id])
-  branchId   String
-  branch     Branch     @relation(fields: [branchId], references: [id])
-  date       DateTime
-  timeSlot   String
-  status     String     @default("PENDING")
-  notes      String?
-  totalPrice Float
-  name       String?
-  phone      String?
-  email      String?
-  district   String?
-  province       String?
-  address    String?
-  time       String?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceId   String?
+  service     Service?   @relation(fields: [serviceId], references: [id])
+  branchId    String?
+  branch      Branch?    @relation(fields: [branchId], references: [id])
+  date        DateTime
+  timeSlot    String
+  status      String     @default("PENDING")
+  notes       String?
+  totalPrice  Float
+  name        String?
+  phone       String?
+  email       String?
+  district    String?
+  province    String?
+  address     String?
+  time        String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@index([userId])
   @@index([serviceId])
