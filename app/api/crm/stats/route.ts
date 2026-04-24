@@ -110,20 +110,27 @@ export async function GET(request: NextRequest) {
     try {
       const bookingsWithUsers = await prisma.booking.findMany({
         where: {},
-        include: { user: true },
         orderBy: { totalPrice: 'desc' },
-        take: 10
+        take: 10,
+        select: { userId: true, totalPrice: true }
       })
+      
+      const userIds = [...new Set(bookingsWithUsers.map(b => b.userId).filter(Boolean))]
+      const users = userIds.length > 0 ? await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true }
+      }) : []
+      const userMap = new Map(users.map(u => [u.id, u]))
       
       const customerSpending: Record<string, {name: string, totalSpent: number, totalBookings: number}> = {}
       bookingsWithUsers.forEach(b => {
-        if (b.user) {
-          const userId = b.userId
-          if (!customerSpending[userId]) {
-            customerSpending[userId] = { name: b.user.name || 'Unknown', totalSpent: 0, totalBookings: 0 }
+        if (b.userId) {
+          const user = userMap.get(b.userId)
+          if (!customerSpending[b.userId]) {
+            customerSpending[b.userId] = { name: user?.name || 'Unknown', totalSpent: 0, totalBookings: 0 }
           }
-          customerSpending[userId].totalSpent += b.totalPrice || 0
-          customerSpending[userId].totalBookings += 1
+          customerSpending[b.userId].totalSpent += b.totalPrice || 0
+          customerSpending[b.userId].totalBookings += 1
         }
       })
       topCustomers = Object.entries(customerSpending).map(([id, data]) => ({
