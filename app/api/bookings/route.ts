@@ -31,36 +31,15 @@ export async function GET(request: NextRequest) {
       where.branchId = branchId
     }
 
-    // Handle NULL serviceId - use OR condition
+    // Handle NULL serviceId - fetch all bookings regardless
     const bookings = await prisma.booking.findMany({
-      where: {
-        ...where,
-        OR: [
-          { serviceId: { not: null } },
-          { serviceId: null }
-        ]
-      },
-      include: {
-        service: {
-          include: {
-            category: true
-          }
-        },
-        branch: {
-          select: {
-            id: true,
-            name: true,
-            location: true,
-            province: true
-          }
-        }
-      },
       orderBy: { createdAt: 'desc' }
     })
 
     return NextResponse.json(bookings)
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch bookings' }, { status: 500 })
+  } catch (error) {
+    console.error('Bookings fetch error:', error)
+    return NextResponse.json({ error: 'Failed to fetch bookings', details: String(error) }, { status: 500 })
   }
 }
 
