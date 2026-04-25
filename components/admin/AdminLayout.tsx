@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck, FiMap, FiGrid, FiShield } from 'react-icons/fi'
+import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck, FiMap, FiGrid, FiShield, FiFileText, FiFile } from 'react-icons/fi'
 import { AdminSessionProvider } from './AdminSessionProvider'
 import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
 
@@ -81,6 +81,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Dashboard', href: '/admin/dashboard', icon: FiHome },
     { name: 'Customers', href: '/admin/customers', icon: FiUsers },
     { name: 'Bookings', href: '/admin/bookings', icon: FiCalendar },
+    { name: 'Invoices', href: '/admin/invoices', icon: FiFileText },
+    { name: 'Quotations', href: '/admin/quotations', icon: FiFile },
     { name: 'Applications', href: '/admin/applications', icon: FiUsers },
     { name: 'Services', href: '/admin/services', icon: FiSettings },
     { name: 'Categories', href: '/admin/categories', icon: FiGrid },
@@ -97,6 +99,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const adminNavigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: FiHome },
     { name: 'Bookings', href: '/admin/bookings', icon: FiCalendar },
+    { name: 'Invoices', href: '/admin/invoices', icon: FiFileText },
+    { name: 'Quotations', href: '/admin/quotations', icon: FiFile },
     { name: 'Applications', href: '/admin/applications', icon: FiUsers },
     { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
     { name: 'Careers', href: '/admin/careers', icon: FiShield },
