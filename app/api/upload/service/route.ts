@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
-import { uploadToCloudinary } from '@/lib/cloudinary'
+import fs from 'fs'
+import path from 'path'
 
 export async function GET() {
   return NextResponse.json({ 
     message: 'Upload endpoint - use POST to upload images',
-    uploadTo: 'Cloudinary'
+    uploadTo: 'Local file system'
   })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== Upload API called (Cloudinary) ===')
+    console.log('=== Upload API called (Local storage) ===')
     
     const session = await getSession(request)
     console.log('Session result:', session)
@@ -53,15 +54,26 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     console.log('Buffer size:', buffer.length)
 
-    // Upload to Cloudinary
-    console.log('Uploading to Cloudinary...')
-    const result: any = await uploadToCloudinary(buffer, 'maintainex/services')
-    
-    console.log('Upload success:', result.secure_url)
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+
+    const timestamp = Date.now()
+    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const fileName = `service-${timestamp}-${originalName}`
+    const filePath = path.join(uploadDir, fileName)
+
+    console.log('Saving to:', filePath)
+    fs.writeFileSync(filePath, buffer)
+    console.log('File saved successfully')
+
+    const url = `/uploads/services/${fileName}`
+    console.log('File URL:', url)
     
     return NextResponse.json({ 
-      url: result.secure_url,
-      publicId: result.public_id
+      url: url,
+      fileName: fileName
     })
   } catch (error) {
     console.error('!!! Upload error:', error)
