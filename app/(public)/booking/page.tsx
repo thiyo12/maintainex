@@ -18,6 +18,7 @@ interface Service {
 interface Category {
   id: string
   name: string
+  slug: string
   services: Service[]
 }
 
@@ -439,7 +440,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                         <p className="text-sm text-primary-600 font-medium">{displayCategory}</p>
                       )}
                       <p className="text-lg font-bold text-dark-900">{displayService.name}</p>
-                      <p className="text-2xl font-bold text-primary-600">Rs. {displayService.price?.toLocaleString()}</p>
+                      <p className="text-2xl font-bold text-primary-600">Starting from LKR {displayService.price?.toLocaleString()}+</p>
                     </div>
                     <button
                       onClick={() => setShowServiceSelector(true)}
@@ -456,7 +457,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
                   <div className="bg-white w-full sm:max-w-lg max-h-[80vh] rounded-t-3xl sm:rounded-2xl overflow-hidden">
                     <div className="p-4 border-b flex items-center justify-between sticky top-0 bg-white">
-                      <h3 className="text-lg font-bold">Select a Service</h3>
+                      <h3 className="text-lg font-bold">
+                        {displayCategory ? `Select ${displayCategory} Service` : 'Select a Service'}
+                      </h3>
                       <button 
                         onClick={() => setShowServiceSelector(false)}
                         className="text-gray-500 text-2xl"
@@ -465,29 +468,31 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       </button>
                     </div>
                     <div className="overflow-y-auto max-h-[60vh] p-4 space-y-4">
-                      {categories.map(category => (
-                        <div key={category.id}>
-                          <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>
-                          <div className="space-y-2">
-                            {category.services.map(service => (
-                              <button
-                                key={service.id}
-                                onClick={() => handleServiceSelect(service.id)}
-                                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                                  formData.serviceId === service.id 
-                                    ? 'border-primary-500 bg-primary-50' 
-                                    : 'border-gray-200 hover:border-primary-300'
-                                }`}
-                              >
-                                <div className="flex justify-between items-center">
-                                  <span className="font-medium">{service.name}</span>
-                                  <span className="font-bold text-primary-600">Starting from LKR {service.price?.toLocaleString()}+</span>
-                                </div>
-                              </button>
-                            ))}
+                      {categories
+                        .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
+                        .map(category => (
+                          <div key={category.id}>
+                            <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>
+                            <div className="space-y-2">
+                              {category.services.map(service => (
+                                <button
+                                  key={service.id}
+                                  onClick={() => handleServiceSelect(service.id)}
+                                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                                    formData.serviceId === service.id 
+                                      ? 'border-primary-500 bg-primary-50' 
+                                      : 'border-gray-200 hover:border-primary-300'
+                                  }`}
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium">{service.name}</span>
+                                    <span className="font-bold text-primary-600">Starting from LKR {service.price?.toLocaleString()}+</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 </div>
