@@ -374,6 +374,27 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Your Information</h2>
               
+              {/* Selected Service Display - Step 1 */}
+              {displayService && (
+                <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      {displayCategory && (
+                        <p className="text-sm text-primary-600 font-medium">{displayCategory}</p>
+                      )}
+                      <p className="text-lg font-bold text-dark-900">{displayService.name}</p>
+                      <p className="text-xl font-bold text-primary-600">Starting from LKR {displayService.price?.toLocaleString()}+</p>
+                    </div>
+                    <button
+                      onClick={() => setShowServiceSelector(true)}
+                      className="text-primary-600 font-medium text-sm hover:text-primary-700"
+                    >
+                      Change
+                    </button>
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -467,32 +488,34 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                         ×
                       </button>
                     </div>
-                    <div className="overflow-y-auto max-h-[60vh] p-4 space-y-4">
-                      {categories
-                        .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
-                        .map(category => (
-                          <div key={category.id}>
-                            <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>
-                            <div className="space-y-2">
-                              {category.services.map(service => (
-                                <button
-                                  key={service.id}
-                                  onClick={() => handleServiceSelect(service.id)}
-                                  className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                                    formData.serviceId === service.id 
-                                      ? 'border-primary-500 bg-primary-50' 
-                                      : 'border-gray-200 hover:border-primary-300'
-                                  }`}
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <span className="font-medium">{service.name}</span>
-                                    <span className="font-bold text-primary-600">Starting from LKR {service.price?.toLocaleString()}+</span>
-                                  </div>
-                                </button>
-                              ))}
+                    <div className="overflow-y-auto max-h-[60vh] p-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {categories
+                          .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
+                          .map(category => (
+                            <div key={category.id} className={displayCategory ? 'col-span-1 sm:col-span-2' : ''}>
+                              {!displayCategory && <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>}
+                              <div className="space-y-2">
+                                {category.services.map(service => (
+                                  <button
+                                    key={service.id}
+                                    onClick={() => handleServiceSelect(service.id)}
+                                    className={`w-full text-left p-3 sm:p-4 rounded-xl border-2 transition-all ${
+                                      formData.serviceId === service.id 
+                                        ? 'border-primary-500 bg-primary-50' 
+                                        : 'border-gray-200 hover:border-primary-300'
+                                    }`}
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <span className="font-medium text-sm">{service.name}</span>
+                                      <span className="font-bold text-primary-600 text-sm">LKR {service.price?.toLocaleString()}+</span>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                      </div>
                     </div>
                   </div>
                 </div>

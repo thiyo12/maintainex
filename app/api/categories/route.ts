@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth-utils'
 function serializeService(service: any) {
   return {
     id: service.id,
-    title: service.name,
+    name: service.name,
     slug: service.slug || '',
     description: service.description || '',
     image: service.image || null,
