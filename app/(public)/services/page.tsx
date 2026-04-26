@@ -138,9 +138,9 @@ function ServicesContent() {
                     className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-yellow-300 hover:shadow-lg transition-all duration-300"
                   >
                     <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
-                      {category.image ? (
+                      {firstSvc?.image ? (
                         <img
-                          src={getImageUrl(category.image)}
+                          src={getImageUrl(firstSvc.image)}
                           alt={category.name}
                           className="w-full h-full object-cover"
                         />
