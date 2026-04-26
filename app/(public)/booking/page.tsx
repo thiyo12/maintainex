@@ -8,16 +8,11 @@ import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiClock, FiCheck, FiChevronRight, FiChevronLeft, FiMessageCircle } from 'react-icons/fi'
 import { DISTRICTS } from '@/lib/districts'
 
-interface Service {
-  id: string
-  name: string
-  price: number
-  description?: string
-}
-
 interface Category {
   id: string
   name: string
+  slug: string
+  subcategories: { id: string; name: string; serviceCount: number }[]
   services: Service[]
 }
 
@@ -26,6 +21,13 @@ interface StoredService {
   name: string
   price: number
   category?: string
+  subcategoryId?: string
+}
+
+interface SelectedCategoryData {
+  mainCategory: string
+  subcategoryId: string
+  categoryName: string
 }
 
 const WHATSAPP_NUMBER = '94770867609'
@@ -70,6 +72,9 @@ function BookingContent() {
   const [error, setError] = useState('')
   const [showServiceSelector, setShowServiceSelector] = useState(false)
   const [storedService, setStoredService] = useState<StoredService | null>(null)
+  const [selectedCategoryData, setSelectedCategoryData] = useState<SelectedCategoryData | null>(null)
+  const [preSelectedServices, setPreSelectedServices] = useState<Service[]>([])
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string>('')
   
   const [formData, setFormData] = useState({
     name: '',
@@ -84,7 +89,11 @@ function BookingContent() {
   })
 
   useEffect(() => {
-    // Read service from localStorage immediately
+    loadStoredData()
+    fetchServices()
+  }, [])
+
+  const loadStoredData = () => {
     try {
       const stored = localStorage.getItem('selectedService')
       if (stored) {
@@ -92,13 +101,44 @@ function BookingContent() {
         setStoredService(serviceData)
         setFormData(prev => ({ ...prev, serviceId: serviceData.id }))
       }
+      
+      const categoryData = localStorage.getItem('selectedCategory')
+      if (categoryData) {
+        const catData = JSON.parse(categoryData) as SelectedCategoryData
+        setSelectedCategoryData(catData)
+        setSelectedSubcategoryId(catData.subcategoryId)
+        if (catData.subcategoryId && categories.length > 0) {
+          const cat = categories.find(c => 
+            c.subcategories?.some(s => s.id === catData.subcategoryId)
+          )
+          if (cat) {
+            const services = cat.services.filter(s => s.categoryId === catData.subcategoryId)
+            setPreSelectedServices(services)
+          }
+        }
+      }
     } catch (err) {
-      console.error('Error reading stored service:', err)
+      console.error('Error reading stored data:', err)
     }
-    
-    // Fetch categories in background for the selector
-    fetchServices()
-  }, [])
+  }
+  
+  useEffect(() => {
+    if (step === 2 && !formData.serviceId && preSelectedServices.length > 0) {
+      if (!formData.serviceId) {
+        const defaultService = preSelectedServices[0]
+        if (defaultService) {
+          setFormData(prev => ({ ...prev, serviceId: defaultService.id }))
+          setStoredService({
+            id: defaultService.id,
+            name: defaultService.name,
+            price: defaultService.price,
+            category: selectedCategoryData?.categoryName,
+            subcategoryId: selectedSubcategoryId
+          })
+        }
+      }
+    }
+  }, [step, formData.serviceId, preSelectedServices])
 
   useEffect(() => {
     if (step === 2 && !formData.serviceId) {
@@ -119,11 +159,48 @@ function BookingContent() {
       if (res.ok) {
         const data = await res.json()
         setCategories(data)
+        
+        const categoryData = localStorage.getItem('selectedCategory')
+        if (categoryData) {
+          const catData = JSON.parse(categoryData) as SelectedCategoryData
+          setSelectedCategoryData(catData)
+          setSelectedSubcategoryId(catData.subcategoryId)
+          
+          const mainCat = data.find((c: Category) => 
+            c.subcategories?.some(s => s.id === catData.subcategoryId)
+          )
+          if (mainCat) {
+            const services = mainCat.services.filter((s: Service) => s.categoryId === catData.subcategoryId)
+            setPreSelectedServices(services)
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching services:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSubcategoryChange = (subcategoryId: string) => {
+    setSelectedSubcategoryId(subcategoryId)
+    const mainCat = categories.find(c => 
+      c.subcategories?.some(s => s.id === subcategoryId)
+    )
+    if (mainCat) {
+      const services = mainCat.services.filter((s: Service) => s.categoryId === subcategoryId)
+      setPreSelectedServices(services)
+      if (services.length > 0) {
+        const firstService = services[0]
+        setFormData(prev => ({ ...prev, serviceId: firstService.id }))
+        setStoredService({
+          id: firstService.id,
+          name: firstService.name,
+          price: firstService.price,
+          category: selectedCategoryData?.categoryName,
+          subcategoryId: subcategoryId
+        })
+      }
     }
   }
 
@@ -430,8 +507,53 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
               
+              {/* Subcategory Selection (when coming from Services page) */}
+              {selectedCategoryData && selectedCategoryData.mainCategory && (
+                <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-primary-600 font-medium mb-2">
+                    {selectedCategoryData.mainCategory}
+                  </p>
+                  <div className="space-y-2">
+                    {selectedCategoryData.subcategoryId ? (
+                      <div>
+                        <p className="font-semibold text-dark-900">
+                          {categories.find(c => 
+                            c.subcategories?.some(s => s.id === selectedCategoryData.subcategoryId)
+                          )?.subcategories?.find(s => s.id === selectedCategoryData.subcategoryId)?.name || 'Select Service'}
+                        </p>
+                        <p className="text-lg font-bold text-primary-600">Rs. {displayService?.price?.toLocaleString()}</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Service Type:
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {categories.find(c => c.name === selectedCategoryData.mainCategory)?.subcategories?.map(sub => (
+                            <button
+                              key={sub.id}
+                              onClick={() => handleSubcategoryChange(sub.id)}
+                              className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                selectedSubcategoryId === sub.id
+                                  ? 'border-primary-500 bg-primary-50' 
+                                  : 'border-gray-200 hover:border-primary-300'
+                              }`}
+                            >
+                              <span className="font-medium">{sub.name}</span>
+                              <span className="block text-sm text-gray-500">
+                                {sub.serviceCount} service{sub.serviceCount !== 1 ? 's' : ''}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               {/* Selected Service Display */}
-              {displayService && (
+              {displayService && !selectedCategoryData && (
                 <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
                   <div className="flex items-center justify-between">
                     <div>

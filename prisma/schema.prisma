@@ -89,9 +89,9 @@ model LoginActivity {
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  slug        String    @unique
+  id           String    @id @default(cuid())
+  name         String    @unique
+  slug         String    @unique
   description String?
   icon        String?
   image       String?
@@ -99,6 +99,10 @@ model Category {
   displayOrder Int     @default(0)
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
+
+  parentId    String?
+  parent     Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children   Category[] @relation("CategoryHierarchy")
 
   services  Service[]
 }

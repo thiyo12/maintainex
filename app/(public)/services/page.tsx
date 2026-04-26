@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
-import CategoryTabs from '@/components/ui/CategoryTabs'
 import { getImageUrl } from '@/lib/images'
 
 interface Service {
@@ -18,11 +17,19 @@ interface Service {
   duration: number
   image: string | null
   categoryId: string
-  category: {
+  category?: {
     id: string
     name: string
     slug: string
   }
+}
+
+interface Subcategory {
+  id: string
+  name: string
+  slug: string
+  displayOrder: number
+  serviceCount: number
 }
 
 interface Category {
@@ -31,7 +38,11 @@ interface Category {
   slug: string
   description: string | null
   icon: string | null
+  image: string | null
   displayOrder: number
+  subcategories: Subcategory[]
+  defaultSubcategoryId: string | null
+  services: Service[]
   _count?: { services: number }
 }
 
@@ -53,9 +64,10 @@ function ServicesContent() {
   const categoryParam = searchParams.get('category')
 
   const [categories, setCategories] = useState<Category[]>([])
-  const [services, setServices] = useState<Service[]>([])
+  const [allServices, setAllServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState<string>(categoryParam || '')
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>(categoryParam || '')
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
@@ -64,7 +76,7 @@ function ServicesContent() {
 
   useEffect(() => {
     if (categoryParam) {
-      setSelectedCategory(categoryParam)
+      setSelectedCategorySlug(categoryParam)
     }
   }, [categoryParam])
 
@@ -85,14 +97,16 @@ function ServicesContent() {
       const categoriesData = await categoriesRes.json()
       const servicesData = await servicesRes.json()
 
-      // Handle both array and {services: []} formats
       const servicesArr = Array.isArray(servicesData) ? servicesData : (servicesData.services || [])
       const categoriesArr = Array.isArray(categoriesData) ? categoriesData : (categoriesData.categories || [])
       
-      console.log('Loaded:', servicesArr.length, 'services,', categoriesArr.length, 'categories')
-      
       setCategories(categoriesArr)
-      setServices(servicesArr)
+      setAllServices(servicesArr)
+      
+      if (categoriesArr.length > 0 && categoriesArr[0].defaultSubcategoryId) {
+        setSelectedCategorySlug(categoriesArr[0].slug)
+        setSelectedSubcategoryId(categoriesArr[0].defaultSubcategoryId)
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -100,27 +114,42 @@ function ServicesContent() {
     }
   }
 
-  // Filter services
-  const filteredServices = services.filter(service => {
-    if (!service.category) return false
-    const matchesCategory = selectedCategory 
-      ? service.category.slug === selectedCategory
-      : true
-    const matchesSearch = searchQuery
-      ? service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (service.description?.toLowerCase().includes(searchQuery.toLowerCase()))
-      : true
-    return matchesCategory && matchesSearch
-  })
+  const selectedCategory = categories.find(c => c.slug === selectedCategorySlug)
+  const subcategoryServices = selectedCategory?.services.filter((s: Service) => 
+    s.categoryId === (selectedSubcategoryId || selectedCategory?.defaultSubcategoryId)
+  ) || []
+
+  const handleCategoryClick = (category: Category) => {
+    setSelectedCategorySlug(category.slug)
+    setSelectedSubcategoryId(category.defaultSubcategoryId || '')
+  }
 
   const handleServiceClick = (service: Service) => {
+    const categoryName = selectedCategory?.name || 'Unknown'
+    const subcategory = selectedCategory?.subcategories?.find(s => s.id === service.categoryId)
+    const fullCategoryName = subcategory ? `${categoryName} - ${subcategory.name}` : categoryName
+    
     localStorage.setItem('selectedService', JSON.stringify({
       id: service.id,
       name: service.name,
       price: service.price,
-      category: service.category?.name || 'Unknown'
+      category: fullCategoryName,
+      subcategoryId: service.categoryId
     }))
     router.push(`/booking?serviceId=${service.id}`)
+  }
+
+  const handleBookNow = () => {
+    const categoryName = selectedCategory?.name || 'Unknown'
+    const subcategory = selectedCategory?.subcategories?.find(s => s.id === selectedSubcategoryId)
+    const fullCategoryName = subcategory ? `${categoryName} - ${subcategory.name}` : categoryName
+    
+    localStorage.setItem('selectedCategory', JSON.stringify({
+      mainCategory: selectedCategory?.name,
+      subcategoryId: selectedSubcategoryId,
+      categoryName: fullCategoryName
+    }))
+    router.push(`/booking`)
   }
 
   if (loading) {
@@ -167,67 +196,79 @@ function ServicesContent() {
           </div>
         </section>
 
-        {/* Category Tabs */}
+        {/* Category Cards with Subcategories */}
         <div className="bg-white border-b sticky top-16 z-30 shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <CategoryTabs 
-              categories={categories} 
-              selectedCategory={selectedCategory}
-            />
+            <div className="flex overflow-x-auto gap-3 pb-2">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => handleCategoryClick(category)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full font-medium transition-all ${
+                    selectedCategorySlug === category.slug
+                      ? 'bg-yellow-400 text-gray-900'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Services Grid */}
+        {/* Services Section - Main Category + First Subcategory Cards */}
         <section id="services-section" className="py-8 md:py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-6">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900">
-                {selectedCategory 
-                  ? categories.find(c => c.slug === selectedCategory)?.name || 'Services'
-                  : 'All Services'
-                }
-              </h2>
-              <p className="text-gray-600">
-                {filteredServices.length} service{filteredServices.length !== 1 ? 's' : ''} available
-              </p>
-            </div>
-
-            {filteredServices.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-                {filteredServices.map((service) => (
-                  <div 
-                    key={service.id}
-                    onClick={() => handleServiceClick(service)}
-                    className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-yellow-300 hover:shadow-lg transition-all duration-300 cursor-pointer"
-                  >
-                    <div className="relative h-40 md:h-44 overflow-hidden bg-gray-100">
-                      {service.image ? (
-                        <img
-                          src={getImageUrl(service.image)}
-                          alt={service.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
-                          <span className="text-4xl">🔧</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-4">
-                      <h3 className="font-bold text-gray-900 mb-1 line-clamp-1">
-                        {service.name}
-                      </h3>
-                      <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                        {service.description}
-                      </p>
-                      <button className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm">
-                        Book Now
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            {selectedCategory && (
+              <div className="mb-6">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                  {selectedCategory.name}
+                </h2>
+                <p className="text-gray-600">
+                  {selectedCategory.subcategories?.[0]?.name || 'Select a service'}
+                </p>
               </div>
+            )}
+
+            {subcategoryServices.length > 0 ? (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+                  {subcategoryServices.map((service) => (
+                    <div 
+                      key={service.id}
+                      onClick={() => handleServiceClick(service)}
+                      className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-yellow-300 hover:shadow-lg transition-all duration-300 cursor-pointer"
+                    >
+                      <div className="relative h-40 md:h-44 overflow-hidden bg-gray-100">
+                        {service.image ? (
+                          <img
+                            src={getImageUrl(service.image)}
+                            alt={service.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                            <span className="text-4xl">🔧</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-4">
+                        <h3 className="font-bold text-gray-900 mb-1 line-clamp-1">
+                          {service.name}
+                        </h3>
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {service.description}
+                        </p>
+                        <button className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm">
+                          Book Now
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="text-center py-16">
                 <div className="text-6xl mb-4">🔍</div>
