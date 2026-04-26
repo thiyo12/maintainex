@@ -38,7 +38,9 @@ export async function GET() {
       icon: cat.icon,
       image: cat.image,
       displayOrder: cat.displayOrder,
-      serviceCount: cat._count.services,
+      _count: {
+        services: cat._count.services
+      },
       services: cat.services.map(serializeService)
     }))
 
