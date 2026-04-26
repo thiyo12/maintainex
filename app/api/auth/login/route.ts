@@ -4,6 +4,45 @@ import bcrypt from 'bcryptjs'
 
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
 
+if (!process.env.NEXTAUTH_SECRET) {
+  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+}
+
+const rateLimitMap = new Map<string, { attempts: number; lockedUntil: number }>()
+const MAX_ATTEMPTS = 5
+const LOCK_DURATION_MS = 15 * 60 * 1000
+
+function checkRateLimit(ip: string): { blocked: boolean; remainingAttempts: number } {
+  const now = Date.now()
+  const record = rateLimitMap.get(ip)
+  
+  if (!record) return { blocked: false, remainingAttempts: MAX_ATTEMPTS }
+  
+  if (record.lockedUntil > now) {
+    return { blocked: true, remainingAttempts: 0 }
+  }
+  
+  if (now > record.lockedUntil) {
+    rateLimitMap.delete(ip)
+    return { blocked: false, remainingAttempts: MAX_ATTEMPTS }
+  }
+  
+  return { blocked: false, remainingAttempts: MAX_ATTEMPTS - record.attempts }
+}
+
+function recordFailedAttempt(ip: string) {
+  const now = Date.now()
+  const record = rateLimitMap.get(ip) || { attempts: 0, lockedUntil: 0 }
+  
+  record.attempts += 1
+  
+  if (record.attempts >= MAX_ATTEMPTS) {
+    record.lockedUntil = now + LOCK_DURATION_MS
+  }
+  
+  rateLimitMap.set(ip, record)
+}
+
 function createSimpleToken(data: any): string {
   const payload = {
     ...data,
@@ -35,6 +74,13 @@ function verifySimpleToken(token: string): any {
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown'
+    const rateLimit = checkRateLimit(ip)
+    
+    if (rateLimit.blocked) {
+      return NextResponse.json({ error: 'Too many login attempts. Please try again later.' }, { status: 429 })
+    }
+    
     const body = await request.json()
     const { email, password } = body
 
@@ -47,6 +93,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!admin) {
+      recordFailedAttempt(ip)
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
@@ -57,6 +104,7 @@ export async function POST(request: NextRequest) {
     const isValid = await bcrypt.compare(password, admin.password)
 
     if (!isValid) {
+      recordFailedAttempt(ip)
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
@@ -70,7 +118,7 @@ export async function POST(request: NextRequest) {
       canEditServices: admin.canEditServices
     })
     
-    console.log('Login successful for:', admin.email, 'role:', admin.role, 'canEditServices:', admin.canEditServices, 'province:', admin.province)
+    console.log('✅ Admin login successful')
 
     const response = NextResponse.json({
       success: true,

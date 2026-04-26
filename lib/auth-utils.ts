@@ -1,5 +1,9 @@
 import { NextRequest } from 'next/server'
 
+if (!process.env.NEXTAUTH_SECRET) {
+  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+}
+
 export interface SessionUser {
   id: string
   email: string
@@ -11,16 +15,12 @@ export interface SessionUser {
 }
 
 export async function getSession(request: NextRequest): Promise<SessionUser | null> {
-  // First try to get from Authorization header (from localStorage auth)
   const authHeader = request.headers.get('Authorization')
-  console.log('Auth header found:', authHeader ? 'yes' : 'no')
   
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
-      const token = authHeader.substring(7) // Remove 'Bearer ' prefix
-      console.log('Token:', token)
+      const token = authHeader.substring(7)
       const decoded = JSON.parse(atob(token))
-      console.log('Decoded token:', decoded)
       if (decoded.id && decoded.email && decoded.role) {
         return {
           id: decoded.id,
@@ -32,8 +32,7 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
           canEditServices: decoded.canEditServices || false
         }
       }
-    } catch (e) {
-      console.log('Failed to parse auth header:', e)
+    } catch {
       // Fall through to cookie check
     }
   }

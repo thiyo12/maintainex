@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+if (!process.env.NEXTAUTH_SECRET) {
+  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+}
+
 const securityHeaders = {
   'X-DNS-Prefetch-Control': 'on',
   'X-Frame-Options': 'SAMEORIGIN',
