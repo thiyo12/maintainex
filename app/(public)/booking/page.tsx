@@ -8,23 +8,17 @@ import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiClock, FiCheck, FiChevronRight, FiChevronLeft, FiMessageCircle } from 'react-icons/fi'
 import { DISTRICTS } from '@/lib/districts'
 
+interface Service {
+  id: string
+  name: string
+  price: number
+  description?: string
+}
+
 interface Category {
   id: string
   name: string
-  slug: string
-  serviceCount: number
   services: Service[]
-}
-
-interface Service {
-  id: string
-  title: string
-  slug: string
-  description: string
-  image: string | null
-  price: number | null
-  duration: number | null
-  categoryId: string
 }
 
 interface StoredService {
@@ -32,12 +26,6 @@ interface StoredService {
   name: string
   price: number
   category?: string
-  categoryId?: string
-}
-
-interface SelectedCategoryData {
-  mainCategory: string
-  categoryName: string
 }
 
 const WHATSAPP_NUMBER = '94770867609'
@@ -82,8 +70,6 @@ function BookingContent() {
   const [error, setError] = useState('')
   const [showServiceSelector, setShowServiceSelector] = useState(false)
   const [storedService, setStoredService] = useState<StoredService | null>(null)
-  const [selectedCategoryData, setSelectedCategoryData] = useState<SelectedCategoryData | null>(null)
-  const [categoryServices, setCategoryServices] = useState<Service[]>([])
   
   const [formData, setFormData] = useState({
     name: '',
@@ -98,63 +84,21 @@ function BookingContent() {
   })
 
   useEffect(() => {
-    loadStoredData()
-    fetchServices()
-  }, [])
-
-  const loadStoredData = () => {
+    // Read service from localStorage immediately
     try {
       const stored = localStorage.getItem('selectedService')
       if (stored) {
         const serviceData = JSON.parse(stored) as StoredService
         setStoredService(serviceData)
         setFormData(prev => ({ ...prev, serviceId: serviceData.id }))
-        
-        if (serviceData.category && serviceData.categoryId) {
-          setSelectedCategoryData({
-            mainCategory: serviceData.category,
-            categoryName: serviceData.category
-          })
-        }
       }
     } catch (err) {
-      console.error('Error reading stored data:', err)
+      console.error('Error reading stored service:', err)
     }
-  }
-  
-  useEffect(() => {
-    if (selectedCategoryData && categories.length > 0) {
-      const stored = localStorage.getItem('selectedService')
-      if (stored) {
-        const serviceData = JSON.parse(stored) as StoredService
-        const mainCat = categories.find(c => c.services?.some(s => s.id === serviceData.id))
-        if (mainCat) {
-          setCategoryServices(mainCat.services || [])
-        }
-      }
-    }
-  }, [selectedCategoryData, categories])
-
-  useEffect(() => {
-    if (step === 2 && !formData.serviceId && categoryServices.length > 0) {
-      if (!formData.serviceId) {
-        const defaultService = categoryServices[0]
-        if (defaultService) {
-          setFormData(prev => ({ ...prev, serviceId: defaultService.id }))
-          const stored = localStorage.getItem('selectedService')
-          if (stored) {
-            const s = JSON.parse(stored)
-            setStoredService({
-              ...s,
-              id: defaultService.id,
-              name: defaultService.title,
-              price: defaultService.price
-            })
-          }
-        }
-      }
-    }
-  }, [step, formData.serviceId, categoryServices])
+    
+    // Fetch categories in background for the selector
+    fetchServices()
+  }, [])
 
   useEffect(() => {
     if (step === 2 && !formData.serviceId) {
@@ -164,21 +108,8 @@ function BookingContent() {
 
   useEffect(() => {
     const serviceId = searchParams.get('serviceId')
-    const categorySlug = searchParams.get('category')
     if (serviceId) {
       setFormData(prev => ({ ...prev, serviceId }))
-    }
-    if (categorySlug) {
-      const stored = localStorage.getItem('selectedService')
-      if (stored) {
-        const s = JSON.parse(stored)
-        if (s.categoryId) {
-          setSelectedCategoryData({
-            mainCategory: s.category,
-            categoryName: s.category
-          })
-        }
-      }
     }
   }, [searchParams])
 
@@ -197,16 +128,17 @@ function BookingContent() {
   }
 
   const selectedService = categories
-    .flatMap(c => c.services || [])
+    .flatMap(c => c.services)
     .find(s => s.id === formData.serviceId)
 
   const selectedCategory = categories.find(c => 
-    c.services?.some(s => s.id === formData.serviceId)
+    c.services.some(s => s.id === formData.serviceId)
   )
 
+  // Use stored service for immediate display, fallback to API data
   const displayService = storedService || (selectedService ? {
     id: selectedService.id,
-    name: selectedService.title,
+    name: selectedService.name,
     price: selectedService.price
   } : null)
   
@@ -498,56 +430,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
               
-              {/* Category Header with all services */}
-              {selectedCategoryData && selectedCategoryData.mainCategory && (
-                <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-4">
-                  <p className="text-lg font-bold text-dark-900 mb-3">
-                    {selectedCategoryData.mainCategory}
-                  </p>
-                  <div className="space-y-2">
-                    {preSelectedServices.length > 0 ? (
-                      preSelectedServices.map((service: any) => (
-                        <button
-                          key={service.id}
-                          onClick={() => {
-                            setFormData({ ...formData, serviceId: service.id })
-                            setStoredService({
-                              id: service.id,
-                              name: service.title,
-                              price: service.price,
-                              category: selectedCategoryData.categoryName
-                            })
-                          }}
-                          className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
-                            formData.serviceId === service.id
-                              ? 'border-primary-500 bg-primary-50' 
-                              : 'border-gray-200 hover:border-primary-300'
-                          }`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{service.title}</span>
-                            <span className="font-bold text-primary-600">
-                              Rs. {service.price?.toLocaleString()}
-                            </span>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-gray-500">No services available</p>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Selected Service Display (when NOT from services page) */}
-              {displayService && !selectedCategoryData && (
-                    )}
-                  </div>
-                </div>
-              )}
-              
               {/* Selected Service Display */}
-              {displayService && !selectedCategoryData && (
+              {displayService && (
                 <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
                   <div className="flex items-center justify-between">
                     <div>
