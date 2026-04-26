@@ -9,7 +9,10 @@ function generateQuotationNumber(): string {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('=== Quotations GET called ===')
     const session = await getSession(request)
+    console.log('Session:', session)
+    
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -28,16 +31,22 @@ export async function GET(request: NextRequest) {
 
     if (status) where.status = status
 
+    console.log('Query where:', where)
+
     const quotations = await prisma.quotation.findMany({
       where,
       include: { branch: { select: { id: true, name: true } }, items: true },
       orderBy: { createdAt: 'desc' }
     })
 
+    console.log('Quotations found:', quotations.length)
     return NextResponse.json(quotations)
   } catch (error) {
-    console.error('Quotations fetch error:', error)
-    return NextResponse.json({ error: 'Failed to fetch quotations' }, { status: 500 })
+    console.error('!!! Quotations fetch error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to fetch quotations', 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
   }
 }
 

@@ -291,7 +291,7 @@ export default function AdminServices() {
     
     try {
       const url = editingService ? `/api/services/${editingService.id}` : '/api/services'
-      const method = editingService ? 'PUT' : 'POST'
+      const method = editingService ? 'PATCH' : 'POST'
       
       const bodyData: any = {
         type: 'service',
@@ -361,7 +361,7 @@ export default function AdminServices() {
     try {
       const authHeaders = getAuthHeader()
       const res = await fetch(`/api/services/${service.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'service',
@@ -402,7 +402,7 @@ export default function AdminServices() {
     try {
       const authHeaders = getAuthHeader()
       const res = await fetch(`/api/services/${draggedServiceId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'service',

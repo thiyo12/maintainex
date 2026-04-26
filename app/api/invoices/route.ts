@@ -9,7 +9,10 @@ function generateInvoiceNumber(): string {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('=== Invoices GET called ===')
     const session = await getSession(request)
+    console.log('Session:', session)
+    
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -30,16 +33,22 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status
     if (paymentStatus) where.paymentStatus = paymentStatus
 
+    console.log('Query where:', where)
+
     const invoices = await prisma.invoice.findMany({
       where,
       include: { branch: { select: { id: true, name: true } }, items: true },
       orderBy: { createdAt: 'desc' }
     })
 
+    console.log('Invoices found:', invoices.length)
     return NextResponse.json(invoices)
   } catch (error) {
-    console.error('Invoices fetch error:', error)
-    return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
+    console.error('!!! Invoices fetch error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to fetch invoices', 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
   }
 }
 
