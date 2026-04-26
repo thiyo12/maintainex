@@ -146,9 +146,30 @@ function BookingContent() {
   const displayCategory = storedService?.category || selectedCategory?.name || ''
 
   const handleServiceSelect = (serviceId: string) => {
+    const service = categories
+      .flatMap(c => c.services)
+      .find(s => s.id === serviceId)
+    const category = categories.find(c => 
+      c.services.some(s => s.id === serviceId)
+    )
+    
     setFormData({ ...formData, serviceId })
     setShowServiceSelector(false)
-    setStep(2)
+    
+    if (service) {
+      setStoredService({
+        id: service.id,
+        name: service.name,
+        price: service.price,
+        category: category?.name
+      })
+    }
+    
+    if (step === 1) {
+      // Stay on step 1, just update the service
+    } else {
+      setStep(2)
+    }
   }
 
   const canProceed = () => {
@@ -488,25 +509,25 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                         ×
                       </button>
                     </div>
-                    <div className="overflow-y-auto max-h-[60vh] p-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-1 gap-3">
+                    <div className="overflow-y-auto max-h-[60vh] p-2 sm:p-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
                         {categories
                           .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
                           .map(category => (
-                            <div key={category.id} className={displayCategory ? 'col-span-2 sm:col-span-1' : ''}>
-                              {!displayCategory && <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>}
-                              <div className="space-y-2">
+                            <div key={category.id}>
+                              {!displayCategory && <h4 className="font-bold text-gray-700 mb-1 text-xs sm:text-sm">{category.name}</h4>}
+                              <div className="grid grid-cols-1 gap-1">
                                 {category.services.map(service => (
                                   <button
                                     key={service.id}
                                     onClick={() => handleServiceSelect(service.id)}
-                                    className={`w-full text-left p-2 sm:p-3 rounded-xl border-2 transition-all ${
+                                    className={`w-full text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
                                       formData.serviceId === service.id 
                                         ? 'border-primary-500 bg-primary-50' 
                                         : 'border-gray-200 hover:border-primary-300'
                                     }`}
                                   >
-                                    <div className="flex justify-between items-center text-xs sm:text-sm">
+                                    <div className="flex justify-between items-center">
                                       <span className="font-medium truncate">{service.name}</span>
                                       <span className="font-bold text-primary-600 whitespace-nowrap">LKR {service.price?.toLocaleString()}+</span>
                                     </div>
