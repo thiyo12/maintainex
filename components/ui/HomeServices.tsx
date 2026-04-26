@@ -21,6 +21,7 @@ interface Category {
   slug: string
   description: string | null
   icon: string | null
+  image: string | null
   services: Service[]
 }
 
@@ -69,6 +70,20 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
     : categories[0]
 
   const featuredServices = featuredCategory?.services || []
+
+  const handleCategoryClick = (category: Category) => {
+    const firstSvc = category.services?.[0]
+    if (firstSvc) {
+      localStorage.setItem('selectedService', JSON.stringify({
+        id: firstSvc.id,
+        name: firstSvc.title,
+        price: firstSvc.price,
+        category: category.name,
+        categoryId: category.id
+      }))
+      window.location.href = `/booking?serviceId=${firstSvc.id}&category=${category.slug}`
+    }
+  }
 
   const handleBookNow = (service: Service) => {
     localStorage.setItem('selectedService', JSON.stringify({
@@ -124,8 +139,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           </div>
         </div>
 
-        {/* Featured Service Card - TaskRabbit Style */}
-        {featuredServices.length > 0 && (
+        {/* Featured Service Card - Show only for specific category */}
+        {selectedCategory && featuredServices.length > 0 && (
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg mb-8 border border-gray-100">
             <div className="grid sm:grid-cols-1 md:grid-cols-2">
               <div className="relative h-auto max-h-[60vh] aspect-video">
@@ -210,8 +225,56 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           </div>
         )}
 
-        {/* Services Grid - Responsive */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
+        {/* All Services - Show Category Cards */}
+        {selectedCategory === null && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+            {categories.map((category) => {
+              const firstSvc = category.services?.[0]
+              return (
+                <div 
+                  key={category.id}
+                  className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
+                >
+                  <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
+                    {category.image ? (
+                      <img
+                        src={getImageUrl(category.image)}
+                        alt={category.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                        <span className="text-4xl">{categoryIcons[category.slug] || '🧹'}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4">
+                    <h3 className="font-bold text-gray-900 mb-1">
+                      {category.name}
+                    </h3>
+                    <p className="text-gray-600 text-sm mb-2">
+                      {firstSvc?.title || 'No services'}
+                    </p>
+                    <p className="text-lg font-bold text-primary-600 mb-3">
+                      {firstSvc?.price ? `Starting from LKR ${firstSvc.price.toLocaleString()}+` : 'Contact us'}
+                    </p>
+                    <button 
+                      onClick={() => handleCategoryClick(category)}
+                      className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-2 rounded-lg transition-colors text-sm"
+                    >
+                      Book Now
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Specific Category - Show Services Grid */}
+        {selectedCategory && (
+          <>
           {filteredServices.slice(0, 8).map((service) => (
             <div
               key={service.id}
@@ -260,7 +323,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               </div>
             </div>
           ))}
-        </div>
+          </>
+        )}
 
         {/* View All Services */}
         <div className="text-center mt-10">
