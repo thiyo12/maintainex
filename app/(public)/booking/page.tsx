@@ -153,7 +153,10 @@ function BookingContent() {
           }
         }
       }
-useEffect(() => {
+    }
+  })
+
+  useEffect(() => {
     if (step === 2 && !formData.serviceId) {
       setShowServiceSelector(true)
     }
