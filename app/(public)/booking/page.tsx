@@ -489,26 +489,26 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       </button>
                     </div>
                     <div className="overflow-y-auto max-h-[60vh] p-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-1 gap-3">
                         {categories
                           .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
                           .map(category => (
-                            <div key={category.id} className={displayCategory ? 'col-span-1 sm:col-span-2' : ''}>
+                            <div key={category.id} className={displayCategory ? 'col-span-2 sm:col-span-1' : ''}>
                               {!displayCategory && <h4 className="font-bold text-gray-700 mb-2">{category.name}</h4>}
                               <div className="space-y-2">
                                 {category.services.map(service => (
                                   <button
                                     key={service.id}
                                     onClick={() => handleServiceSelect(service.id)}
-                                    className={`w-full text-left p-3 sm:p-4 rounded-xl border-2 transition-all ${
+                                    className={`w-full text-left p-2 sm:p-3 rounded-xl border-2 transition-all ${
                                       formData.serviceId === service.id 
                                         ? 'border-primary-500 bg-primary-50' 
                                         : 'border-gray-200 hover:border-primary-300'
                                     }`}
                                   >
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-medium text-sm">{service.name}</span>
-                                      <span className="font-bold text-primary-600 text-sm">LKR {service.price?.toLocaleString()}+</span>
+                                    <div className="flex justify-between items-center text-xs sm:text-sm">
+                                      <span className="font-medium truncate">{service.name}</span>
+                                      <span className="font-bold text-primary-600 whitespace-nowrap">LKR {service.price?.toLocaleString()}+</span>
                                     </div>
                                   </button>
                                 ))}
