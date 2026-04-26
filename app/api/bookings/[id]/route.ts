@@ -81,6 +81,50 @@ export async function PATCH(
       data: { status }
     })
 
+    // Auto-create invoice when booking is completed
+    if (status === 'COMPLETED' && existingBooking.status !== 'COMPLETED') {
+      try {
+        const service = booking.serviceId 
+          ? await prisma.service.findUnique({ where: { id: booking.serviceId } })
+          : null
+
+        const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`
+        const invoiceBranchId = booking.branchId || session.branchId || ''
+        
+        const invoice = await prisma.invoice.create({
+          data: {
+            invoiceNumber,
+            branchId: invoiceBranchId,
+            customerName: booking.name || 'Unknown Customer',
+            customerEmail: booking.email,
+            customerPhone: booking.phone,
+            customerAddress: booking.address,
+            subtotal: booking.totalPrice || 0,
+            tax: 0,
+            total: booking.totalPrice || 0,
+            status: 'DRAFT',
+            paymentStatus: 'UNPAID',
+            notes: `Booking Reference: ${booking.id.slice(-8).toUpperCase()}${service ? ` - ${service.name}` : ''}`,
+            createdBy: session.id,
+            items: service ? {
+              create: [{
+                description: service.name,
+                quantity: 1,
+                unitPrice: booking.totalPrice || 0,
+                totalPrice: booking.totalPrice || 0
+              }]
+            } : undefined
+          },
+          include: { items: true }
+        })
+        
+        console.log('Auto-created invoice:', invoice.id, 'for booking:', booking.id)
+      } catch (invErr) {
+        console.error('Failed to auto-create invoice:', invErr)
+        // Don't fail the booking update if invoice creation fails
+      }
+    }
+
     let service = null
     if (booking.serviceId) {
       service = await prisma.service.findUnique({

@@ -57,6 +57,7 @@ export default function AdminInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null)
   const [filterStatus, setFilterStatus] = useState('')
@@ -77,12 +78,10 @@ export default function AdminInvoices() {
     items: [{ description: '', quantity: 1, unitPrice: 0, totalPrice: 0 }] as InvoiceItem[]
   })
 
-  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-
   useEffect(() => {
     fetchInvoices()
-    if (isSuperAdmin) fetchBranches()
-  }, [filterStatus, filterPayment, filterBranch])
+    if (user?.role === 'SUPER_ADMIN') fetchBranches()
+  }, [user, filterStatus, filterPayment, filterBranch])
 
   const fetchInvoices = async () => {
     try {
@@ -94,17 +93,35 @@ export default function AdminInvoices() {
       const url = `/api/invoices${params.toString() ? '?' + params : ''}`
       const res = await fetch(url, { headers: getAuthHeader() })
       
+      console.log('Invoices fetch response:', res.status)
+      
       if (res.status === 401) {
         window.location.href = '/admin/login'
         return
       }
       
+      if (res.status === 403 || res.status === 404) {
+        setInvoices([])
+        setLoading(false)
+        return
+      }
+      
       const data = await res.json()
+      console.log('Invoices data:', data)
+      
       if (Array.isArray(data)) {
         setInvoices(data)
+      } else if (data.error) {
+        console.error('Invoices API error:', data.error)
+        toast.error(data.error)
+        setInvoices([])
+      } else {
+        setInvoices([])
       }
     } catch (err) {
+      console.error('Fetch invoices error:', err)
       toast.error('Failed to fetch invoices')
+      setInvoices([])
     } finally {
       setLoading(false)
     }
@@ -298,7 +315,7 @@ export default function AdminInvoices() {
           <option value="PAID">Paid</option>
         </select>
 
-        {isSuperAdmin && (
+        {user?.role === 'SUPER_ADMIN' && (
           <select
             value={filterBranch}
             onChange={(e) => setFilterBranch(e.target.value)}

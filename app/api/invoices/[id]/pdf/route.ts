@@ -30,27 +30,67 @@ export async function GET(
     const jsPDF = require('jspdf')
     const doc = new jsPDF()
 
-    doc.setFontSize(20)
-    doc.text('INVOICE', 20, 20)
-
+    // Header
+    doc.setFillColor(59, 130, 246)
+    doc.rect(0, 0, 210, 40, 'F')
+    
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.setFont('helvetica', 'bold')
+    doc.text('MAINTAINEX', 20, 20)
+    
     doc.setFontSize(12)
-    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 20, 35)
-    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 20, 42)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Professional Cleaning & Maintenance Services', 20, 30)
+    
+    // Company Info in header
+    doc.setFontSize(9)
+    doc.text('Tel: 077 086 7609', 140, 15)
+    doc.text('Email: info@maintainex.lk', 140, 22)
+    doc.text('Web: www.maintainex.lk', 140, 29)
+
+    // Invoice Details
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('INVOICE', 20, 55)
+    
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Invoice #: ${invoice.invoiceNumber}`, 20, 65)
+    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 20, 72)
     if (invoice.dueDate) {
-      doc.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 20, 49)
+      doc.text(`Due Date: ${new Date(invoice.dueDate).toLocaleDateString()}`, 20, 79)
+    }
+    doc.text(`Status: ${invoice.paymentStatus}`, 20, 86)
+
+    // From (Company)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text('From:', 120, 65)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoice.branch.name, 120, 72)
+    if (invoice.branch.location) {
+      doc.text(invoice.branch.location.substring(0, 30), 120, 79)
     }
 
-    doc.text('From:', 140, 35)
-    doc.text(invoice.branch.name, 140, 42)
-    doc.text('To:', 20, 60)
-    doc.text(invoice.customerName, 20, 67)
+    // Bill To (Customer)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Bill To:', 20, 100)
+    doc.setFont('helvetica', 'normal')
+    doc.text(invoice.customerName, 20, 107)
     if (invoice.customerAddress) {
-      doc.text(invoice.customerAddress, 20, 74)
+      doc.text(invoice.customerAddress.substring(0, 40), 20, 114)
     }
     if (invoice.customerPhone) {
-      doc.text(invoice.customerPhone, 20, 81)
+      doc.text(`Tel: ${invoice.customerPhone}`, 20, 121)
+    }
+    if (invoice.customerEmail) {
+      doc.text(invoice.customerEmail, 20, 128)
     }
 
+    // Items Table
     const tableData = invoice.items.map(item => [
       item.description,
       item.quantity.toString(),
@@ -60,24 +100,76 @@ export async function GET(
 
     const autoTable = require('jspdf-autotable')
     autoTable(doc, {
-      startY: 95,
-      head: [['Description', 'Qty', 'Unit Price', 'Total']],
+      startY: 140,
+      head: [['Description', 'Qty', 'Unit Price', 'Total (LKR)']],
       body: tableData,
       theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] }
+      headStyles: { 
+        fillColor: [59, 130, 246],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      bodyStyles: {
+        fontSize: 9
+      },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 20, halign: 'center' },
+        2: { cellWidth: 35, halign: 'right' },
+        3: { cellWidth: 35, halign: 'right' }
+      }
     })
 
     const finalY = (doc as any).lastAutoTable.finalY + 10
-    doc.text(`Subtotal: LKR ${invoice.subtotal.toLocaleString()}`, 140, finalY)
-    doc.text(`Tax: LKR ${invoice.tax.toLocaleString()}`, 140, finalY + 7)
-    doc.setFontSize(14)
-    doc.text(`Total: LKR ${invoice.total.toLocaleString()}`, 140, finalY + 17)
-
-    if (invoice.notes) {
-      doc.setFontSize(10)
-      doc.text('Notes:', 20, finalY + 30)
-      doc.text(invoice.notes, 20, finalY + 37)
+    
+    // Totals
+    doc.setFontSize(10)
+    doc.text(`Subtotal:`, 140, finalY)
+    doc.text(`LKR ${invoice.subtotal.toLocaleString()}`, 180, finalY, { align: 'right' })
+    
+    if (invoice.tax > 0) {
+      doc.text(`Tax:`, 140, finalY + 7)
+      doc.text(`LKR ${invoice.tax.toLocaleString()}`, 180, finalY + 7, { align: 'right' })
     }
+    
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Total:`, 140, finalY + 17)
+    doc.setTextColor(59, 130, 246)
+    doc.text(`LKR ${invoice.total.toLocaleString()}`, 180, finalY + 17, { align: 'right' })
+    doc.setTextColor(0, 0, 0)
+
+    // Payment Info
+    const paymentY = finalY + 35
+    doc.setFillColor(240, 240, 240)
+    doc.rect(120, paymentY - 5, 90, 35, 'F')
+    
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Payment Details', 125, paymentY + 2)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.text('Bank: Commercial Bank', 125, paymentY + 10)
+    doc.text('Account: 1234567890', 125, paymentY + 16)
+    doc.text('Branch: Colombo', 125, paymentY + 22)
+
+    // Notes
+    if (invoice.notes) {
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Notes:', 20, finalY + 30)
+      doc.setFont('helvetica', 'normal')
+      const noteLines = doc.splitTextToSize(invoice.notes, 100)
+      doc.text(noteLines, 20, finalY + 38)
+    }
+
+    // Footer
+    const footerY = 270
+    doc.setFontSize(8)
+    doc.setTextColor(128, 128, 128)
+    doc.text('Thank you for choosing Maintainex!', 105, footerY, { align: 'center' })
+    doc.text('Please contact us if you have any questions.', 105, footerY + 5, { align: 'center' })
 
     const pdfBuffer = doc.output('arraybuffer')
     const blob = new Blob([pdfBuffer], { type: 'application/pdf' })
