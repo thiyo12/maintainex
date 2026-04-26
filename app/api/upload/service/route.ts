@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
-import fs from 'fs'
-import path from 'path'
+import { uploadToCloudinary } from '@/lib/cloudinary'
 
 export async function GET() {
   return NextResponse.json({ 
     message: 'Upload endpoint - use POST to upload images',
-    uploadTo: 'Local VPS Storage'
+    uploadTo: 'Cloudinary'
   })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== Upload API called (Local Storage) ===')
+    console.log('=== Upload API called (Cloudinary) ===')
     
     const session = await getSession(request)
     console.log('Session result:', session)
@@ -39,14 +38,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
     if (!validTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type. Allowed: jpg, png, webp, gif, pdf' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid file type. Allowed: jpg, png, webp, gif' }, { status: 400 })
     }
 
-    const maxSize = 5 * 1024 * 1024
+    const maxSize = 10 * 1024 * 1024
     if (file.size > maxSize) {
-      return NextResponse.json({ error: 'File size exceeds 5MB limit' }, { status: 400 })
+      return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 })
     }
 
     console.log('Reading file buffer...')
@@ -54,50 +53,21 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes)
     console.log('Buffer size:', buffer.length)
 
-    // Sanitize filename - only allow safe characters
-    const timestamp = Date.now()
-    const originalName = file.name || 'file'
-    // Remove any unsafe characters, keep only alphanumeric, dot, dash, underscore
-    const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const fileName = `${timestamp}_${safeName}`
+    // Upload to Cloudinary
+    console.log('Uploading to Cloudinary...')
+    const result: any = await uploadToCloudinary(buffer, 'maintainex/services')
     
-    // Write to /app/public/uploads/services/
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services')
-    
-    console.log('Upload directory:', uploadDir)
-    console.log('CWD:', process.cwd())
-
-    try {
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true })
-        console.log('Created upload directory')
-      }
-    } catch (dirError) {
-      console.error('Failed to create directory:', dirError)
-      return NextResponse.json({ error: 'Failed to create upload directory' }, { status: 500 })
-    }
-
-    const filePath = path.join(uploadDir, fileName)
-    
-    try {
-      fs.writeFileSync(filePath, buffer)
-      console.log('File saved to:', filePath)
-    } catch (writeError) {
-      console.error('Failed to write file:', writeError)
-      return NextResponse.json({ error: 'Failed to save file: ' + String(writeError) }, { status: 500 })
-    }
-
-    const savedPath = `/uploads/services/${fileName}`
+    console.log('Upload success:', result.secure_url)
     
     return NextResponse.json({ 
-      success: true, 
-      url: savedPath,
-      fileName: fileName,
-      savedPath: savedPath
+      url: result.secure_url,
+      publicId: result.public_id
     })
   } catch (error) {
-    console.error('=== UPLOAD ERROR ===')
-    console.error(error)
-    return NextResponse.json({ error: 'Failed to upload file', details: String(error), stack: error instanceof Error ? error.stack : '' }, { status: 500 })
+    console.error('!!! Upload error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to upload file', 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
   }
 }
