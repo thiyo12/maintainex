@@ -154,7 +154,7 @@ function BookingContent() {
         }
       }
     }
-  })
+  }, [step, formData.serviceId, categoryServices])
 
   useEffect(() => {
     if (step === 2 && !formData.serviceId) {
