@@ -304,6 +304,11 @@ export default function AdminServices() {
         isActive: formData.isActive
       }
 
+      console.log('=== Service Update Debug ===')
+      console.log('formData.image:', formData.image)
+      console.log('bodyData.image:', bodyData.image)
+      console.log('editingService.id:', editingService?.id)
+
       if (isSuperAdmin && formData.categoryId) {
         bodyData.categoryId = formData.categoryId
       }
@@ -329,6 +334,8 @@ export default function AdminServices() {
       setShowModal(false)
       setEditingService(null)
       resetForm()
+      // Clear and refetch
+      setCategories([])
       fetchData()
     } catch (err: any) {
       toast.error(err.message || 'Failed to save service')
@@ -424,6 +431,8 @@ export default function AdminServices() {
       toast.error('You do not have permission to edit services')
       return
     }
+    console.log('=== Editing Service ===')
+    console.log('Service image from DB:', service.image)
     setEditingService(service)
     setFormData({
       name: service.name,
@@ -435,6 +444,7 @@ export default function AdminServices() {
       categoryId: service.categoryId,
       isActive: service.isActive
     })
+    console.log('Form data set with image:', service.image || '')
     setShowModal(true)
   }
 

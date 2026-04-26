@@ -245,10 +245,17 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       }
 
       const data = await response.json()
+      console.log('Upload response data:', data)
       const newUrl = data.url
+      console.log('New image URL:', newUrl)
+      
+      if (!newUrl) {
+        throw new Error('No URL returned from upload')
+      }
       
       setCurrentValue(newUrl)
       onChange(newUrl)
+      console.log('onChange called with:', newUrl)
       toast.success('Image uploaded successfully!')
       setUploadProgress(100)
     } catch (err: any) {

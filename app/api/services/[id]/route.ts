@@ -90,6 +90,10 @@ export async function PATCH(
     }
 
     const body = await request.json()
+    console.log('=== PATCH API Received ===')
+    console.log('Request body:', body)
+    console.log('Image field:', body.image)
+    
     const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features } = body
 
     const service = await prisma.service.update({
@@ -109,6 +113,9 @@ export async function PATCH(
       },
       include: { category: true }
     })
+
+    console.log('=== Updated Service ===')
+    console.log('Service image:', service.image)
 
     return NextResponse.json({
       ...service,
