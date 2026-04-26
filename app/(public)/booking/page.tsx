@@ -12,8 +12,19 @@ interface Category {
   id: string
   name: string
   slug: string
-  subcategories: { id: string; name: string; serviceCount: number }[]
+  serviceCount: number
   services: Service[]
+}
+
+interface Service {
+  id: string
+  title: string
+  slug: string
+  description: string
+  image: string | null
+  price: number | null
+  duration: number | null
+  categoryId: string
 }
 
 interface StoredService {
@@ -21,12 +32,11 @@ interface StoredService {
   name: string
   price: number
   category?: string
-  subcategoryId?: string
+  categoryId?: string
 }
 
 interface SelectedCategoryData {
   mainCategory: string
-  subcategoryId: string
   categoryName: string
 }
 
@@ -73,8 +83,7 @@ function BookingContent() {
   const [showServiceSelector, setShowServiceSelector] = useState(false)
   const [storedService, setStoredService] = useState<StoredService | null>(null)
   const [selectedCategoryData, setSelectedCategoryData] = useState<SelectedCategoryData | null>(null)
-  const [preSelectedServices, setPreSelectedServices] = useState<Service[]>([])
-  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string>('')
+  const [categoryServices, setCategoryServices] = useState<Service[]>([])
   
   const [formData, setFormData] = useState({
     name: '',
@@ -100,21 +109,12 @@ function BookingContent() {
         const serviceData = JSON.parse(stored) as StoredService
         setStoredService(serviceData)
         setFormData(prev => ({ ...prev, serviceId: serviceData.id }))
-      }
-      
-      const categoryData = localStorage.getItem('selectedCategory')
-      if (categoryData) {
-        const catData = JSON.parse(categoryData) as SelectedCategoryData
-        setSelectedCategoryData(catData)
-        setSelectedSubcategoryId(catData.subcategoryId)
-        if (catData.subcategoryId && categories.length > 0) {
-          const cat = categories.find(c => 
-            c.subcategories?.some(s => s.id === catData.subcategoryId)
-          )
-          if (cat) {
-            const services = cat.services.filter(s => s.categoryId === catData.subcategoryId)
-            setPreSelectedServices(services)
-          }
+        
+        if (serviceData.category && serviceData.categoryId) {
+          setSelectedCategoryData({
+            mainCategory: serviceData.category,
+            categoryName: serviceData.category
+          })
         }
       }
     } catch (err) {
@@ -123,24 +123,37 @@ function BookingContent() {
   }
   
   useEffect(() => {
-    if (step === 2 && !formData.serviceId && preSelectedServices.length > 0) {
-      if (!formData.serviceId) {
-        const defaultService = preSelectedServices[0]
-        if (defaultService) {
-          setFormData(prev => ({ ...prev, serviceId: defaultService.id }))
-          setStoredService({
-            id: defaultService.id,
-            name: defaultService.name,
-            price: defaultService.price,
-            category: selectedCategoryData?.categoryName,
-            subcategoryId: selectedSubcategoryId
-          })
+    if (selectedCategoryData && categories.length > 0) {
+      const stored = localStorage.getItem('selectedService')
+      if (stored) {
+        const serviceData = JSON.parse(stored) as StoredService
+        const mainCat = categories.find(c => c.services?.some(s => s.id === serviceData.id))
+        if (mainCat) {
+          setCategoryServices(mainCat.services || [])
         }
       }
     }
-  }, [step, formData.serviceId, preSelectedServices])
+  }, [selectedCategoryData, categories])
 
   useEffect(() => {
+    if (step === 2 && !formData.serviceId && categoryServices.length > 0) {
+      if (!formData.serviceId) {
+        const defaultService = categoryServices[0]
+        if (defaultService) {
+          setFormData(prev => ({ ...prev, serviceId: defaultService.id }))
+          const stored = localStorage.getItem('selectedService')
+          if (stored) {
+            const s = JSON.parse(stored)
+            setStoredService({
+              ...s,
+              id: defaultService.id,
+              name: defaultService.title,
+              price: defaultService.price
+            })
+          }
+        }
+      }
+useEffect(() => {
     if (step === 2 && !formData.serviceId) {
       setShowServiceSelector(true)
     }
@@ -148,8 +161,21 @@ function BookingContent() {
 
   useEffect(() => {
     const serviceId = searchParams.get('serviceId')
+    const categorySlug = searchParams.get('category')
     if (serviceId) {
       setFormData(prev => ({ ...prev, serviceId }))
+    }
+    if (categorySlug) {
+      const stored = localStorage.getItem('selectedService')
+      if (stored) {
+        const s = JSON.parse(stored)
+        if (s.categoryId) {
+          setSelectedCategoryData({
+            mainCategory: s.category,
+            categoryName: s.category
+          })
+        }
+      }
     }
   }, [searchParams])
 
@@ -159,21 +185,6 @@ function BookingContent() {
       if (res.ok) {
         const data = await res.json()
         setCategories(data)
-        
-        const categoryData = localStorage.getItem('selectedCategory')
-        if (categoryData) {
-          const catData = JSON.parse(categoryData) as SelectedCategoryData
-          setSelectedCategoryData(catData)
-          setSelectedSubcategoryId(catData.subcategoryId)
-          
-          const mainCat = data.find((c: Category) => 
-            c.subcategories?.some(s => s.id === catData.subcategoryId)
-          )
-          if (mainCat) {
-            const services = mainCat.services.filter((s: Service) => s.categoryId === catData.subcategoryId)
-            setPreSelectedServices(services)
-          }
-        }
       }
     } catch (err) {
       console.error('Error fetching services:', err)
@@ -182,40 +193,17 @@ function BookingContent() {
     }
   }
 
-  const handleSubcategoryChange = (subcategoryId: string) => {
-    setSelectedSubcategoryId(subcategoryId)
-    const mainCat = categories.find(c => 
-      c.subcategories?.some(s => s.id === subcategoryId)
-    )
-    if (mainCat) {
-      const services = mainCat.services.filter((s: Service) => s.categoryId === subcategoryId)
-      setPreSelectedServices(services)
-      if (services.length > 0) {
-        const firstService = services[0]
-        setFormData(prev => ({ ...prev, serviceId: firstService.id }))
-        setStoredService({
-          id: firstService.id,
-          name: firstService.name,
-          price: firstService.price,
-          category: selectedCategoryData?.categoryName,
-          subcategoryId: subcategoryId
-        })
-      }
-    }
-  }
-
   const selectedService = categories
-    .flatMap(c => c.services)
+    .flatMap(c => c.services || [])
     .find(s => s.id === formData.serviceId)
 
   const selectedCategory = categories.find(c => 
-    c.services.some(s => s.id === formData.serviceId)
+    c.services?.some(s => s.id === formData.serviceId)
   )
 
-  // Use stored service for immediate display, fallback to API data
   const displayService = storedService || (selectedService ? {
     id: selectedService.id,
-    name: selectedService.name,
+    name: selectedService.title,
     price: selectedService.price
   } : null)
   
@@ -507,46 +495,49 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
               
-              {/* Subcategory Selection (when coming from Services page) */}
+              {/* Category Header with all services */}
               {selectedCategoryData && selectedCategoryData.mainCategory && (
                 <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-4">
-                  <p className="text-sm text-primary-600 font-medium mb-2">
+                  <p className="text-lg font-bold text-dark-900 mb-3">
                     {selectedCategoryData.mainCategory}
                   </p>
                   <div className="space-y-2">
-                    {selectedCategoryData.subcategoryId ? (
-                      <div>
-                        <p className="font-semibold text-dark-900">
-                          {categories.find(c => 
-                            c.subcategories?.some(s => s.id === selectedCategoryData.subcategoryId)
-                          )?.subcategories?.find(s => s.id === selectedCategoryData.subcategoryId)?.name || 'Select Service'}
-                        </p>
-                        <p className="text-lg font-bold text-primary-600">Rs. {displayService?.price?.toLocaleString()}</p>
-                      </div>
+                    {preSelectedServices.length > 0 ? (
+                      preSelectedServices.map((service: any) => (
+                        <button
+                          key={service.id}
+                          onClick={() => {
+                            setFormData({ ...formData, serviceId: service.id })
+                            setStoredService({
+                              id: service.id,
+                              name: service.title,
+                              price: service.price,
+                              category: selectedCategoryData.categoryName
+                            })
+                          }}
+                          className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+                            formData.serviceId === service.id
+                              ? 'border-primary-500 bg-primary-50' 
+                              : 'border-gray-200 hover:border-primary-300'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{service.title}</span>
+                            <span className="font-bold text-primary-600">
+                              Rs. {service.price?.toLocaleString()}
+                            </span>
+                          </div>
+                        </button>
+                      ))
                     ) : (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Select Service Type:
-                        </label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {categories.find(c => c.name === selectedCategoryData.mainCategory)?.subcategories?.map(sub => (
-                            <button
-                              key={sub.id}
-                              onClick={() => handleSubcategoryChange(sub.id)}
-                              className={`p-3 rounded-xl border-2 text-left transition-all ${
-                                selectedSubcategoryId === sub.id
-                                  ? 'border-primary-500 bg-primary-50' 
-                                  : 'border-gray-200 hover:border-primary-300'
-                              }`}
-                            >
-                              <span className="font-medium">{sub.name}</span>
-                              <span className="block text-sm text-gray-500">
-                                {sub.serviceCount} service{sub.serviceCount !== 1 ? 's' : ''}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                      <p className="text-gray-500">No services available</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Selected Service Display (when NOT from services page) */}
+              {displayService && !selectedCategoryData && (
                     )}
                   </div>
                 </div>

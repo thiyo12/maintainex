@@ -17,20 +17,11 @@ function serializeService(service: any) {
 export async function GET() {
   try {
     const categories = await prisma.category.findMany({
-      where: { 
-        isActive: true,
-        parentId: null 
-      },
+      where: { isActive: true },
       include: {
-        children: {
-          where: { isActive: true },
-          orderBy: { displayOrder: 'asc' },
-          include: {
-            _count: { select: { services: true } }
-          }
-        },
         services: {
-          where: { isActive: true }
+          where: { isActive: true },
+          orderBy: { displayOrder: 'asc' }
         },
         _count: {
           select: { services: true }
@@ -39,25 +30,17 @@ export async function GET() {
       orderBy: { displayOrder: 'asc' }
     })
 
-    const serializedCategories = categories.map(cat => {
-      const firstSubcategory = cat.children[0]
-      const defaultServices = firstSubcategory 
-        ? cat.services.filter(s => s.categoryId === firstSubcategory.id)
-        : cat.services
-      
-      return {
-        ...cat,
-        subcategories: cat.children.map(sub => ({
-          id: sub.id,
-          name: sub.name,
-          slug: sub.slug,
-          displayOrder: sub.displayOrder,
-          serviceCount: sub._count.services
-        })),
-        defaultSubcategoryId: firstSubcategory?.id || null,
-        services: defaultServices.map(serializeService)
-      }
-    })
+    const serializedCategories = categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description,
+      icon: cat.icon,
+      image: cat.image,
+      displayOrder: cat.displayOrder,
+      serviceCount: cat._count.services,
+      services: cat.services.map(serializeService)
+    }))
 
     return NextResponse.json(serializedCategories as any[], {
       headers: {
