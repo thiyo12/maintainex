@@ -13,10 +13,9 @@ export async function DELETE(
     }
     
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canEdit = session.canEditServices === true
 
-    if (!isSuper && !canEdit) {
-      return NextResponse.json({ error: 'You do not have permission to delete services' }, { status: 403 })
+    if (!isSuper) {
+      return NextResponse.json({ error: 'Only Super Admin can delete services' }, { status: 403 })
     }
 
     const serviceId = params.id
@@ -79,10 +78,9 @@ export async function PATCH(
     }
     
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canEdit = session.canEditServices === true
 
-    if (!isSuper && !canEdit) {
-      return NextResponse.json({ error: 'You do not have permission to update services' }, { status: 403 })
+    if (!isSuper) {
+      return NextResponse.json({ error: 'Only Super Admin can update services' }, { status: 403 })
     }
 
     const body = await request.json()

@@ -23,12 +23,11 @@ export async function POST(request: NextRequest) {
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canEdit = session.canEditServices === true
-    console.log('Permissions - isSuper:', isSuper, 'canEdit:', canEdit)
+    console.log('Permissions - isSuper:', isSuper)
 
-    if (!isSuper && !canEdit) {
+    if (!isSuper) {
       console.log('=== PERMISSION DENIED ===')
-      return NextResponse.json({ error: 'You do not have permission to upload images', isSuper, canEdit }, { status: 403 })
+      return NextResponse.json({ error: 'Only Super Admin can upload images' }, { status: 403 })
     }
 
     console.log('Parsing form data...')

@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
     }
     
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canEdit = session.canEditServices === true
 
     const body = await request.json()
     const { type } = body
@@ -91,8 +90,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'service') {
-      if (!isSuper && !canEdit) {
-        return NextResponse.json({ error: 'You do not have permission to add services' }, { status: 403 })
+      if (!isSuper) {
+        return NextResponse.json({ error: 'Only Super Admin can manage services' }, { status: 403 })
       }
 
       if (!body.name || body.name.trim().length < 2) {

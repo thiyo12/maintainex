@@ -43,10 +43,10 @@ interface ServiceItemProps {
   onEdit: (service: Service) => void
   onDelete: (id: string) => void
   onToggleTrending: (service: Service) => void
-  hasEditPermission: boolean
+  isSuperAdmin: boolean
 }
 
-function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, hasEditPermission }: ServiceItemProps) {
+function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, isSuperAdmin }: ServiceItemProps) {
   const [imgError, setImgError] = useState(false)
   
   const {
@@ -71,7 +71,7 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, hasE
       className={`bg-white border border-gray-200 rounded-xl p-4 ${isDragging ? 'shadow-lg ring-2 ring-primary-400' : 'hover:border-gray-300'}`}
     >
       <div className="flex items-center gap-3">
-        {hasEditPermission && (
+        {isSuperAdmin && (
           <button
             {...attributes}
             {...listeners}
@@ -133,7 +133,7 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, hasE
         </div>
 
         <div className="flex items-center gap-2">
-          {hasEditPermission && (
+          {isSuperAdmin && (
             <>
               <button
                 onClick={() => onToggleTrending(service)}
@@ -201,8 +201,6 @@ export default function AdminServices() {
   )
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
-  const canEditServices = user?.canEditServices === true
-  const hasEditPermission = isSuperAdmin || canEditServices
 
   useEffect(() => {
     fetchData()
@@ -422,7 +420,7 @@ export default function AdminServices() {
   }
 
   const editService = (service: Service) => {
-    if (!hasEditPermission) {
+    if (!isSuperAdmin) {
       toast.error('You do not have permission to edit services')
       return
     }
@@ -441,7 +439,7 @@ export default function AdminServices() {
   }
 
   const openAddModal = () => {
-    if (!hasEditPermission) {
+    if (!isSuperAdmin) {
       toast.error('You do not have permission to add services')
       return
     }
@@ -498,14 +496,14 @@ export default function AdminServices() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Services</h1>
           <p className="text-gray-600">
-            {hasEditPermission ? 'Manage your services, drag to reorder categories' : 'View services and pricing'}
+            {isSuperAdmin ? 'Manage your services, drag to reorder categories' : 'View services and pricing'}
           </p>
         </div>
         <div className="flex gap-3">
           <button onClick={fetchData} className="btn-outline flex items-center">
             <FiRefreshCw className="mr-2" /> Refresh
           </button>
-          {hasEditPermission && (
+          {isSuperAdmin && (
             <button onClick={openAddModal} className="btn-primary flex items-center">
               <FiPlus className="mr-2" /> Add Service
             </button>
@@ -513,7 +511,7 @@ export default function AdminServices() {
         </div>
       </div>
 
-      {!hasEditPermission && (
+      {!isSuperAdmin && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
           <p className="text-sm text-amber-700">
             You have view-only access. Contact Super Admin to get permission for editing services.
@@ -579,7 +577,7 @@ export default function AdminServices() {
                       <p className="text-sm text-gray-500">{category.services.length} services</p>
                     </div>
                   </div>
-                  {hasEditPermission && (
+                  {isSuperAdmin && (
                     <button
                       onClick={() => {
                         resetForm()
@@ -608,13 +606,13 @@ export default function AdminServices() {
                           onEdit={editService}
                           onDelete={handleDelete}
                           onToggleTrending={handleToggleTrending}
-                          hasEditPermission={hasEditPermission}
+                          isSuperAdmin={isSuperAdmin}
                         />
                       ))
                     ) : (
                       <div className="bg-white border border-dashed border-gray-300 rounded-xl p-8 text-center">
                         <p className="text-gray-500">No services in this category yet</p>
-                        {hasEditPermission && (
+                        {isSuperAdmin && (
                           <button
                             onClick={() => {
                               resetForm()
@@ -636,7 +634,7 @@ export default function AdminServices() {
           ) : (
             <div className="bg-white rounded-xl p-12 text-center">
               <p className="text-gray-500 mb-4">No categories found</p>
-              {hasEditPermission && (
+              {isSuperAdmin && (
                 <button
                   onClick={() => setShowAddCategory(true)}
                   className="btn-primary"
@@ -650,7 +648,7 @@ export default function AdminServices() {
       </DndContext>
 
       <div className="mt-6">
-        {hasEditPermission && categories.length > 0 && (
+        {isSuperAdmin && categories.length > 0 && (
           <button onClick={openAddModal} className="btn-outline w-full py-4">
             <FiPlus className="inline mr-2" /> Add New Service (General)
           </button>
