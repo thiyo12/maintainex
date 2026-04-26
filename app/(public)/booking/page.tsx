@@ -510,7 +510,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       </button>
                     </div>
                     <div className="overflow-y-auto max-h-[60vh] p-2 sm:p-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {categories
                           .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
                           .map(category => (
