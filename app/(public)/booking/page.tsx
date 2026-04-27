@@ -516,20 +516,16 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                           .map(category => (
                             <div key={category.id}>
                               {!displayCategory && <h4 className="font-bold text-gray-700 mb-1 text-xs sm:text-sm">{category.name}</h4>}
-                              <div className="grid grid-cols-2 gap-1">
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', width: '100%' }}>
                                   {category.services.map(service => (
                                     <button
                                       key={service.id}
                                       onClick={() => handleServiceSelect(service.id)}
-                                      className={`w-full text-left p-1 sm:p-2 rounded border text-xs sm:text-sm ${
-                                        formData.serviceId === service.id 
-                                          ? 'border-primary-500 bg-primary-50' 
-                                          : 'border-gray-200 hover:border-primary-300'
-                                      }`}
+                                      style={{ width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: formData.serviceId === service.id ? '2px solid #E5AF00' : '1px solid #E5E5E5', backgroundColor: formData.serviceId === service.id ? '#FFF9E6' : '#FFFFFF' }}
                                     >
-                                      <div className="flex justify-between items-center">
-                                        <span className="font-medium truncate">{service.name}</span>
-                                        <span className="font-bold text-primary-600 whitespace-nowrap">LKR {service.price?.toLocaleString()}+</span>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{service.name}</span>
+                                        <span style={{ fontWeight: 'bold', color: '#E5AF00', whiteSpace: 'nowrap' }}>LKR {service.price?.toLocaleString()}+</span>
                                       </div>
                                     </button>
                                   ))}
