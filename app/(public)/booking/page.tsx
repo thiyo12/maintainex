@@ -510,18 +510,18 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       </button>
                     </div>
                     <div className="overflow-y-auto max-h-[60vh] p-2 sm:p-4">
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-2 w-full">
                         {categories
                           .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
                           .map(category => (
                             <div key={category.id}>
                               {!displayCategory && <h4 className="font-bold text-gray-700 mb-1 text-xs sm:text-sm">{category.name}</h4>}
-                              <div className="grid grid-cols-2 gap-1 w-full break-inside-avoid">
+                              <div className="grid grid-cols-2 gap-1 w-full break-inside-avoid [&>*]:min-w-0">
                                 {category.services.map(service => (
                                   <button
                                     key={service.id}
                                     onClick={() => handleServiceSelect(service.id)}
-                                    className={`text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
+                                    className={`w-full text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
                                       formData.serviceId === service.id 
                                         ? 'border-primary-500 bg-primary-50' 
                                         : 'border-gray-200 hover:border-primary-300'
