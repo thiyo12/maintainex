@@ -516,7 +516,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                           .map(category => (
                             <div key={category.id}>
                               {!displayCategory && <h4 className="font-bold text-gray-700 mb-1 text-xs sm:text-sm">{category.name}</h4>}
-                              <div className="grid grid-cols-1 gap-1">
+                              <div className="grid grid-cols-2 gap-1">
                                 {category.services.map(service => (
                                   <button
                                     key={service.id}
