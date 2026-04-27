@@ -71,6 +71,8 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
                       alt={service.name}
                       onError={() => handleImageError(service.id)}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <Image

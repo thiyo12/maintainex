@@ -151,6 +151,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     className="w-full h-full object-cover"
                     onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                     onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <Image
@@ -241,6 +243,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                         src={getImageUrl(firstSvc.image)}
                         alt={category.name}
                         className="w-full h-full object-cover"
+                        loading="lazy"
+                        decoding="async"
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
@@ -281,13 +285,15 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-[275ms] hover:scale-105 hover:z-10"
             >
               <div className="relative h-auto max-h-[40vh] aspect-video overflow-hidden">
-                {service.image?.startsWith('/uploads/') ? (
-                  <img
-                    src={getImageUrl(service.image)}
-                    alt={service.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
+{service.image?.startsWith('/uploads/') ? (
+                    <img
+                      src={getImageUrl(service.image)}
+                      alt={service.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
                   <Image
                     src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
                     alt={service.title}

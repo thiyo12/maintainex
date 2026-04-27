@@ -53,6 +53,8 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
                 src={getImageUrl(service.image)}
                 alt={service.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+                decoding="async"
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">

@@ -138,6 +138,8 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
             alt={currentSlide.name}
             className="w-full h-full object-cover"
             crossOrigin="anonymous"
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <img
@@ -145,6 +147,8 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
             alt={currentSlide.name}
             className="w-full h-full object-cover"
             onError={() => handleImageError(currentIndex)}
+            loading="lazy"
+            decoding="async"
           />
         )}
         

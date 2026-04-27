@@ -17,13 +17,15 @@ export function ServiceCard({ title, description, image, slug, price }: ServiceC
   return (
     <div className="card group">
       <div className="relative h-48 overflow-hidden">
-        {isUploadedImage ? (
-          <img
-            src={imageSrc}
-            alt={title}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-        ) : (
+{isUploadedImage ? (
+            <img
+              src={imageSrc}
+              alt={title}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
           <Image
             src={imageSrc}
             alt={title}

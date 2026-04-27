@@ -41,14 +41,16 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
       className="group block bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
     >
       <div className="relative h-32 sm:h-40 md:h-48 overflow-hidden">
-        {isUploadedImage ? (
-          <img
-            src={imageSrc}
-            alt={service.title}
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-        ) : (
+{isUploadedImage ? (
+            <img
+              src={imageSrc}
+              alt={service.title}
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : (
           <Image
             src={imageSrc}
             alt={service.title}

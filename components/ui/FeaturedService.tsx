@@ -50,6 +50,8 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
               src={imageSrc}
               alt={category.name}
               className="w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
           ) : (
             <Image
