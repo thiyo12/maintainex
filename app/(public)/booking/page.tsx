@@ -521,7 +521,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                                   <button
                                     key={service.id}
                                     onClick={() => handleServiceSelect(service.id)}
-                                    className={`w-full text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
+                                    className={`text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
                                       formData.serviceId === service.id 
                                         ? 'border-primary-500 bg-primary-50' 
                                         : 'border-gray-200 hover:border-primary-300'
