@@ -516,24 +516,24 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                           .map(category => (
                             <div key={category.id}>
                               {!displayCategory && <h4 className="font-bold text-gray-700 mb-1 text-xs sm:text-sm">{category.name}</h4>}
-                              <div className="grid grid-cols-2 gap-1 w-full break-inside-avoid [&>*]:min-w-0">
-                                {category.services.map(service => (
-                                  <button
-                                    key={service.id}
-                                    onClick={() => handleServiceSelect(service.id)}
-                                    className={`w-full text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
-                                      formData.serviceId === service.id 
-                                        ? 'border-primary-500 bg-primary-50' 
-                                        : 'border-gray-200 hover:border-primary-300'
-                                    }`}
-                                  >
-                                    <div className="flex justify-between items-center">
-                                      <span className="font-medium truncate">{service.name}</span>
-                                      <span className="font-bold text-primary-600 whitespace-nowrap">LKR {service.price?.toLocaleString()}+</span>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
+                              <div className="flex flex-wrap gap-1 w-full">
+                                  {category.services.map(service => (
+                                    <button
+                                      key={service.id}
+                                      onClick={() => handleServiceSelect(service.id)}
+                                      className={`w-[48%] text-left p-1.5 sm:p-2 rounded-lg border text-xs sm:text-sm ${
+                                        formData.serviceId === service.id 
+                                          ? 'border-primary-500 bg-primary-50' 
+                                          : 'border-gray-200 hover:border-primary-300'
+                                      }`}
+                                    >
+                                      <div className="flex justify-between items-center">
+                                        <span className="font-medium truncate">{service.name}</span>
+                                        <span className="font-bold text-primary-600 whitespace-nowrap">LKR {service.price?.toLocaleString()}+</span>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
                             </div>
                           ))}
                       </div>
