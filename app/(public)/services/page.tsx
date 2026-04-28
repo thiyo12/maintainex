@@ -120,13 +120,77 @@ function ServicesContent() {
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 text-center">
               Our Services
             </h1>
+            {selectedCategory && (
+              <p className="text-gray-800 text-center max-w-2xl mx-auto mb-6">
+                {selectedCategory.services?.length || 0} services in {selectedCategory.name}
+              </p>
+            )}
+            {!selectedCategory && (
             <p className="text-gray-800 text-center max-w-2xl mx-auto mb-6">
               Professional home services at your fingertips. Choose a service to get started.
             </p>
+            )}
           </div>
         </section>
 
-        {/* Category Cards */}
+        {/* Show Services in Selected Category */}
+        {selectedCategorySlug && selectedCategory?.services && selectedCategory.services.length > 0 && (
+          <section id="services-list" className="py-8 md:py-12">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                {selectedCategory.services.map((service) => (
+                  <div 
+                    key={service.id}
+                    className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
+                      {service.image ? (
+                        <img
+                          src={getImageUrl(service.image)}
+                          alt={service.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                          <span className="text-4xl">🧹</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4">
+                      <h3 className="font-bold text-gray-900 mb-1">
+                        {service.title}
+                      </h3>
+                      <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                        {service.description || 'Professional service'}
+                      </p>
+                      <p className="text-lg font-bold text-primary-600 mb-3">
+                        {service.price ? `Rs. ${service.price.toLocaleString()}` : 'Contact us'}
+                      </p>
+                      <button 
+                        onClick={() => {
+                          localStorage.setItem('selectedService', JSON.stringify({
+                            id: service.id,
+                            name: service.title,
+                            price: service.price,
+                            category: selectedCategory.name
+                          }))
+                          router.push(`/booking?serviceId=${service.id}&category=${selectedCategory.slug}`)
+                        }}
+                        className="w-full bg-primary-500 hover:bg-primary-600 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm"
+                      >
+                        Book Now
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Category Cards - Show when NO category selected */}
+        {!selectedCategorySlug && (
         <section id="services-section" className="py-8 md:py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
@@ -174,6 +238,7 @@ function ServicesContent() {
             </div>
           </div>
         </section>
+        )}
 
         {/* CTA Section */}
         <section className="py-12 bg-gradient-to-br from-yellow-400 to-yellow-500">
