@@ -40,7 +40,7 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
       {services.map((service) => (
         <Link
           key={service.id}
