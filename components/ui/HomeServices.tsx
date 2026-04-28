@@ -276,17 +276,17 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           </div>
         )}
 
-        {/* Specific Category - Show Services Grid */}
+{/* Specific Category - Show Services Grid */}
         {selectedCategory && (
           <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {filteredServices.slice(0, 8).map((service) => (
-            <div
-              key={service.id}
-              className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-[275ms] hover:scale-105 hover:z-10"
-            >
-              <div className="relative h-auto max-h-[40vh] aspect-video overflow-hidden">
-{service.image?.startsWith('/uploads/') ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              {filteredServices.slice(0, 8).map((service) => (
+                <div
+                  key={service.id}
+                  className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-[275ms] hover:scale-105 hover:z-10"
+                >
+                  <div className="relative h-auto max-h-[40vh] aspect-video overflow-hidden">
+                    {service.image?.startsWith('/uploads/') ? (
                     <img
                       src={getImageUrl(service.image)}
                       alt={service.title}
@@ -329,7 +329,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                 </div>
               </div>
             </div>
-          </div>
+          ))}
+            </div>
           </>
         )}
 
