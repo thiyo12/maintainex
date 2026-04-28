@@ -68,9 +68,6 @@ function ServicesContent() {
       if (res.ok) {
         const data = await res.json()
         setCategories(data)
-        if (data.length > 0 && !categoryParam) {
-          setSelectedCategorySlug(data[0].slug)
-        }
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -120,6 +117,18 @@ function ServicesContent() {
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 text-center">
               Our Services
             </h1>
+            {selectedCategory && (
+              <div className="flex justify-center mb-4">
+                <button 
+                  onClick={() => {
+                    router.push('/services')
+                  }}
+                  className="text-primary-600 hover:text-primary-700 font-medium flex items-center gap-2"
+                >
+                  ← View All Categories
+                </button>
+              </div>
+            )}
             {selectedCategory && (
               <p className="text-gray-800 text-center max-w-2xl mx-auto mb-6">
                 {selectedCategory.services?.length || 0} services in {selectedCategory.name}
