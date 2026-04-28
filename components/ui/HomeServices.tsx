@@ -142,8 +142,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         {/* Featured Service Card - Show only for specific category */}
         {selectedCategory && featuredServices.length > 0 && (
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg mb-8 border border-gray-100">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              <div className="relative h-auto max-h-[60vh] aspect-video">
+            <div className="flex flex-col">
+              <div className="relative h-48 md:h-56">
                 {featuredServices[0]?.image?.startsWith('/uploads/') ? (
                   <img
                     src={getImageUrl(featuredServices[0]?.image)}
