@@ -63,7 +63,7 @@ function BookingLoading() {
 function BookingContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -102,15 +102,18 @@ function BookingContent() {
   }, [])
 
   useEffect(() => {
-    if (step === 2 && !formData.serviceId) {
+    if (categories.length > 0 && step === 0 && !formData.serviceId) {
       setShowServiceSelector(true)
     }
-  }, [step])
+  }, [step, categories, formData.serviceId])
 
   useEffect(() => {
     const serviceId = searchParams.get('serviceId')
     if (serviceId) {
       setFormData(prev => ({ ...prev, serviceId }))
+      if (step === 0) {
+        setStep(1)
+      }
     }
   }, [searchParams])
 
@@ -174,11 +177,13 @@ function BookingContent() {
 
   const canProceed = () => {
     switch (step) {
-      case 1:
-        return formData.name.trim().length >= 1 && formData.phone.trim().length >= 9
+      case 0:
+        return !!formData.serviceId
       case 2:
-        return !!formData.district
+        return formData.name.trim().length >= 1 && formData.phone.trim().length >= 9
       case 3:
+        return !!formData.district
+      case 4:
         return !!formData.date && !!formData.time
       default:
         return true
@@ -190,13 +195,13 @@ function BookingContent() {
       setStep(step + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      if (step === 1 && formData.name.trim().length < 1) {
+      if (step === 2 && formData.name.trim().length < 1) {
         alert('Please enter your name')
-      } else if (step === 1 && formData.phone.trim().length < 9) {
+      } else if (step === 2 && formData.phone.trim().length < 9) {
         alert('Please enter a valid phone number (at least 9 digits)')
-      } else if (step === 2 && !formData.district) {
+      } else if (step === 3 && !formData.district) {
         alert('Please select a district')
-      } else if (step === 3 && (!formData.date || !formData.time)) {
+      } else if (step === 4 && (!formData.date || !formData.time)) {
         alert('Please select date and time')
       }
     }
@@ -361,16 +366,16 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
         <div className="bg-white shadow-sm sticky top-16 z-40">
           <div className="max-w-lg mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
-              {[1, 2, 3, 4].map((s) => (
+              {[0, 1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                     step >= s 
                       ? 'bg-primary-500 text-dark-900' 
                       : 'bg-gray-200 text-gray-500'
                   }`}>
-                    {step > s ? <FiCheck className="text-lg" /> : s}
+                    {step > s ? <FiCheck className="text-lg" /> : s + 1}
                   </div>
-                  {s < 4 && (
+                  {s < 3 && (
                     <div className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 ${
                       step > s ? 'bg-primary-500' : 'bg-gray-200'
                     }`} />
@@ -379,16 +384,48 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
               ))}
             </div>
             <div className="flex justify-between mt-2 text-xs sm:text-sm text-gray-500">
+              <span className={step >= 0 ? 'text-dark-900 font-medium' : ''}>Select Service</span>
               <span className={step >= 1 ? 'text-dark-900 font-medium' : ''}>Your Info</span>
-              <span className={step >= 2 ? 'text-dark-900 font-medium' : ''}>Service</span>
-              <span className={step >= 3 ? 'text-dark-900 font-medium' : ''}>Schedule</span>
-              <span className={step >= 4 ? 'text-dark-900 font-medium' : ''}>Confirm</span>
+              <span className={step >= 2 ? 'text-dark-900 font-medium' : ''}>Schedule</span>
+              <span className={step >= 3 ? 'text-dark-900 font-medium' : ''}>Confirm</span>
             </div>
           </div>
         </div>
 
         {/* Form Content */}
         <div className="max-w-lg mx-auto px-4 py-6">
+          
+          {/* Step 0: Service Selection */}
+          {step === 0 && (
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-xl font-bold text-dark-900 mb-4">Select a Service</h2>
+              <p className="text-gray-600 mb-6 text-sm">Choose from our professional services</p>
+              
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                {categories.map(category => (
+                  <div key={category.id}>
+                    <h4 className="font-bold text-gray-700 mb-2 text-sm">{category.name}</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {category.services.map(service => (
+                        <button
+                          key={service.id}
+                          onClick={() => handleServiceSelect(service.id)}
+                          className={`p-3 rounded-lg border-2 text-left transition-all ${
+                            formData.serviceId === service.id
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-gray-200 hover:border-primary-300'
+                          }`}
+                        >
+                          <div className="font-medium text-sm text-dark-900 truncate">{service.name}</div>
+                          <div className="text-primary-600 font-bold text-sm">LKR {service.price?.toLocaleString()}+</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           {/* Step 1: Basic Info */}
           {step === 1 && (
@@ -468,8 +505,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             </div>
           )}
 
-          {/* Step 2: Service Selection */}
-          {step === 2 && (
+          {/* Step 3: Service Selection */}
+          {step === 3 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
               
@@ -578,8 +615,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             </div>
           )}
 
-          {/* Step 3: Schedule */}
-          {step === 3 && (
+          {/* Step 4: Schedule */}
+          {step === 4 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Schedule</h2>
               
@@ -635,8 +672,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             </div>
           )}
 
-          {/* Step 4: Confirmation */}
-          {step === 4 && (
+          {/* Step 5: Confirmation */}
+          {step === 5 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Booking Summary</h2>
               

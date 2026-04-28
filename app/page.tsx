@@ -143,7 +143,7 @@ export default async function HomePage() {
                 <AnimatedHero />
                 
                 <p className="text-base md:text-xl text-dark-900/80 mb-6 md:mb-8 mt-4 md:mt-8 max-w-lg">
-                  Professional cleaning and maintenance services for homes and businesses across Sri Lanka.
+                  One Partner for All Your Property Maintenance Needs
                 </p>
                 
                 {/* Mobile: Services Slider - Below Hero Text, Above Buttons */}
