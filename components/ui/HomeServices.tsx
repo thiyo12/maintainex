@@ -142,7 +142,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         {/* Featured Service Card - Show only for specific category */}
         {selectedCategory && featuredServices.length > 0 && (
           <div className="bg-white rounded-2xl overflow-hidden shadow-lg mb-8 border border-gray-100">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid md:grid-cols-2 gap-0">
               <div className="relative h-auto max-h-[60vh] aspect-video">
                 {featuredServices[0]?.image?.startsWith('/uploads/') ? (
                   <img
@@ -279,6 +279,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         {/* Specific Category - Show Services Grid */}
         {selectedCategory && (
           <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
           {filteredServices.slice(0, 8).map((service) => (
             <div
               key={service.id}
@@ -328,7 +329,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                 </div>
               </div>
             </div>
-          ))}
+          </div>
           </>
         )}
 
