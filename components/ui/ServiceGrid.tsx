@@ -31,7 +31,7 @@ export default function ServiceGrid({ services, title }: ServiceGridProps) {
       {title && (
         <h3 className="text-2xl font-bold text-gray-900 mb-6">{title}</h3>
       )}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {services.map((service) => (
           <ServiceCardNew key={service.id} service={service} />
         ))}
