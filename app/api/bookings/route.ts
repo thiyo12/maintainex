@@ -77,7 +77,7 @@ function isValidEmail(email: string): boolean {
 
 function isValidPhone(phone: string): boolean {
   const cleaned = phone.replace(/\D/g, '')
-  return cleaned.length >= 10 && cleaned.length <= 15
+  return cleaned.length >= 9 && cleaned.length <= 15
 }
 
 function isValidName(name: string): boolean {
@@ -90,25 +90,25 @@ export async function POST(request: NextRequest) {
     
     let { name, phone, email, district, address, subService, date, time, notes } = body
 
-    if (!name || !phone || !email || !district || !date || !time) {
-      return NextResponse.json({ error: 'Please fill in all required fields: Name, Phone, Email, District, Date, and Time' }, { status: 400 })
+    if (!name || !phone || !district || !date || !time) {
+      return NextResponse.json({ error: 'Please fill in all required fields: Name, Phone, District, Date, and Time' }, { status: 400 })
     }
 
     name = sanitizeString(name)
     phone = sanitizeString(phone)
-    email = sanitizeString(email)
+    email = email ? sanitizeString(email) : ''
     district = sanitizeString(district)
-    address = sanitizeString(address)
+    address = address ? sanitizeString(address) : ''
 
     if (!isValidName(name)) {
       return NextResponse.json({ error: 'Please enter your name (2-100 characters)' }, { status: 400 })
     }
 
     if (!isValidPhone(phone)) {
-      return NextResponse.json({ error: 'Please enter a valid phone number (10-15 digits)' }, { status: 400 })
+      return NextResponse.json({ error: 'Please enter a valid phone number (9-15 digits)' }, { status: 400 })
     }
 
-    if (!isValidEmail(email)) {
+    if (email && !isValidEmail(email)) {
       return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 })
     }
 

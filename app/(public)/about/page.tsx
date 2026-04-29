@@ -157,10 +157,10 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* Industries We Serve */}
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-12">
+        {/* Industries We Serve - Auto Scroll Rolling */}
+        <section className="py-20 bg-gray-50 overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+            <div className="text-center">
               <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
                 Industries We Serve
               </h2>
@@ -168,10 +168,13 @@ export default function AboutPage() {
                 Professional services for every industry
               </p>
             </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+          </div>
+          
+          {/* Rolling Carousel */}
+          <div className="relative">
+            <div className="flex animate-scroll gap-4 md:gap-6 w-max">
               {/* Shopping Malls */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
                   <span className="text-4xl">🏬</span>
                 </div>
@@ -181,7 +184,7 @@ export default function AboutPage() {
               </div>
 
               {/* Schools */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
                   <span className="text-4xl">🏫</span>
                 </div>
@@ -191,7 +194,7 @@ export default function AboutPage() {
               </div>
 
               {/* Real Estate */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
                   <span className="text-4xl">🏠</span>
                 </div>
@@ -201,7 +204,7 @@ export default function AboutPage() {
               </div>
 
               {/* Hospitals */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
                   <span className="text-4xl">🏥</span>
                 </div>
@@ -211,7 +214,7 @@ export default function AboutPage() {
               </div>
 
               {/* Industrial */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
                   <span className="text-4xl">🏭</span>
                 </div>
@@ -221,7 +224,7 @@ export default function AboutPage() {
               </div>
 
               {/* Education Centres */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
                   <span className="text-4xl">📚</span>
                 </div>
@@ -231,7 +234,7 @@ export default function AboutPage() {
               </div>
 
               {/* Office Complex */}
-              <div className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                 <div className="h-32 md:h-40 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
                   <span className="text-4xl">🏢</span>
                 </div>
@@ -240,16 +243,80 @@ export default function AboutPage() {
                 </div>
               </div>
 
-              {/* Partner - MX Cleaning Solution */}
-              <div className="bg-primary-50 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow border-2 border-primary-300">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-primary-200 to-primary-300 flex items-center justify-center">
-                  <span className="text-4xl">🤝</span>
+              {/* Duplicate for continuous scroll effect */}
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                  <span className="text-4xl">🏬</span>
                 </div>
                 <div className="p-4 text-center">
-                  <p className="text-xs text-primary-600 font-medium uppercase mb-1">Partner</p>
-                  <h4 className="font-bold text-dark-900">MX Cleaning Solution</h4>
+                  <h4 className="font-semibold text-dark-900">Shopping Malls</h4>
                 </div>
               </div>
+
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                  <span className="text-4xl">🏫</span>
+                </div>
+                <div className="p-4 text-center">
+                  <h4 className="font-semibold text-dark-900">Schools</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                  <span className="text-4xl">🏠</span>
+                </div>
+                <div className="p-4 text-center">
+                  <h4 className="font-semibold text-dark-900">Real Estate</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+                  <span className="text-4xl">🏥</span>
+                </div>
+                <div className="p-4 text-center">
+                  <h4 className="font-semibold text-dark-900">Hospitals</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                  <span className="text-4xl">🏭</span>
+                </div>
+                <div className="p-4 text-center">
+                  <h4 className="font-semibold text-dark-900">Industrial</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                  <span className="text-4xl">📚</span>
+                </div>
+                <div className="p-4 text-center">
+                  <h4 className="font-semibold text-dark-900">Education Centres</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-32 md:h-40 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
+                  <span className="text-4xl">🏢</span>
+                </div>
+                <div className="p-4 text-center">
+                  <h4 className="font-semibold text-dark-900">Office Complex</h4>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Partner Section - Below Rolling */}
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
+            <div className="text-center">
+              <p className="text-sm text-primary-600 font-medium uppercase mb-2">Our Partner</p>
+              <h3 className="text-2xl font-bold text-dark-900 mb-4">MX Cleaning Solution</h3>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Reliable cleaning partner committed to excellence
+              </p>
             </div>
           </div>
         </section>
