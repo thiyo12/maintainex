@@ -177,7 +177,7 @@ function BookingContent() {
       case 0:
         return !!formData.serviceId
       case 1:
-        return formData.name.trim().length >= 1 && formData.phone.trim().length >= 3
+        return formData.name.trim().length >= 1 && formData.phone.replace(/\D/g, '').length >= 9
       case 2:
         return !!formData.district && !!formData.date && !!formData.time
       case 3:
@@ -196,8 +196,8 @@ function BookingContent() {
         alert('Please select a service')
       } else if (step === 1 && formData.name.trim().length < 1) {
         alert('Please enter your name')
-      } else if (step === 1 && formData.phone.trim().length < 3) {
-        alert('Please enter your phone number')
+      } else if (step === 1 && formData.phone.replace(/\D/g, '').length < 9) {
+        alert('Please enter a valid phone number (at least 9 digits)')
       } else if (step === 2 && !formData.district) {
         alert('Please select a district')
       } else if (step === 2 && !formData.date) {
@@ -485,7 +485,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       placeholder="0712345678"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Can start with 0 (mobile) or landline (e.g., 011...)</p>
+                  <p className="text-xs text-gray-500 mt-1">Enter 9-10 digits (mobile) or more (with country code)</p>
                 </div>
 
                 <div>
@@ -532,63 +532,6 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preferred Date *
-                  </label>
-                  <div className="relative">
-                    <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Preferred Time *
-                  </label>
-                  <div className="relative">
-                    <FiClock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <select
-                      value={formData.time}
-                      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
-                    >
-                      <option value="">Select Time</option>
-                      {TIME_SLOTS.map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all resize-none"
-                    placeholder="Any special requirements..."
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Confirmation */}
-          {step === 3 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-6">Schedule</h2>
-              
-              <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Preferred Date *
