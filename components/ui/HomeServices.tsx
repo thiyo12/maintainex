@@ -344,6 +344,163 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
             <FiArrowRight className="w-5 h-5" />
           </Link>
         </div>
+
+        {/* Industries We Serve - Rolling Carousel */}
+        <div className="mt-20">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-dark-900 mb-2">
+              Industries We Serve
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Professional services for every industry
+            </p>
+          </div>
+          
+          <div className="relative overflow-hidden">
+            <div className="flex animate-scroll gap-4 md:gap-6 w-max">
+              {/* Shopping Malls */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                  <span className="text-3xl">🏬</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Shopping Malls</h4>
+                </div>
+              </div>
+
+              {/* Schools */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                  <span className="text-3xl">🏫</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Schools</h4>
+                </div>
+              </div>
+
+              {/* Real Estate */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                  <span className="text-3xl">🏠</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Real Estate</h4>
+                </div>
+              </div>
+
+              {/* Hospitals */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+                  <span className="text-3xl">🏥</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Hospitals</h4>
+                </div>
+              </div>
+
+              {/* Industrial */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                  <span className="text-3xl">🏭</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Industrial</h4>
+                </div>
+              </div>
+
+              {/* Education Centres */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                  <span className="text-3xl">📚</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Education</h4>
+                </div>
+              </div>
+
+              {/* Office Complex */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
+                  <span className="text-3xl">🏢</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Office</h4>
+                </div>
+              </div>
+
+              {/* Duplicate for continuous scroll */}
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                  <span className="text-3xl">🏬</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Shopping Malls</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                  <span className="text-3xl">🏫</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Schools</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                  <span className="text-3xl">🏠</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Real Estate</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+                  <span className="text-3xl">🏥</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Hospitals</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                  <span className="text-3xl">🏭</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Industrial</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                  <span className="text-3xl">📚</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Education</h4>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                <div className="h-24 md:h-28 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
+                  <span className="text-3xl">🏢</span>
+                </div>
+                <div className="p-3 text-center">
+                  <h4 className="font-semibold text-dark-900 text-sm">Office</h4>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Partner Section */}
+          <div className="text-center mt-10">
+            <p className="text-sm text-primary-600 font-medium uppercase mb-2">Our Partner</p>
+            <h3 className="text-xl font-bold text-dark-900 mb-2">MX Cleaning Solution</h3>
+            <p className="text-gray-600 text-sm">Reliable cleaning partner committed to excellence</p>
+          </div>
+        </div>
       </div>
     </section>
   )

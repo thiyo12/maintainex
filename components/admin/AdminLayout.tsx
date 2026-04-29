@@ -86,6 +86,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Applications', href: '/admin/applications', icon: FiUsers },
     { name: 'Services', href: '/admin/services', icon: FiSettings },
     { name: 'Categories', href: '/admin/categories', icon: FiGrid },
+    { name: 'Industries', href: '/admin/industries', icon: FiGrid },
     { name: 'Branches', href: '/admin/branches', icon: FiMapPin },
     { name: 'Districts', href: '/admin/districts', icon: FiMap },
     { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
