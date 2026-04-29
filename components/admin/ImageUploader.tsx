@@ -28,13 +28,15 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
     setImageError(false)
   }, [value])
 
+  const DOMAIN = 'https://maintainex.lk'
+
   const getImageUrl = (url: string) => {
     if (!url) return url
     if (url.startsWith('http')) {
       return url
     }
     if (url.startsWith('/uploads/')) {
-      return `/api/files${url}`
+      return `${DOMAIN}/api/files${url}`
     }
     return url
   }

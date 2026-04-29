@@ -1,3 +1,5 @@
+const DOMAIN = 'https://maintainex.lk'
+
 export function getImageUrl(url: string | null | undefined): string {
   if (!url) return ''
   
@@ -6,7 +8,7 @@ export function getImageUrl(url: string | null | undefined): string {
   }
   
   if (url.startsWith('/uploads/')) {
-    return `/api/files${url}`
+    return `${DOMAIN}/api/files${url}`
   }
   
   if (url.startsWith('/api/')) {
@@ -14,10 +16,10 @@ export function getImageUrl(url: string | null | undefined): string {
   }
   
   if (url.startsWith('/')) {
-    return `/api/files${url}`
+    return `${DOMAIN}/api/files${url}`
   }
-  
-  return `/api/files/${url}`
+
+  return `${DOMAIN}/api/files/${url}`
 }
 
 export function isCloudinaryUrl(url: string | null | undefined): boolean {

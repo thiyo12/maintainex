@@ -40,18 +40,20 @@ interface ServiceCategorySliderProps {
   categories: Category[]
 }
 
+const DOMAIN = 'https://maintainex.lk'
+
 function getImageUrl(url: string | null | undefined): string {
   if (!url) return ''
-  if (url.startsWith('/uploads/')) {
-    return `/api/files${url}`
-  }
   if (url.startsWith('http')) {
     return url
   }
-  if (url.startsWith('/')) {
-    return `/api/files${url}`
+  if (url.startsWith('/uploads/')) {
+    return `${DOMAIN}/api/files${url}`
   }
-  return `/api/files/${url}`
+  if (url.startsWith('/')) {
+    return `${DOMAIN}/api/files${url}`
+  }
+  return `${DOMAIN}/api/files/${url}`
 }
 
 export default function ServiceCategorySlider({ categories = [] }: ServiceCategorySliderProps) {
