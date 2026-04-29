@@ -3,8 +3,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
+    console.log('Creating Industry table...')
+    
     // Use Prisma's executeRaw to create table directly
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Industry" (
@@ -20,6 +22,8 @@ export async function POST(request: NextRequest) {
         "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
       )
     `)
+
+    console.log('Table created! Seeding industries...')
 
     // Seed default industries
     const industries = [
@@ -44,9 +48,11 @@ export async function POST(request: NextRequest) {
       SELECT COUNT(*) as count FROM "Industry"
     `
 
+    console.log('Success! Industries:', result)
+
     return NextResponse.json({ 
       success: true, 
-      message: 'Industries created!',
+      message: 'Industry table created and seeded!',
       count: Number(result[0]?.count || 0)
     })
   } catch (error) {
@@ -56,4 +62,9 @@ export async function POST(request: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
+}
+
+// Also allow GET for easy testing
+export async function GET() {
+  return POST()
 }
