@@ -177,7 +177,7 @@ function BookingContent() {
       case 0:
         return !!formData.serviceId
       case 1:
-        return formData.name.trim().length >= 1 && formData.phone.trim().length >= 9
+        return formData.name.trim().length >= 1 && formData.phone.trim().length >= 3
       case 2:
         return !!formData.district && !!formData.date && !!formData.time
       case 3:
@@ -196,8 +196,8 @@ function BookingContent() {
         alert('Please select a service')
       } else if (step === 1 && formData.name.trim().length < 1) {
         alert('Please enter your name')
-      } else if (step === 1 && formData.phone.trim().length < 9) {
-        alert('Please enter a valid phone number (at least 9 digits)')
+      } else if (step === 1 && formData.phone.trim().length < 3) {
+        alert('Please enter your phone number')
       } else if (step === 2 && !formData.district) {
         alert('Please select a district')
       } else if (step === 2 && !formData.date) {
@@ -482,9 +482,10 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
-                      placeholder="0771234567"
+                      placeholder="0712345678"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Can start with 0 (mobile) or landline (e.g., 011...)</p>
                 </div>
 
                 <div>
