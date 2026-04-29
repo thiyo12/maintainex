@@ -168,10 +168,11 @@ function BookingContent() {
       })
     }
     
-    if (step === 1) {
-      // Stay on step 1, just update the service
+    if (step === 0) {
+      // After selecting service, go to Step 1 (Your Info)
+      setStep(1)
     } else {
-      setStep(2)
+      setStep(step + 1)
     }
   }
 
