@@ -25,6 +25,7 @@ export default function AdminIndustries() {
   const [showModal, setShowModal] = useState(false)
   const [editingIndustry, setEditingIndustry] = useState<Industry | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [setupError, setSetupError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     icon: '🏬',
@@ -45,9 +46,15 @@ export default function AdminIndustries() {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       })
       const data = await res.json()
-      setIndustries(data)
+      if (res.ok && Array.isArray(data)) {
+        setIndustries(data)
+      } else {
+        console.error('API error:', data)
+        setIndustries([])
+      }
     } catch (error) {
       console.error('Error:', error)
+      setIndustries([])
     } finally {
       setLoading(false)
     }
@@ -170,6 +177,57 @@ export default function AdminIndustries() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+      </div>
+    )
+  }
+
+  if (setupError || industries.length === 0) {
+    return (
+      <div className="p-6">
+        <div className="bg-yellow-50 border border-yellow-400 rounded-xl p-6 text-center">
+          <h2 className="text-xl font-bold text-dark-900 mb-4">Setup Industries Section</h2>
+          <p className="text-gray-600 mb-4">
+            The Industries table needs to be created in your database.
+          </p>
+          <p className="text-sm text-gray-500 mb-4">
+            Please run: <code className="bg-gray-200 px-2 py-1 rounded">npx prisma db push</code>
+            <br />on your server terminal to create the table.
+          </p>
+          <button
+            onClick={async () => {
+              setLoading(true)
+              setSetupError(null)
+              try {
+                const authToken = localStorage.getItem('auth_token')
+                const res = await fetch('/api/industries/setup', {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                  },
+                  body: JSON.stringify({ action: 'seed' })
+                })
+                const data = await res.json()
+                if (res.ok) {
+                  toast.success(`Created ${data.count} industries!`)
+                  fetchIndustries()
+                } else {
+                  setSetupError(data.error || 'Failed to setup')
+                }
+              } catch (err: any) {
+                setSetupError('Error: ' + (err?.message || 'Unknown error'))
+              } finally {
+                setLoading(false)
+              }
+            }}
+            className="bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold px-6 py-3 rounded-lg"
+          >
+            Try Auto-Setup
+          </button>
+          {setupError && (
+            <p className="text-red-600 mt-4">{setupError}</p>
+          )}
+        </div>
       </div>
     )
   }
