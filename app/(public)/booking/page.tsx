@@ -168,24 +168,20 @@ function BookingContent() {
       })
     }
     
-    if (step === 0) {
-      // After selecting service, go to Step 1 (Your Info)
-      setStep(1)
-    } else {
-      setStep(step + 1)
-    }
+    // After selecting service, go to Step 1 (Your Info)
+    setStep(1)
   }
 
   const canProceed = () => {
     switch (step) {
       case 0:
         return !!formData.serviceId
-      case 2:
+      case 1:
         return formData.name.trim().length >= 1 && formData.phone.trim().length >= 9
+      case 2:
+        return !!formData.district && !!formData.date && !!formData.time
       case 3:
-        return !!formData.district
-      case 4:
-        return !!formData.date && !!formData.time
+        return true
       default:
         return true
     }
@@ -196,14 +192,18 @@ function BookingContent() {
       setStep(step + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      if (step === 2 && formData.name.trim().length < 1) {
+      if (step === 0 && !formData.serviceId) {
+        alert('Please select a service')
+      } else if (step === 1 && formData.name.trim().length < 1) {
         alert('Please enter your name')
-      } else if (step === 2 && formData.phone.trim().length < 9) {
+      } else if (step === 1 && formData.phone.trim().length < 9) {
         alert('Please enter a valid phone number (at least 9 digits)')
-      } else if (step === 3 && !formData.district) {
+      } else if (step === 2 && !formData.district) {
         alert('Please select a district')
-      } else if (step === 4 && (!formData.date || !formData.time)) {
-        alert('Please select date and time')
+      } else if (step === 2 && !formData.date) {
+        alert('Please select a date')
+      } else if (step === 2 && !formData.time) {
+        alert('Please select a time')
       }
     }
   }
@@ -506,77 +506,11 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             </div>
           )}
 
-          {/* Step 3: Service Selection */}
-          {step === 3 && (
+          {/* Step 2: Schedule */}
+          {step === 2 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-6">Select Service</h2>
+              <h2 className="text-xl font-bold text-dark-900 mb-6">Schedule</h2>
               
-              {/* Selected Service Display */}
-              {displayService && (
-                <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      {displayCategory && (
-                        <p className="text-sm text-primary-600 font-medium">{displayCategory}</p>
-                      )}
-                      <p className="text-lg font-bold text-dark-900">{displayService.name}</p>
-                      <p className="text-2xl font-bold text-primary-600">Starting from LKR {displayService.price?.toLocaleString()}+</p>
-                    </div>
-                    <button
-                      onClick={() => setShowServiceSelector(true)}
-                      className="text-primary-600 font-medium text-sm hover:text-primary-700"
-                    >
-                      Change
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Service Selector Modal */}
-              {showServiceSelector && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-                  <div className="bg-white w-full sm:max-w-lg max-h-[80vh] rounded-t-3xl sm:rounded-2xl overflow-hidden">
-                    <div className="p-4 border-b flex items-center justify-between sticky top-0 bg-white">
-                      <h3 className="text-lg font-bold">
-                        {displayCategory ? `Select ${displayCategory} Service` : 'Select a Service'}
-                      </h3>
-                      <button 
-                        onClick={() => setShowServiceSelector(false)}
-                        className="text-gray-500 text-2xl"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="overflow-y-auto max-h-[70vh] p-1 sm:p-4">
-                      <div className="grid grid-cols-2 gap-2 w-full">
-                        {categories
-                          .filter(cat => !displayCategory || cat.name === displayCategory || cat.slug === searchParams.get('category'))
-                          .map(category => (
-                            <div key={category.id}>
-                              {!displayCategory && <h4 className="font-bold text-gray-700 mb-1 text-xs sm:text-sm">{category.name}</h4>}
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', width: '100%' }}>
-                                  {category.services.map(service => (
-                                    <button
-                                      key={service.id}
-                                      onClick={() => handleServiceSelect(service.id)}
-                                      style={{ width: '100%', textAlign: 'left', padding: '6px 8px', fontSize: '12px', borderRadius: '6px', border: formData.serviceId === service.id ? '2px solid #E5AF00' : '1px solid #E5E5E5', backgroundColor: formData.serviceId === service.id ? '#FFF9E6' : '#FFFFFF' }}
-                                    >
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{service.name}</span>
-                                        <span style={{ fontWeight: 'bold', color: '#E5AF00', whiteSpace: 'nowrap' }}>LKR {service.price?.toLocaleString()}+</span>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* District */}
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -599,25 +533,57 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address (Optional)
+                    Preferred Date *
                   </label>
                   <div className="relative">
-                    <FiMapPin className="absolute left-4 top-4 text-gray-400" />
-                    <textarea
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      rows={3}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all resize-none"
-                      placeholder="Enter your address"
+                    <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="date"
+                      value={formData.date}
+                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preferred Time *
+                  </label>
+                  <div className="relative">
+                    <FiClock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <select
+                      value={formData.time}
+                      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
+                    >
+                      <option value="">Select Time</option>
+                      {TIME_SLOTS.map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all resize-none"
+                    placeholder="Any special requirements..."
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 4: Schedule */}
-          {step === 4 && (
+          {/* Step 3: Confirmation */}
+          {step === 3 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Schedule</h2>
               
@@ -673,8 +639,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             </div>
           )}
 
-          {/* Step 5: Confirmation */}
-          {step === 5 && (
+          {/* Step 3: Confirmation */}
+          {step === 3 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-6">Booking Summary</h2>
               
@@ -774,7 +740,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
               </button>
             )}
             
-            {step < 4 ? (
+            {step < 3 ? (
               <button
                 onClick={handleNext}
                 disabled={!canProceed()}
