@@ -3,10 +3,12 @@ const DOMAIN = 'https://maintainex.lk'
 export function getImageUrl(url: string | null | undefined): string {
   if (!url) return ''
   
+  // Already full URL (Cloudinary, external) - return directly
   if (url.startsWith('http')) {
     return url
   }
   
+  // Local uploads - try domain first, fall back to local
   if (url.startsWith('/uploads/')) {
     return `${DOMAIN}/api/files${url}`
   }

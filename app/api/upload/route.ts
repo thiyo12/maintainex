@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
-import cloudinary from '@/lib/cloudinary'
+import { uploadToCloudinary } from '@/lib/cloudinary'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const folder = formData.get('folder') as string || 'maintain'
+    const folder = formData.get('folder') as string || 'general'
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -20,18 +20,12 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const result = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { folder, resource_type: 'auto' },
-        (error, result) => {
-          if (error) reject(error)
-          else resolve(result)
-        }
-      )
-      uploadStream.end(buffer)
-    }) as any
+    const result = await uploadToCloudinary(buffer, folder, file.name)
 
-    return NextResponse.json({ url: result.secure_url })
+    return NextResponse.json({ 
+      url: result.url,
+      success: true 
+    })
   } catch (error) {
     console.error('Error uploading file:', error)
     return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 })

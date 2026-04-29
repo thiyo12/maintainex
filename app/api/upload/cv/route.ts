@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import cloudinary from '@/lib/cloudinary'
+import { v2 as cloudinary } from 'cloudinary'
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'ddt2rqfe1',
+  api_key: process.env.CLOUDINARY_API_KEY || '273983623944158',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'wqzJvZQFYx9z9ogg49rNvRw4IrQ'
+})
 
 const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
 const RATE_LIMIT = 10

@@ -44,6 +44,7 @@ const DOMAIN = 'https://maintainex.lk'
 
 function getImageUrl(url: string | null | undefined): string {
   if (!url) return ''
+  // Already full URL (Cloudinary, external) - return directly
   if (url.startsWith('http')) {
     return url
   }
