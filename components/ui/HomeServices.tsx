@@ -64,7 +64,7 @@ const categoryIcons: Record<string, string> = {
 }
 
 export default function HomeServices({ initialCategories, initialServices }: HomeServicesProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategories[0]?.slug || '')
   const [imgLoading, setImgLoading] = useState<Record<string, boolean>>({})
   const [industries, setIndustries] = useState<Industry[]>([])
   const categories = initialCategories
