@@ -141,7 +141,6 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
-                <span>{categoryIcons[category.slug] || '🧹'}</span>
                 <span>{category.name}</span>
               </button>
             ))}
@@ -189,7 +188,6 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
 
               <div className="p-6 lg:p-8 flex flex-col justify-center">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-2xl">{categoryIcons[featuredCategory?.slug || ''] || '🧹'}</span>
                   <h3 className="text-xl lg:text-2xl font-bold text-gray-900">
                     {featuredCategory?.name}
                   </h3>
