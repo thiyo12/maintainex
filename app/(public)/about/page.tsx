@@ -1,6 +1,7 @@
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
+import IndustriesCarousel from '@/components/ui/IndustriesCarousel'
 
 export default function AboutPage() {
   return (
@@ -171,143 +172,7 @@ export default function AboutPage() {
           </div>
           
           {/* Rolling Carousel */}
-          <div className="relative">
-            <div className="flex animate-scroll gap-4 md:gap-6 w-max">
-              {/* Shopping Malls */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                  <span className="text-4xl">🏬</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Shopping Malls</h4>
-                </div>
-              </div>
-
-              {/* Schools */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
-                  <span className="text-4xl">🏫</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Schools</h4>
-                </div>
-              </div>
-
-              {/* Real Estate */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                  <span className="text-4xl">🏠</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Real Estate</h4>
-                </div>
-              </div>
-
-              {/* Hospitals */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
-                  <span className="text-4xl">🏥</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Hospitals</h4>
-                </div>
-              </div>
-
-              {/* Industrial */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                  <span className="text-4xl">🏭</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Industrial</h4>
-                </div>
-              </div>
-
-              {/* Education Centres */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-                  <span className="text-4xl">📚</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Education Centres</h4>
-                </div>
-              </div>
-
-              {/* Office Complex */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
-                  <span className="text-4xl">🏢</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Office Complex</h4>
-                </div>
-              </div>
-
-              {/* Duplicate for continuous scroll effect */}
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                  <span className="text-4xl">🏬</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Shopping Malls</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
-                  <span className="text-4xl">🏫</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Schools</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                  <span className="text-4xl">🏠</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Real Estate</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
-                  <span className="text-4xl">🏥</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Hospitals</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                  <span className="text-4xl">🏭</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Industrial</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-                  <span className="text-4xl">📚</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Education Centres</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
-                  <span className="text-4xl">🏢</span>
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">Office Complex</h4>
-                </div>
-              </div>
-            </div>
-          </div>
+          <IndustriesCarousel />
 
           {/* Partner Section - Below Rolling */}
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">

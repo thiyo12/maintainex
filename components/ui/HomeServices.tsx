@@ -1,10 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiTool, FiImage, FiPackage, FiStar, FiCloud, FiZap, FiTrendingUp, FiArrowRight, FiCheck } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
+
+interface Industry {
+  id: string
+  name: string
+  icon: string | null
+  image: string | null
+  displayOrder: number
+}
 
 interface Service {
   id: string
@@ -58,8 +66,20 @@ const categoryIcons: Record<string, string> = {
 export default function HomeServices({ initialCategories, initialServices }: HomeServicesProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [imgLoading, setImgLoading] = useState<Record<string, boolean>>({})
+  const [industries, setIndustries] = useState<Industry[]>([])
   const categories = initialCategories
   const allServices = initialServices
+
+  useEffect(() => {
+    fetch('/api/industries')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setIndustries(data)
+        }
+      })
+      .catch(console.error)
+  }, [])
 
   const filteredServices = selectedCategory
     ? allServices.filter(s => categories.find(c => c.slug === selectedCategory)?.services.some(sv => sv.id === s.id))
@@ -237,7 +257,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   key={category.id}
                   className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
                 >
-                  <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
+                  <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
                     {firstSvc?.image ? (
                       <img
                         src={getImageUrl(firstSvc.image)}
@@ -285,7 +305,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   key={service.id}
                   className="group bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-[275ms] hover:scale-105 hover:z-10"
                 >
-                  <div className="relative h-auto max-h-[40vh] aspect-video overflow-hidden">
+                  <div className="relative h-28 md:h-32 overflow-hidden">
                     {service.image?.startsWith('/uploads/') ? (
                     <img
                       src={getImageUrl(service.image)}
@@ -358,139 +378,152 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           
           <div className="relative overflow-hidden">
             <div className="flex animate-scroll gap-4 md:gap-6 w-max">
-              {/* Shopping Malls */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                  <span className="text-3xl">🏬</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Shopping Malls</h4>
-                </div>
-              </div>
-
-              {/* Schools */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
-                  <span className="text-3xl">🏫</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Schools</h4>
-                </div>
-              </div>
-
-              {/* Real Estate */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                  <span className="text-3xl">🏠</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Real Estate</h4>
-                </div>
-              </div>
-
-              {/* Hospitals */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
-                  <span className="text-3xl">🏥</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Hospitals</h4>
-                </div>
-              </div>
-
-              {/* Industrial */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                  <span className="text-3xl">🏭</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Industrial</h4>
-                </div>
-              </div>
-
-              {/* Education Centres */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-                  <span className="text-3xl">📚</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Education</h4>
-                </div>
-              </div>
-
-              {/* Office Complex */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
-                  <span className="text-3xl">🏢</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Office</h4>
-                </div>
-              </div>
-
-              {/* Duplicate for continuous scroll */}
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                  <span className="text-3xl">🏬</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Shopping Malls</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
-                  <span className="text-3xl">🏫</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Schools</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
-                  <span className="text-3xl">🏠</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Real Estate</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
-                  <span className="text-3xl">🏥</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Hospitals</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                  <span className="text-3xl">🏭</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Industrial</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
-                  <span className="text-3xl">📚</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Education</h4>
-                </div>
-              </div>
-
-              <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-24 md:h-28 bg-gradient-to-br from-indigo-100 to-indigo-200 flex items-center justify-center">
-                  <span className="text-3xl">🏢</span>
-                </div>
-                <div className="p-3 text-center">
-                  <h4 className="font-semibold text-dark-900 text-sm">Office</h4>
-                </div>
-              </div>
+              {industries.length > 0 ? (
+                <>
+                  {industries.map((industry) => (
+                    <div key={industry.id} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                      <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
+                        {industry.image ? (
+                          <img
+                            src={getImageUrl(industry.image)}
+                            alt={industry.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                            <span className="text-3xl">{industry.icon || '🏢'}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 text-center">
+                        <h4 className="font-semibold text-dark-900 text-sm">{industry.name}</h4>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Duplicate for continuous scroll */}
+                  {industries.map((industry) => (
+                    <div key={`${industry.id}-dup`} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                      <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
+                        {industry.image ? (
+                          <img
+                            src={getImageUrl(industry.image)}
+                            alt={industry.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                            <span className="text-3xl">{industry.icon || '🏢'}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 text-center">
+                        <h4 className="font-semibold text-dark-900 text-sm">{industry.name}</h4>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                /* Fallback when no industries data */
+                <>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                      <span className="text-3xl">🏬</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Shopping Malls</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                      <span className="text-3xl">🏫</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Schools</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                      <span className="text-3xl">🏠</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Real Estate</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+                      <span className="text-3xl">🏥</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Hospitals</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <span className="text-3xl">🏭</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Industrial</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                      <span className="text-3xl">🏢</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Office</h4>
+                    </div>
+                  </div>
+                  {/* Duplicates for scroll */}
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                      <span className="text-3xl">🏬</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Shopping Malls</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                      <span className="text-3xl">🏫</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Schools</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center">
+                      <span className="text-3xl">🏠</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Real Estate</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-red-100 to-red-200 flex items-center justify-center">
+                      <span className="text-3xl">🏥</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Hospitals</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <span className="text-3xl">🏭</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Industrial</h4>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                    <div className="h-24 md:h-28 bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                      <span className="text-3xl">🏢</span>
+                    </div>
+                    <div className="p-3 text-center">
+                      <h4 className="font-semibold text-dark-900 text-sm">Office</h4>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

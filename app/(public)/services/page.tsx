@@ -154,7 +154,7 @@ function ServicesContent() {
                     key={service.id}
                     className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
                   >
-                    <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
+                    <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
                       {service.image ? (
                         <img
                           src={getImageUrl(service.image)}
@@ -211,7 +211,7 @@ function ServicesContent() {
                     key={service.id}
                     className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
                   >
-                    <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
+                    <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
                       {service.image ? (
                         <img
                           src={getImageUrl(service.image)}
@@ -269,7 +269,7 @@ function ServicesContent() {
                     key={category.id}
                     className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-yellow-300 hover:shadow-lg transition-all duration-300"
                   >
-                    <div className="relative h-32 md:h-36 overflow-hidden bg-gray-100">
+                    <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
                       {firstSvc?.image ? (
                         <img
                           src={getImageUrl(firstSvc.image)}
