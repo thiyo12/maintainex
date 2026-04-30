@@ -329,7 +329,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                             src={industry.image}
                             alt={industry.name}
                             className="w-full h-full object-cover"
-                            loading="eager"
+                            crossOrigin="anonymous"
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
@@ -342,7 +342,6 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                       </div>
                     </div>
                   ))}
-                  {/* Duplicate for continuous scroll */}
                   {industries.map((industry) => (
                     <div key={`${industry.id}-dup`} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                       <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
@@ -351,7 +350,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                             src={industry.image}
                             alt={industry.name}
                             className="w-full h-full object-cover"
-                            loading="eager"
+                            crossOrigin="anonymous"
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
