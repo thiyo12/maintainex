@@ -25,8 +25,8 @@ export default function IndustriesCarousel() {
   }, [])
 
   return (
-    <div className="relative">
-      <div className="flex animate-scroll gap-4 md:gap-6 w-max">
+    <div className="relative w-full overflow-x-auto">
+      <div className="flex animate-scroll gap-4 md:gap-6 w-max justify-start md:justify-center px-2 md:px-0">
         {industries.length > 0 ? (
           <>
             {industries.map((industry) => {

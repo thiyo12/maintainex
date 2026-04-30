@@ -315,8 +315,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
             </p>
           </div>
           
-          <div className="relative overflow-hidden">
-            <div className="flex animate-scroll gap-4 md:gap-6 w-max">
+          <div className="relative overflow-hidden w-full">
+            <div className="flex animate-scroll gap-4 md:gap-6 w-max justify-start md:justify-center">
               {industries.length > 0 ? (
                 <>
                   {industries.map((industry) => {
