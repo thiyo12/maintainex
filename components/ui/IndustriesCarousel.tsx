@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getImageUrl } from '@/lib/images'
+import Image from 'next/image'
 
 interface Industry {
   id: string
@@ -18,59 +18,71 @@ export default function IndustriesCarousel() {
     fetch('/api/industries')
       .then(res => res.json())
       .then(data => {
-        console.log('IndustriesCarousel - API response:', data)
         if (Array.isArray(data)) {
           setIndustries(data)
         }
       })
-      .catch(err => console.error('IndustriesCarousel - Error:', err))
+      .catch(console.error)
   }, [])
+
+  const getIndustryImage = (industry: Industry): string => {
+    if (industry.image && industry.image.trim() !== '') {
+      return industry.image
+    }
+    return ''
+  }
 
   return (
     <div className="relative">
       <div className="flex animate-scroll gap-4 md:gap-6 w-max">
         {industries.length > 0 ? (
           <>
-            {industries.map((industry) => (
-              <div key={industry.id} className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 overflow-hidden bg-gray-100">
-                  {industry.image ? (
-                    <img
-                      src={getImageUrl(industry.image)}
-                      alt={industry.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                      <span className="text-4xl">{industry.icon || '🏢'}</span>
-                    </div>
-                  )}
+            {industries.map((industry) => {
+              const imgUrl = getIndustryImage(industry)
+              return (
+                <div key={industry.id} className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                  <div className="h-32 md:h-40 overflow-hidden bg-gray-100 relative">
+                    {imgUrl ? (
+                      <img
+                        src={imgUrl}
+                        alt={industry.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                        <span className="text-4xl">{industry.icon || '🏢'}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 text-center">
+                    <h4 className="font-semibold text-dark-900">{industry.name}</h4>
+                  </div>
                 </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">{industry.name}</h4>
+              )
+            })}
+            {industries.map((industry) => {
+              const imgUrl = getIndustryImage(industry)
+              return (
+                <div key={`${industry.id}-dup`} className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                  <div className="h-32 md:h-40 overflow-hidden bg-gray-100 relative">
+                    {imgUrl ? (
+                      <img
+                        src={imgUrl}
+                        alt={industry.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                        <span className="text-4xl">{industry.icon || '🏢'}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4 text-center">
+                    <h4 className="font-semibold text-dark-900">{industry.name}</h4>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {industries.map((industry) => (
-              <div key={`${industry.id}-dup`} className="flex-shrink-0 w-48 md:w-56 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                <div className="h-32 md:h-40 overflow-hidden bg-gray-100">
-                  {industry.image ? (
-                    <img
-                      src={getImageUrl(industry.image)}
-                      alt={industry.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                      <span className="text-4xl">{industry.icon || '🏢'}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 text-center">
-                  <h4 className="font-semibold text-dark-900">{industry.name}</h4>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </>
         ) : (
           /* Fallback when no industries data */
