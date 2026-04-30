@@ -64,7 +64,7 @@ const categoryIcons: Record<string, string> = {
 }
 
 export default function HomeServices({ initialCategories, initialServices }: HomeServicesProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [imgLoading, setImgLoading] = useState<Record<string, boolean>>({})
   const [industries, setIndustries] = useState<Industry[]>([])
   const categories = initialCategories
@@ -131,17 +131,6 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         {/* Category Pills - TaskRabbit Style */}
         <div className="w-full overflow-x-auto pb-4 mb-8">
           <div className="flex gap-2 min-w-max px-2 justify-start md:justify-center">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium transition-all duration-200 whitespace-nowrap text-sm ${
-                selectedCategory === null
-                  ? 'bg-primary-500 text-white shadow-md'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-              }`}
-            >
-              All Services
-            </button>
-            
             {categories.map((category) => (
               <button
                 key={category.id}
@@ -248,55 +237,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
         )}
 
         {/* All Services - Show Category Cards */}
-        {selectedCategory === null && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {categories.map((category) => {
-              const firstSvc = category.services?.[0]
-              return (
-                <div 
-                  key={category.id}
-                  className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
-                >
-                  <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
-                    {firstSvc?.image ? (
-                      <img
-                        src={getImageUrl(firstSvc.image)}
-                        alt={category.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-                        <span className="text-4xl">{categoryIcons[category.slug] || '🧹'}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-4">
-                    <h3 className="font-bold text-gray-900 mb-1">
-                      {category.name}
-                    </h3>
-                    <p className="text-gray-600 text-sm mb-2">
-                      {firstSvc?.title || 'No services'}
-                    </p>
-                    <p className="text-lg font-bold text-primary-600 mb-3">
-                      {firstSvc?.price ? `Starting from LKR ${firstSvc.price.toLocaleString()}+` : 'Contact us'}
-                    </p>
-                    <button 
-                      onClick={() => handleCategoryClick(category)}
-                      className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold py-2 rounded-lg transition-colors text-sm"
-                    >
-                      Book Now
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-{/* Specific Category - Show Services Grid */}
+        {/* Specific Category - Show Services Grid */}
         {selectedCategory && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
