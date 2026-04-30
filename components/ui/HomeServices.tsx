@@ -74,6 +74,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
     fetch('/api/industries')
       .then(res => res.json())
       .then(data => {
+        console.log('HomeServices - Industries API response:', data)
         if (Array.isArray(data)) {
           setIndustries(data)
         }

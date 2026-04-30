@@ -18,11 +18,12 @@ export default function IndustriesCarousel() {
     fetch('/api/industries')
       .then(res => res.json())
       .then(data => {
+        console.log('IndustriesCarousel - API response:', data)
         if (Array.isArray(data)) {
           setIndustries(data)
         }
       })
-      .catch(console.error)
+      .catch(err => console.error('IndustriesCarousel - Error:', err))
   }, [])
 
   return (
