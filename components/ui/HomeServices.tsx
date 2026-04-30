@@ -321,53 +321,49 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
             <div className="flex animate-scroll gap-4 md:gap-6 w-max">
               {industries.length > 0 ? (
                 <>
-                  {industries.map((industry) => {
-                    const imgUrl = industry.image && industry.image.trim() !== '' ? industry.image : ''
-                    return (
-                      <div key={industry.id} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                        <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
-                          {imgUrl ? (
-                            <img
-                              src={imgUrl}
-                              alt={industry.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                              <span className="text-3xl">{industry.icon || '🏢'}</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3 text-center">
-                          <h4 className="font-semibold text-dark-900 text-sm">{industry.name}</h4>
-                        </div>
+                  {industries.map((industry) => (
+                    <div key={industry.id} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                      <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
+                        {industry.image && industry.image.length > 10 ? (
+                          <img
+                            src={industry.image}
+                            alt={industry.name}
+                            className="w-full h-full object-cover"
+                            loading="eager"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                            <span className="text-3xl">{industry.icon || '🏢'}</span>
+                          </div>
+                        )}
                       </div>
-                    )
-                  })}
+                      <div className="p-3 text-center">
+                        <h4 className="font-semibold text-dark-900 text-sm">{industry.name}</h4>
+                      </div>
+                    </div>
+                  ))}
                   {/* Duplicate for continuous scroll */}
-                  {industries.map((industry) => {
-                    const imgUrl = industry.image && industry.image.trim() !== '' ? industry.image : ''
-                    return (
-                      <div key={`${industry.id}-dup`} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
-                        <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
-                          {imgUrl ? (
-                            <img
-                              src={imgUrl}
-                              alt={industry.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-                              <span className="text-3xl">{industry.icon || '🏢'}</span>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3 text-center">
-                          <h4 className="font-semibold text-dark-900 text-sm">{industry.name}</h4>
-                        </div>
+                  {industries.map((industry) => (
+                    <div key={`${industry.id}-dup`} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
+                      <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
+                        {industry.image && industry.image.length > 10 ? (
+                          <img
+                            src={industry.image}
+                            alt={industry.name}
+                            className="w-full h-full object-cover"
+                            loading="eager"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                            <span className="text-3xl">{industry.icon || '🏢'}</span>
+                          </div>
+                        )}
                       </div>
-                    )
-                  })}
+                      <div className="p-3 text-center">
+                        <h4 className="font-semibold text-dark-900 text-sm">{industry.name}</h4>
+                      </div>
+                    </div>
+                  ))}
                 </>
               ) : (
                 /* Fallback when no industries data */
