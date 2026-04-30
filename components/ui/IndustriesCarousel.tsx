@@ -38,6 +38,7 @@ export default function IndustriesCarousel() {
                       alt={industry.name}
                       className="w-full h-full object-cover"
                       crossOrigin="anonymous"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
@@ -59,6 +60,7 @@ export default function IndustriesCarousel() {
                       alt={industry.name}
                       className="w-full h-full object-cover"
                       crossOrigin="anonymous"
+                      decoding="async"
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
