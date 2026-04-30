@@ -72,6 +72,9 @@ function BookingContent() {
   const [showServiceSelector, setShowServiceSelector] = useState(false)
   const [storedService, setStoredService] = useState<StoredService | null>(null)
   
+  // Get category from URL param to filter services
+  const categoryParam = searchParams.get('category')
+  
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -399,31 +402,40 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
           {/* Step 0: Service Selection */}
           {step === 0 && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-4">Select a Service</h2>
-              <p className="text-gray-600 mb-6 text-sm">Choose from our professional services</p>
+              <h2 className="text-xl font-bold text-dark-900 mb-4">
+                {categoryParam ? `Select a ${categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1).replace(/-/g, ' ')} Service` : 'Select a Service'}
+              </h2>
+              <p className="text-gray-600 mb-6 text-sm">
+                {categoryParam ? `Choose from our ${categoryParam.replace(/-/g, ' ')} services` : 'Choose from our professional services'}
+              </p>
               
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                {categories.map(category => (
-                  <div key={category.id}>
-                    <h4 className="font-bold text-gray-700 mb-2 text-sm">{category.name}</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {category.services.map(service => (
-                        <button
-                          key={service.id}
-                          onClick={() => handleServiceSelect(service.id)}
-                          className={`p-3 rounded-lg border-2 text-left transition-all ${
-                            formData.serviceId === service.id
-                              ? 'border-primary-500 bg-primary-50'
-                              : 'border-gray-200 hover:border-primary-300'
-                          }`}
-                        >
-                          <div className="font-medium text-sm text-dark-900 truncate">{service.name}</div>
-                          <div className="text-primary-600 font-bold text-sm">LKR {service.price?.toLocaleString()}+</div>
-                        </button>
-                      ))}
+                {categories
+                  .filter(cat => !categoryParam || cat.slug === categoryParam || cat.name.toLowerCase().replace(/ /g, '-') === categoryParam)
+                  .map(category => (
+                    <div key={category.id}>
+                      <h4 className="font-bold text-gray-700 mb-2 text-sm">{category.name}</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {category.services.map(service => (
+                          <button
+                            key={service.id}
+                            onClick={() => handleServiceSelect(service.id)}
+                            className={`p-3 rounded-lg border-2 text-left transition-all ${
+                              formData.serviceId === service.id
+                                ? 'border-primary-500 bg-primary-50'
+                                : 'border-gray-200 hover:border-primary-300'
+                            }`}
+                          >
+                            <div className="font-medium text-sm text-dark-900 truncate">{service.name}</div>
+                            <div className="text-primary-600 font-bold text-sm">LKR {service.price?.toLocaleString()}+</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                {categoryParam && categories.filter(cat => cat.slug === categoryParam || cat.name.toLowerCase().replace(/ /g, '-') === categoryParam).length === 0 && (
+                  <p className="text-gray-500 text-sm">No services found for this category.</p>
+                )}
               </div>
             </div>
           )}
