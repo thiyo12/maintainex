@@ -330,6 +330,11 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                             alt={industry.name}
                             className="w-full h-full object-cover"
                             loading="eager"
+                            onError={(e) => {
+                              console.log('Image load error:', industry.name, industry.image)
+                              e.currentTarget.style.display = 'none'
+                              e.currentTarget.parentElement.innerHTML = `<span class="text-3xl">${industry.icon || '🏢'}</span>`
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
@@ -352,6 +357,11 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                             alt={industry.name}
                             className="w-full h-full object-cover"
                             loading="eager"
+                            onError={(e) => {
+                              console.log('Image load error:', industry.name, industry.image)
+                              e.currentTarget.style.display = 'none'
+                              e.currentTarget.parentElement.innerHTML = `<span class="text-3xl">${industry.icon || '🏢'}</span>`
+                            }}
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
