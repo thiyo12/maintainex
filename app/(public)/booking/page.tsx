@@ -75,6 +75,21 @@ function BookingContent() {
   // Get category from URL param to filter services
   const categoryParam = searchParams.get('category')
   
+  // Store category from URL in localStorage to preserve when user clicks "Change"
+  const [storedCategory, setStoredCategory] = useState<string>('')
+  
+  useEffect(() => {
+    // Store category from URL param to localStorage on page load
+    if (categoryParam) {
+      localStorage.setItem('bookingCategory', categoryParam)
+      setStoredCategory(categoryParam)
+    } else {
+      // Try to get from localStorage
+      const saved = localStorage.getItem('bookingCategory')
+      if (saved) setStoredCategory(saved)
+    }
+  }, [categoryParam])
+  
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -403,17 +418,17 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
           {(step === 0 || showServiceSelector) && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-4">
-                {categoryParam ? `Select a ${categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1).replace(/-/g, ' ')} Service` : 'Select a Service'}
+                {storedCategory ? `Select a ${storedCategory.charAt(0).toUpperCase() + storedCategory.slice(1).replace(/-/g, ' ')} Service` : 'Select a Service'}
               </h2>
               <p className="text-gray-600 mb-6 text-sm">
-                {categoryParam ? `Choose from our ${categoryParam.replace(/-/g, ' ')} services` : 'Choose from our professional services'}
+                {storedCategory ? `Choose from our ${storedCategory.replace(/-/g, ' ')} services` : 'Choose from our professional services'}
               </p>
               
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 {categories
-                  .filter(cat => !categoryParam || 
-                    cat.slug.toLowerCase().includes(categoryParam.toLowerCase()) || 
-                    cat.name.toLowerCase().includes(categoryParam.toLowerCase().replace(/-/g, ' ')))
+                  .filter(cat => !storedCategory || 
+                    cat.slug.toLowerCase().includes(storedCategory.toLowerCase()) || 
+                    cat.name.toLowerCase().includes(storedCategory.toLowerCase().replace(/-/g, ' ')))
                   .map(category => (
                     <div key={category.id}>
                       <h4 className="font-bold text-gray-700 mb-2 text-sm">{category.name}</h4>
@@ -435,9 +450,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       </div>
                     </div>
                   ))}
-                {categoryParam && categories.filter(cat => 
-                  cat.slug.toLowerCase().includes(categoryParam.toLowerCase()) || 
-                  cat.name.toLowerCase().includes(categoryParam.toLowerCase().replace(/-/g, ' '))
+                {storedCategory && categories.filter(cat => 
+                  cat.slug.toLowerCase().includes(storedCategory.toLowerCase()) || 
+                  cat.name.toLowerCase().includes(storedCategory.toLowerCase().replace(/-/g, ' '))
                 ).length === 0 && (
                   <p className="text-gray-500 text-sm">No services found for this category.</p>
                 )}
