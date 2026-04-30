@@ -152,6 +152,7 @@ export default function AdminIndustries() {
     setUploading(true)
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('folder', 'industries')
 
     try {
       const authToken = localStorage.getItem('auth_token')
