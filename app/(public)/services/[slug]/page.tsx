@@ -401,7 +401,7 @@ export default function ServiceDetailPage() {
                         price: service.price,
                         category: service.category?.name
                       }))
-                      router.push(`/booking?serviceId=${service.id}`)
+                      router.push(`/booking?serviceId=${service.id}&category=${service.category?.slug}`)
                     }}
                     className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-center text-lg mb-4"
                   >
@@ -533,7 +533,7 @@ export default function ServiceDetailPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href={`/booking?serviceId=${service.id}`}
+                href={`/booking?serviceId=${service.id}&category=${service.category?.slug}`}
                 className="bg-dark-900 hover:bg-dark-800 text-white font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-lg"
               >
                 Book Now
