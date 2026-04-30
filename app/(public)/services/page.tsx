@@ -142,61 +142,70 @@ function ServicesContent() {
           </div>
         </section>
 
-        {/* ALL Services Grid - Default View */}
+        {/* ALL Services Grid - Grouped by Category */}
         {!selectedCategorySlug && (
         <section id="all-services" className="py-8 md:py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-              {categories.flatMap(cat => cat.services).map((service) => {
-                const serviceCategory = categories.find(cat => cat.services.some(s => s.id === service.id))
-                return (
-                  <div 
-                    key={service.id}
-                    className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
-                  >
-                    <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
-                      {service.image ? (
-                        <img
-                          src={getImageUrl(service.image)}
-                          alt={service.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
-                          <span className="text-4xl">🧹</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-4">
-                      <h3 className="font-bold text-gray-900 mb-1">
-                        {service.title}
-                      </h3>
-                      <p className="text-gray-600 text-sm mb-2 line-clamp-2">
-                        {service.description || 'Professional service'}
-                      </p>
-                      <p className="text-lg font-bold text-primary-600 mb-3">
-                        {service.price ? `Rs. ${service.price.toLocaleString()}` : 'Contact us'}
-                      </p>
-                      <button 
-                        onClick={() => {
-                          localStorage.setItem('selectedService', JSON.stringify({
-                            id: service.id,
-                            name: service.title,
-                            price: service.price,
-                            category: serviceCategory?.name
-                          }))
-                          router.push(`/booking?serviceId=${service.id}&category=${serviceCategory?.slug}`)
-                        }}
-                        className="w-full bg-primary-500 hover:bg-primary-600 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm"
-                      >
-                        Book Now
-                      </button>
-                    </div>
+            {categories.map((category) => (
+              category.services && category.services.length > 0 && (
+                <div key={category.id} className="mb-12">
+                  <div className="flex items-center gap-3 mb-6">
+                    {category.icon && <span className="text-2xl">{category.icon}</span>}
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                      {category.name}
+                    </h2>
                   </div>
-                )
-              })}
-            </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                    {category.services.map((service) => (
+                      <div 
+                        key={service.id}
+                        className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
+                      >
+                        <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
+                          {service.image ? (
+                            <img
+                              src={getImageUrl(service.image)}
+                              alt={service.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                              <span className="text-4xl">🧹</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-4">
+                          <h3 className="font-bold text-gray-900 mb-1">
+                            {service.title}
+                          </h3>
+                          <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                            {service.description || 'Professional service'}
+                          </p>
+                          <p className="text-lg font-bold text-primary-600 mb-3">
+                            {service.price ? `Rs. ${service.price.toLocaleString()}` : 'Contact us'}
+                          </p>
+                          <button 
+                            onClick={() => {
+                              localStorage.setItem('selectedService', JSON.stringify({
+                                id: service.id,
+                                name: service.title,
+                                price: service.price,
+                                category: category.name
+                              }))
+                              router.push(`/booking?serviceId=${service.id}&category=${category.slug}`)
+                            }}
+                            className="w-full bg-primary-500 hover:bg-primary-600 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm"
+                          >
+                            Book Now
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            ))}
           </div>
         </section>
         )}

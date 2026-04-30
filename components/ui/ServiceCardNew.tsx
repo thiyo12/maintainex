@@ -27,10 +27,6 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
     ? `Starting from LKR ${service.price.toLocaleString()}+` 
     : 'Contact for quote'
 
-  const durationDisplay = service.duration 
-    ? `${service.duration} min` 
-    : null
-
   const isUploadedImage = service.image?.startsWith('/uploads/') && !imgError
   const fallbackImage = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'
   const imageSrc = isUploadedImage ? getImageUrl(service.image) : (service.image || fallbackImage)
@@ -61,12 +57,6 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        
-        {durationDisplay && (
-          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-sm font-medium text-gray-700">
-            {durationDisplay}
-          </div>
-        )}
       </div>
 
       <div className="p-5">
