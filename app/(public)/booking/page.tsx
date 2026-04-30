@@ -411,7 +411,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
               
               <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                 {categories
-                  .filter(cat => !categoryParam || cat.slug === categoryParam || cat.name.toLowerCase().replace(/ /g, '-') === categoryParam)
+                  .filter(cat => !categoryParam || 
+                    cat.slug.toLowerCase().includes(categoryParam.toLowerCase()) || 
+                    cat.name.toLowerCase().includes(categoryParam.toLowerCase().replace(/-/g, ' ')))
                   .map(category => (
                     <div key={category.id}>
                       <h4 className="font-bold text-gray-700 mb-2 text-sm">{category.name}</h4>
@@ -433,7 +435,10 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       </div>
                     </div>
                   ))}
-                {categoryParam && categories.filter(cat => cat.slug === categoryParam || cat.name.toLowerCase().replace(/ /g, '-') === categoryParam).length === 0 && (
+                {categoryParam && categories.filter(cat => 
+                  cat.slug.toLowerCase().includes(categoryParam.toLowerCase()) || 
+                  cat.name.toLowerCase().includes(categoryParam.toLowerCase().replace(/-/g, ' '))
+                ).length === 0 && (
                   <p className="text-gray-500 text-sm">No services found for this category.</p>
                 )}
               </div>
