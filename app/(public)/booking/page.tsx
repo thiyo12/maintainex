@@ -400,7 +400,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
         <div className="max-w-lg mx-auto px-4 py-6">
           
           {/* Step 0: Service Selection */}
-          {step === 0 && (
+          {(step === 0 || showServiceSelector) && (
             <div className="bg-white rounded-2xl shadow-lg p-6">
               <h2 className="text-xl font-bold text-dark-900 mb-4">
                 {categoryParam ? `Select a ${categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1).replace(/-/g, ' ')} Service` : 'Select a Service'}
@@ -457,7 +457,10 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       <p className="text-xl font-bold text-primary-600">Starting from LKR {displayService.price?.toLocaleString()}+</p>
                     </div>
                     <button
-                      onClick={() => setShowServiceSelector(true)}
+                      onClick={() => {
+                        setShowServiceSelector(true)
+                        setStep(0)
+                      }}
                       className="text-primary-600 font-medium text-sm hover:text-primary-700"
                     >
                       Change
