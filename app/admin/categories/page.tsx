@@ -209,7 +209,7 @@ export default function AdminCategories() {
       {/* Empty State */}
       {categories.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
-          <div className="text-5xl mb-4">📋</div>
+          <div className="text-5xl mb-4">🧹</div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Categories</h3>
           <p className="text-gray-500 mb-4">Create your first category to show on homepage.</p>
           <button onClick={() => { resetForm(); setShowModal(true) }} className="btn-primary">
@@ -232,7 +232,7 @@ export default function AdminCategories() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-4xl sm:text-5xl">
-                    {category.icon || '📋'}
+                    {category.icon || '🧹'}
                   </div>
                 )}
                 {/* Status Badge */}
