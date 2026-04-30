@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { FiX, FiStar, FiClock, FiCheck, FiArrowRight } from 'react-icons/fi'
+import { FiX, FiStar, FiCheck, FiArrowRight } from 'react-icons/fi'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getImageUrl } from '@/lib/images'
@@ -102,12 +102,6 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <span className="text-2xl font-bold text-primary-600">{priceDisplay}</span>
-              {service.duration && (
-                <span className="flex items-center gap-1 text-gray-600">
-                  <FiClock className="w-4 h-4" />
-                  {service.duration} minutes
-                </span>
-              )}
             </div>
 
             <p className="text-gray-600 mb-6">{service.description}</p>

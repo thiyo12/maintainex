@@ -7,7 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
-import { FiClock, FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone } from 'react-icons/fi'
+import { FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 
 const WHATSAPP_NUMBER = '94770867609'
@@ -278,12 +278,6 @@ export default function ServiceDetailPage() {
                       {formatPrice(service.price)}
                     </span>
                   )}
-                  {service.duration && (
-                    <span className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
-                      <FiClock className="w-5 h-5" />
-                      {formatDuration(service.duration)}
-                    </span>
-                  )}
                   {service.reviews && service.reviews.length > 0 && (
                     <span className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
                       <FiStar className="w-5 h-5 text-yellow-400 fill-yellow-400" />
@@ -395,9 +389,6 @@ export default function ServiceDetailPage() {
                       <span className="text-4xl font-bold text-primary-600">
                         {formatPrice(service.price)}
                       </span>
-                      {service.duration && (
-                        <span className="text-gray-500">/ {formatDuration(service.duration)}</span>
-                      )}
                     </div>
                   </div>
 
@@ -497,11 +488,6 @@ export default function ServiceDetailPage() {
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
-                      )}
-                      {related.duration && (
-                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium text-gray-700">
-                          {formatDuration(related.duration)}
-                        </div>
                       )}
                     </div>
                     <div className="p-4">

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiArrowRight, FiClock } from 'react-icons/fi'
+import { FiArrowRight } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 
 interface Category {
@@ -93,18 +93,6 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
               </div>
               <div className="text-sm text-gray-500">Services</div>
             </div>
-            {firstService?.duration && (
-              <>
-                <div className="h-12 w-px bg-gray-200" />
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-900 flex items-center gap-1">
-                    <FiClock className="w-5 h-5" />
-                    {firstService.duration}
-                  </div>
-                  <div className="text-sm text-gray-500">Minutes</div>
-                </div>
-              </>
-            )}
           </div>
 
           <div className="flex items-center gap-4">
