@@ -131,18 +131,12 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
 
   return (
     <div className="relative w-full aspect-video lg:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl bg-gray-900">
-      <Link 
-        href={`/services?category=${currentSlide.slug}`}
-        className="block w-full h-full relative pointer-events-none"
-      >
+      <div className="absolute inset-0 pointer-events-none">
         {showFallback ? (
           <img
             src={FALLBACK_IMAGES[currentIndex % FALLBACK_IMAGES.length]}
             alt={currentSlide.name}
             className="w-full h-full object-cover"
-            crossOrigin="anonymous"
-            loading="lazy"
-            decoding="async"
           />
         ) : (
           <img
@@ -150,8 +144,6 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
             alt={currentSlide.name}
             className="w-full h-full object-cover"
             onError={() => handleImageError(currentIndex)}
-            loading="lazy"
-            decoding="async"
           />
         )}
         
@@ -164,7 +156,7 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
             </h3>
           </div>
         </div>
-      </Link>
+      </div>
 
       <button
         onClick={handlePrev}
