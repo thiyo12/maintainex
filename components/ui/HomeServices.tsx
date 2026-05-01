@@ -106,13 +106,15 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
   }
 
   const handleBookNow = (service: Service) => {
+    const categorySlug = featuredCategory?.slug || categories[0]?.slug || ''
     localStorage.setItem('selectedService', JSON.stringify({
       id: service.id,
       name: service.title,
       price: service.price,
-      category: featuredCategory?.name
+      category: featuredCategory?.name || categories[0]?.name
     }))
-    window.location.href = `/booking?serviceId=${service.id}`
+    localStorage.setItem('bookingCategory', categorySlug)
+    window.location.href = `/booking?serviceId=${service.id}&category=${categorySlug}`
   }
 
   return (

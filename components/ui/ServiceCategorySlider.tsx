@@ -133,7 +133,7 @@ export default function ServiceCategorySlider({ categories = [] }: ServiceCatego
     <div className="relative w-full aspect-video lg:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl bg-gray-900">
       <Link 
         href={`/services?category=${currentSlide.slug}`}
-        className="block w-full h-full relative"
+        className="block w-full h-full relative pointer-events-none"
       >
         {showFallback ? (
           <img
