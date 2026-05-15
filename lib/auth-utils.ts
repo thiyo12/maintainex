@@ -11,6 +11,8 @@ if (!JWT_SECRET) {
 }
 
 
+export type SessionUser = SessionData
+
 export interface SessionData {
   id: string
   email: string
