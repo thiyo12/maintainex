@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
 
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME
-const apiKey = process.env.CLOUDINARY_API_KEY
-const apiSecret = process.env.CLOUDINARY_API_SECRET
-
-if (!cloudName || !apiKey || !apiSecret) {
-  throw new Error('CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET must be set')
-}
-
-cloudinary.config({
-  cloud_name: cloudName,
-  api_key: apiKey,
-  api_secret: apiSecret
-})
-
 export async function POST(request: NextRequest) {
   try {
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME
+    const apiKey = process.env.CLOUDINARY_API_KEY
+    const apiSecret = process.env.CLOUDINARY_API_SECRET
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      return NextResponse.json({ error: 'Cloudinary not configured' }, { status: 500 })
+    }
+
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret
+    })
+
     let formData
     try {
       formData = await request.formData()
