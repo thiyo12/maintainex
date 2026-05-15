@@ -33,8 +33,7 @@ export async function getSession(req: NextRequest): Promise<SessionData | null> 
     const decoded = jwt.verify(token, JWT_SECRET!) as unknown as SessionData
 
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      include: { adminProfile: { select: { canEditServices: true, branchId: true, province: true } } }
+      where: { id: decoded.id }
     })
 
     if (!user || !user.isActive) return null
@@ -45,9 +44,9 @@ export async function getSession(req: NextRequest): Promise<SessionData | null> 
       name: user.name,
       role: user.role,
       isActive: user.isActive,
-      branchId: user.adminProfile?.branchId ?? undefined,
-      canEditServices: user.adminProfile?.canEditServices ?? false,
-      province: user.adminProfile?.province ?? undefined
+      branchId: undefined,
+      canEditServices: false,
+      province: undefined
     }
   } catch {
     return null
