@@ -3,9 +3,6 @@ import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 if (!process.env.NEXTAUTH_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('NEXTAUTH_SECRET must be set in production')
-  }
   console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - set in production!')
 }
 
