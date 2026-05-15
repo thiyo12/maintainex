@@ -216,8 +216,12 @@ export async function middleware(request: NextRequest) {
              request.headers.get('x-real-ip') || 
              'unknown'
   
-  const rateLimitType = pathname.startsWith('/api/auth') ? 'auth' : 'admin'
-  const rateLimit = await checkRateLimit(ip, 'IP', rateLimitType)
+  // Only rate-limit admin & API routes (skip public page loads)
+  let rateLimit = { remaining: 100, resetAt: new Date() }
+  if (pathname.startsWith('/admin') || pathname.startsWith('/api/')) {
+    const rateLimitType = pathname.startsWith('/api/auth') ? 'auth' : 'admin'
+    rateLimit = await checkRateLimit(ip, 'IP', rateLimitType)
+  }
   
   let response: NextResponse
 

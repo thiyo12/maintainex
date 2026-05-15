@@ -9,7 +9,11 @@ export async function GET() {
     const industries = await prisma.industry.findMany({
       orderBy: { displayOrder: 'asc' }
     })
-    return NextResponse.json(industries)
+    return NextResponse.json(industries, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, max-age=60, stale-while-revalidate=120',
+      }
+    })
   } catch (error) {
     console.error('Error fetching industries:', error)
     return NextResponse.json({ error: 'Failed to fetch industries' }, { status: 500 })
