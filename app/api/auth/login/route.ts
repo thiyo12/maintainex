@@ -49,8 +49,6 @@ export async function POST(request: NextRequest) {
       where: { email },
       include: {
         customerProfile: true,
-        taskerProfile: true,
-        adminProfile: true,
       }
     })
 
@@ -70,10 +68,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() }
-    })
+
 
     await prisma.failedLogin.deleteMany({
       where: { email }
@@ -96,12 +91,8 @@ export async function POST(request: NextRequest) {
           name: user.name,
           phone: user.phone,
           role: user.role,
-          avatarUrl: user.avatarUrl,
-          emailVerified: user.emailVerified,
         },
-        profile: user.role === 'CUSTOMER' ? user.customerProfile
-          : user.role === 'TASKER' ? user.taskerProfile
-          : user.adminProfile,
+        profile: user.role === 'CUSTOMER' ? user.customerProfile : null,
       }
     })
 
