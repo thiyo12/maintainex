@@ -13,7 +13,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const application = await prisma.jobApplication.findUnique({
+    const application = await prisma.application.findUnique({
       where: { id: (await params).id }
     })
 
@@ -42,7 +42,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const existingApplication = await prisma.jobApplication.findUnique({
+    const existingApplication = await prisma.application.findUnique({
       where: { id: (await params).id }
     })
 
@@ -61,7 +61,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    const application = await prisma.jobApplication.update({
+    const application = await prisma.application.update({
       where: { id: (await params).id },
       data: { status }
     })
@@ -95,7 +95,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const application = await prisma.jobApplication.findUnique({
+    const application = await prisma.application.findUnique({
       where: { id: (await params).id }
     })
 
@@ -107,7 +107,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized - This application belongs to another branch' }, { status: 403 })
     }
 
-    await prisma.jobApplication.delete({
+    await prisma.application.delete({
       where: { id: (await params).id }
     })
 

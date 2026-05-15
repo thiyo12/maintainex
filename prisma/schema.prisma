@@ -7,216 +7,51 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// ENUMS
-// ============================================
-
-enum UserRole {
-  CUSTOMER
-  TASKER
-  ADMIN
-  SUPER_ADMIN
-}
-
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  BANNED
-  PENDING_VERIFICATION
-}
-
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  INVOICED
-  NO_SHOW
-}
-
-enum TaskStatus {
-  DRAFT
-  PENDING_REVIEW
-  APPROVED
-  OPEN
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  DISPUTED
-}
-
-enum TaskApplicationStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  WITHDRAWN
-}
-
-enum TaskAssignmentStatus {
-  PENDING
-  CONFIRMED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-  DISPUTED
-}
-
-enum PaymentStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  REFUNDED
-  PARTIALLY_REFUNDED
-  ESCROW
-  RELEASED
-}
-
-enum PaymentMethod {
-  CASH
-  CARD
-  BANK_TRANSFER
-  STRIPE
-  WHATSAPP_PAY
-}
-
-enum DisputeStatus {
-  OPEN
-  UNDER_REVIEW
-  RESOLVED
-  CLOSED
-}
-
-enum DisputeResolution {
-  REFUND_FULL
-  REFUND_PARTIAL
-  NO_ACTION
-  TASKER_COMPENSATION
-}
-
-enum NotificationType {
-  TASK_CREATED
-  TASK_APPROVED
-  TASK_REJECTED
-  APPLICATION_RECEIVED
-  APPLICATION_ACCEPTED
-  APPLICATION_REJECTED
-  TASK_ASSIGNED
-  TASK_COMPLETED
-  PAYMENT_RECEIVED
-  PAYMENT_RELEASED
-  PAYMENT_FAILED
-  REVIEW_RECEIVED
-  REVIEW_RESPONSE
-  MESSAGE_RECEIVED
-  DISPUTE_OPENED
-  DISPUTE_RESOLVED
-  BOOKING_CONFIRMED
-  BOOKING_CANCELLED
-  SYSTEM_ALERT
-  REMINDER
-  WHATSAPP_SENT
-}
-
-enum BackgroundCheckStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED_CLEAR
-  COMPLETED_FLAGGED
-  EXPIRED
-}
-
-enum AvailabilitySlotStatus {
-  AVAILABLE
-  BOOKED
-  UNAVAILABLE
-}
-
-enum CustomerType {
-  REGULAR
-  VIP
-  CORPORATE
-  POTENTIAL
-}
-
-enum CustomerStatus {
-  ACTIVE
-  INACTIVE
-  BLACKLISTED
-}
-
-// ============================================
-// CORE USER & AUTH MODELS
-// ============================================
-
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  passwordHash      String
-  name              String
-  phone             String?
-  role              UserRole  @default(CUSTOMER)
-  status            UserStatus @default(PENDING_VERIFICATION)
-  isActive          Boolean   @default(true)
-  avatarUrl         String?
-  emailVerified     Boolean   @default(false)
-  emailVerifiedAt   DateTime?
-  twoFactorEnabled  Boolean   @default(false)
-  twoFactorSecret   String?
-  lastLoginAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String     @id @default(cuid())
+  email         String     @unique
+  passwordHash  String
+  name          String
+  phone         String?
+  role          String     @default("CUSTOMER")
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  sessions          Session[]
-  otps              OTP[]
-  loginActivities   LoginActivity[]
-  bookings          Booking[]
-  reviews           Review[]
-  customerProfile   CustomerProfile?
-  taskerProfile     TaskerProfile?
-  adminProfile      AdminProfile?
-  verificationToken VerificationToken?
-  refreshTokens     RefreshToken[]
-  notifications     Notification[]
-  messagesSent      ChatMessage[] @relation("MessageSender")
-  messagesReceived  ChatMessage[] @relation("MessageReceiver")
-
-  @@index([email])
-  @@index([role])
-  @@index([status])
-  @@index([isActive])
+  sessions        Session[]
+  otps            OTP[]
+  loginActivities LoginActivity[]
+  bookings        Booking[]
+  reviews         Review[]
+  customerProfile CustomerProfile?
 }
 
-model AdminProfile {
+model Admin {
   id              String   @id @default(cuid())
-  userId          String   @unique
+  email           String   @unique
+  password        String
+  name            String?
   role            String   @default("ADMIN")
-  province        String?
+  province       String?
   branchId        String?
   branch          Branch?  @relation(fields: [branchId], references: [id])
   canEditServices Boolean  @default(false)
+  isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  actions         AdminAction[]
-  disputes        Dispute[] @relation("DisputeAdmin")
-  tasksReviewed   Task[]    @relation("TaskReviewedBy")
-
-  @@index([userId])
   @@index([branchId])
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String
-  userAgent String
-  isValid   Boolean  @default(true)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress    String
+  userAgent    String
+  isValid      Boolean  @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
 
   @@index([userId])
 }
@@ -239,190 +74,19 @@ model LoginActivity {
   id           String   @id @default(cuid())
   userId       String?
   user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  email        String
-  ipAddress    String
-  userAgent    String
-  location     String?
-  isNewIP      Boolean  @default(false)
-  isNewDevice  Boolean  @default(false)
-  isSuspicious Boolean  @default(false)
-  reason       String?
-  createdAt    DateTime @default(now())
+  email       String
+  ipAddress   String
+  userAgent   String
+  location   String?
+  isNewIP     Boolean  @default(false)
+  isNewDevice Boolean  @default(false)
+  isSuspicious Boolean @default(false)
+  reason     String?
+  createdAt  DateTime  @default(now())
 
   @@index([createdAt])
   @@index([isSuspicious])
 }
-
-model VerificationToken {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([token])
-}
-
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  expiresAt DateTime
-  revoked   Boolean  @default(false)
-  revokedAt DateTime?
-  createdAt DateTime @default(now())
-
-  @@index([token])
-  @@index([userId])
-}
-
-// ============================================
-// CUSTOMER & TASKER PROFILES
-// ============================================
-
-model CustomerProfile {
-  id               String   @id @default(cuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Classification
-  customerType     CustomerType @default(REGULAR)
-  status           CustomerStatus @default(ACTIVE)
-
-  // Preferences
-  preferredContact String?
-  smsOptIn         Boolean  @default(true)
-  emailOptIn       Boolean  @default(true)
-  whatsappOptIn    Boolean  @default(true)
-  notificationPrefs String? // JSON: push, email, sms preferences
-
-  // Source tracking
-  source           String?
-  sourceDetails    String?
-
-  // Lifetime value
-  totalBookings    Int      @default(0)
-  totalTasks       Int      @default(0)
-  totalSpent       Float    @default(0)
-  lifetimeValue    Float    @default(0)
-
-  // Wallet
-  walletBalance    Float    @default(0)
-
-  // First & last interactions
-  firstBooking     DateTime?
-  lastBooking      DateTime?
-
-  // Notes
-  summary          String?
-  blacklistReason  String?
-  blacklistDate    DateTime?
-
-  // Location
-  province         String?
-  defaultDistrict  String?
-
-  // Metadata
-  metadata         String?
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  tags             CustomerTag[]
-  addresses        CustomerAddress[]
-  activities       CustomerActivity[]
-  notes            CustomerNote[]
-  communications   CustomerCommunication[]
-  segments         CustomerSegmentCustomer[]
-  tasks            Task[]
-  assignments      TaskAssignment[] @relation("CustomerAssignments")
-  reviews          Review[] @relation("CustomerReviews")
-  disputes         Dispute[] @relation("DisputeCustomer")
-  favorites        Favorite[]
-
-  @@index([userId])
-  @@index([customerType])
-  @@index([status])
-  @@index([province])
-  @@index([createdAt])
-}
-
-model TaskerProfile {
-  id                    String    @id @default(cuid())
-  userId                String    @unique
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Profile
-  bio                   String?
-  profileImage          String?
-  hourlyRate            Float     @default(0)
-  minimumJobPrice       Float     @default(0)
-
-  // Location & Availability
-  primaryDistrict       String?
-  serviceRadius         Int       @default(25) // km
-  serviceDistricts      String?   // JSON array of districts they serve
-  isAvailable           Boolean   @default(true)
-  availabilitySchedule  String?   // JSON: weekly schedule
-
-  // Performance
-  overallRating         Float     @default(0)
-  totalReviews          Int       @default(0)
-  totalTasksCompleted   Int       @default(0)
-  totalEarnings         Float     @default(0)
-  responseTime          Float?    // average response time in hours
-  completionRate        Float?    // percentage
-  acceptanceRate        Float?    // percentage
-  onTimeRate            Float?    // percentage
-
-  // Verification
-  backgroundCheckStatus BackgroundCheckStatus @default(NOT_STARTED)
-  backgroundCheckDate   DateTime?
-  backgroundCheckDoc    String?
-  nicNumber             String?
-  verified              Boolean   @default(false)
-  verifiedAt            DateTime?
-
-  // Payment
-  stripeAccountId       String?
-  bankName              String?
-  bankAccountNumber     String?
-  branchName            String?
-
-  // Badges
-  badges                String?   // JSON array: ["top_rated", "fast_responder"]
-
-  // Stats
-  responseTimeAvg       Float?
-  lastActiveAt          DateTime?
-
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  // Relations
-  skills                TaskerSkill[]
-  portfolio             TaskerPortfolio[]
-  availability          TaskerAvailability[]
-  applications          TaskApplication[]
-  assignments           TaskAssignment[] @relation("TaskerAssignments")
-  reviews               Review[]
-  disputes              Dispute[] @relation("DisputeTasker")
-  favoritedBy           Favorite[]
-
-  @@index([userId])
-  @@index([overallRating])
-  @@index([isAvailable])
-  @@index([hourlyRate])
-  @@index([primaryDistrict])
-  @@index([verified])
-}
-
-// ============================================
-// SERVICE CATALOG (Maintainex Existing)
-// ============================================
 
 model Category {
   id          String    @id @default(cuid())
@@ -436,39 +100,7 @@ model Category {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
-  services    Service[]
-  taskerSkills TaskerSkill[]
-  tasks       Task[]
-
-  @@index([slug])
-  @@index([isActive])
-}
-
-model Service {
-  id             String   @id @default(cuid())
-  name           String
-  slug           String?
-  description    String
-  shortDescription String?
-  categoryId     String
-  category       Category @relation(fields: [categoryId], references: [id])
-  price          Float
-  duration       Int
-  features       String[]
-  image          String?
-  displayOrder   Int      @default(0)
-  views          Int      @default(0)
-  isTrending     Boolean  @default(false)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-
-  bookings       Booking[]
-  reviews        Review[]
-
-  @@index([categoryId])
-  @@index([views])
-  @@index([isTrending])
-  @@index([isActive])
+  services  Service[]
 }
 
 model Industry {
@@ -484,69 +116,66 @@ model Industry {
   updatedAt    DateTime @updatedAt
 }
 
-// ============================================
-// BRANCH & STAFF
-// ============================================
+model Service {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String?
+  description String
+  shortDescription String?
+  categoryId  String
+  category    Category    @relation(fields: [categoryId], references: [id])
+  price       Float
+  duration    Int
+  features    String[]
+  image       String?
+  displayOrder Int     @default(0)
+  views       Int      @default(0)
+  isTrending  Boolean  @default(false)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime    @default(now())
+
+  bookings  Booking[]
+  reviews   Review[]
+
+  @@index([categoryId])
+  @@index([views])
+  @@index([isTrending])
+}
 
 model Branch {
-  id         String   @id @default(cuid())
-  name       String
-  address    String
-  city       String
-  phone      String?
-  location   String?
-  districts  String?  // JSON array
-  province   String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id       String    @id @default(cuid())
+  name     String
+  address  String
+  city     String
+  phone    String?
+  location String?
+  districts String?
+  province       String?
+  isActive Boolean   @default(true)
+  createdAt DateTime  @default(now())
 
-  bookings   Booking[]
-  admins     AdminProfile[]
-  jobApplications JobApplication[]
-  staff      Staff[]
-  vacancies  JobVacancy[]
-  invoices   Invoice[]
+  bookings Booking[]
+  admins   Admin[]
+  applications Application[]
+  staff     Staff[]
+  vacancies JobVacancy[]
+  invoices  Invoice[]
   quotations Quotation[]
 
   @@index([city])
-  @@index([province])
 }
-
-model Staff {
-  id        String   @id @default(cuid())
-  staffId   String   @unique
-  name      String
-  phone     String?
-  email     String?
-  position  String?
-  photo     String?
-  branchId  String?
-  branch    Branch?  @relation(fields: [branchId], references: [id])
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([branchId])
-  @@index([staffId])
-}
-
-// ============================================
-// BOOKING (Enhanced - Maintainex Existing)
-// ============================================
 
 model Booking {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   serviceId   String?
-  service     Service? @relation(fields: [serviceId], references: [id])
+  service     Service?   @relation(fields: [serviceId], references: [id])
   branchId    String?
-  branch      Branch?  @relation(fields: [branchId], references: [id])
-  taskId      String?  // Link to marketplace task
-  task        Task?    @relation("TaskBookings", fields: [taskId], references: [id])
+  branch      Branch?    @relation(fields: [branchId], references: [id])
   date        DateTime
   timeSlot    String
-  status      BookingStatus @default(PENDING)
+  status      String     @default("PENDING")
   notes       String?
   totalPrice  Float
   name        String?
@@ -556,691 +185,17 @@ model Booking {
   province    String?
   address     String?
   time        String?
-  assignedTo  String?  // staff/tasker ID
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  payments    Payment[]
-  invoice     Invoice?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   @@index([userId])
   @@index([serviceId])
   @@index([branchId])
   @@index([status])
   @@index([date])
-  @@index([taskId])
-  @@index([province])
 }
 
-// ============================================
-// MARKETPLACE: TASKS & APPLICATIONS
-// ============================================
-
-model Task {
-  id              String     @id @default(cuid())
-  title           String
-  description     String
-  categoryId      String?
-  category        Category?  @relation(fields: [categoryId], references: [id])
-  customerId      String
-  customer        CustomerProfile @relation(fields: [customerId], references: [id])
-
-  // Task details
-  budget          Float?
-  budgetType      String     @default("fixed") // fixed, hourly, negotiable
-  urgency         String?    // low, medium, high, urgent
-
-  // Location (Sri Lanka)
-  district        String?
-  province        String?
-  address         String?
-  latitude        Float?
-  longitude       Float?
-  isRemote        Boolean    @default(false)
-
-  // Scheduling
-  startDate       DateTime?
-  endDate         DateTime?
-  isFlexibleDate  Boolean    @default(true)
-  preferredTime   String?
-
-  // Attachments
-  images          String?    // JSON array of image URLs
-
-  // Status & Review
-  status          TaskStatus @default(DRAFT)
-  adminNotes      String?
-  reviewedBy      String?
-  reviewer        AdminProfile? @relation("TaskReviewedBy", fields: [reviewedBy], references: [id])
-  reviewedAt      DateTime?
-  rejectionReason String?
-
-  // Stats
-  views           Int        @default(0)
-  applicationsCount Int      @default(0)
-
-  // Timestamps
-  publishedAt     DateTime?
-  completedAt     DateTime?
-  cancelledAt     DateTime?
-  cancellationReason String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-
-  // Relations
-  taskImages      TaskImage[]
-  applications    TaskApplication[]
-  assignment      TaskAssignment?
-  reviews         Review[]
-  disputes        Dispute[]
-  chatMessages    ChatMessage[]
-  bookings        Booking[] @relation("TaskBookings")
-
-  @@index([categoryId])
-  @@index([customerId])
-  @@index([status])
-  @@index([budget])
-  @@index([createdAt])
-  @@index([district])
-  @@index([province])
-  @@index([urgency])
-}
-
-model TaskImage {
-  id         String   @id @default(cuid())
-  taskId     String
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  url        String
-  thumbnailUrl String?
-  caption    String?
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
-
-  @@index([taskId])
-}
-
-model TaskApplication {
-  id            String    @id @default(cuid())
-  taskId        String
-  task          Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  taskerId      String
-  tasker        TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-
-  // Application details
-  bidAmount     Float?
-  message       String?
-  proposedDuration String? // e.g., "2 hours", "1 day"
-  availability  String?   // when they can start
-
-  // Status
-  status        TaskApplicationStatus @default(PENDING)
-  viewedAt      DateTime?
-  respondedAt   DateTime?
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  @@unique([taskId, taskerId])
-  @@index([taskId])
-  @@index([taskerId])
-  @@index([status])
-}
-
-model TaskAssignment {
-  id              String    @id @default(cuid())
-  taskId          String    @unique
-  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  taskerId        String
-  tasker          TaskerProfile @relation("TaskerAssignments", fields: [taskerId], references: [id])
-  customerId      String
-  customer        CustomerProfile @relation("CustomerAssignments", fields: [customerId], references: [id])
-
-  // Assignment details
-  status          TaskAssignmentStatus @default(PENDING)
-  agreedPrice     Float
-  agreedDuration  String?
-
-  // Timeline
-  assignedBy      String?   // admin who assigned
-  startDate       DateTime?
-  endDate         DateTime?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  cancelledAt     DateTime?
-  cancellationReason String?
-
-  // Completion
-  notes           String?
-  completionPhotos String?  // JSON array
-  customerFeedback String?
-
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  // Relations
-  payment         Payment?
-  review          Review?
-  chatMessages    ChatMessage[]
-
-  @@index([taskerId])
-  @@index([customerId])
-  @@index([status])
-}
-
-// ============================================
-// TASKER SKILLS & AVAILABILITY
-// ============================================
-
-model TaskerSkill {
-  id              String   @id @default(cuid())
-  taskerId        String
-  tasker          TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  categoryId      String
-  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  experienceLevel String   // beginner, intermediate, expert
-  certified       Boolean  @default(false)
-  hourlyRate      Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([taskerId, categoryId])
-  @@index([taskerId])
-  @@index([categoryId])
-}
-
-model TaskerPortfolio {
-  id          String   @id @default(cuid())
-  taskerId    String
-  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  imageUrl    String
-  thumbnailUrl String?
-  title       String
-  description String?
-  categoryId  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([taskerId])
-}
-
-model TaskerAvailability {
-  id        String    @id @default(cuid())
-  taskerId  String
-  tasker    TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  date      DateTime
-  startTime String
-  endTime   String
-  status    AvailabilitySlotStatus @default(AVAILABLE)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@unique([taskerId, date, startTime])
-  @@index([taskerId])
-  @@index([date])
-  @@index([status])
-}
-
-// ============================================
-// PAYMENTS & FINANCIAL
-// ============================================
-
-model Payment {
-  id              String   @id @default(cuid())
-  assignmentId    String   @unique
-  assignment      TaskAssignment @relation(fields: [assignmentId], references: [id])
-  bookingId       String?
-  booking         Booking? @relation(fields: [bookingId], references: [id])
-
-  customerId      String
-  taskerId        String
-  amount          Float
-  platformFee     Float    @default(0)
-  taskerPayout    Float
-  currency        String   @default("LKR")
-
-  status          PaymentStatus @default(PENDING)
-  method          PaymentMethod @default(CASH)
-
-  // Stripe
-  stripePaymentIntentId String?
-  stripeChargeId    String?
-  stripePayoutId    String?
-  stripeTransferId  String?
-  receiptUrl        String?
-
-  // Invoice
-  invoiceNumber     String?
-
-  // Refunds
-  refundedAmount    Float    @default(0)
-  refundReason      String?
-  refundedAt        DateTime?
-
-  // Timestamps
-  paidAt            DateTime?
-  releasedAt        DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([assignmentId])
-  @@index([bookingId])
-  @@index([customerId])
-  @@index([taskerId])
-  @@index([status])
-  @@index([createdAt])
-}
-
-model Invoice {
-  id              String   @id @default(cuid())
-  invoiceNumber   String   @unique
-  type            String   @default("INVOICE")
-  branchId        String
-  branch          Branch   @relation(fields: [branchId], references: [id])
-  bookingId       String?  @unique
-  booking         Booking? @relation(fields: [bookingId], references: [id])
-  customerName    String
-  customerEmail   String?
-  customerPhone   String?
-  customerAddress String?
-  subtotal        Float
-  tax             Float    @default(0)
-  total           Float
-  status          String   @default("DRAFT")
-  paymentStatus   String   @default("UNPAID")
-  amountPaid      Float    @default(0)
-  dueDate         DateTime?
-  notes           String?
-  createdBy       String
-  isDeleted       Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  items           InvoiceItem[]
-
-  @@index([branchId])
-  @@index([bookingId])
-  @@index([invoiceNumber])
-}
-
-model InvoiceItem {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  description String
-  quantity    Float   @default(1)
-  unitPrice   Float
-  totalPrice  Float
-}
-
-model Quotation {
-  id               String   @id @default(cuid())
-  quotationNumber  String   @unique
-  type             String   @default("QUOTATION")
-  branchId         String
-  branch           Branch   @relation(fields: [branchId], references: [id])
-  customerName     String
-  customerEmail    String?
-  customerPhone    String?
-  customerAddress  String?
-  subtotal         Float
-  tax              Float    @default(0)
-  total            Float
-  validUntil       DateTime
-  status           String   @default("DRAFT")
-  notes            String?
-  createdBy        String
-  isDeleted        Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  items            QuotationItem[]
-
-  @@index([branchId])
-}
-
-model QuotationItem {
-  id           String    @id @default(cuid())
-  quotationId  String
-  quotation    Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  description  String
-  quantity     Float     @default(1)
-  unitPrice    Float
-  totalPrice   Float
-}
-
-// ============================================
-// REVIEWS & RATINGS (Enhanced)
-// ============================================
-
-model Review {
-  id              String   @id @default(cuid())
-
-  // For service reviews (Maintainex existing)
-  userId          String?
-  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  serviceId       String?
-  service         Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  // For task reviews (marketplace)
-  taskId          String?
-  task            Task?    @relation(fields: [taskId], references: [id])
-  assignmentId    String?  @unique
-  assignment      TaskAssignment? @relation(fields: [assignmentId], references: [id])
-  customer        CustomerProfile? @relation("CustomerReviews", fields: [customerId], references: [id])
-  customerId      String?
-  taskerId        String?
-  tasker          TaskerProfile? @relation(fields: [taskerId], references: [id])
-
-  // Rating
-  rating          Int
-  professionalism Int?
-  punctuality     Int?
-  quality         Int?
-  communication   Int?
-  value           Int?
-
-  // Content
-  comment         String?
-  isPublic        Boolean  @default(true)
-  isVerified      Boolean  @default(true)
-  helpfulCount    Int      @default(0)
-
-  // Response
-  response        String?
-  respondedAt     DateTime?
-
-  // Moderation
-  status          String   @default("PENDING")
-
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([serviceId])
-  @@index([taskId])
-  @@index([taskerId])
-  @@index([customerId])
-  @@index([rating])
-  @@index([status])
-}
-
-// ============================================
-// CHAT & MESSAGING
-// ============================================
-
-model ChatMessage {
-  id            String   @id @default(cuid())
-  assignmentId  String?
-  assignment    TaskAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  taskId        String?
-  task          Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  senderId      String
-  sender        User     @relation("MessageSender", fields: [senderId], references: [id])
-  receiverId    String
-  receiver      User     @relation("MessageReceiver", fields: [receiverId], references: [id])
-  content       String
-  messageType   String   @default("text") // text, image, file, system
-  imageUrl      String?
-  fileUrl       String?
-  fileName      String?
-  isRead        Boolean  @default(false)
-  readAt        DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([assignmentId])
-  @@index([taskId])
-  @@index([senderId])
-  @@index([receiverId])
-  @@index([createdAt])
-}
-
-// ============================================
-// DISPUTES
-// ============================================
-
-model Dispute {
-  id              String    @id @default(cuid())
-  taskId          String
-  task            Task      @relation(fields: [taskId], references: [id])
-  customerId      String
-  customer        CustomerProfile @relation("DisputeCustomer", fields: [customerId], references: [id])
-  taskerId        String
-  tasker          TaskerProfile @relation("DisputeTasker", fields: [taskerId], references: [id])
-  adminId         String?
-  admin           AdminProfile? @relation("DisputeAdmin", fields: [adminId], references: [id])
-
-  status          DisputeStatus @default(OPEN)
-  reason          String
-  description     String
-  resolution      DisputeResolution?
-  resolutionNotes String?
-  resolvedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  evidence        DisputeEvidence[]
-
-  @@index([taskId])
-  @@index([status])
-  @@index([customerId])
-  @@index([taskerId])
-}
-
-model DisputeEvidence {
-  id          String   @id @default(cuid())
-  disputeId   String
-  dispute     Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
-  submittedBy String
-  type        String   // photo, document, message
-  url         String
-  description String?
-  createdAt   DateTime @default(now())
-
-  @@index([disputeId])
-}
-
-// ============================================
-// NOTIFICATIONS
-// ============================================
-
-model Notification {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        NotificationType
-  title       String
-  message     String
-  data        String?  // JSON
-  isRead      Boolean  @default(false)
-  readAt      DateTime?
-  actionUrl   String?
-  createdAt   DateTime @default(now())
-
-  @@index([userId])
-  @@index([type])
-  @@index([isRead])
-  @@index([createdAt])
-}
-
-// ============================================
-// CRM MODELS (Maintainex Existing)
-// ============================================
-
-model CustomerTag {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  color       String   @default("#6366f1")
-  description String?
-  type        String   @default("GENERAL")
-  usageCount  Int      @default(0)
-  isSystem    Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  customers   CustomerProfile[]
-
-  @@index([name])
-  @@index([type])
-}
-
-model CustomerSegment {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  description String?
-  criteria    String   // JSON
-  type        String   @default("DYNAMIC")
-  memberCount Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  customers   CustomerSegmentCustomer[]
-
-  @@index([name])
-  @@index([type])
-}
-
-model CustomerSegmentCustomer {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  segmentId   String
-  segment     CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-  addedAt     DateTime @default(now())
-  addedBy     String?
-
-  @@unique([customerId, segmentId])
-  @@index([customerId])
-  @@index([segmentId])
-}
-
-model CustomerAddress {
-  id            String   @id @default(cuid())
-  customerId    String
-  customer      CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  label         String
-  address       String
-  district      String
-  province      String
-  postalCode    String?
-  instructions  String?
-  contactName   String?
-  contactPhone  String?
-  isDefault     Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([customerId])
-}
-
-model CustomerNote {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  content     String
-  type        String   @default("GENERAL")
-  createdById String?
-  createdByName String?
-  isPrivate   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([customerId])
-  @@index([createdById])
-}
-
-model CustomerActivity {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  type        String
-  title       String
-  description String?
-  metadata    String?
-  relatedId   String?
-  relatedType String?
-  createdById String?
-  createdByName String?
-  createdByEmail String?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
-
-  @@index([customerId])
-  @@index([type])
-  @@index([createdById])
-  @@index([createdAt])
-}
-
-model CustomerCommunication {
-  id            String   @id @default(cuid())
-  customerId    String
-  customer      CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  channel       String
-  direction     String
-  subject       String?
-  content       String
-  status        String   @default("PENDING")
-  statusDetails String?
-  externalId    String?
-  externalStatus String?
-  sentById      String?
-  sentByEmail   String?
-  sentAt        DateTime?
-  deliveredAt   DateTime?
-  readAt        DateTime?
-  errorMessage  String?
-  retryCount    Int      @default(0)
-  templateId    String?
-  templateName  String?
-  metadata      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([customerId])
-  @@index([channel])
-  @@index([direction])
-  @@index([status])
-  @@index([sentById])
-  @@index([createdAt])
-}
-
-model Favorite {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  taskerId    String
-  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-
-  @@unique([customerId, taskerId])
-  @@index([customerId])
-  @@index([taskerId])
-}
-
-// ============================================
-// HR: JOB VACANCIES & APPLICATIONS
-// ============================================
-
-model JobVacancy {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  location    String?
-  isActive    Boolean  @default(true)
-  branchId    String?
-  branch      Branch?  @relation(fields: [branchId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([isActive])
-  @@index([branchId])
-}
-
-model JobApplication {
+model Application {
   id         String   @id @default(cuid())
   name       String
   email      String
@@ -1252,36 +207,31 @@ model JobApplication {
   status     String   @default("PENDING")
   notes      String?
   district   String?
-  province   String?
+  province       String?
   address    String?
   position   String?
   branchId   String?
   branch     Branch?  @relation(fields: [branchId], references: [id])
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([status])
   @@index([branchId])
 }
 
-// ============================================
-// ADMIN & SYSTEM MODELS
-// ============================================
+model Review {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceId    String
+  service      Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  rating       Int
+  comment      String?
+  status       String   @default("PENDING")
+  customerName String?
+  createdAt    DateTime  @default(now())
 
-model AdminAction {
-  id          String   @id @default(cuid())
-  adminId     String
-  admin       AdminProfile @relation(fields: [adminId], references: [id])
-  targetUserId String?
-  action      String
-  reason      String?
-  details     String?
-  createdAt   DateTime @default(now())
-
-  @@index([adminId])
-  @@index([targetUserId])
-  @@index([action])
-  @@index([createdAt])
+  @@index([serviceId])
 }
 
 model Settings {
@@ -1311,27 +261,304 @@ model ActivityLog {
   @@index([createdAt])
 }
 
+// ============================================
+// CRM MODELS - Customer Relationship Management
+// ============================================
+
+model CustomerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Customer Classification
+  customerType    String   @default("REGULAR")  // REGULAR, VIP, CORPORATE, POTENTIAL
+  status          String   @default("ACTIVE")     // ACTIVE, INACTIVE, BLACKLISTED
+  
+  // Preferences
+  preferredContact String? // EMAIL, PHONE, WHATSAPP
+  smsOptIn        Boolean  @default(true)
+  emailOptIn      Boolean  @default(true)
+  whatsappOptIn   Boolean  @default(true)
+  
+  // Source tracking
+  source          String?  // WEBSITE, REFERRAL, CAMPAIGN, WALK_IN
+  sourceDetails   String?
+  
+  // Lifetime value
+  totalBookings   Int      @default(0)
+  totalSpent      Float    @default(0)
+  lifetimeValue   Float    @default(0)
+  
+  // First & last interactions
+  firstBooking    DateTime?
+  lastBooking     DateTime?
+  
+  // Notes & blacklist
+  summary         String?   // Short summary/notes about customer
+  blacklistReason String?
+  blacklistDate   DateTime?
+  
+  // Province (for query performance and province-based access)
+  province        String?
+  
+  // Metadata
+  metadata        String?  // JSON for additional data
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  tags            CustomerTag[]
+  addresses       CustomerAddress[]
+  activities      CustomerActivity[]
+  notes           CustomerNote[]
+  communications  CustomerCommunication[]
+  segments        CustomerSegmentCustomer[]
+
+  @@index([userId])
+  @@index([customerType])
+  @@index([status])
+  @@index([province])
+  @@index([createdAt])
+}
+
+model CustomerTag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  color       String   @default("#6366f1")  // Hex color for UI
+  description String?
+  
+  // Tag type
+  type        String   @default("GENERAL") // GENERAL, BEHAVIOR, VALUE, PREFERENCE
+  
+  // Usage stats
+  usageCount  Int      @default(0)
+  
+  isSystem    Boolean  @default(false)  // System tags can't be deleted
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  customers   CustomerProfile[]
+
+  @@index([name])
+  @@index([type])
+}
+
+model CustomerSegment {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  
+  // Segment criteria (JSON)
+  criteria    String   // {"province": "Western", "minBookings": 3}
+  
+  // Segment type
+  type        String   @default("DYNAMIC") // DYNAMIC, STATIC
+  
+  // Stats
+  memberCount Int      @default(0)
+  
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  customers   CustomerSegmentCustomer[]
+
+  @@index([name])
+  @@index([type])
+}
+
+model CustomerSegmentCustomer {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  segmentId   String
+  segment     CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  
+  addedAt     DateTime @default(now())
+  addedBy     String?  // Admin ID who added
+  
+  @@unique([customerId, segmentId])
+  @@index([customerId])
+  @@index([segmentId])
+}
+
+model CustomerAddress {
+  id            String   @id @default(cuid())
+  customerId    String
+  customer      CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  label         String   // Home, Office, Other
+  address       String
+  district      String
+  province      String
+  postalCode    String?
+  instructions  String?  // Delivery/access instructions
+  
+  // Contact person at address
+  contactName   String?
+  contactPhone  String?
+  
+  isDefault     Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([customerId])
+}
+
+model CustomerNote {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  content     String
+  type        String   @default("GENERAL") // GENERAL, COMPLAINT, FEEDBACK, INTERNAL
+  
+  // Author tracking
+  createdById String?
+  createdByName String?
+  
+  isPrivate   Boolean  @default(false)  // Private notes only visible to creator
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([createdById])
+}
+
+model CustomerActivity {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  type        String   // BOOKING_CREATED, BOOKING_COMPLETED, CALL_MADE, CALL_RECEIVED, 
+                      // EMAIL_SENT, EMAIL_OPENED, WHATSAPP_SENT, WHATSAPP_RECEIVED,
+                      // NOTE_ADDED, TAG_ADDED, TAG_REMOVED, SEGMENT_ADDED, SEGMENT_REMOVED,
+                      // STATUS_CHANGED, PROFILE_UPDATED, ADDRESS_ADDED, LOGIN
+  
+  // Activity details
+  title       String
+  description String?
+  metadata    String?  // JSON for additional data
+  
+  // Related entities
+  relatedId   String?  // Booking ID, etc.
+  relatedType String?  // BOOKING, SERVICE, etc.
+  
+  // Author tracking
+  createdById String?
+  createdByName String?
+  createdByEmail String?
+  
+  ipAddress   String?
+  
+  createdAt   DateTime @default(now())
+
+  @@index([customerId])
+  @@index([type])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model CustomerCommunication {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  // Communication details
+  channel     String   // EMAIL, SMS, WHATSAPP, NOTIFICATION, CALL
+  direction   String   // OUTBOUND, INBOUND
+  
+  subject     String?
+  content     String
+  
+  // Status tracking
+  status      String   @default("PENDING") // PENDING, SENT, DELIVERED, READ, FAILED, CANCELLED
+  statusDetails String?
+  
+  // External reference
+  externalId  String?  // Third-party message ID (WhatsApp message ID, etc.)
+  externalStatus String? // Status from WhatsApp API, etc.
+  
+  // Sending details
+  sentById    String?
+  sentByEmail String?
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  
+  // Error handling
+  errorMessage String?
+  retryCount  Int      @default(0)
+  
+  // Template reference
+  templateId  String?
+  templateName String?
+  
+  // Metadata
+  metadata    String?  // JSON for additional data
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([customerId])
+  @@index([channel])
+  @@index([direction])
+  @@index([status])
+  @@index([sentById])
+  @@index([createdAt])
+}
+
+// ============================================
+// SECURITY MODELS
+// ============================================
+
 model SecurityAudit {
   id          String   @id @default(cuid())
-  action      String
-  category    String
+  
+  // Action details
+  action      String   // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, EXPORT, API_CALL
+  category    String   // AUTH, CUSTOMER, BOOKING, SERVICE, REPORT, ADMIN, SYSTEM
+  
+  // Who
   userId      String?
   userEmail   String?
   userRole    String?
   userProvince String?
+  
+  // What
   entityType  String?
   entityId    String?
   entityName  String?
+  
+  // Details
   description String
-  oldValue    String?
-  newValue    String?
+  oldValue   String?  // JSON of previous state
+  newValue   String?  // JSON of new state
+  
+  // Context
   ipAddress   String?
   userAgent   String?
   sessionId   String?
+  
+  // Result
   success     Boolean  @default(true)
   errorMessage String?
-  riskLevel   String   @default("LOW")
-  isSuspicious Boolean @default(false)
+  
+  // Risk assessment
+  riskLevel   String   @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  isSuspicious Boolean  @default(false)
+  
   createdAt   DateTime @default(now())
 
   @@index([action])
@@ -1347,21 +574,34 @@ model SecurityAudit {
 model ApiKey {
   id          String   @id @default(cuid())
   name        String
-  key         String   @unique
-  prefix      String
+  key         String   @unique  // Hashed version
+  
+  // Key metadata (unhashed prefix stored for identification)
+  prefix      String   // First 8 chars of key for identification
   version     Int      @default(1)
-  permissions String[]
-  scope       String   @default("FULL")
-  province    String?
+  
+  // Permissions
+  permissions String[] // READ, WRITE, DELETE, ADMIN
+  
+  // Scoping
+  scope       String   @default("FULL") // FULL, CUSTOMERS, BOOKINGS, REPORTS
+  province    String?  // If set, key only works for this province
+  
+  // Status
   isActive    Boolean  @default(true)
   expiresAt   DateTime?
   lastUsedAt  DateTime?
   lastIp      String?
-  rateLimit   Int      @default(100)
+  
+  // Usage limits
+  rateLimit   Int      @default(100)  // Requests per minute
   requestCount Int     @default(0)
+  
+  // Owner
   createdById String
   createdByEmail String
   description String?
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1372,15 +612,26 @@ model ApiKey {
 
 model RateLimitLog {
   id          String   @id @default(cuid())
-  identifier  String
-  type        String
+  
+  // What was rate limited
+  identifier  String   // IP address, API key, or user ID
+  type        String   // IP, API_KEY, USER
+  
+  // Endpoint
   endpoint    String
   method      String
+  
+  // Request details
   requestCount Int     @default(1)
+  
+  // Window
   windowStart DateTime
   windowEnd   DateTime
+  
+  // Result
   limited     Boolean  @default(false)
   blockUntil  DateTime?
+  
   createdAt   DateTime @default(now())
 
   @@index([identifier, windowStart])
@@ -1389,14 +640,23 @@ model RateLimitLog {
 
 model FailedLogin {
   id          String   @id @default(cuid())
+  
+  // Who tried to login
   email       String
   ipAddress   String
   userAgent   String?
+  
+  // Attempt details
   attemptCount Int     @default(1)
-  blocked     Boolean  @default(false)
-  blockUntil  DateTime?
-  reason      String?
+  blocked      Boolean  @default(false)
+  blockUntil   DateTime?
+  
+  // Why it failed
+  reason      String?  // INVALID_PASSWORD, INVALID_OTP, ACCOUNT_LOCKED, etc.
+  
+  // Location
   location    String?
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1407,18 +667,31 @@ model FailedLogin {
 
 model DataExport {
   id          String   @id @default(cuid())
-  type        String
-  format      String   @default("CSV")
-  filters     String?
+  
+  // Export details
+  type        String   // CUSTOMERS, BOOKINGS, REPORTS, FULL
+  format      String   @default("CSV") // CSV, JSON, EXCEL
+  
+  // Filters applied
+  filters     String?  // JSON of filters used
+  
+  // File info
   fileName    String?
   fileSize    Int?
   filePath    String?
-  status      String   @default("PENDING")
+  
+  // Status
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
   progress    Int      @default(0)
+  
+  // Requester
   requestedById String
   requestedByEmail String
-  downloadUrl String?
+  
+  // Download
+  downloadUrl  String?
   expiresAt   DateTime?
+  
   createdAt   DateTime @default(now())
   completedAt DateTime?
   updatedAt   DateTime @updatedAt
@@ -1426,4 +699,111 @@ model DataExport {
   @@index([requestedById])
   @@index([status])
   @@index([createdAt])
+}
+
+// Job Vacancies for Careers page
+model JobVacancy {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  isActive    Boolean  @default(true)
+  branchId    String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([branchId])
+}
+
+// Staff managed by branch admins
+model Staff {
+  id          String   @id @default(cuid())
+  staffId     String   @unique  // Auto-generated: EMP-001, EMP-002...
+  name        String
+  phone       String?
+  email       String?
+  position    String?
+  photo       String?
+  branchId    String?
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([staffId])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique
+  type            String   @default("INVOICE")
+  branchId        String
+  customerName    String
+  customerEmail   String?
+  customerPhone   String?
+  customerAddress String?
+  subtotal        Float
+  tax             Float    @default(0)
+  total           Float
+  status          String   @default("DRAFT")
+  paymentStatus   String   @default("UNPAID")
+  amountPaid      Float    @default(0)
+  dueDate         DateTime?
+  notes           String?
+  createdBy       String
+  isDeleted       Boolean  @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  items     InvoiceItem[]
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Float   @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Quotation {
+  id               String   @id @default(cuid())
+  quotationNumber String   @unique
+  type             String   @default("QUOTATION")
+  branchId         String
+  customerName     String
+  customerEmail    String?
+  customerPhone   String?
+  customerAddress String?
+  subtotal        Float
+  tax             Float    @default(0)
+  total           Float
+  validUntil      DateTime
+  status          String   @default("DRAFT")
+  notes           String?
+  createdBy       String
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  items     QuotationItem[]
+}
+
+model QuotationItem {
+  id           String  @id @default(cuid())
+  quotationId   String
+  description  String
+  quantity    Float   @default(1)
+  unitPrice    Float
+  totalPrice   Float
+
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 }

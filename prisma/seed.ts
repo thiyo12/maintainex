@@ -248,25 +248,15 @@ async function main() {
   const superAdminEmail = process.env.ADMIN_EMAIL || 'super@maintain.lk'
   const superAdminPasswordPlain = process.env.ADMIN_PASSWORD || 'M@int@in2024!'
   const superAdminPassword = await bcrypt.hash(superAdminPasswordPlain, 12)
-  const superAdmin = await prisma.user.upsert({
+  const superAdmin = await prisma.admin.upsert({
     where: { email: superAdminEmail },
     update: {},
     create: {
       email: superAdminEmail,
-      passwordHash: superAdminPassword,
+      password: superAdminPassword,
       name: 'Super Admin',
       role: 'SUPER_ADMIN',
-      isActive: true,
-      status: 'ACTIVE',
-      adminProfile: {
-        create: {
-          role: 'SUPER_ADMIN',
-          canEditServices: true
-        }
-      }
-    },
-    include: {
-      adminProfile: true
+      isActive: true
     }
   })
   console.log(`Created Super Admin: ${superAdmin.email}`)
@@ -275,26 +265,16 @@ async function main() {
     const adminEmail = 'admin@maintain.lk'
     const adminPasswordPlain = 'Adm1n@M4int@in!'
     const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
-    const branchAdmin = await prisma.user.upsert({
+    const branchAdmin = await prisma.admin.upsert({
       where: { email: adminEmail },
       update: {},
       create: {
         email: adminEmail,
-        passwordHash: adminPassword,
+        password: adminPassword,
         name: 'Northern Admin',
         role: 'ADMIN',
-        isActive: true,
-        status: 'ACTIVE',
-        adminProfile: {
-          create: {
-            role: 'ADMIN',
-            branchId: northernBranch.id,
-            canEditServices: false
-          }
-        }
-      },
-      include: {
-        adminProfile: true
+        branchId: northernBranch.id,
+        isActive: true
       }
     })
     console.log(`Created Branch Admin: ${branchAdmin.email}`)
@@ -303,7 +283,12 @@ async function main() {
   console.log('')
   console.log('✅ Seed completed successfully!')
   console.log('')
-  console.log('⚠️  Change default passwords in production!')
+  console.log('Login Credentials:')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('Super Admin:  super@maintain.lk / M@int@in2024!')
+  console.log('Branch Admin: admin@maintain.lk / Adm1n@M4int@in!')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('⚠️  Change these passwords immediately in production!')
   console.log('⚠️  Use environment variables: ADMIN_EMAIL, ADMIN_PASSWORD')
   console.log('')
   console.log('Categories Created:')
