@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
 import { getProvinceFromDistrict } from '@/lib/provinces'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 export async function GET(request: NextRequest) {
   try {
@@ -142,7 +143,8 @@ export async function POST(request: NextRequest) {
     let user = await prisma.user.findUnique({ where: { email } })
     
     if (!user) {
-      const hashedPassword = await bcrypt.hash('temp-password-123', 10)
+      const randomPass = crypto.randomUUID()
+      const hashedPassword = await bcrypt.hash(randomPass, 12)
       user = await prisma.user.create({
         data: {
           email,

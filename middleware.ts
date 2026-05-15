@@ -13,7 +13,7 @@ const securityHeaders = {
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
 
@@ -32,26 +32,6 @@ const RATE_LIMITS = {
 }
 
 async function getSession(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-  
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.substring(7)
-      const decoded = JSON.parse(atob(token))
-      if (decoded.id && decoded.email && decoded.role) {
-        return {
-          id: decoded.id,
-          email: decoded.email,
-          role: decoded.role,
-          branchId: decoded.branchId || null,
-          province: decoded.province || null,
-          name: decoded.name || null,
-          canEditServices: decoded.canEditServices || false
-        }
-      }
-    } catch {}
-  }
-
   const JWT_SECRET = process.env.NEXTAUTH_SECRET!
   
   function verifySimpleToken(token: string): any {

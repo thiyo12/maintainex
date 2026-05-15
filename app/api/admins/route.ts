@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
-    const admins = await prisma.admin.findMany({
+    const admins = await prisma.adminProfile.findMany({
       include: {
-        branch: {
+        user: { select: { name: true, email: true } }, branch: {
           select: {
             id: true,
             name: true,
@@ -60,30 +60,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Branch is required for admin users' }, { status: 400 })
     }
 
-    const existingAdmin = await prisma.admin.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email }
     })
 
-    if (existingAdmin) {
+    if (existingUser) {
       return NextResponse.json({ error: 'Email already exists' }, { status: 400 })
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10)
+    const hashedPassword = await bcrypt.hash(password, 12)
 
-    const admin = await prisma.admin.create({
+    const admin = await prisma.user.create({
       data: {
         email,
-        password: hashedPassword,
-        name: name || null,
-        role,
-        branchId: role === 'ADMIN' ? branchId : null
+        passwordHash: hashedPassword,
+        name: name || email.split('@')[0],
+        phone: null,
+        role: role as any,
+        status: 'ACTIVE',
+        isActive: true,
+        emailVerified: false,
+        adminProfile: {
+          create: {
+            role,
+            branchId: role === 'ADMIN' ? branchId : null,
+          }
+        }
       },
       include: {
-        branch: {
-          select: {
-            id: true,
-            name: true,
-            location: true
+        adminProfile: {
+          include: {
+            branch: { select: { id: true, name: true, location: true } }
           }
         }
       }

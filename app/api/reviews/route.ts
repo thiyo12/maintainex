@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import crypto from 'crypto'
 
 function sanitizeString(str: string): string {
   return str.replace(/<[^>]*>/g, '').trim()
@@ -52,12 +53,20 @@ export async function POST(request: NextRequest) {
     let guestUser = await prisma.user.findFirst({ where: { email: 'guest@maintain.lk' } })
     
     if (!guestUser) {
+      const bcrypt = await import('bcryptjs')
       guestUser = await prisma.user.create({
         data: {
           email: 'guest@maintain.lk',
-          passwordHash: 'guest',
-          name: 'Guest User'
+          passwordHash: await bcrypt.hash(crypto.randomUUID(), 12),
+          name: 'Guest User',
+          isActive: false
         }
+      })
+    } else if (guestUser.passwordHash === 'guest') {
+      const bcrypt = await import('bcryptjs')
+      guestUser = await prisma.user.update({
+        where: { id: guestUser.id },
+        data: { passwordHash: await bcrypt.hash(crypto.randomUUID(), 12), isActive: false }
       })
     }
 
@@ -65,7 +74,6 @@ export async function POST(request: NextRequest) {
       data: {
         rating: parsedRating,
         comment: comment ? sanitizeString(comment) : null,
-        customerName: sanitizeString(customerName),
         serviceId,
         userId: guestUser.id,
         status: 'PENDING'

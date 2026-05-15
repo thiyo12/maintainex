@@ -1,152 +1,118 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import { verifyPassword, createToken, hashPassword } from '@/lib/auth-utils'
+import { loginSchema } from '@/lib/validations'
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
+const BRUTE_LIMIT = 5
+const BRUTE_WINDOW = 15 * 60 * 1000
 
-if (!process.env.NEXTAUTH_SECRET) {
-  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+async function checkBruteForce(email: string, ip: string): Promise<boolean> {
+  const since = new Date(Date.now() - BRUTE_WINDOW)
+  const recent = await prisma.failedLogin.count({
+    where: {
+      OR: [{ email }, { ip }],
+      createdAt: { gte: since }
+    }
+  })
+  return recent < BRUTE_LIMIT
 }
 
-const rateLimitMap = new Map<string, { attempts: number; lockedUntil: number }>()
-const MAX_ATTEMPTS = 5
-const LOCK_DURATION_MS = 15 * 60 * 1000
-
-function checkRateLimit(ip: string): { blocked: boolean; remainingAttempts: number } {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-  
-  if (!record) return { blocked: false, remainingAttempts: MAX_ATTEMPTS }
-  
-  if (record.lockedUntil > now) {
-    return { blocked: true, remainingAttempts: 0 }
-  }
-  
-  if (now > record.lockedUntil) {
-    rateLimitMap.delete(ip)
-    return { blocked: false, remainingAttempts: MAX_ATTEMPTS }
-  }
-  
-  return { blocked: false, remainingAttempts: MAX_ATTEMPTS - record.attempts }
-}
-
-function recordFailedAttempt(ip: string) {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip) || { attempts: 0, lockedUntil: 0 }
-  
-  record.attempts += 1
-  
-  if (record.attempts >= MAX_ATTEMPTS) {
-    record.lockedUntil = now + LOCK_DURATION_MS
-  }
-  
-  rateLimitMap.set(ip, record)
-}
-
-function createSimpleToken(data: any): string {
-  const payload = {
-    ...data,
-    created: Date.now()
-  }
-  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64')
-  const signature = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-  return `${encoded}.${signature}`
-}
-
-function verifySimpleToken(token: string): any {
-  try {
-    const [encoded, signature] = token.split('.')
-    if (!encoded || !signature) return null
-    
-    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-    if (signature !== expectedSig) return null
-    
-    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
-    
-    const maxAge = 30 * 24 * 60 * 60 * 1000
-    if (Date.now() - payload.created > maxAge) return null
-    
-    return payload
-  } catch {
-    return null
-  }
+async function recordFailedAttempt(email: string, ip: string): Promise<void> {
+  await prisma.failedLogin.create({
+    data: { email, ip }
+  })
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.ip || 'unknown'
-    const rateLimit = checkRateLimit(ip)
-    
-    if (rateLimit.blocked) {
-      return NextResponse.json({ error: 'Too many login attempts. Please try again later.' }, { status: 429 })
-    }
-    
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown'
     const body = await request.json()
-    const { email, password } = body
+    const validation = loginSchema.safeParse(body)
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.errors[0]?.message || 'Invalid input' },
+        { status: 400 }
+      )
     }
 
-    const admin = await prisma.admin.findUnique({
-      where: { email }
-    })
+    const { email, password } = validation.data
 
-    if (!admin) {
-      recordFailedAttempt(ip)
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    const allowed = await checkBruteForce(email, ip)
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many attempts. Try again later.' }, { status: 429 })
     }
 
-    if (!admin.isActive) {
-      return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
-    }
-
-    const isValid = await bcrypt.compare(password, admin.password)
-
-    if (!isValid) {
-      recordFailedAttempt(ip)
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
-    }
-
-    const token = createSimpleToken({
-      id: admin.id,
-      email: admin.email,
-      role: admin.role,
-      branchId: admin.branchId,
-      province: admin.province || null,
-      name: admin.name,
-      canEditServices: admin.canEditServices
-    })
-    
-    console.log('✅ Admin login successful')
-
-    const response = NextResponse.json({
-      success: true,
-      user: {
-        id: admin.id,
-        email: admin.email,
-        name: admin.name,
-        role: admin.role,
-        branchId: admin.branchId,
-        province: admin.province || null,
-        canEditServices: admin.canEditServices
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        customerProfile: true,
+        taskerProfile: true,
+        adminProfile: true,
       }
     })
 
-    const isProduction = process.env.NODE_ENV === 'production'
-    const isHttpUrl = process.env.NEXTAUTH_URL?.startsWith('http://')
+    if (!user) {
+      await recordFailedAttempt(email, ip)
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    }
 
-    response.cookies.set('admin_token', token, {
+    if (!user.isActive) {
+      await recordFailedAttempt(email, ip)
+      return NextResponse.json({ error: 'Account is deactivated' }, { status: 401 })
+    }
+
+    const isValid = await verifyPassword(password, user.passwordHash)
+    if (!isValid) {
+      await recordFailedAttempt(email, ip)
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    })
+
+    const token = createToken({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+    })
+
+    const response = NextResponse.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          phone: user.phone,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+          emailVerified: user.emailVerified,
+        },
+        profile: user.role === 'CUSTOMER' ? user.customerProfile
+          : user.role === 'TASKER' ? user.taskerProfile
+          : user.adminProfile,
+      }
+    })
+
+    response.cookies.set('session', token, {
       httpOnly: true,
-      secure: isProduction && !isHttpUrl,
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60,
       path: '/',
-      maxAge: 30 * 24 * 60 * 60
     })
 
     return response
   } catch (error) {
     console.error('Login error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to login' },
+      { status: 500 }
+    )
   }
 }

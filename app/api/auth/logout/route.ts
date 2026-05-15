@@ -1,13 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const response = NextResponse.json({ success: true })
-  response.cookies.set('admin_token', '', {
+
+  response.cookies.set('session', '', {
     httpOnly: true,
-    secure: false,
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 0,
     path: '/',
-    maxAge: 0
   })
+
   return response
 }

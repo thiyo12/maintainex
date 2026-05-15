@@ -2,8 +2,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/auth-utils'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const session = await getSession(request)
+  if (!session || session.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     console.log('Creating Industry table...')
     
@@ -64,7 +69,6 @@ export async function POST() {
   }
 }
 
-// Also allow GET for easy testing
-export async function GET() {
-  return POST()
+export async function GET(request: NextRequest) {
+  return POST(request)
 }
