@@ -94,8 +94,8 @@ export async function GET(
     let where: any = {}
     where = applySegmentCriteria(criteria, where, isSuperAdmin)
 
-    if (!isSuperAdmin && session.province) {
-      where.province = session.province
+    if (!isSuperAdmin && (session as any).province) {
+      where.province = (session as any).province
     }
 
     let customers: any[]

@@ -111,7 +111,7 @@ export async function getStatsForPeriod(startDate: Date, endDate: Date, branchId
       _count: true,
       where: whereClause
     }),
-    prisma.application.groupBy({
+    prisma.jobApplication.groupBy({
       by: ['status'],
       _count: true,
       where: whereClause
