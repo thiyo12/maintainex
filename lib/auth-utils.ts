@@ -1,82 +1,87 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import jwt from 'jsonwebtoken'
+import { prisma } from '@/lib/prisma'
 
-if (!process.env.NEXTAUTH_SECRET) {
-  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+if (!JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET or NEXTAUTH_SECRET must be set in production')
+  }
+  console.warn('⚠️ SECURITY: JWT_SECRET not set - using insecure fallback')
 }
 
-export interface SessionUser {
+
+export interface SessionData {
   id: string
   email: string
+  name: string
   role: string
-  branchId?: string | null
-  province?: string | null
-  name?: string | null
+  isActive: boolean
+  branchId?: string
   canEditServices?: boolean
+  province?: string
 }
 
-export async function getSession(request: NextRequest): Promise<SessionUser | null> {
-  const authHeader = request.headers.get('Authorization')
-  
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.substring(7)
-      const decoded = JSON.parse(atob(token))
-      if (decoded.id && decoded.email && decoded.role) {
-        return {
-          id: decoded.id,
-          email: decoded.email,
-          role: decoded.role,
-          branchId: decoded.branchId || null,
-          province: decoded.province || null,
-          name: decoded.name || null,
-          canEditServices: decoded.canEditServices || false
-        }
-      }
-    } catch {
-      // Fall through to cookie check
-    }
-  }
+export async function getSession(req: NextRequest): Promise<SessionData | null> {
+  try {
+    const cookie = req.cookies.get('session')
+    if (!cookie) return null
 
-  // Fallback to cookie-based auth
-  const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
-  
-  function verifySimpleToken(token: string): any {
-    try {
-      const [encoded, signature] = token.split('.')
-      if (!encoded || !signature) return null
-      
-      const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-      if (signature !== expectedSig) return null
-      
-      const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
-      
-      const maxAge = 30 * 24 * 60 * 60 * 1000
-      if (Date.now() - payload.created > maxAge) return null
-      
-      return payload
-    } catch {
-      return null
-    }
-  }
+    const token = cookie.value
+    const decoded = jwt.verify(token, JWT_SECRET) as SessionData
 
-  const token = request.cookies.get('admin_token')?.value
-  
-  if (!token) {
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      include: { adminProfile: { select: { canEditServices: true, branchId: true, province: true } } }
+    })
+
+    if (!user || !user.isActive) return null
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+      branchId: user.adminProfile?.branchId ?? undefined,
+      canEditServices: user.adminProfile?.canEditServices ?? false,
+      province: user.adminProfile?.province ?? undefined
+    }
+  } catch {
     return null
   }
-  
-  const payload = verifySimpleToken(token)
-  if (!payload) {
-    return null
-  }
-  
-  return {
-    id: payload.id,
-    email: payload.email,
-    role: payload.role,
-    branchId: payload.branchId,
-    province: payload.province || null,
-    name: payload.name,
-    canEditServices: payload.canEditServices || false
-  }
+}
+
+export function requireAuth(req: NextRequest) {
+  return getSession(req)
+}
+
+export function requireRole(session: SessionData | null, roles: string[]) {
+  if (!session) return false
+  return roles.includes(session.role)
+}
+
+export function createToken(user: SessionData): string {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+      canEditServices: user.canEditServices,
+    },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  )
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  const bcrypt = await import('bcryptjs')
+  return bcrypt.hash(password, 12)
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  const bcrypt = await import('bcryptjs')
+  return bcrypt.compare(password, hash)
 }

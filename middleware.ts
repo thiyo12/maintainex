@@ -3,7 +3,10 @@ import type { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 if (!process.env.NEXTAUTH_SECRET) {
-  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('NEXTAUTH_SECRET must be set in production')
+  }
+  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - set in production!')
 }
 
 const securityHeaders = {
@@ -52,7 +55,7 @@ async function getSession(request: NextRequest) {
     } catch {}
   }
 
-  const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
+  const JWT_SECRET = process.env.NEXTAUTH_SECRET!
   
   function verifySimpleToken(token: string): any {
     try {
