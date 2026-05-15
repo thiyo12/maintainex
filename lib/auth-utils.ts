@@ -30,7 +30,7 @@ export async function getSession(req: NextRequest): Promise<SessionData | null> 
     if (!cookie) return null
 
     const token = cookie.value
-    const decoded = jwt.verify(token, JWT_SECRET) as unknown as SessionData
+    const decoded = jwt.verify(token, JWT_SECRET!) as unknown as SessionData
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
@@ -73,7 +73,7 @@ export function createToken(user: SessionData): string {
       isActive: user.isActive,
       canEditServices: user.canEditServices,
     },
-    JWT_SECRET,
+    JWT_SECRET!,
     { expiresIn: '7d' }
   )
 }
