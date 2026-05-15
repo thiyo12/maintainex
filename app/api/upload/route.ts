@@ -19,6 +19,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    if (!validTypes.includes(file.type)) {
+      return NextResponse.json({ error: 'Invalid file type. Allowed: jpg, png, webp, gif' }, { status: 400 })
+    }
+
+    const maxSize = 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 })
+    }
+
     // For industries, save locally instead of Cloudinary
     if (folder === 'industries') {
       const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'industries')

@@ -33,9 +33,9 @@ export async function DELETE(
     })
 
     return NextResponse.json({ success: true, message: 'Service deleted successfully' })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Delete service error:', error)
-    return NextResponse.json({ error: 'Failed to delete service', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete service' }, { status: 500 })
   }
 }
 
@@ -72,27 +72,19 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('=== Service PATCH called ===')
-    console.log('Service ID:', params.id)
-    
     const session = await getSession(request)
-    console.log('Session:', session)
     
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized', reason: 'No session' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
     const isSuper = session.role === 'SUPER_ADMIN'
-    console.log('isSuper:', isSuper)
 
     if (!isSuper) {
       return NextResponse.json({ error: 'Only Super Admin can update services' }, { status: 403 })
     }
 
     const body = await request.json()
-    console.log('=== PATCH API Received ===')
-    console.log('Request body:', body)
-    console.log('Image field:', body.image)
     
     const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features } = body
 
@@ -114,15 +106,12 @@ export async function PATCH(
       include: { category: true }
     })
 
-    console.log('=== Updated Service ===')
-    console.log('Service image:', service.image)
-
     return NextResponse.json({
       ...service,
       price: service.price ? Number(service.price) : null,
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('Update service error:', error)
-    return NextResponse.json({ error: 'Failed to update service', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
   }
 }

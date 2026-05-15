@@ -16,13 +16,14 @@ export async function GET(request: NextRequest) {
     const includeReviews = searchParams.get('reviews') === 'true'
     const includeAll = searchParams.get('all') === 'true'
 
-    // Test simple query first
-    const testCount = await prisma.service.count()
-    console.log('Service count:', testCount)
-
-    // Public API: only active services
-    // Admin API (all=true): include all services
-    const where: any = includeAll ? {} : { isActive: true }
+    const where: any = { isActive: true }
+    if (includeAll) {
+      const session = await getSession(request)
+      if (!session || (session.role !== 'SUPER_ADMIN' && session.role !== 'ADMIN')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      where.isActive = undefined
+    }
     if (categorySlug) {
       where.category = { slug: categorySlug }
     }

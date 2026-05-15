@@ -15,49 +15,8 @@ cloudinary.config({
   api_secret: apiSecret
 })
 
-const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
-const RATE_LIMIT = 10
-const RATE_WINDOW = 60 * 1000
-
-function cleanupOldEntries() {
-  const now = Date.now()
-  const entries = Array.from(rateLimitMap.entries())
-  for (const [ip, record] of entries) {
-    if (now - record.lastReset > RATE_WINDOW * 2) {
-      rateLimitMap.delete(ip)
-    }
-  }
-}
-
-if (typeof window === 'undefined') {
-  setInterval(cleanupOldEntries, RATE_WINDOW * 2)
-}
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-  
-  if (!record || now - record.lastReset > RATE_WINDOW) {
-    rateLimitMap.set(ip, { count: 1, lastReset: now })
-    return true
-  }
-  
-  if (record.count >= RATE_LIMIT) {
-    return false
-  }
-  
-  record.count++
-  return true
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
-    }
-
     let formData
     try {
       formData = await request.formData()

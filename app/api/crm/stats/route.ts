@@ -184,8 +184,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('CRM stats error:', error)
     return NextResponse.json({ 
-      error: 'Failed to load CRM stats',
-      details: error.message 
+      error: 'Failed to load CRM stats'
     }, { status: 500 })
   }
 }

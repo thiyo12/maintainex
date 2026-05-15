@@ -13,7 +13,7 @@ const securityHeaders = {
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
 
@@ -31,33 +31,91 @@ const RATE_LIMITS = {
   admin: { maxRequests: 200, windowSeconds: 60 },
 }
 
+async function verifySessionToken(token: string, secret: string): Promise<any> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+
+    const [headerB64, payloadB64, signatureB64] = parts
+
+    const signature = Uint8Array.from(
+      atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')),
+      c => c.charCodeAt(0)
+    )
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    )
+
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signature,
+      new TextEncoder().encode(`${headerB64}.${payloadB64}`)
+    )
+
+    if (!valid) return null
+
+    const payloadStr = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'))
+    const payload = JSON.parse(payloadStr)
+
+    if (payload.exp && Date.now() >= payload.exp * 1000) return null
+
+    return payload
+  } catch {
+    return null
+  }
+}
+
+function verifySimpleToken(token: string): any {
+  try {
+    const JWT_SECRET = process.env.NEXTAUTH_SECRET || ''
+    const [encoded, signature] = token.split('.')
+    if (!encoded || !signature) return null
+    
+    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+    if (signature !== expectedSig) return null
+    
+    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
+    
+    const maxAge = 30 * 24 * 60 * 60 * 1000
+    if (Date.now() - payload.created > maxAge) return null
+    
+    return payload
+  } catch {
+    return null
+  }
+}
+
 async function getSession(request: NextRequest) {
   const JWT_SECRET = process.env.NEXTAUTH_SECRET!
   
-  function verifySimpleToken(token: string): any {
-    try {
-      const [encoded, signature] = token.split('.')
-      if (!encoded || !signature) return null
-      
-      const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-      if (signature !== expectedSig) return null
-      
-      const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
-      
-      const maxAge = 30 * 24 * 60 * 60 * 1000
-      if (Date.now() - payload.created > maxAge) return null
-      
-      return payload
-    } catch {
-      return null
+  const sessionCookie = request.cookies.get('session')?.value
+  
+  if (sessionCookie) {
+    const payload = await verifySessionToken(sessionCookie, JWT_SECRET)
+    if (payload) {
+      return {
+        id: payload.id,
+        email: payload.email,
+        role: payload.role,
+        branchId: payload.branchId,
+        province: payload.province || null,
+        name: payload.name,
+        canEditServices: payload.canEditServices || false
+      }
     }
   }
 
-  const token = request.cookies.get('admin_token')?.value
+  const adminToken = request.cookies.get('admin_token')?.value
   
-  if (!token) return null
+  if (!adminToken) return null
   
-  const payload = verifySimpleToken(token)
+  const payload = verifySimpleToken(adminToken)
   if (!payload) return null
   
   return {
@@ -291,6 +349,12 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
+  // Allow public access to contact API
+  if (pathname === '/api/contact') {
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
   if (
     pathname.startsWith('/api/') &&
     pathname !== '/api/auth/login' &&
@@ -332,24 +396,14 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const baseUrl = request.url.split('/')[0] + '//' + request.url.split('/')[2]
-    const apiUrl = `${baseUrl}/api/settings/maintenance?_=${Date.now()}`
-    
-    const maintenanceResponse = await fetch(apiUrl, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
+    const setting = await prisma.settings.findUnique({
+      where: { key: 'maintenanceMode' },
     })
     
-    if (maintenanceResponse.ok) {
-      const data = await maintenanceResponse.json()
-      
-      if (data.maintenanceMode === true) {
-        const maintenanceUrl = new URL('/maintenance', request.url)
-        response = NextResponse.redirect(maintenanceUrl)
-        return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-      }
+    if (setting && setting.value === 'true') {
+      const maintenanceUrl = new URL('/maintenance', request.url)
+      response = NextResponse.redirect(maintenanceUrl)
+      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
   } catch (error) {
     console.error('Maintenance check failed:', error)

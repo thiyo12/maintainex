@@ -8,18 +8,20 @@ const BRUTE_WINDOW = 15 * 60 * 1000
 
 async function checkBruteForce(email: string, ip: string): Promise<boolean> {
   const since = new Date(Date.now() - BRUTE_WINDOW)
-  const recent = await prisma.failedLogin.count({
-    where: {
-      OR: [{ email }, { ip }],
-      createdAt: { gte: since }
-    }
-  })
-  return recent < BRUTE_LIMIT
+  const [emailAttempts, ipAttempts] = await Promise.all([
+    prisma.failedLogin.count({
+      where: { email, createdAt: { gte: since } }
+    }),
+    prisma.failedLogin.count({
+      where: { ipAddress: ip, createdAt: { gte: since } }
+    })
+  ])
+  return emailAttempts < BRUTE_LIMIT && ipAttempts < BRUTE_LIMIT
 }
 
 async function recordFailedAttempt(email: string, ip: string): Promise<void> {
   await prisma.failedLogin.create({
-    data: { email, ip }
+    data: { email, ipAddress: ip }
   })
 }
 
@@ -71,6 +73,10 @@ export async function POST(request: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() }
+    })
+
+    await prisma.failedLogin.deleteMany({
+      where: { email }
     })
 
     const token = createToken({
