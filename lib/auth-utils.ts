@@ -4,10 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET or NEXTAUTH_SECRET must be set in production')
-  }
-  console.warn('⚠️ SECURITY: JWT_SECRET not set - using insecure fallback')
+  console.warn('⚠️ SECURITY: JWT_SECRET not set - JWT operations will fail')
 }
 
 
