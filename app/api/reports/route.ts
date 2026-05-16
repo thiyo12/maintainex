@@ -158,7 +158,7 @@ async function getDailyStats(start: Date, end: Date, branchId?: string | null) {
     where: whereClause
   })
 
-  const applications = await prisma.application.groupBy({
+  const applications = await prisma.jobApplication.groupBy({
     by: ['status'],
     _count: true,
     where: whereClause

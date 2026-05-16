@@ -3,13 +3,13 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN'
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'CUSTOMER' | 'TASKER'
 
 export interface ExtendedUser {
   id: string
   email: string
   name: string | null
-  role: string
+  role: UserRole
   branchId: string | null
   isActive: boolean
 }
@@ -27,31 +27,40 @@ const authOptions: AuthOptions = {
           throw new Error('Email and password required')
         }
 
-        const admin = await prisma.admin.findUnique({
-          where: { email: credentials.email }
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+          include: {
+            adminProfile: { select: { role: true, branchId: true } }
+          }
         })
 
-        if (!admin) {
+        if (!user) {
           throw new Error('Invalid credentials')
         }
 
-        if (!admin.isActive) {
+        if (!user.isActive) {
           throw new Error('Account is deactivated')
         }
 
-        const isValid = await bcrypt.compare(credentials.password, admin.password)
+        if (!user.passwordHash) {
+          throw new Error('No password set')
+        }
+
+        const isValid = await bcrypt.compare(credentials.password, user.passwordHash)
 
         if (!isValid) {
           throw new Error('Invalid credentials')
         }
 
+        const role = user.role as UserRole
+
         return {
-          id: admin.id,
-          email: admin.email,
-          name: admin.name,
-          role: admin.role,
-          branchId: admin.branchId,
-          isActive: admin.isActive
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role,
+          branchId: user.adminProfile?.branchId ?? null,
+          isActive: user.isActive
         }
       }
     })

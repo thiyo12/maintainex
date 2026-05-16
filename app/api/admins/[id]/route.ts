@@ -19,10 +19,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const admin = await prisma.admin.findUnique({
+    const admin = await prisma.adminProfile.findUnique({
       where: { id: params.id },
       include: {
-        branch: {
+        user: { select: { name: true, email: true } }, branch: {
           select: {
             id: true,
             name: true,
@@ -90,11 +90,11 @@ export async function PUT(
     if (isSuper && isActive !== undefined) updateData.isActive = isActive
     if (isSuper && canEditServices !== undefined) updateData.canEditServices = canEditServices
 
-    const admin = await prisma.admin.update({
+    const admin = await prisma.adminProfile.update({
       where: { id: params.id },
       data: updateData,
       include: {
-        branch: {
+        user: { select: { name: true, email: true } }, branch: {
           select: {
             id: true,
             name: true,
@@ -111,7 +111,7 @@ export async function PUT(
       action: 'UPDATE',
       entityType: 'ADMIN',
       entityId: admin.id,
-      description: `Updated admin "${admin.name || admin.email}"`,
+      description: `Updated admin "${admin.user?.name || admin.user?.email}"`,
       details: { updatedFields: Object.keys(body) }
     })
 
@@ -142,15 +142,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
     }
 
-    const admin = await prisma.admin.findUnique({
-      where: { id: params.id }
+    const admin = await prisma.adminProfile.findUnique({
+      where: { id: params.id },
+      include: { user: { select: { name: true, email: true } } }
     })
 
     if (!admin) {
       return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
     }
 
-    await prisma.admin.delete({
+    await prisma.adminProfile.delete({
       where: { id: params.id }
     })
 
@@ -161,8 +162,8 @@ export async function DELETE(
       action: 'DELETE',
       entityType: 'ADMIN',
       entityId: params.id,
-      description: `Deleted admin "${admin.name || admin.email}"`,
-      details: { email: admin.email, role: admin.role }
+      description: `Deleted admin "${admin.user?.name || admin.user?.email}"`,
+      details: { email: admin.user?.email, role: admin.role }
     })
 
     return NextResponse.json({ message: 'Admin deleted successfully' })
