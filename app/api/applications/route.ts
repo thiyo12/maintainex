@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       where.branchId = branchId
     }
 
-    const applications = await prisma.jobApplication.findMany({
+    const applications = await prisma.application.findMany({
       where,
       orderBy: { createdAt: 'desc' }
     })
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     const branchId = branch?.id || null
 
-    const application = await prisma.jobApplication.create({
+    const application = await prisma.application.create({
       data: {
         name,
         phone,

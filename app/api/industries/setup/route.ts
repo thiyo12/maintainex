@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
         // Table doesn't exist - try to create it
         // Note: Prisma db push is needed to create table
         return NextResponse.json({ 
-          error: 'Database table not found. Please run database migration.'
+          error: 'Database table not found. Please run "npx prisma db push" on your server.',
+          details: 'Table needs to be created via Prisma migration'
         }, { status: 500 })
       }
     }
@@ -68,7 +69,8 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in setup:', error)
     return NextResponse.json({ 
-      error: 'Setup failed'
+      error: 'Setup failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

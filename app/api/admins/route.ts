@@ -12,9 +12,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Super Admin only' }, { status: 401 })
     }
 
-    const admins = await prisma.adminProfile.findMany({
+    const admins = await prisma.admin.findMany({
       include: {
-        user: { select: { name: true, email: true } },
         branch: {
           select: {
             id: true,
@@ -26,7 +25,12 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json(admins)
+    const safeAdmins = admins.map(admin => ({
+      ...admin,
+      password: undefined
+    }))
+
+    return NextResponse.json(safeAdmins)
   } catch (error) {
     console.error('Error fetching admins:', error)
     return NextResponse.json({ error: 'Failed to fetch admins' }, { status: 500 })
@@ -56,37 +60,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Branch is required for admin users' }, { status: 400 })
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingAdmin = await prisma.admin.findUnique({
       where: { email }
     })
 
-    if (existingUser) {
+    if (existingAdmin) {
       return NextResponse.json({ error: 'Email already exists' }, { status: 400 })
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12)
+    const hashedPassword = await bcrypt.hash(password, 10)
 
-    const user = await prisma.user.create({
+    const admin = await prisma.admin.create({
       data: {
         email,
-        passwordHash: hashedPassword,
-        name: name || email.split('@')[0],
-        phone: null,
-        role: role as any,
-        status: 'ACTIVE',
-        isActive: true,
-        emailVerified: false,
-        adminProfile: {
-          create: {
-            role,
-            branchId: role === 'ADMIN' ? branchId : null,
-          }
-        }
+        password: hashedPassword,
+        name: name || null,
+        role,
+        branchId: role === 'ADMIN' ? branchId : null
       },
       include: {
-        adminProfile: {
-          include: {
-            branch: { select: { id: true, name: true, location: true } }
+        branch: {
+          select: {
+            id: true,
+            name: true,
+            location: true
           }
         }
       }
@@ -98,12 +95,17 @@ export async function POST(request: NextRequest) {
       adminName: session.name,
       action: 'CREATE',
       entityType: 'ADMIN',
-      entityId: user.id,
+      entityId: admin.id,
       description: `Created ${role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'} "${name || email}"`,
       details: { email, role, branchId }
     })
 
-    return NextResponse.json(user, { status: 201 })
+    const safeAdmin = {
+      ...admin,
+      password: undefined
+    }
+
+    return NextResponse.json(safeAdmin, { status: 201 })
   } catch (error) {
     console.error('Error creating admin:', error)
     return NextResponse.json({ error: 'Failed to create admin' }, { status: 500 })

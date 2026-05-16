@@ -8,15 +8,7 @@ export async function GET(
   { params }: { params: { path: string[] } }
 ) {
   try {
-    const publicDir = path.resolve(process.cwd(), 'public')
-    const requestedPath = path.join(...params.path)
-    const resolvedPath = path.resolve(publicDir, requestedPath)
-    
-    if (!resolvedPath.startsWith(publicDir + path.sep)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-    
-    const filePath = resolvedPath
+    const filePath = path.join(process.cwd(), 'public', ...params.path)
     
     if (!existsSync(filePath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })

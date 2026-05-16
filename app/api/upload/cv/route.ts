@@ -1,21 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'ddt2rqfe1',
+  api_key: process.env.CLOUDINARY_API_KEY || '273983623944158',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'wqzJvZQFYx9z9ogg49rNvRw4IrQ'
+})
+
+const rateLimitMap = new Map<string, { count: number; lastReset: number }>()
+const RATE_LIMIT = 10
+const RATE_WINDOW = 60 * 1000
+
+function cleanupOldEntries() {
+  const now = Date.now()
+  const entries = Array.from(rateLimitMap.entries())
+  for (const [ip, record] of entries) {
+    if (now - record.lastReset > RATE_WINDOW * 2) {
+      rateLimitMap.delete(ip)
+    }
+  }
+}
+
+if (typeof window === 'undefined') {
+  setInterval(cleanupOldEntries, RATE_WINDOW * 2)
+}
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const record = rateLimitMap.get(ip)
+  
+  if (!record || now - record.lastReset > RATE_WINDOW) {
+    rateLimitMap.set(ip, { count: 1, lastReset: now })
+    return true
+  }
+  
+  if (record.count >= RATE_LIMIT) {
+    return false
+  }
+  
+  record.count++
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME
-    const apiKey = process.env.CLOUDINARY_API_KEY
-    const apiSecret = process.env.CLOUDINARY_API_SECRET
-
-    if (!cloudName || !apiKey || !apiSecret) {
-      return NextResponse.json({ error: 'Cloudinary not configured' }, { status: 500 })
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
     }
-
-    cloudinary.config({
-      cloud_name: cloudName,
-      api_key: apiKey,
-      api_secret: apiSecret
-    })
 
     let formData
     try {

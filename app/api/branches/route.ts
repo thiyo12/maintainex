@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
           select: {
             admins: true,
             bookings: true,
-            jobApplications: true
+            applications: true
           }
         }
       } : undefined,

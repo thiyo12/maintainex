@@ -20,27 +20,23 @@ export async function GET(
     const branch = await prisma.branch.findUnique({
       where: { id: params.id },
       include: {
-        admins: includeAdmins ? {
-          include: { user: true },
-          select: {
-            id: true,
-            role: true,
-            createdAt: true,
-            user: {
-              select: {
-                id: true,
-                email: true,
-                name: true,
-                isActive: true
-              }
+        ...(includeAdmins && {
+          admins: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              isActive: true,
+              createdAt: true
             }
           }
-        } : undefined,
+        }),
         _count: {
           select: {
             admins: true,
             bookings: true,
-            jobApplications: true
+            applications: true
           }
         }
       }
@@ -123,7 +119,7 @@ export async function DELETE(
           select: {
             admins: true,
             bookings: true,
-            jobApplications: true
+            applications: true
           }
         }
       }
@@ -133,7 +129,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Branch not found' }, { status: 404 })
     }
 
-    if (branch._count.admins > 0 || branch._count.bookings > 0 || branch._count.jobApplications > 0) {
+    if (branch._count.admins > 0 || branch._count.bookings > 0 || branch._count.applications > 0) {
       return NextResponse.json({ 
         error: 'Cannot delete branch with existing data. Remove all related data first.' 
       }, { status: 400 })

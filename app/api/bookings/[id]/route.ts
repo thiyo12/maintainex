@@ -35,11 +35,9 @@ export async function GET(
     
     let user = null
     if (booking.userId) {
-      const fullUser = await prisma.user.findUnique({
-        where: { id: booking.userId },
-        select: { id: true, name: true, email: true, phone: true, role: true }
+      user = await prisma.user.findUnique({
+        where: { id: booking.userId }
       })
-      user = fullUser
     }
 
     return NextResponse.json({ ...booking, service: serviceWithCategory, user })
@@ -136,11 +134,9 @@ export async function PATCH(
     
     let user = null
     if (booking.userId) {
-      const fullUser = await prisma.user.findUnique({
-        where: { id: booking.userId },
-        select: { id: true, name: true, email: true, phone: true, role: true }
+      user = await prisma.user.findUnique({
+        where: { id: booking.userId }
       })
-      user = fullUser
     }
 
     await logActivity({
