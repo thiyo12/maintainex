@@ -84,16 +84,14 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          phone: user.phone,
-          role: user.role,
-        },
-        profile: user.role === 'CUSTOMER' ? user.customerProfile : null,
-      }
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+      },
+      profile: user.role === 'CUSTOMER' ? user.customerProfile : null,
     })
 
     response.cookies.set('session', token, {
