@@ -807,3 +807,136 @@ model QuotationItem {
 
   quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 }
+
+// ============================================
+// MOBILE MARKETPLACE MODELS
+// ============================================
+
+model TaskerProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bio           String?
+  hourlyRate    Float    @default(0)
+  skills        String[]  // Category slugs
+  serviceAreas  String[]  // District names
+  rating        Float    @default(0)
+  completedJobs Int      @default(0)
+  isVerified    Boolean  @default(false)
+  isOnline      Boolean  @default(false)
+  profileImage  String?
+
+  // Location
+  latitude      Float?
+  longitude     Float?
+  locationUpdatedAt DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bids          Bid[]
+  assignments   Assignment[]
+  reviews       TaskerReview[]
+  notifications Notification[]
+
+  @@index([isOnline])
+  @@index([isVerified])
+  @@index([rating])
+}
+
+model JobPosting {
+  id            String   @id @default(cuid())
+  customerId    String
+  customer      User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  title         String
+  description   String
+  category      String   // Category slug
+  budget        Float
+  location      String   // District or address
+  latitude      Float?
+  longitude     Float?
+  scheduledDate DateTime?
+  status        String   @default("OPEN") // OPEN, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  bids          Bid[]
+  assignments   Assignment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([category])
+  @@index([location])
+  @@index([createdAt])
+}
+
+model Bid {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  taskerId    String
+  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+
+  amount      Float
+  message     String?
+  status      String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+
+  createdAt   DateTime @default(now())
+
+  @@unique([jobId, taskerId])
+  @@index([jobId])
+  @@index([taskerId])
+  @@index([status])
+}
+
+model Assignment {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  taskerId    String
+  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+
+  status      String   @default("ASSIGNED") // ASSIGNED, EN_ROUTE, IN_PROGRESS, COMPLETED, CANCELLED
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@index([jobId])
+  @@index([taskerId])
+  @@index([status])
+}
+
+model TaskerReview {
+  id          String   @id @default(cuid())
+  taskerId    String
+  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  reviewerId  String
+  reviewer    User     @relation(fields: [reviewerId], references: [id])
+
+  jobId       String?
+  rating      Int
+  comment     String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([taskerId])
+  @@index([reviewerId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  data        String?  // JSON payload
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([createdAt])
+}

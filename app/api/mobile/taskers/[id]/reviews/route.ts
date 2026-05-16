@@ -1,0 +1,32 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { authenticateRequest } from '@/lib/mobile-auth'
+
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const reviews = await prisma.taskerReview.findMany({
+      where: { taskerId: params.id },
+      include: { reviewer: { select: { name: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return NextResponse.json(
+      reviews.map(r => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        jobId: r.jobId,
+        reviewerName: r.reviewer.name,
+        createdAt: r.createdAt.toISOString(),
+      }))
+    )
+  } catch (error) {
+    console.error('Reviews error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}

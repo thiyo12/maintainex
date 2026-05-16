@@ -1,0 +1,109 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { authenticateRequest } from '@/lib/mobile-auth'
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { name, phone, email, serviceId, district, address, date, time, notes } = await request.json()
+
+    if (!name || !phone || !serviceId || !district || !date || !time) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    const totalPrice = 0
+    let service
+    if (serviceId) {
+      service = await prisma.service.findUnique({ where: { id: serviceId } })
+    }
+
+    const booking = await prisma.booking.create({
+      data: {
+        userId: user.id,
+        serviceId,
+        name,
+        phone,
+        email: email || null,
+        district,
+        address: address || null,
+        date: new Date(date),
+        timeSlot: time,
+        time: time,
+        totalPrice: service?.price || totalPrice,
+        status: 'PENDING',
+        notes: notes || null,
+      },
+    })
+
+    return NextResponse.json({
+      booking: {
+        id: booking.id,
+        serviceId: booking.serviceId,
+        serviceName: service?.name || '',
+        categoryName: service?.categoryId || '',
+        customerName: booking.name,
+        customerPhone: booking.phone,
+        customerEmail: booking.email,
+        district: booking.district,
+        address: booking.address,
+        date: booking.date?.toISOString(),
+        time: booking.timeSlot,
+        notes: booking.notes,
+        price: booking.totalPrice,
+        status: booking.status,
+        createdAt: booking.createdAt.toISOString(),
+        userId: booking.userId,
+      },
+    })
+  } catch (error) {
+    console.error('Mobile booking create error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const status = searchParams.get('status')
+    const where: any = { userId: user.id }
+    if (status) where.status = status
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: { service: { include: { category: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return NextResponse.json(
+      bookings.map(b => ({
+        id: b.id,
+        serviceId: b.serviceId,
+        serviceName: b.service?.name || '',
+        categoryName: b.service?.category?.name || '',
+        customerName: b.name,
+        customerPhone: b.phone,
+        customerEmail: b.email,
+        district: b.district,
+        address: b.address,
+        date: b.date?.toISOString(),
+        time: b.timeSlot || b.time,
+        notes: b.notes,
+        price: b.totalPrice,
+        status: b.status,
+        createdAt: b.createdAt.toISOString(),
+      }))
+    )
+  } catch (error) {
+    console.error('Mobile bookings list error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
