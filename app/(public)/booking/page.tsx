@@ -79,11 +79,14 @@ function BookingContent() {
   const [storedCategory, setStoredCategory] = useState<string>('')
   
   useEffect(() => {
+    // Store category from URL param to localStorage on page load
     if (categoryParam) {
       localStorage.setItem('bookingCategory', categoryParam)
       setStoredCategory(categoryParam)
     } else {
-      setStoredCategory('')
+      // Try to get from localStorage
+      const saved = localStorage.getItem('bookingCategory')
+      if (saved) setStoredCategory(saved)
     }
   }, [categoryParam])
   
