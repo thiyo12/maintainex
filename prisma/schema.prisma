@@ -24,6 +24,10 @@ model User {
   bookings        Booking[]
   reviews         Review[]
   customerProfile CustomerProfile?
+  taskerProfile   TaskerProfile?
+  jobPostings     JobPosting[]
+  taskerReviewsGiven TaskerReview[]
+  notifications   Notification[]
 }
 
 model Admin {
@@ -838,7 +842,6 @@ model TaskerProfile {
   bids          Bid[]
   assignments   Assignment[]
   reviews       TaskerReview[]
-  notifications Notification[]
 
   @@index([isOnline])
   @@index([isVerified])
