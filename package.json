@@ -8,13 +8,13 @@
     "dev:all": "bash dev.sh local",
     "dev:all:prod": "bash dev.sh production",
     "build": "npx prisma generate && next build",
-    "start": "next start",
+    "start": "npx prisma migrate deploy && next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node --tsconfig tsconfig.json prisma/seed.ts",
-    "postinstall": "npx prisma generate && npx prisma migrate deploy"
+    "postinstall": "npx prisma generate"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
