@@ -8,7 +8,7 @@
     "dev:all": "bash dev.sh local",
     "dev:all:prod": "bash dev.sh production",
     "build": "npx prisma generate && next build",
-    "start": "npx prisma migrate deploy && next start",
+    "start": "npx prisma db push && next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
