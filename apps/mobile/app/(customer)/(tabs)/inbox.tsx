@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { conversations } from '../../lib/api'
-import { colors } from '../../lib/colors'
+import { conversations } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
 
 export default function CustomerInbox() {
   const router = useRouter()

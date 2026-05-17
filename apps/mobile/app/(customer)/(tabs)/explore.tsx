@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { taskers } from '../../lib/api'
-import { colors } from '../../lib/colors'
-import type { TaskerProfile } from '../../lib/types'
+import { taskers } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
+import type { TaskerProfile } from '../../../lib/types'
 
 export default function ExploreScreen() {
   const router = useRouter()

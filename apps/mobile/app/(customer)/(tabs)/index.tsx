@@ -4,10 +4,10 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useAuth } from '../../lib/auth'
-import { categories, taskers } from '../../lib/api'
-import { colors } from '../../lib/colors'
-import type { Category, TaskerProfile } from '../../lib/types'
+import { useAuth } from '../../../lib/auth'
+import { categories, taskers } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
+import type { Category, TaskerProfile } from '../../../lib/types'
 
 const catIcons: Record<string, string> = {
   construction: '🏗️', cleaning: '🧹', electrical: '⚡', plumbing: '🔧',

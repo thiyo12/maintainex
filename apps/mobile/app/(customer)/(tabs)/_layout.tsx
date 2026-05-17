@@ -1,18 +1,16 @@
 import { Tabs } from 'expo-router'
 import { Text, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { colors } from '../../lib/colors'
+import { colors } from '../../../lib/colors'
 
 const tabs = [
-  { name: 'index', title: 'Dashboard', icon: '📊' },
-  { name: 'contracts-list', title: 'Contracts', icon: '📄' },
-  { name: 'milestones-list', title: 'Milestones', icon: '🎯' },
-  { name: 'team', title: 'Team', icon: '👥' },
-  { name: 'earnings-list', title: 'Earnings', icon: '💰' },
-  { name: 'profile', title: 'Profile', icon: '👤' },
+  { name: 'index', title: 'Home', icon: '🏠' },
+  { name: 'explore', title: 'Explore', icon: '🗺️' },
+  { name: 'inbox', title: 'Chat', icon: '💬' },
+  { name: 'settings', title: 'Profile', icon: '👤' },
 ]
 
-export default function CompanyLayout() {
+export default function TabsLayout() {
   const insets = useSafeAreaInsets()
   const bottomPad = Math.max(insets.bottom, 4)
 
@@ -34,7 +32,7 @@ export default function CompanyLayout() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarShowLabel: true,
       }}
     >
@@ -45,7 +43,7 @@ export default function CompanyLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.55 }}>
+              <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.55 }}>
                 {tab.icon}
               </Text>
             ),

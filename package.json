@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:mobile": "cd apps/mobile && npx expo start",
+    "dev:all": "bash dev.sh local",
+    "dev:all:prod": "bash dev.sh production",
     "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "next lint",

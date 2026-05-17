@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { View, Text, StyleSheet } from 'react-native'
+import { Text, Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../../lib/colors'
 
@@ -12,14 +12,28 @@ const tabs = [
 
 export default function TaskerLayout() {
   const insets = useSafeAreaInsets()
+  const bottomPad = Math.max(insets.bottom, 4)
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }],
+        tabBarStyle: {
+          backgroundColor: colors.white,
+          borderTopWidth: 1,
+          borderTopColor: colors.lightGray,
+          height: 56 + bottomPad,
+          paddingBottom: bottomPad,
+          paddingTop: 6,
+          ...Platform.select({
+            ios: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+            default: { elevation: 8 },
+          }),
+        },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarShowLabel: true,
       }}
     >
       {tabs.map((tab) => (
@@ -29,11 +43,9 @@ export default function TaskerLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
-                <Text style={[styles.tabIcon, focused && { color: colors.primary }]}>
-                  {tab.icon}
-                </Text>
-              </View>
+              <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.55 }}>
+                {tab.icon}
+              </Text>
             ),
           }}
         />
@@ -41,16 +53,3 @@ export default function TaskerLayout() {
     </Tabs>
   )
 }
-
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-    paddingTop: 6,
-    height: 64,
-  },
-  tabIconWrap: { alignItems: 'center', justifyContent: 'center' },
-  tabIconActive: { marginTop: -4 },
-  tabIcon: { fontSize: 24 },
-})
