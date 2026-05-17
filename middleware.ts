@@ -37,7 +37,8 @@ async function getSession(request: NextRequest) {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     try {
       const token = authHeader.substring(7)
-      const decoded = JSON.parse(atob(token))
+      const payload = token.split('.')[0]
+      const decoded = JSON.parse(atob(payload))
       if (decoded.id && decoded.email && decoded.role) {
         return {
           id: decoded.id,
