@@ -1,0 +1,73 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { authenticateRequest } from '@/lib/mobile-auth'
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { jobId, reason, description } = await request.json()
+    if (!jobId || !reason || !description) {
+      return NextResponse.json({ error: 'jobId, reason, and description required' }, { status: 400 })
+    }
+
+    const job = await prisma.jobPosting.findUnique({ where: { id: jobId } })
+    if (!job) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    const dispute = await prisma.dispute.create({
+      data: {
+        jobId,
+        raisedById: user.id,
+        reason,
+        description,
+      },
+    })
+
+    return NextResponse.json({
+      id: dispute.id,
+      jobId: dispute.jobId,
+      reason: dispute.reason,
+      status: dispute.status,
+      createdAt: dispute.createdAt.toISOString(),
+    })
+  } catch (error) {
+    console.error('Dispute create error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const disputes = await prisma.dispute.findMany({
+      where: { raisedById: user.id },
+      include: {
+        job: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return NextResponse.json(
+      disputes.map(d => ({
+        id: d.id,
+        jobId: d.jobId,
+        jobTitle: d.job.title,
+        reason: d.reason,
+        status: d.status,
+        createdAt: d.createdAt.toISOString(),
+      }))
+    )
+  } catch (error) {
+    console.error('Disputes list error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}

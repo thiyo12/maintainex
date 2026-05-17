@@ -8,26 +8,32 @@ datasource db {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  email         String     @unique
-  passwordHash  String
-  name          String
-  phone         String?
-  role          String     @default("CUSTOMER")
-  isActive      Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         String   @default("CUSTOMER")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  sessions        Session[]
-  otps            OTP[]
-  loginActivities LoginActivity[]
-  bookings        Booking[]
-  reviews         Review[]
-  customerProfile CustomerProfile?
-  taskerProfile   TaskerProfile?
-  jobPostings     JobPosting[]
+  sessions           Session[]
+  otps               OTP[]
+  loginActivities    LoginActivity[]
+  bookings           Booking[]
+  reviews            Review[]
+  customerProfile    CustomerProfile?
+  taskerProfile      TaskerProfile?
+  jobPostings        JobPosting[]
   taskerReviewsGiven TaskerReview[]
-  notifications   Notification[]
+  notifications      Notification[]
+  conversations      ConversationParticipant[]
+  messagesSent       Message[]
+  disputes           Dispute[]
+  companyProfile     CompanyProfile?
+  teamMembers        TeamMember[]
+  payouts            Payout[]
 }
 
 model Admin {
@@ -36,7 +42,7 @@ model Admin {
   password        String
   name            String?
   role            String   @default("ADMIN")
-  province       String?
+  province        String?
   branchId        String?
   branch          Branch?  @relation(fields: [branchId], references: [id])
   canEditServices Boolean  @default(false)
@@ -48,14 +54,14 @@ model Admin {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress    String
-  userAgent    String
-  isValid      Boolean  @default(true)
-  expiresAt    DateTime
-  createdAt    DateTime  @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String
+  userAgent String
+  isValid   Boolean  @default(true)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }
@@ -78,33 +84,33 @@ model LoginActivity {
   id           String   @id @default(cuid())
   userId       String?
   user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  email       String
-  ipAddress   String
-  userAgent   String
-  location   String?
-  isNewIP     Boolean  @default(false)
-  isNewDevice Boolean  @default(false)
-  isSuspicious Boolean @default(false)
-  reason     String?
-  createdAt  DateTime  @default(now())
+  email        String
+  ipAddress    String
+  userAgent    String
+  location     String?
+  isNewIP      Boolean  @default(false)
+  isNewDevice  Boolean  @default(false)
+  isSuspicious Boolean  @default(false)
+  reason       String?
+  createdAt    DateTime @default(now())
 
   @@index([createdAt])
   @@index([isSuspicious])
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  slug        String    @unique
-  description String?
-  icon        String?
-  image       String?
-  coverImage  String?
-  displayOrder Int     @default(0)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id           String   @id @default(cuid())
+  name         String   @unique
+  slug         String   @unique
+  description  String?
+  icon         String?
+  image        String?
+  coverImage   String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
-  services  Service[]
+  services Service[]
 }
 
 model Industry {
@@ -121,25 +127,25 @@ model Industry {
 }
 
 model Service {
-  id          String     @id @default(cuid())
-  name        String
-  slug        String?
-  description String
+  id               String   @id @default(cuid())
+  name             String
+  slug             String?
+  description      String
   shortDescription String?
-  categoryId  String
-  category    Category    @relation(fields: [categoryId], references: [id])
-  price       Float
-  duration    Int
-  features    String[]
-  image       String?
-  displayOrder Int     @default(0)
-  views       Int      @default(0)
-  isTrending  Boolean  @default(false)
-  isActive    Boolean    @default(true)
-  createdAt   DateTime    @default(now())
+  categoryId       String
+  category         Category @relation(fields: [categoryId], references: [id])
+  price            Float
+  duration         Int
+  features         String[]
+  image            String?
+  displayOrder     Int      @default(0)
+  views            Int      @default(0)
+  isTrending       Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
 
-  bookings  Booking[]
-  reviews   Review[]
+  bookings Booking[]
+  reviews  Review[]
 
   @@index([categoryId])
   @@index([views])
@@ -147,50 +153,50 @@ model Service {
 }
 
 model Branch {
-  id       String    @id @default(cuid())
-  name     String
-  address  String
-  city     String
-  phone    String?
-  location String?
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  city      String
+  phone     String?
+  location  String?
   districts String?
-  province       String?
-  isActive Boolean   @default(true)
-  createdAt DateTime  @default(now())
+  province  String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-  bookings Booking[]
-  admins   Admin[]
+  bookings     Booking[]
+  admins       Admin[]
   applications Application[]
-  staff     Staff[]
-  vacancies JobVacancy[]
-  invoices  Invoice[]
-  quotations Quotation[]
+  staff        Staff[]
+  vacancies    JobVacancy[]
+  invoices     Invoice[]
+  quotations   Quotation[]
 
   @@index([city])
 }
 
 model Booking {
-  id          String     @id @default(cuid())
-  userId      String?
-  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  serviceId   String?
-  service     Service?   @relation(fields: [serviceId], references: [id])
-  branchId    String?
-  branch      Branch?    @relation(fields: [branchId], references: [id])
-  date        DateTime
-  timeSlot    String
-  status      String     @default("PENDING")
-  notes       String?
-  totalPrice  Float
-  name        String?
-  phone       String?
-  email       String?
-  district    String?
-  province    String?
-  address     String?
-  time        String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceId  String?
+  service    Service? @relation(fields: [serviceId], references: [id])
+  branchId   String?
+  branch     Branch?  @relation(fields: [branchId], references: [id])
+  date       DateTime
+  timeSlot   String
+  status     String   @default("PENDING")
+  notes      String?
+  totalPrice Float
+  name       String?
+  phone      String?
+  email      String?
+  district   String?
+  province   String?
+  address    String?
+  time       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([userId])
   @@index([serviceId])
@@ -211,13 +217,13 @@ model Application {
   status     String   @default("PENDING")
   notes      String?
   district   String?
-  province       String?
+  province   String?
   address    String?
   position   String?
   branchId   String?
   branch     Branch?  @relation(fields: [branchId], references: [id])
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@index([status])
   @@index([branchId])
@@ -233,14 +239,14 @@ model Review {
   comment      String?
   status       String   @default("PENDING")
   customerName String?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 
   @@index([serviceId])
 }
 
 model Settings {
-  id    String  @id @default(cuid())
-  key   String  @unique
+  id    String @id @default(cuid())
+  key   String @unique
   value String
 }
 
@@ -270,54 +276,54 @@ model ActivityLog {
 // ============================================
 
 model CustomerProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Customer Classification
-  customerType    String   @default("REGULAR")  // REGULAR, VIP, CORPORATE, POTENTIAL
-  status          String   @default("ACTIVE")     // ACTIVE, INACTIVE, BLACKLISTED
-  
+  customerType String @default("REGULAR") // REGULAR, VIP, CORPORATE, POTENTIAL
+  status       String @default("ACTIVE") // ACTIVE, INACTIVE, BLACKLISTED
+
   // Preferences
   preferredContact String? // EMAIL, PHONE, WHATSAPP
-  smsOptIn        Boolean  @default(true)
-  emailOptIn      Boolean  @default(true)
-  whatsappOptIn   Boolean  @default(true)
-  
+  smsOptIn         Boolean @default(true)
+  emailOptIn       Boolean @default(true)
+  whatsappOptIn    Boolean @default(true)
+
   // Source tracking
-  source          String?  // WEBSITE, REFERRAL, CAMPAIGN, WALK_IN
-  sourceDetails   String?
-  
+  source        String? // WEBSITE, REFERRAL, CAMPAIGN, WALK_IN
+  sourceDetails String?
+
   // Lifetime value
-  totalBookings   Int      @default(0)
-  totalSpent      Float    @default(0)
-  lifetimeValue   Float    @default(0)
-  
+  totalBookings Int   @default(0)
+  totalSpent    Float @default(0)
+  lifetimeValue Float @default(0)
+
   // First & last interactions
-  firstBooking    DateTime?
-  lastBooking     DateTime?
-  
+  firstBooking DateTime?
+  lastBooking  DateTime?
+
   // Notes & blacklist
-  summary         String?   // Short summary/notes about customer
+  summary         String? // Short summary/notes about customer
   blacklistReason String?
   blacklistDate   DateTime?
-  
+
   // Province (for query performance and province-based access)
-  province        String?
-  
+  province String?
+
   // Metadata
-  metadata        String?  // JSON for additional data
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  metadata String? // JSON for additional data
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  tags            CustomerTag[]
-  addresses       CustomerAddress[]
-  activities      CustomerActivity[]
-  notes           CustomerNote[]
-  communications  CustomerCommunication[]
-  segments        CustomerSegmentCustomer[]
+  tags           CustomerTag[]
+  addresses      CustomerAddress[]
+  activities     CustomerActivity[]
+  notes          CustomerNote[]
+  communications CustomerCommunication[]
+  segments       CustomerSegmentCustomer[]
 
   @@index([userId])
   @@index([customerType])
@@ -327,146 +333,146 @@ model CustomerProfile {
 }
 
 model CustomerTag {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
-  color       String   @default("#6366f1")  // Hex color for UI
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  color       String  @default("#6366f1") // Hex color for UI
   description String?
-  
+
   // Tag type
-  type        String   @default("GENERAL") // GENERAL, BEHAVIOR, VALUE, PREFERENCE
-  
+  type String @default("GENERAL") // GENERAL, BEHAVIOR, VALUE, PREFERENCE
+
   // Usage stats
-  usageCount  Int      @default(0)
-  
-  isSystem    Boolean  @default(false)  // System tags can't be deleted
-  isActive    Boolean  @default(true)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  usageCount Int @default(0)
+
+  isSystem Boolean @default(false) // System tags can't be deleted
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  customers   CustomerProfile[]
+  customers CustomerProfile[]
 
   @@index([name])
   @@index([type])
 }
 
 model CustomerSegment {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
   description String?
-  
+
   // Segment criteria (JSON)
-  criteria    String   // {"province": "Western", "minBookings": 3}
-  
+  criteria String // {"province": "Western", "minBookings": 3}
+
   // Segment type
-  type        String   @default("DYNAMIC") // DYNAMIC, STATIC
-  
+  type String @default("DYNAMIC") // DYNAMIC, STATIC
+
   // Stats
-  memberCount Int      @default(0)
-  
-  isActive    Boolean  @default(true)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  memberCount Int @default(0)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  customers   CustomerSegmentCustomer[]
+  customers CustomerSegmentCustomer[]
 
   @@index([name])
   @@index([type])
 }
 
 model CustomerSegmentCustomer {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  segmentId   String
-  segment     CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
-  
-  addedAt     DateTime @default(now())
-  addedBy     String?  // Admin ID who added
-  
+  id         String          @id @default(cuid())
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  segmentId  String
+  segment    CustomerSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  addedAt DateTime @default(now())
+  addedBy String? // Admin ID who added
+
   @@unique([customerId, segmentId])
   @@index([customerId])
   @@index([segmentId])
 }
 
 model CustomerAddress {
-  id            String   @id @default(cuid())
-  customerId    String
-  customer      CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  label         String   // Home, Office, Other
-  address       String
-  district      String
-  province      String
-  postalCode    String?
-  instructions  String?  // Delivery/access instructions
-  
+  id         String          @id @default(cuid())
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  label        String // Home, Office, Other
+  address      String
+  district     String
+  province     String
+  postalCode   String?
+  instructions String? // Delivery/access instructions
+
   // Contact person at address
-  contactName   String?
-  contactPhone  String?
-  
-  isDefault     Boolean  @default(false)
-  isActive      Boolean  @default(true)
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  contactName  String?
+  contactPhone String?
+
+  isDefault Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
 }
 
 model CustomerNote {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  content     String
-  type        String   @default("GENERAL") // GENERAL, COMPLAINT, FEEDBACK, INTERNAL
-  
+  id         String          @id @default(cuid())
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  content String
+  type    String @default("GENERAL") // GENERAL, COMPLAINT, FEEDBACK, INTERNAL
+
   // Author tracking
-  createdById String?
+  createdById   String?
   createdByName String?
-  
-  isPrivate   Boolean  @default(false)  // Private notes only visible to creator
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  isPrivate Boolean @default(false) // Private notes only visible to creator
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@index([createdById])
 }
 
 model CustomerActivity {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
-  type        String   // BOOKING_CREATED, BOOKING_COMPLETED, CALL_MADE, CALL_RECEIVED, 
-                      // EMAIL_SENT, EMAIL_OPENED, WHATSAPP_SENT, WHATSAPP_RECEIVED,
-                      // NOTE_ADDED, TAG_ADDED, TAG_REMOVED, SEGMENT_ADDED, SEGMENT_REMOVED,
-                      // STATUS_CHANGED, PROFILE_UPDATED, ADDRESS_ADDED, LOGIN
-  
+  id         String          @id @default(cuid())
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  type String // BOOKING_CREATED, BOOKING_COMPLETED, CALL_MADE, CALL_RECEIVED, 
+  // EMAIL_SENT, EMAIL_OPENED, WHATSAPP_SENT, WHATSAPP_RECEIVED,
+  // NOTE_ADDED, TAG_ADDED, TAG_REMOVED, SEGMENT_ADDED, SEGMENT_REMOVED,
+  // STATUS_CHANGED, PROFILE_UPDATED, ADDRESS_ADDED, LOGIN
+
   // Activity details
   title       String
   description String?
-  metadata    String?  // JSON for additional data
-  
+  metadata    String? // JSON for additional data
+
   // Related entities
-  relatedId   String?  // Booking ID, etc.
-  relatedType String?  // BOOKING, SERVICE, etc.
-  
+  relatedId   String? // Booking ID, etc.
+  relatedType String? // BOOKING, SERVICE, etc.
+
   // Author tracking
-  createdById String?
-  createdByName String?
+  createdById    String?
+  createdByName  String?
   createdByEmail String?
-  
-  ipAddress   String?
-  
-  createdAt   DateTime @default(now())
+
+  ipAddress String?
+
+  createdAt DateTime @default(now())
 
   @@index([customerId])
   @@index([type])
@@ -475,45 +481,45 @@ model CustomerActivity {
 }
 
 model CustomerCommunication {
-  id          String   @id @default(cuid())
-  customerId  String
-  customer    CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  
+  id         String          @id @default(cuid())
+  customerId String
+  customer   CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
   // Communication details
-  channel     String   // EMAIL, SMS, WHATSAPP, NOTIFICATION, CALL
-  direction   String   // OUTBOUND, INBOUND
-  
-  subject     String?
-  content     String
-  
+  channel   String // EMAIL, SMS, WHATSAPP, NOTIFICATION, CALL
+  direction String // OUTBOUND, INBOUND
+
+  subject String?
+  content String
+
   // Status tracking
-  status      String   @default("PENDING") // PENDING, SENT, DELIVERED, READ, FAILED, CANCELLED
+  status        String  @default("PENDING") // PENDING, SENT, DELIVERED, READ, FAILED, CANCELLED
   statusDetails String?
-  
+
   // External reference
-  externalId  String?  // Third-party message ID (WhatsApp message ID, etc.)
+  externalId     String? // Third-party message ID (WhatsApp message ID, etc.)
   externalStatus String? // Status from WhatsApp API, etc.
-  
+
   // Sending details
   sentById    String?
   sentByEmail String?
   sentAt      DateTime?
   deliveredAt DateTime?
   readAt      DateTime?
-  
+
   // Error handling
   errorMessage String?
-  retryCount  Int      @default(0)
-  
+  retryCount   Int     @default(0)
+
   // Template reference
-  templateId  String?
+  templateId   String?
   templateName String?
-  
+
   // Metadata
-  metadata    String?  // JSON for additional data
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  metadata String? // JSON for additional data
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([customerId])
   @@index([channel])
@@ -528,42 +534,42 @@ model CustomerCommunication {
 // ============================================
 
 model SecurityAudit {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Action details
-  action      String   // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, EXPORT, API_CALL
-  category    String   // AUTH, CUSTOMER, BOOKING, SERVICE, REPORT, ADMIN, SYSTEM
-  
+  action   String // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, EXPORT, API_CALL
+  category String // AUTH, CUSTOMER, BOOKING, SERVICE, REPORT, ADMIN, SYSTEM
+
   // Who
-  userId      String?
-  userEmail   String?
-  userRole    String?
+  userId       String?
+  userEmail    String?
+  userRole     String?
   userProvince String?
-  
+
   // What
-  entityType  String?
-  entityId    String?
-  entityName  String?
-  
+  entityType String?
+  entityId   String?
+  entityName String?
+
   // Details
   description String
-  oldValue   String?  // JSON of previous state
-  newValue   String?  // JSON of new state
-  
+  oldValue    String? // JSON of previous state
+  newValue    String? // JSON of new state
+
   // Context
-  ipAddress   String?
-  userAgent   String?
-  sessionId   String?
-  
+  ipAddress String?
+  userAgent String?
+  sessionId String?
+
   // Result
-  success     Boolean  @default(true)
+  success      Boolean @default(true)
   errorMessage String?
-  
+
   // Risk assessment
-  riskLevel   String   @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
-  isSuspicious Boolean  @default(false)
-  
-  createdAt   DateTime @default(now())
+  riskLevel    String  @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  isSuspicious Boolean @default(false)
+
+  createdAt DateTime @default(now())
 
   @@index([action])
   @@index([category])
@@ -576,38 +582,38 @@ model SecurityAudit {
 }
 
 model ApiKey {
-  id          String   @id @default(cuid())
-  name        String
-  key         String   @unique  // Hashed version
-  
+  id   String @id @default(cuid())
+  name String
+  key  String @unique // Hashed version
+
   // Key metadata (unhashed prefix stored for identification)
-  prefix      String   // First 8 chars of key for identification
-  version     Int      @default(1)
-  
+  prefix  String // First 8 chars of key for identification
+  version Int    @default(1)
+
   // Permissions
   permissions String[] // READ, WRITE, DELETE, ADMIN
-  
+
   // Scoping
-  scope       String   @default("FULL") // FULL, CUSTOMERS, BOOKINGS, REPORTS
-  province    String?  // If set, key only works for this province
-  
+  scope    String  @default("FULL") // FULL, CUSTOMERS, BOOKINGS, REPORTS
+  province String? // If set, key only works for this province
+
   // Status
-  isActive    Boolean  @default(true)
-  expiresAt   DateTime?
-  lastUsedAt  DateTime?
-  lastIp      String?
-  
+  isActive   Boolean   @default(true)
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  lastIp     String?
+
   // Usage limits
-  rateLimit   Int      @default(100)  // Requests per minute
-  requestCount Int     @default(0)
-  
+  rateLimit    Int @default(100) // Requests per minute
+  requestCount Int @default(0)
+
   // Owner
-  createdById String
+  createdById    String
   createdByEmail String
-  description String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  description    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([key])
   @@index([createdById])
@@ -615,54 +621,54 @@ model ApiKey {
 }
 
 model RateLimitLog {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // What was rate limited
-  identifier  String   // IP address, API key, or user ID
-  type        String   // IP, API_KEY, USER
-  
+  identifier String // IP address, API key, or user ID
+  type       String // IP, API_KEY, USER
+
   // Endpoint
-  endpoint    String
-  method      String
-  
+  endpoint String
+  method   String
+
   // Request details
-  requestCount Int     @default(1)
-  
+  requestCount Int @default(1)
+
   // Window
   windowStart DateTime
   windowEnd   DateTime
-  
+
   // Result
-  limited     Boolean  @default(false)
-  blockUntil  DateTime?
-  
-  createdAt   DateTime @default(now())
+  limited    Boolean   @default(false)
+  blockUntil DateTime?
+
+  createdAt DateTime @default(now())
 
   @@index([identifier, windowStart])
   @@index([limited])
 }
 
 model FailedLogin {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Who tried to login
-  email       String
-  ipAddress   String
-  userAgent   String?
-  
+  email     String
+  ipAddress String
+  userAgent String?
+
   // Attempt details
-  attemptCount Int     @default(1)
-  blocked      Boolean  @default(false)
+  attemptCount Int       @default(1)
+  blocked      Boolean   @default(false)
   blockUntil   DateTime?
-  
+
   // Why it failed
-  reason      String?  // INVALID_PASSWORD, INVALID_OTP, ACCOUNT_LOCKED, etc.
-  
+  reason String? // INVALID_PASSWORD, INVALID_OTP, ACCOUNT_LOCKED, etc.
+
   // Location
-  location    String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  location String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([email, ipAddress])
   @@index([blocked])
@@ -670,35 +676,35 @@ model FailedLogin {
 }
 
 model DataExport {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Export details
-  type        String   // CUSTOMERS, BOOKINGS, REPORTS, FULL
-  format      String   @default("CSV") // CSV, JSON, EXCEL
-  
+  type   String // CUSTOMERS, BOOKINGS, REPORTS, FULL
+  format String @default("CSV") // CSV, JSON, EXCEL
+
   // Filters applied
-  filters     String?  // JSON of filters used
-  
+  filters String? // JSON of filters used
+
   // File info
-  fileName    String?
-  fileSize    Int?
-  filePath    String?
-  
+  fileName String?
+  fileSize Int?
+  filePath String?
+
   // Status
-  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
-  progress    Int      @default(0)
-  
+  status   String @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  progress Int    @default(0)
+
   // Requester
-  requestedById String
+  requestedById    String
   requestedByEmail String
-  
+
   // Download
-  downloadUrl  String?
+  downloadUrl String?
   expiresAt   DateTime?
-  
-  createdAt   DateTime @default(now())
+
+  createdAt   DateTime  @default(now())
   completedAt DateTime?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   @@index([requestedById])
   @@index([status])
@@ -713,7 +719,7 @@ model JobVacancy {
   location    String?
   isActive    Boolean  @default(true)
   branchId    String?
-  branch     Branch?  @relation(fields: [branchId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -723,67 +729,67 @@ model JobVacancy {
 
 // Staff managed by branch admins
 model Staff {
-  id          String   @id @default(cuid())
-  staffId     String   @unique  // Auto-generated: EMP-001, EMP-002...
-  name        String
-  phone       String?
-  email       String?
-  position    String?
-  photo       String?
-  branchId    String?
-  branch      Branch?  @relation(fields: [branchId], references: [id])
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  staffId   String   @unique // Auto-generated: EMP-001, EMP-002...
+  name      String
+  phone     String?
+  email     String?
+  position  String?
+  photo     String?
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id])
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([branchId])
   @@index([staffId])
 }
 
 model Invoice {
-  id              String   @id @default(cuid())
-  invoiceNumber   String   @unique
-  type            String   @default("INVOICE")
+  id              String    @id @default(cuid())
+  invoiceNumber   String    @unique
+  type            String    @default("INVOICE")
   branchId        String
   customerName    String
   customerEmail   String?
   customerPhone   String?
   customerAddress String?
   subtotal        Float
-  tax             Float    @default(0)
+  tax             Float     @default(0)
   total           Float
-  status          String   @default("DRAFT")
-  paymentStatus   String   @default("UNPAID")
-  amountPaid      Float    @default(0)
+  status          String    @default("DRAFT")
+  paymentStatus   String    @default("UNPAID")
+  amountPaid      Float     @default(0)
   dueDate         DateTime?
   notes           String?
   createdBy       String
-  isDeleted       Boolean  @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  isDeleted       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  branch    Branch   @relation(fields: [branchId], references: [id])
-  items     InvoiceItem[]
+  branch Branch        @relation(fields: [branchId], references: [id])
+  items  InvoiceItem[]
 }
 
 model InvoiceItem {
-  id          String  @id @default(cuid())
+  id          String @id @default(cuid())
   invoiceId   String
   description String
-  quantity    Float   @default(1)
+  quantity    Float  @default(1)
   unitPrice   Float
   totalPrice  Float
 
-  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
 
 model Quotation {
-  id               String   @id @default(cuid())
+  id              String   @id @default(cuid())
   quotationNumber String   @unique
-  type             String   @default("QUOTATION")
-  branchId         String
-  customerName     String
-  customerEmail    String?
+  type            String   @default("QUOTATION")
+  branchId        String
+  customerName    String
+  customerEmail   String?
   customerPhone   String?
   customerAddress String?
   subtotal        Float
@@ -794,22 +800,22 @@ model Quotation {
   notes           String?
   createdBy       String
   isDeleted       Boolean  @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  branch    Branch   @relation(fields: [branchId], references: [id])
-  items     QuotationItem[]
+  branch Branch          @relation(fields: [branchId], references: [id])
+  items  QuotationItem[]
 }
 
 model QuotationItem {
-  id           String  @id @default(cuid())
-  quotationId   String
-  description  String
-  quantity    Float   @default(1)
-  unitPrice    Float
-  totalPrice   Float
+  id          String @id @default(cuid())
+  quotationId String
+  description String
+  quantity    Float  @default(1)
+  unitPrice   Float
+  totalPrice  Float
 
-  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
 }
 
 // ============================================
@@ -817,14 +823,14 @@ model QuotationItem {
 // ============================================
 
 model TaskerProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   bio           String?
   hourlyRate    Float    @default(0)
-  skills        String[]  // Category slugs
-  serviceAreas  String[]  // District names
+  skills        String[] // Category slugs
+  serviceAreas  String[] // District names
   rating        Float    @default(0)
   completedJobs Int      @default(0)
   isVerified    Boolean  @default(false)
@@ -832,16 +838,16 @@ model TaskerProfile {
   profileImage  String?
 
   // Location
-  latitude      Float?
-  longitude     Float?
+  latitude          Float?
+  longitude         Float?
   locationUpdatedAt DateTime?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  bids          Bid[]
-  assignments   Assignment[]
-  reviews       TaskerReview[]
+  bids        Bid[]
+  assignments Assignment[]
+  reviews     TaskerReview[]
 
   @@index([isOnline])
   @@index([isVerified])
@@ -849,25 +855,26 @@ model TaskerProfile {
 }
 
 model JobPosting {
-  id            String   @id @default(cuid())
-  customerId    String
-  customer      User     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id         String @id @default(cuid())
+  customerId String
+  customer   User   @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   title         String
   description   String
-  category      String   // Category slug
+  category      String // Category slug
   budget        Float
-  location      String   // District or address
+  location      String // District or address
   latitude      Float?
   longitude     Float?
   scheduledDate DateTime?
-  status        String   @default("OPEN") // OPEN, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
+  status        String    @default("OPEN") // OPEN, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  bids          Bid[]
-  assignments   Assignment[]
+  bids        Bid[]
+  assignments Assignment[]
+  disputes    Dispute[]
 
   @@index([customerId])
   @@index([status])
@@ -877,17 +884,17 @@ model JobPosting {
 }
 
 model Bid {
-  id          String   @id @default(cuid())
-  jobId       String
-  job         JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  taskerId    String
-  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  id       String        @id @default(cuid())
+  jobId    String
+  job      JobPosting    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  taskerId String
+  tasker   TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
 
-  amount      Float
-  message     String?
-  status      String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  amount  Float
+  message String?
+  status  String  @default("PENDING") // PENDING, ACCEPTED, REJECTED
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([jobId, taskerId])
   @@index([jobId])
@@ -896,17 +903,17 @@ model Bid {
 }
 
 model Assignment {
-  id          String   @id @default(cuid())
-  jobId       String
-  job         JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  taskerId    String
-  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  id       String        @id @default(cuid())
+  jobId    String
+  job      JobPosting    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  taskerId String
+  tasker   TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
 
-  status      String   @default("ASSIGNED") // ASSIGNED, EN_ROUTE, IN_PROGRESS, COMPLETED, CANCELLED
+  status      String    @default("ASSIGNED") // ASSIGNED, EN_ROUTE, IN_PROGRESS, COMPLETED, CANCELLED
   startedAt   DateTime?
   completedAt DateTime?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([jobId])
   @@index([taskerId])
@@ -914,32 +921,203 @@ model Assignment {
 }
 
 model TaskerReview {
-  id          String   @id @default(cuid())
-  taskerId    String
-  tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  reviewerId  String
-  reviewer    User     @relation(fields: [reviewerId], references: [id])
+  id         String        @id @default(cuid())
+  taskerId   String
+  tasker     TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  reviewerId String
+  reviewer   User          @relation(fields: [reviewerId], references: [id])
 
-  jobId       String?
-  rating      Int
-  comment     String?
+  jobId   String?
+  rating  Int
+  comment String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([taskerId])
   @@index([reviewerId])
 }
 
 model Notification {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  body        String
-  data        String?  // JSON payload
-  read        Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  data      String? // JSON payload
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@index([userId, read])
+  @@index([createdAt])
+}
+
+// ============================================
+// MOBILE CHAT MODELS
+// ============================================
+
+model Conversation {
+  id        String   @id @default(cuid())
+  jobId     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  text           String
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+// ============================================
+// MOBILE DISPUTE MODELS
+// ============================================
+
+model Dispute {
+  id          String     @id @default(cuid())
+  jobId       String
+  job         JobPosting @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  raisedById  String
+  raisedBy    User       @relation(fields: [raisedById], references: [id])
+  reason      String
+  description String
+  resolution  String?
+  status      String     @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED, DISMISSED
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([jobId])
+  @@index([raisedById])
+  @@index([status])
+}
+
+// ============================================
+// COMPANY MODELS
+// ============================================
+
+model CompanyProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  companyName       String
+  registrationNo    String?
+  description       String?
+  services          String[]
+  serviceAreas      String[]
+  rating            Float    @default(0)
+  completedProjects Int      @default(0)
+  isVerified        Boolean  @default(false)
+  logo              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contracts   Contract[]
+  teamMembers TeamMember[]
+
+  @@index([isVerified])
+  @@index([rating])
+}
+
+model TeamMember {
+  id        String         @id @default(cuid())
+  companyId String
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  name          String
+  role          String
+  skills        String[]
+  isOnline      Boolean  @default(false)
+  rating        Float    @default(0)
+  completedJobs Int      @default(0)
+  joinedAt      DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model Contract {
+  id          String         @id @default(cuid())
+  companyId   String
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  clientName  String
+  title       String
+  description String?
+  value       Float
+  status      String         @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  progress    Int            @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  milestones Milestone[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model Milestone {
+  id          String    @id @default(cuid())
+  contractId  String
+  contract    Contract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  amount      Float
+  status      String    @default("PENDING") // PENDING, APPROVED, IN_REVIEW
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([contractId])
+  @@index([status])
+}
+
+// ============================================
+// EARNINGS & PAYOUT MODELS
+// ============================================
+
+model Payout {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Float
+  description String?
+  status      String    @default("PENDING") // PENDING, CLEARED, FAILED
+  source      String // JOB, CONTRACT, MILESTONE
+  sourceId    String? // Job ID, Contract ID, etc.
+  createdAt   DateTime  @default(now())
+  clearedAt   DateTime?
+
+  @@index([userId])
+  @@index([status])
   @@index([createdAt])
 }

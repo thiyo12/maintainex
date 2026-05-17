@@ -1,181 +1,165 @@
-import { useState, useEffect } from 'react'
-import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert,
-} from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useRouter } from 'expo-router'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../lib/auth'
-import { taskers as taskersApi, categories as categoriesApi } from '../../lib/api'
-import { Category } from '../../lib/types'
 
 const colors = {
-  primary: '#F59E0B',
+  teal: '#0D9488',
   dark: '#1A1A2E',
   gray: '#6B7280',
   lightGray: '#E5E7EB',
-  background: '#F9FAFB',
   white: '#FFFFFF',
+  green: '#10B981',
+  primary: '#F59E0B',
 }
 
-const DISTRICTS = [
-  'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo', 'Galle',
-  'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara', 'Kandy', 'Kegalle',
-  'Kilinochchi', 'Kurunegala', 'Mannar', 'Matale', 'Matara', 'Monaragala',
-  'Mullaitivu', 'Nuwara Eliya', 'Polonnaruwa', 'Puttalam', 'Ratnapura',
-  'Trincomalee', 'Vavuniya',
-]
+const skills = ['Plumbing', 'Pipe Fitting', 'Water Heater Repair', 'Drain Cleaning']
+const serviceAreas = ['Colombo 01', 'Colombo 02', 'Colombo 03', 'Colombo 04', 'Colombo 05']
 
-export default function TaskerProfileScreen() {
+export default function TaskerProfile() {
+  const router = useRouter()
   const { user, logout } = useAuth()
-  const [categories, setCategories] = useState<Category[]>([])
-  const [bio, setBio] = useState('')
-  const [hourlyRate, setHourlyRate] = useState('')
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    categoriesApi.list().then(setCategories).catch(() => {})
-  }, [])
-
-  const toggleSkill = (slug: string) => {
-    setSelectedSkills(prev =>
-      prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug]
-    )
-  }
-
-  const toggleArea = (area: string) => {
-    setSelectedAreas(prev =>
-      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
-    )
-  }
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await taskersApi.updateProfile({
-        bio, hourlyRate: parseInt(hourlyRate) || 0,
-        skills: selectedSkills, serviceAreas: selectedAreas,
-      })
-      Alert.alert('Saved', 'Profile updated successfully')
-    } catch (err: any) {
-      Alert.alert('Error', err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.profileHeader}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>K</Text>
+          </View>
+          <Text style={styles.name}>Kamal Perera</Text>
+          <Text style={styles.role}>Plumber • ⭐ 4.8</Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.badge}><Text style={styles.badgeText}>✓ Verified</Text></View>
+            <View style={styles.badge}><Text style={styles.badgeText}>🟢 Online</Text></View>
+          </View>
         </View>
-        <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
-      </View>
 
-      <Text style={styles.sectionTitle}>About You</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        value={bio}
-        onChangeText={setBio}
-        placeholder="Tell customers about yourself and your experience..."
-        multiline numberOfLines={4}
-      />
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>47</Text>
+            <Text style={styles.statLabel}>Jobs</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>4.8</Text>
+            <Text style={styles.statLabel}>Rating</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>99%</Text>
+            <Text style={styles.statLabel}>Completion</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>3 yr</Text>
+            <Text style={styles.statLabel}>Exp.</Text>
+          </View>
+        </View>
 
-      <Text style={styles.sectionTitle}>Hourly Rate (LKR)</Text>
-      <TextInput
-        style={styles.input}
-        value={hourlyRate}
-        onChangeText={setHourlyRate}
-        placeholder="e.g. 1500"
-        keyboardType="number-pad"
-      />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Skills</Text>
+          <View style={styles.tagRow}>
+            {skills.map((s) => (
+              <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
+            ))}
+          </View>
+        </View>
 
-      <Text style={styles.sectionTitle}>Skills / Services</Text>
-      <View style={styles.chipRow}>
-        {categories.map(c => (
-          <TouchableOpacity
-            key={c.id}
-            style={[styles.chip, selectedSkills.includes(c.slug) && styles.chipActive]}
-            onPress={() => toggleSkill(c.slug)}
-          >
-            <Text style={[styles.chipText, selectedSkills.includes(c.slug) && styles.chipTextActive]}>
-              {c.name}
-            </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Service areas</Text>
+          <View style={styles.tagRow}>
+            {serviceAreas.map((a) => (
+              <View key={a} style={styles.tag}><Text style={styles.tagText}>{a}</Text></View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>📋 Edit profile</Text>
+            <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>Service Areas</Text>
-      <View style={styles.chipRow}>
-        {DISTRICTS.map(d => (
-          <TouchableOpacity
-            key={d}
-            style={[styles.chip, selectedAreas.includes(d) && styles.chipActive]}
-            onPress={() => toggleArea(d)}
-          >
-            <Text style={[styles.chipText, selectedAreas.includes(d) && styles.chipTextActive]}>
-              {d}
-            </Text>
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>💳 Payment details</Text>
+            <Text style={styles.menuArrow}>›</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity
-        style={[styles.saveButton, saving && styles.buttonDisabled]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        {saving ? (
-          <ActivityIndicator color={colors.dark} />
-        ) : (
-          <Text style={styles.saveButtonText}>Save Profile</Text>
-        )}
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <TouchableOpacity style={styles.menuRow}>
+            <Text style={styles.menuLabel}>🔔 Notifications</Text>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuRow} onPress={logout}>
+            <Text style={[styles.menuLabel, { color: '#EF4444' }]}>🚪 Log out</Text>
+            <Text style={[styles.menuArrow, { color: '#EF4444' }]}>›</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, paddingTop: 60, paddingBottom: 40 },
-  header: { alignItems: 'center', marginBottom: 32 },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
   avatar: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.teal,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  avatarText: { fontSize: 36, fontWeight: '800', color: colors.dark },
-  name: { fontSize: 22, fontWeight: '700', color: colors.dark },
-  email: { fontSize: 14, color: colors.gray, marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.dark, marginBottom: 12, marginTop: 24 },
-  input: {
-    backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.lightGray,
-    borderRadius: 12, padding: 14, fontSize: 15, color: colors.dark,
+  avatarText: { fontSize: 28, fontWeight: '700', color: colors.white },
+  name: { fontSize: 22, fontWeight: '800', color: colors.dark, marginBottom: 4 },
+  role: { fontSize: 15, color: colors.gray, marginBottom: 10 },
+  badgeRow: { flexDirection: 'row', gap: 8 },
+  badge: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: '#D1FAE5',
   },
-  textArea: { minHeight: 100, textAlignVertical: 'top' },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10,
-    backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.lightGray,
+  badgeText: { fontSize: 13, fontWeight: '600', color: colors.green },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 8, marginBottom: 20 },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  chipActive: { borderColor: colors.primary, backgroundColor: '#FFFBEB' },
-  chipText: { fontSize: 13, color: colors.dark, fontWeight: '500' },
-  chipTextActive: { color: colors.primary },
-  saveButton: {
-    backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 14,
-    alignItems: 'center', marginTop: 32,
+  statValue: { fontSize: 18, fontWeight: '800', color: colors.dark },
+  statLabel: { fontSize: 11, color: colors.gray, marginTop: 2 },
+  section: { paddingHorizontal: 24, marginBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.dark, marginBottom: 10 },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.lightGray,
   },
-  buttonDisabled: { opacity: 0.6 },
-  saveButtonText: { fontSize: 16, fontWeight: '700', color: colors.dark },
-  logoutButton: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 16,
-    alignItems: 'center', marginTop: 16, borderWidth: 1.5, borderColor: '#FEE2E2',
+  tagText: { fontSize: 13, fontWeight: '600', color: colors.dark },
+  menuRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  logoutText: { fontSize: 16, fontWeight: '600', color: '#EF4444' },
+  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.dark },
+  menuArrow: { fontSize: 22, color: colors.gray, fontWeight: '300' },
 })

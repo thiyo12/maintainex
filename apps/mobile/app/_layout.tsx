@@ -11,7 +11,8 @@ export default function RootLayout() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(customer)" />
         <Stack.Screen name="(tasker)" />
-        <Stack.Screen name="(admin)" />
+        <Stack.Screen name="(company)" />
+        <Stack.Screen name="(chat)" />
       </Stack>
     </AuthProvider>
   )

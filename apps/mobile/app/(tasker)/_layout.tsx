@@ -2,21 +2,19 @@ import { Tabs } from 'expo-router'
 import { View, Text, StyleSheet } from 'react-native'
 
 const colors = {
-  primary: '#F59E0B',
+  teal: '#0D9488',
   dark: '#1A1A2E',
   gray: '#6B7280',
   lightGray: '#E5E7EB',
+  white: '#FFFFFF',
 }
 
-function TabIcon({ name, focused }: { name: string; focused: boolean }) {
-  const icons: Record<string, string> = {
-    home: '🏠',
-    jobs: '📋',
-    earnings: '💰',
-    profile: '👤',
-  }
-  return <Text style={[styles.icon, focused && styles.iconActive]}>{icons[name] || '📄'}</Text>
-}
+const tabs = [
+  { name: 'index', title: 'Jobs', icon: '🗺️' },
+  { name: 'my-jobs', title: 'My Jobs', icon: '📋' },
+  { name: 'earnings', title: 'Earnings', icon: '💰' },
+  { name: 'profile', title: 'Profile', icon: '👤' },
+]
 
 export default function TaskerLayout() {
   return (
@@ -24,53 +22,40 @@ export default function TaskerLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
-        tabBarActiveTintColor: colors.dark,
+        tabBarActiveTintColor: colors.teal,
         tabBarInactiveTintColor: colors.gray,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon name="home" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="jobs"
-        options={{
-          title: 'Jobs',
-          tabBarIcon: ({ focused }) => <TabIcon name="jobs" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="earnings"
-        options={{
-          title: 'Earnings',
-          tabBarIcon: ({ focused }) => <TabIcon name="earnings" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon name="profile" focused={focused} />,
-        }}
-      />
+      {tabs.map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            tabBarIcon: ({ focused }) => (
+              <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
+                <Text style={[styles.tabIcon, focused && { color: colors.teal }]}>
+                  {tab.icon}
+                </Text>
+              </View>
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   )
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.lightGray,
-    paddingTop: 8,
+    paddingTop: 6,
     paddingBottom: 24,
     height: 80,
   },
-  tabLabel: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  icon: { fontSize: 22 },
-  iconActive: {},
+  tabIconWrap: { alignItems: 'center', justifyContent: 'center' },
+  tabIconActive: { marginTop: -8 },
+  tabIcon: { fontSize: 24 },
 })

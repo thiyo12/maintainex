@@ -1,0 +1,125 @@
+import { useState } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+
+const colors = {
+  coral: '#F97316',
+  dark: '#1A1A2E',
+  gray: '#6B7280',
+  lightGray: '#E5E7EB',
+  white: '#FFFFFF',
+  green: '#10B981',
+}
+
+type Tab = 'active' | 'completed' | 'all'
+
+const contracts = [
+  { id: '1024', client: 'City Hotel', title: 'Full plumbing renovation', value: 850000, status: 'In progress', progress: 60 },
+  { id: '1023', client: 'Sunil Perera', title: 'Home electrical rewiring', value: 125000, status: 'In progress', progress: 30 },
+  { id: '1022', client: 'ABC Corp', title: 'Office AC installation', value: 450000, status: 'Completed', progress: 100 },
+  { id: '1021', client: 'Dilmah Constructions', title: 'Commercial plumbing', value: 1200000, status: 'Completed', progress: 100 },
+]
+
+export default function CompanyContracts() {
+  const [tab, setTab] = useState<Tab>('active')
+
+  const filtered = tab === 'all' ? contracts : contracts.filter(c =>
+    tab === 'active' ? c.status === 'In progress' : c.status === 'Completed'
+  )
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.topBar}>
+        <Text style={styles.heading}>Contracts</Text>
+      </View>
+
+      <View style={styles.tabs}>
+        {(['active', 'completed', 'all'] as Tab[]).map((t) => (
+          <TouchableOpacity
+            key={t}
+            style={[styles.tab, tab === t && styles.tabActive]}
+            onPress={() => setTab(t)}
+          >
+            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {filtered.map((c) => (
+          <TouchableOpacity key={c.id} style={styles.contractCard} activeOpacity={0.8}>
+            <View style={styles.cardTop}>
+              <Text style={styles.contractTitle} numberOfLines={1}>{c.title}</Text>
+              <Text style={styles.contractValue}>LKR {c.value.toLocaleString()}</Text>
+            </View>
+            <Text style={styles.contractClient}>{c.client} • #{c.id}</Text>
+            <View style={styles.progressRow}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress === 100 ? colors.green : colors.coral }]} />
+              </View>
+              <Text style={styles.progressText}>{c.progress}%</Text>
+            </View>
+            <View style={styles.cardBottom}>
+              <View style={[styles.contractStatus, { backgroundColor: c.status === 'Completed' ? '#D1FAE5' : '#FFF7ED' }]}>
+                <Text style={[styles.contractStatusText, { color: c.status === 'Completed' ? colors.green : colors.coral }]}>
+                  {c.status}
+                </Text>
+              </View>
+              <Text style={styles.viewDetails}>View details ›</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    backgroundColor: colors.lightGray,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  tabActive: { backgroundColor: colors.white },
+  tabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
+  tabTextActive: { color: colors.coral, fontWeight: '700' },
+  contractCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: 24,
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  contractTitle: { fontSize: 15, fontWeight: '700', color: colors.dark, flex: 1, marginRight: 8 },
+  contractValue: { fontSize: 15, fontWeight: '700', color: colors.coral },
+  contractClient: { fontSize: 13, color: colors.gray, marginBottom: 10 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  progressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.lightGray,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', borderRadius: 4 },
+  progressText: { fontSize: 12, fontWeight: '600', color: colors.dark, width: 36 },
+  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  contractStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  contractStatusText: { fontSize: 12, fontWeight: '600' },
+  viewDetails: { fontSize: 13, color: colors.coral, fontWeight: '600' },
+})

@@ -1,60 +1,175 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native'
+import { useState } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const colors = {
-  primary: '#F59E0B',
+  teal: '#0D9488',
   dark: '#1A1A2E',
   gray: '#6B7280',
-  background: '#F9FAFB',
+  lightGray: '#E5E7EB',
   white: '#FFFFFF',
+  green: '#10B981',
+  primary: '#F59E0B',
 }
 
-export default function EarningsScreen() {
+type Period = 'weekly' | 'monthly' | 'yearly'
+
+const transactions = [
+  { job: 'Fix leaking pipe', amount: 8500, date: 'Today', status: 'Pending' },
+  { job: 'Electrical repair', amount: 12000, date: 'Yesterday', status: 'Cleared' },
+  { job: 'Paint bedroom', amount: 15000, date: 'May 12', status: 'Cleared' },
+  { job: 'AC service', amount: 6500, date: 'May 10', status: 'Cleared' },
+  { job: 'Garden cleanup', amount: 8000, date: 'May 8', status: 'Cleared' },
+]
+
+export default function TaskerEarnings() {
+  const [period, setPeriod] = useState<Period>('weekly')
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Earnings</Text>
-
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryLabel}>This Week</Text>
-        <Text style={styles.summaryAmount}>LKR 0</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.topBar}>
+        <Text style={styles.heading}>Earnings</Text>
       </View>
 
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryBox}>
-          <Text style={styles.boxLabel}>Completed Jobs</Text>
-          <Text style={styles.boxValue}>0</Text>
+      <View style={styles.balanceCard}>
+        <Text style={styles.balanceLabel}>Available balance</Text>
+        <Text style={styles.balanceValue}>LKR 18,500</Text>
+        <TouchableOpacity style={styles.withdrawBtn}>
+          <Text style={styles.withdrawBtnText}>Withdraw</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.statsRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>This {period}</Text>
+          <Text style={styles.statValue}>LKR 20,500</Text>
         </View>
-        <View style={styles.summaryBox}>
-          <Text style={styles.boxLabel}>Rating</Text>
-          <Text style={styles.boxValue}>⭐ 0.0</Text>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Pending</Text>
+          <Text style={styles.statValue}>LKR 8,500</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Total all time</Text>
+          <Text style={styles.statValue}>LKR 245,000</Text>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Recent Transactions</Text>
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>No transactions yet</Text>
+      <View style={styles.periodTabs}>
+        {(['weekly', 'monthly', 'yearly'] as Period[]).map((p) => (
+          <TouchableOpacity
+            key={p}
+            style={[styles.periodTab, period === p && styles.periodTabActive]}
+            onPress={() => setPeriod(p)}
+          >
+            <Text style={[styles.periodTabText, period === p && styles.periodTabTextActive]}>
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
-    </ScrollView>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={styles.transactionTitle}>Recent transactions</Text>
+        {transactions.map((tx, i) => (
+          <View key={i} style={styles.txCard}>
+            <View style={styles.txLeft}>
+              <View style={[styles.txDot, { backgroundColor: tx.status === 'Cleared' ? colors.green : colors.primary }]} />
+              <View>
+                <Text style={styles.txJob}>{tx.job}</Text>
+                <Text style={styles.txDate}>{tx.date} • {tx.status}</Text>
+              </View>
+            </View>
+            <View style={styles.txRight}>
+              <Text style={[styles.txAmount, { color: tx.status === 'Cleared' ? colors.green : colors.primary }]}>
+                +LKR {tx.amount.toLocaleString()}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 20, paddingTop: 60, paddingBottom: 40 },
-  title: { fontSize: 28, fontWeight: '800', color: colors.dark, marginBottom: 24 },
-  summaryCard: {
-    backgroundColor: colors.primary, borderRadius: 16, padding: 24, marginBottom: 16,
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  balanceCard: {
+    backgroundColor: colors.teal,
+    marginHorizontal: 24,
+    padding: 24,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  summaryLabel: { fontSize: 14, color: colors.dark, opacity: 0.7 },
-  summaryAmount: { fontSize: 36, fontWeight: '800', color: colors.dark, marginTop: 8 },
-  summaryRow: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-  summaryBox: {
-    flex: 1, backgroundColor: colors.white, borderRadius: 16, padding: 16,
-    alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  balanceLabel: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
+  balanceValue: { fontSize: 36, fontWeight: '800', color: colors.white, marginBottom: 16 },
+  withdrawBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 24,
   },
-  boxLabel: { fontSize: 13, color: colors.gray, marginBottom: 8 },
-  boxValue: { fontSize: 22, fontWeight: '800', color: colors.dark },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.dark, marginBottom: 12 },
-  empty: { alignItems: 'center', paddingTop: 20 },
-  emptyText: { fontSize: 14, color: colors.gray },
+  withdrawBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 16 },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  statLabel: { fontSize: 11, color: colors.gray, marginBottom: 4 },
+  statValue: { fontSize: 14, fontWeight: '800', color: colors.dark },
+  periodTabs: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    backgroundColor: colors.lightGray,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  periodTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  periodTabActive: { backgroundColor: colors.white },
+  periodTabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
+  periodTabTextActive: { color: colors.teal, fontWeight: '700' },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.dark,
+    paddingHorizontal: 24,
+    marginBottom: 10,
+  },
+  txCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    marginHorizontal: 24,
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  txLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  txDot: { width: 8, height: 8, borderRadius: 4 },
+  txJob: { fontSize: 14, fontWeight: '600', color: colors.dark },
+  txDate: { fontSize: 12, color: colors.gray, marginTop: 2 },
+  txRight: {},
+  txAmount: { fontSize: 15, fontWeight: '700' },
 })

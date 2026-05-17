@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { auth } from '../../lib/api'
 
@@ -14,145 +14,208 @@ const colors = {
   lightGray: '#E5E7EB',
   background: '#F9FAFB',
   white: '#FFFFFF',
+  green: '#10B981',
 }
 
 export default function OtpScreen() {
   const router = useRouter()
-  const { loginWithOtp } = useAuth()
-  const [phone, setPhone] = useState('')
-  const [otp, setOtp] = useState('')
-  const [step, setStep] = useState<'phone' | 'otp'>('phone')
+  const { phone, role } = useLocalSearchParams<{ phone: string; role: string }>()
+  const { register } = useAuth()
+
+  const [codes, setCodes] = useState<string[]>(Array(6).fill(''))
   const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(true)
+  const [resendTimer, setResendTimer] = useState(60)
+  const [devCode, setDevCode] = useState('')
+  const inputRefs = useRef<(TextInput | null)[]>([])
 
-  const handleSendOtp = async () => {
-    if (!phone || phone.replace(/\D/g, '').length < 9) {
-      Alert.alert('Error', 'Please enter a valid phone number')
+  useEffect(() => {
+    if (phone) sendOtp()
+  }, [phone])
+
+  useEffect(() => {
+    if (resendTimer <= 0) return
+    const interval = setInterval(() => setResendTimer((t) => t - 1), 1000)
+    return () => clearInterval(interval)
+  }, [resendTimer])
+
+  const fillCode = (code: string) => {
+    const digits = code.split('')
+    setCodes(digits)
+  }
+
+  const sendOtp = async () => {
+    setSending(true)
+    try {
+      const res = await auth.sendOtp({ phone: phone || '' })
+      if (res.devCode) {
+        setDevCode(res.devCode)
+        fillCode(res.devCode)
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to send verification code')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleResend = () => {
+    setResendTimer(60)
+    sendOtp()
+  }
+
+  const handleCodeChange = (text: string, index: number) => {
+    const digit = text.replace(/\D/g, '').slice(-1)
+    const newCodes = [...codes]
+    newCodes[index] = digit
+    setCodes(newCodes)
+
+    if (digit && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  const handleKeyPress = (key: string, index: number) => {
+    if (key === 'Backspace' && !codes[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handleVerify = async () => {
+    const code = codes.join('')
+    if (code.length < 6) {
+      Alert.alert('Error', 'Please enter the complete code')
       return
     }
+
     setLoading(true)
     try {
-      await auth.requestOtp(phone)
-      setStep('otp')
+      await auth.verifyOtp({ phone: phone || '', code })
+
+      const userRole = role || 'CUSTOMER'
+      if (userRole === 'TASKER') router.replace('/(tasker)')
+      else router.replace('/(customer)')
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to send OTP')
+      Alert.alert('Verification Failed', 'Invalid or expired code. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.length < 4) {
-      Alert.alert('Error', 'Please enter the OTP code')
-      return
-    }
-    setLoading(true)
-    try {
-      await loginWithOtp(phone, otp)
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Invalid OTP')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const allFilled = codes.every((c) => c !== '')
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <TouchableOpacity onPress={() => step === 'otp' ? setStep('phone') : router.back()} style={styles.backButton}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>
-        {step === 'phone' ? 'Login with OTP' : 'Enter OTP'}
-      </Text>
+      <Text style={styles.title}>Verify your phone</Text>
       <Text style={styles.subtitle}>
-        {step === 'phone'
-          ? 'Enter your phone number to receive a code'
-          : `Enter the code sent to ${phone}`}
+        We sent a 6 digit code to {phone || 'your phone'}
       </Text>
 
-      {step === 'phone' ? (
-        <View style={styles.form}>
-          <Text style={styles.label}>Phone Number</Text>
+      {devCode ? (
+        <Text style={styles.devHint}>Dev code: {devCode} (auto-filled)</Text>
+      ) : null}
+
+      <View style={styles.codeRow}>
+        {codes.map((digit, i) => (
           <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="0712345678"
-            keyboardType="phone-pad"
-          />
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSendOtp}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.dark} />
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.form}>
-          <Text style={styles.label}>OTP Code</Text>
-          <TextInput
-            style={[styles.input, styles.otpInput]}
-            value={otp}
-            onChangeText={setOtp}
-            placeholder="000000"
+            key={i}
+            ref={(ref) => { inputRefs.current[i] = ref }}
+            style={[styles.codeBox, digit ? styles.codeBoxFilled : null]}
+            value={digit}
+            onChangeText={(t) => handleCodeChange(t, i)}
+            onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={1}
           />
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleVerifyOtp}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.dark} />
-            ) : (
-              <Text style={styles.buttonText}>Verify & Login</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSendOtp} style={{ marginTop: 16, alignItems: 'center' }}>
-            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '500' }}>
-              Resend Code
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        ))}
+      </View>
+
+      <TouchableOpacity
+        onPress={handleResend}
+        disabled={resendTimer > 0 || sending}
+        style={styles.resendButton}
+      >
+        <Text style={[styles.resendText, (resendTimer > 0 || sending) && styles.resendTextDisabled]}>
+          {sending ? 'Sending...' : resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend code'}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.verifyButton, (!allFilled || loading) && styles.verifyButtonDisabled]}
+        onPress={handleVerify}
+        disabled={!allFilled || loading}
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Text style={styles.verifyText}>Verify</Text>
+        )}
+      </TouchableOpacity>
     </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 32, paddingTop: 60 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    padding: 32,
+    paddingTop: 60,
+  },
   backButton: { marginBottom: 32 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   title: { fontSize: 32, fontWeight: '800', color: colors.dark, marginBottom: 8 },
-  subtitle: { fontSize: 16, color: colors.gray, marginBottom: 40 },
-  form: { gap: 4 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 6 },
-  input: {
-    backgroundColor: colors.white,
+  subtitle: { fontSize: 16, color: colors.gray, marginBottom: 8, lineHeight: 24 },
+  devHint: {
+    fontSize: 14,
+    color: colors.green,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 24,
+    backgroundColor: '#ECFDF5',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 32,
+  },
+  codeBox: {
+    width: 48,
+    height: 56,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: colors.lightGray,
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
+    backgroundColor: colors.white,
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: '700',
     color: colors.dark,
   },
-  otpInput: { fontSize: 24, textAlign: 'center', letterSpacing: 8, fontWeight: '700' },
-  button: {
+  codeBoxFilled: {
+    borderColor: colors.primary,
+    backgroundColor: '#FFFBEB',
+  },
+  resendButton: { alignItems: 'center', marginBottom: 40 },
+  resendText: { fontSize: 15, color: colors.primary, fontWeight: '500' },
+  resendTextDisabled: { color: colors.gray },
+  verifyButton: {
     backgroundColor: colors.primary,
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
-    marginTop: 24,
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 18, fontWeight: '700', color: colors.dark },
+  verifyButtonDisabled: { opacity: 0.6 },
+  verifyText: { fontSize: 18, fontWeight: '700', color: colors.white },
 })

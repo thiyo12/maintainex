@@ -7,6 +7,8 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
+  signupData: { name: string; email: string; phone: string; password: string; role: string } | null
+  setSignupData: (data: { name: string; email: string; phone: string; password: string; role: string } | null) => void
   login: (email: string, password: string) => Promise<void>
   loginWithOtp: (phone: string, otp: string) => Promise<void>
   register: (data: { email: string; password: string; name: string; phone: string; role: string }) => Promise<void>
@@ -19,6 +21,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [signupData, setSignupData] = useState<{ name: string; email: string; phone: string; password: string; role: string } | null>(null)
 
   useEffect(() => {
     loadStoredAuth()
@@ -62,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setAuthToken(null)
     setUser(null)
+    setSignupData(null)
     await SecureStore.deleteItemAsync('auth_token')
     await SecureStore.deleteItemAsync('auth_user')
   }, [])
@@ -82,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        signupData,
+        setSignupData,
         login,
         loginWithOtp,
         register,

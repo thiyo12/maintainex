@@ -67,6 +67,10 @@ export const auth = {
     request<AuthResponse>('/api/mobile/auth/login', { method: 'POST', body: JSON.stringify({ phone: data.phone, password: data.otp }) }),
   requestOtp: (phone: string) =>
     request<{ success: boolean }>('/api/mobile/auth/otp', { method: 'POST', body: JSON.stringify({ phone }) }),
+  sendOtp: (data: { phone: string; userId?: string }) =>
+    request<{ success: boolean; devCode?: string }>('/api/mobile/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
+  verifyOtp: (data: { phone: string; code: string }) =>
+    request<{ success: boolean }>('/api/mobile/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
   me: () => request<{ user: import('./types').User }>('/api/mobile/auth/me'),
 }
 
@@ -130,4 +134,82 @@ export const notifications = {
     request<void>('/api/mobile/notifications', { method: 'POST', body: JSON.stringify({ token }) }),
   markRead: (id: string) =>
     request<void>(`/api/mobile/notifications/${id}`, { method: 'PUT' }),
+}
+
+// Conversations & Messages
+export const conversations = {
+  list: () =>
+    request<{ id: string; otherUser: { id: string; name: string } | null; lastMessage: any; unreadCount: number; updatedAt: string }[]>('/api/mobile/conversations'),
+  create: (data: { participantId: string; jobId?: string; initialMessage?: string }) =>
+    request<{ id: string; existing: boolean }>('/api/mobile/conversations', { method: 'POST', body: JSON.stringify(data) }),
+  get: (id: string) =>
+    request<{ id: string; participants: any[]; messages: any[] }>(`/api/mobile/conversations/${id}`),
+  sendMessage: (conversationId: string, text: string) =>
+    request<any>(`/api/mobile/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ text }) }),
+  getMessages: (conversationId: string, after?: string) =>
+    request<any[]>(`/api/mobile/conversations/${conversationId}/messages${after ? `?after=${after}` : ''}`),
+}
+
+// Disputes
+export const disputes = {
+  create: (data: { jobId: string; reason: string; description: string }) =>
+    request<{ id: string; status: string }>('/api/mobile/disputes', { method: 'POST', body: JSON.stringify(data) }),
+  list: () =>
+    request<{ id: string; jobTitle: string; reason: string; status: string; createdAt: string }[]>('/api/mobile/disputes'),
+  get: (id: string) =>
+    request<any>(`/api/mobile/disputes/${id}`),
+}
+
+// Company
+export const company = {
+  profile: {
+    get: () => request<any>('/api/mobile/company/profile'),
+    update: (data: any) => request<any>('/api/mobile/company/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  contracts: {
+    list: (params?: string) =>
+      request<any[]>(`/api/mobile/company/contracts${params ? `?${params}` : ''}`),
+    get: (id: string) => request<any>(`/api/mobile/company/contracts/${id}`),
+    update: (id: string, data: any) =>
+      request<any>(`/api/mobile/company/contracts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  milestones: {
+    list: (params?: string) =>
+      request<any[]>(`/api/mobile/company/milestones${params ? `?${params}` : ''}`),
+  },
+  team: {
+    list: () => request<any[]>('/api/mobile/company/team'),
+  },
+  earnings: {
+    get: () => request<any>('/api/mobile/company/earnings'),
+  },
+}
+
+// Earnings & Payouts
+export const earnings = {
+  get: () => request<any>('/api/mobile/earnings'),
+  withdraw: (amount: number) =>
+    request<any>('/api/mobile/withdraw', { method: 'POST', body: JSON.stringify({ amount }) }),
+}
+
+// File upload
+export const upload = {
+  file: async (fileUri: string) => {
+    const token = await getAuthToken()
+    const formData = new FormData()
+    const filename = fileUri.split('/').pop() || 'photo.jpg'
+    const ext = filename.split('.').pop() || 'jpg'
+    formData.append('file', {
+      uri: fileUri,
+      name: filename,
+      type: `image/${ext}`,
+    } as any)
+    const res = await fetch(`${API_URL}/api/mobile/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    })
+    if (!res.ok) throw new Error('Upload failed')
+    return res.json() as Promise<{ url: string; filename: string }>
+  },
 }

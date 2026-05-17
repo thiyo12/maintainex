@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email, password, and name required' }, { status: 400 })
     }
 
-    const validRoles = ['CUSTOMER', 'TASKER']
+    const validRoles = ['CUSTOMER', 'TASKER', 'COMPANY']
     const userRole = validRoles.includes(role) ? role : 'CUSTOMER'
 
     const existing = await prisma.user.findUnique({ where: { email } })
