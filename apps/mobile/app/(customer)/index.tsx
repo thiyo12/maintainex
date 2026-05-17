@@ -1,56 +1,57 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Animated,
+  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useAuth } from '../../lib/auth'
+import { categories, taskers } from '../../lib/api'
+import { colors } from '../../lib/colors'
+import type { Category, TaskerProfile } from '../../lib/types'
 
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-  green: '#10B981',
+const catIcons: Record<string, string> = {
+  construction: '🏗️', cleaning: '🧹', electrical: '⚡', plumbing: '🔧',
+  painting: '🎨', moving: '📦', gardening: '🌿', handyman: '🔨',
 }
-
-const categories = [
-  { key: 'construction', icon: '🏗️', label: 'Construction' },
-  { key: 'cleaning', icon: '🧹', label: 'Cleaning' },
-  { key: 'electrical', icon: '⚡', label: 'Electrical' },
-  { key: 'plumbing', icon: '🔧', label: 'Plumbing' },
-  { key: 'painting', icon: '🎨', label: 'Painting' },
-  { key: 'moving', icon: '📦', label: 'Moving' },
-  { key: 'gardening', icon: '🌿', label: 'Gardening' },
-  { key: 'handyman', icon: '🔨', label: 'Handyman' },
-]
-
-const nearbyTaskers = [
-  { name: 'Kamal Perera', skill: 'Plumber', distance: '1.2 km', rating: 4.8, online: true },
-  { name: 'Saman Fernando', skill: 'Electrician', distance: '2.5 km', rating: 4.6, online: true },
-  { name: 'Nimal Silva', skill: 'Painter', distance: '3.0 km', rating: 4.9, online: false },
-]
 
 export default function CustomerHome() {
   const router = useRouter()
+  const { user } = useAuth()
   const fadeAnim = useRef(new Animated.Value(0)).current
+  const [catList, setCatList] = useState<Category[]>([])
+  const [taskerList, setTaskerList] = useState<TaskerProfile[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start()
+    loadData()
   }, [])
+
+  const loadData = async () => {
+    try {
+      const [cats, tks] = await Promise.all([
+        categories.list(),
+        taskers.list(),
+      ])
+      setCatList(cats)
+      setTaskerList(tks)
+    } catch (e) {
+      console.error('Home load error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.greeting}>Hello, Kamal 👋</Text>
-            <Text style={styles.location}>📍 Colombo, Sri Lanka</Text>
+            <Text style={styles.greeting}>Hello, {user?.name || 'User'} 👋</Text>
+            <Text style={styles.location}>📍 Sri Lanka</Text>
           </View>
           <TouchableOpacity style={styles.avatar}>
-            <Text style={styles.avatarText}>K</Text>
+            <Text style={styles.avatarText}>{(user?.name || 'U')[0]}</Text>
           </TouchableOpacity>
         </View>
 
@@ -63,40 +64,44 @@ export default function CustomerHome() {
           />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesRow}>
-            {categories.map((cat) => (
-              <TouchableOpacity key={cat.key} style={styles.categoryCard} activeOpacity={0.7}>
-                <View style={styles.catIconWrap}>
-                  <Text style={styles.catIcon}>{cat.icon}</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.sectionTitle}>Categories</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesRow}>
+              {catList.map((cat) => (
+                <TouchableOpacity key={cat.id} style={styles.categoryCard} activeOpacity={0.7}>
+                  <View style={styles.catIconWrap}>
+                    <Text style={styles.catIcon}>{catIcons[cat.slug] || '📋'}</Text>
+                  </View>
+                  <Text style={styles.catLabel}>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.sectionTitle}>Nearby Taskers</Text>
+            {taskerList.map((t, i) => (
+              <TouchableOpacity key={t.id || i} style={styles.taskerCard} activeOpacity={0.8}>
+                <View style={styles.taskerLeft}>
+                  <View style={styles.taskerAvatar}>
+                    <Text style={styles.taskerAvatarText}>{t.user?.name?.[0] || 'T'}</Text>
+                    {t.isOnline ? <View style={styles.onlineDot} /> : null}
+                  </View>
+                  <View style={styles.taskerInfo}>
+                    <Text style={styles.taskerName}>{t.user?.name || 'Tasker'}</Text>
+                    <Text style={styles.taskerSkill}>{t.skills?.[0] || 'Professional'} • {t.serviceAreas?.[0] || 'Sri Lanka'}</Text>
+                    <Text style={styles.taskerRating}>⭐ {t.rating?.toFixed(1) || '5.0'}</Text>
+                  </View>
                 </View>
-                <Text style={styles.catLabel}>{cat.label}</Text>
+                <View style={styles.badges}>
+                  {t.isOnline ? <View style={styles.availableBadge}><Text style={styles.availableText}>Available</Text></View> : null}
+                  {t.isVerified ? <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ Verified</Text></View> : null}
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
-
-          <Text style={styles.sectionTitle}>Nearby Taskers</Text>
-          {nearbyTaskers.map((tasker, i) => (
-            <TouchableOpacity key={i} style={styles.taskerCard} activeOpacity={0.8}>
-              <View style={styles.taskerLeft}>
-                <View style={styles.taskerAvatar}>
-                  <Text style={styles.taskerAvatarText}>{tasker.name[0]}</Text>
-                  {tasker.online ? <View style={styles.onlineDot} /> : null}
-                </View>
-                <View style={styles.taskerInfo}>
-                  <Text style={styles.taskerName}>{tasker.name}</Text>
-                  <Text style={styles.taskerSkill}>{tasker.skill} • {tasker.distance}</Text>
-                  <Text style={styles.taskerRating}>⭐ {tasker.rating}</Text>
-                </View>
-              </View>
-              <View style={styles.badges}>
-                {tasker.online ? <View style={styles.availableBadge}><Text style={styles.availableText}>Available</Text></View> : null}
-                <View style={styles.verifiedBadge}><Text style={styles.verifiedText}>✓ Verified</Text></View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        )}
 
         <TouchableOpacity
           style={styles.fab}

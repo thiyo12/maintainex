@@ -1,31 +1,46 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  coral: '#F97316',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { colors } from '../../lib/colors'
+import { company } from '../../lib/api'
 
 type Tab = 'active' | 'completed' | 'all'
 
-const contracts = [
-  { id: '1024', client: 'City Hotel', title: 'Full plumbing renovation', value: 850000, status: 'In progress', progress: 60 },
-  { id: '1023', client: 'Sunil Perera', title: 'Home electrical rewiring', value: 125000, status: 'In progress', progress: 30 },
-  { id: '1022', client: 'ABC Corp', title: 'Office AC installation', value: 450000, status: 'Completed', progress: 100 },
-  { id: '1021', client: 'Dilmah Constructions', title: 'Commercial plumbing', value: 1200000, status: 'Completed', progress: 100 },
-]
-
 export default function CompanyContracts() {
   const [tab, setTab] = useState<Tab>('active')
+  const [loading, setLoading] = useState(true)
+  const [contracts, setContracts] = useState<any[]>([])
+
+  const fetchContracts = useCallback(async () => {
+    try {
+      const data = await company.contracts.list()
+      setContracts(data)
+    } catch {
+      setContracts([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchContracts()
+  }, [fetchContracts])
 
   const filtered = tab === 'all' ? contracts : contracts.filter(c =>
-    tab === 'active' ? c.status === 'In progress' : c.status === 'Completed'
+    tab === 'active'
+      ? c.status === 'In progress' || c.status === 'active'
+      : c.status === 'Completed' || c.status === 'completed'
   )
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -48,29 +63,33 @@ export default function CompanyContracts() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {filtered.map((c) => (
-          <TouchableOpacity key={c.id} style={styles.contractCard} activeOpacity={0.8}>
-            <View style={styles.cardTop}>
-              <Text style={styles.contractTitle} numberOfLines={1}>{c.title}</Text>
-              <Text style={styles.contractValue}>LKR {c.value.toLocaleString()}</Text>
-            </View>
-            <Text style={styles.contractClient}>{c.client} • #{c.id}</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress === 100 ? colors.green : colors.coral }]} />
+        {filtered.length === 0 ? (
+          <Text style={styles.emptyText}>No contracts found</Text>
+        ) : (
+          filtered.map((c) => (
+            <TouchableOpacity key={c.id} style={styles.contractCard} activeOpacity={0.8}>
+              <View style={styles.cardTop}>
+                <Text style={styles.contractTitle} numberOfLines={1}>{c.title}</Text>
+                <Text style={styles.contractValue}>LKR {Number(c.value).toLocaleString()}</Text>
               </View>
-              <Text style={styles.progressText}>{c.progress}%</Text>
-            </View>
-            <View style={styles.cardBottom}>
-              <View style={[styles.contractStatus, { backgroundColor: c.status === 'Completed' ? '#D1FAE5' : '#FFF7ED' }]}>
-                <Text style={[styles.contractStatusText, { color: c.status === 'Completed' ? colors.green : colors.coral }]}>
-                  {c.status}
-                </Text>
+              <Text style={styles.contractClient}>{c.clientName} • #{c.id}</Text>
+              <View style={styles.progressRow}>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? colors.green : colors.companyAccent }]} />
+                </View>
+                <Text style={styles.progressText}>{c.progress}%</Text>
               </View>
-              <Text style={styles.viewDetails}>View details ›</Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={styles.cardBottom}>
+                <View style={[styles.contractStatus, { backgroundColor: c.status === 'Completed' || c.status === 'completed' ? '#D1FAE5' : '#FFF7ED' }]}>
+                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? colors.green : colors.companyAccent }]}>
+                    {c.status}
+                  </Text>
+                </View>
+                <Text style={styles.viewDetails}>View details ›</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -91,7 +110,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
   tabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
-  tabTextActive: { color: colors.coral, fontWeight: '700' },
+  tabTextActive: { color: colors.companyAccent, fontWeight: '700' },
   contractCard: {
     backgroundColor: colors.white,
     marginHorizontal: 24,
@@ -106,7 +125,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   contractTitle: { fontSize: 15, fontWeight: '700', color: colors.dark, flex: 1, marginRight: 8 },
-  contractValue: { fontSize: 15, fontWeight: '700', color: colors.coral },
+  contractValue: { fontSize: 15, fontWeight: '700', color: colors.companyAccent },
   contractClient: { fontSize: 13, color: colors.gray, marginBottom: 10 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   progressBar: {
@@ -121,5 +140,6 @@ const styles = StyleSheet.create({
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   contractStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   contractStatusText: { fontSize: 12, fontWeight: '600' },
-  viewDetails: { fontSize: 13, color: colors.coral, fontWeight: '600' },
+  viewDetails: { fontSize: 13, color: colors.companyAccent, fontWeight: '600' },
+  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 40, fontSize: 14 },
 })

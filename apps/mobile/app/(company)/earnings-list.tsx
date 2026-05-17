@@ -1,28 +1,49 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  coral: '#F97316',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { colors } from '../../lib/colors'
+import { company } from '../../lib/api'
 
 type Period = 'monthly' | 'quarterly' | 'yearly'
 
-const payouts = [
-  { contract: 'City Hotel - Plumbing', amount: 85000, date: 'May 14', status: 'Paid' },
-  { contract: 'ABC Corp - AC Installation', amount: 150000, date: 'May 10', status: 'Paid' },
-  { contract: 'Sunil Perera - Rewiring', amount: 25000, date: 'May 5', status: 'Paid' },
-  { contract: 'Dilmah - Commercial Plumbing', amount: 200000, date: 'Apr 28', status: 'Paid' },
-  { contract: 'City Hotel - Phase 1', amount: 170000, date: 'Apr 20', status: 'Pending' },
-]
-
 export default function CompanyEarnings() {
   const [period, setPeriod] = useState<Period>('monthly')
+  const [loading, setLoading] = useState(true)
+  const [earnings, setEarnings] = useState<any>(null)
+  const [payouts, setPayouts] = useState<any[]>([])
+
+  const fetchEarnings = useCallback(async () => {
+    try {
+      const data = await company.earnings.get()
+      setEarnings(data)
+      setPayouts(data.recentPayouts || data.payouts || [])
+    } catch {
+      setEarnings(null)
+      setPayouts([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchEarnings()
+  }, [fetchEarnings])
+
+  const totalRevenue = earnings?.totalRevenue || earnings?.monthlyRevenue || 0
+  const pendingAmount = earnings?.pendingAmount || 0
+  const paidOut = earnings?.paidOut || 0
+  const avgPerJob = earnings?.avgPerJob || 0
+  const revenueChange = earnings?.revenueChange || 0
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -32,25 +53,25 @@ export default function CompanyEarnings() {
 
       <View style={styles.revenueCard}>
         <Text style={styles.revenueLabel}>Total revenue</Text>
-        <Text style={styles.revenueValue}>LKR 1,245,000</Text>
-        <Text style={styles.revenuePeriod}>This month</Text>
+        <Text style={styles.revenueValue}>LKR {Number(totalRevenue).toLocaleString()}</Text>
+        <Text style={styles.revenuePeriod}>This {period}</Text>
         <View style={styles.revenueChange}>
-          <Text style={styles.changeText}>↑ 12% from last month</Text>
+          <Text style={styles.changeText}>↑ {revenueChange}% from last {period}</Text>
         </View>
       </View>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Pending</Text>
-          <Text style={styles.statValue}>LKR 170,000</Text>
+          <Text style={styles.statValue}>LKR {Number(pendingAmount).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Paid out</Text>
-          <Text style={styles.statValue}>LKR 1,075,000</Text>
+          <Text style={styles.statValue}>LKR {Number(paidOut).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Avg per job</Text>
-          <Text style={styles.statValue}>LKR 103,750</Text>
+          <Text style={styles.statValue}>LKR {Number(avgPerJob).toLocaleString()}</Text>
         </View>
       </View>
 
@@ -70,23 +91,31 @@ export default function CompanyEarnings() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <Text style={styles.payoutTitle}>Recent payouts</Text>
-        {payouts.map((p, i) => (
-          <View key={i} style={styles.payoutCard}>
-            <View style={styles.payoutLeft}>
-              <View style={[styles.payoutDot, { backgroundColor: p.status === 'Paid' ? colors.green : colors.coral }]} />
-              <View style={styles.payoutInfo}>
-                <Text style={styles.payoutContract} numberOfLines={1}>{p.contract}</Text>
-                <Text style={styles.payoutDate}>{p.date}</Text>
+        {payouts.length === 0 ? (
+          <Text style={styles.emptyText}>No payouts yet</Text>
+        ) : (
+          payouts.map((p, i) => {
+            const status = p.status || (p.paid ? 'Paid' : 'Pending')
+            const isPaid = status === 'Paid' || status === 'paid'
+            return (
+              <View key={p.id || i} style={styles.payoutCard}>
+                <View style={styles.payoutLeft}>
+                  <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.green : colors.companyAccent }]} />
+                  <View style={styles.payoutInfo}>
+                    <Text style={styles.payoutContract} numberOfLines={1}>{p.contract || p.title}</Text>
+                    <Text style={styles.payoutDate}>{p.date || (p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '')}</Text>
+                  </View>
+                </View>
+                <View style={styles.payoutRight}>
+                  <Text style={[styles.payoutAmount, { color: isPaid ? colors.green : colors.companyAccent }]}>
+                    LKR {Number(p.amount).toLocaleString()}
+                  </Text>
+                  <Text style={styles.payoutStatus}>{status}</Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.payoutRight}>
-              <Text style={[styles.payoutAmount, { color: p.status === 'Paid' ? colors.green : colors.coral }]}>
-                LKR {p.amount.toLocaleString()}
-              </Text>
-              <Text style={styles.payoutStatus}>{p.status}</Text>
-            </View>
-          </View>
-        ))}
+            )
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -97,7 +126,7 @@ const styles = StyleSheet.create({
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
   revenueCard: {
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     marginHorizontal: 24,
     padding: 24,
     borderRadius: 20,
@@ -140,7 +169,7 @@ const styles = StyleSheet.create({
   periodTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   periodTabActive: { backgroundColor: colors.white },
   periodTabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
-  periodTabTextActive: { color: colors.coral, fontWeight: '700' },
+  periodTabTextActive: { color: colors.companyAccent, fontWeight: '700' },
   payoutTitle: {
     fontSize: 16, fontWeight: '700', color: colors.dark,
     paddingHorizontal: 24, marginBottom: 10,
@@ -168,4 +197,5 @@ const styles = StyleSheet.create({
   payoutRight: { alignItems: 'flex-end' },
   payoutAmount: { fontSize: 14, fontWeight: '700' },
   payoutStatus: { fontSize: 11, color: colors.gray, marginTop: 2 },
+  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 20, fontSize: 14 },
 })

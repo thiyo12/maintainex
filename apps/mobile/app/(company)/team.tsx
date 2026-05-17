@@ -1,24 +1,45 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  coral: '#F97316',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
-
-const teamMembers = [
-  { name: 'Saman Kumara', role: 'Plumber', rating: 4.9, jobs: 89, online: true, since: '2023' },
-  { name: 'Nuwan Perera', role: 'Electrician', rating: 4.7, jobs: 62, online: true, since: '2023' },
-  { name: 'Lahiru Silva', role: 'Painter', rating: 4.8, jobs: 45, online: false, since: '2024' },
-  { name: 'Ruwan Jayasuriya', role: 'Handyman', rating: 4.6, jobs: 34, online: true, since: '2024' },
-  { name: 'Kasun Fernando', role: 'AC Technician', rating: 4.9, jobs: 27, online: false, since: '2025' },
-]
+import { colors } from '../../lib/colors'
+import { company } from '../../lib/api'
 
 export default function CompanyTeam() {
+  const [loading, setLoading] = useState(true)
+  const [members, setMembers] = useState<any[]>([])
+
+  const fetchTeam = useCallback(async () => {
+    try {
+      const data = await company.team.list()
+      setMembers(data)
+    } catch {
+      setMembers([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchTeam()
+  }, [fetchTeam])
+
+  const totalMembers = members.length
+  const onlineCount = members.filter((m: any) => m.online).length
+  const avgRating =
+    members.length > 0
+      ? (members.reduce((sum: number, m: any) => sum + (m.rating || 0), 0) / members.length).toFixed(1)
+      : '0.0'
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
@@ -30,42 +51,46 @@ export default function CompanyTeam() {
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryStat}>
-          <Text style={styles.summaryValue}>8</Text>
+          <Text style={styles.summaryValue}>{totalMembers}</Text>
           <Text style={styles.summaryLabel}>Members</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryStat}>
-          <Text style={styles.summaryValue}>5</Text>
+          <Text style={styles.summaryValue}>{onlineCount}</Text>
           <Text style={styles.summaryLabel}>Online</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryStat}>
-          <Text style={styles.summaryValue}>4.8</Text>
+          <Text style={styles.summaryValue}>{avgRating}</Text>
           <Text style={styles.summaryLabel}>Avg rating</Text>
         </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {teamMembers.map((m, i) => (
-          <TouchableOpacity key={i} style={styles.memberCard} activeOpacity={0.8}>
-            <View style={styles.memberLeft}>
-              <View style={styles.memberAvatar}>
-                <Text style={styles.avatarText}>{m.name[0]}</Text>
-                {m.online ? <View style={styles.onlineDot} /> : null}
+        {members.length === 0 ? (
+          <Text style={styles.emptyText}>No team members found</Text>
+        ) : (
+          members.map((m, i) => (
+            <TouchableOpacity key={m.id || i} style={styles.memberCard} activeOpacity={0.8}>
+              <View style={styles.memberLeft}>
+                <View style={styles.memberAvatar}>
+                  <Text style={styles.avatarText}>{m.name?.[0] || '?'}</Text>
+                  {m.online ? <View style={styles.onlineDot} /> : null}
+                </View>
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberName}>{m.name}</Text>
+                  <Text style={styles.memberRole}>{m.role}{m.rating ? ` • ⭐ ${m.rating}` : ''}</Text>
+                  <Text style={styles.memberMeta}>{m.email || ''}</Text>
+                </View>
               </View>
-              <View style={styles.memberInfo}>
-                <Text style={styles.memberName}>{m.name}</Text>
-                <Text style={styles.memberRole}>{m.role} • ⭐ {m.rating}</Text>
-                <Text style={styles.memberMeta}>{m.jobs} jobs • Since {m.since}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: m.online ? '#D1FAE5' : '#FEE2E2' }]}>
+                <Text style={[styles.statusText, { color: m.online ? colors.green : '#EF4444' }]}>
+                  {m.online ? 'Online' : 'Offline'}
+                </Text>
               </View>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: m.online ? '#D1FAE5' : '#FEE2E2' }]}>
-              <Text style={[styles.statusText, { color: m.online ? colors.green : '#EF4444' }]}>
-                {m.online ? 'Online' : 'Offline'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -83,7 +108,7 @@ const styles = StyleSheet.create({
   },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
   addBtn: {
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
@@ -127,7 +152,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -143,4 +168,5 @@ const styles = StyleSheet.create({
   memberMeta: { fontSize: 11, color: colors.gray, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 11, fontWeight: '600' },
+  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 40, fontSize: 14 },
 })

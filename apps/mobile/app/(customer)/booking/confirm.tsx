@@ -1,21 +1,41 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { useState } from 'react'
+import { bookings } from '../../../lib/api'
+import { useAuth } from '../../../lib/auth'
+import { colors } from '../../../lib/colors'
 
 export default function BookingConfirmScreen() {
   const router = useRouter()
-  const total = 8500
+  const { user } = useAuth()
+  const { jobId, bidId, taskerName, price } = useLocalSearchParams()
+  const total = Number(price) || 8500
   const fee = Math.round(total * 0.05)
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleConfirm = async () => {
+    setSubmitting(true)
+    try {
+      const res = await bookings.create({
+        name: user?.name || '',
+        phone: user?.phone || '',
+        email: user?.email || '',
+        serviceId: jobId || '',
+        district: 'Colombo',
+        address: '',
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        notes: bidId ? `Bid: ${bidId}` : '',
+      })
+      router.push(`/(customer)/booking/confirmed?bookingId=${res.booking.id}`)
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to create booking')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -25,10 +45,9 @@ export default function BookingConfirmScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summary}>
-          <Text style={styles.sumTitle}>Fix leaking pipe</Text>
-          <Text style={styles.sumDetail}>Kamal Perera • Plumber</Text>
-          <Text style={styles.sumDetail}>📅 Today at 2:00 PM</Text>
-          <Text style={styles.sumDetail}>📍 Colombo 03</Text>
+          <Text style={styles.sumTitle}>Service booking</Text>
+          <Text style={styles.sumDetail}>{taskerName || 'Tasker'} • Professional</Text>
+          <Text style={styles.sumDetail}>📅 Today</Text>
         </View>
 
         <View style={styles.payment}>
@@ -52,22 +71,16 @@ export default function BookingConfirmScreen() {
             Funds are held securely in escrow until the job is completed to your satisfaction.
           </Text>
         </View>
-
-        <Text style={styles.sectionLabel}>Payment method</Text>
-        <TouchableOpacity style={styles.paymentOption}>
-          <Text style={styles.payOptionText}>💳 Visa ending in 4242</Text>
-          <Text style={styles.radio} >✓</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.addPayment}>
-          <Text style={styles.addPaymentText}>+ Add new payment method</Text>
-        </TouchableOpacity>
       </ScrollView>
 
       <TouchableOpacity
         style={styles.confirmBtn}
-        onPress={() => router.push('/(customer)/booking/confirmed')}
+        onPress={handleConfirm}
+        disabled={submitting}
       >
-        <Text style={styles.confirmBtnText}>Confirm and pay LKR {(total + fee).toLocaleString()}</Text>
+        <Text style={styles.confirmBtnText}>
+          {submitting ? 'Processing...' : `Confirm and pay LKR ${(total + fee).toLocaleString()}`}
+        </Text>
       </TouchableOpacity>
     </SafeAreaView>
   )
@@ -116,33 +129,8 @@ const styles = StyleSheet.create({
   },
   escrowIcon: { fontSize: 20 },
   escrowText: { flex: 1, fontSize: 13, color: '#1E40AF', lineHeight: 18 },
-  sectionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.dark,
-    paddingHorizontal: 24,
-    marginBottom: 10,
-  },
-  paymentOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    marginHorizontal: 24,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  payOptionText: { fontSize: 14, color: colors.dark },
-  radio: { fontSize: 18, color: colors.primary, fontWeight: '700' },
-  addPayment: {
-    marginHorizontal: 24,
-    padding: 14,
-    alignItems: 'center',
-  },
-  addPaymentText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
   confirmBtn: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.primary,
     marginHorizontal: 24,
     marginBottom: 24,
     paddingVertical: 16,

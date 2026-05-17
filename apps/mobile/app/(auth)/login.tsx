@@ -5,16 +5,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../lib/auth'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-  red: '#EF4444',
-}
+import { colors } from '../../lib/colors'
 
 export default function LoginScreen() {
   const router = useRouter()

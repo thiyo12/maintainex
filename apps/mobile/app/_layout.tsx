@@ -13,6 +13,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tasker)" />
         <Stack.Screen name="(company)" />
         <Stack.Screen name="(chat)" />
+        <Stack.Screen name="(admin)" />
       </Stack>
     </AuthProvider>
   )

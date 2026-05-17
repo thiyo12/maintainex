@@ -1,23 +1,74 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-}
+import { colors } from '../../../../lib/colors'
+import { jobs } from '../../../../lib/api'
+import { useAuth } from '../../../../lib/auth'
+import { JobPosting } from '../../../../lib/types'
 
 export default function JobCompleteScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
+  const { user } = useAuth()
+  const [job, setJob] = useState<JobPosting | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
+  const [completing, setCompleting] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    jobs.get(id as string)
+      .then(setJob)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  const handleComplete = async () => {
+    setCompleting(true)
+    try {
+      await jobs.complete(id as string)
+      setConfirmed(true)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setCompleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </SafeAreaView>
+    )
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: colors.red, textAlign: 'center' }}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  const taskerName = job?.assignedTasker?.user?.name || 'Tasker'
+  const taskerInfo = job?.assignedTasker?.skills?.length
+    ? job.assignedTasker.skills.join(', ')
+    : ''
+  const taskerDisplay = taskerInfo ? `${taskerName} • ${taskerInfo}` : taskerName
+  const formattedDate = job?.scheduledDate
+    ? new Date(job.scheduledDate).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : ''
 
   return (
     <SafeAreaView style={styles.container}>
@@ -35,26 +86,22 @@ export default function JobCompleteScreen() {
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.sumTitle}>Fix leaking pipe</Text>
+          <Text style={styles.sumTitle}>{job?.title || 'Job'}</Text>
           <View style={styles.sumRow}>
             <Text style={styles.sumLabel}>Tasker</Text>
-            <Text style={styles.sumValue}>Kamal Perera • Plumber</Text>
+            <Text style={styles.sumValue}>{taskerDisplay}</Text>
           </View>
           <View style={styles.sumRow}>
             <Text style={styles.sumLabel}>Location</Text>
-            <Text style={styles.sumValue}>📍 Colombo 03</Text>
+            <Text style={styles.sumValue}>{job?.location || ''}</Text>
           </View>
           <View style={styles.sumRow}>
             <Text style={styles.sumLabel}>Date</Text>
-            <Text style={styles.sumValue}>📅 Today at 2:00 PM</Text>
-          </View>
-          <View style={styles.sumRow}>
-            <Text style={styles.sumLabel}>Duration</Text>
-            <Text style={styles.sumValue}>⏱️ 1 hour 15 min</Text>
+            <Text style={styles.sumValue}>{formattedDate}</Text>
           </View>
           <View style={styles.sumRow}>
             <Text style={styles.sumLabel}>Quoted</Text>
-            <Text style={styles.sumPrice}>LKR 8,500</Text>
+            <Text style={styles.sumPrice}>LKR {(job?.budget || 0).toLocaleString()}</Text>
           </View>
         </View>
 
@@ -75,7 +122,7 @@ export default function JobCompleteScreen() {
             <Text style={styles.confirmedIcon}>🎉</Text>
             <Text style={styles.confirmedText}>Job marked as complete!</Text>
             <Text style={styles.confirmedSub}>
-              Payment of LKR 8,925 will be released to the tasker.
+              Payment of LKR {((job?.budget || 0) * 1.05).toLocaleString()} will be released to the tasker.
             </Text>
           </View>
         ) : null}
@@ -83,10 +130,13 @@ export default function JobCompleteScreen() {
         <View style={styles.actionSection}>
           <Text style={styles.actionTitle}>Is everything done correctly?</Text>
           <TouchableOpacity
-            style={styles.confirmBtn}
-            onPress={() => setConfirmed(true)}
+            style={[styles.confirmBtn, completing && { opacity: 0.6 }]}
+            onPress={handleComplete}
+            disabled={completing}
           >
-            <Text style={styles.confirmBtnText}>Yes, complete the job</Text>
+            <Text style={styles.confirmBtnText}>
+              {completing ? 'Completing...' : 'Yes, complete the job'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.issueBtn}
@@ -199,7 +249,7 @@ const styles = StyleSheet.create({
   issueBtnText: { fontSize: 16, fontWeight: '600', color: colors.red },
   escrowNote: { fontSize: 12, color: colors.gray, textAlign: 'center', lineHeight: 18 },
   nextBtn: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     marginHorizontal: 24,
     marginBottom: 32,
     paddingVertical: 16,

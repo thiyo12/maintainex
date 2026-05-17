@@ -1,23 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-}
+import { useAuth } from '../../../lib/auth'
+import { colors } from '../../../lib/colors'
 
 export default function EditProfileScreen() {
   const router = useRouter()
-  const [name, setName] = useState('Kamal')
-  const [email, setEmail] = useState('kamal@example.com')
-  const [phone, setPhone] = useState('+94 77 123 4567')
-  const [location, setLocation] = useState('Colombo, Sri Lanka')
+  const { user } = useAuth()
+
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [location, setLocation] = useState('')
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '')
+      setEmail(user.email || '')
+      setPhone(user.phone || '')
+    }
+  }, [user])
 
   const handleSave = () => {
     Alert.alert('Saved', 'Profile updated successfully')
@@ -35,7 +38,7 @@ export default function EditProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.avatarSection}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>K</Text>
+            <Text style={styles.avatarText}>{name.charAt(0)}</Text>
           </View>
           <TouchableOpacity style={styles.changePhotoBtn}>
             <Text style={styles.changePhotoText}>Change photo</Text>
@@ -73,7 +76,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -81,12 +84,12 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 32, fontWeight: '700', color: colors.white },
   changePhotoBtn: {
     borderWidth: 1.5,
-    borderColor: colors.purple,
+    borderColor: colors.customerAccent,
     paddingHorizontal: 20,
     paddingVertical: 6,
     borderRadius: 20,
   },
-  changePhotoText: { fontSize: 13, fontWeight: '600', color: colors.purple },
+  changePhotoText: { fontSize: 13, fontWeight: '600', color: colors.customerAccent },
   label: { fontSize: 14, fontWeight: '700', color: colors.dark, marginBottom: 6, marginTop: 12 },
   input: {
     backgroundColor: colors.white,
@@ -98,7 +101,7 @@ const styles = StyleSheet.create({
     color: colors.dark,
   },
   saveBtn: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     marginHorizontal: 24,
     marginBottom: 32,
     paddingVertical: 16,

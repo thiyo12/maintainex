@@ -1,29 +1,39 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-const colors = {
-  teal: '#0D9488',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  primary: '#F59E0B',
-}
+import { colors } from '../../lib/colors'
+import { earnings } from '../../lib/api'
 
 type Period = 'weekly' | 'monthly' | 'yearly'
 
-const transactions = [
-  { job: 'Fix leaking pipe', amount: 8500, date: 'Today', status: 'Pending' },
-  { job: 'Electrical repair', amount: 12000, date: 'Yesterday', status: 'Cleared' },
-  { job: 'Paint bedroom', amount: 15000, date: 'May 12', status: 'Cleared' },
-  { job: 'AC service', amount: 6500, date: 'May 10', status: 'Cleared' },
-  { job: 'Garden cleanup', amount: 8000, date: 'May 8', status: 'Cleared' },
-]
+interface EarningsData {
+  balance: number
+  totalEarned: number
+  totalJobs: number
+  pendingAmount?: number
+  transactions: { job: string; amount: number; date: string; status: string }[]
+}
 
 export default function TaskerEarnings() {
   const [period, setPeriod] = useState<Period>('weekly')
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<EarningsData | null>(null)
+
+  useEffect(() => {
+    loadEarnings()
+  }, [])
+
+  async function loadEarnings() {
+    try {
+      const res = await earnings.get()
+      setData(res)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -31,62 +41,77 @@ export default function TaskerEarnings() {
         <Text style={styles.heading}>Earnings</Text>
       </View>
 
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Available balance</Text>
-        <Text style={styles.balanceValue}>LKR 18,500</Text>
-        <TouchableOpacity style={styles.withdrawBtn}>
-          <Text style={styles.withdrawBtnText}>Withdraw</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>This {period}</Text>
-          <Text style={styles.statValue}>LKR 20,500</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Pending</Text>
-          <Text style={styles.statValue}>LKR 8,500</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Total all time</Text>
-          <Text style={styles.statValue}>LKR 245,000</Text>
-        </View>
-      </View>
+      ) : (
+        <>
+          <View style={styles.balanceCard}>
+            <Text style={styles.balanceLabel}>Available balance</Text>
+            <Text style={styles.balanceValue}>LKR {(data?.balance || 0).toLocaleString()}</Text>
+            <TouchableOpacity style={styles.withdrawBtn}>
+              <Text style={styles.withdrawBtnText}>Withdraw</Text>
+            </TouchableOpacity>
+          </View>
 
-      <View style={styles.periodTabs}>
-        {(['weekly', 'monthly', 'yearly'] as Period[]).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[styles.periodTab, period === p && styles.periodTabActive]}
-            onPress={() => setPeriod(p)}
-          >
-            <Text style={[styles.periodTabText, period === p && styles.periodTabTextActive]}>
-              {p.charAt(0).toUpperCase() + p.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.transactionTitle}>Recent transactions</Text>
-        {transactions.map((tx, i) => (
-          <View key={i} style={styles.txCard}>
-            <View style={styles.txLeft}>
-              <View style={[styles.txDot, { backgroundColor: tx.status === 'Cleared' ? colors.green : colors.primary }]} />
-              <View>
-                <Text style={styles.txJob}>{tx.job}</Text>
-                <Text style={styles.txDate}>{tx.date} • {tx.status}</Text>
-              </View>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>This {period}</Text>
+              <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
-            <View style={styles.txRight}>
-              <Text style={[styles.txAmount, { color: tx.status === 'Cleared' ? colors.green : colors.primary }]}>
-                +LKR {tx.amount.toLocaleString()}
-              </Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={styles.statValue}>LKR {(data?.pendingAmount || 0).toLocaleString()}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Total all time</Text>
+              <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
           </View>
-        ))}
-      </ScrollView>
+
+          <View style={styles.periodTabs}>
+            {(['weekly', 'monthly', 'yearly'] as Period[]).map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[styles.periodTab, period === p && styles.periodTabActive]}
+                onPress={() => setPeriod(p)}
+              >
+                <Text style={[styles.periodTabText, period === p && styles.periodTabTextActive]}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.transactionTitle}>Recent transactions</Text>
+            {(data?.transactions || []).length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyIcon}>📭</Text>
+                <Text style={styles.emptyTitle}>No transactions yet</Text>
+              </View>
+            ) : (
+              (data?.transactions || []).map((tx, i) => (
+                <View key={i} style={styles.txCard}>
+                  <View style={styles.txLeft}>
+                    <View style={[styles.txDot, { backgroundColor: tx.status === 'Cleared' ? colors.green : colors.primary }]} />
+                    <View>
+                      <Text style={styles.txJob}>{tx.job}</Text>
+                      <Text style={styles.txDate}>{tx.date} • {tx.status}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.txRight}>
+                    <Text style={[styles.txAmount, { color: tx.status === 'Cleared' ? colors.green : colors.primary }]}>
+                      +LKR {tx.amount.toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </>
+      )}
     </SafeAreaView>
   )
 }
@@ -95,6 +120,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   balanceCard: {
     backgroundColor: colors.teal,
     marginHorizontal: 24,
@@ -172,4 +198,7 @@ const styles = StyleSheet.create({
   txDate: { fontSize: 12, color: colors.gray, marginTop: 2 },
   txRight: {},
   txAmount: { fontSize: 15, fontWeight: '700' },
+  empty: { alignItems: 'center', paddingTop: 40 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.gray },
 })

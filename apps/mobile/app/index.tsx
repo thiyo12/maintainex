@@ -3,13 +3,7 @@ import { View, Text, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../lib/auth'
 import { LoadingScreen } from '../components/ui/LoadingScreen'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  white: '#FFFFFF',
-}
+import { colors } from '../lib/colors'
 
 export default function SplashScreen() {
   const { isAuthenticated, isLoading, user } = useAuth()
@@ -20,6 +14,7 @@ export default function SplashScreen() {
     if (isAuthenticated) {
       if (user?.role === 'ADMIN') router.replace('/(admin)')
       else if (user?.role === 'TASKER') router.replace('/(tasker)')
+      else if (user?.role === 'COMPANY') router.replace('/(company)')
       else router.replace('/(customer)')
       return
     }
@@ -50,9 +45,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 32,
   },
-  logoWrapper: {
-    alignItems: 'center',
-  },
+  logoWrapper: { alignItems: 'center' },
   logoSquare: {
     width: 100,
     height: 100,
@@ -67,21 +60,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
-  logoText: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: colors.dark,
-  },
-  appName: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.white,
-    marginBottom: 8,
-  },
-  tagline: {
-    fontSize: 16,
-    color: colors.white,
-    opacity: 0.9,
-    textAlign: 'center',
-  },
+  logoText: { fontSize: 48, fontWeight: '800', color: colors.dark },
+  appName: { fontSize: 36, fontWeight: '800', color: colors.white, marginBottom: 8 },
+  tagline: { fontSize: 16, color: colors.white, opacity: 0.9, textAlign: 'center' },
 })

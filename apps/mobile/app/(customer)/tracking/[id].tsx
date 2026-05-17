@@ -1,31 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-}
-
-const progressSteps = [
-  { label: 'Assigned', time: '2:00 PM', done: true },
-  { label: 'En route', time: '2:10 PM', done: true },
-  { label: 'In progress', time: '2:25 PM', done: true },
-  { label: 'Completed', time: 'Pending', done: false },
-]
+import { bookings } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
+import type { Booking } from '../../../lib/types'
 
 export default function LiveTrackingScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const pulseAnim = useRef(new Animated.Value(1)).current
-  const [stepIndex, setStepIndex] = useState(2)
+  const [booking, setBooking] = useState<Booking | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [stepIndex, setStepIndex] = useState(1)
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -35,8 +22,37 @@ export default function LiveTrackingScreen() {
       ])
     )
     pulse.start()
+
+    if (id) {
+      bookings.get(id as string)
+        .then((b) => {
+          setBooking(b)
+          const statusMap: Record<string, number> = { PENDING: 0, CONFIRMED: 0, ASSIGNED: 1, IN_PROGRESS: 2, COMPLETED: 3, CANCELLED: -1 }
+          setStepIndex(statusMap[b.status] ?? 0)
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+
     return () => pulse.stop()
-  }, [])
+  }, [id])
+
+  const progressSteps = [
+    { label: 'Assigned', time: '—', done: stepIndex >= 1 },
+    { label: 'En route', time: '—', done: stepIndex >= 2 },
+    { label: 'In progress', time: '—', done: stepIndex >= 3 },
+    { label: 'Completed', time: 'Pending', done: stepIndex >= 4 },
+  ]
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 100 }} />
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,7 +69,7 @@ export default function LiveTrackingScreen() {
           <Text style={styles.mapEmoji}>🗺️</Text>
           <Animated.View style={[styles.pulseDot, { opacity: pulseAnim }]} />
           <Text style={styles.mapText}>Tasker location live</Text>
-          <Text style={styles.mapSub}>Colombo 03 • 1.2 km away</Text>
+          <Text style={styles.mapSub}>{booking?.district || 'Colombo'} • 1.2 km away</Text>
           <View style={styles.etaBox}>
             <Text style={styles.etaLabel}>Estimated arrival</Text>
             <Text style={styles.etaValue}>12 min</Text>
@@ -63,12 +79,12 @@ export default function LiveTrackingScreen() {
         <View style={styles.taskerCard}>
           <View style={styles.taskerLeft}>
             <View style={styles.taskerAvatar}>
-              <Text style={styles.avatarText}>K</Text>
+              <Text style={styles.avatarText}>{booking?.customerName?.[0] || 'T'}</Text>
               <View style={styles.onlineDot} />
             </View>
             <View style={styles.taskerInfo}>
-              <Text style={styles.taskerName}>Kamal Perera</Text>
-              <Text style={styles.taskerSkill}>Plumber • ⭐ 4.8</Text>
+              <Text style={styles.taskerName}>{booking?.customerName || 'Tasker'}</Text>
+              <Text style={styles.taskerSkill}>{booking?.serviceName || 'Professional'} • ⭐ 4.8</Text>
               <Text style={styles.taskerStatus}>🟢 On the way</Text>
             </View>
           </View>
@@ -83,9 +99,9 @@ export default function LiveTrackingScreen() {
         </View>
 
         <View style={styles.jobCard}>
-          <Text style={styles.jobTitle}>Fix leaking pipe</Text>
-          <Text style={styles.jobMeta}>📍 Colombo 03 • Urgent</Text>
-          <Text style={styles.jobPrice}>LKR 8,925</Text>
+          <Text style={styles.jobTitle}>{booking?.serviceName || 'Service'}</Text>
+          <Text style={styles.jobMeta}>📍 {booking?.district || ''} • Urgent</Text>
+          <Text style={styles.jobPrice}>LKR {(booking?.price || 0).toLocaleString()}</Text>
         </View>
 
         <View style={styles.progressSection}>
@@ -123,82 +139,40 @@ export default function LiveTrackingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-  },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 8 },
   backBtn: { width: 60 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   topTitle: { fontSize: 18, fontWeight: '700', color: colors.dark, textAlign: 'center' },
   mapPlaceholder: {
-    backgroundColor: colors.purple,
-    marginHorizontal: 24,
-    borderRadius: 20,
-    height: 220,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    overflow: 'hidden',
+    backgroundColor: colors.primary, marginHorizontal: 24, borderRadius: 20, height: 220,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 16, overflow: 'hidden',
   },
   mapEmoji: { fontSize: 48, marginBottom: 8 },
   pulseDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.green,
-    position: 'absolute',
-    top: '45%',
-    left: '55%',
+    width: 16, height: 16, borderRadius: 8, backgroundColor: colors.green,
+    position: 'absolute', top: '45%', left: '55%',
   },
   mapText: { fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 4 },
   mapSub: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 12 },
   etaBox: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 20, paddingVertical: 8,
+    borderRadius: 20, flexDirection: 'row', gap: 8, alignItems: 'center',
   },
   etaLabel: { fontSize: 13, color: colors.white, fontWeight: '500' },
   etaValue: { fontSize: 13, color: colors.white, fontWeight: '800' },
   taskerCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 24,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: colors.white, marginHorizontal: 24, padding: 16, borderRadius: 14, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   taskerLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   taskerAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.purple,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+    width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary,
+    justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
   avatarText: { fontSize: 20, fontWeight: '700', color: colors.white },
   onlineDot: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: colors.green,
-    borderWidth: 2,
-    borderColor: colors.white,
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+    width: 14, height: 14, borderRadius: 7, backgroundColor: colors.green,
+    borderWidth: 2, borderColor: colors.white, position: 'absolute', bottom: 0, right: 0,
   },
   taskerInfo: { flex: 1 },
   taskerName: { fontSize: 16, fontWeight: '700', color: colors.dark },
@@ -206,81 +180,47 @@ const styles = StyleSheet.create({
   taskerStatus: { fontSize: 13, color: colors.green, marginTop: 2, fontWeight: '600' },
   taskerActions: { flexDirection: 'row', gap: 10 },
   callBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: colors.lightGray,
-    alignItems: 'center',
+    flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5,
+    borderColor: colors.lightGray, alignItems: 'center',
   },
   callBtnText: { fontSize: 14, fontWeight: '600', color: colors.dark },
   chatBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.purple,
-    alignItems: 'center',
+    flex: 1, paddingVertical: 10, borderRadius: 10,
+    backgroundColor: colors.primary, alignItems: 'center',
   },
   chatBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   jobCard: {
-    backgroundColor: colors.white,
-    marginHorizontal: 24,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: colors.white, marginHorizontal: 24, padding: 16, borderRadius: 14, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   jobTitle: { fontSize: 16, fontWeight: '700', color: colors.dark, marginBottom: 4 },
   jobMeta: { fontSize: 13, color: colors.gray, marginBottom: 4 },
   jobPrice: { fontSize: 18, fontWeight: '800', color: colors.primary },
   progressSection: {
-    backgroundColor: colors.white,
-    marginHorizontal: 24,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: colors.white, marginHorizontal: 24, padding: 16, borderRadius: 14,
+    marginBottom: 100, shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.dark, marginBottom: 16 },
   progressRow: { flexDirection: 'row', marginBottom: 4 },
   progressLeft: { alignItems: 'center', width: 32, marginRight: 12 },
   progressDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 28, height: 28, borderRadius: 14, backgroundColor: colors.lightGray,
+    justifyContent: 'center', alignItems: 'center',
   },
   progressDotDone: { backgroundColor: colors.green },
   progressDotCurrent: { backgroundColor: colors.primary },
   progressCheck: { fontSize: 14, color: colors.white, fontWeight: '700' },
   progressNum: { fontSize: 12, color: colors.gray, fontWeight: '600' },
-  progressLine: {
-    width: 2,
-    height: 28,
-    backgroundColor: colors.lightGray,
-  },
+  progressLine: { width: 2, height: 28, backgroundColor: colors.lightGray },
   progressLineDone: { backgroundColor: colors.green },
   progressContent: { paddingTop: 4, flex: 1 },
   progressLabel: { fontSize: 15, color: colors.gray, fontWeight: '500' },
   progressLabelDone: { color: colors.dark, fontWeight: '600' },
   progressTime: { fontSize: 12, color: colors.gray, marginTop: 2 },
   completeBtn: {
-    backgroundColor: colors.green,
-    marginHorizontal: 24,
-    marginBottom: 32,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
+    backgroundColor: colors.green, marginHorizontal: 24, marginBottom: 32,
+    paddingVertical: 16, borderRadius: 14, alignItems: 'center',
   },
   completeBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
 })

@@ -1,37 +1,51 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-const colors = {
-  teal: '#0D9488',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  primary: '#F59E0B',
-}
-
-const nearbyJobs = [
-  { title: 'Fix leaking pipe', location: 'Colombo 03', distance: '1.2 km', budget: 8500, urgency: 'Today' },
-  { title: 'Electrical rewiring', location: 'Colombo 05', distance: '2.5 km', budget: 15000, urgency: 'This week' },
-  { title: 'Paint 2-bedroom apt', location: 'Colombo 07', distance: '3.8 km', budget: 25000, urgency: 'Flexible' },
-]
+import { colors } from '../../lib/colors'
+import { jobs, taskers } from '../../lib/api'
+import { useAuth } from '../../lib/auth'
+import type { JobPosting } from '../../lib/types'
 
 export default function TaskerHome() {
   const router = useRouter()
+  const { user } = useAuth()
   const [isOnline, setIsOnline] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [nearbyJobs, setNearbyJobs] = useState<JobPosting[]>([])
+  const [profile, setProfile] = useState({ rating: 0, completedJobs: 0 })
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    try {
+      const [jobsData, taskerData] = await Promise.all([
+        jobs.list('status=OPEN'),
+        user?.id ? taskers.get(user.id) : Promise.resolve(null),
+      ])
+      setNearbyJobs(jobsData)
+      if (taskerData) {
+        setProfile({ rating: taskerData.rating, completedJobs: taskerData.completedJobs })
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.greeting}>Hello, Kamal 👋</Text>
+          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Tasker'} 👋</Text>
           <Text style={styles.location}>📍 Colombo, Sri Lanka</Text>
         </View>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>K</Text>
+          <Text style={styles.avatarText}>{(user?.name || 'T')[0]}</Text>
         </View>
       </View>
 
@@ -43,61 +57,67 @@ export default function TaskerHome() {
         <Switch
           value={isOnline}
           onValueChange={setIsOnline}
-          trackColor={{ false: colors.lightGray, true: colors.teal }}
+          trackColor={{ false: colors.lightGray, true: colors.primary }}
           thumbColor={colors.white}
         />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>💰</Text>
-            <Text style={styles.statValue}>LKR 45,200</Text>
-            <Text style={styles.statLabel}>This month</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>✅</Text>
-            <Text style={styles.statValue}>47</Text>
-            <Text style={styles.statLabel}>Jobs done</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>⭐</Text>
-            <Text style={styles.statValue}>4.8</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-
-        <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapEmoji}>🗺️</Text>
-          <Text style={styles.mapTitle}>Jobs near you</Text>
-          <Text style={styles.mapSub}>12 jobs available within 5 km</Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Nearby jobs</Text>
-        {nearbyJobs.map((job, i) => (
-          <TouchableOpacity
-            key={i}
-            style={styles.jobCard}
-            onPress={() => router.push('/(tasker)/jobs/' + (i + 1))}
-          >
-            <View style={styles.jobTop}>
-              <Text style={styles.jobTitle}>{job.title}</Text>
-              <Text style={styles.jobBudget}>LKR {job.budget.toLocaleString()}</Text>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>💰</Text>
+              <Text style={styles.statValue}>LKR 45,200</Text>
+              <Text style={styles.statLabel}>This month</Text>
             </View>
-            <View style={styles.jobTags}>
-              <View style={styles.jobTag}>
-                <Text style={styles.jobTagText}>📍 {job.distance}</Text>
-              </View>
-              <View style={[styles.jobTag, { backgroundColor: job.urgency === 'Today' ? '#FEF3C7' : '#E0E7FF' }]}>
-                <Text style={[styles.jobTagText, { color: job.urgency === 'Today' ? '#D97706' : '#4F46E5' }]}>
-                  {job.urgency}
-                </Text>
-              </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>✅</Text>
+              <Text style={styles.statValue}>{profile.completedJobs}</Text>
+              <Text style={styles.statLabel}>Jobs done</Text>
             </View>
-            <Text style={styles.jobLocation}>{job.location}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            <View style={styles.statCard}>
+              <Text style={styles.statIcon}>⭐</Text>
+              <Text style={styles.statValue}>{profile.rating.toFixed(1)}</Text>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
+          </View>
+
+          <View style={styles.mapPlaceholder}>
+            <Text style={styles.mapEmoji}>🗺️</Text>
+            <Text style={styles.mapTitle}>Jobs near you</Text>
+            <Text style={styles.mapSub}>{nearbyJobs.length} jobs available within 5 km</Text>
+          </View>
+
+          <Text style={styles.sectionTitle}>Nearby jobs</Text>
+          {nearbyJobs.map((job, i) => (
+            <TouchableOpacity
+              key={job.id}
+              style={styles.jobCard}
+              onPress={() => router.push('/(tasker)/jobs/' + job.id)}
+            >
+              <View style={styles.jobTop}>
+                <Text style={styles.jobTitle}>{job.title}</Text>
+                <Text style={styles.jobBudget}>LKR {job.budget.toLocaleString()}</Text>
+              </View>
+              <View style={styles.jobTags}>
+                <View style={styles.jobTag}>
+                  <Text style={styles.jobTagText}>📍 {job.location}</Text>
+                </View>
+                <View style={[styles.jobTag, { backgroundColor: '#E0E7FF' }]}>
+                  <Text style={[styles.jobTagText, { color: '#4F46E5' }]}>
+                    {job.category}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.jobLocation}>{job.customer?.name} • {new Date(job.createdAt).toLocaleDateString()}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }
@@ -118,7 +138,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.primaryDark,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -164,7 +184,7 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 16, fontWeight: '800', color: colors.dark },
   statLabel: { fontSize: 11, color: colors.gray, marginTop: 2 },
   mapPlaceholder: {
-    backgroundColor: colors.teal,
+    backgroundColor: colors.primary,
     marginHorizontal: 24,
     borderRadius: 20,
     height: 160,
@@ -206,4 +226,5 @@ const styles = StyleSheet.create({
   },
   jobTagText: { fontSize: 12, fontWeight: '600', color: '#D97706' },
   jobLocation: { fontSize: 13, color: colors.gray },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
 })

@@ -4,19 +4,11 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { jobs } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
 import ProgressSteps from '../../../components/ui/ProgressSteps'
 import CategoryPills from '../../../components/ui/CategoryPills'
 import PhotoUploader from '../../../components/ui/PhotoUploader'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-}
 
 export default function PostJobScreen() {
   const router = useRouter()
@@ -31,6 +23,7 @@ export default function PostJobScreen() {
   const [letQuote, setLetQuote] = useState(false)
   const [urgency, setUrgency] = useState('')
   const [prefer, setPrefer] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const steps = ['Job Details', 'Location & Budget', 'Review']
   const charCount = description.length
@@ -47,8 +40,23 @@ export default function PostJobScreen() {
     if (step < 2) setStep(step + 1)
   }
 
-  const handlePost = () => {
-    router.push('/(customer)/jobs/posted-confirm')
+  const handlePost = async () => {
+    setSubmitting(true)
+    try {
+      const budget = letQuote ? 0 : Math.round((Number(budgetMin) + Number(budgetMax)) / 2)
+      const job = await jobs.create({
+        title,
+        description,
+        category,
+        budget: String(budget),
+        location,
+      })
+      router.push(`/(customer)/jobs/posted-confirm?jobId=${job.id}`)
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to post job')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -187,91 +195,12 @@ export default function PostJobScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        style={[styles.nextBtn, step === 2 && { backgroundColor: colors.purple }]}
+        style={[styles.nextBtn, step === 2 && { backgroundColor: colors.primary }]}
         onPress={step === 2 ? handlePost : handleNext}
+        disabled={submitting}
       >
-        <Text style={styles.nextText}>{step === 2 ? 'Post job' : 'Next'}</Text>
+        <Text style={styles.nextText}>{submitting ? 'Posting...' : step === 2 ? 'Post job' : 'Next'}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   )
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  backBtn: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 4 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 4 },
-  scroll: { paddingHorizontal: 24, flex: 1 },
-  stepLabel: { fontSize: 14, fontWeight: '600', color: colors.gray, marginBottom: 16, marginTop: 8 },
-  sectionLabel: { fontSize: 14, fontWeight: '700', color: colors.dark, marginTop: 16, marginBottom: 8 },
-  input: {
-    backgroundColor: colors.white,
-    borderWidth: 1.5,
-    borderColor: colors.lightGray,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: colors.dark,
-  },
-  textArea: { height: 100, textAlignVertical: 'top' },
-  charCount: { fontSize: 12, color: colors.gray, textAlign: 'right', marginTop: 4 },
-  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  budgetInput: { flex: 1 },
-  budgetSep: { fontSize: 18, color: colors.gray },
-  currency: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 10 },
-  toggle: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  toggleActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  toggleCheck: { color: colors.white, fontSize: 12, fontWeight: '700' },
-  toggleLabel: { fontSize: 14, color: colors.dark },
-  pillRow: { flexDirection: 'row', gap: 10 },
-  pill: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: colors.lightGray,
-    backgroundColor: colors.white,
-  },
-  pillActive: { borderColor: colors.primary, backgroundColor: '#FFFBEB' },
-  pillText: { fontSize: 14, fontWeight: '600', color: colors.dark },
-  pillTextActive: { color: colors.primary },
-  summaryCard: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 16,
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-  },
-  summaryLabel: { fontSize: 13, fontWeight: '600', color: colors.gray, width: 80 },
-  summaryValue: { flex: 1, fontSize: 14, color: colors.dark },
-  editLink: { fontSize: 13, color: colors.primary, fontWeight: '600' },
-  nextBtn: {
-    marginHorizontal: 24,
-    marginBottom: 24,
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  nextText: { fontSize: 17, fontWeight: '700', color: colors.white },
-})

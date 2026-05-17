@@ -1,37 +1,47 @@
-import { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useEffect, useRef, useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  green: '#10B981',
-  purple: '#7C3AED',
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-}
-
-const steps = [
-  { label: 'Booking confirmed', filled: true },
-  { label: 'Payment secured', filled: true },
-  { label: 'Worker on the way', filled: false },
-  { label: 'Job completed', filled: false },
-]
+import { bookings } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
+import type { Booking } from '../../../lib/types'
 
 export default function BookingConfirmedScreen() {
   const router = useRouter()
+  const { bookingId } = useLocalSearchParams()
   const scaleAnim = useRef(new Animated.Value(0)).current
+  const [booking, setBooking] = useState<Booking | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 4,
-      tension: 60,
-      useNativeDriver: true,
+      toValue: 1, friction: 4, tension: 60, useNativeDriver: true,
     }).start()
-  }, [])
+
+    if (bookingId) {
+      bookings.get(bookingId as string)
+        .then(setBooking)
+        .catch(console.error)
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
+    }
+  }, [bookingId])
+
+  const steps = [
+    { label: 'Booking confirmed', filled: true },
+    { label: 'Payment secured', filled: true },
+    { label: 'Worker on the way', filled: false },
+    { label: 'Job completed', filled: false },
+  ]
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 100 }} />
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -42,11 +52,11 @@ export default function BookingConfirmedScreen() {
       <Text style={styles.subheading}>Payment secured in escrow</Text>
 
       <View style={styles.summary}>
-        <Text style={styles.sumLabel}>Fix leaking pipe</Text>
-        <Text style={styles.sumValue}>Kamal Perera • Plumber</Text>
-        <Text style={styles.sumValue}>📅 Today at 2:00 PM</Text>
-        <Text style={styles.sumValue}>📍 Colombo 03</Text>
-        <Text style={styles.totalAmount}>LKR 8,925</Text>
+        <Text style={styles.sumLabel}>{booking?.serviceName || 'Service'}</Text>
+        <Text style={styles.sumValue}>{booking?.customerName || ''}</Text>
+        <Text style={styles.sumValue}>📅 {booking?.date ? new Date(booking.date).toLocaleDateString() : 'Today'} at {booking?.time || ''}</Text>
+        <Text style={styles.sumValue}>📍 {booking?.district || ''}</Text>
+        <Text style={styles.totalAmount}>LKR {(booking?.price || 0).toLocaleString()}</Text>
       </View>
 
       <View style={styles.tracker}>
@@ -62,10 +72,10 @@ export default function BookingConfirmedScreen() {
       </View>
 
       <View style={styles.buttons}>
-        <TouchableOpacity style={styles.mapBtn} onPress={() => router.push('/(customer)/tracking/1')}>
+        <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(customer)/tracking/${bookingId || 1}`)}>
           <Text style={styles.mapBtnText}>🗺️ Track on map</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.chatBtn} onPress={() => router.push('/(chat)/1')}>
+        <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/(chat)/${bookingId || 1}`)}>
           <Text style={styles.chatBtnText}>💬 Chat with worker</Text>
         </TouchableOpacity>
       </View>
@@ -76,28 +86,15 @@ export default function BookingConfirmedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB', alignItems: 'center', paddingHorizontal: 24, paddingTop: 40 },
   circle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.green,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: colors.green, justifyContent: 'center', alignItems: 'center', marginBottom: 20,
   },
   checkmark: { fontSize: 36, color: colors.white, fontWeight: '700' },
   heading: { fontSize: 26, fontWeight: '800', color: colors.dark, marginBottom: 4 },
   subheading: { fontSize: 15, color: colors.gray, marginBottom: 28 },
   summary: {
-    backgroundColor: colors.white,
-    width: '100%',
-    padding: 18,
-    borderRadius: 14,
-    marginBottom: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: colors.white, width: '100%', padding: 18, borderRadius: 14, marginBottom: 28,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   sumLabel: { fontSize: 16, fontWeight: '700', color: colors.dark, marginBottom: 8 },
   sumValue: { fontSize: 14, color: colors.gray, marginBottom: 4 },
@@ -105,42 +102,24 @@ const styles = StyleSheet.create({
   tracker: { width: '100%', paddingHorizontal: 16, marginBottom: 32 },
   trackerStep: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
   trackerDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    marginTop: 2,
+    width: 28, height: 28, borderRadius: 14, backgroundColor: colors.lightGray,
+    justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 2,
   },
   trackerDotFilled: { backgroundColor: colors.green },
   trackerCheck: { fontSize: 14, color: colors.white, fontWeight: '700' },
   trackerNum: { fontSize: 12, color: colors.gray, fontWeight: '600' },
   trackerLabel: { fontSize: 15, color: colors.gray, fontWeight: '500', paddingTop: 4 },
   trackerLabelFilled: { color: colors.dark, fontWeight: '600' },
-  trackerLine: {
-    width: 2,
-    height: 24,
-    backgroundColor: colors.lightGray,
-    marginLeft: 13,
-  },
+  trackerLine: { width: 2, height: 24, backgroundColor: colors.lightGray, marginLeft: 13 },
   trackerLineFilled: { backgroundColor: colors.green },
   buttons: { width: '100%', gap: 12 },
   mapBtn: {
-    backgroundColor: colors.purple,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
+    backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 14, alignItems: 'center',
   },
   mapBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
   chatBtn: {
-    backgroundColor: colors.white,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.lightGray,
+    backgroundColor: colors.white, paddingVertical: 16, borderRadius: 14, alignItems: 'center',
+    borderWidth: 2, borderColor: colors.lightGray,
   },
   chatBtnText: { fontSize: 16, fontWeight: '700', color: colors.dark },
 })

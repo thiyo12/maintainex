@@ -1,39 +1,45 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
-const colors = {
-  teal: '#0D9488',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  primary: '#F59E0B',
-}
+import { colors } from '../../lib/colors'
+import { jobs } from '../../lib/api'
+import type { JobPosting } from '../../lib/types'
 
 type Tab = 'active' | 'completed' | 'cancelled'
-
-const allJobs = {
-  active: [
-    { id: '1', title: 'Fix leaking pipe', customer: 'Ranil W.', location: 'Colombo 03', amount: 8500, status: 'En route', time: '2:00 PM' },
-    { id: '2', title: 'Electrical repair', customer: 'Supun K.', location: 'Colombo 05', amount: 12000, status: 'In progress', time: '3:30 PM' },
-  ],
-  completed: [
-    { id: '3', title: 'Paint bedroom', customer: 'Nimal S.', location: 'Colombo 07', amount: 15000, status: 'Completed', time: 'Yesterday' },
-    { id: '4', title: 'AC service', customer: 'Priya M.', location: 'Colombo 04', amount: 6500, status: 'Completed', time: '2 days ago' },
-  ],
-  cancelled: [
-    { id: '5', title: 'Garden cleanup', customer: 'Amal P.', location: 'Colombo 06', amount: 8000, status: 'Cancelled', time: '1 week ago' },
-  ],
-}
 
 export default function TaskerMyJobs() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('active')
+  const [loading, setLoading] = useState(true)
+  const [activeJobs, setActiveJobs] = useState<JobPosting[]>([])
+  const [completedJobs, setCompletedJobs] = useState<JobPosting[]>([])
+  const [cancelledJobs, setCancelledJobs] = useState<JobPosting[]>([])
 
-  const jobs = allJobs[tab]
+  useEffect(() => {
+    loadJobs()
+  }, [])
+
+  async function loadJobs() {
+    try {
+      const [active, completed, cancelled] = await Promise.all([
+        jobs.list('status=OPEN,ASSIGNED,IN_PROGRESS'),
+        jobs.list('status=COMPLETED'),
+        jobs.list('status=CANCELLED'),
+      ])
+      setActiveJobs(active)
+      setCompletedJobs(completed)
+      setCancelledJobs(cancelled)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const allJobs = { active: activeJobs, completed: completedJobs, cancelled: cancelledJobs }
+  const jobsList = allJobs[tab]
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,45 +61,51 @@ export default function TaskerMyJobs() {
         ))}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {jobs.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📭</Text>
-            <Text style={styles.emptyTitle}>No {tab} jobs</Text>
-          </View>
-        ) : (
-          jobs.map((job) => (
-            <TouchableOpacity key={job.id} style={styles.jobCard} activeOpacity={0.8}>
-              <View style={styles.jobTop}>
-                <Text style={styles.jobTitle}>{job.title}</Text>
-                <Text style={styles.jobAmount}>LKR {job.amount.toLocaleString()}</Text>
-              </View>
-              <Text style={styles.jobCustomer}>{job.customer} • {job.location}</Text>
-              <View style={styles.jobBottom}>
-                <View style={[styles.statusBadge, { backgroundColor: tab === 'active' ? '#CCFBF1' : tab === 'completed' ? '#D1FAE5' : '#FEE2E2' }]}>
-                  <Text style={[styles.statusText, { color: tab === 'active' ? colors.teal : tab === 'completed' ? colors.green : '#EF4444' }]}>
-                    {job.status}
-                  </Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {jobsList.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>📭</Text>
+              <Text style={styles.emptyTitle}>No {tab} jobs</Text>
+            </View>
+          ) : (
+            jobsList.map((job) => (
+              <TouchableOpacity key={job.id} style={styles.jobCard} activeOpacity={0.8}>
+                <View style={styles.jobTop}>
+                  <Text style={styles.jobTitle}>{job.title}</Text>
+                  <Text style={styles.jobAmount}>LKR {job.budget.toLocaleString()}</Text>
                 </View>
-                <Text style={styles.jobTime}>{job.time}</Text>
-              </View>
-              {tab === 'active' ? (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.trackBtn}
-                    onPress={() => router.push('/(customer)/tracking/' + job.id)}
-                  >
-                    <Text style={styles.trackBtnText}>Track</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.msgBtn}>
-                    <Text style={styles.msgBtnText}>Message</Text>
-                  </TouchableOpacity>
+                <Text style={styles.jobCustomer}>{job.customer?.name} • {job.location}</Text>
+                <View style={styles.jobBottom}>
+                  <View style={[styles.statusBadge, { backgroundColor: tab === 'active' ? '#CCFBF1' : tab === 'completed' ? '#D1FAE5' : '#FEE2E2' }]}>
+                    <Text style={[styles.statusText, { color: tab === 'active' ? colors.teal : tab === 'completed' ? colors.green : '#EF4444' }]}>
+                      {tab === 'active' ? 'Active' : tab === 'completed' ? 'Completed' : 'Cancelled'}
+                    </Text>
+                  </View>
+                  <Text style={styles.jobTime}>{new Date(job.createdAt).toLocaleDateString()}</Text>
                 </View>
-              ) : null}
-            </TouchableOpacity>
-          ))
-        )}
-      </ScrollView>
+                {tab === 'active' ? (
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={styles.trackBtn}
+                      onPress={() => router.push('/(customer)/tracking/' + job.id)}
+                    >
+                      <Text style={styles.trackBtnText}>Track</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.msgBtn}>
+                      <Text style={styles.msgBtnText}>Message</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }
@@ -119,6 +131,7 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.white },
   tabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
   tabTextActive: { color: colors.teal, fontWeight: '700' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.gray },

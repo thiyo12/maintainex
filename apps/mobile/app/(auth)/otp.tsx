@@ -6,16 +6,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { auth } from '../../lib/api'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { colors } from '../../lib/colors'
 
 export default function OtpScreen() {
   const router = useRouter()

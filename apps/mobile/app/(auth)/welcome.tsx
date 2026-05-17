@@ -1,15 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-}
+import { colors } from '../../lib/colors'
 
 export default function WelcomeScreen() {
   const router = useRouter()

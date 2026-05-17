@@ -1,32 +1,44 @@
-import { useState, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native'
-import { useRouter, useFocusEffect } from 'expo-router'
+import { useState, useEffect } from 'react'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native'
+import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
-
-const conversations = [
-  { id: '1', name: 'Kamal Perera', role: 'Plumber', lastMsg: 'I\'ll arrive in 15 minutes', unread: 2, online: true, time: '2:30 PM', avatar: 'K' },
-  { id: '2', name: 'Saman Fernando', role: 'Electrician', lastMsg: 'Yes, I can do it tomorrow morning', unread: 0, online: false, time: '11:20 AM', avatar: 'S' },
-  { id: '3', name: 'Nimal Silva', role: 'Painter', lastMsg: 'Thanks for the job!', unread: 1, online: true, time: 'Yesterday', avatar: 'N' },
-  { id: '4', name: 'Support Team', role: 'Maintainex', lastMsg: 'Your dispute has been received', unread: 0, online: true, time: 'Yesterday', avatar: 'M' },
-]
+import { conversations } from '../../lib/api'
+import { colors } from '../../lib/colors'
 
 export default function CustomerInbox() {
   const router = useRouter()
   const [search, setSearch] = useState('')
+  const [conversationsData, setConversationsData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filtered = conversations.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const data = await conversations.list()
+        setConversationsData(data)
+      } catch {
+        // fail silently
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  const filtered = conversationsData.filter(c =>
+    c.otherUser?.name?.toLowerCase().includes(search.toLowerCase())
   )
+
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+    if (diffDays === 1) return 'Yesterday'
+    return date.toLocaleDateString()
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -45,46 +57,52 @@ export default function CustomerInbox() {
         />
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.conversationCard}
-            onPress={() => router.push(`/(chat)/${item.id}`)}
-          >
-            <View style={styles.avatarWrap}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{item.avatar}</Text>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.customerAccent} />
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.conversationCard}
+              onPress={() => router.push(`/(chat)/${item.id}`)}
+            >
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {item.otherUser?.name?.[0] || '?'}
+                  </Text>
+                </View>
               </View>
-              {item.online ? <View style={styles.onlineDot} /> : null}
+              <View style={styles.content}>
+                <View style={styles.topRow}>
+                  <Text style={styles.name}>{item.otherUser?.name || 'Unknown'}</Text>
+                  <Text style={styles.time}>{formatTime(item.updatedAt)}</Text>
+                </View>
+                <View style={styles.bottomRow}>
+                  <Text style={[styles.lastMsg, item.unreadCount > 0 && styles.lastMsgUnread]} numberOfLines={1}>
+                    {item.lastMessage?.text || ''}
+                  </Text>
+                  {item.unreadCount > 0 ? (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadText}>{item.unreadCount}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>💬</Text>
+              <Text style={styles.emptyTitle}>No messages yet</Text>
             </View>
-            <View style={styles.content}>
-              <View style={styles.topRow}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.time}>{item.time}</Text>
-              </View>
-              <View style={styles.bottomRow}>
-                <Text style={[styles.lastMsg, item.unread > 0 && styles.lastMsgUnread]} numberOfLines={1}>
-                  {item.lastMsg}
-                </Text>
-                {item.unread > 0 ? (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>{item.unread}</Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text style={styles.role}>{item.role}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>💬</Text>
-            <Text style={styles.emptyTitle}>No messages yet</Text>
-          </View>
-        }
-      />
+          }
+        />
+      )}
     </SafeAreaView>
   )
 }
@@ -126,16 +144,11 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
-  onlineDot: {
-    position: 'absolute', bottom: 1, right: 1,
-    width: 13, height: 13, borderRadius: 7,
-    backgroundColor: colors.green, borderWidth: 2, borderColor: colors.white,
-  },
   content: { flex: 1 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   name: { fontSize: 15, fontWeight: '700', color: colors.dark },
@@ -144,12 +157,12 @@ const styles = StyleSheet.create({
   lastMsg: { fontSize: 13, color: colors.gray, flex: 1, marginRight: 8 },
   lastMsgUnread: { fontWeight: '600', color: colors.dark },
   unreadBadge: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.warning,
     minWidth: 20, height: 20, borderRadius: 10,
     justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6,
   },
   unreadText: { fontSize: 11, fontWeight: '700', color: colors.white },
-  role: { fontSize: 11, color: colors.gray, marginTop: 2 },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { alignItems: 'center', paddingTop: 80 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.dark },

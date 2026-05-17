@@ -1,22 +1,17 @@
-import { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-}
+import { colors } from '../../../../lib/colors'
+import { bookings } from '../../../../lib/api'
+import { Booking } from '../../../../lib/types'
 
 export default function ReceiptScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
+  const [booking, setBooking] = useState<Booking | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const fadeAnim = useRef(new Animated.Value(0)).current
   const slideAnim = useRef(new Animated.Value(30)).current
 
@@ -27,9 +22,47 @@ export default function ReceiptScreen() {
     ]).start()
   }, [])
 
-  const subtotal = 8500
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    bookings.get(id as string)
+      .then(setBooking)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </SafeAreaView>
+    )
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: colors.red, textAlign: 'center' }}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  const subtotal = booking?.price || 0
   const fee = Math.round(subtotal * 0.05)
   const total = subtotal + fee
+  const serviceDate = booking?.date
+    ? new Date(booking.date).toLocaleDateString('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : ''
+  const serviceTime = booking?.time || ''
+  const dateDisplay = serviceTime ? `${serviceDate} at ${serviceTime}` : serviceDate
+  const locationDisplay = booking?.district || ''
 
   return (
     <SafeAreaView style={styles.container}>
@@ -51,10 +84,11 @@ export default function ReceiptScreen() {
           <View style={styles.divider} />
 
           <View style={styles.serviceSection}>
-            <Text style={styles.serviceTitle}>Fix leaking pipe</Text>
-            <Text style={styles.serviceMeta}>Plumbing • Colombo 03</Text>
-            <Text style={styles.serviceMeta}>Kamal Perera • Plumber</Text>
-            <Text style={styles.serviceDate}>📅 Today at 2:00 PM</Text>
+            <Text style={styles.serviceTitle}>{booking?.serviceName || 'Service'}</Text>
+            <Text style={styles.serviceMeta}>
+              {booking?.categoryName || ''}{locationDisplay ? ` • ${locationDisplay}` : ''}
+            </Text>
+            <Text style={styles.serviceDate}>{dateDisplay}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -84,7 +118,11 @@ export default function ReceiptScreen() {
           </View>
           <View style={styles.paymentSection}>
             <Text style={styles.paymentLabel}>Paid on</Text>
-            <Text style={styles.paymentValue}>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+            <Text style={styles.paymentValue}>
+              {booking?.createdAt
+                ? new Date(booking.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </Text>
           </View>
 
           <View style={styles.escrowNote}>
@@ -209,7 +247,7 @@ const styles = StyleSheet.create({
   },
   reviewBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   homeBtn: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     marginHorizontal: 24,
     marginBottom: 32,
     paddingVertical: 16,

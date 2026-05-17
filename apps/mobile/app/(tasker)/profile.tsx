@@ -1,34 +1,61 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+
+import { colors } from '../../lib/colors'
+import { taskers } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-
-const colors = {
-  teal: '#0D9488',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  primary: '#F59E0B',
-}
-
-const skills = ['Plumbing', 'Pipe Fitting', 'Water Heater Repair', 'Drain Cleaning']
-const serviceAreas = ['Colombo 01', 'Colombo 02', 'Colombo 03', 'Colombo 04', 'Colombo 05']
+import type { TaskerProfile } from '../../lib/types'
 
 export default function TaskerProfile() {
   const router = useRouter()
   const { user, logout } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<TaskerProfile | null>(null)
+
+  useEffect(() => {
+    loadProfile()
+  }, [])
+
+  async function loadProfile() {
+    if (!user?.id) return
+    try {
+      const data = await taskers.get(user.id)
+      setProfile(data)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  const name = profile?.user?.name || user?.name || 'Tasker'
+  const initial = name[0]
+  const skills = profile?.skills || []
+  const serviceAreas = profile?.serviceAreas || []
+  const rating = profile?.rating || 0
+  const completedJobs = profile?.completedJobs || 0
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>K</Text>
+            <Text style={styles.avatarText}>{initial}</Text>
           </View>
-          <Text style={styles.name}>Kamal Perera</Text>
-          <Text style={styles.role}>Plumber • ⭐ 4.8</Text>
+          <Text style={styles.name}>{name}</Text>
+          <Text style={styles.role}>Plumber • ⭐ {rating.toFixed(1)}</Text>
           <View style={styles.badgeRow}>
             <View style={styles.badge}><Text style={styles.badgeText}>✓ Verified</Text></View>
             <View style={styles.badge}><Text style={styles.badgeText}>🟢 Online</Text></View>
@@ -37,11 +64,11 @@ export default function TaskerProfile() {
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>47</Text>
+            <Text style={styles.statValue}>{completedJobs}</Text>
             <Text style={styles.statLabel}>Jobs</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>4.8</Text>
+            <Text style={styles.statValue}>{rating.toFixed(1)}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
           <View style={styles.statCard}>
@@ -98,6 +125,7 @@ export default function TaskerProfile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
   avatar: {
     width: 72,

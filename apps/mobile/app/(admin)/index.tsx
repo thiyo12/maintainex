@@ -1,29 +1,83 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useEffect, useState } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { colors } from '../../lib/colors'
 import { useAuth } from '../../lib/auth'
+import { taskers, bookings, disputes, earnings } from '../../lib/api'
 
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-  purple: '#7C3AED',
+interface AdminStats {
+  totalTaskers: string
+  activeBookings: string
+  totalJobs: string
+  revenue: string
+  disputes: string
 }
 
-const stats = [
-  { label: 'Total users', value: '1,247' },
-  { label: 'Taskers', value: '342' },
-  { label: 'Companies', value: '28' },
-  { label: 'Active jobs', value: '89' },
-  { label: 'Revenue', value: 'LKR 2.4M' },
-  { label: 'Disputes', value: '3' },
-]
+const placeholderStats: AdminStats = {
+  totalTaskers: '—',
+  activeBookings: '—',
+  totalJobs: '—',
+  revenue: '—',
+  disputes: '—',
+}
 
 export default function AdminDashboard() {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const [stats, setStats] = useState<AdminStats>(placeholderStats)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
+  const fetchStats = async () => {
+    try {
+      const [taskerRes, bookingRes, disputeRes, earningsRes] = await Promise.allSettled([
+        taskers.list(),
+        bookings.list(),
+        disputes.list(),
+        earnings.get(),
+      ])
+
+      const taskersData = taskerRes.status === 'fulfilled' ? taskerRes.value : []
+      const bookingsData = bookingRes.status === 'fulfilled' ? bookingRes.value : []
+      const disputesData = disputeRes.status === 'fulfilled' ? disputeRes.value : []
+      const earningsData = earningsRes.status === 'fulfilled' ? earningsRes.value : null
+
+      setStats({
+        totalTaskers: `${taskersData.length}`,
+        activeBookings: `${bookingsData.filter((b: any) => b.status === 'IN_PROGRESS' || b.status === 'ASSIGNED').length}`,
+        totalJobs: `${bookingsData.length}`,
+        revenue: earningsData?.total ? `LKR ${Number(earningsData.total).toLocaleString()}` : '—',
+        disputes: `${disputesData.length}`,
+      })
+    } catch {
+      setStats(placeholderStats)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const statCards = [
+    { label: 'Taskers', value: stats.totalTaskers },
+    { label: 'Active jobs', value: stats.activeBookings },
+    { label: 'Total jobs', value: stats.totalJobs },
+    { label: 'Revenue', value: stats.revenue },
+    { label: 'Disputes', value: stats.disputes },
+  ]
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.topBar}>
+          <Text style={styles.heading}>Admin</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -36,7 +90,7 @@ export default function AdminDashboard() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.statsGrid}>
-          {stats.map((s, i) => (
+          {statCards.map((s, i) => (
             <View key={i} style={styles.statCard}>
               <Text style={styles.statValue}>{s.value}</Text>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -65,7 +119,8 @@ export default function AdminDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',

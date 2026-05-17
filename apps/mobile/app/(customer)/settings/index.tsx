@@ -2,17 +2,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-nati
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../../lib/auth'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-}
+import { colors } from '../../../lib/colors'
 
 export default function CustomerSettings() {
   const router = useRouter()
@@ -96,7 +86,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -107,12 +97,12 @@ const styles = StyleSheet.create({
   phone: { fontSize: 14, color: colors.gray, marginBottom: 14 },
   editProfileBtn: {
     borderWidth: 1.5,
-    borderColor: colors.purple,
+    borderColor: colors.customerAccent,
     paddingHorizontal: 24,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  editProfileText: { fontSize: 14, fontWeight: '600', color: colors.purple },
+  editProfileText: { fontSize: 14, fontWeight: '600', color: colors.customerAccent },
   section: { paddingHorizontal: 24, marginBottom: 16 },
   menuRow: {
     flexDirection: 'row',

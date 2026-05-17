@@ -1,52 +1,82 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native'
+import { useState, useRef, useCallback } from 'react'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
-
-const initialMessages: { id: string; text: string; sender: 'user' | 'other'; time: string }[] = [
-  { id: '1', text: 'Hi, I can take this job today', sender: 'other', time: '2:15 PM' },
-  { id: '2', text: 'Great! When can you come?', sender: 'user', time: '2:16 PM' },
-  { id: '3', text: 'I can be there in 30 minutes', sender: 'other', time: '2:17 PM' },
-  { id: '4', text: 'Perfect, see you soon', sender: 'user', time: '2:18 PM' },
-  { id: '5', text: 'I\'ll arrive in 15 minutes', sender: 'other', time: '2:30 PM' },
-]
+import { conversations, auth } from '../../lib/api'
+import { colors } from '../../lib/colors'
 
 export default function ChatDetailScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
-  const [messages, setMessages] = useState(initialMessages)
+  const [messages, setMessages] = useState<any[]>([])
   const [inputText, setInputText] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [otherUserName, setOtherUserName] = useState('')
   const flatListRef = useRef<FlatList>(null)
+
+  const fetchUserId = useCallback(async () => {
+    try {
+      const user = await auth.me()
+      setUserId(user.user.id)
+    } catch {
+      // fail silently
+    }
+  }, [])
+
+  const fetchMessages = useCallback(async () => {
+    if (!userId) return
+    try {
+      const data = await conversations.get(id as string)
+      setMessages(data.messages || [])
+      if (data.participants?.length > 0 && !otherUserName) {
+        const other = data.participants.find((p: any) => p.id !== userId)
+        if (other) setOtherUserName(other.name || '')
+      }
+    } catch {
+      // fail silently
+    } finally {
+      setLoading(false)
+    }
+  }, [id, userId, otherUserName])
 
   useFocusEffect(
     useCallback(() => {
-      const interval = setInterval(() => {
-        setMessages(prev => [...prev])
-      }, 5000)
+      if (!userId) return
+      fetchMessages()
+      const interval = setInterval(fetchMessages, 5000)
       return () => clearInterval(interval)
-    }, [])
+    }, [fetchMessages, userId])
   )
 
-  const sendMessage = () => {
+  useFocusEffect(
+    useCallback(() => {
+      fetchUserId()
+    }, [fetchUserId])
+  )
+
+  const sendMessage = async () => {
     if (!inputText.trim()) return
-    const newMsg = {
+    const text = inputText.trim()
+    const optimisticMsg = {
       id: Date.now().toString(),
-      text: inputText.trim(),
-      sender: 'user' as const,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text,
+      senderId: userId,
+      createdAt: new Date().toISOString(),
     }
-    setMessages(prev => [...prev, newMsg])
+    setMessages(prev => [...prev, optimisticMsg])
     setInputText('')
+    try {
+      await conversations.sendMessage(id as string, text)
+    } catch {
+      // fail silently
+    }
+  }
+
+  const formatTime = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   return (
@@ -57,10 +87,10 @@ export default function ChatDetailScreen() {
         </TouchableOpacity>
         <View style={styles.topInfo}>
           <View style={styles.avatarSmall}>
-            <Text style={styles.avatarText}>K</Text>
+            <Text style={styles.avatarText}>{otherUserName?.[0] || '?'}</Text>
           </View>
           <View>
-            <Text style={styles.chatName}>Kamal Perera</Text>
+            <Text style={styles.chatName}>{otherUserName || 'Chat'}</Text>
             <Text style={styles.chatStatus}>🟢 Online</Text>
           </View>
         </View>
@@ -74,25 +104,34 @@ export default function ChatDetailScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={90}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messagesContainer}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-          renderItem={({ item }) => (
-            <View style={[styles.messageWrap, item.sender === 'user' ? styles.messageSent : styles.messageReceived]}>
-              <View style={[styles.messageBubble, item.sender === 'user' ? styles.bubbleSent : styles.bubbleReceived]}>
-                <Text style={[styles.messageText, item.sender === 'user' && styles.messageTextSent]}>
-                  {item.text}
-                </Text>
-              </View>
-              <Text style={[styles.messageTime, item.sender === 'user' ? styles.timeSent : styles.timeReceived]}>
-                {item.time}
-              </Text>
-            </View>
-          )}
-        />
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.customerAccent} />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(item) => item.id || Math.random().toString()}
+            contentContainerStyle={styles.messagesContainer}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+            renderItem={({ item }) => {
+              const isUser = userId ? item.senderId === userId : false
+              return (
+                <View style={[styles.messageWrap, isUser ? styles.messageSent : styles.messageReceived]}>
+                  <View style={[styles.messageBubble, isUser ? styles.bubbleSent : styles.bubbleReceived]}>
+                    <Text style={[styles.messageText, isUser && styles.messageTextSent]}>
+                      {item.text}
+                    </Text>
+                  </View>
+                  <Text style={[styles.messageTime, isUser ? styles.timeSent : styles.timeReceived]}>
+                    {formatTime(item.createdAt || item.updatedAt)}
+                  </Text>
+                </View>
+              )
+            }}
+          />
+        )}
 
         <View style={styles.inputBar}>
           <TextInput
@@ -124,13 +163,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   backBtn: { marginRight: 12 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+  backText: { fontSize: 16, color: colors.warning, fontWeight: '600' },
   topInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarSmall: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -147,7 +186,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   bubbleSent: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     borderBottomRightRadius: 4,
   },
   bubbleReceived: {
@@ -183,10 +222,11 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   sendBtn: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
   },
   sendBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 })

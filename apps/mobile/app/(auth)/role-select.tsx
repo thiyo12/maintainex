@@ -4,18 +4,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-  purple: '#7C3AED',
-  teal: '#0D9488',
-  coral: '#EA580C',
-}
+import { colors } from '../../lib/colors'
 
 const roles = [
   {
@@ -23,21 +12,21 @@ const roles = [
     icon: '🙋',
     title: 'I need work done',
     subtitle: 'Post jobs and hire taskers',
-    color: colors.purple,
+    color: colors.customerAccent,
   },
   {
     id: 'TASKER',
     icon: '🔧',
     title: 'I am a tasker',
     subtitle: 'Find jobs near me',
-    color: colors.teal,
+    color: colors.taskerAccent,
   },
   {
     id: 'COMPANY',
     icon: '🏢',
     title: 'We are a company',
     subtitle: 'Register and get contracts',
-    color: colors.coral,
+    color: colors.companyAccent,
   },
 ]
 

@@ -1,33 +1,79 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  coral: '#F97316',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  primary: '#F59E0B',
-}
-
-const stats = [
-  { icon: '📄', label: 'Active contracts', value: '12' },
-  { icon: '💰', label: 'Revenue (month)', value: 'LKR 1.2M' },
-  { icon: '👥', label: 'Team members', value: '8' },
-  { icon: '⭐', label: 'Avg. rating', value: '4.7' },
-]
-
-const recentActivity = [
-  { text: 'Contract #1024 completed - Colombo office renovation', time: '2 hours ago' },
-  { text: 'New milestone approved - Phase 2 of City Hotel project', time: '5 hours ago' },
-  { text: 'Team member Saman joined the plumbing crew', time: '1 day ago' },
-  { text: 'Payment of LKR 250,000 received for Contract #1019', time: '2 days ago' },
-]
+import { colors } from '../../lib/colors'
+import { company } from '../../lib/api'
 
 export default function CompanyDashboard() {
   const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState([
+    { icon: '📄', label: 'Active contracts', value: '-' },
+    { icon: '💰', label: 'Revenue (month)', value: '-' },
+    { icon: '👥', label: 'Team members', value: '-' },
+    { icon: '⭐', label: 'Avg. rating', value: '-' },
+  ])
+  const [revenueMonth, setRevenueMonth] = useState('LKR 0')
+  const [chartData, setChartData] = useState<number[]>([])
+  const [recentActivity, setRecentActivity] = useState<{ text: string; time: string }[]>([])
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [earningsRes, contractsRes] = await Promise.all([
+        company.earnings.get(),
+        company.contracts.list(),
+      ])
+
+      const activeContracts = contractsRes.filter(
+        (c: any) => c.status === 'In progress' || c.status === 'active'
+      ).length
+
+      const monthRevenue = earningsRes.monthlyRevenue || earningsRes.totalRevenue || 0
+      const teamMembers = earningsRes.teamCount || stats[2].value
+      const rating = earningsRes.rating || stats[3].value
+
+      setStats([
+        { icon: '📄', label: 'Active contracts', value: String(activeContracts) },
+        { icon: '💰', label: 'Revenue (month)', value: `LKR ${(monthRevenue / 1000).toFixed(1)}K` },
+        { icon: '👥', label: 'Team members', value: String(teamMembers) },
+        { icon: '⭐', label: 'Avg. rating', value: String(rating) },
+      ])
+
+      setRevenueMonth(`LKR ${Number(monthRevenue).toLocaleString()}`)
+      setChartData(earningsRes.monthlyData || earningsRes.chartData || [40, 65, 45, 80, 55, 90, 70])
+
+      if (earningsRes.recentActivity) {
+        setRecentActivity(earningsRes.recentActivity)
+      } else {
+        const activity = contractsRes.slice(-4).map((c: any) => ({
+          text: `${c.title || 'Contract'} - ${c.status} (${c.clientName || 'Client'})`,
+          time: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : 'Recently',
+        }))
+        setRecentActivity(activity.length > 0 ? activity : [
+          { text: 'Dashboard ready — no recent activity', time: '' },
+        ])
+      }
+    } catch {
+      setRecentActivity([{ text: 'Could not load data. Pull to retry.', time: '' }])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -55,11 +101,11 @@ export default function CompanyDashboard() {
         <View style={styles.chartPlaceholder}>
           <Text style={styles.chartEmoji}>📈</Text>
           <Text style={styles.chartTitle}>Revenue overview</Text>
-          <Text style={styles.chartSub}>LKR 1,245,000 this month</Text>
+          <Text style={styles.chartSub}>{revenueMonth} this month</Text>
           <View style={styles.chartBars}>
-            {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
+            {(chartData.length > 0 ? chartData : [40, 65, 45, 80, 55, 90, 70]).map((h: number, i: number) => (
               <View key={i} style={styles.chartBarWrap}>
-                <View style={[styles.chartBar, { height: h }]} />
+                <View style={[styles.chartBar, { height: Math.min(h, 100) }]} />
               </View>
             ))}
           </View>
@@ -71,7 +117,7 @@ export default function CompanyDashboard() {
             <View style={styles.activityDot} />
             <View style={styles.activityContent}>
               <Text style={styles.activityText}>{a.text}</Text>
-              <Text style={styles.activityTime}>{a.time}</Text>
+              {a.time ? <Text style={styles.activityTime}>{a.time}</Text> : null}
             </View>
           </View>
         ))}
@@ -96,7 +142,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -146,7 +192,7 @@ const styles = StyleSheet.create({
   chartBarWrap: { flex: 1, alignItems: 'center', height: 100, justifyContent: 'flex-end' },
   chartBar: {
     width: '100%',
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     borderRadius: 6,
     opacity: 0.7,
   },
@@ -167,7 +213,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     marginTop: 5,
   },
   activityContent: { flex: 1 },

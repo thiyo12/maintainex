@@ -1,19 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  green: '#10B981',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  primary: '#F59E0B',
-  white: '#FFFFFF',
-}
+import { colors } from '../../../lib/colors'
 
 export default function JobPostedConfirmation() {
   const router = useRouter()
+  const { jobId } = useLocalSearchParams()
   const scaleAnim = useRef(new Animated.Value(0)).current
   const countAnim = useRef(new Animated.Value(0)).current
 
@@ -48,7 +41,7 @@ export default function JobPostedConfirmation() {
       <Text style={styles.counterLabel}>workers notified</Text>
 
       <View style={styles.buttons}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(customer)/jobs/quotes')}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push(`/(customer)/jobs/quotes?jobId=${jobId || ''}`)}>
           <Text style={styles.primaryBtnText}>View my job</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(customer)')}>

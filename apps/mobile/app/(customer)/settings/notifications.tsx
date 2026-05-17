@@ -1,20 +1,15 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { notifications } from '../../../lib/api'
+import { colors } from '../../../lib/colors'
+import type { Notification } from '../../../lib/types'
 
 export default function NotificationsScreen() {
   const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [notificationItems, setNotificationItems] = useState<Notification[]>([])
   const [settings, setSettings] = useState({
     jobUpdates: true,
     messages: true,
@@ -23,6 +18,21 @@ export default function NotificationsScreen() {
     emailNotifications: true,
     smsNotifications: false,
   })
+
+  useEffect(() => {
+    loadNotifications()
+  }, [])
+
+  const loadNotifications = async () => {
+    try {
+      const data = await notifications.list()
+      setNotificationItems(data)
+    } catch {
+      // silently fail — toggles still work locally
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const toggle = (key: keyof typeof settings) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }))
@@ -36,39 +46,43 @@ export default function NotificationsScreen() {
 
       <Text style={styles.heading}>Notifications</Text>
 
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <Text style={styles.sectionTitle}>Push notifications</Text>
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.label}>Job updates</Text>
-            <Switch value={settings.jobUpdates} onValueChange={() => toggle('jobUpdates')} trackColor={{ false: colors.lightGray, true: colors.purple }} />
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.customerAccent} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
+          <Text style={styles.sectionTitle}>Push notifications</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.label}>Job updates</Text>
+              <Switch value={settings.jobUpdates} onValueChange={() => toggle('jobUpdates')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Messages</Text>
+              <Switch value={settings.messages} onValueChange={() => toggle('messages')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>New quotes</Text>
+              <Switch value={settings.quotes} onValueChange={() => toggle('quotes')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Promotions & offers</Text>
+              <Switch value={settings.promotions} onValueChange={() => toggle('promotions')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
+            </View>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Messages</Text>
-            <Switch value={settings.messages} onValueChange={() => toggle('messages')} trackColor={{ false: colors.lightGray, true: colors.purple }} />
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>New quotes</Text>
-            <Switch value={settings.quotes} onValueChange={() => toggle('quotes')} trackColor={{ false: colors.lightGray, true: colors.purple }} />
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Promotions & offers</Text>
-            <Switch value={settings.promotions} onValueChange={() => toggle('promotions')} trackColor={{ false: colors.lightGray, true: colors.purple }} />
-          </View>
-        </View>
 
-        <Text style={styles.sectionTitle}>Notification channels</Text>
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.label}>Email notifications</Text>
-            <Switch value={settings.emailNotifications} onValueChange={() => toggle('emailNotifications')} trackColor={{ false: colors.lightGray, true: colors.purple }} />
+          <Text style={styles.sectionTitle}>Notification channels</Text>
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.label}>Email notifications</Text>
+              <Switch value={settings.emailNotifications} onValueChange={() => toggle('emailNotifications')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>SMS notifications</Text>
+              <Switch value={settings.smsNotifications} onValueChange={() => toggle('smsNotifications')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
+            </View>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>SMS notifications</Text>
-            <Switch value={settings.smsNotifications} onValueChange={() => toggle('smsNotifications')} trackColor={{ false: colors.lightGray, true: colors.purple }} />
-          </View>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }

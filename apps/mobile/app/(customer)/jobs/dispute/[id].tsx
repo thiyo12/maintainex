@@ -1,18 +1,11 @@
-import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-}
+import { colors } from '../../../../lib/colors'
+import { jobs, disputes } from '../../../../lib/api'
+import { useAuth } from '../../../../lib/auth'
+import { JobPosting } from '../../../../lib/types'
 
 const disputeReasons = [
   { key: 'incomplete', label: 'Work not completed' },
@@ -26,11 +19,26 @@ const disputeReasons = [
 export default function DisputeScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
+  const { user } = useAuth()
+  const [job, setJob] = useState<JobPosting | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(0)
   const [reason, setReason] = useState('')
   const [description, setDescription] = useState('')
   const [expectation, setExpectation] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [disputeId, setDisputeId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    jobs.get(id as string)
+      .then(setJob)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [id])
 
   const handleNext = () => {
     if (step === 0 && !reason) {
@@ -44,8 +52,39 @@ export default function DisputeScreen() {
     if (step < 2) setStep(step + 1)
   }
 
-  const handleSubmit = () => {
-    setSubmitted(true)
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    try {
+      const res = await disputes.create({ jobId: id as string, reason, description })
+      setDisputeId(res.id)
+      setSubmitted(true)
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to submit dispute')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const taskerName = job?.assignedTasker?.user?.name || 'Tasker'
+  const jobTitle = job?.title || 'Job'
+  const escrowAmount = ((job?.budget || 0) * 1.05)
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </SafeAreaView>
+    )
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: colors.red, textAlign: 'center' }}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   if (submitted) {
@@ -61,7 +100,7 @@ export default function DisputeScreen() {
           </Text>
           <View style={styles.ticketBox}>
             <Text style={styles.ticketLabel}>Dispute ID</Text>
-            <Text style={styles.ticketId}>#DSP-{id}-001</Text>
+            <Text style={styles.ticketId}>#{disputeId}</Text>
           </View>
           <Text style={styles.refundNote}>
             🔒 Funds remain in escrow until the dispute is resolved.
@@ -139,11 +178,11 @@ export default function DisputeScreen() {
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Job</Text>
-                <Text style={styles.summaryValue}>Fix leaking pipe</Text>
+                <Text style={styles.summaryValue}>{jobTitle}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Tasker</Text>
-                <Text style={styles.summaryValue}>Kamal Perera</Text>
+                <Text style={styles.summaryValue}>{taskerName}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Reason</Text>
@@ -153,7 +192,7 @@ export default function DisputeScreen() {
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Amount in escrow</Text>
-                <Text style={styles.summaryPrice}>LKR 8,925</Text>
+                <Text style={styles.summaryPrice}>LKR {escrowAmount.toLocaleString()}</Text>
               </View>
             </View>
             <View style={styles.descriptionBox}>
@@ -179,9 +218,10 @@ export default function DisputeScreen() {
       <TouchableOpacity
         style={[styles.nextBtn, step === 2 && { backgroundColor: colors.red }]}
         onPress={step === 2 ? handleSubmit : handleNext}
+        disabled={submitting}
       >
         <Text style={styles.nextBtnText}>
-          {step === 0 ? 'Next' : step === 1 ? 'Review dispute' : 'Submit dispute'}
+          {submitting ? 'Submitting...' : step === 0 ? 'Next' : step === 1 ? 'Review dispute' : 'Submit dispute'}
         </Text>
       </TouchableOpacity>
     </SafeAreaView>
@@ -333,7 +373,7 @@ const styles = StyleSheet.create({
   refundNote: { fontSize: 13, color: colors.gray, textAlign: 'center', marginBottom: 32 },
   homeBtn: {
     width: '100%',
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',

@@ -1,29 +1,42 @@
-import { useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  coral: '#F97316',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  primary: '#F59E0B',
-}
-
-const milestones = [
-  { contract: 'City Hotel - Plumbing', title: 'Site inspection complete', amount: 85000, status: 'Approved', date: 'May 14' },
-  { contract: 'City Hotel - Plumbing', title: 'Materials delivered', amount: 170000, status: 'Pending', date: 'May 20' },
-  { contract: 'City Hotel - Plumbing', title: 'Phase 1 installation', amount: 255000, status: 'In review', date: 'Jun 01' },
-  { contract: 'Sunil Perera - Rewiring', title: 'Initial assessment', amount: 25000, status: 'Approved', date: 'May 12' },
-  { contract: 'Sunil Perera - Rewiring', title: 'Wiring complete', amount: 50000, status: 'Pending', date: 'May 25' },
-]
+import { colors } from '../../lib/colors'
+import { company } from '../../lib/api'
 
 export default function CompanyMilestones() {
   const [filter, setFilter] = useState<string>('all')
+  const [loading, setLoading] = useState(true)
+  const [milestones, setMilestones] = useState<any[]>([])
 
-  const filtered = filter === 'all' ? milestones : milestones.filter(m => m.status.toLowerCase() === filter)
+  const fetchMilestones = useCallback(async () => {
+    try {
+      const data = await company.milestones.list()
+      setMilestones(data)
+    } catch {
+      setMilestones([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchMilestones()
+  }, [fetchMilestones])
+
+  const filtered = filter === 'all'
+    ? milestones
+    : milestones.filter(m => (m.status?.toLowerCase() || '') === filter)
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -46,32 +59,48 @@ export default function CompanyMilestones() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {filtered.map((m, i) => (
-          <View key={i} style={styles.milestoneCard}>
-            <View style={styles.cardLeft}>
-              <View style={[styles.statusDot, {
-                backgroundColor: m.status === 'Approved' ? colors.green : m.status === 'Pending' ? colors.primary : colors.coral,
-              }]} />
-              <View style={styles.cardContent}>
-                <Text style={styles.milestoneTitle}>{m.title}</Text>
-                <Text style={styles.milestoneContract}>{m.contract}</Text>
-                <View style={styles.milestoneBottom}>
-                  <Text style={styles.milestoneAmount}>LKR {m.amount.toLocaleString()}</Text>
-                  <Text style={styles.milestoneDate}>{m.date}</Text>
+        {filtered.length === 0 ? (
+          <Text style={styles.emptyText}>No milestones found</Text>
+        ) : (
+          filtered.map((m, i) => (
+            <View key={m.id || i} style={styles.milestoneCard}>
+              <View style={styles.cardLeft}>
+                <View style={[styles.statusDot, {
+                  backgroundColor: m.status === 'Approved' || m.status === 'approved'
+                    ? colors.green
+                    : m.status === 'Pending' || m.status === 'pending'
+                    ? colors.primary
+                    : colors.companyAccent,
+                }]} />
+                <View style={styles.cardContent}>
+                  <Text style={styles.milestoneTitle}>{m.title}</Text>
+                  <Text style={styles.milestoneContract}>{m.contract || m.contractName}</Text>
+                  <View style={styles.milestoneBottom}>
+                    <Text style={styles.milestoneAmount}>LKR {Number(m.amount).toLocaleString()}</Text>
+                    <Text style={styles.milestoneDate}>{m.date || (m.dueDate ? new Date(m.dueDate).toLocaleDateString() : '')}</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-            <View style={[styles.statusBadge, {
-              backgroundColor: m.status === 'Approved' ? '#D1FAE5' : m.status === 'Pending' ? '#FFFBEB' : '#FFF7ED',
-            }]}>
-              <Text style={[styles.statusText, {
-                color: m.status === 'Approved' ? colors.green : m.status === 'Pending' ? colors.primary : colors.coral,
+              <View style={[styles.statusBadge, {
+                backgroundColor: m.status === 'Approved' || m.status === 'approved'
+                  ? '#D1FAE5'
+                  : m.status === 'Pending' || m.status === 'pending'
+                  ? '#FFFBEB'
+                  : '#FFF7ED',
               }]}>
-                {m.status}
-              </Text>
+                <Text style={[styles.statusText, {
+                  color: m.status === 'Approved' || m.status === 'approved'
+                    ? colors.green
+                    : m.status === 'Pending' || m.status === 'pending'
+                    ? colors.primary
+                    : colors.companyAccent,
+                }]}>
+                  {m.status}
+                </Text>
+              </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   )
@@ -92,7 +121,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
   tabText: { fontSize: 12, fontWeight: '600', color: colors.gray },
-  tabTextActive: { color: colors.coral, fontWeight: '700' },
+  tabTextActive: { color: colors.companyAccent, fontWeight: '700' },
   milestoneCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -118,4 +147,5 @@ const styles = StyleSheet.create({
   milestoneDate: { fontSize: 12, color: colors.gray },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginLeft: 8 },
   statusText: { fontSize: 11, fontWeight: '600' },
+  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 40, fontSize: 14 },
 })

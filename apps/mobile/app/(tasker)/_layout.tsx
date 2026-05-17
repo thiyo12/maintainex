@@ -1,13 +1,7 @@
 import { Tabs } from 'expo-router'
 import { View, Text, StyleSheet } from 'react-native'
-
-const colors = {
-  teal: '#0D9488',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-}
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { colors } from '../../lib/colors'
 
 const tabs = [
   { name: 'index', title: 'Jobs', icon: '🗺️' },
@@ -17,12 +11,14 @@ const tabs = [
 ]
 
 export default function TaskerLayout() {
+  const insets = useSafeAreaInsets()
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: colors.teal,
+        tabBarStyle: [styles.tabBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 8 }],
+        tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.gray,
       }}
     >
@@ -34,7 +30,7 @@ export default function TaskerLayout() {
             title: tab.title,
             tabBarIcon: ({ focused }) => (
               <View style={[styles.tabIconWrap, focused && styles.tabIconActive]}>
-                <Text style={[styles.tabIcon, focused && { color: colors.teal }]}>
+                <Text style={[styles.tabIcon, focused && { color: colors.primary }]}>
                   {tab.icon}
                 </Text>
               </View>
@@ -52,10 +48,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.lightGray,
     paddingTop: 6,
-    paddingBottom: 24,
-    height: 80,
+    height: 64,
   },
   tabIconWrap: { alignItems: 'center', justifyContent: 'center' },
-  tabIconActive: { marginTop: -8 },
+  tabIconActive: { marginTop: -4 },
   tabIcon: { fontSize: 24 },
 })

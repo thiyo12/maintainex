@@ -1,35 +1,30 @@
-import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
-
-const nearbyTaskers = [
-  { name: 'Kamal Perera', skill: 'Plumber', distance: '1.2 km', rating: 4.8, price: 'LKR 850/hr', online: true },
-  { name: 'Saman Fernando', skill: 'Electrician', distance: '2.5 km', rating: 4.6, price: 'LKR 1,200/hr', online: true },
-  { name: 'Nimal Silva', skill: 'Painter', distance: '3.0 km', rating: 4.9, price: 'LKR 700/hr', online: false },
-  { name: 'Priya Mendis', skill: 'Cleaner', distance: '1.8 km', rating: 4.7, price: 'LKR 500/hr', online: true },
-  { name: 'Ruwan Jayasuriya', skill: 'Handyman', distance: '4.2 km', rating: 4.5, price: 'LKR 600/hr', online: false },
-  { name: 'Lahiru Silva', skill: 'Gardener', distance: '3.5 km', rating: 4.8, price: 'LKR 550/hr', online: true },
-]
+import { taskers } from '../../lib/api'
+import { colors } from '../../lib/colors'
+import type { TaskerProfile } from '../../lib/types'
 
 export default function ExploreScreen() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterSkill, setFilterSkill] = useState('')
+  const [taskerList, setTaskerList] = useState<TaskerProfile[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filtered = nearbyTaskers.filter(t =>
-    t.name.toLowerCase().includes(search.toLowerCase()) &&
-    (!filterSkill || t.skill.toLowerCase().includes(filterSkill.toLowerCase()))
+  useEffect(() => {
+    taskers.list()
+      .then(setTaskerList)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  const skills = [...new Set(taskerList.flatMap(t => t.skills || []))]
+
+  const filtered = taskerList.filter(t =>
+    t.user?.name?.toLowerCase().includes(search.toLowerCase()) &&
+    (!filterSkill || (t.skills || []).some(s => s.toLowerCase().includes(filterSkill.toLowerCase())))
   )
 
   return (
@@ -50,7 +45,7 @@ export default function ExploreScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
-        {['All', 'Plumber', 'Electrician', 'Painter', 'Cleaner', 'Handyman', 'Gardener'].map((f) => (
+        {['All', ...skills].map((f) => (
           <TouchableOpacity
             key={f}
             style={[styles.filterPill, filterSkill === f && styles.filterPillActive]}
@@ -66,32 +61,36 @@ export default function ExploreScreen() {
       <View style={styles.mapPlaceholder}>
         <Text style={styles.mapEmoji}>🗺️</Text>
         <Text style={styles.mapTitle}>{filtered.length} taskers nearby</Text>
-        <Text style={styles.mapSub}>📍 Colombo, Sri Lanka</Text>
+        <Text style={styles.mapSub}>📍 Sri Lanka</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {filtered.map((t, i) => (
-          <TouchableOpacity key={i} style={styles.taskerCard} activeOpacity={0.8}>
-            <View style={styles.taskerLeft}>
-              <View style={styles.taskerAvatar}>
-                <Text style={styles.avatarText}>{t.name[0]}</Text>
-                {t.online ? <View style={styles.onlineDot} /> : null}
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {filtered.map((t, i) => (
+            <TouchableOpacity key={t.id || i} style={styles.taskerCard} activeOpacity={0.8}>
+              <View style={styles.taskerLeft}>
+                <View style={styles.taskerAvatar}>
+                  <Text style={styles.avatarText}>{t.user?.name?.[0] || 'T'}</Text>
+                  {t.isOnline ? <View style={styles.onlineDot} /> : null}
+                </View>
+                <View style={styles.taskerInfo}>
+                  <Text style={styles.taskerName}>{t.user?.name || 'Tasker'}</Text>
+                  <Text style={styles.taskerSkill}>{t.skills?.[0] || 'Professional'} • ⭐ {t.rating?.toFixed(1) || '5.0'}</Text>
+                  <Text style={styles.taskerDistance}>{t.serviceAreas?.[0] || 'Sri Lanka'}</Text>
+                </View>
               </View>
-              <View style={styles.taskerInfo}>
-                <Text style={styles.taskerName}>{t.name}</Text>
-                <Text style={styles.taskerSkill}>{t.skill} • ⭐ {t.rating}</Text>
-                <Text style={styles.taskerDistance}>{t.distance} away</Text>
+              <View style={styles.taskerRight}>
+                <Text style={styles.taskerPrice}>LKR {t.hourlyRate?.toLocaleString() || '—'}/hr</Text>
+                <TouchableOpacity style={styles.hireBtn}>
+                  <Text style={styles.hireBtnText}>Hire</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-            <View style={styles.taskerRight}>
-              <Text style={styles.taskerPrice}>{t.price}</Text>
-              <TouchableOpacity style={styles.hireBtn}>
-                <Text style={styles.hireBtnText}>Hire</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </SafeAreaView>
   )
 }

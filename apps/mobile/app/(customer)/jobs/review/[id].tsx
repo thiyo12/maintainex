@@ -1,22 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Animated, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import StarRating from '../../../../components/ui/StarRating'
-
-const colors = {
-  primary: '#F59E0B',
-  purple: '#7C3AED',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { colors } from '../../../../lib/colors'
+import { jobs } from '../../../../lib/api'
+import { JobPosting } from '../../../../lib/types'
 
 export default function ReviewScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams()
+  const [job, setJob] = useState<JobPosting | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -27,6 +23,15 @@ export default function ReviewScreen() {
     Animated.spring(slideAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }).start()
   }, [])
 
+  useEffect(() => {
+    if (!id) return
+    setLoading(true)
+    jobs.get(id as string)
+      .then(setJob)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [id])
+
   const handleSubmit = () => {
     if (rating === 0) {
       Alert.alert('Error', 'Please select a rating')
@@ -36,6 +41,27 @@ export default function ReviewScreen() {
   }
 
   const categories = ['Quality', 'Punctuality', 'Communication', 'Value']
+
+  const taskerName = job?.assignedTasker?.user?.name || 'Tasker'
+  const avatarLetter = taskerName.charAt(0)
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+      </SafeAreaView>
+    )
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ color: colors.red, textAlign: 'center' }}>{error}</Text>
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   if (submitted) {
     return (
@@ -68,9 +94,9 @@ export default function ReviewScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.taskerAvatar}>
-            <Text style={styles.avatarText}>K</Text>
+            <Text style={styles.avatarText}>{avatarLetter}</Text>
           </View>
-          <Text style={styles.heading}>Review Kamal Perera</Text>
+          <Text style={styles.heading}>Review {taskerName}</Text>
           <Text style={styles.subtitle}>Share your experience with this tasker</Text>
         </View>
 
@@ -134,7 +160,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -239,7 +265,7 @@ const styles = StyleSheet.create({
   successSub: { fontSize: 15, color: colors.gray, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   homeBtn: {
     width: '100%',
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',

@@ -1,64 +1,95 @@
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { colors } from '../../lib/colors'
+import { company } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-
-const colors = {
-  coral: '#F97316',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
 
 export default function CompanyProfile() {
   const { logout } = useAuth()
+  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<any>(null)
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      const data = await company.profile.get()
+      setProfile(data)
+    } catch {
+      setProfile(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchProfile()
+  }, [fetchProfile])
+
+  const name = profile?.companyName || profile?.name || 'Premium Builders (Pvt) Ltd'
+  const regNumber = profile?.registrationNumber || profile?.regNumber || 'GST-12345678'
+  const initials = (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || 'PB').toUpperCase()
+  const about = profile?.about || profile?.description || `${name} is a licensed construction and maintenance company specializing in plumbing, electrical, and renovation services for commercial and residential clients in Colombo.`
+  const services = profile?.services || ['Plumbing', 'Electrical', 'Painting', 'Renovation', 'AC Installation', 'Construction']
+  const serviceAreas = profile?.serviceAreas || profile?.areas || ['Colombo', 'Gampaha', 'Kalutara', 'Negombo']
+  const rating = profile?.rating || '4.7'
+  const activeContracts = profile?.activeContracts || profile?.activeContractCount || 12
+  const teamMembers = profile?.teamMembers || profile?.teamCount || 8
+  const projectsDone = profile?.projectsDone || profile?.completedProjects || 47
+  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || '3 yr'
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>PB</Text>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-          <Text style={styles.companyName}>Premium Builders (Pvt) Ltd</Text>
-          <Text style={styles.companyReg}>Registered • GST-12345678</Text>
+          <Text style={styles.companyName}>{name}</Text>
+          <Text style={styles.companyReg}>Registered • {regNumber}</Text>
           <View style={styles.badgeRow}>
             <View style={styles.badge}><Text style={styles.badgeText}>✓ Verified</Text></View>
-            <View style={styles.badge}><Text style={styles.badgeText}>⭐ 4.7</Text></View>
+            <View style={styles.badge}><Text style={styles.badgeText}>⭐ {rating}</Text></View>
           </View>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statValue}>{activeContracts}</Text>
             <Text style={styles.statLabel}>Active contracts</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>8</Text>
+            <Text style={styles.statValue}>{teamMembers}</Text>
             <Text style={styles.statLabel}>Team members</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>47</Text>
+            <Text style={styles.statValue}>{projectsDone}</Text>
             <Text style={styles.statLabel}>Projects done</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>3 yr</Text>
+            <Text style={styles.statValue}>{inBusiness}</Text>
             <Text style={styles.statLabel}>In business</Text>
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.aboutText}>
-            Premium Builders is a licensed construction and maintenance company specializing in plumbing, electrical, and renovation services for commercial and residential clients in Colombo.
-          </Text>
+          <Text style={styles.aboutText}>{about}</Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Services</Text>
           <View style={styles.tagRow}>
-            {['Plumbing', 'Electrical', 'Painting', 'Renovation', 'AC Installation', 'Construction'].map((s) => (
+            {services.map((s: string) => (
               <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
             ))}
           </View>
@@ -67,7 +98,7 @@ export default function CompanyProfile() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Service areas</Text>
           <View style={styles.tagRow}>
-            {['Colombo', 'Gampaha', 'Kalutara', 'Negombo'].map((a) => (
+            {serviceAreas.map((a: string) => (
               <View key={a} style={styles.tag}><Text style={styles.tagText}>{a}</Text></View>
             ))}
           </View>
@@ -104,7 +135,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.coral,
+    backgroundColor: colors.companyAccent,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
