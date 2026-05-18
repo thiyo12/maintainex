@@ -80,13 +80,13 @@ const styles = StyleSheet.create({
   counter: {
     fontSize: 56,
     fontWeight: '800',
-    color: colors.purple,
+    color: colors.customerAccent,
     marginBottom: 4,
   },
   counterLabel: { fontSize: 14, color: colors.gray, fontWeight: '500', marginBottom: 48 },
   buttons: { width: '100%', gap: 14 },
   primaryBtn: {
-    backgroundColor: colors.purple,
+    backgroundColor: colors.customerAccent,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',

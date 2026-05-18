@@ -159,11 +159,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
     backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.lightGray, marginRight: 8,
   },
-  filterPillActive: { backgroundColor: colors.purple, borderColor: colors.purple },
+  filterPillActive: { backgroundColor: colors.customerAccent, borderColor: colors.customerAccent },
   filterPillText: { fontSize: 13, fontWeight: '600', color: colors.dark },
   filterPillTextActive: { color: colors.white },
   mapPlaceholder: {
-    backgroundColor: colors.purple, marginHorizontal: 24, borderRadius: 20,
+    backgroundColor: colors.customerAccent, marginHorizontal: 24, borderRadius: 20,
     height: 140, justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
   mapTitle: { fontSize: 16, fontWeight: '700', color: colors.white, marginTop: 6, marginBottom: 2 },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   },
   taskerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
   taskerAvatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.purple,
+    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.customerAccent,
     justifyContent: 'center', alignItems: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   taskerRight: { alignItems: 'flex-end', gap: 8 },
   taskerPrice: { fontSize: 14, fontWeight: '800', color: colors.primary },
   hireBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.purple,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.customerAccent,
     paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8,
   },
   hireBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },

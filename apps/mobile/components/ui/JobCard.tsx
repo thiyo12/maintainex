@@ -26,7 +26,7 @@ interface Props {
 const statusColors: Record<string, string> = {
   OPEN: colors.green,
   ASSIGNED: colors.primary,
-  IN_PROGRESS: colors.purple,
+  IN_PROGRESS: colors.customerAccent,
   COMPLETED: colors.gray,
   CANCELLED: colors.red,
 }

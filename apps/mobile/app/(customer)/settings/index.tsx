@@ -16,8 +16,8 @@ function MenuRow({ icon, label, onPress, color }: any) {
       onPress={onPress}
     >
       <Animated.View style={[styles.menuRow, { transform: [{ scale }] }]}>
-        <View style={[styles.menuIconWrap, { backgroundColor: (color || colors.purple) + '20' }]}>
-          <Ionicons name={icon} size={20} color={color || colors.purple} />
+        <View style={[styles.menuIconWrap, { backgroundColor: (color || colors.customerAccent) + '20' }]}>
+          <Ionicons name={icon} size={20} color={color || colors.customerAccent} />
         </View>
         <Text style={styles.menuLabel}>{label}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.gray} />

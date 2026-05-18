@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 22, fontWeight: '800', color: colors.dark },
   location: { fontSize: 13, color: colors.gray, marginTop: 4 },
   avatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.purple,
+    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.customerAccent,
     justifyContent: 'center', alignItems: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   taskerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   taskerAvatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.purple,
+    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.customerAccent,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
   taskerAvatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
@@ -276,9 +276,9 @@ const styles = StyleSheet.create({
   findSub: { fontSize: 12, color: '#92400E', marginTop: 2 },
   fab: {
     position: 'absolute', bottom: 100, right: 24, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.purple, paddingHorizontal: 20, paddingVertical: 14,
+    backgroundColor: colors.customerAccent, paddingHorizontal: 20, paddingVertical: 14,
     borderRadius: 28,
-    shadowColor: colors.purple, shadowOffset: { width: 0, height: 6 },
+    shadowColor: colors.customerAccent, shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3, shadowRadius: 12, elevation: 8, gap: 8,
   },
   fabLabel: { fontSize: 15, fontWeight: '700', color: colors.white },
