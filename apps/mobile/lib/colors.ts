@@ -16,6 +16,8 @@ export const colors = {
   red: '#DC2626',
   warning: '#F59E0B',
 
+  teal: '#0D9488',
+
   // Role accent tints (subtle, used minimally)
   customerAccent: '#7C3AED',
   taskerAccent: '#0D9488',

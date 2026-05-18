@@ -33,13 +33,14 @@ export default function EditProfileScreen() {
     }
     setSaving(true)
     try {
-      await auth.register({ name, email, password: 'ignored', phone, role: user?.role || 'CUSTOMER' })
+      await auth.updateProfile({ name, phone })
       await refreshUser()
       Alert.alert('Saved', 'Profile updated successfully')
       router.back()
-    } catch {
-      Alert.alert('Saved', 'Profile updated successfully')
-      router.back()
+    } catch (e: any) {
+      let msg = 'Failed to save'
+      try { msg = JSON.parse(e.message).error || msg } catch {}
+      Alert.alert('Error', msg)
     } finally {
       setSaving(false)
     }

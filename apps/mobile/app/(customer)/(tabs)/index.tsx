@@ -7,6 +7,7 @@ import { useAuth } from '../../../lib/auth'
 import { categories, taskers } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
 import type { Category, TaskerProfile } from '../../../lib/types'
+import PressScale from '../../../components/find/PressScale'
 
 const catIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   construction: 'construct-outline', cleaning: 'sparkles-outline', electrical: 'flash-outline',
@@ -14,17 +15,6 @@ const catIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
   gardening: 'leaf-outline', handyman: 'build-outline', assembly: 'settings-outline',
   mounting: 'easel-outline', outdoor: 'sunny-outline', repairs: 'hammer-outline',
   trending: 'trending-up-outline',
-}
-
-function PressScale({ onPress, children, style }: any) {
-  const scale = useRef(new Animated.Value(1)).current
-  const animIn = () => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()
-  const animOut = () => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={1} onPressIn={animIn} onPressOut={animOut}>
-      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
-    </TouchableOpacity>
-  )
 }
 
 export default function CustomerHome() {
@@ -44,9 +34,11 @@ export default function CustomerHome() {
 
   const loadData = async () => {
     try {
-      const [cats, tks] = await Promise.all([categories.list(), taskers.list()])
-      setCatList(cats)
-      setTaskerList(tks)
+      const [catsResult, tksResult] = await Promise.allSettled([categories.list(), taskers.list()])
+      if (catsResult.status === 'fulfilled') setCatList(catsResult.value)
+      else console.error('Categories error:', catsResult.reason)
+      if (tksResult.status === 'fulfilled') setTaskerList(tksResult.value)
+      else console.error('Taskers error:', tksResult.reason)
     } catch (e) {
       console.error('Home load error:', e)
     } finally {

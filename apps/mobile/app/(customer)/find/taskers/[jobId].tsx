@@ -74,7 +74,7 @@ export default function FindTaskerList() {
               isOnline={item.isOnline}
               distance={item.distance}
               hourlyRate={item.hourlyRate}
-              onPress={() => router.push(`/(customer)/find/tasker-profile/${item.id}?jobId=${jobId}`)}
+              onPress={() => router.push(`/(customer)/find/tasker-profile/${item.id}?jobId=${jobId}` as any)}
             />
           )}
           contentContainerStyle={styles.list}

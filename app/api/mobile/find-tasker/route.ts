@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const templateJob = await prisma.templateJob.findUnique({
       where: { id: jobId },
-      select: { categoryId: true, id: true },
+      include: { category: { select: { name: true } } },
     })
 
     if (!templateJob) {
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       where: {
         isVerified: true,
         isOnline: true,
-        skills: { has: templateJob.categoryId },
+        skills: { has: templateJob.category.name },
       },
       include: {
         user: { select: { id: true, name: true, phone: true, email: true } },

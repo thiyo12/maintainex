@@ -21,12 +21,16 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
 
 let authToken: string | null = null
 
-export const setAuthToken = (token: string | null) => {
+export const setAuthToken = async (token: string | null) => {
   authToken = token
-  if (token) {
-    SecureStore.setItemAsync('auth_token', token)
-  } else {
-    SecureStore.deleteItemAsync('auth_token')
+  try {
+    if (token) {
+      await SecureStore.setItemAsync('auth_token', token)
+    } else {
+      await SecureStore.deleteItemAsync('auth_token')
+    }
+  } catch (e) {
+    console.error('Failed to persist auth token:', e)
   }
 }
 
@@ -78,6 +82,8 @@ export const auth = {
   verifyOtp: (data: { phone: string; code: string }) =>
     request<{ success: boolean }>('/api/mobile/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
   me: () => request<{ user: import('./types').User }>('/api/mobile/auth/me'),
+  updateProfile: (data: { name?: string; phone?: string }) =>
+    request<{ user: import('./types').User }>('/api/mobile/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
 }
 
 // Categories & Services

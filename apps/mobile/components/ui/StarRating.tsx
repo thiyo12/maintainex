@@ -16,7 +16,7 @@ interface Props {
 }
 
 export default function StarRating({ stars, size = 32, onRate, readonly = false }: Props) {
-  const animValues = useRef(stars.map(() => new Animated.Value(1))).current
+  const animValues = useRef(Array.from({ length: 5 }, () => new Animated.Value(1))).current
 
   useEffect(() => {
     if (!readonly && stars > 0) {

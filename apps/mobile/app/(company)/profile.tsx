@@ -5,18 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { company } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
-
-function PressScale({ onPress, children, style }: any) {
-  const scale = useRef(new Animated.Value(1)).current
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={1}
-      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
-    >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
-    </TouchableOpacity>
-  )
-}
+import PressScale from '../../components/find/PressScale'
 
 export default function CompanyProfile() {
   const { logout } = useAuth()

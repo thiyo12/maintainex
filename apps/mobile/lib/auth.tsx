@@ -32,8 +32,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await SecureStore.getItemAsync('auth_token')
       const storedUser = await SecureStore.getItemAsync('auth_user')
       if (token && storedUser) {
-        setAuthToken(token)
+        await setAuthToken(token)
         setUser(JSON.parse(storedUser))
+        // Validate token against server — if stale, clear session
+        try {
+          await auth.me()
+        } catch {
+          await SecureStore.deleteItemAsync('auth_token')
+          await SecureStore.deleteItemAsync('auth_user')
+          setAuthToken(null)
+          setUser(null)
+        }
       }
     } catch {
     } finally {
@@ -43,30 +52,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await auth.login({ email, password })
-    setAuthToken(res.token)
+    await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
   }, [])
 
   const loginWithOtp = useCallback(async (phone: string, otp: string) => {
     const res = await auth.loginWithOtp({ phone, otp })
-    setAuthToken(res.token)
+    await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
   }, [])
 
   const register = useCallback(async (data: { email: string; password: string; name: string; phone: string; role: string }) => {
     const res = await auth.register(data)
-    setAuthToken(res.token)
+    await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
   }, [])
 
   const logout = useCallback(async () => {
-    setAuthToken(null)
+    await setAuthToken(null)
     setUser(null)
     setSignupData(null)
-    await SecureStore.deleteItemAsync('auth_token')
     await SecureStore.deleteItemAsync('auth_user')
   }, [])
 

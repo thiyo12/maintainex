@@ -101,7 +101,7 @@ export default function LiveTrackingScreen() {
               <Ionicons name="call-outline" size={16} color={colors.dark} />
               <Text style={styles.callBtnText}> Call</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.chatBtn} onPress={() => router.push('/(chat)/' + id)}>
+            <TouchableOpacity style={styles.chatBtn} onPress={() => router.push('/(chat)/' + id as any)}>
               <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.white} />
               <Text style={styles.chatBtnText}> Chat</Text>
             </TouchableOpacity>
@@ -141,7 +141,7 @@ export default function LiveTrackingScreen() {
       {stepIndex === 2 ? (
         <TouchableOpacity
           style={styles.completeBtn}
-          onPress={() => router.push('/(customer)/jobs/complete/' + id)}
+          onPress={() => router.push('/(customer)/jobs/complete/' + id as any)}
         >
           <Text style={styles.completeBtnText}>Mark as complete</Text>
         </TouchableOpacity>

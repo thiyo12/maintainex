@@ -195,12 +195,18 @@ model Booking {
   province   String?
   address    String?
   time       String?
+  taskerId   String?
+  tasker     TaskerProfile? @relation(fields: [taskerId], references: [id], onDelete: SetNull)
+  templateJobId String?
+  templateJob   TemplateJob? @relation(fields: [templateJobId], references: [id], onDelete: SetNull)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@index([userId])
   @@index([serviceId])
   @@index([branchId])
+  @@index([taskerId])
+  @@index([templateJobId])
   @@index([status])
   @@index([date])
 }
@@ -856,6 +862,7 @@ model TemplateJob {
   createdAt             DateTime @default(now())
 
   taskerSkills TaskerSkill[]
+  bookings     Booking[]
 
   @@index([categoryId])
   @@index([isPopular])
@@ -921,6 +928,7 @@ model TaskerProfile {
   assignments Assignment[]
   reviews     TaskerReview[]
   taskerSkills TaskerSkill[]
+  bookings    Booking[]
 
   @@index([isOnline])
   @@index([isVerified])

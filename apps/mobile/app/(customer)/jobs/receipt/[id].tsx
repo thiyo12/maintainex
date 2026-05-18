@@ -145,7 +145,7 @@ export default function ReceiptScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.reviewBtn}
-            onPress={() => router.push('/(customer)/jobs/review/' + id)}
+            onPress={() => router.push('/(customer)/jobs/review/' + id as any)}
           >
             <Ionicons name="star-outline" size={16} color={colors.white} />
             <Text style={styles.reviewBtnText}> Leave a review</Text>

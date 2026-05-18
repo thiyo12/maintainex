@@ -61,7 +61,7 @@ export default function QuotesScreen() {
                   <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>View profile</Text></TouchableOpacity>
                   <TouchableOpacity
                     style={styles.acceptBtn}
-                    onPress={() => router.push(`/(customer)/booking/confirm?jobId=${jobId || ''}&bidId=${q.id}&taskerName=${q.tasker?.user?.name || ''}&price=${q.amount}`)}
+                    onPress={() => router.push(`/(customer)/booking/confirm?jobId=${jobId || ''}&bidId=${q.id}&taskerName=${q.tasker?.user?.name || ''}&price=${q.amount}` as any)}
                   >
                     <Text style={styles.acceptBtnText}>Accept quote</Text>
                   </TouchableOpacity>
@@ -74,3 +74,28 @@ export default function QuotesScreen() {
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  backBtn: { paddingHorizontal: 24, paddingTop: 8 },
+  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+  heading: { fontSize: 22, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginTop: 16, marginBottom: 16 },
+  jobSummary: { backgroundColor: colors.white, marginHorizontal: 24, padding: 16, borderRadius: 14, marginBottom: 8 },
+  jobTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
+  jobMeta: { fontSize: 13, color: colors.gray, marginTop: 4 },
+  count: { fontSize: 14, fontWeight: '600', color: colors.gray, paddingHorizontal: 24, marginBottom: 12, marginTop: 8 },
+  card: { backgroundColor: colors.white, marginHorizontal: 24, marginBottom: 12, padding: 16, borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  avatarText: { fontSize: 18, fontWeight: '700', color: colors.dark },
+  cardInfo: { flex: 1 },
+  cardName: { fontSize: 15, fontWeight: '700', color: colors.dark },
+  cardSkill: { fontSize: 13, color: colors.gray, marginTop: 2 },
+  price: { fontSize: 15, fontWeight: '800', color: colors.primary },
+  message: { fontSize: 14, color: colors.gray, lineHeight: 20, marginBottom: 12 },
+  cardActions: { flexDirection: 'row', gap: 10 },
+  viewBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: colors.lightGray, alignItems: 'center' },
+  viewBtnText: { fontSize: 14, fontWeight: '600', color: colors.dark },
+  acceptBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center' },
+  acceptBtnText: { fontSize: 14, fontWeight: '700', color: colors.dark },
+})

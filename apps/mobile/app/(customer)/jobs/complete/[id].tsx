@@ -120,7 +120,7 @@ export default function JobCompleteScreen() {
 
         {confirmed ? (
           <View style={styles.confirmedBox}>
-            <Ionicons name="party-popper-outline" size={32} color={colors.green} style={{ marginBottom: 8 }} />
+            <Ionicons name="sparkles-outline" size={32} color={colors.green} style={{ marginBottom: 8 }} />
             <Text style={styles.confirmedText}>Job marked as complete!</Text>
             <Text style={styles.confirmedSub}>
               Payment of LKR {((job?.budget || 0) * 1.05).toLocaleString()} will be released to the tasker.
@@ -141,7 +141,7 @@ export default function JobCompleteScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.issueBtn}
-            onPress={() => router.push('/(customer)/jobs/dispute/' + id)}
+            onPress={() => router.push('/(customer)/jobs/dispute/' + id as any)}
           >
             <Text style={styles.issueBtnText}>Report an issue</Text>
           </TouchableOpacity>
@@ -155,7 +155,7 @@ export default function JobCompleteScreen() {
       {confirmed ? (
         <TouchableOpacity
           style={styles.nextBtn}
-          onPress={() => router.push('/(customer)/jobs/receipt/' + id)}
+            onPress={() => router.push('/(customer)/jobs/receipt/' + id as any)}
         >
           <Text style={styles.nextBtnText}>Continue to receipt</Text>
         </TouchableOpacity>

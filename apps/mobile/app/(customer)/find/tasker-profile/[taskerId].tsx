@@ -119,7 +119,7 @@ export default function TaskerProfileDetail() {
         label="Starting from"
         buttonText="Book Now"
         icon="calendar"
-        onPress={() => router.push(`/(customer)/find/booking/${jobId}?taskerId=${taskerId}&rate=${tasker.hourlyRate}`)}
+        onPress={() => router.push(`/(customer)/find/booking/${jobId}?taskerId=${taskerId}&rate=${tasker.hourlyRate}` as any)}
       />
     </View>
   )

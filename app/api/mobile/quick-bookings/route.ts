@@ -8,19 +8,16 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    if (user.role !== 'CUSTOMER') {
-      return NextResponse.json({ error: 'Only customers can book' }, { status: 403 })
-    }
 
     const { jobId, taskerId, date, timeSlot, address, district, notes } = await request.json()
 
-    if (!jobId || !taskerId || !date || !timeSlot || !address) {
-      return NextResponse.json({ error: 'jobId, taskerId, date, timeSlot, and address are required' }, { status: 400 })
+    if (!jobId || !taskerId || !date || !timeSlot || !address || !district) {
+      return NextResponse.json({ error: 'Missing required fields: jobId, taskerId, date, timeSlot, address, district' }, { status: 400 })
     }
 
     const templateJob = await prisma.templateJob.findUnique({ where: { id: jobId } })
     if (!templateJob) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Template job not found' }, { status: 404 })
     }
 
     const tasker = await prisma.taskerProfile.findUnique({ where: { id: taskerId } })
@@ -28,20 +25,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
     }
 
-    const avgPrice = (templateJob.priceMin + templateJob.priceMax) / 2
+    const totalPrice = templateJob.priceMax
 
     const booking = await prisma.booking.create({
       data: {
         userId: user.id,
-        date: new Date(date),
-        timeSlot,
-        totalPrice: avgPrice,
-        name: user.name,
-        phone: user.phone || '',
+        taskerId,
+        templateJobId: jobId,
+        name: user.name || user.email,
+        phone: '',
         district,
         address,
-        notes,
-        status: 'CONFIRMED',
+        date: new Date(date),
+        timeSlot,
+        totalPrice,
+        status: 'PENDING',
+        notes: notes || null,
       },
     })
 
