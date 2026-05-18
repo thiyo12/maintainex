@@ -57,7 +57,7 @@ export default function TaskerHome() {
         <View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Tasker'}</Text>
-            <Ionicons name="hand-wave-outline" size={22} color={colors.primary} style={{ marginLeft: 6 }} />
+            <Ionicons name="hand-left-outline" size={22} color={colors.primary} style={{ marginLeft: 6 }} />
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
             <Ionicons name="location-outline" size={14} color={colors.gray} />

@@ -208,3 +208,36 @@ export default function PostJobScreen() {
     </SafeAreaView>
   )
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F9FAFB', paddingHorizontal: 20 },
+  backBtn: { marginTop: 12, marginBottom: 8 },
+  backText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },
+  heading: { fontSize: 24, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
+  scroll: { flex: 1 },
+  stepLabel: { fontSize: 13, fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
+  sectionLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#1F2937', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 12 },
+  textArea: { minHeight: 90, textAlignVertical: 'top' },
+  charCount: { fontSize: 11, color: '#9CA3AF', textAlign: 'right', marginTop: -8, marginBottom: 8 },
+  budgetRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  budgetInput: { flex: 1, textAlign: 'center' },
+  budgetSep: { fontSize: 16, color: '#9CA3AF' },
+  currency: { fontSize: 14, fontWeight: '600', color: '#374151', marginLeft: 4 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  toggle: { width: 22, height: 22, borderRadius: 5, borderWidth: 2, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center' },
+  toggleActive: { backgroundColor: '#059669', borderColor: '#059669' },
+  toggleLabel: { fontSize: 14, color: '#374151' },
+  pillRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB' },
+  pillActive: { borderColor: '#F59E0B', backgroundColor: '#FEF3C7' },
+  pillText: { fontSize: 13, color: '#374151' },
+  pillTextActive: { color: '#92400E', fontWeight: '600' },
+  summaryCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 16 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  summaryLabel: { fontSize: 13, color: '#9CA3AF', width: 80 },
+  summaryValue: { flex: 1, fontSize: 14, color: '#1F2937' },
+  editLink: { fontSize: 13, color: '#3B82F6', fontWeight: '500' },
+  nextBtn: { backgroundColor: '#059669', paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginBottom: 20 },
+  nextText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+})
