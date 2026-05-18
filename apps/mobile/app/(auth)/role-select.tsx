@@ -50,7 +50,7 @@ export default function RoleSelectScreen() {
           {roles.map((role) => {
             const isSelected = selected === role.id
             return (
-              <PressScale key={role.id} style={undefined}>
+              <PressScale key={role.id} onPress={() => setSelected(role.id)}>
                 <View style={[
                   styles.card,
                   isSelected && { borderColor: role.color, borderWidth: 2 },
@@ -58,33 +58,35 @@ export default function RoleSelectScreen() {
                   <View style={styles.cardContent}>
                     <View style={styles.cardLeft}>
                       <Ionicons name={role.icon} size={32} color={role.color} style={{ marginRight: 16 }} />
-                    <View style={styles.cardText}>
-                      <Text style={styles.cardTitle}>{role.title}</Text>
-                      <Text style={styles.cardSubtitle}>{role.subtitle}</Text>
+                      <View style={styles.cardText}>
+                        <Text style={styles.cardTitle}>{role.title}</Text>
+                        <Text style={styles.cardSubtitle}>{role.subtitle}</Text>
+                      </View>
                     </View>
+                    <Text style={[styles.arrow, isSelected && { color: role.color }]}>
+                      ›
+                    </Text>
                   </View>
-                  <Text style={[styles.arrow, isSelected && { color: role.color }]}>
-                    ›
-                  </Text>
                 </View>
-              </View>
-            </PressScale>
+              </PressScale>
             )
           })}
         </View>
 
-        <PressScale
-          style={undefined}
+        <TouchableOpacity
+          style={[styles.continueButton, !selected && styles.continueButtonDisabled]}
           onPress={() => {
             if (selected) {
               router.push({ pathname: '/(auth)/register', params: { role: selected } })
             }
           }}
+          disabled={!selected}
+          activeOpacity={0.8}
         >
           <Text style={[styles.continueText, !selected && styles.continueTextDisabled]}>
             Continue
           </Text>
-        </PressScale>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   )
