@@ -1,5 +1,5 @@
-import CustomerSettings from '../settings/index'
+import ProfileContent from '../../../components/ProfileContent'
 
 export default function ProfileTab() {
-  return <CustomerSettings />
+  return <ProfileContent />
 }
