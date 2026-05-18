@@ -96,7 +96,7 @@ export default function ExploreScreen() {
           </View>
 
           {filtered.map((t, i) => (
-            <PressScale key={t.id || i}>
+            <PressScale key={t.id || i} onPress={() => router.push(`/(customer)/find/tasker-profile/${t.id}`)}>
               <View style={styles.taskerCard}>
                 <View style={styles.taskerLeft}>
                   <View style={styles.taskerAvatar}>
@@ -118,7 +118,8 @@ export default function ExploreScreen() {
                   <Text style={styles.taskerPrice}>
                     {t.hourlyRate ? `LKR ${t.hourlyRate}/hr` : '—'}
                   </Text>
-                  <TouchableOpacity style={styles.hireBtn}>
+                  <TouchableOpacity style={styles.hireBtn}
+                    onPress={() => router.push(`/(customer)/find/tasker-profile/${t.id}`)}>
                     <Ionicons name="hand-left-outline" size={14} color={colors.white} />
                     <Text style={styles.hireBtnText}> Hire</Text>
                   </TouchableOpacity>

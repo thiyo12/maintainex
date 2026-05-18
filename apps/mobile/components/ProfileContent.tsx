@@ -50,19 +50,25 @@ export default function ProfileContent() {
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="person-outline" label="My profile" color={colors.customerAccent} />
+          <MenuRow icon="person-outline" label="My profile" color={colors.customerAccent}
+            onPress={() => router.push('/(customer)/settings/my-profile')} />
           <MenuRow icon="create-outline" label="Edit profile" color={colors.customerAccent}
             onPress={() => router.push('/(customer)/settings/edit-profile')} />
           <MenuRow icon="notifications-outline" label="Notifications" color="#F59E0B"
             onPress={() => router.push('/(customer)/settings/notifications')} />
-          <MenuRow icon="card-outline" label="Payment methods" color="#10B981" />
-          <MenuRow icon="location-outline" label="Saved addresses" color="#3B82F6" />
+          <MenuRow icon="card-outline" label="Payment methods" color="#10B981"
+            onPress={() => router.push('/(customer)/settings/payment')} />
+          <MenuRow icon="location-outline" label="Saved addresses" color="#3B82F6"
+            onPress={() => router.push('/(customer)/settings/addresses')} />
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="help-circle-outline" label="Help & support" color="#8B5CF6" />
-          <MenuRow icon="document-text-outline" label="Terms & privacy" color="#6B7280" />
-          <MenuRow icon="information-circle-outline" label="About Maintainex" color="#EC4899" />
+          <MenuRow icon="help-circle-outline" label="Help & support" color="#8B5CF6"
+            onPress={() => router.push('/(customer)/settings/help')} />
+          <MenuRow icon="document-text-outline" label="Terms & privacy" color="#6B7280"
+            onPress={() => router.push('/(customer)/settings/terms')} />
+          <MenuRow icon="information-circle-outline" label="About Maintainex" color="#EC4899"
+            onPress={() => router.push('/(customer)/settings/about')} />
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8}>

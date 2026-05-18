@@ -1,44 +1,53 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { colors } from '../../lib/colors'
 
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
+interface CategoryItem {
+  id: string
+  name: string
+  iconName: string
+  colorHex: string
 }
-
-const categories = [
-  { key: 'construction', icon: '🏗️', label: 'Construction' },
-  { key: 'cleaning', icon: '🧹', label: 'Cleaning' },
-  { key: 'electrical', icon: '⚡', label: 'Electrical' },
-  { key: 'plumbing', icon: '🔧', label: 'Plumbing' },
-  { key: 'painting', icon: '🎨', label: 'Painting' },
-  { key: 'moving', icon: '📦', label: 'Moving' },
-  { key: 'gardening', icon: '🌿', label: 'Gardening' },
-  { key: 'handyman', icon: '🔨', label: 'Handyman' },
-]
 
 interface Props {
+  items?: CategoryItem[]
   selected?: string
-  onSelect: (key: string) => void
+  onSelect: (id: string) => void
+  loading?: boolean
 }
 
-export default function CategoryPills({ selected, onSelect }: Props) {
+const FALLBACK_CATEGORIES: CategoryItem[] = [
+  { id: 'cleaning', name: 'Cleaning', iconName: 'sparkles-outline', colorHex: '#0EA5E9' },
+  { id: 'electrical', name: 'Electrical', iconName: 'flash-outline', colorHex: '#F59E0B' },
+  { id: 'plumbing', name: 'Plumbing', iconName: 'water-outline', colorHex: '#3B82F6' },
+  { id: 'painting', name: 'Painting', iconName: 'color-palette-outline', colorHex: '#EC4899' },
+  { id: 'moving', name: 'Moving', iconName: 'cube-outline', colorHex: '#F97316' },
+  { id: 'gardening', name: 'Gardening', iconName: 'leaf-outline', colorHex: '#16A34A' },
+  { id: 'repairs', name: 'Repairs', iconName: 'hammer-outline', colorHex: '#78716C' },
+  { id: 'assembly', name: 'Assembly', iconName: 'settings-outline', colorHex: '#7C3AED' },
+]
+
+export default function CategoryPills({ items, selected, onSelect, loading }: Props) {
+  const list = items || FALLBACK_CATEGORIES
+
+  if (loading) {
+    return <Text style={{ fontSize: 13, color: '#9CA3AF', paddingVertical: 12 }}>Loading categories...</Text>
+  }
+
   return (
     <View style={styles.row}>
-      {categories.map((cat) => {
-        const isSelected = selected === cat.key
+      {list.map((cat) => {
+        const isSelected = selected === cat.id
         return (
           <TouchableOpacity
-            key={cat.key}
-            style={[styles.pill, isSelected && styles.pillActive]}
-            onPress={() => onSelect(cat.key)}
+            key={cat.id}
+            style={[styles.pill, isSelected && { borderColor: cat.colorHex, backgroundColor: cat.colorHex + '15' }]}
+            onPress={() => onSelect(cat.id)}
             activeOpacity={0.7}
           >
-            <Text style={styles.pillIcon}>{cat.icon}</Text>
-            <Text style={[styles.pillLabel, isSelected && styles.pillLabelActive]}>
-              {cat.label}
+            <Ionicons name={cat.iconName as any} size={16} color={isSelected ? cat.colorHex : '#6B7280'} />
+            <Text style={[styles.pillLabel, isSelected && { color: cat.colorHex, fontWeight: '700' }]}>
+              {cat.name}
             </Text>
           </TouchableOpacity>
         )
@@ -57,25 +66,17 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
+    borderColor: '#E5E7EB',
     gap: 6,
   },
-  pillActive: {
-    backgroundColor: '#FFFBEB',
-    borderColor: colors.primary,
-  },
-  pillIcon: { fontSize: 16 },
   pillLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.dark,
-  },
-  pillLabelActive: {
-    color: colors.primary,
+    color: '#1F2937',
   },
 })

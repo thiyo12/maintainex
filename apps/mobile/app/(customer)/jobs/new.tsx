@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { jobs } from '../../../lib/api'
+import { jobs, jobCategories } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
 import ProgressSteps from '../../../components/ui/ProgressSteps'
 import CategoryPills from '../../../components/ui/CategoryPills'
@@ -14,7 +14,10 @@ import PhotoUploader from '../../../components/ui/PhotoUploader'
 export default function PostJobScreen() {
   const router = useRouter()
   const [step, setStep] = useState(0)
-  const [category, setCategory] = useState('')
+  const [cats, setCats] = useState<any[]>([])
+  const [catsLoading, setCatsLoading] = useState(true)
+  const [categoryId, setCategoryId] = useState('')
+  const [categoryName, setCategoryName] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [photos, setPhotos] = useState<any[]>([])
@@ -26,11 +29,18 @@ export default function PostJobScreen() {
   const [prefer, setPrefer] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
+  useEffect(() => {
+    jobCategories.list().then(data => {
+      setCats(data)
+      setCatsLoading(false)
+    }).catch(() => setCatsLoading(false))
+  }, [])
+
   const steps = ['Job Details', 'Location & Budget', 'Review']
   const charCount = description.length
 
   const handleNext = () => {
-    if (step === 0 && (!category || !title || !description)) {
+    if (step === 0 && (!categoryId || !title || !description)) {
       Alert.alert('Error', 'Please fill in all required fields')
       return
     }
@@ -48,7 +58,7 @@ export default function PostJobScreen() {
       const job = await jobs.create({
         title,
         description,
-        category,
+        category: categoryName || categoryId,
         budget: String(budget),
         location,
       })
@@ -60,9 +70,20 @@ export default function PostJobScreen() {
     }
   }
 
+  const handleCategorySelect = (id: string) => {
+    setCategoryId(id)
+    const cat = cats.find(c => c.id === id)
+    setCategoryName(cat?.name || id)
+  }
+
+  const goBack = () => {
+    if (step > 0) setStep(step - 1)
+    else router.back()
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : router.back()} style={styles.backBtn}>
+      <TouchableOpacity onPress={goBack} style={styles.backBtn}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
@@ -74,7 +95,7 @@ export default function PostJobScreen() {
           <View>
             <Text style={styles.stepLabel}>Job details</Text>
             <Text style={styles.sectionLabel}>Category</Text>
-            <CategoryPills selected={category} onSelect={setCategory} />
+            <CategoryPills items={cats} selected={categoryId} onSelect={handleCategorySelect} loading={catsLoading} />
             <Text style={styles.sectionLabel}>Job title</Text>
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Fix leaking pipe" />
             <Text style={styles.sectionLabel}>Description</Text>
@@ -163,35 +184,35 @@ export default function PostJobScreen() {
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Category</Text>
-                <Text style={styles.summaryValue}>{category || 'Not set'}</Text>
-                <TouchableOpacity><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <Text style={styles.summaryValue}>{categoryName || 'Not set'}</Text>
+                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Title</Text>
                 <Text style={styles.summaryValue} numberOfLines={1}>{title}</Text>
-                <TouchableOpacity><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Description</Text>
                 <Text style={styles.summaryValue} numberOfLines={2}>{description}</Text>
-                <TouchableOpacity><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Location</Text>
                 <Text style={styles.summaryValue}>{location || 'Not set'}</Text>
-                <TouchableOpacity><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Budget</Text>
                 <Text style={styles.summaryValue}>
                   {letQuote ? 'Let them quote' : `LKR ${budgetMin || '0'} - ${budgetMax || '0'}`}
                 </Text>
-                <TouchableOpacity><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Urgency</Text>
                 <Text style={styles.summaryValue}>{urgency || 'Not set'}</Text>
-                <TouchableOpacity><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
               </View>
             </View>
           </View>

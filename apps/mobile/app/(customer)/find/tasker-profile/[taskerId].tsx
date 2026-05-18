@@ -117,9 +117,15 @@ export default function TaskerProfileDetail() {
       <StickyBottomBar
         price={`Rs ${tasker.hourlyRate}/hr`}
         label="Starting from"
-        buttonText="Book Now"
-        icon="calendar"
-        onPress={() => router.push(`/(customer)/find/booking/${jobId}?taskerId=${taskerId}&rate=${tasker.hourlyRate}` as any)}
+        buttonText={jobId ? "Book Now" : "Select Service"}
+        icon={jobId ? "calendar" : "search"}
+        onPress={() => {
+          if (jobId) {
+            router.push(`/(customer)/find/booking/${jobId}?taskerId=${taskerId}&rate=${tasker.hourlyRate}` as any)
+          } else {
+            router.push('/(customer)/find')
+          }
+        }}
       />
     </View>
   )
