@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/colors'
 import { jobs, disputes } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/auth'
@@ -92,7 +93,7 @@ export default function DisputeScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.successContainer}>
           <View style={styles.successCircle}>
-            <Text style={styles.successIcon}>📋</Text>
+            <Ionicons name="document-text-outline" size={36} color={colors.white} />
           </View>
           <Text style={styles.successTitle}>Dispute filed</Text>
           <Text style={styles.successSub}>
@@ -102,9 +103,10 @@ export default function DisputeScreen() {
             <Text style={styles.ticketLabel}>Dispute ID</Text>
             <Text style={styles.ticketId}>#{disputeId}</Text>
           </View>
-          <Text style={styles.refundNote}>
-            🔒 Funds remain in escrow until the dispute is resolved.
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 32 }}>
+            <Ionicons name="lock-closed-outline" size={14} color={colors.gray} />
+            <Text style={styles.refundNote}> Funds remain in escrow until the dispute is resolved.</Text>
+          </View>
           <TouchableOpacity
             style={styles.homeBtn}
             onPress={() => router.replace('/(customer)')}
@@ -206,7 +208,7 @@ export default function DisputeScreen() {
               </View>
             ) : null}
             <View style={styles.warningBox}>
-              <Text style={styles.warningIcon}>⚠️</Text>
+              <Ionicons name="warning-outline" size={18} color="#92400E" />
               <Text style={styles.warningText}>
                 False or fraudulent disputes may result in account suspension. Please ensure your claim is accurate.
               </Text>
@@ -326,7 +328,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 100,
   },
-  warningIcon: { fontSize: 18 },
   warningText: { flex: 1, fontSize: 12, color: '#92400E', lineHeight: 18 },
   nextBtn: {
     backgroundColor: colors.red,
@@ -357,7 +358,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  successIcon: { fontSize: 36 },
   successTitle: { fontSize: 26, fontWeight: '800', color: colors.dark, marginBottom: 8 },
   successSub: { fontSize: 15, color: colors.gray, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
   ticketBox: {
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   },
   ticketLabel: { fontSize: 12, color: colors.gray, marginBottom: 4 },
   ticketId: { fontSize: 16, fontWeight: '700', color: colors.dark },
-  refundNote: { fontSize: 13, color: colors.gray, textAlign: 'center', marginBottom: 32 },
+  refundNote: { fontSize: 13, color: colors.gray, textAlign: 'center' },
   homeBtn: {
     width: '100%',
     backgroundColor: colors.customerAccent,

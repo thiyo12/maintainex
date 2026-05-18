@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { earnings } from '../../lib/api'
 
@@ -18,13 +18,10 @@ interface EarningsData {
 export default function TaskerEarnings() {
   const [period, setPeriod] = useState<Period>('weekly')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [data, setData] = useState<EarningsData | null>(null)
 
-  useEffect(() => {
-    loadEarnings()
-  }, [])
-
-  async function loadEarnings() {
+  const loadEarnings = useCallback(async () => {
     try {
       const res = await earnings.get()
       setData(res)
@@ -32,8 +29,13 @@ export default function TaskerEarnings() {
       console.error(e)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadEarnings()
+  }, [loadEarnings])
 
   return (
     <SafeAreaView style={styles.container}>
@@ -84,11 +86,13 @@ export default function TaskerEarnings() {
             ))}
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadEarnings} tintColor={colors.primary} />}
+          >
             <Text style={styles.transactionTitle}>Recent transactions</Text>
             {(data?.transactions || []).length === 0 ? (
               <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>📭</Text>
+                <Ionicons name="cash-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
                 <Text style={styles.emptyTitle}>No transactions yet</Text>
               </View>
             ) : (
@@ -199,6 +203,5 @@ const styles = StyleSheet.create({
   txRight: {},
   txAmount: { fontSize: 15, fontWeight: '700' },
   empty: { alignItems: 'center', paddingTop: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.gray },
 })

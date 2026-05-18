@@ -1,7 +1,8 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { Ionicons } from '@expo/vector-icons'
 import { bookings } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { colors } from '../../../lib/colors'
@@ -47,7 +48,10 @@ export default function BookingConfirmScreen() {
         <View style={styles.summary}>
           <Text style={styles.sumTitle}>Service booking</Text>
           <Text style={styles.sumDetail}>{taskerName || 'Tasker'} • Professional</Text>
-          <Text style={styles.sumDetail}>📅 Today</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="calendar-outline" size={16} color={colors.gray} />
+            <Text style={styles.sumDetail}> Today</Text>
+          </View>
         </View>
 
         <View style={styles.payment}>
@@ -66,7 +70,7 @@ export default function BookingConfirmScreen() {
         </View>
 
         <View style={styles.escrowBox}>
-          <Text style={styles.escrowIcon}>🔒</Text>
+          <Ionicons name="lock-closed-outline" size={20} color="#1E40AF" />
           <Text style={styles.escrowText}>
             Funds are held securely in escrow until the job is completed to your satisfaction.
           </Text>

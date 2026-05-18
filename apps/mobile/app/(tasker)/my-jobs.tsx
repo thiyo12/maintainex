@@ -1,11 +1,23 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { jobs } from '../../lib/api'
 import type { JobPosting } from '../../lib/types'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 type Tab = 'active' | 'completed' | 'cancelled'
 
@@ -13,15 +25,12 @@ export default function TaskerMyJobs() {
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [activeJobs, setActiveJobs] = useState<JobPosting[]>([])
   const [completedJobs, setCompletedJobs] = useState<JobPosting[]>([])
   const [cancelledJobs, setCancelledJobs] = useState<JobPosting[]>([])
 
-  useEffect(() => {
-    loadJobs()
-  }, [])
-
-  async function loadJobs() {
+  const loadJobs = useCallback(async () => {
     try {
       const [active, completed, cancelled] = await Promise.all([
         jobs.list('status=OPEN,ASSIGNED,IN_PROGRESS'),
@@ -35,8 +44,13 @@ export default function TaskerMyJobs() {
       console.error(e)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadJobs()
+  }, [loadJobs])
 
   const allJobs = { active: activeJobs, completed: completedJobs, cancelled: cancelledJobs }
   const jobsList = allJobs[tab]
@@ -66,15 +80,18 @@ export default function TaskerMyJobs() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.primary} />}
+        >
           {jobsList.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>📭</Text>
+              <Ionicons name="briefcase-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>No {tab} jobs</Text>
             </View>
           ) : (
             jobsList.map((job) => (
-              <TouchableOpacity key={job.id} style={styles.jobCard} activeOpacity={0.8}>
+              <PressScale key={job.id}>
+                <View style={styles.jobCard}>
                 <View style={styles.jobTop}>
                   <Text style={styles.jobTitle}>{job.title}</Text>
                   <Text style={styles.jobAmount}>LKR {job.budget.toLocaleString()}</Text>
@@ -101,7 +118,8 @@ export default function TaskerMyJobs() {
                     </TouchableOpacity>
                   </View>
                 ) : null}
-              </TouchableOpacity>
+              </View>
+            </PressScale>
             ))
           )}
         </ScrollView>
@@ -133,7 +151,6 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.teal, fontWeight: '700' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.gray },
   jobCard: {
     backgroundColor: colors.white,

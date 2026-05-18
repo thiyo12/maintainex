@@ -1,13 +1,14 @@
 import { Tabs } from 'expo-router'
-import { Text, Platform } from 'react-native'
+import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 
 const tabs = [
-  { name: 'index', title: 'Jobs', icon: '🗺️' },
-  { name: 'my-jobs', title: 'My Jobs', icon: '📋' },
-  { name: 'earnings', title: 'Earnings', icon: '💰' },
-  { name: 'profile', title: 'Profile', icon: '👤' },
+  { name: 'index', title: 'Jobs', icon: 'compass-outline' as const },
+  { name: 'my-jobs', title: 'My Jobs', icon: 'briefcase-outline' as const },
+  { name: 'earnings', title: 'Earnings', icon: 'cash-outline' as const },
+  { name: 'profile', title: 'Profile', icon: 'person-outline' as const },
 ]
 
 export default function TaskerLayout() {
@@ -43,9 +44,7 @@ export default function TaskerLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.55 }}>
-                {tab.icon}
-              </Text>
+              <Ionicons name={tab.icon} size={22} color={focused ? colors.primary : colors.gray} />
             ),
           }}
         />

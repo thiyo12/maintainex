@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { company } from '../../lib/api'
 
@@ -79,7 +80,13 @@ export default function CompanyTeam() {
                 </View>
                 <View style={styles.memberInfo}>
                   <Text style={styles.memberName}>{m.name}</Text>
-                  <Text style={styles.memberRole}>{m.role}{m.rating ? ` • ⭐ ${m.rating}` : ''}</Text>
+                  <Text style={styles.memberRole}>{m.role}</Text>
+                  {m.rating ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <Ionicons name="star" size={13} color="#F59E0B" />
+                      <Text style={[styles.memberRole, { marginTop: 0 }]}> {m.rating}</Text>
+                    </View>
+                  ) : null}
                   <Text style={styles.memberMeta}>{m.email || ''}</Text>
                 </View>
               </View>

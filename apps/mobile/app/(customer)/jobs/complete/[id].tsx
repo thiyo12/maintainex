@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/colors'
 import { jobs } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/auth'
@@ -78,7 +79,7 @@ export default function JobCompleteScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerEmoji}>✅</Text>
+          <Ionicons name="checkmark-circle-outline" size={52} color={colors.green} style={{ marginBottom: 12 }} />
           <Text style={styles.heading}>Job in review</Text>
           <Text style={styles.subtitle}>
             The tasker has marked this job as complete. Please confirm that everything is done to your satisfaction.
@@ -108,9 +109,9 @@ export default function JobCompleteScreen() {
         <View style={styles.photosSection}>
           <Text style={styles.photoSectionTitle}>Completion photos</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
-            {['📸', '📸', '📸'].map((emoji, i) => (
+            {[1, 2, 3].map((_, i) => (
               <View key={i} style={styles.photoThumb}>
-                <Text style={styles.photoEmoji}>{emoji}</Text>
+                <Ionicons name="camera-outline" size={32} color={colors.gray} />
                 <Text style={styles.photoLabel}>Photo {i + 1}</Text>
               </View>
             ))}
@@ -119,7 +120,7 @@ export default function JobCompleteScreen() {
 
         {confirmed ? (
           <View style={styles.confirmedBox}>
-            <Text style={styles.confirmedIcon}>🎉</Text>
+            <Ionicons name="party-popper-outline" size={32} color={colors.green} style={{ marginBottom: 8 }} />
             <Text style={styles.confirmedText}>Job marked as complete!</Text>
             <Text style={styles.confirmedSub}>
               Payment of LKR {((job?.budget || 0) * 1.05).toLocaleString()} will be released to the tasker.
@@ -144,9 +145,10 @@ export default function JobCompleteScreen() {
           >
             <Text style={styles.issueBtnText}>Report an issue</Text>
           </TouchableOpacity>
-          <Text style={styles.escrowNote}>
-            🔒 Funds are held in escrow. Payment is only released when you confirm completion.
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16 }}>
+            <Ionicons name="lock-closed-outline" size={14} color={colors.gray} />
+            <Text style={[styles.escrowNote, { marginTop: 0 }]}> Funds are held in escrow. Payment is only released when you confirm completion.</Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -167,7 +169,6 @@ const styles = StyleSheet.create({
   backBtn: { paddingHorizontal: 24, paddingTop: 8 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   header: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 16, paddingBottom: 20 },
-  headerEmoji: { fontSize: 48, marginBottom: 12 },
   heading: { fontSize: 24, fontWeight: '800', color: colors.dark, marginBottom: 8 },
   subtitle: { fontSize: 14, color: colors.gray, textAlign: 'center', lineHeight: 20 },
   summaryCard: {
@@ -208,7 +209,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
   },
-  photoEmoji: { fontSize: 32, marginBottom: 4 },
   photoLabel: { fontSize: 11, color: colors.gray, fontWeight: '500' },
   confirmedBox: {
     backgroundColor: '#D1FAE5',
@@ -218,7 +218,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  confirmedIcon: { fontSize: 32, marginBottom: 8 },
   confirmedText: { fontSize: 16, fontWeight: '700', color: colors.green, marginBottom: 4 },
   confirmedSub: { fontSize: 13, color: colors.gray, textAlign: 'center' },
   actionSection: {

@@ -1,9 +1,22 @@
-import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useEffect, useState, useRef } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { useAuth } from '../../lib/auth'
 import { taskers, bookings, disputes, earnings } from '../../lib/api'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 interface AdminStats {
   totalTaskers: string
@@ -100,18 +113,30 @@ export default function AdminDashboard() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick actions</Text>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>👥 Manage users</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>📋 Manage jobs</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>⚙️ Platform settings</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>💰 View payouts</Text>
-          </TouchableOpacity>
+          <PressScale>
+            <View style={styles.actionBtn}>
+              <Ionicons name="people-outline" size={20} color={colors.dark} style={{ marginRight: 10 }} />
+              <Text style={styles.actionBtnText}>Manage users</Text>
+            </View>
+          </PressScale>
+          <PressScale>
+            <View style={styles.actionBtn}>
+              <Ionicons name="briefcase-outline" size={20} color={colors.dark} style={{ marginRight: 10 }} />
+              <Text style={styles.actionBtnText}>Manage jobs</Text>
+            </View>
+          </PressScale>
+          <PressScale>
+            <View style={styles.actionBtn}>
+              <Ionicons name="settings-outline" size={20} color={colors.dark} style={{ marginRight: 10 }} />
+              <Text style={styles.actionBtnText}>Platform settings</Text>
+            </View>
+          </PressScale>
+          <PressScale>
+            <View style={styles.actionBtn}>
+              <Ionicons name="cash-outline" size={20} color={colors.dark} style={{ marginRight: 10 }} />
+              <Text style={styles.actionBtnText}>View payouts</Text>
+            </View>
+          </PressScale>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -164,6 +189,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 14,
     marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,

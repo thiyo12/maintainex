@@ -1,12 +1,24 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { taskers } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { TaskerProfile } from '../../lib/types'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 export default function TaskerProfile() {
   const router = useRouter()
@@ -55,10 +67,20 @@ export default function TaskerProfile() {
             <Text style={styles.avatarText}>{initial}</Text>
           </View>
           <Text style={styles.name}>{name}</Text>
-          <Text style={styles.role}>Plumber • ⭐ {rating.toFixed(1)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+            <Text style={[styles.role, { marginBottom: 0 }]}>Plumber • </Text>
+            <Ionicons name="star" size={15} color="#F59E0B" />
+            <Text style={[styles.role, { marginBottom: 0 }]}> {rating.toFixed(1)}</Text>
+          </View>
           <View style={styles.badgeRow}>
-            <View style={styles.badge}><Text style={styles.badgeText}>✓ Verified</Text></View>
-            <View style={styles.badge}><Text style={styles.badgeText}>🟢 Online</Text></View>
+            <View style={styles.badge}>
+              <Ionicons name="checkmark-circle" size={14} color={colors.green} />
+              <Text style={styles.badgeText}> Verified</Text>
+            </View>
+            <View style={styles.badge}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green, marginRight: 4 }} />
+              <Text style={styles.badgeText}>Online</Text>
+            </View>
           </View>
         </View>
 
@@ -101,22 +123,34 @@ export default function TaskerProfile() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>📋 Edit profile</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>💳 Payment details</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuRow}>
-            <Text style={styles.menuLabel}>🔔 Notifications</Text>
-            <Text style={styles.menuArrow}>›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuRow} onPress={logout}>
-            <Text style={[styles.menuLabel, { color: '#EF4444' }]}>🚪 Log out</Text>
-            <Text style={[styles.menuArrow, { color: '#EF4444' }]}>›</Text>
-          </TouchableOpacity>
+          <PressScale>
+            <View style={styles.menuRow}>
+              <Ionicons name="create-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
+              <Text style={styles.menuLabel}>Edit profile</Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </PressScale>
+          <PressScale>
+            <View style={styles.menuRow}>
+              <Ionicons name="card-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
+              <Text style={styles.menuLabel}>Payment details</Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </PressScale>
+          <PressScale>
+            <View style={styles.menuRow}>
+              <Ionicons name="notifications-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
+              <Text style={styles.menuLabel}>Notifications</Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </PressScale>
+          <PressScale onPress={logout}>
+            <View style={styles.menuRow}>
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 12 }} />
+              <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Log out</Text>
+              <Text style={[styles.menuArrow, { color: '#EF4444' }]}>›</Text>
+            </View>
+          </PressScale>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -145,6 +179,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     backgroundColor: '#D1FAE5',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   badgeText: { fontSize: 13, fontWeight: '600', color: colors.green },
   statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 8, marginBottom: 20 },

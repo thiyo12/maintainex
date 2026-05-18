@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { conversations, auth } from '../../lib/api'
 import { colors } from '../../lib/colors'
 
@@ -91,7 +92,10 @@ export default function ChatDetailScreen() {
           </View>
           <View>
             <Text style={styles.chatName}>{otherUserName || 'Chat'}</Text>
-            <Text style={styles.chatStatus}>🟢 Online</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green, marginRight: 4 }} />
+              <Text style={styles.chatStatus}>Online</Text>
+            </View>
           </View>
         </View>
         <TouchableOpacity>

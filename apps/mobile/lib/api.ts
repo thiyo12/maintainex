@@ -9,6 +9,12 @@ import {
   Review,
   Notification,
   Bid,
+  JobCategory,
+  TemplateJob,
+  FindTaskerResult,
+  QuickBookingInput,
+  QuickBooking,
+  SearchResult,
 } from './types'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
@@ -190,6 +196,49 @@ export const earnings = {
   get: () => request<any>('/api/mobile/earnings'),
   withdraw: (amount: number) =>
     request<any>('/api/mobile/withdraw', { method: 'POST', body: JSON.stringify({ amount }) }),
+}
+
+// Find a Tasker - Job Categories & Template Jobs
+export const jobCategories = {
+  list: (country?: string) =>
+    request<JobCategory[]>(`/api/mobile/job-categories${country ? `?country=${country}` : ''}`),
+  get: (id: string) =>
+    request<JobCategory>(`/api/mobile/job-categories/${id}`),
+}
+
+export const templateJobs = {
+  listByCategory: (categoryId: string, country?: string) =>
+    request<TemplateJob[]>(`/api/mobile/template-jobs?categoryId=${categoryId}${country ? `&country=${country}` : ''}`),
+  get: (id: string) =>
+    request<TemplateJob>(`/api/mobile/template-jobs/${id}`),
+  search: (query: string) =>
+    request<TemplateJob[]>(`/api/mobile/template-jobs/search?q=${encodeURIComponent(query)}`),
+  popular: (country?: string) =>
+    request<TemplateJob[]>(`/api/mobile/template-jobs/popular${country ? `?country=${country}` : ''}`),
+}
+
+export const findTasker = {
+  search: (params: { jobId: string; latitude?: number; longitude?: number; maxDistance?: number }) => {
+    const qs = new URLSearchParams({ jobId: params.jobId })
+    if (params.latitude) qs.set('latitude', params.latitude.toString())
+    if (params.longitude) qs.set('longitude', params.longitude.toString())
+    if (params.maxDistance) qs.set('maxDistance', params.maxDistance.toString())
+    return request<FindTaskerResult[]>(`/api/mobile/find-tasker?${qs.toString()}`)
+  },
+  getTaskerProfile: (taskerId: string) =>
+    request<FindTaskerResult>(`/api/mobile/find-tasker/${taskerId}`),
+}
+
+export const quickBookings = {
+  create: (data: QuickBookingInput) =>
+    request<QuickBooking>('/api/mobile/quick-bookings', { method: 'POST', body: JSON.stringify(data) }),
+  get: (id: string) =>
+    request<QuickBooking>(`/api/mobile/quick-bookings/${id}`),
+}
+
+export const search = {
+  all: (query: string) =>
+    request<SearchResult>(`/api/mobile/search?q=${encodeURIComponent(query)}`),
 }
 
 // File upload

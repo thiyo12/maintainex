@@ -4,6 +4,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { jobs } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
 import ProgressSteps from '../../../components/ui/ProgressSteps'
@@ -92,7 +93,10 @@ export default function PostJobScreen() {
         ) : step === 1 ? (
           <View>
             <Text style={styles.stepLabel}>Location and budget</Text>
-            <Text style={styles.sectionLabel}>📍 Job location</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, marginTop: 16 }}>
+              <Ionicons name="location-outline" size={16} color={colors.dark} />
+              <Text style={styles.sectionLabel}> Job location</Text>
+            </View>
             <TextInput
               style={styles.input}
               value={location}
@@ -124,7 +128,7 @@ export default function PostJobScreen() {
             </View>
             <TouchableOpacity style={styles.toggleRow} onPress={() => setLetQuote(!letQuote)}>
               <View style={[styles.toggle, letQuote && styles.toggleActive]}>
-                {letQuote ? <Text style={styles.toggleCheck}>✓</Text> : null}
+                {letQuote ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
               </View>
               <Text style={styles.toggleLabel}>Let them quote instead</Text>
             </TouchableOpacity>

@@ -1,15 +1,16 @@
 import { Tabs } from 'expo-router'
-import { Text, Platform } from 'react-native'
+import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 
 const tabs = [
-  { name: 'index', title: 'Dashboard', icon: '📊' },
-  { name: 'contracts-list', title: 'Contracts', icon: '📄' },
-  { name: 'milestones-list', title: 'Milestones', icon: '🎯' },
-  { name: 'team', title: 'Team', icon: '👥' },
-  { name: 'earnings-list', title: 'Earnings', icon: '💰' },
-  { name: 'profile', title: 'Profile', icon: '👤' },
+  { name: 'index', title: 'Dashboard', icon: 'grid-outline' as const },
+  { name: 'contracts-list', title: 'Contracts', icon: 'document-text-outline' as const },
+  { name: 'milestones-list', title: 'Milestones', icon: 'flag-outline' as const },
+  { name: 'team', title: 'Team', icon: 'people-outline' as const },
+  { name: 'earnings-list', title: 'Earnings', icon: 'cash-outline' as const },
+  { name: 'profile', title: 'Profile', icon: 'person-outline' as const },
 ]
 
 export default function CompanyLayout() {
@@ -45,9 +46,7 @@ export default function CompanyLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.55 }}>
-                {tab.icon}
-              </Text>
+              <Ionicons name={tab.icon} size={20} color={focused ? colors.primary : colors.gray} />
             ),
           }}
         />

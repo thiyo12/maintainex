@@ -1,29 +1,42 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 const roles = [
   {
     id: 'CUSTOMER',
-    icon: '🙋',
+    icon: 'hand-left-outline' as const,
     title: 'I need work done',
     subtitle: 'Post jobs and hire taskers',
     color: colors.customerAccent,
   },
   {
     id: 'TASKER',
-    icon: '🔧',
+    icon: 'construct-outline' as const,
     title: 'I am a tasker',
     subtitle: 'Find jobs near me',
     color: colors.taskerAccent,
   },
   {
     id: 'COMPANY',
-    icon: '🏢',
+    icon: 'business-outline' as const,
     title: 'We are a company',
     subtitle: 'Register and get contracts',
     color: colors.companyAccent,
@@ -48,18 +61,14 @@ export default function RoleSelectScreen() {
           {roles.map((role) => {
             const isSelected = selected === role.id
             return (
-              <TouchableOpacity
-                key={role.id}
-                style={[
+              <PressScale key={role.id} style={undefined}>
+                <View style={[
                   styles.card,
                   isSelected && { borderColor: role.color, borderWidth: 2 },
-                ]}
-                onPress={() => setSelected(role.id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.cardContent}>
-                  <View style={styles.cardLeft}>
-                    <Text style={styles.cardIcon}>{role.icon}</Text>
+                ]}>
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardLeft}>
+                      <Ionicons name={role.icon} size={32} color={role.color} style={{ marginRight: 16 }} />
                     <View style={styles.cardText}>
                       <Text style={styles.cardTitle}>{role.title}</Text>
                       <Text style={styles.cardSubtitle}>{role.subtitle}</Text>
@@ -69,24 +78,24 @@ export default function RoleSelectScreen() {
                     ›
                   </Text>
                 </View>
-              </TouchableOpacity>
+              </View>
+            </PressScale>
             )
           })}
         </View>
 
-        <TouchableOpacity
-          style={[styles.continueButton, !selected && styles.continueButtonDisabled]}
+        <PressScale
+          style={undefined}
           onPress={() => {
             if (selected) {
               router.push({ pathname: '/(auth)/register', params: { role: selected } })
             }
           }}
-          disabled={!selected}
         >
           <Text style={[styles.continueText, !selected && styles.continueTextDisabled]}>
             Continue
           </Text>
-        </TouchableOpacity>
+        </PressScale>
       </ScrollView>
     </SafeAreaView>
   )
@@ -142,10 +151,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-  },
-  cardIcon: {
-    fontSize: 32,
-    marginRight: 16,
   },
   cardText: {
     flex: 1,

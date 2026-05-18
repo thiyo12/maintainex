@@ -1,15 +1,29 @@
-import { useState, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native'
+import { useState, useCallback, useRef } from 'react'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Animated, RefreshControl } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { conversations } from '../../lib/api'
 import { colors } from '../../lib/colors'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 export default function ChatListScreen() {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [conversationsData, setConversationsData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -19,6 +33,7 @@ export default function ChatListScreen() {
       // fail silently
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
@@ -53,7 +68,7 @@ export default function ChatListScreen() {
       </View>
 
       <View style={styles.searchBar}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Ionicons name="search" size={18} color={colors.gray} style={{ marginRight: 10 }} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations"
@@ -71,11 +86,10 @@ export default function ChatListScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchConversations} tintColor={colors.primary} />}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.conversationCard}
-              onPress={() => router.push(`/(chat)/${item.id}`)}
-            >
+              <PressScale onPress={() => router.push(`/(chat)/${item.id}`)}>
+              <View style={styles.conversationCard}>
               <View style={styles.avatarWrap}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>
@@ -99,11 +113,12 @@ export default function ChatListScreen() {
                   ) : null}
                 </View>
               </View>
-            </TouchableOpacity>
+            </View>
+            </PressScale>
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>💬</Text>
+              <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>No conversations yet</Text>
               <Text style={styles.emptySub}>When you book a service, chat will appear here</Text>
             </View>
@@ -130,7 +145,6 @@ const styles = StyleSheet.create({
     borderColor: colors.lightGray,
     marginBottom: 12,
   },
-  searchIcon: { fontSize: 16, marginRight: 10 },
   searchInput: { flex: 1, fontSize: 15, color: colors.dark },
   conversationCard: {
     flexDirection: 'row',
@@ -175,7 +189,6 @@ const styles = StyleSheet.create({
   unreadText: { fontSize: 11, fontWeight: '700', color: colors.white },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.dark, marginBottom: 6 },
   emptySub: { fontSize: 13, color: colors.gray, textAlign: 'center', paddingHorizontal: 32 },
 })

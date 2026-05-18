@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { bookings } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
 import type { Booking } from '../../../lib/types'
@@ -46,7 +47,7 @@ export default function BookingConfirmedScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
-        <Text style={styles.checkmark}>✓</Text>
+        <Ionicons name="checkmark" size={36} color={colors.white} />
       </Animated.View>
       <Text style={styles.heading}>Booking confirmed</Text>
       <Text style={styles.subheading}>Payment secured in escrow</Text>
@@ -54,8 +55,14 @@ export default function BookingConfirmedScreen() {
       <View style={styles.summary}>
         <Text style={styles.sumLabel}>{booking?.serviceName || 'Service'}</Text>
         <Text style={styles.sumValue}>{booking?.customerName || ''}</Text>
-        <Text style={styles.sumValue}>📅 {booking?.date ? new Date(booking.date).toLocaleDateString() : 'Today'} at {booking?.time || ''}</Text>
-        <Text style={styles.sumValue}>📍 {booking?.district || ''}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <Ionicons name="calendar-outline" size={16} color={colors.gray} />
+          <Text style={styles.sumValue}> {booking?.date ? new Date(booking.date).toLocaleDateString() : 'Today'} at {booking?.time || ''}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+          <Ionicons name="location-outline" size={16} color={colors.gray} />
+          <Text style={styles.sumValue}> {booking?.district || ''}</Text>
+        </View>
         <Text style={styles.totalAmount}>LKR {(booking?.price || 0).toLocaleString()}</Text>
       </View>
 
@@ -63,7 +70,7 @@ export default function BookingConfirmedScreen() {
         {steps.map((s, i) => (
           <View key={i} style={styles.trackerStep}>
             <View style={[styles.trackerDot, s.filled && styles.trackerDotFilled]}>
-              {s.filled ? <Text style={styles.trackerCheck}>✓</Text> : <Text style={styles.trackerNum}>{i + 1}</Text>}
+              {s.filled ? <Ionicons name="checkmark" size={14} color={colors.white} /> : <Text style={styles.trackerNum}>{i + 1}</Text>}
             </View>
             <Text style={[styles.trackerLabel, s.filled && styles.trackerLabelFilled]}>{s.label}</Text>
             {i < steps.length - 1 ? <View style={[styles.trackerLine, s.filled && styles.trackerLineFilled]} /> : null}
@@ -73,10 +80,12 @@ export default function BookingConfirmedScreen() {
 
       <View style={styles.buttons}>
         <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(customer)/tracking/${bookingId || 1}`)}>
-          <Text style={styles.mapBtnText}>🗺️ Track on map</Text>
+          <Ionicons name="map" size={18} color={colors.white} style={{ marginRight: 6 }} />
+          <Text style={styles.mapBtnText}>Track on map</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/(chat)/${bookingId || 1}`)}>
-          <Text style={styles.chatBtnText}>💬 Chat with worker</Text>
+          <Ionicons name="chatbubble-ellipses" size={18} color={colors.dark} style={{ marginRight: 6 }} />
+          <Text style={styles.chatBtnText}>Chat with worker</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -89,7 +98,6 @@ const styles = StyleSheet.create({
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: colors.green, justifyContent: 'center', alignItems: 'center', marginBottom: 20,
   },
-  checkmark: { fontSize: 36, color: colors.white, fontWeight: '700' },
   heading: { fontSize: 26, fontWeight: '800', color: colors.dark, marginBottom: 4 },
   subheading: { fontSize: 15, color: colors.gray, marginBottom: 28 },
   summary: {
@@ -114,11 +122,11 @@ const styles = StyleSheet.create({
   trackerLineFilled: { backgroundColor: colors.green },
   buttons: { width: '100%', gap: 12 },
   mapBtn: {
-    backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 14, alignItems: 'center',
+    backgroundColor: colors.primary, paddingVertical: 16, borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
   },
   mapBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
   chatBtn: {
-    backgroundColor: colors.white, paddingVertical: 16, borderRadius: 14, alignItems: 'center',
+    backgroundColor: colors.white, paddingVertical: 16, borderRadius: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
     borderWidth: 2, borderColor: colors.lightGray,
   },
   chatBtnText: { fontSize: 16, fontWeight: '700', color: colors.dark },

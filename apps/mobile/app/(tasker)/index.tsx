@@ -1,26 +1,35 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityIndicator, Animated, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { jobs, taskers } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
 import type { JobPosting } from '../../lib/types'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 export default function TaskerHome() {
   const router = useRouter()
   const { user } = useAuth()
   const [isOnline, setIsOnline] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [nearbyJobs, setNearbyJobs] = useState<JobPosting[]>([])
   const [profile, setProfile] = useState({ rating: 0, completedJobs: 0 })
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [jobsData, taskerData] = await Promise.all([
         jobs.list('status=OPEN'),
@@ -34,15 +43,26 @@ export default function TaskerHome() {
       console.error(e)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Tasker'} 👋</Text>
-          <Text style={styles.location}>📍 Colombo, Sri Lanka</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'Tasker'}</Text>
+            <Ionicons name="hand-wave-outline" size={22} color={colors.primary} style={{ marginLeft: 6 }} />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Ionicons name="location-outline" size={14} color={colors.gray} />
+            <Text style={styles.location}> Colombo, Sri Lanka</Text>
+          </View>
         </View>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{(user?.name || 'T')[0]}</Text>
@@ -67,27 +87,29 @@ export default function TaskerHome() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} tintColor={colors.primary} />}
+        >
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>💰</Text>
+              <Ionicons name="cash-outline" size={24} color={colors.teal} style={{ marginBottom: 6 }} />
               <Text style={styles.statValue}>LKR 45,200</Text>
               <Text style={styles.statLabel}>This month</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>✅</Text>
+              <Ionicons name="checkmark-done-outline" size={24} color={colors.teal} style={{ marginBottom: 6 }} />
               <Text style={styles.statValue}>{profile.completedJobs}</Text>
               <Text style={styles.statLabel}>Jobs done</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>⭐</Text>
+              <Ionicons name="star" size={24} color="#F59E0B" style={{ marginBottom: 6 }} />
               <Text style={styles.statValue}>{profile.rating.toFixed(1)}</Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
           </View>
 
           <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapEmoji}>🗺️</Text>
+            <Ionicons name="map" size={40} color="rgba(255,255,255,0.9)" style={{ marginBottom: 8 }} />
             <Text style={styles.mapTitle}>Jobs near you</Text>
             <Text style={styles.mapSub}>{nearbyJobs.length} jobs available within 5 km</Text>
           </View>
@@ -105,7 +127,8 @@ export default function TaskerHome() {
               </View>
               <View style={styles.jobTags}>
                 <View style={styles.jobTag}>
-                  <Text style={styles.jobTagText}>📍 {job.location}</Text>
+                  <Ionicons name="location-outline" size={12} color="#D97706" />
+                  <Text style={styles.jobTagText}> {job.location}</Text>
                 </View>
                 <View style={[styles.jobTag, { backgroundColor: '#E0E7FF' }]}>
                   <Text style={[styles.jobTagText, { color: '#4F46E5' }]}>
@@ -180,7 +203,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  statIcon: { fontSize: 24, marginBottom: 6 },
   statValue: { fontSize: 16, fontWeight: '800', color: colors.dark },
   statLabel: { fontSize: 11, color: colors.gray, marginTop: 2 },
   mapPlaceholder: {
@@ -192,7 +214,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  mapEmoji: { fontSize: 40, marginBottom: 8 },
   mapTitle: { fontSize: 18, fontWeight: '700', color: colors.white, marginBottom: 4 },
   mapSub: { fontSize: 14, color: 'rgba(255,255,255,0.8)' },
   sectionTitle: {
@@ -223,6 +244,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
     backgroundColor: '#FFFBEB',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   jobTagText: { fontSize: 12, fontWeight: '600', color: '#D97706' },
   jobLocation: { fontSize: 13, color: colors.gray },

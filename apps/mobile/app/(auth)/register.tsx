@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { colors } from '../../lib/colors'
 
@@ -128,7 +129,7 @@ export default function RegisterScreen() {
             onPress={() => setAgreeTerms(!agreeTerms)}
           >
             <View style={[styles.checkbox, agreeTerms && styles.checkboxActive]}>
-              {agreeTerms && <Text style={styles.checkmark}>✓</Text>}
+              {agreeTerms && <Ionicons name="checkmark" size={14} color={colors.white} />}
             </View>
             <Text style={styles.checkboxLabel}>
               I agree to the{' '}
@@ -190,11 +191,6 @@ const styles = StyleSheet.create({
   checkboxActive: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
-  },
-  checkmark: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '700',
   },
   checkboxLabel: {
     flex: 1,

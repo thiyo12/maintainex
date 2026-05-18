@@ -819,6 +819,78 @@ model QuotationItem {
 }
 
 // ============================================
+// JOB SECTION — CATEGORIES & TEMPLATE JOBS
+// ============================================
+
+model JobCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  iconName  String
+  colorHex  String
+  sortOrder Int      @default(0)
+  countries String[]
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  jobs TemplateJob[]
+
+  @@index([sortOrder])
+  @@index([isActive])
+}
+
+model TemplateJob {
+  id                    String   @id @default(cuid())
+  categoryId            String
+  category              JobCategory @relation(fields: [categoryId], references: [id])
+  name                  String
+  description           String
+  whatIsIncluded        String[]
+  typicalDurationMinutes Int
+  priceMin              Float
+  priceMax              Float
+  currency              String   @default("LKR")
+  isPopular             Boolean  @default(false)
+  isCompanyOnly         Boolean  @default(false)
+  countries             String[]
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+
+  taskerSkills TaskerSkill[]
+
+  @@index([categoryId])
+  @@index([isPopular])
+  @@index([isActive])
+}
+
+model TaskerSkill {
+  id             String       @id @default(cuid())
+  taskerId       String
+  tasker         TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            TemplateJob  @relation(fields: [jobId], references: [id])
+  experienceYears Int         @default(0)
+  hourlyRate     Float        @default(0)
+  fixedRate      Float        @default(0)
+  currency       String       @default("LKR")
+
+  @@unique([taskerId, jobId])
+  @@index([taskerId])
+  @@index([jobId])
+}
+
+model CompanySpecialty {
+  id         String         @id @default(cuid())
+  companyId  String
+  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId String?
+  jobId      String?
+
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([jobId])
+}
+
+// ============================================
 // MOBILE MARKETPLACE MODELS
 // ============================================
 
@@ -848,6 +920,7 @@ model TaskerProfile {
   bids        Bid[]
   assignments Assignment[]
   reviews     TaskerReview[]
+  taskerSkills TaskerSkill[]
 
   @@index([isOnline])
   @@index([isVerified])
@@ -1037,8 +1110,9 @@ model CompanyProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contracts   Contract[]
-  teamMembers TeamMember[]
+  contracts    Contract[]
+  teamMembers  TeamMember[]
+  specialties  CompanySpecialty[]
 
   @@index([isVerified])
   @@index([rating])

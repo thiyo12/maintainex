@@ -1,0 +1,331 @@
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+const categories = [
+  {
+    name: 'Electrical Works', iconName: 'flash', colorHex: '#F59E0B', sortOrder: 1,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Wiring and rewiring', description: 'Complete electrical wiring and rewiring for homes and offices including new circuits, switchboards, and distribution panels.', whatIsIncluded: ['Inspect existing wiring', 'Run new electrical cables', 'Install junction boxes', 'Connect to main panel', 'Test all circuits'], typicalDurationMinutes: 180, priceMin: 3500, priceMax: 15000, isPopular: true },
+      { name: 'Switch and socket installation', description: 'Install new switches, sockets, and power outlets in any room of your home or office.', whatIsIncluded: ['Remove old switch/socket', 'Check wiring condition', 'Install new unit', 'Secure mounting', 'Test operation'], typicalDurationMinutes: 60, priceMin: 800, priceMax: 2500, isPopular: false },
+      { name: 'Circuit breaker repair', description: 'Diagnose and repair faulty circuit breakers, replace tripped or broken breakers, and ensure your electrical panel is safe.', whatIsIncluded: ['Identify faulty breaker', 'Test circuit load', 'Replace breaker if needed', 'Check panel connections', 'Safety inspection'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 6000, isPopular: false },
+      { name: 'Light and fan installation', description: 'Professional installation of ceiling lights, wall lights, fans, and exhaust fans.', whatIsIncluded: ['Mounting bracket installation', 'Wiring connection', 'Fixture assembly', 'Balancing for fans', 'Switch installation'], typicalDurationMinutes: 90, priceMin: 1500, priceMax: 4000, isPopular: true },
+      { name: 'Doorbell installation', description: 'Install wired or wireless doorbells including video doorbells with proper wiring.', whatIsIncluded: ['Choose mounting location', 'Run low-voltage wiring', 'Mount doorbell unit', 'Connect chime', 'Test functionality'], typicalDurationMinutes: 60, priceMin: 1200, priceMax: 3500, isPopular: false },
+      { name: 'Extension board and cabling', description: 'Build custom extension boards with multiple sockets and proper cable management.', whatIsIncluded: ['Select cable gauge', 'Assemble extension board', 'Wire sockets correctly', 'Install fuse protection', 'Test all outlets'], typicalDurationMinutes: 45, priceMin: 800, priceMax: 2000, isPopular: false },
+      { name: 'Generator connection', description: 'Connect backup generator to your home electrical system with proper transfer switch.', whatIsIncluded: ['Assess power requirements', 'Install transfer switch', 'Connect generator inlet', 'Run cabling', 'Test changeover'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Inverter and solar wiring', description: 'Install and connect inverter systems and solar panel wiring for backup power.', whatIsIncluded: ['Mount inverter', 'Battery connection', 'Solar panel wiring', 'Charge controller setup', 'System testing'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 20000, isPopular: false },
+      { name: 'Water heater installation', description: 'Install electric or instant water heaters with proper electrical connection and safety.', whatIsIncluded: ['Mount water heater', 'Run dedicated circuit', 'Connect wiring', 'Install cutoff switch', 'Test heating'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Power outage repair', description: 'Emergency diagnosis and repair of complete or partial power outages in your property.', whatIsIncluded: ['Inspect main panel', 'Test circuits', 'Identify fault location', 'Repair damaged wiring', 'Restore power safely'], typicalDurationMinutes: 120, priceMin: 2500, priceMax: 8000, isPopular: false },
+      { name: 'Garden lighting installation', description: 'Install outdoor garden lights, pathway lights, and landscape lighting with weatherproof connections.', whatIsIncluded: ['Plan light placement', 'Run outdoor cabling', 'Install weatherproof fixtures', 'Connect to timer/switch', 'Test all lights'], typicalDurationMinutes: 150, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Emergency electrical repair', description: '24/7 emergency electrical repair service for urgent issues like sparking outlets, exposed wires, or power failure.', whatIsIncluded: ['Emergency assessment', 'Immediate hazard isolation', 'Temporary safe fix', 'Full repair if possible', 'Safety recommendations'], typicalDurationMinutes: 90, priceMin: 4000, priceMax: 12000, isPopular: true },
+    ]
+  },
+  {
+    name: 'Plumbing', iconName: 'water', colorHex: '#3B82F6', sortOrder: 2,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Leaking pipe repair', description: 'Fix leaking water pipes under sinks, behind walls, or underground. Fast and reliable repair to prevent water damage.', whatIsIncluded: ['Locate leak source', 'Isolate water supply', 'Repair or replace pipe section', 'Test for leaks', 'Restore water flow'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 6000, isPopular: true },
+      { name: 'Tap and faucet repair', description: 'Repair or replace dripping, leaking, or broken taps and faucets in kitchens and bathrooms.', whatIsIncluded: ['Inspect tap mechanism', 'Replace washers/cartridges', 'Clean aerator', 'Reassemble and test', 'Check for leaks'], typicalDurationMinutes: 45, priceMin: 1000, priceMax: 3000, isPopular: false },
+      { name: 'Toilet flush repair', description: 'Fix running toilets, weak flushes, broken handles, and internal mechanism issues.', whatIsIncluded: ['Diagnose flush issue', 'Inspect internal components', 'Replace faulty parts', 'Adjust water level', 'Test flush cycle'], typicalDurationMinutes: 45, priceMin: 1200, priceMax: 3500, isPopular: false },
+      { name: 'Water tank installation', description: 'Install new overhead or underground water tanks with proper plumbing connections and overflow setup.', whatIsIncluded: ['Site preparation', 'Tank placement', 'Inlet/outlet connection', 'Overflow pipe installation', 'Test for leaks'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Water pump repair', description: 'Diagnose and repair faulty water pumps including pressure issues, motor problems, and priming issues.', whatIsIncluded: ['Inspect pump motor', 'Check pressure settings', 'Clean or replace valves', 'Prime pump if needed', 'Test operation'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Drain unblocking', description: 'Clear blocked drains in sinks, showers, toilets, and floor drains using professional tools.', whatIsIncluded: ['Assess blockage severity', 'Use plunger/snake', 'Chemical treatment if needed', 'Flush with hot water', 'Test drainage'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: true },
+      { name: 'Shower fitting installation', description: 'Install new shower heads, shower arms, shower systems, and handheld sprayers.', whatIsIncluded: ['Remove old fitting', 'Clean pipe threads', 'Apply plumber tape', 'Install new shower fitting', 'Test water flow'], typicalDurationMinutes: 60, priceMin: 1500, priceMax: 4000, isPopular: false },
+      { name: 'Hot water system repair', description: 'Repair electric or gas hot water systems including thermostat issues, heating element replacement, and leaks.', whatIsIncluded: ['Diagnose heating issue', 'Check thermostat', 'Inspect elements', 'Replace faulty parts', 'Test temperature'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Kitchen sink installation', description: 'Install new kitchen sinks with proper plumbing connections, drain assembly, and sealing.', whatIsIncluded: ['Remove old sink', 'Prepare countertop', 'Install sink basin', 'Connect drain pipes', 'Seal and test'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 7000, isPopular: false },
+      { name: 'Sewage pipe repair', description: 'Repair damaged sewage pipes including cracks, blockages, and connection issues in your drainage system.', whatIsIncluded: ['Locate pipe damage', 'Excavate if needed', 'Replace damaged section', 'Proper sealing', 'Test flow'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Emergency plumbing repair', description: '24/7 emergency plumbing service for burst pipes, major leaks, and overflowing drains.', whatIsIncluded: ['Emergency response', 'Stop water flow', 'Temporary repair', 'Assess damage', 'Plan permanent fix'], typicalDurationMinutes: 60, priceMin: 5000, priceMax: 15000, isPopular: true },
+    ]
+  },
+  {
+    name: 'AC and Refrigeration', iconName: 'snowflake', colorHex: '#06B6D4', sortOrder: 3,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'AC installation', description: 'Professional installation of new air conditioning units including split ACs, window ACs, and central AC systems.', whatIsIncluded: ['Site assessment', 'Mount indoor unit', 'Install outdoor unit', 'Connect refrigerant lines', 'Test cooling performance'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 20000, isPopular: true },
+      { name: 'AC servicing and cleaning', description: 'Complete AC service including filter cleaning, coil cleaning, drain check, and performance optimization.', whatIsIncluded: ['Clean air filters', 'Clean evaporator coils', 'Check condensate drain', 'Inspect outdoor unit', 'Test temperature output'], typicalDurationMinutes: 90, priceMin: 2500, priceMax: 5000, isPopular: true },
+      { name: 'AC gas refilling', description: 'Refill refrigerant gas in AC units that are not cooling properly due to gas leakage.', whatIsIncluded: ['Check gas pressure', 'Detect leaks', 'Repair leaks if found', 'Vacuum system', 'Refill refrigerant gas'], typicalDurationMinutes: 120, priceMin: 4000, priceMax: 10000, isPopular: true },
+      { name: 'AC not cooling repair', description: 'Diagnose and repair AC units that are running but not cooling effectively.', whatIsIncluded: ['Check thermostat settings', 'Inspect compressor', 'Test refrigerant levels', 'Clean condenser coils', 'Restore cooling'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'AC water leak repair', description: 'Fix water leaking from AC units caused by clogged drains, frozen coils, or improper installation.', whatIsIncluded: ['Locate leak source', 'Clean drain line', 'Check coil temperature', 'Repair drain pan', 'Test condensation flow'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: false },
+      { name: 'AC remote repair', description: 'Repair or replace faulty AC remote controls and receiver boards.', whatIsIncluded: ['Test remote signals', 'Check receiver board', 'Repair or replace remote', 'Sync with AC unit', 'Test all functions'], typicalDurationMinutes: 45, priceMin: 1000, priceMax: 3000, isPopular: false },
+      { name: 'Refrigerator repair', description: 'Repair refrigerators that are not cooling, making noise, or having temperature issues.', whatIsIncluded: ['Diagnose cooling issue', 'Check compressor', 'Inspect thermostat', 'Test door seals', 'Restore proper temperature'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Freezer repair', description: 'Repair chest freezers and upright freezers with temperature, defrost, or mechanical issues.', whatIsIncluded: ['Check temperature', 'Inspect defrost system', 'Test compressor', 'Check door seals', 'Restore freezing'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Cold room maintenance', description: 'Maintenance and repair of commercial cold rooms and walk-in coolers for businesses.', whatIsIncluded: ['Inspect refrigeration unit', 'Check temperature controls', 'Clean condenser coils', 'Test door seals', 'Performance report'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 20000, isPopular: false },
+      { name: 'Ventilation fan installation', description: 'Install exhaust fans and ventilation systems in bathrooms, kitchens, and commercial spaces.', whatIsIncluded: ['Cut opening if needed', 'Mount fan unit', 'Connect ducting', 'Wire to switch', 'Test airflow'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 7000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Painting and Decorating', iconName: 'color-palette', colorHex: '#EC4899', sortOrder: 4,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Interior wall painting', description: 'Professional interior wall painting for homes and offices with smooth, even finish.', whatIsIncluded: ['Surface preparation', 'Fill cracks and holes', 'Apply primer', 'Two coats of paint', 'Clean up and disposal'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 25000, isPopular: true },
+      { name: 'Exterior house painting', description: 'Weather-resistant exterior painting to protect and beautify your home facade.', whatIsIncluded: ['Pressure wash exterior', 'Scrape loose paint', 'Apply exterior primer', 'Two coats exterior paint', 'Trim and detail work'], typicalDurationMinutes: 480, priceMin: 15000, priceMax: 60000, isPopular: false },
+      { name: 'Ceiling painting', description: 'Paint ceilings including popcorn/textured ceilings with proper drip protection.', whatIsIncluded: ['Protect floors and furniture', 'Clean ceiling surface', 'Fill imperfections', 'Apply paint evenly', 'Edge and corner work'], typicalDurationMinutes: 180, priceMin: 4000, priceMax: 12000, isPopular: false },
+      { name: 'Wallpaper installation', description: 'Install wallpaper with pattern matching, seamless joins, and bubble-free application.', whatIsIncluded: ['Measure and cut wallpaper', 'Prepare wall surface', 'Apply adhesive', 'Hang and smooth wallpaper', 'Trim edges and clean'], typicalDurationMinutes: 180, priceMin: 6000, priceMax: 20000, isPopular: false },
+      { name: 'Furniture painting and refinishing', description: 'Paint, stain, or refinish wooden furniture to give it a fresh new look.', whatIsIncluded: ['Sand existing finish', 'Repair any damage', 'Apply primer', 'Paint or stain', 'Seal and protect'], typicalDurationMinutes: 180, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Texture wall finish', description: 'Create decorative texture wall finishes like sponge, rag roll, or skip trowel.', whatIsIncluded: ['Prepare wall surface', 'Apply base coat', 'Create texture pattern', 'Seal texture', 'Touch up as needed'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Door and trim painting', description: 'Paint interior doors, window frames, baseboards, and crown molding with crisp lines.', whatIsIncluded: ['Sand and clean surface', 'Mask adjacent areas', 'Apply primer if needed', 'Paint with enamel', 'Remove masking and touch up'], typicalDurationMinutes: 120, priceMin: 2500, priceMax: 8000, isPopular: false },
+      { name: 'Waterproof coating application', description: 'Apply waterproof coatings to walls, roofs, and basements to prevent moisture damage.', whatIsIncluded: ['Clean surface thoroughly', 'Repair cracks', 'Apply waterproof membrane', 'Seal joints and edges', 'Test for leaks'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 18000, isPopular: false },
+      { name: 'Metal railing painting', description: 'Paint metal railings, gates, and grills with rust-inhibitive paint.', whatIsIncluded: ['Remove rust', 'Sand rough areas', 'Apply rust primer', 'Two coats metal paint', 'Check for drips'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Carpentry and Furniture', iconName: 'hammer', colorHex: '#92400E', sortOrder: 5,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Custom shelf installation', description: 'Design and install custom shelves, bookcases, and storage units for any room.', whatIsIncluded: ['Measure space', 'Cut materials to size', 'Assemble shelf unit', 'Mount securely to wall', 'Finish and level'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 12000, isPopular: true },
+      { name: 'Cabinet repair and refacing', description: 'Repair damaged cabinets or reface existing cabinets with new doors and drawer fronts.', whatIsIncluded: ['Assess cabinet condition', 'Repair structural damage', 'Replace hinges/hardware', 'Install new doors/drawers', 'Adjust for proper fit'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 20000, isPopular: false },
+      { name: 'Door repair and hanging', description: 'Repair sticking doors, broken hinges, or hang new doors with proper alignment.', whatIsIncluded: ['Remove old door', 'Prepare door frame', 'Trim door if needed', 'Install hinges and handle', 'Test swing and latch'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 6000, isPopular: false },
+      { name: 'Furniture assembly', description: 'Assemble flat-pack furniture from any brand including beds, wardrobes, tables, and cabinets.', whatIsIncluded: ['Unpack and organize parts', 'Follow assembly instructions', 'Safely assemble all components', 'Secure all fasteners', 'Clean up packaging waste'], typicalDurationMinutes: 90, priceMin: 1500, priceMax: 5000, isPopular: true },
+      { name: 'Wooden floor installation', description: 'Install hardwood, laminate, or engineered wood flooring with proper underlayment.', whatIsIncluded: ['Prepare subfloor', 'Install underlayment', 'Lay flooring boards', 'Cut around obstacles', 'Install trim and transitions'], typicalDurationMinutes: 360, priceMin: 10000, priceMax: 40000, isPopular: false },
+      { name: 'Deck and porch building', description: 'Build or repair wooden decks, porches, and outdoor platforms.', whatIsIncluded: ['Design and plan layout', 'Set foundation posts', 'Frame deck structure', 'Install decking boards', 'Apply sealant/stain'], typicalDurationMinutes: 480, priceMin: 20000, priceMax: 80000, isPopular: false },
+      { name: 'Window and door frame repair', description: 'Repair rotted or damaged window and door frames including sill replacement.', whatIsIncluded: ['Remove damaged wood', 'Treat for pests/rot', 'Cut and fit new wood', 'Prime and paint', 'Caulk and seal'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Custom wardrobe build', description: 'Build custom fitted wardrobes with shelves, hanging space, and drawers.', whatIsIncluded: ['Take precise measurements', 'Design layout', 'Build frame and doors', 'Install shelving and rails', 'Finish and paint'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Staircase railing installation', description: 'Install new stair railings, balusters, and handrails for safety and style.', whatIsIncluded: ['Measure staircase', 'Cut railing to size', 'Install posts securely', 'Attach balusters', 'Mount handrail'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Tiling and Flooring', iconName: 'grid', colorHex: '#7C3AED', sortOrder: 6,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Floor tile installation', description: 'Install ceramic, porcelain, or vitrified tiles on floors with proper leveling and grouting.', whatIsIncluded: ['Prepare subfloor', 'Apply adhesive', 'Lay tiles with spacers', 'Cut tiles at edges', 'Grout and seal'], typicalDurationMinutes: 360, priceMin: 8000, priceMax: 35000, isPopular: true },
+      { name: 'Wall tile installation', description: 'Install tiles on bathroom, kitchen, and feature walls with precision cutting.', whatIsIncluded: ['Prepare wall surface', 'Apply waterproofing', 'Set tiles evenly', 'Cut around fixtures', 'Grout and polish'], typicalDurationMinutes: 240, priceMin: 6000, priceMax: 25000, isPopular: false },
+      { name: 'Tile repair and replacement', description: 'Replace cracked, chipped, or broken tiles and re-grout damaged areas.', whatIsIncluded: ['Remove damaged tile', 'Clean adhesive residue', 'Install new tile', 'Grout and match color', 'Seal grout lines'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 6000, isPopular: false },
+      { name: 'Bathroom waterproofing', description: 'Apply waterproof membrane systems to bathroom floors and walls before tiling.', whatIsIncluded: ['Clean substrate', 'Apply primer', 'Install waterproof membrane', 'Seal corners and joints', 'Water test'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Vinyl flooring installation', description: 'Install sheet vinyl, vinyl plank, or luxury vinyl tile flooring.', whatIsIncluded: ['Prepare subfloor', 'Acclimate flooring', 'Cut and fit planks/sheets', 'Seam welding if needed', 'Install baseboards'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 18000, isPopular: false },
+      { name: 'Mosaic tile work', description: 'Create decorative mosaic tile patterns for backsplashes, feature walls, and floors.', whatIsIncluded: ['Design layout', 'Prepare surface', 'Install mosaic sheets', 'Grout with care', 'Polish and seal'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Carpet installation', description: 'Install wall-to-wall carpet with proper underlay, stretching, and edge finishing.', whatIsIncluded: ['Remove old carpet', 'Install underlay', 'Cut carpet to size', 'Stretch and secure', 'Finish edges'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 20000, isPopular: false },
+      { name: 'Skirting board installation', description: 'Install or replace skirting boards and baseboards for a finished look.', whatIsIncluded: ['Measure walls', 'Cut skirting to length', 'Mitre corners', 'Fix to wall', 'Fill joints and paint'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Outdoor patio tiling', description: 'Install outdoor-rated tiles on patios, balconies, and walkways with slip-resistant finish.', whatIsIncluded: ['Prepare outdoor surface', 'Apply outdoor adhesive', 'Lay slip-resistant tiles', 'Cut at edges', 'Apply outdoor grout'], typicalDurationMinutes: 360, priceMin: 10000, priceMax: 40000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Masonry and Concrete', iconName: 'construct', colorHex: '#78716C', sortOrder: 7,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Brick and block wall construction', description: 'Build new brick or concrete block walls for boundaries, partitions, or structures.', whatIsIncluded: ['Mark foundation line', 'Mix mortar', 'Lay bricks/blocks', 'Reinforce as needed', 'Finish and cure'], typicalDurationMinutes: 360, priceMin: 10000, priceMax: 50000, isPopular: false },
+      { name: 'Concrete slab pour', description: 'Pour concrete slabs for foundations, patios, driveways, and floors.', whatIsIncluded: ['Excavate and level area', 'Set formwork', 'Install reinforcement', 'Pour and level concrete', 'Finish surface'], typicalDurationMinutes: 480, priceMin: 15000, priceMax: 80000, isPopular: false },
+      { name: 'Plastering and rendering', description: 'Apply plaster or render to walls and ceilings for a smooth, finished surface.', whatIsIncluded: ['Prepare surface', 'Apply base coat', 'Float and level', 'Apply finish coat', 'Smooth and cure'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 20000, isPopular: true },
+      { name: 'Concrete crack repair', description: 'Repair cracks in concrete walls, floors, and driveways to prevent further damage.', whatIsIncluded: ['Widen crack for filling', 'Clean debris', 'Apply filler/ epoxy', 'Smooth surface', 'Seal and cure'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 8000, isPopular: false },
+      { name: 'Pillar and column construction', description: 'Build reinforced concrete pillars and columns for structural support.', whatIsIncluded: ['Dig foundation', 'Set reinforcement cage', 'Install formwork', 'Pour concrete', 'Strip forms and cure'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Driveway paving', description: 'Pave driveways with concrete, interlocking blocks, or asphalt.', whatIsIncluded: ['Excavate and grade', 'Lay base material', 'Install edging', 'Pour/pave surface', 'Compact and finish'], typicalDurationMinutes: 480, priceMin: 20000, priceMax: 80000, isPopular: false },
+      { name: 'Garden wall building', description: 'Build decorative garden walls, retaining walls, and planter boxes with brick or stone.', whatIsIncluded: ['Dig foundation trench', 'Lay base course', 'Build wall to height', 'Install coping', 'Point and clean'], typicalDurationMinutes: 300, priceMin: 10000, priceMax: 40000, isPopular: false },
+      { name: 'Steps and stair construction', description: 'Build concrete or brick steps and stairs for entrances and garden levels.', whatIsIncluded: ['Measure rise and run', 'Build formwork', 'Pour concrete/lay bricks', 'Install non-slip surface', 'Cure and finish'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 30000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Roofing and Gutters', iconName: 'home', colorHex: '#DC2626', sortOrder: 8,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Roof leak repair', description: 'Locate and repair roof leaks to prevent water damage to your home interior.', whatIsIncluded: ['Inspect roof for damage', 'Locate leak source', 'Repair damaged area', 'Replace broken tiles/shingles', 'Test for water tightness'], typicalDurationMinutes: 120, priceMin: 4000, priceMax: 15000, isPopular: true },
+      { name: 'Roof tile replacement', description: 'Replace broken, cracked, or missing roof tiles to maintain roof integrity.', whatIsIncluded: ['Remove damaged tiles', 'Check underlayment', 'Install new tiles', 'Secure properly', 'Match existing color'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Gutter cleaning and repair', description: 'Clean debris from gutters and downpipes and repair leaks or damage.', whatIsIncluded: ['Remove leaves and debris', 'Flush downpipes', 'Repair leaks and joints', 'Check brackets', 'Test water flow'], typicalDurationMinutes: 120, priceMin: 2500, priceMax: 8000, isPopular: false },
+      { name: 'Gutter installation', description: 'Install new gutter systems with proper slope and downpipe placement.', whatIsIncluded: ['Measure roofline', 'Cut gutters to length', 'Install brackets', 'Join sections', 'Connect downpipes'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Ceiling leak repair', description: 'Repair water-damaged ceilings caused by roof leaks with proper restoration.', whatIsIncluded: ['Stop active leak', 'Remove damaged plaster', 'Treat for mold', 'Patch and replaster', 'Paint to match'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Roof inspection and maintenance', description: 'Comprehensive roof inspection to identify potential issues before they become major problems.', whatIsIncluded: ['Visual inspection', 'Check flashing', 'Inspect valleys', 'Check chimney seals', 'Detailed report'], typicalDurationMinutes: 90, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Skylight installation', description: 'Install new skylights or roof windows to bring natural light into your home.', whatIsIncluded: ['Cut roof opening', 'Frame opening', 'Install skylight unit', 'Flash and seal', 'Interior finishing'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Fascia and soffit repair', description: 'Repair or replace damaged fascia boards and soffits for roof edge protection.', whatIsIncluded: ['Remove old fascia/soffit', 'Check for rot', 'Install new boards', 'Paint or match color', 'Secure properly'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 15000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Pest Control', iconName: 'bug', colorHex: '#65A30D', sortOrder: 9,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'General pest control treatment', description: 'Comprehensive pest control treatment for cockroaches, ants, spiders, and other common pests.', whatIsIncluded: ['Inspect property', 'Identify pest type', 'Apply treatment', 'Seal entry points', 'Safety recommendations'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 10000, isPopular: true },
+      { name: 'Termite inspection and treatment', description: 'Inspect for termites and apply treatment to eliminate colonies and prevent future damage.', whatIsIncluded: ['Thorough property inspection', 'Identify termite species', 'Apply treatment', 'Install bait stations', 'Prevention plan'], typicalDurationMinutes: 120, priceMin: 5000, priceMax: 25000, isPopular: true },
+      { name: 'Mosquito control', description: 'Reduce mosquito population around your home with targeted treatment.', whatIsIncluded: ['Identify breeding sites', 'Apply larvicide', 'Mist treatment for adults', 'Recommend prevention', 'Follow-up visit'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Rodent control and removal', description: 'Remove rats and mice from your property and prevent re-entry.', whatIsIncluded: ['Inspect entry points', 'Set traps', 'Seal holes and gaps', 'Clean droppings safely', 'Prevention advice'], typicalDurationMinutes: 90, priceMin: 4000, priceMax: 12000, isPopular: false },
+      { name: 'Bed bug treatment', description: 'Eliminate bed bug infestations with professional heat or chemical treatment.', whatIsIncluded: ['Inspect affected areas', 'Prepare treatment plan', 'Apply heat/chemical treatment', 'Mattress encasement', 'Follow-up inspection'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Lizard and gecko control', description: 'Safe removal and prevention of lizards and geckos in your home.', whatIsIncluded: ['Identify attractants', 'Seal entry points', 'Apply repellent', 'Remove food sources', 'Prevention tips'], typicalDurationMinutes: 60, priceMin: 2500, priceMax: 6000, isPopular: false },
+      { name: 'Flea and tick treatment', description: 'Treat home and garden for flea and tick infestations, especially after pets.', whatIsIncluded: ['Identify infested areas', 'Treat carpets and upholstery', 'Treat yard/garden', 'Pet safety advice', 'Prevention plan'], typicalDurationMinutes: 90, priceMin: 4000, priceMax: 12000, isPopular: false },
+      { name: 'Wood borer treatment', description: 'Treat furniture and structural wood for powderpost beetle and wood borer infestations.', whatIsIncluded: ['Inspect wood damage', 'Identify borer type', 'Apply injectable treatment', 'Surface treatment', 'Monitor for activity'], typicalDurationMinutes: 120, priceMin: 4000, priceMax: 15000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Cleaning Services', iconName: 'sparkles', colorHex: '#0EA5E9', sortOrder: 10,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Home deep cleaning', description: 'Thorough deep cleaning of your entire home including all rooms, surfaces, and hard-to-reach areas.', whatIsIncluded: ['Dust all surfaces', 'Vacuum and mop floors', 'Clean kitchen thoroughly', 'Scrub bathrooms', 'Wipe windows and mirrors'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 15000, isPopular: true },
+      { name: 'Office cleaning', description: 'Professional cleaning for offices and commercial spaces to maintain a hygienic work environment.', whatIsIncluded: ['Empty trash bins', 'Dust desks and surfaces', 'Vacuum carpets', 'Clean restrooms', 'Sanitize high-touch areas'], typicalDurationMinutes: 180, priceMin: 6000, priceMax: 20000, isPopular: false },
+      { name: 'Kitchen deep cleaning', description: 'Comprehensive kitchen cleaning including oven, refrigerator, cabinets, and countertops.', whatIsIncluded: ['Clean oven interior', 'Defrost and clean fridge', 'Wipe cabinets inside/out', 'Degrease countertops', 'Clean sink and faucet'], typicalDurationMinutes: 180, priceMin: 4000, priceMax: 10000, isPopular: false },
+      { name: 'Bathroom deep cleaning', description: 'Thorough bathroom cleaning including tile scrubbing, mold removal, and fixture polishing.', whatIsIncluded: ['Scrub tiles and grout', 'Clean toilet thoroughly', 'Polish mirrors and fixtures', 'Remove mold and mildew', 'Clean shower/bathtub'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Sofa and upholstery cleaning', description: 'Professional sofa and upholstery cleaning using steam or dry cleaning methods.', whatIsIncluded: ['Vacuum upholstery', 'Pre-treat stains', 'Apply cleaning solution', 'Extract dirt and moisture', 'Deodorize and freshen'], typicalDurationMinutes: 120, priceMin: 3500, priceMax: 10000, isPopular: false },
+      { name: 'Window cleaning', description: 'Streak-free window cleaning for all windows including exterior accessible windows.', whatIsIncluded: ['Remove curtains/blinds', 'Wash window frames', 'Clean glass both sides', 'Wipe sills and tracks', 'Rehang window treatments'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 8000, isPopular: false },
+      { name: 'Move-in/move-out cleaning', description: 'Complete cleaning service for properties being moved into or out of.', whatIsIncluded: ['Clean all rooms', 'Wipe all surfaces', 'Clean inside cabinets', 'Scrub bathrooms/kitchen', 'Vacuum and mop floors'], typicalDurationMinutes: 300, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Carpet steam cleaning', description: 'Professional carpet steam cleaning to remove deep dirt, stains, and allergens.', whatIsIncluded: ['Vacuum thoroughly', 'Pre-treat stains', 'Steam clean carpets', 'Extract water', 'Speed dry setup'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 12000, isPopular: false },
+      { name: 'Post-construction cleaning', description: 'Heavy-duty cleaning after construction or renovation to remove dust, debris, and residues.', whatIsIncluded: ['Remove construction debris', 'Vacuum dust everywhere', 'Wipe all surfaces', 'Clean windows and fixtures', 'Final polish'], typicalDurationMinutes: 360, priceMin: 10000, priceMax: 30000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Gardening and Landscaping', iconName: 'leaf', colorHex: '#16A34A', sortOrder: 11,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Garden maintenance', description: 'Regular garden maintenance including weeding, pruning, mowing, and general care.', whatIsIncluded: ['Mow lawn', 'Trim hedges and edges', 'Remove weeds', 'Prune plants', 'Clear debris'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: true },
+      { name: 'Lawn mowing and care', description: 'Professional lawn mowing with edging and cleanup for a well-manicured lawn.', whatIsIncluded: ['Mow to desired height', 'Edge along paths', 'Trim around obstacles', 'Blow clippings', 'Apply fertilizer if needed'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 6000, isPopular: true },
+      { name: 'Tree trimming and pruning', description: 'Trim and prune trees for health, safety, and appearance including palm trees.', whatIsIncluded: ['Assess tree condition', 'Remove dead branches', 'Shape canopy', 'Clear fallen debris', 'Dispose of cuttings'], typicalDurationMinutes: 120, priceMin: 4000, priceMax: 15000, isPopular: false },
+      { name: 'Hedge trimming', description: 'Shape and maintain hedges and bushes for a neat garden appearance.', whatIsIncluded: ['Trim sides evenly', 'Shape top', 'Collect clippings', 'Check for pests', 'Fertilize if needed'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 6000, isPopular: false },
+      { name: 'Planting and garden design', description: 'Plant new flowers, shrubs, and trees with professional garden design advice.', whatIsIncluded: ['Prepare soil', 'Select appropriate plants', 'Dig planting holes', 'Plant and water', 'Apply mulch'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 20000, isPopular: false },
+      { name: 'Lawn renovation and turf installation', description: 'Install new turf or renovate existing lawn with seeding, aeration, and top dressing.', whatIsIncluded: ['Remove old lawn', 'Prepare soil bed', 'Level surface', 'Install new turf/seed', 'Water and fertilize'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Irrigation system installation', description: 'Install drip irrigation or sprinkler systems for efficient garden watering.', whatIsIncluded: ['Design irrigation layout', 'Dig trenches', 'Lay pipes and drippers', 'Connect to water source', 'Test all zones'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Compost and soil preparation', description: 'Prepare garden soil with compost, fertilizer, and amendments for optimal plant growth.', whatIsIncluded: ['Test soil quality', 'Remove weeds', 'Add compost/organic matter', 'Mix amendments', 'Level and prepare beds'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Pond and water feature maintenance', description: 'Clean and maintain garden ponds, fountains, and water features.', whatIsIncluded: ['Clean pump and filter', 'Remove algae', 'Trim aquatic plants', 'Check water quality', 'Top up water'], typicalDurationMinutes: 90, priceMin: 3000, priceMax: 8000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Home Security and Automation', iconName: 'lock-closed', colorHex: '#1E293B', sortOrder: 12,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'CCTV camera installation', description: 'Install security cameras for home or business monitoring with mobile viewing access.', whatIsIncluded: ['Camera placement planning', 'Mount cameras', 'Run cables', 'Connect to DVR/NVR', 'Configure mobile app'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 30000, isPopular: true },
+      { name: 'Smart lock installation', description: 'Install electronic smart locks with keypad, fingerprint, or mobile app access.', whatIsIncluded: ['Remove old lock', 'Check door alignment', 'Install smart lock', 'Configure settings', 'Test all access methods'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Alarm system installation', description: 'Install burglar alarm systems with sensors, sirens, and monitoring connectivity.', whatIsIncluded: ['Survey entry points', 'Install door/window sensors', 'Mount control panel', 'Set up motion detectors', 'Test alarm response'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Video doorbell installation', description: 'Install smart video doorbells with two-way audio and motion detection.', whatIsIncluded: ['Connect wiring/charge battery', 'Mount doorbell', 'Configure Wi-Fi', 'Set up mobile app', 'Test motion and audio'], typicalDurationMinutes: 45, priceMin: 2000, priceMax: 5000, isPopular: false },
+      { name: 'Smart home hub setup', description: 'Set up and configure smart home hubs to control lights, temperature, and devices.', whatIsIncluded: ['Connect hub to network', 'Pair compatible devices', 'Create automations', 'Set up voice control', 'Test all integrations'], typicalDurationMinutes: 120, priceMin: 4000, priceMax: 12000, isPopular: false },
+      { name: 'Electric fence installation', description: 'Install electric fencing for perimeter security around properties.', whatIsIncluded: ['Mark perimeter', 'Install fence posts', 'Run electric wire', 'Connect energizer', 'Test and safety check'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Gate automation', description: 'Install automatic gate openers with remote controls and safety sensors.', whatIsIncluded: ['Assess gate type and weight', 'Mount motor unit', 'Install track/arm', 'Wire control panel', 'Program remotes and test'], typicalDurationMinutes: 240, priceMin: 15000, priceMax: 40000, isPopular: false },
+      { name: 'Intercom system installation', description: 'Install audio or video intercom systems for building entry communication.', whatIsIncluded: ['Mount outdoor panel', 'Install indoor units', 'Run wiring', 'Connect to power', 'Test communication'], typicalDurationMinutes: 120, priceMin: 5000, priceMax: 18000, isPopular: false },
+      { name: 'Smoke and gas detector installation', description: 'Install smart smoke, CO, and gas detectors with mobile alerts.', whatIsIncluded: ['Identify optimal locations', 'Mount detectors', 'Wire/hardware setup', 'Connect to smart system', 'Test all detectors'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 6000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Moving and Packing', iconName: 'car', colorHex: '#F97316', sortOrder: 13,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Local moving service', description: 'Professional moving service for local moves including loading, transport, and unloading.', whatIsIncluded: ['Pack fragile items', 'Furniture disassembly', 'Loading onto truck', 'Transport to new location', 'Unload and place'], typicalDurationMinutes: 360, priceMin: 10000, priceMax: 40000, isPopular: true },
+      { name: 'Packing service', description: 'Professional packing of all household items with quality packing materials.', whatIsIncluded: ['Supply packing materials', 'Wrap fragile items', 'Pack boxes systematically', 'Label each box', 'Inventory list'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Furniture disassembly and assembly', description: 'Disassemble furniture for moving and reassemble at the new location.', whatIsIncluded: ['Disassemble bed frames', 'Take apart wardrobes', 'Remove table legs', 'Reassemble at destination', 'Check all connections'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Piano moving', description: 'Specialized piano moving service with proper equipment and handling.', whatIsIncluded: ['Wrap piano carefully', 'Use piano dolly', 'Secure in truck', 'Transport carefully', 'Place in new location'], typicalDurationMinutes: 180, priceMin: 10000, priceMax: 35000, isPopular: false },
+      { name: 'Vehicle transport', description: 'Transport vehicles locally or intercity using flatbed or enclosed carriers.', whatIsIncluded: ['Schedule pickup', 'Load vehicle safely', 'Secure for transport', 'Deliver to destination', 'Inspect upon delivery'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Storage solutions', description: 'Temporary storage of household items with secure facility and inventory management.', whatIsIncluded: ['Pick up items', 'Inventory and label', 'Store in secure unit', 'Climate control if needed', 'Return on schedule'], typicalDurationMinutes: 120, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Office relocation', description: 'Complete office moving service with minimal business disruption.', whatIsIncluded: ['IT equipment packing', 'Furniture moving', 'Document box transport', 'Setup at new location', 'IT reconnection'], typicalDurationMinutes: 480, priceMin: 25000, priceMax: 100000, isPopular: false },
+      { name: 'Waste removal after move', description: 'Remove packing waste, boxes, and debris after moving in.', whatIsIncluded: ['Collect all packing waste', 'Break down boxes', 'Remove debris', 'Recycle materials', 'Leave space clean'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Vehicle Care and Maintenance', iconName: 'car-sport', colorHex: '#6366F1', sortOrder: 14,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Car washing and detailing', description: 'Professional car wash and detailing service including interior and exterior cleaning.', whatIsIncluded: ['Exterior hand wash', 'Wheel and tire cleaning', 'Interior vacuum', 'Dashboard and console wipe', 'Window cleaning'], typicalDurationMinutes: 90, priceMin: 2000, priceMax: 6000, isPopular: true },
+      { name: 'Car waxing and polishing', description: 'Protect and shine your vehicle with professional waxing and polishing.', whatIsIncluded: ['Wash and dry', 'Clay bar treatment', 'Apply wax/polish', 'Buff to shine', 'Trim and detail'], typicalDurationMinutes: 180, priceMin: 4000, priceMax: 12000, isPopular: false },
+      { name: 'Interior deep cleaning', description: 'Thorough interior car cleaning including seats, carpets, and headliner.', whatIsIncluded: ['Vacuum thoroughly', 'Shampoo carpets/seats', 'Clean leather condition', 'Wipe all surfaces', 'Deodorize'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Oil change service', description: 'Engine oil change including filter replacement and fluid top-up.', whatIsIncluded: ['Drain old oil', 'Replace oil filter', 'Fill with new oil', 'Check fluid levels', 'Reset maintenance light'], typicalDurationMinutes: 45, priceMin: 1500, priceMax: 5000, isPopular: true },
+      { name: 'Tire change and rotation', description: 'Change tires or rotate existing tires for even wear.', whatIsIncluded: ['Jack up vehicle', 'Remove wheels', 'Mount new tires', 'Balance each tire', 'Torque to spec'], typicalDurationMinutes: 60, priceMin: 1500, priceMax: 4000, isPopular: false },
+      { name: 'AC service for vehicles', description: 'Car air conditioning service including gas refill and performance check.', whatIsIncluded: ['Check AC pressure', 'Inspect for leaks', 'Vacuum system', 'Refill refrigerant', 'Test cooling output'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Battery replacement', description: 'Test and replace car battery with proper disposal of old battery.', whatIsIncluded: ['Test battery health', 'Remove old battery', 'Clean terminals', 'Install new battery', 'Test charging system'], typicalDurationMinutes: 30, priceMin: 1000, priceMax: 3000, isPopular: false },
+      { name: 'Motorcycle servicing', description: 'Basic motorcycle maintenance service including chain, oil, and brake check.', whatIsIncluded: ['Oil change', 'Chain clean and lube', 'Brake inspection', 'Tire pressure check', 'General inspection'], typicalDurationMinutes: 60, priceMin: 1500, priceMax: 4000, isPopular: false },
+      { name: 'Paint protection film application', description: 'Apply clear paint protection film to vulnerable areas of your vehicle.', whatIsIncluded: ['Clean surface thoroughly', 'Cut film to size', 'Apply with squeegee', 'Heat-set edges', 'Inspect for bubbles'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 30000, isPopular: false },
+    ]
+  },
+  {
+    name: 'IT and Electronics Repair', iconName: 'desktop', colorHex: '#8B5CF6', sortOrder: 15,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Computer repair and troubleshooting', description: 'Diagnose and repair hardware and software issues on desktop and laptop computers.', whatIsIncluded: ['Diagnose problem', 'Repair hardware issue', 'Remove viruses/malware', 'Optimize performance', 'Test all functions'], typicalDurationMinutes: 120, priceMin: 2500, priceMax: 8000, isPopular: true },
+      { name: 'Smartphone screen replacement', description: 'Replace cracked or broken smartphone screens with quality replacement parts.', whatIsIncluded: ['Remove damaged screen', 'Clean frame and adhesive', 'Install new screen', 'Test touch and display', 'Apply screen protector'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 15000, isPopular: true },
+      { name: 'Laptop battery replacement', description: 'Replace worn-out laptop batteries with compatible new batteries.', whatIsIncluded: ['Diagnose battery health', 'Open laptop case', 'Disconnect old battery', 'Install new battery', 'Calibrate and test'], typicalDurationMinutes: 45, priceMin: 2000, priceMax: 6000, isPopular: false },
+      { name: 'Wi-Fi network setup', description: 'Set up and optimize Wi-Fi networks for home or office with maximum coverage.', whatIsIncluded: ['Assess coverage needs', 'Position router optimally', 'Configure network settings', 'Set up password/security', 'Test speed and coverage'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: false },
+      { name: 'Data backup and recovery', description: 'Backup important data or recover lost files from damaged storage devices.', whatIsIncluded: ['Assess data loss', 'Attempt recovery', 'Backup to external drive', 'Organize recovered data', 'Recommend backup plan'], typicalDurationMinutes: 120, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Printer setup and repair', description: 'Set up new printers or repair printing issues including connectivity problems.', whatIsIncluded: ['Unbox and setup', 'Install drivers/software', 'Connect to network', 'Fix paper jams', 'Test print quality'], typicalDurationMinutes: 60, priceMin: 1500, priceMax: 4000, isPopular: false },
+      { name: 'TV mounting and setup', description: 'Mount TVs on walls with cable concealment and device connection.', whatIsIncluded: ['Choose mounting location', 'Install wall bracket', 'Mount TV securely', 'Hide cables', 'Connect devices and test'], typicalDurationMinutes: 60, priceMin: 2500, priceMax: 7000, isPopular: true },
+      { name: 'Smart home device setup', description: 'Set up smart speakers, displays, and IoT devices with proper configuration.', whatIsIncluded: ['Unbox and power up', 'Connect to Wi-Fi', 'Configure settings', 'Link to smart home app', 'Test voice/control'], typicalDurationMinutes: 60, priceMin: 1500, priceMax: 4000, isPopular: false },
+      { name: 'CCTV and security system setup', description: 'Install and configure IP cameras, NVRs, and security systems with remote access.', whatIsIncluded: ['Camera positioning', 'Run network cables', 'Configure NVR', 'Set up remote viewing', 'Test all cameras'], typicalDurationMinutes: 180, priceMin: 6000, priceMax: 20000, isPopular: false },
+      { name: 'Software installation and updates', description: 'Install operating systems, applications, and perform system updates.', whatIsIncluded: ['Install OS if needed', 'Install required software', 'Configure settings', 'Apply updates/patches', 'Test functionality'], typicalDurationMinutes: 60, priceMin: 1500, priceMax: 4000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Event and Party Services', iconName: 'musical-notes', colorHex: '#F43F5E', sortOrder: 16,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Event decoration setup', description: 'Professional decoration setup for parties, weddings, and special events.', whatIsIncluded: ['Theme consultation', 'Set up decorations', 'Arrange floral displays', 'Install lighting', 'Cleanup after event'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 40000, isPopular: true },
+      { name: 'Sound system setup', description: 'Set up PA systems, speakers, microphones, and audio equipment for events.', whatIsIncluded: ['Assess venue acoustics', 'Position speakers', 'Connect microphones', 'Set up mixing board', 'Sound check'], typicalDurationMinutes: 120, priceMin: 5000, priceMax: 20000, isPopular: false },
+      { name: 'Lighting setup for events', description: 'Install decorative and functional lighting for events including DJ lighting.', whatIsIncluded: ['Plan lighting layout', 'Set up light stands', 'Install effect lights', 'Connect controllers', 'Test all lighting'], typicalDurationMinutes: 120, priceMin: 5000, priceMax: 18000, isPopular: false },
+      { name: 'Tent and canopy rental setup', description: 'Set up tents, canopies, and marquees for outdoor events.', whatIsIncluded: ['Site preparation', 'Assemble frame', 'Drape canopy', 'Secure with weights/stakes', 'Interior setup'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Photography and videography', description: 'Professional event photography and videography coverage.', whatIsIncluded: ['Event coverage', 'Professional editing', 'Digital photo delivery', 'Highlight video', 'Online gallery'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Catering setup service', description: 'Set up buffet stations, bars, and dining areas for events.', whatIsIncluded: ['Arrange tables and linens', 'Set up buffet stations', 'Prepare beverage stations', 'Arrange seating', 'Cleanup service'], typicalDurationMinutes: 180, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'DJ and entertainment service', description: 'Professional DJ service with music, MC, and dance floor management.', whatIsIncluded: ['Consult playlist', 'Set up DJ equipment', 'MC announcements', 'Manage music flow', 'Equipment teardown'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Bouncy castle and inflatable setup', description: 'Set up bouncy castles, slides, and inflatable games for children parties.', whatIsIncluded: ['Select safe location', 'Set up inflatable', 'Secure with stakes', 'Test inflation', 'Safety briefing'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Balloon decoration service', description: 'Custom balloon arches, columns, centerpieces, and decorations for events.', whatIsIncluded: ['Color/theme consultation', 'Create balloon arrangements', 'Set up at venue', 'Secure all decorations', 'Cleanup after event'], typicalDurationMinutes: 120, priceMin: 4000, priceMax: 15000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Personal Care and Wellness', iconName: 'body', colorHex: '#D946EF', sortOrder: 17,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Massage therapy at home', description: 'Professional massage therapy in the comfort of your own home.', whatIsIncluded: ['Setup massage table', 'Aromatherapy options', 'Full body massage', 'Focus on problem areas', 'Relaxation techniques'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 8000, isPopular: true },
+      { name: 'Haircut and styling at home', description: 'Professional haircut, styling, or blow-dry service at your location.', whatIsIncluded: ['Consultation', 'Wash and condition', 'Cut and style', 'Blow dry', 'Product recommendations'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: false },
+      { name: 'Makeup and grooming service', description: 'Professional makeup application for events, photoshoots, or special occasions.', whatIsIncluded: ['Skin preparation', 'Foundation application', 'Eye makeup', 'Lip and cheek color', 'Setting and finishing'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 10000, isPopular: false },
+      { name: 'Manicure and pedicure', description: 'Professional nail care service including shaping, cuticle care, and polish.', whatIsIncluded: ['Soak and exfoliate', 'Trim and shape nails', 'Cuticle care', 'Massage hands/feet', 'Apply polish'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: false },
+      { name: 'Facial and skincare treatment', description: 'Professional facial cleansing and skincare treatment using quality products.', whatIsIncluded: ['Cleanse and tone', 'Exfoliate', 'Extract impurities', 'Apply face mask', 'Moisturize and protect'], typicalDurationMinutes: 60, priceMin: 3000, priceMax: 7000, isPopular: false },
+      { name: 'Personal training session', description: 'One-on-one personal training session at your home or nearby park.', whatIsIncluded: ['Fitness assessment', 'Custom workout plan', 'Guided exercises', 'Form correction', 'Cool down and stretch'], typicalDurationMinutes: 60, priceMin: 2500, priceMax: 6000, isPopular: false },
+      { name: 'Yoga and meditation instruction', description: 'Private yoga or meditation session tailored to your experience level.', whatIsIncluded: ['Breathing exercises', 'Guided meditation', 'Yoga asanas', 'Relaxation techniques', 'Personalized routine'], typicalDurationMinutes: 60, priceMin: 2000, priceMax: 5000, isPopular: false },
+      { name: 'Elderly care assistance', description: 'Compassionate care assistance for elderly family members at home.', whatIsIncluded: ['Companionship', 'Medication reminders', 'Light housekeeping', 'Meal preparation', 'Mobility assistance'], typicalDurationMinutes: 240, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Child care and babysitting', description: 'Trustworthy babysitting and child care service at your home.', whatIsIncluded: ['Supervise children', 'Engage in activities', 'Prepare meals/snacks', 'Put to bed', 'Light tidying'], typicalDurationMinutes: 240, priceMin: 3000, priceMax: 10000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Home Renovation and Interiors', iconName: 'business', colorHex: '#0D9488', sortOrder: 18,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Full room renovation', description: 'Complete room renovation including demolition, reconstruction, and finishing.', whatIsIncluded: ['Demolish old fixtures', 'Electrical and plumbing work', 'Wall and floor finishing', 'Install new fixtures', 'Paint and final touches'], typicalDurationMinutes: 960, priceMin: 50000, priceMax: 200000, isPopular: false },
+      { name: 'Bathroom renovation', description: 'Full bathroom renovation including tiling, fixtures, plumbing, and waterproofing.', whatIsIncluded: ['Remove old fittings', 'Waterproofing', 'Tile walls and floor', 'Install toilet/sink/shower', 'Plumbing and finishing'], typicalDurationMinutes: 720, priceMin: 40000, priceMax: 150000, isPopular: true },
+      { name: 'Kitchen renovation', description: 'Complete kitchen makeover with cabinets, countertops, plumbing, and appliance setup.', whatIsIncluded: ['Remove old kitchen', 'Plumbing and electrical', 'Install cabinets', 'Install countertop', 'Connect appliances'], typicalDurationMinutes: 720, priceMin: 50000, priceMax: 200000, isPopular: false },
+      { name: 'False ceiling installation', description: 'Install false ceilings with lighting integration for modern interiors.', whatIsIncluded: ['Design ceiling layout', 'Install frame structure', 'Fix ceiling boards', 'Install recessed lights', 'Paint and finish'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Partition wall construction', description: 'Build new partition walls to divide rooms or create new spaces.', whatIsIncluded: ['Mark layout', 'Build frame', 'Install insulation', 'Fix drywall/plasterboard', 'Finish and paint'], typicalDurationMinutes: 240, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Closet and storage design', description: 'Design and build custom closet and storage systems for bedrooms and halls.', whatIsIncluded: ['Measure space', 'Design storage layout', 'Build closet frame', 'Install shelves and rails', 'Doors and finishing'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Staircase renovation', description: 'Renovate existing staircases with new treads, railings, and paint/stain.', whatIsIncluded: ['Remove old treads/risers', 'Install new treads', 'Replace balusters', 'Install handrail', 'Stain or paint'], typicalDurationMinutes: 360, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Window replacement', description: 'Replace old windows with new energy-efficient windows including frame and glazing.', whatIsIncluded: ['Remove old window', 'Prepare opening', 'Install new window', 'Insulate gaps', 'Seal and trim'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 30000, isPopular: false },
+      { name: 'Interior design consultation', description: 'Professional interior design advice and space planning for your home.', whatIsIncluded: ['Site visit and assessment', 'Design concept presentation', 'Color and material selection', 'Furniture layout plan', 'Shopping list'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 30000, isPopular: false },
+    ]
+  },
+  {
+    name: 'Solar and Energy Solutions', iconName: 'sunny', colorHex: '#EAB308', sortOrder: 19,
+    countries: ['LK', 'CA', 'DE'],
+    jobs: [
+      { name: 'Solar panel installation', description: 'Install solar panel systems for residential or commercial properties with grid connection.', whatIsIncluded: ['Site assessment', 'Mount panel frames', 'Install solar panels', 'Connect inverter', 'Grid connection setup'], typicalDurationMinutes: 480, priceMin: 50000, priceMax: 200000, isPopular: true },
+      { name: 'Solar water heater installation', description: 'Install solar water heating systems with collector panels and storage tank.', whatIsIncluded: ['Roof assessment', 'Mount solar collectors', 'Install storage tank', 'Connect plumbing', 'Test heating performance'], typicalDurationMinutes: 240, priceMin: 20000, priceMax: 60000, isPopular: false },
+      { name: 'Inverter installation', description: 'Install power inverter systems for backup power during outages.', whatIsIncluded: ['Assess power needs', 'Mount inverter unit', 'Connect batteries', 'Wire to main panel', 'Test backup function'], typicalDurationMinutes: 180, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Battery storage system setup', description: 'Install lithium or lead-acid battery banks for solar energy storage.', whatIsIncluded: ['Design battery bank', 'Mount battery rack', 'Connect batteries', 'Install charge controller', 'Test storage capacity'], typicalDurationMinutes: 240, priceMin: 15000, priceMax: 60000, isPopular: false },
+      { name: 'Solar pump installation', description: 'Install solar-powered water pumps for agricultural or domestic water supply.', whatIsIncluded: ['Assess water needs', 'Mount solar panels', 'Install pump controller', 'Connect pump', 'Test water flow'], typicalDurationMinutes: 240, priceMin: 15000, priceMax: 50000, isPopular: false },
+      { name: 'Energy audit and consultation', description: 'Comprehensive home energy audit to identify savings and solar opportunities.', whatIsIncluded: ['Inspect property', 'Review energy bills', 'Identify inefficiencies', 'Solar feasibility report', 'Recommendation plan'], typicalDurationMinutes: 120, priceMin: 5000, priceMax: 15000, isPopular: false },
+      { name: 'Solar street light installation', description: 'Install solar-powered street lights for driveways, gardens, and pathways.', whatIsIncluded: ['Plan light placement', 'Install pole/base', 'Mount solar panel and light', 'Connect battery', 'Test automatic operation'], typicalDurationMinutes: 120, priceMin: 8000, priceMax: 25000, isPopular: false },
+      { name: 'Solar maintenance and cleaning', description: 'Clean and maintain solar panels for optimal energy generation.', whatIsIncluded: ['Inspect panels', 'Clean surface', 'Check connections', 'Monitor performance', 'Maintenance report'], typicalDurationMinutes: 90, priceMin: 3000, priceMax: 8000, isPopular: false },
+      { name: 'Wind turbine installation', description: 'Install small-scale wind turbines for supplementary home energy generation.', whatIsIncluded: ['Wind assessment', 'Install foundation', 'Erect turbine tower', 'Connect generator', 'Grid tie-in'], typicalDurationMinutes: 480, priceMin: 50000, priceMax: 150000, isPopular: false },
+    ]
+  },
+]
+
+async function main() {
+  console.log('Seeding job categories and template jobs...')
+  let totalJobs = 0
+  for (const cat of categories) {
+    const created = await prisma.jobCategory.upsert({
+      where: { name: cat.name },
+      update: { iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: cat.countries, isActive: true },
+      create: { name: cat.name, iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: cat.countries, isActive: true },
+    })
+    for (const job of cat.jobs) {
+      await prisma.templateJob.upsert({
+        where: { id: `${cat.name.toLowerCase().replace(/\s+/g, '-')}-${job.name.toLowerCase().replace(/\s+/g, '-')}` },
+        update: {
+          categoryId: created.id, name: job.name, description: job.description,
+          whatIsIncluded: job.whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes,
+          priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR',
+          isPopular: job.isPopular, isCompanyOnly: false, countries: cat.countries, isActive: true,
+        },
+        create: {
+          id: `${cat.name.toLowerCase().replace(/\s+/g, '-')}-${job.name.toLowerCase().replace(/\s+/g, '-')}`,
+          categoryId: created.id, name: job.name, description: job.description,
+          whatIsIncluded: job.whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes,
+          priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR',
+          isPopular: job.isPopular, isCompanyOnly: false, countries: cat.countries, isActive: true,
+        },
+      })
+      totalJobs++
+    }
+    console.log(`  ${cat.name}: ${cat.jobs.length} jobs`)
+  }
+  console.log(`\n✅ Total: ${categories.length} categories, ${totalJobs} template jobs`)
+}
+
+main()
+  .catch((e) => { console.error(e); process.exit(1) })
+  .finally(() => prisma.$disconnect())

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { jobs } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
 import type { JobPosting } from '../../../lib/types'
@@ -48,7 +49,10 @@ export default function QuotesScreen() {
                   <View style={styles.avatar}><Text style={styles.avatarText}>{q.tasker?.user?.name?.[0] || 'T'}</Text></View>
                   <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{q.tasker?.user?.name || 'Tasker'}</Text>
-                    <Text style={styles.cardSkill}>⭐ {q.tasker?.rating?.toFixed(1) || '5.0'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="star" size={13} color="#F59E0B" />
+                      <Text style={styles.cardSkill}> {q.tasker?.rating?.toFixed(1) || '5.0'}</Text>
+                    </View>
                   </View>
                   <Text style={styles.price}>LKR {q.amount?.toLocaleString()}</Text>
                 </View>

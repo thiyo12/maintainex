@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, ScrollView, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { bookings } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
 import type { Booking } from '../../../lib/types'
@@ -66,7 +67,7 @@ export default function LiveTrackingScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapEmoji}>🗺️</Text>
+          <Ionicons name="map" size={48} color="rgba(255,255,255,0.9)" />
           <Animated.View style={[styles.pulseDot, { opacity: pulseAnim }]} />
           <Text style={styles.mapText}>Tasker location live</Text>
           <Text style={styles.mapSub}>{booking?.district || 'Colombo'} • 1.2 km away</Text>
@@ -84,23 +85,35 @@ export default function LiveTrackingScreen() {
             </View>
             <View style={styles.taskerInfo}>
               <Text style={styles.taskerName}>{booking?.customerName || 'Tasker'}</Text>
-              <Text style={styles.taskerSkill}>{booking?.serviceName || 'Professional'} • ⭐ 4.8</Text>
-              <Text style={styles.taskerStatus}>🟢 On the way</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <Text style={[styles.taskerSkill, { marginTop: 0 }]}>{booking?.serviceName || 'Professional'} • </Text>
+                <Ionicons name="star" size={13} color="#F59E0B" />
+                <Text style={[styles.taskerSkill, { marginTop: 0 }]}> 4.8</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green, marginRight: 4 }} />
+                <Text style={[styles.taskerStatus, { marginTop: 0 }]}>On the way</Text>
+              </View>
             </View>
           </View>
           <View style={styles.taskerActions}>
             <TouchableOpacity style={styles.callBtn}>
-              <Text style={styles.callBtnText}>📞 Call</Text>
+              <Ionicons name="call-outline" size={16} color={colors.dark} />
+              <Text style={styles.callBtnText}> Call</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.chatBtn} onPress={() => router.push('/(chat)/' + id)}>
-              <Text style={styles.chatBtnText}>💬 Chat</Text>
+              <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.white} />
+              <Text style={styles.chatBtnText}> Chat</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.jobCard}>
           <Text style={styles.jobTitle}>{booking?.serviceName || 'Service'}</Text>
-          <Text style={styles.jobMeta}>📍 {booking?.district || ''} • Urgent</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Ionicons name="location-outline" size={14} color={colors.gray} />
+            <Text style={styles.jobMeta}> {booking?.district || ''} • Urgent</Text>
+          </View>
           <Text style={styles.jobPrice}>LKR {(booking?.price || 0).toLocaleString()}</Text>
         </View>
 
@@ -110,7 +123,7 @@ export default function LiveTrackingScreen() {
             <View key={i} style={styles.progressRow}>
               <View style={styles.progressLeft}>
                 <View style={[styles.progressDot, step.done && styles.progressDotDone, i === stepIndex && styles.progressDotCurrent]}>
-                  {step.done ? <Text style={styles.progressCheck}>✓</Text> : <Text style={styles.progressNum}>{i + 1}</Text>}
+                  {step.done ? <Ionicons name="checkmark" size={14} color={colors.white} /> : <Text style={styles.progressNum}>{i + 1}</Text>}
                 </View>
                 {i < progressSteps.length - 1 ? (
                   <View style={[styles.progressLine, step.done && styles.progressLineDone]} />
@@ -147,7 +160,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, marginHorizontal: 24, borderRadius: 20, height: 220,
     justifyContent: 'center', alignItems: 'center', marginBottom: 16, overflow: 'hidden',
   },
-  mapEmoji: { fontSize: 48, marginBottom: 8 },
   pulseDot: {
     width: 16, height: 16, borderRadius: 8, backgroundColor: colors.green,
     position: 'absolute', top: '45%', left: '55%',
@@ -181,12 +193,12 @@ const styles = StyleSheet.create({
   taskerActions: { flexDirection: 'row', gap: 10 },
   callBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5,
-    borderColor: colors.lightGray, alignItems: 'center',
+    borderColor: colors.lightGray, alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
   },
   callBtnText: { fontSize: 14, fontWeight: '600', color: colors.dark },
   chatBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10,
-    backgroundColor: colors.primary, alignItems: 'center',
+    backgroundColor: colors.primary, alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
   },
   chatBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   jobCard: {
@@ -210,7 +222,6 @@ const styles = StyleSheet.create({
   },
   progressDotDone: { backgroundColor: colors.green },
   progressDotCurrent: { backgroundColor: colors.primary },
-  progressCheck: { fontSize: 14, color: colors.white, fontWeight: '700' },
   progressNum: { fontSize: 12, color: colors.gray, fontWeight: '600' },
   progressLine: { width: 2, height: 28, backgroundColor: colors.lightGray },
   progressLineDone: { backgroundColor: colors.green },

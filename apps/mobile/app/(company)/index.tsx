@@ -1,13 +1,33 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { company } from '../../lib/api'
+
+function PressScale({ onPress, children, style }: any) {
+  const scale = useRef(new Animated.Value(1)).current
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={1}
+      onPressIn={() => Animated.spring(scale, { toValue: 0.95, friction: 8, tension: 100, useNativeDriver: true }).start()}
+      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+    </TouchableOpacity>
+  )
+}
 
 export default function CompanyDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+    '📄': 'document-text-outline',
+    '💰': 'cash-outline',
+    '👥': 'people-outline',
+    '⭐': 'star',
+  }
   const [stats, setStats] = useState([
     { icon: '📄', label: 'Active contracts', value: '-' },
     { icon: '💰', label: 'Revenue (month)', value: '-' },
@@ -58,6 +78,7 @@ export default function CompanyDashboard() {
       setRecentActivity([{ text: 'Could not load data. Pull to retry.', time: '' }])
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
@@ -79,7 +100,10 @@ export default function CompanyDashboard() {
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <View>
-          <Text style={styles.greeting}>Hello, Nimal 👋</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={styles.greeting}>Hello, Nimal</Text>
+            <Ionicons name="hand-wave-outline" size={22} color={colors.primary} style={{ marginLeft: 6 }} />
+          </View>
           <Text style={styles.companyName}>Premium Builders (Pvt) Ltd</Text>
         </View>
         <View style={styles.avatar}>
@@ -87,19 +111,23 @@ export default function CompanyDashboard() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={colors.primary} />}
+      >
         <View style={styles.statsGrid}>
           {stats.map((s, i) => (
-            <View key={i} style={styles.statCard}>
-              <Text style={styles.statIcon}>{s.icon}</Text>
-              <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </View>
+            <PressScale key={i}>
+              <View style={styles.statCard}>
+                <Ionicons name={iconMap[s.icon] || 'grid-outline'} size={28} color={colors.companyAccent} style={{ marginBottom: 8 }} />
+                <Text style={styles.statValue}>{s.value}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </View>
+            </PressScale>
           ))}
         </View>
 
         <View style={styles.chartPlaceholder}>
-          <Text style={styles.chartEmoji}>📈</Text>
+          <Ionicons name="trending-up-outline" size={32} color={colors.companyAccent} style={{ marginBottom: 8 }} />
           <Text style={styles.chartTitle}>Revenue overview</Text>
           <Text style={styles.chartSub}>{revenueMonth} this month</Text>
           <View style={styles.chartBars}>
@@ -165,7 +193,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  statIcon: { fontSize: 28, marginBottom: 8 },
   statValue: { fontSize: 20, fontWeight: '800', color: colors.dark },
   statLabel: { fontSize: 12, color: colors.gray, marginTop: 4 },
   chartPlaceholder: {
@@ -180,7 +207,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  chartEmoji: { fontSize: 32, marginBottom: 8 },
   chartTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },
   chartSub: { fontSize: 13, color: colors.gray, marginBottom: 16 },
   chartBars: {

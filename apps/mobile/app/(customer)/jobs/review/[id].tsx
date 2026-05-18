@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import StarRating from '../../../../components/ui/StarRating'
 import { colors } from '../../../../lib/colors'
 import { jobs } from '../../../../lib/api'
@@ -68,7 +69,7 @@ export default function ReviewScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.successContainer}>
           <Animated.View style={[styles.successCircle, { transform: [{ scale: slideAnim }] }]}>
-            <Text style={styles.successIcon}>⭐</Text>
+            <Ionicons name="star" size={36} color={colors.white} />
           </Animated.View>
           <Text style={styles.successTitle}>Review submitted</Text>
           <Text style={styles.successSub}>
@@ -260,7 +261,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  successIcon: { fontSize: 36 },
   successTitle: { fontSize: 26, fontWeight: '800', color: colors.dark, marginBottom: 8 },
   successSub: { fontSize: 15, color: colors.gray, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
   homeBtn: {

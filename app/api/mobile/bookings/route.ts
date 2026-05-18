@@ -9,22 +9,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, phone, email, serviceId, district, address, date, time, notes } = await request.json()
+    const { name, phone, email, serviceId, jobId, district, address, date, time, notes, amount } = await request.json()
 
-    if (!name || !phone || !serviceId || !district || !date || !time) {
+    if (!name || !phone || !district || !date || !time) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const totalPrice = 0
-    let service
+    if (!serviceId && !jobId) {
+      return NextResponse.json({ error: 'serviceId or jobId required' }, { status: 400 })
+    }
+
+    let totalPrice = amount || 0
+    let serviceName = ''
     if (serviceId) {
-      service = await prisma.service.findUnique({ where: { id: serviceId } })
+      const service = await prisma.service.findUnique({ where: { id: serviceId } })
+      if (service) {
+        totalPrice = service.price || totalPrice
+        serviceName = service.name || ''
+      }
     }
 
     const booking = await prisma.booking.create({
       data: {
         userId: user.id,
-        serviceId,
+        serviceId: serviceId || null,
         name,
         phone,
         email: email || null,
@@ -33,18 +41,23 @@ export async function POST(request: NextRequest) {
         date: new Date(date),
         timeSlot: time,
         time: time,
-        totalPrice: service?.price || totalPrice,
+        totalPrice,
         status: 'PENDING',
         notes: notes || null,
       },
     })
 
+    if (jobId && serviceName === '') {
+      const job = await prisma.jobPosting.findUnique({ where: { id: jobId } })
+      if (job) serviceName = job.title
+    }
+
     return NextResponse.json({
       booking: {
         id: booking.id,
         serviceId: booking.serviceId,
-        serviceName: service?.name || '',
-        categoryName: service?.categoryId || '',
+        serviceName,
+        categoryName: '',
         customerName: booking.name,
         customerPhone: booking.phone,
         customerEmail: booking.email,

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/colors'
 import { bookings } from '../../../../lib/api'
 import { Booking } from '../../../../lib/types'
@@ -73,11 +74,12 @@ export default function ReceiptScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.receiptCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.receiptHeader}>
-            <Text style={styles.receiptEmoji}>🧾</Text>
+            <Ionicons name="receipt-outline" size={40} color={colors.dark} style={{ marginBottom: 8 }} />
             <Text style={styles.receiptTitle}>Payment receipt</Text>
             <Text style={styles.receiptId}>#INV-{id}-001</Text>
             <View style={styles.paidBadge}>
-              <Text style={styles.paidText}>✅ Paid</Text>
+              <Ionicons name="checkmark-circle" size={14} color={colors.green} />
+              <Text style={styles.paidText}> Paid</Text>
             </View>
           </View>
 
@@ -114,7 +116,10 @@ export default function ReceiptScreen() {
 
           <View style={styles.paymentSection}>
             <Text style={styles.paymentLabel}>Payment method</Text>
-            <Text style={styles.paymentValue}>💳 Visa ending in 4242</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="card-outline" size={14} color={colors.dark} />
+              <Text style={styles.paymentValue}> Visa ending in 4242</Text>
+            </View>
           </View>
           <View style={styles.paymentSection}>
             <Text style={styles.paymentLabel}>Paid on</Text>
@@ -126,7 +131,7 @@ export default function ReceiptScreen() {
           </View>
 
           <View style={styles.escrowNote}>
-            <Text style={styles.escrowIcon}>🔒</Text>
+            <Ionicons name="lock-closed-outline" size={16} color="#1E40AF" />
             <Text style={styles.escrowText}>
               Payment has been released from escrow to the tasker.
             </Text>
@@ -135,13 +140,15 @@ export default function ReceiptScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity style={styles.shareBtn}>
-            <Text style={styles.shareBtnText}>📤 Share receipt</Text>
+            <Ionicons name="share-outline" size={16} color={colors.dark} />
+            <Text style={styles.shareBtnText}> Share receipt</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.reviewBtn}
             onPress={() => router.push('/(customer)/jobs/review/' + id)}
           >
-            <Text style={styles.reviewBtnText}>⭐ Leave a review</Text>
+            <Ionicons name="star-outline" size={16} color={colors.white} />
+            <Text style={styles.reviewBtnText}> Leave a review</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -174,7 +181,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   receiptHeader: { alignItems: 'center', marginBottom: 16 },
-  receiptEmoji: { fontSize: 40, marginBottom: 8 },
   receiptTitle: { fontSize: 20, fontWeight: '800', color: colors.dark, marginBottom: 4 },
   receiptId: { fontSize: 12, color: colors.gray, marginBottom: 8 },
   paidBadge: {
@@ -182,6 +188,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   paidText: { fontSize: 13, fontWeight: '700', color: colors.green },
   divider: { height: 1, backgroundColor: colors.lightGray, marginVertical: 12 },
@@ -220,7 +228,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
   },
-  escrowIcon: { fontSize: 16 },
   escrowText: { flex: 1, fontSize: 12, color: '#1E40AF', lineHeight: 18 },
   actions: {
     flexDirection: 'row',
@@ -235,6 +242,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.lightGray,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
     backgroundColor: colors.white,
   },
   shareBtnText: { fontSize: 14, fontWeight: '600', color: colors.dark },
@@ -244,6 +253,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.primary,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   reviewBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   homeBtn: {

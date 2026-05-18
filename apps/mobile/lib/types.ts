@@ -148,3 +148,90 @@ export interface ApiError {
   message: string
   statusCode: number
 }
+
+// Find a Tasker - Job Section Types
+export interface JobCategory {
+  id: string
+  name: string
+  iconName: string
+  colorHex: string
+  sortOrder: number
+  countries: string[]
+  isActive: boolean
+  jobs?: TemplateJob[]
+}
+
+export interface TemplateJob {
+  id: string
+  categoryId: string
+  category?: JobCategory
+  name: string
+  description: string
+  whatIsIncluded: string[]
+  typicalDurationMinutes: number
+  priceMin: number
+  priceMax: number
+  currency: string
+  isPopular: boolean
+  isCompanyOnly: boolean
+  countries: string[]
+}
+
+export interface FindTaskerResult {
+  id: string
+  userId: string
+  name: string
+  bio: string
+  rating: number
+  completedJobs: number
+  isVerified: boolean
+  isOnline: boolean
+  profileImage?: string
+  latitude?: number
+  longitude?: number
+  distance?: number
+  skills: string[]
+  hourlyRate: number
+  fixedRate: number
+  experienceYears: number
+}
+
+export interface TaskerSkill {
+  id: string
+  taskerId: string
+  jobId: string
+  job: TemplateJob
+  experienceYears: number
+  hourlyRate: number
+  fixedRate: number
+  currency: string
+}
+
+export interface QuickBookingInput {
+  jobId: string
+  taskerId: string
+  date: string
+  timeSlot: string
+  address: string
+  district: string
+  notes?: string
+}
+
+export interface QuickBooking {
+  id: string
+  jobId: string
+  taskerId: string
+  customerId: string
+  date: string
+  timeSlot: string
+  status: string
+  totalPrice: number
+  createdAt: string
+}
+
+export interface SearchResult {
+  categories: JobCategory[]
+  jobs: TemplateJob[]
+  taskers: FindTaskerResult[]
+  totalResults: number
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../lib/colors'
 
 export default function JobPostedConfirmation() {
@@ -33,7 +34,7 @@ export default function JobPostedConfirmation() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
-        <Text style={styles.checkmark}>✓</Text>
+        <Ionicons name="checkmark" size={40} color={colors.white} />
       </Animated.View>
       <Text style={styles.heading}>Job posted successfully</Text>
       <Text style={styles.subtitle}>Taskers and companies near you have been notified</Text>
@@ -74,7 +75,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  checkmark: { fontSize: 40, color: colors.white, fontWeight: '700' },
   heading: { fontSize: 26, fontWeight: '800', color: colors.dark, textAlign: 'center', marginBottom: 12 },
   subtitle: { fontSize: 15, color: colors.gray, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
   counter: {
