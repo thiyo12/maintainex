@@ -121,13 +121,21 @@ export default function FlashOfferBanner() {
       setVisible(true)
       return
     }
+    let cancelled = false
     const poll = setInterval(() => {
-      if (sessionStorage.getItem('flash_splash_shown')) {
+      if (sessionStorage.getItem('flash_splash_shown') && !cancelled) {
         setVisible(true)
         clearInterval(poll)
       }
     }, 100)
-    return () => clearInterval(poll)
+    // Fallback: show banner even if no splash after 2.5s
+    const fallback = setTimeout(() => {
+      if (!cancelled) {
+        setVisible(true)
+        clearInterval(poll)
+      }
+    }, 2500)
+    return () => { cancelled = true; clearInterval(poll); clearTimeout(fallback) }
   }, [loading])
 
   const handleClaim = async () => {

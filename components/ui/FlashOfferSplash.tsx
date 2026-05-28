@@ -49,7 +49,6 @@ export default function FlashOfferSplash() {
   const [visible, setVisible] = useState(false)
   const splashRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
-  const offerKeyRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
