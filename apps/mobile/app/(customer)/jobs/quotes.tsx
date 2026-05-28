@@ -26,9 +26,6 @@ export default function QuotesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
       <Text style={styles.heading}>Quotes received</Text>
 
       {loading ? (
@@ -77,8 +74,6 @@ export default function QuotesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  backBtn: { paddingHorizontal: 24, paddingTop: 8 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   heading: { fontSize: 22, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginTop: 16, marginBottom: 16 },
   jobSummary: { backgroundColor: colors.white, marginHorizontal: 24, padding: 16, borderRadius: 14, marginBottom: 8 },
   jobTitle: { fontSize: 16, fontWeight: '700', color: colors.dark },

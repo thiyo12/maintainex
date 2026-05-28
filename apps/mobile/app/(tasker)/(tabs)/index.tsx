@@ -3,11 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityI
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import { jobs, taskers } from '../../lib/api'
-import { useAuth } from '../../lib/auth'
-import type { JobPosting } from '../../lib/types'
-import PressScale from '../../components/find/PressScale'
+import { colors } from '../../../lib/colors'
+import { jobs, taskers } from '../../../lib/api'
+import { useAuth } from '../../../lib/auth'
+import type { JobPosting } from '../../../lib/types'
+import PressScale from '../../../components/find/PressScale'
 
 export default function TaskerHome() {
   const router = useRouter()

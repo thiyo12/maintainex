@@ -20,6 +20,8 @@ interface Booking {
   branch: { id: string; name: string; location: string } | null
   createdAt: string
   date: string | null
+  budgetMin: number | null
+  budgetMax: number | null
 }
 
 interface Branch {
@@ -394,6 +396,7 @@ export default function AdminBookings() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">District</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Budget</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Date & Time</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
                 <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">Actions</th>
@@ -425,6 +428,15 @@ export default function AdminBookings() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-gray-600">{booking.service?.name}</td>
+                    <td className="px-6 py-4">
+                      {booking.budgetMin && booking.budgetMax ? (
+                        <span className="text-gray-700 font-medium">
+                          LKR {Number(booking.budgetMin).toLocaleString()} – {Number(booking.budgetMax).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <div className="text-gray-900">{booking.date ? new Date(booking.date).toLocaleDateString() : '-'}</div>
                       <div className="text-sm text-gray-500">{booking.time}</div>
@@ -493,7 +505,7 @@ export default function AdminBookings() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                     No bookings found
                   </td>
                 </tr>
@@ -535,6 +547,14 @@ export default function AdminBookings() {
               <div>
                 <label className="text-sm text-gray-500">Service</label>
                 <div className="font-medium">{selectedBooking.service?.name}</div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Budget Range</label>
+                <div className="font-medium">
+                  {selectedBooking.budgetMin && selectedBooking.budgetMax
+                    ? `LKR ${Number(selectedBooking.budgetMin).toLocaleString()} – ${Number(selectedBooking.budgetMax).toLocaleString()}`
+                    : '—'}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

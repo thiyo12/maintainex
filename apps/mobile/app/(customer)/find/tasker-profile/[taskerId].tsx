@@ -102,7 +102,7 @@ export default function TaskerProfileDetail() {
                 <View style={styles.reviewHeader}>
                   <Text style={styles.reviewerName}>{r.reviewerName}</Text>
                   <View style={styles.reviewStars}>
-                    {Array.from({ length: r.rating }).map((_, si) => (
+                    {Array.from({ length: Math.round(r.rating) || 0 }).map((_, si) => (
                       <Ionicons key={si} name="star" size={12} color="#F59E0B" />
                     ))}
                   </View>

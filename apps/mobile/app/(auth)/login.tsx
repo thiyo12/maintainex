@@ -14,6 +14,13 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const redirectByRole = (role: string) => {
+    if (role === 'ADMIN') router.replace('/(admin)')
+    else if (role === 'TASKER') router.replace('/(tasker)')
+    else if (role === 'COMPANY') router.replace('/(company)')
+    else router.replace('/(customer)')
+  }
+
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields')
@@ -21,7 +28,8 @@ export default function LoginScreen() {
     }
     setLoading(true)
     try {
-      await login(email, password)
+      const user = await login(email, password)
+      redirectByRole(user.role)
     } catch (err: any) {
       Alert.alert('Login Failed', err.message || 'Invalid credentials')
     } finally {

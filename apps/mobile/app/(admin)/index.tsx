@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import { useAuth } from '../../lib/auth'
@@ -24,8 +25,14 @@ const placeholderStats: AdminStats = {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const { logout, user } = useAuth()
   const [stats, setStats] = useState<AdminStats>(placeholderStats)
+
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/')
+  }
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -85,7 +92,7 @@ export default function AdminDashboard() {
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <Text style={styles.heading}>Admin</Text>
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
           <Text style={styles.logoutBtnText}>Logout</Text>
         </TouchableOpacity>
       </View>

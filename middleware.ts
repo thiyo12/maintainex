@@ -308,8 +308,8 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
-  // Allow public access to mobile auth API (register, login, me)
-  if (pathname.startsWith('/api/mobile/auth')) {
+  // Allow all mobile API paths (they handle auth via Bearer token)
+  if (pathname.startsWith('/api/mobile/')) {
     response = NextResponse.next()
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }

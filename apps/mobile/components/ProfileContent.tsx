@@ -30,6 +30,11 @@ export default function ProfileContent() {
   const router = useRouter()
   const { user, logout } = useAuth()
 
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/')
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -42,7 +47,7 @@ export default function ProfileContent() {
           <Text style={styles.phone}>{user?.phone || ''}</Text>
           <TouchableOpacity
             style={styles.editProfileBtn}
-            onPress={() => router.push('/(customer)/settings/edit-profile')}
+            onPress={() => router.push('/settings/edit-profile')}
           >
             <Ionicons name="create-outline" size={16} color={colors.customerAccent} />
             <Text style={styles.editProfileText}> Edit profile</Text>
@@ -51,27 +56,27 @@ export default function ProfileContent() {
 
         <View style={styles.section}>
           <MenuRow icon="person-outline" label="My profile" color={colors.customerAccent}
-            onPress={() => router.push('/(customer)/settings/my-profile')} />
+            onPress={() => router.push('/settings/my-profile')} />
           <MenuRow icon="create-outline" label="Edit profile" color={colors.customerAccent}
-            onPress={() => router.push('/(customer)/settings/edit-profile')} />
+            onPress={() => router.push('/settings/edit-profile')} />
           <MenuRow icon="notifications-outline" label="Notifications" color="#F59E0B"
-            onPress={() => router.push('/(customer)/settings/notifications')} />
+            onPress={() => router.push('/settings/notifications')} />
           <MenuRow icon="card-outline" label="Payment methods" color="#10B981"
-            onPress={() => router.push('/(customer)/settings/payment')} />
+            onPress={() => router.push('/settings/payment')} />
           <MenuRow icon="location-outline" label="Saved addresses" color="#3B82F6"
-            onPress={() => router.push('/(customer)/settings/addresses')} />
+            onPress={() => router.push('/settings/addresses')} />
         </View>
 
         <View style={styles.section}>
           <MenuRow icon="help-circle-outline" label="Help & support" color="#8B5CF6"
-            onPress={() => router.push('/(customer)/settings/help')} />
+            onPress={() => router.push('/settings/help')} />
           <MenuRow icon="document-text-outline" label="Terms & privacy" color="#6B7280"
-            onPress={() => router.push('/(customer)/settings/terms')} />
+            onPress={() => router.push('/settings/terms')} />
           <MenuRow icon="information-circle-outline" label="About Maintainex" color="#EC4899"
-            onPress={() => router.push('/(customer)/settings/about')} />
+            onPress={() => router.push('/settings/about')} />
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color={colors.red} />
           <Text style={styles.logoutBtnText}> Log out</Text>
         </TouchableOpacity>

@@ -32,6 +32,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       time: booking.timeSlot || booking.time,
       notes: booking.notes,
       price: booking.totalPrice,
+      budgetMin: booking.budgetMin,
+      budgetMax: booking.budgetMax,
       status: booking.status,
       createdAt: booking.createdAt.toISOString(),
     })

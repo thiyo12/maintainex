@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, phone, email, serviceId, jobId, district, address, date, time, notes, amount } = await request.json()
+    const { name, phone, email, serviceId, jobId, district, address, date, time, notes, amount, budgetMin, budgetMax } = await request.json()
 
     if (!name || !phone || !district || !date || !time) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
         timeSlot: time,
         time: time,
         totalPrice,
+        budgetMin: budgetMin ? parseFloat(budgetMin) : null,
+        budgetMax: budgetMax ? parseFloat(budgetMax) : null,
         status: 'PENDING',
         notes: notes || null,
       },
@@ -67,6 +69,8 @@ export async function POST(request: NextRequest) {
         time: booking.timeSlot,
         notes: booking.notes,
         price: booking.totalPrice,
+        budgetMin: booking.budgetMin,
+        budgetMax: booking.budgetMax,
         status: booking.status,
         createdAt: booking.createdAt.toISOString(),
         userId: booking.userId,
@@ -111,6 +115,8 @@ export async function GET(request: NextRequest) {
         time: b.timeSlot || b.time,
         notes: b.notes,
         price: b.totalPrice,
+        budgetMin: b.budgetMin,
+        budgetMax: b.budgetMax,
         status: b.status,
         createdAt: b.createdAt.toISOString(),
       }))

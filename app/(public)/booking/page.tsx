@@ -94,7 +94,9 @@ function BookingContent() {
     address: '',
     date: '',
     time: '',
-    notes: ''
+    notes: '',
+    budgetMin: '',
+    budgetMax: ''
   })
 
   useEffect(() => {
@@ -260,6 +262,8 @@ function BookingContent() {
             time: formData.time,
             notes: formData.notes,
             price: displayService?.price || data.booking.totalPrice,
+            budgetMin: data.booking.budgetMin,
+            budgetMax: data.booking.budgetMax,
             status: data.booking.status,
             createdAt: data.booking.createdAt
           }
@@ -292,12 +296,12 @@ function BookingContent() {
 ${formData.email ? `✉️ *Email:* ${formData.email}` : ''}
 
 🧹 *Service:* ${displayService?.name || 'Not selected'}
-💰 *Price:* Rs. ${displayService?.price?.toLocaleString() || 'TBD'}
 
 📍 *District:* ${formData.district}
 ${formData.address ? `📍 *Address:* ${formData.address}` : ''}
 📅 *Date:* ${formData.date}
 ⏰ *Time:* ${formData.time}
+${formData.budgetMin && formData.budgetMax ? `💰 *Budget:* LKR ${Number(formData.budgetMin).toLocaleString()} - ${Number(formData.budgetMax).toLocaleString()}` : ''}
 ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
 ─────────────────────
@@ -439,7 +443,6 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                             }`}
                           >
                             <div className="font-medium text-sm text-dark-900 truncate">{service.name}</div>
-                            <div className="text-primary-600 font-bold text-sm">LKR {service.price?.toLocaleString()}+</div>
                           </button>
                         ))}
                       </div>
@@ -469,7 +472,6 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                         <p className="text-sm text-primary-600 font-medium">{displayCategory}</p>
                       )}
                       <p className="text-lg font-bold text-dark-900">{displayService.name}</p>
-                      <p className="text-xl font-bold text-primary-600">Starting from LKR {displayService.price?.toLocaleString()}+</p>
                     </div>
                     <button
                       onClick={() => {
@@ -667,11 +669,43 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                     <span className="font-medium">{formData.notes}</span>
                   </div>
                 )}
-                <div className="border-t pt-3 flex justify-between items-center">
-                  <span className="text-lg font-bold">Total</span>
-                  <span className="text-2xl font-bold text-primary-600">
-                    Rs. {displayService?.price?.toLocaleString() || 'TBD'}
-                  </span>
+                <div className="border-t pt-3">
+                  <span className="text-lg font-bold">Budget Range (optional)</span>
+                  <div className="mt-3 flex items-center gap-3">
+                    <input
+                      type="number"
+                      value={formData.budgetMin}
+                      onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                      placeholder="Min"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                    />
+                    <span className="text-gray-400 text-xl">—</span>
+                    <input
+                      type="number"
+                      value={formData.budgetMax}
+                      onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                      placeholder="Max"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                    />
+                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">LKR</span>
+                  </div>
+                  {formData.budgetMin && formData.budgetMax && (
+                    <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden relative">
+                      <div
+                        className="h-full bg-primary-500 rounded-full"
+                        style={{
+                          marginLeft: `${Math.min(Number(formData.budgetMin) / (Number(formData.budgetMax) || 1) * 100, 100)}%`,
+                          width: `${Math.max((Number(formData.budgetMax) - Number(formData.budgetMin)) / (Number(formData.budgetMax) || 1) * 100, 5)}%`
+                        }}
+                      />
+                    </div>
+                  )}
+                  {formData.budgetMin && formData.budgetMax && (
+                    <p className="text-sm text-primary-600 font-medium mt-2">
+                      LKR {Number(formData.budgetMin).toLocaleString()} — LKR {Number(formData.budgetMax).toLocaleString()}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">Leave blank to let taskers suggest a price</p>
                 </div>
               </div>
 

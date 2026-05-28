@@ -1,15 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import { company } from '../../lib/api'
-import { useAuth } from '../../lib/auth'
-import PressScale from '../../components/find/PressScale'
+import { colors } from '../../../lib/colors'
+import { company } from '../../../lib/api'
+import { useAuth } from '../../../lib/auth'
+import PressScale from '../../../components/find/PressScale'
 
 export default function CompanyProfile() {
+  const router = useRouter()
   const { logout } = useAuth()
   const [loading, setLoading] = useState(true)
+
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/')
+  }
+  const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
 
   const fetchProfile = useCallback(async () => {
@@ -17,6 +25,7 @@ export default function CompanyProfile() {
       const data = await company.profile.get()
       setProfile(data)
     } catch {
+      setError('Failed to load profile. Please try again.')
       setProfile(null)
     } finally {
       setLoading(false)
@@ -27,17 +36,31 @@ export default function CompanyProfile() {
     fetchProfile()
   }, [fetchProfile])
 
-  const name = profile?.companyName || profile?.name || 'Premium Builders (Pvt) Ltd'
-  const regNumber = profile?.registrationNumber || profile?.regNumber || 'GST-12345678'
-  const initials = (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || 'PB').toUpperCase()
-  const about = profile?.about || profile?.description || `${name} is a licensed construction and maintenance company specializing in plumbing, electrical, and renovation services for commercial and residential clients in Colombo.`
-  const services = profile?.services || ['Plumbing', 'Electrical', 'Painting', 'Renovation', 'AC Installation', 'Construction']
-  const serviceAreas = profile?.serviceAreas || profile?.areas || ['Colombo', 'Gampaha', 'Kalutara', 'Negombo']
-  const rating = profile?.rating || '4.7'
-  const activeContracts = profile?.activeContracts || profile?.activeContractCount || 12
-  const teamMembers = profile?.teamMembers || profile?.teamCount || 8
-  const projectsDone = profile?.projectsDone || profile?.completedProjects || 47
-  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || '3 yr'
+  if (error && !profile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.red} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 16, color: colors.gray, textAlign: 'center', marginBottom: 20 }}>{error}</Text>
+          <TouchableOpacity style={{ backgroundColor: colors.companyAccent, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
+            <Text style={{ color: colors.white, fontWeight: '700' }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
+  }
+
+  const name = profile?.companyName || profile?.name || ''
+  const regNumber = profile?.registrationNumber || profile?.regNumber || ''
+  const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : ''
+  const about = profile?.about || profile?.description || ''
+  const services = profile?.services || []
+  const serviceAreas = profile?.serviceAreas || profile?.areas || []
+  const rating = profile?.rating || ''
+  const activeContracts = profile?.activeContracts || profile?.activeContractCount || 0
+  const teamMembers = profile?.teamMembers || profile?.teamCount || 0
+  const projectsDone = profile?.projectsDone || profile?.completedProjects || 0
+  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || ''
 
   if (loading) {
     return (
@@ -114,28 +137,28 @@ export default function CompanyProfile() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <PressScale>
+          <PressScale onPress={() => router.push('/settings/edit-profile')}>
             <View style={styles.menuRow}>
               <Ionicons name="create-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Edit company profile</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
-          <PressScale>
+          <PressScale onPress={() => Alert.alert('Coming soon', 'Payment features will be available in a future update.')}>
             <View style={styles.menuRow}>
               <Ionicons name="card-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Payment & banking</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
-          <PressScale>
+          <PressScale onPress={() => Alert.alert('Coming soon', 'Notification settings will be available in a future update.')}>
             <View style={styles.menuRow}>
               <Ionicons name="notifications-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Notifications</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
-          <PressScale onPress={logout}>
+          <PressScale onPress={handleLogout}>
             <View style={styles.menuRow}>
               <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 12 }} />
               <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Log out</Text>

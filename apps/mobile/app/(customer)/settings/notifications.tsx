@@ -2,48 +2,47 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { notifications } from '../../../lib/api'
+import * as SecureStore from 'expo-secure-store'
 import { colors } from '../../../lib/colors'
-import type { Notification } from '../../../lib/types'
+
+const SETTINGS_KEY = 'notification_settings'
+
+const DEFAULTS = {
+  jobUpdates: true,
+  messages: true,
+  quotes: true,
+  promotions: false,
+  emailNotifications: true,
+  smsNotifications: false,
+}
 
 export default function NotificationsScreen() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [notificationItems, setNotificationItems] = useState<Notification[]>([])
-  const [settings, setSettings] = useState({
-    jobUpdates: true,
-    messages: true,
-    quotes: true,
-    promotions: false,
-    emailNotifications: true,
-    smsNotifications: false,
-  })
+  const [settings, setSettings] = useState(DEFAULTS)
 
   useEffect(() => {
-    loadNotifications()
+    loadSettings()
   }, [])
 
-  const loadNotifications = async () => {
+  const loadSettings = async () => {
     try {
-      const data = await notifications.list()
-      setNotificationItems(data)
+      const stored = await SecureStore.getItemAsync(SETTINGS_KEY)
+      if (stored) setSettings({ ...DEFAULTS, ...JSON.parse(stored) })
     } catch {
-      // silently fail — toggles still work locally
     } finally {
       setLoading(false)
     }
   }
 
-  const toggle = (key: keyof typeof settings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }))
+  const toggle = async (key: keyof typeof DEFAULTS) => {
+    const next = { ...settings, [key]: !settings[key] }
+    setSettings(next)
+    await SecureStore.setItemAsync(SETTINGS_KEY, JSON.stringify(next))
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-
       <Text style={styles.heading}>Notifications</Text>
 
       {loading ? (
@@ -89,8 +88,6 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  backBtn: { paddingHorizontal: 24, paddingTop: 8 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.gray, marginBottom: 10, marginTop: 8, textTransform: 'uppercase' },

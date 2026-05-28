@@ -3,10 +3,10 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import { jobs } from '../../lib/api'
-import type { JobPosting } from '../../lib/types'
-import PressScale from '../../components/find/PressScale'
+import { colors } from '../../../lib/colors'
+import { jobs } from '../../../lib/api'
+import type { JobPosting } from '../../../lib/types'
+import PressScale from '../../../components/find/PressScale'
 
 type Tab = 'active' | 'completed' | 'cancelled'
 

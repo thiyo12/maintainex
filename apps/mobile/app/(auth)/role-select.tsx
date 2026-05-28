@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated,
+  View, Text, TouchableOpacity, StyleSheet, ScrollView,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'

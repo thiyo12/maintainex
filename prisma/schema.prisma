@@ -188,6 +188,8 @@ model Booking {
   status     String   @default("PENDING")
   notes      String?
   totalPrice Float
+  budgetMin  Float?
+  budgetMax  Float?
   name       String?
   phone      String?
   email      String?

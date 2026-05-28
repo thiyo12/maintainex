@@ -9,9 +9,9 @@ interface AuthContextType {
   isAuthenticated: boolean
   signupData: { name: string; email: string; phone: string; password: string; role: string } | null
   setSignupData: (data: { name: string; email: string; phone: string; password: string; role: string } | null) => void
-  login: (email: string, password: string) => Promise<void>
-  loginWithOtp: (phone: string, otp: string) => Promise<void>
-  register: (data: { email: string; password: string; name: string; phone: string; role: string }) => Promise<void>
+  login: (email: string, password: string) => Promise<any>
+  loginWithOtp: (phone: string, otp: string) => Promise<any>
+  register: (data: { email: string; password: string; name: string; phone: string; role: string }) => Promise<any>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -50,11 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const redirectByRole = (role: string) => {
+    // Can't access router here, return role for caller to handle
+  }
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await auth.login({ email, password })
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    return res.user
   }, [])
 
   const loginWithOtp = useCallback(async (phone: string, otp: string) => {
@@ -62,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    return res.user
   }, [])
 
   const register = useCallback(async (data: { email: string; password: string; name: string; phone: string; role: string }) => {
@@ -69,12 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    return res.user
   }, [])
 
   const logout = useCallback(async () => {
     await setAuthToken(null)
     setUser(null)
     setSignupData(null)
+    await SecureStore.deleteItemAsync('auth_token')
     await SecureStore.deleteItemAsync('auth_user')
   }, [])
 

@@ -3,12 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import { company } from '../../lib/api'
-import PressScale from '../../components/find/PressScale'
+import { colors } from '../../../lib/colors'
+import { company } from '../../../lib/api'
+import { useAuth } from '../../../lib/auth'
+import PressScale from '../../../components/find/PressScale'
 
 export default function CompanyDashboard() {
   const router = useRouter()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -90,10 +92,10 @@ export default function CompanyDashboard() {
       <View style={styles.topBar}>
         <View>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={styles.greeting}>Hello, Nimal</Text>
+            <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
             <Ionicons name="hand-left-outline" size={22} color={colors.primary} style={{ marginLeft: 6 }} />
           </View>
-          <Text style={styles.companyName}>Premium Builders (Pvt) Ltd</Text>
+          <Text style={styles.companyName}>{user?.name || 'Company'}</Text>
         </View>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>PB</Text>

@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         taskerId,
         templateJobId: jobId,
         name: user.name || user.email,
-        phone: '',
+        phone: user.phone || '',
         district,
         address,
         date: new Date(date),

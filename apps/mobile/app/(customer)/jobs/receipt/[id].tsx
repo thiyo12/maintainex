@@ -67,10 +67,6 @@ export default function ReceiptScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-
       <ScrollView showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.receiptCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.receiptHeader}>

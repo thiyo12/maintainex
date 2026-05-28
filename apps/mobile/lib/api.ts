@@ -88,8 +88,8 @@ export const auth = {
 
 // Categories & Services
 export const categories = {
-  list: () => request<Category[]>('/api/categories'),
-  get: (slug: string) => request<Category>(`/api/categories/${slug}`),
+  list: () => request<Category[]>('/api/mobile/job-categories'),
+  get: (slug: string) => request<Category>(`/api/mobile/job-categories/${slug}`),
 }
 
 // Bookings
@@ -193,7 +193,7 @@ export const company = {
     list: () => request<any[]>('/api/mobile/company/team'),
   },
   earnings: {
-    get: () => request<any>('/api/mobile/company/earnings'),
+    get: (period?: string) => request<any>(`/api/mobile/company/earnings${period ? `?period=${period}` : ''}`),
   },
 }
 

@@ -88,10 +88,6 @@ export default function ReviewScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.taskerAvatar}>

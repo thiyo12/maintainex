@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import { earnings } from '../../lib/api'
+import { colors } from '../../../lib/colors'
+import { earnings } from '../../../lib/api'
 
 type Period = 'weekly' | 'monthly' | 'yearly'
 

@@ -49,11 +49,6 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.primary} />
-          <Text style={styles.backText}> Back</Text>
-        </TouchableOpacity>
-
         <Text style={styles.heading}>Edit profile</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
@@ -71,7 +66,9 @@ export default function EditProfileScreen() {
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" />
 
           <Text style={styles.label}>Email</Text>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="email@example.com" />
+          <View style={[styles.input, { backgroundColor: '#F3F4F6', justifyContent: 'center' }]}>
+            <Text style={{ fontSize: 15, color: colors.gray }}>{email}</Text>
+          </View>
 
           <Text style={styles.label}>Phone</Text>
           <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0712345678" />
@@ -97,8 +94,6 @@ export default function EditProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  backBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, paddingTop: 8 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
   avatarSection: { alignItems: 'center', marginBottom: 24 },

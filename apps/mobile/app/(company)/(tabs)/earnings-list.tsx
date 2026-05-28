@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../lib/colors'
-import { company } from '../../lib/api'
+import { colors } from '../../../lib/colors'
+import { company } from '../../../lib/api'
 
 type Period = 'monthly' | 'quarterly' | 'yearly'
 
@@ -12,9 +12,9 @@ export default function CompanyEarnings() {
   const [earnings, setEarnings] = useState<any>(null)
   const [payouts, setPayouts] = useState<any[]>([])
 
-  const fetchEarnings = useCallback(async () => {
+  const fetchEarnings = useCallback(async (p?: Period) => {
     try {
-      const data = await company.earnings.get()
+      const data = await company.earnings.get(p || period)
       setEarnings(data)
       setPayouts(data.recentPayouts || data.payouts || [])
     } catch {
@@ -23,11 +23,11 @@ export default function CompanyEarnings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [period])
 
   useEffect(() => {
-    fetchEarnings()
-  }, [fetchEarnings])
+    fetchEarnings(period)
+  }, [period, fetchEarnings])
 
   const totalRevenue = earnings?.totalRevenue || earnings?.monthlyRevenue || 0
   const pendingAmount = earnings?.pendingAmount || 0

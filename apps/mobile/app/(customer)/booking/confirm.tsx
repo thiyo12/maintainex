@@ -11,11 +11,16 @@ export default function BookingConfirmScreen() {
   const router = useRouter()
   const { user } = useAuth()
   const { jobId, bidId, taskerName, price } = useLocalSearchParams()
-  const total = Number(price) || 8500
+  const [budgetMin, setBudgetMin] = useState('')
+  const [budgetMax, setBudgetMax] = useState('')
+  const baseAmount = budgetMin && budgetMax ? (Number(budgetMin) + Number(budgetMax)) / 2 : Number(price) || 8500
+  const total = baseAmount
   const fee = Math.round(total * 0.05)
+  const [district, setDistrict] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const handleConfirm = async () => {
+    if (!district) { Alert.alert('Error', 'Please enter your district'); return }
     setSubmitting(true)
     try {
       const res = await bookings.create({
@@ -23,11 +28,13 @@ export default function BookingConfirmScreen() {
         phone: user?.phone || '',
         email: user?.email || '',
         serviceId: jobId || '',
-        district: 'Colombo',
+        district,
         address: '',
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         notes: bidId ? `Bid: ${bidId}` : '',
+        budgetMin: budgetMin || undefined,
+        budgetMax: budgetMax || undefined,
       })
       router.push(`/(customer)/booking/confirmed?bookingId=${res.booking.id}`)
     } catch (e: any) {
@@ -39,9 +46,6 @@ export default function BookingConfirmScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
       <Text style={styles.heading}>Confirm booking</Text>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -54,11 +58,43 @@ export default function BookingConfirmScreen() {
           </View>
         </View>
 
+        <View style={styles.summary}>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>Service location (district)</Text>
+          <TextInput
+            style={{ borderWidth: 1.5, borderColor: colors.lightGray, borderRadius: 12, padding: 14, fontSize: 15, color: colors.dark }}
+            placeholder="Enter your district"
+            value={district}
+            onChangeText={setDistrict}
+          />
+        </View>
+
         <View style={styles.payment}>
-          <View style={styles.payRow}>
-            <Text style={styles.payLabel}>Quoted amount</Text>
-            <Text style={styles.payValue}>LKR {total.toLocaleString()}</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>Budget Range (optional)</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <TextInput
+              style={[styles.input, { flex: 1, textAlign: 'center' }]}
+              value={budgetMin}
+              onChangeText={setBudgetMin}
+              placeholder="Min"
+              keyboardType="numeric"
+            />
+            <Text style={{ fontSize: 16, color: colors.gray }}>-</Text>
+            <TextInput
+              style={[styles.input, { flex: 1, textAlign: 'center' }]}
+              value={budgetMax}
+              onChangeText={setBudgetMax}
+              placeholder="Max"
+              keyboardType="numeric"
+            />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark }}>LKR</Text>
           </View>
+          <Text style={{ fontSize: 12, color: colors.gray, marginBottom: 8 }}>Leave blank to use quoted price</Text>
+          {budgetMin && budgetMax && (
+            <View style={styles.payRow}>
+              <Text style={styles.payLabel}>Your range</Text>
+              <Text style={styles.payValue}>LKR {Number(budgetMin).toLocaleString()} - {Number(budgetMax).toLocaleString()}</Text>
+            </View>
+          )}
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Platform fee (5%)</Text>
             <Text style={styles.payValue}>LKR {fee.toLocaleString()}</Text>
@@ -92,8 +128,6 @@ export default function BookingConfirmScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  backBtn: { paddingHorizontal: 24, paddingTop: 8 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   summary: {
     backgroundColor: colors.white,
@@ -142,4 +176,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  input: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#1F2937', borderWidth: 1, borderColor: '#E5E7EB', marginBottom: 12 },
 })

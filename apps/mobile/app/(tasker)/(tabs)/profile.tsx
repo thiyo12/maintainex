@@ -1,18 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import { taskers } from '../../lib/api'
-import { useAuth } from '../../lib/auth'
-import type { TaskerProfile } from '../../lib/types'
-import PressScale from '../../components/find/PressScale'
+import { colors } from '../../../lib/colors'
+import { taskers } from '../../../lib/api'
+import { useAuth } from '../../../lib/auth'
+import type { TaskerProfile } from '../../../lib/types'
+import PressScale from '../../../components/find/PressScale'
 
 export default function TaskerProfile() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [loading, setLoading] = useState(true)
+
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/')
+  }
   const [profile, setProfile] = useState<TaskerProfile | null>(null)
 
   useEffect(() => {
@@ -112,28 +117,28 @@ export default function TaskerProfile() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <PressScale>
+          <PressScale onPress={() => router.push('/settings/edit-profile')}>
             <View style={styles.menuRow}>
               <Ionicons name="create-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Edit profile</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
-          <PressScale>
+          <PressScale onPress={() => Alert.alert('Coming soon', 'Payment features will be available in a future update.')}>
             <View style={styles.menuRow}>
               <Ionicons name="card-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Payment details</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
-          <PressScale>
+          <PressScale onPress={() => Alert.alert('Coming soon', 'Notification settings will be available in a future update.')}>
             <View style={styles.menuRow}>
               <Ionicons name="notifications-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Notifications</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
-          <PressScale onPress={logout}>
+          <PressScale onPress={handleLogout}>
             <View style={styles.menuRow}>
               <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 12 }} />
               <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Log out</Text>

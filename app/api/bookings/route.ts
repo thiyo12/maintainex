@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    let { name, phone, email, district, address, subService, date, time, notes } = body
+    let { name, phone, email, district, address, subService, date, time, notes, budgetMin, budgetMax } = body
 
     if (!name || !phone || !district || !date || !time) {
       return NextResponse.json({ error: 'Please fill in all required fields: Name, Phone, District, Date, and Time' }, { status: 400 })
@@ -169,6 +169,8 @@ export async function POST(request: NextRequest) {
         timeSlot: time,
         notes: notes ? sanitizeString(notes) : null,
         totalPrice: service?.price || 0,
+        budgetMin: budgetMin ? parseFloat(budgetMin) : null,
+        budgetMax: budgetMax ? parseFloat(budgetMax) : null,
         status: 'PENDING',
         name,
         phone,
