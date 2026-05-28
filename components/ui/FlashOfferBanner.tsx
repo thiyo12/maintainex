@@ -176,11 +176,11 @@ export default function FlashOfferBanner() {
       {!expired ? (
         <>
           <div
-            className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl"
+            className="flex items-center gap-1 sm:gap-1.5 justify-center sm:justify-start text-2xl sm:text-3xl md:text-4xl"
             style={{ color: offer.textColor }}
           >
             <span
-              className="text-lg md:text-xl font-sans leading-none"
+              className="text-xl sm:text-lg md:text-xl font-sans leading-none"
               style={{ animation: 'bnPulse 2s ease-in-out infinite' }}
             >
               {offer.badgeText.split(' ')[0] || '🔥'}
@@ -225,10 +225,10 @@ export default function FlashOfferBanner() {
       ) : (
         <>
           <div
-            className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl"
+            className="flex items-center gap-1 sm:gap-1.5 justify-center sm:justify-start text-2xl sm:text-3xl md:text-4xl"
             style={{ color: offer.textColor }}
           >
-            <span className="text-lg md:text-xl font-sans leading-none">🔥</span>
+            <span className="text-xl sm:text-lg md:text-xl font-sans leading-none">🔥</span>
             <span className="font-bold font-mono">00:00:00</span>
           </div>
           <div className="mt-1 text-xs md:text-sm font-medium text-center sm:text-left" style={{ color: offer.textColor + 'aa' }}>

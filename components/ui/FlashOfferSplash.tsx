@@ -138,30 +138,30 @@ export default function FlashOfferSplash() {
   return (
     <div
       ref={splashRef}
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto"
       style={{ backgroundColor: offer.bgColor }}
     >
       <div
         ref={innerRef}
-        className="flex flex-col items-center text-center px-6 max-w-lg mx-auto"
+        className="flex flex-col items-center text-center px-4 sm:px-6 max-w-lg mx-auto py-8"
         style={{ color: offer.textColor }}
       >
         <span
-          className="text-5xl md:text-6xl mb-3"
+          className="text-4xl sm:text-5xl md:text-6xl mb-2 sm:mb-3"
           style={{ animation: 'rkPulse 2s ease-in-out infinite' }}
         >
           {offer.badgeText.split(' ')[0] || '🔥'}
         </span>
 
-        <h2 className="text-2xl md:text-3xl font-bold mb-2">{offer.title}</h2>
+        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 sm:mb-2">{offer.title}</h2>
 
         {offer.description && (
-          <p className={`text-sm md:text-base mb-4 ${isLight ? 'text-white/80' : 'text-black/60'}`}>
+          <p className={`text-xs sm:text-sm md:text-base mb-3 sm:mb-4 ${isLight ? 'text-white/80' : 'text-black/60'}`}>
             {offer.description}
           </p>
         )}
 
-        <div className="text-5xl md:text-6xl font-bold font-mono tracking-wider mb-4 flex items-center justify-center">
+        <div className="text-3xl sm:text-4xl md:text-6xl font-bold font-mono tracking-wider mb-3 sm:mb-4 flex items-center justify-center">
           <span className="inline-flex items-center">{hh[0]}</span>
           <span className="inline-flex items-center">{hh[1]}</span>
           <span className="inline-flex items-center justify-center w-[0.3em]" style={{ animation: 'rkBlink 1s step-end infinite' }}>:</span>
@@ -172,7 +172,7 @@ export default function FlashOfferSplash() {
           <span className="inline-flex items-center">{ss[1]}</span>
         </div>
 
-        <div className="w-48 mb-4">
+        <div className="w-36 sm:w-40 md:w-48 mb-3 sm:mb-4">
           <div className="flex justify-between text-xs mb-1 px-1">
             <span>{offer.currentClaims}/{offer.maxClaims} claimed</span>
             <span>{Math.round(claimPct)}%</span>
@@ -190,7 +190,7 @@ export default function FlashOfferSplash() {
 
         <a
           href={offer.linkUrl || '/booking'}
-          className={`inline-block px-8 py-3 rounded-xl font-bold text-base transition-all hover:scale-105 ${
+          className={`inline-block px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold text-sm sm:text-base transition-all hover:scale-105 ${
             isLight ? 'bg-white text-gray-900' : 'bg-gray-900 text-white'
           }`}
           style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}
