@@ -117,13 +117,17 @@ export default function FlashOfferBanner() {
 
   useEffect(() => {
     if (loading) return
-    const done = sessionStorage.getItem('flash_splash_shown')
-    if (done) {
+    if (sessionStorage.getItem('flash_splash_shown')) {
       setVisible(true)
-    } else {
-      const t = setTimeout(() => setVisible(true), 2600)
-      return () => clearTimeout(t)
+      return
     }
+    const poll = setInterval(() => {
+      if (sessionStorage.getItem('flash_splash_shown')) {
+        setVisible(true)
+        clearInterval(poll)
+      }
+    }, 100)
+    return () => clearInterval(poll)
   }, [loading])
 
   const handleClaim = async () => {

@@ -126,17 +126,18 @@ export default function FlashOfferSplash() {
     const scaleY = targetRect.height / splashRect.height
 
     setPhase('morphing')
+    // Signal banner to appear (it reads sessionStorage)
+    sessionStorage.setItem('flash_splash_shown', '1')
 
     // Apply FLIP transform to the splash element
     requestAnimationFrame(() => {
       splashEl.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
       splashEl.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`
 
-      // Meanwhile fade splash + hide after animation
+      // Hide splash after animation
       setTimeout(() => {
         setVisible(false)
         setPhase('done')
-        sessionStorage.setItem('flash_splash_shown', '1')
         // Clean up inline styles so DOM isn't polluted
         splashEl.style.transition = ''
         splashEl.style.transform = ''
