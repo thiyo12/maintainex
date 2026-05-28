@@ -50,10 +50,7 @@ export default function ServiceCardClient({ service }: ServiceCardClientProps) {
         <p className="text-gray-500 text-sm mb-3 line-clamp-2">
           {service.description || 'Professional cleaning service'}
         </p>
-        <div className="flex items-center justify-between">
-          <span className="text-primary-600 font-bold">
-            Starting from LKR {service.price.toLocaleString()}+
-          </span>
+        <div className="flex items-center justify-end">
           <button 
             onClick={handleBookNow}
             className="bg-primary-500 hover:bg-primary-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"

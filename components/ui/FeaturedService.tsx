@@ -30,10 +30,6 @@ interface FeaturedServiceProps {
 
 export default function FeaturedService({ category, services }: FeaturedServiceProps) {
   const firstService = services[0]
-  const priceDisplay = firstService?.price 
-    ? `Starting from LKR ${firstService.price.toLocaleString()}+` 
-    : 'Contact for quote'
-
   const totalJobs = Math.floor(Math.random() * 5000) + 1000
 
   const isUploadedImage = firstService?.image?.startsWith('/uploads/')
@@ -93,12 +89,6 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
               </div>
               <div className="text-sm text-gray-500">Services</div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-2xl font-bold text-primary-600">
-              Starting from {priceDisplay}
-            </span>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">

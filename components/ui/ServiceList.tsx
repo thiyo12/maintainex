@@ -72,10 +72,7 @@ export default function ServiceList({ services, categoryName }: ServiceListProps
               {service.description || 'Professional service'}
             </p>
 
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-primary-600 font-bold text-sm">
-                Starting from LKR {service.price.toLocaleString()}+
-              </span>
+            <div className="flex items-center justify-end gap-2">
               <div className="flex gap-1">
                 <button
                   onClick={(e) => handleViewDetails(e, service)}

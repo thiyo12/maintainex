@@ -45,10 +45,6 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
 
   if (!isOpen || !service) return null
 
-  const priceDisplay = service.price 
-    ? `Starting from LKR ${service.price.toLocaleString()}+` 
-    : 'Contact for quote'
-
   const isUploadedImage = service.image?.startsWith('/uploads/')
   const imageSrc = isUploadedImage 
     ? getImageUrl(service.image)
@@ -100,10 +96,6 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
           </div>
 
           <div className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-2xl font-bold text-primary-600">{priceDisplay}</span>
-            </div>
-
             <p className="text-gray-600 mb-6">{service.description}</p>
 
             <div className="mb-6">

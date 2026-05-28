@@ -116,7 +116,6 @@ export default function TaskerProfileDetail() {
 
       <StickyBottomBar
         price={`Rs ${tasker.hourlyRate}/hr`}
-        label="Starting from"
         buttonText={jobId ? "Book Now" : "Select Service"}
         icon={jobId ? "calendar" : "search"}
         onPress={() => {

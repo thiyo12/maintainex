@@ -23,10 +23,6 @@ interface ServiceCardNewProps {
 export default function ServiceCardNew({ service }: ServiceCardNewProps) {
   const [imgError, setImgError] = useState(false)
   
-  const priceDisplay = service.price 
-    ? `Starting from LKR ${service.price.toLocaleString()}+` 
-    : 'Contact for quote'
-
   const isUploadedImage = service.image?.startsWith('/uploads/') && !imgError
   const fallbackImage = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'
   const imageSrc = isUploadedImage ? getImageUrl(service.image) : (service.image || fallbackImage)
@@ -68,10 +64,7 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
           {service.description}
         </p>
 
-        <div className="flex items-center justify-between">
-          <span className="text-primary-600 font-bold">
-            {priceDisplay}
-          </span>
+        <div className="flex items-center justify-end">
           <span className="flex items-center gap-1 text-sm font-medium text-gray-600 group-hover:text-primary-600 transition-colors">
             Details
             <FiArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

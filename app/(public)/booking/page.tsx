@@ -743,7 +743,11 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       <span>LKR 100,000</span>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-400">Drag handles or enter values above to set your budget range</p>
+                  {!formData.budgetMin && !formData.budgetMax ? (
+                    <p className="text-sm text-blue-600 font-medium mt-2">Our team will contact you within 2 hours to discuss pricing</p>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-1">Price will change based on requirements</p>
+                  )}
                 </div>
               </div>
 

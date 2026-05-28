@@ -108,10 +108,7 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
                     {service.name}
                   </h3>
                   
-                  <div className="flex items-center justify-between">
-                    <span className="text-primary-600 font-bold text-sm md:text-base">
-                      {service.price ? `Starting from LKR ${service.price.toLocaleString()}+` : 'Quote'}
-                    </span>
+                  <div className="flex items-center justify-end">
                     <FiArrowRight className="w-4 h-4 text-gray-400 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
                   </div>
                 </div>

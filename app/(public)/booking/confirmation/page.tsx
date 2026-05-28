@@ -24,6 +24,8 @@ interface BookingData {
   reference?: string
   category?: string
   price?: number
+  budgetMin?: number
+  budgetMax?: number
   status?: string
 }
 
@@ -79,6 +81,8 @@ function ConfirmationContent() {
               time: booking.time,
               notes: booking.notes,
               price: booking.totalPrice,
+              budgetMin: booking.budgetMin,
+              budgetMax: booking.budgetMax,
               status: booking.status
             }
           }
@@ -302,12 +306,23 @@ function ConfirmationContent() {
                 </div>
               )}
 
-              {bookingData.price && (
-                <div className="border-t pt-4 flex justify-between items-center">
-                  <span className="text-lg font-bold text-dark-900">Total Amount</span>
-                  <span className="text-2xl font-bold text-primary-600">
-                    Rs. {bookingData.price.toLocaleString()}
-                  </span>
+              {bookingData.budgetMin && bookingData.budgetMax ? (
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-dark-900">Budget Range</span>
+                    <span className="text-2xl font-bold text-primary-600">
+                      Rs. {bookingData.budgetMin.toLocaleString()} – Rs. {bookingData.budgetMax.toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Price will change based on requirements</p>
+                </div>
+              ) : (
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-dark-900">Pricing</span>
+                    <span className="text-lg font-medium text-primary-600">To be discussed</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Our team will contact you within 2 hours</p>
                 </div>
               )}
             </div>

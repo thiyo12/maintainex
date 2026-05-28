@@ -275,12 +275,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   {service.description}
                 </p>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-primary-600 font-bold text-sm">
-                    {service.price 
-                      ? `Starting from LKR ${service.price.toLocaleString()}+` 
-                      : 'Contact'}
-                  </span>
+                <div className="flex items-center justify-end">
                   <button
                     onClick={() => handleBookNow(service)}
                     className="text-xs font-semibold text-white bg-primary-500 hover:bg-primary-600 px-3 py-1.5 rounded-lg transition-colors"
