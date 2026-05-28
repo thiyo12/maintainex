@@ -1205,3 +1205,35 @@ model Payout {
   @@index([status])
   @@index([createdAt])
 }
+
+// ============================================
+// FLASH OFFERS — Landing page promotions
+// ============================================
+
+model FlashOffer {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  discountType  String   // PERCENTAGE or FLAT
+  discountValue Float
+  couponCode    String?
+  linkUrl       String?
+  badgeText     String   @default("🔥 FLASH")
+  bgColor       String   @default("#FFC300")
+  textColor     String   @default("#1a1a1a")
+
+  startsAt      DateTime
+  expiresAt     DateTime
+
+  maxClaims     Int      @default(50)
+  currentClaims Int      @default(0)
+
+  isActive      Boolean  @default(true)
+  displayOrder  Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([expiresAt])
+}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck, FiMap, FiGrid, FiShield, FiFileText, FiFile } from 'react-icons/fi'
+import { FiHome, FiCalendar, FiUsers, FiSettings, FiLogOut, FiMenu, FiX, FiBarChart2, FiMapPin, FiUserCheck, FiMap, FiGrid, FiShield, FiFileText, FiFile, FiZap } from 'react-icons/fi'
 import { AdminSessionProvider } from './AdminSessionProvider'
 import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
 
@@ -86,6 +86,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Applications', href: '/admin/applications', icon: FiUsers },
     { name: 'Services', href: '/admin/services', icon: FiSettings },
     { name: 'Categories', href: '/admin/categories', icon: FiGrid },
+    { name: 'Flash Offers', href: '/admin/flash-offers', icon: FiZap },
     { name: 'Industries', href: '/admin/industries', icon: FiGrid },
     { name: 'Branches', href: '/admin/branches', icon: FiMapPin },
     { name: 'Districts', href: '/admin/districts', icon: FiMap },

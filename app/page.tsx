@@ -4,6 +4,7 @@ import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import AnimatedHero from '@/components/ui/AnimatedHero'
+import FlashOfferBanner from '@/components/ui/FlashOfferBanner'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import HomeServices from '@/components/ui/HomeServices'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
@@ -176,6 +177,8 @@ export default async function HomePage() {
                     <AnimatedCounter end={24} suffix=":00" duration={2000} />
                     <div className="text-dark-900/70 text-xs md:text-sm">Support</div>
                   </div>
+                  <div className="hidden sm:block h-8 md:h-12 w-px bg-dark-900/20" />
+                  <FlashOfferBanner />
                 </div>
               </div>
               
