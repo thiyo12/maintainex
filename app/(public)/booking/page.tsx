@@ -675,7 +675,11 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                     <input
                       type="number"
                       value={formData.budgetMin}
-                      onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const max = formData.budgetMax || '100000'
+                        setFormData({ ...formData, budgetMin: val && Number(val) > Number(max) ? max : val })
+                      }}
                       placeholder="Min"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
                     />
@@ -683,29 +687,63 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                     <input
                       type="number"
                       value={formData.budgetMax}
-                      onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        const min = formData.budgetMin || '0'
+                        setFormData({ ...formData, budgetMax: val && Number(val) < Number(min) ? min : val })
+                      }}
                       placeholder="Max"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
                     />
                     <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">LKR</span>
                   </div>
-                  {formData.budgetMin && formData.budgetMax && (
-                    <div className="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden relative">
+                  <div className="mt-4 mb-2">
+                    <div className="relative h-10">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100000"
+                        step="500"
+                        value={formData.budgetMin || '0'}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          const max = Number(formData.budgetMax || '100000')
+                          const clamped = Number(val) > max ? String(max) : val
+                          setFormData({ ...formData, budgetMin: clamped })
+                        }}
+                        className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
+                        style={{ zIndex: 3 }}
+                      />
+                      <input
+                        type="range"
+                        min="0"
+                        max="100000"
+                        step="500"
+                        value={formData.budgetMax || '100000'}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          const min = Number(formData.budgetMin || '0')
+                          const clamped = Number(val) < min ? String(min) : val
+                          setFormData({ ...formData, budgetMax: clamped })
+                        }}
+                        className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
+                        style={{ zIndex: 2 }}
+                      />
+                      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-gray-200 rounded-full" />
                       <div
-                        className="h-full bg-primary-500 rounded-full"
+                        className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-primary-400 rounded-full"
                         style={{
-                          marginLeft: `${Math.min(Number(formData.budgetMin) / (Number(formData.budgetMax) || 1) * 100, 100)}%`,
-                          width: `${Math.max((Number(formData.budgetMax) - Number(formData.budgetMin)) / (Number(formData.budgetMax) || 1) * 100, 5)}%`
+                          left: `${(Number(formData.budgetMin || 0) / 100000) * 100}%`,
+                          right: `${100 - (Number(formData.budgetMax || 100000) / 100000) * 100}%`,
                         }}
                       />
                     </div>
-                  )}
-                  {formData.budgetMin && formData.budgetMax && (
-                    <p className="text-sm text-primary-600 font-medium mt-2">
-                      LKR {Number(formData.budgetMin).toLocaleString()} — LKR {Number(formData.budgetMax).toLocaleString()}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-400 mt-1">Leave blank to let taskers suggest a price</p>
+                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                      <span>LKR 0</span>
+                      <span>LKR 100,000</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">Drag handles or enter values above to set your budget range</p>
                 </div>
               </div>
 

@@ -92,13 +92,12 @@ export default function ServiceDetailPage() {
   const generateWhatsAppLink = () => {
     if (!service) return '#'
     
-    const message = `Hi, I'm interested in the ${service.name} service (Rs. ${service.price?.toLocaleString()}). Can you provide more information?`
+    const message = `Hi, I'm interested in the ${service.name} service. Can you provide more information?`
     return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
   }
 
-  const formatPrice = (price: number | null) => {
-    if (price === null || price === undefined) return 'Contact for quote'
-    return `Starting from LKR ${price.toLocaleString()}+`
+  const formatPrice = (_price: number | null) => {
+    return ''
   }
 
   const formatDuration = (duration: number | null) => {
@@ -273,11 +272,6 @@ export default function ServiceDetailPage() {
                   {service.name}
                 </h1>
                 <div className="flex flex-wrap items-center gap-4 text-white/90">
-                  {service.price !== null && (
-                    <span className="text-2xl sm:text-3xl font-bold text-primary-400">
-                      {formatPrice(service.price)}
-                    </span>
-                  )}
                   {service.reviews && service.reviews.length > 0 && (
                     <span className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
                       <FiStar className="w-5 h-5 text-yellow-400 fill-yellow-400" />
@@ -383,15 +377,6 @@ export default function ServiceDetailPage() {
                 <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 sticky top-28">
                   <h3 className="text-2xl font-bold text-dark-900 mb-6">Book This Service</h3>
                   
-                  {/* Price Display */}
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold text-primary-600">
-                        {formatPrice(service.price)}
-                      </span>
-                    </div>
-                  </div>
-
                   {/* Book Now Button - Large Touch Target */}
                   <button
                     onClick={() => {
@@ -497,10 +482,7 @@ export default function ServiceDetailPage() {
                       <p className="text-gray-500 text-sm line-clamp-2 mb-3">
                         {related.description}
                       </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-primary-600 font-bold">
-                          {formatPrice(related.price)}
-                        </span>
+                      <div className="flex items-center justify-end">
                         <span className="text-sm font-medium text-gray-500 group-hover:text-primary-600 transition-colors flex items-center gap-1">
                           View <FiArrowRight className="w-4 h-4" />
                         </span>

@@ -3,6 +3,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useState, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
+import Slider from '@react-native-community/slider'
 import { bookings } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { colors } from '../../../lib/colors'
@@ -70,25 +71,75 @@ export default function BookingConfirmScreen() {
 
         <View style={styles.payment}>
           <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>Budget Range (optional)</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <TextInput
-              style={[styles.input, { flex: 1, textAlign: 'center' }]}
+              style={[styles.input, { flex: 1, textAlign: 'center', marginBottom: 0 }]}
               value={budgetMin}
-              onChangeText={setBudgetMin}
+              onChangeText={(val) => {
+                const max = budgetMax || '100000'
+                setBudgetMin(val && Number(val) > Number(max) ? max : val)
+              }}
               placeholder="Min"
               keyboardType="numeric"
             />
             <Text style={{ fontSize: 16, color: colors.gray }}>-</Text>
             <TextInput
-              style={[styles.input, { flex: 1, textAlign: 'center' }]}
+              style={[styles.input, { flex: 1, textAlign: 'center', marginBottom: 0 }]}
               value={budgetMax}
-              onChangeText={setBudgetMax}
+              onChangeText={(val) => {
+                const min = budgetMin || '0'
+                setBudgetMax(val && Number(val) < Number(min) ? min : val)
+              }}
               placeholder="Max"
               keyboardType="numeric"
             />
             <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark }}>LKR</Text>
           </View>
-          <Text style={{ fontSize: 12, color: colors.gray, marginBottom: 8 }}>Leave blank to use quoted price</Text>
+          <View style={{ marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: -4 }}>
+              <Text style={{ fontSize: 11, color: colors.gray }}>LKR 0</Text>
+              <Text style={{ fontSize: 11, color: colors.gray }}>LKR 100K</Text>
+            </View>
+            <View style={{ height: 40, justifyContent: 'center', position: 'relative' }}>
+              <View style={{ height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, marginHorizontal: 14 }} />
+              <View
+                style={{
+                  position: 'absolute', height: 4, backgroundColor: colors.primary,
+                  borderRadius: 2, left: `${(Number(budgetMin || 0) / 100000) * 100}%`,
+                  right: `${100 - (Number(budgetMax || 100000) / 100000) * 100}%`,
+                }}
+              />
+              <Slider
+                style={{ position: 'absolute', left: 0, right: 0, height: 40 }}
+                minimumValue={0}
+                maximumValue={100000}
+                step={500}
+                value={Number(budgetMin) || 0}
+                onValueChange={(v) => {
+                  const max = Number(budgetMax || 100000)
+                  setBudgetMin(v > max ? String(max) : String(Math.round(v)))
+                }}
+                minimumTrackTintColor="transparent"
+                maximumTrackTintColor="transparent"
+                thumbTintColor={colors.primary}
+              />
+              <Slider
+                style={{ position: 'absolute', left: 0, right: 0, height: 40 }}
+                minimumValue={0}
+                maximumValue={100000}
+                step={500}
+                value={Number(budgetMax) || 100000}
+                onValueChange={(v) => {
+                  const min = Number(budgetMin || 0)
+                  setBudgetMax(v < min ? String(min) : String(Math.round(v)))
+                }}
+                minimumTrackTintColor="transparent"
+                maximumTrackTintColor="transparent"
+                thumbTintColor={colors.primary}
+              />
+            </View>
+          </View>
+          <Text style={{ fontSize: 12, color: colors.gray, marginBottom: 8 }}>Drag thumbs or enter values above</Text>
           {budgetMin && budgetMax && (
             <View style={styles.payRow}>
               <Text style={styles.payLabel}>Your range</Text>
