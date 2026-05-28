@@ -78,7 +78,7 @@ function Colon() {
   return (
     <span
       className="inline-flex items-center justify-center w-[0.25em] align-middle font-bold font-mono"
-      style={{ animation: 'foBlink 1s step-end infinite' }}
+      style={{ animation: 'bnBlink 1s step-end infinite' }}
     >
       :
     </span>
@@ -128,7 +128,6 @@ export default function FlashOfferBanner() {
         clearInterval(poll)
       }
     }, 100)
-    // Fallback: show banner even if no splash after 2.5s
     const fallback = setTimeout(() => {
       if (!cancelled) {
         setVisible(true)
@@ -154,76 +153,102 @@ export default function FlashOfferBanner() {
     setClaiming(false)
   }
 
-  if (loading || !offer || remaining <= 0) return null
+  if (loading || !offer) return null
 
   const { hh, mm, ss } = formatCountdown(remaining)
   const claimPct = Math.min((offer.currentClaims / offer.maxClaims) * 100, 100)
   const prev = prevRef.current
   prevRef.current = { hh, mm, ss }
   const fullyClaimed = offer.currentClaims >= offer.maxClaims
+  const expired = remaining <= 0
 
   return (
     <div
       id="flash-offer-target"
-      className={`text-center sm:text-left transition-all duration-500 ease-out ${
-        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
+      className={`hidden md:block text-center sm:text-left transition-all duration-500 ease-out rounded-xl px-3 py-2 ${
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 pointer-events-none'
       }`}
+      style={expired ? {
+        animation: 'bnGlow 2s ease-in-out infinite',
+        '--glow-color': offer.bgColor,
+      } as any : {}}
     >
-      <div
-        className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl"
-        style={{ color: offer.textColor }}
-      >
-        <span
-          className="text-lg md:text-xl font-sans leading-none"
-          style={{ animation: 'foPulse 2s ease-in-out infinite' }}
-        >
-          {offer.badgeText.split(' ')[0] || '🔥'}
-        </span>
-        <FlipDigit digit={hh[0]} prevDigit={prev.hh[0]} />
-        <FlipDigit digit={hh[1]} prevDigit={prev.hh[1]} />
-        <Colon />
-        <FlipDigit digit={mm[0]} prevDigit={prev.mm[0]} />
-        <FlipDigit digit={mm[1]} prevDigit={prev.mm[1]} />
-        <Colon />
-        <FlipDigit digit={ss[0]} prevDigit={prev.ss[0]} />
-        <FlipDigit digit={ss[1]} prevDigit={prev.ss[1]} />
-      </div>
-      <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
-        <div className="w-14 h-1.5 rounded-full overflow-hidden flex-shrink-0" style={{ backgroundColor: offer.bgColor + '40' }}>
+      {!expired ? (
+        <>
           <div
-            className="h-full rounded-full transition-all duration-1000"
-            style={{
-              width: `${claimPct}%`,
-              backgroundColor: fullyClaimed ? '#EF4444' : '#48BB78',
-            }}
-          />
-        </div>
-        <span className="text-dark-900/70 text-xs whitespace-nowrap font-medium">
-          {fullyClaimed ? 'Fully Claimed' : `${offer.currentClaims}/${offer.maxClaims}`}
-        </span>
-      </div>
-      <button
-        onClick={handleClaim}
-        disabled={fullyClaimed || claiming}
-        className={`text-xs md:text-sm mt-0.5 font-medium transition-colors ${
-          fullyClaimed
-            ? 'text-gray-400 cursor-not-allowed'
-            : offer.textColor === '#FFFFFF' || offer.textColor === '#ffffff'
-              ? 'text-white/70 hover:text-white'
-              : 'text-dark-900/70 hover:text-dark-900'
-        }`}
-      >
-        {fullyClaimed ? 'All claimed' : claiming ? 'Claiming...' : `${offer.badgeText} Offer`}
-      </button>
+            className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl"
+            style={{ color: offer.textColor }}
+          >
+            <span
+              className="text-lg md:text-xl font-sans leading-none"
+              style={{ animation: 'bnPulse 2s ease-in-out infinite' }}
+            >
+              {offer.badgeText.split(' ')[0] || '🔥'}
+            </span>
+            <FlipDigit digit={hh[0]} prevDigit={prev.hh[0]} />
+            <FlipDigit digit={hh[1]} prevDigit={prev.hh[1]} />
+            <Colon />
+            <FlipDigit digit={mm[0]} prevDigit={prev.mm[0]} />
+            <FlipDigit digit={mm[1]} prevDigit={prev.mm[1]} />
+            <Colon />
+            <FlipDigit digit={ss[0]} prevDigit={prev.ss[0]} />
+            <FlipDigit digit={ss[1]} prevDigit={prev.ss[1]} />
+          </div>
+          <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
+            <div className="w-14 h-1.5 rounded-full overflow-hidden flex-shrink-0" style={{ backgroundColor: offer.bgColor + '40' }}>
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{
+                  width: `${claimPct}%`,
+                  backgroundColor: fullyClaimed ? '#EF4444' : '#48BB78',
+                }}
+              />
+            </div>
+            <span className="text-dark-900/70 text-xs whitespace-nowrap font-medium">
+              {fullyClaimed ? 'Fully Claimed' : `${offer.currentClaims}/${offer.maxClaims}`}
+            </span>
+          </div>
+          <button
+            onClick={handleClaim}
+            disabled={fullyClaimed || claiming}
+            className={`text-xs md:text-sm mt-0.5 font-medium transition-colors ${
+              fullyClaimed
+                ? 'text-gray-400 cursor-not-allowed'
+                : offer.textColor === '#FFFFFF' || offer.textColor === '#ffffff'
+                  ? 'text-white/70 hover:text-white'
+                  : 'text-dark-900/70 hover:text-dark-900'
+            }`}
+          >
+            {fullyClaimed ? 'Offer Ended' : claiming ? 'Claiming...' : `${offer.badgeText} Offer`}
+          </button>
+        </>
+      ) : (
+        <>
+          <div
+            className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl"
+            style={{ color: offer.textColor }}
+          >
+            <span className="text-lg md:text-xl font-sans leading-none">🔥</span>
+            <span className="font-bold font-mono">00:00:00</span>
+          </div>
+          <div className="mt-1 text-xs md:text-sm font-medium text-center sm:text-left" style={{ color: offer.textColor + 'aa' }}>
+            Offer Ended
+          </div>
+        </>
+      )}
 
       <style>{`
-        @keyframes foPulse {
+        @keyframes bnPulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.15); }
         }
-        @keyframes foBlink {
+        @keyframes bnBlink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.2; }
+        }
+        @keyframes bnGlow {
+          0%, 100% { box-shadow: 0 0 8px 2px var(--glow-color, #FFC300)40; }
+          50% { box-shadow: 0 0 20px 6px var(--glow-color, #FFC300)60, 0 0 40px 10px var(--glow-color, #FFC300)20; }
         }
       `}</style>
     </div>

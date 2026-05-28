@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface FlashOffer {
   id: string
@@ -30,29 +30,17 @@ function formatCountdown(ms: number): { hh: string; mm: string; ss: string } {
   }
 }
 
-function SplashColon() {
-  return (
-    <span
-      className="inline-flex items-center justify-center w-[0.3em] align-middle font-bold font-mono"
-      style={{ animation: 'spBlink 1s step-end infinite' }}
-    >
-      :
-    </span>
-  )
-}
-
 export default function FlashOfferSplash() {
   const [offer, setOffer] = useState<FlashOffer | null>(null)
   const [loading, setLoading] = useState(true)
   const [remaining, setRemaining] = useState(0)
-  const [phase, setPhase] = useState<'idle' | 'show' | 'morphing' | 'done'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'show' | 'launching' | 'done'>('idle')
   const [visible, setVisible] = useState(false)
   const splashRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
-  // Fetch offer
   useEffect(() => {
     if (sessionStorage.getItem('flash_splash_shown')) {
       setLoading(false)
@@ -81,7 +69,6 @@ export default function FlashOfferSplash() {
       .finally(() => setLoading(false))
   }, [])
 
-  // Countdown tick
   useEffect(() => {
     if (!offer) return
     intervalRef.current = setInterval(() => {
@@ -90,59 +77,53 @@ export default function FlashOfferSplash() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [offer])
 
-  // Session check
   useEffect(() => {
     if (typeof window === 'undefined') return
     const done = sessionStorage.getItem('flash_splash_shown')
     if (done) setLoading(false)
   }, [])
 
-  // Start 2s timer then morph
   useEffect(() => {
     if (phase !== 'show') return
-    timerRef.current = setTimeout(() => startMorph(), 2000)
+    timerRef.current = setTimeout(() => startLaunch(), 3500)
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [phase])
 
-  const startMorph = useCallback(() => {
-    const targetEl = document.getElementById('flash-offer-target')
+  const startLaunch = () => {
     const splashEl = splashRef.current
     const innerEl = innerRef.current
-    if (!targetEl || !splashEl || !innerEl) {
-      // Graceful fallback: just fade out
+    if (!splashEl || !innerEl) {
       setPhase('done')
       setVisible(false)
       sessionStorage.setItem('flash_splash_shown', '1')
       return
     }
 
-    const splashRect = splashEl.getBoundingClientRect()
-    const targetRect = targetEl.getBoundingClientRect()
-
-    const dx = targetRect.left - splashRect.left
-    const dy = targetRect.top - splashRect.top
-    const scaleX = targetRect.width / splashRect.width
-    const scaleY = targetRect.height / splashRect.height
-
-    setPhase('morphing')
-    // Signal banner to appear (it reads sessionStorage)
+    setPhase('launching')
     sessionStorage.setItem('flash_splash_shown', '1')
 
-    // Apply FLIP transform to the splash element
+    // Rocket launch: inner content shoots upward
     requestAnimationFrame(() => {
-      splashEl.style.transition = 'transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
-      splashEl.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`
+      // Fade background
+      splashEl.style.transition = 'opacity 0.3s ease-out'
+      splashEl.style.opacity = '0'
 
-      // Hide splash after animation
+      // Launch inner content upward
+      innerEl.style.transition = 'transform 0.6s cubic-bezier(0.1, 0.9, 0.3, 1), opacity 0.4s ease-out'
+      innerEl.style.transform = 'translateY(-120vh) scale(1.3)'
+      innerEl.style.opacity = '0'
+
       setTimeout(() => {
         setVisible(false)
         setPhase('done')
-        // Clean up inline styles so DOM isn't polluted
         splashEl.style.transition = ''
-        splashEl.style.transform = ''
+        splashEl.style.opacity = ''
+        innerEl.style.transition = ''
+        innerEl.style.transform = ''
+        innerEl.style.opacity = ''
       }, 600)
     })
-  }, [])
+  }
 
   if (loading) return null
   if (!visible || !offer || phase === 'done') return null
@@ -155,49 +136,40 @@ export default function FlashOfferSplash() {
   return (
     <div
       ref={splashRef}
-      className="fixed inset-0 z-[9999] flex items-center justify-center transition-opacity duration-500"
-      style={{
-        backgroundColor: offer.bgColor,
-        opacity: phase === 'morphing' ? 0 : 1,
-        transformOrigin: 'top left',
-      }}
+      className="fixed inset-0 z-[9999] items-center justify-center hidden md:flex"
+      style={{ backgroundColor: offer.bgColor }}
     >
       <div
         ref={innerRef}
         className="flex flex-col items-center text-center px-6 max-w-lg mx-auto"
         style={{ color: offer.textColor }}
       >
-        {/* Badge */}
         <span
           className="text-5xl md:text-6xl mb-3"
-          style={{ animation: 'spPulse 2s ease-in-out infinite' }}
+          style={{ animation: 'rkPulse 2s ease-in-out infinite' }}
         >
           {offer.badgeText.split(' ')[0] || '🔥'}
         </span>
 
-        {/* Title */}
         <h2 className="text-2xl md:text-3xl font-bold mb-2">{offer.title}</h2>
 
-        {/* Description */}
         {offer.description && (
           <p className={`text-sm md:text-base mb-4 ${isLight ? 'text-white/80' : 'text-black/60'}`}>
             {offer.description}
           </p>
         )}
 
-        {/* Countdown */}
         <div className="text-5xl md:text-6xl font-bold font-mono tracking-wider mb-4 flex items-center justify-center">
           <span className="inline-flex items-center">{hh[0]}</span>
           <span className="inline-flex items-center">{hh[1]}</span>
-          <SplashColon />
+          <span className="inline-flex items-center justify-center w-[0.3em]" style={{ animation: 'rkBlink 1s step-end infinite' }}>:</span>
           <span className="inline-flex items-center">{mm[0]}</span>
           <span className="inline-flex items-center">{mm[1]}</span>
-          <SplashColon />
+          <span className="inline-flex items-center justify-center w-[0.3em]" style={{ animation: 'rkBlink 1s step-end infinite' }}>:</span>
           <span className="inline-flex items-center">{ss[0]}</span>
           <span className="inline-flex items-center">{ss[1]}</span>
         </div>
 
-        {/* Progress bar */}
         <div className="w-48 mb-4">
           <div className="flex justify-between text-xs mb-1 px-1">
             <span>{offer.currentClaims}/{offer.maxClaims} claimed</span>
@@ -214,7 +186,6 @@ export default function FlashOfferSplash() {
           </div>
         </div>
 
-        {/* CTA */}
         <a
           href={offer.linkUrl || '/booking'}
           className={`inline-block px-8 py-3 rounded-xl font-bold text-base transition-all hover:scale-105 ${
@@ -227,11 +198,11 @@ export default function FlashOfferSplash() {
       </div>
 
       <style>{`
-        @keyframes spPulse {
+        @keyframes rkPulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.15); }
         }
-        @keyframes spBlink {
+        @keyframes rkBlink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.2; }
         }
