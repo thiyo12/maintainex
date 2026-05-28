@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
 import { Providers } from './providers'
 import './globals.css'
@@ -24,9 +25,18 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const region = host.includes('ca.') ? 'CA' : 'LK'
+
   return (
     <html lang="en">
       <body className="min-h-screen bg-gray-50">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `document.cookie="region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax"`,
+          }}
+        />
         <Providers>
           <Toaster 
             position="top-right"

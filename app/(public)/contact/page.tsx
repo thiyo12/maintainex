@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { useRegion } from '@/lib/region-context'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiMapPin, FiPhone, FiMail, FiClock, FiSend, FiCheck } from 'react-icons/fi'
 
 export default function ContactPage() {
+  const region = useRegion()
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -106,8 +108,8 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-xl font-bold text-dark-900 mb-2">Phone</h3>
                 <p className="text-gray-600 mb-2">Call or WhatsApp</p>
-                <a href="tel:0770867609" className="text-primary-600 font-semibold hover:text-primary-700">
-                  0770867609
+                <a href={`tel:${region.phoneRaw}`} className="text-primary-600 font-semibold hover:text-primary-700">
+                  {region.phone}
                 </a>
               </div>
 
@@ -291,11 +293,11 @@ export default function ContactPage() {
                   <h3 className="text-xl font-bold text-dark-900 mb-4">Need Immediate Help?</h3>
                   <p className="text-dark-900/80 mb-6">Call us directly for instant support</p>
                   <a 
-                    href="tel:0770867609" 
+                    href={`tel:${region.phoneRaw}`} 
                     className="inline-flex items-center gap-2 bg-dark-900 hover:bg-dark-800 text-white font-bold px-8 py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
                   >
                     <FiPhone />
-                    0770867609
+                    {region.phone}
                   </a>
                 </div>
               </div>

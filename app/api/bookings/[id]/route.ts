@@ -21,6 +21,10 @@ export async function GET(
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
 
+    if (session.role !== 'SUPER_ADMIN' && session.region && booking.region !== session.region) {
+      return NextResponse.json({ error: 'Unauthorized - This booking belongs to another region' }, { status: 403 })
+    }
+
     if (session.role !== 'SUPER_ADMIN' && booking.branchId && booking.branchId !== session.branchId) {
       return NextResponse.json({ error: 'Unauthorized - This booking belongs to another branch' }, { status: 403 })
     }
@@ -63,6 +67,10 @@ export async function PATCH(
 
     if (!existingBooking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN' && session.region && existingBooking.region !== session.region) {
+      return NextResponse.json({ error: 'Unauthorized - This booking belongs to another region' }, { status: 403 })
     }
 
     if (session.role !== 'SUPER_ADMIN' && existingBooking.branchId !== session.branchId) {
@@ -174,6 +182,10 @@ export async function DELETE(
 
     if (!booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN' && session.region && booking.region !== session.region) {
+      return NextResponse.json({ error: 'Unauthorized - This booking belongs to another region' }, { status: 403 })
     }
 
     if (session.role !== 'SUPER_ADMIN' && booking.branchId && booking.branchId !== session.branchId) {

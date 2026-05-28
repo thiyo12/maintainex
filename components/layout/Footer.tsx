@@ -5,9 +5,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { FiMail, FiPhone, FiMapPin, FiX, FiSmartphone } from 'react-icons/fi'
 import { FaFacebookF, FaTwitter, FaInstagram, FaTiktok, FaLinkedinIn, FaWhatsapp } from 'react-icons/fa'
+import { useRegion } from '@/lib/region-context'
 
 export default function Footer() {
   const [showAppMessage, setShowAppMessage] = useState(false)
+  const region = useRegion()
 
   const handleAppClick = () => {
     setShowAppMessage(true)
@@ -138,26 +140,26 @@ export default function Footer() {
             <ul className="space-y-4">
               <li className="flex items-start space-x-3">
                 <FiMapPin className="text-primary-500 mt-1 flex-shrink-0" />
-                <span className="text-gray-400">57/1 New Senguntha Road, Thirunelvaly, Sri Lanka</span>
+                <span className="text-gray-400">{region.label === 'Canada' ? 'Toronto, Ontario, Canada' : '57/1 New Senguntha Road, Thirunelvaly, Sri Lanka'}</span>
               </li>
               <li className="flex items-center space-x-3">
                 <FiPhone className="text-primary-500 flex-shrink-0" />
-                <a href="tel:0770867609" className="text-gray-400 hover:text-primary-500 transition-colors">0770867609</a>
+                <a href={`tel:${region.phoneRaw}`} className="text-gray-400 hover:text-primary-500 transition-colors">{region.phone}</a>
               </li>
               <li className="flex items-center space-x-3">
                 <FiMail className="text-primary-500 flex-shrink-0" />
-                <a href="mailto:maintainex.lk@gmail.com" className="text-gray-400 hover:text-primary-500 transition-colors">maintainex.lk@gmail.com</a>
+                <a href={`mailto:${region.email}`} className="text-gray-400 hover:text-primary-500 transition-colors">{region.email}</a>
               </li>
               <li className="flex items-center space-x-3">
                 <FaWhatsapp className="text-primary-500 flex-shrink-0" />
-                <a href="https://wa.me/94770867609" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary-500 transition-colors">WhatsApp Us</a>
+                <a href={`https://wa.me/${region.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-primary-500 transition-colors">WhatsApp Us</a>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-500">
-          <p>&copy; {new Date().getFullYear()} Maintainex. All rights reserved. | Shine Beyond Expectations | Made with care in Sri Lanka</p>
+          <p>&copy; {new Date().getFullYear()} Maintainex. All rights reserved. | Shine Beyond Expectations | Made with care{region.label === 'Canada' ? ' in Canada' : ' in Sri Lanka'}</p>
         </div>
       </div>
     </footer>

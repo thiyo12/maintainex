@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { useRegion } from '@/lib/region-context'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiSend, FiCheck, FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase, FiUpload, FiFile } from 'react-icons/fi'
-import { DISTRICTS } from '@/lib/districts'
 
 interface Vacancy {
   id: string
@@ -16,6 +16,7 @@ interface Vacancy {
 }
 
 export default function CareersPage() {
+  const region = useRegion()
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -350,9 +351,9 @@ export default function CareersPage() {
                       required
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
                     >
-                      <option value="">Select your district</option>
-                      {DISTRICTS.map(district => (
-                        <option key={district} value={district}>{district}</option>
+                      <option value="">Select your {region.label === 'Canada' ? 'city' : 'district'}</option>
+                      {region.districts.map(d => (
+                        <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
                   </div>
@@ -451,7 +452,7 @@ export default function CareersPage() {
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h3 className="text-xl font-bold text-dark-900 mb-4">Or contact us directly</h3>
-            <p className="text-gray-600 mb-2">📞 0770867609</p>
+            <p className="text-gray-600 mb-2">📞 {region.phone}</p>
             <p className="text-gray-600">✉️ careers@maintain.lk</p>
           </div>
         </section>

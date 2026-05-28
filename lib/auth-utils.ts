@@ -10,6 +10,7 @@ export interface SessionUser {
   role: string
   branchId?: string | null
   province?: string | null
+  region?: string | null
   name?: string | null
   canEditServices?: boolean
 }
@@ -28,6 +29,7 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
           role: decoded.role,
           branchId: decoded.branchId || null,
           province: decoded.province || null,
+          region: decoded.region || null,
           name: decoded.name || null,
           canEditServices: decoded.canEditServices || false
         }
@@ -76,6 +78,7 @@ export async function getSession(request: NextRequest): Promise<SessionUser | nu
     role: payload.role,
     branchId: payload.branchId,
     province: payload.province || null,
+    region: payload.region || null,
     name: payload.name,
     canEditServices: payload.canEditServices || false
   }

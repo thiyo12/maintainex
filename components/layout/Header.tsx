@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiMenu, FiX, FiPhone } from 'react-icons/fi'
+import { useRegion } from '@/lib/region-context'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -15,6 +16,7 @@ const navigation = [
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const region = useRegion()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm">
@@ -41,11 +43,11 @@ export default function Header() {
 
           <div className="hidden md:flex items-center space-x-4">
             <a
-              href="tel:0770867609"
+              href={`tel:${region.phoneRaw}`}
               className="flex items-center space-x-2 text-primary-600 font-semibold"
             >
               <FiPhone className="animate-pulse" />
-              <span className="hidden lg:inline">0770867609</span>
+              <span className="hidden lg:inline">{region.phone}</span>
             </a>
             <Link href="/booking" className="btn-primary">
               Book Now
@@ -76,11 +78,11 @@ export default function Header() {
               ))}
               <div className="pt-4 border-t border-gray-100 mt-4">
                 <a
-                  href="tel:0770867609"
+                  href={`tel:${region.phoneRaw}`}
                   className="flex items-center space-x-2 text-primary-600 font-semibold py-3 px-4"
                 >
                   <FiPhone className="animate-pulse" />
-                  <span>0770867609</span>
+                  <span>{region.phone}</span>
                 </a>
                 <Link
                   href="/booking"

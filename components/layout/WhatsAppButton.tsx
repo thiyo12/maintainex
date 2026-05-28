@@ -1,22 +1,12 @@
 'use client'
 
 import { FiMessageCircle } from 'react-icons/fi'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useRegion } from '@/lib/region-context'
 
 export default function WhatsAppButton() {
   const [isOpen, setIsOpen] = useState(false)
-  const [phoneNumber, setPhoneNumber] = useState('94770867609')
-
-  useEffect(() => {
-    fetch('/api/settings')
-      .then(res => res.json())
-      .then(data => {
-        if (data.whatsappNumber) {
-          setPhoneNumber(data.whatsappNumber)
-        }
-      })
-      .catch(() => {})
-  }, [])
+  const region = useRegion()
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -31,7 +21,7 @@ export default function WhatsAppButton() {
             Get instant responses. Click below to start chatting with our team.
           </p>
           <a
-            href={`https://wa.me/${phoneNumber}?text=${encodeURIComponent('Hi, I would like to know more about your cleaning services.')}`}
+            href={`https://wa.me/${region.whatsapp}?text=${encodeURIComponent('Hi, I would like to know more about your cleaning services.')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white text-center py-3 rounded-lg font-semibold transition-colors"

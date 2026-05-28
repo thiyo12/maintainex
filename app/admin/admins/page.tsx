@@ -6,6 +6,7 @@ import { FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiShield, FiU
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
 import { PROVINCES } from '@/lib/provinces'
+import { REGIONS } from '@/lib/regions'
 
 interface Branch {
   id: string
@@ -21,6 +22,7 @@ interface Admin {
   branchId: string | null
   branch: Branch | null
   province: string | null
+  region: string
   canEditServices: boolean
   isActive: boolean
   createdAt: string
@@ -33,6 +35,7 @@ interface AdminFormData {
   role: string
   branchId: string
   province: string
+  region: string
 }
 
 export default function AdminAdmins() {
@@ -48,7 +51,8 @@ export default function AdminAdmins() {
     name: '',
     role: 'ADMIN',
     branchId: '',
-    province: ''
+    province: '',
+    region: 'LK'
   })
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<'ALL' | 'SUPER_ADMIN' | 'ADMIN'>('ALL')
@@ -101,11 +105,12 @@ export default function AdminAdmins() {
         name: admin.name || '',
         role: admin.role,
         branchId: admin.branchId || '',
-        province: admin.province || ''
+        province: admin.province || '',
+        region: admin.region || 'LK'
       })
     } else {
       setEditingAdmin(null)
-      setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '', province: '' })
+      setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '', province: '', region: 'LK' })
     }
     setShowModal(true)
   }
@@ -113,7 +118,7 @@ export default function AdminAdmins() {
   const closeModal = () => {
     setShowModal(false)
     setEditingAdmin(null)
-    setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '', province: '' })
+    setFormData({ email: '', password: '', name: '', role: 'ADMIN', branchId: '', province: '', region: 'LK' })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,7 +133,8 @@ export default function AdminAdmins() {
       const body: any = {
         email: formData.email,
         name: formData.name || null,
-        role: formData.role
+        role: formData.role,
+        region: formData.region || 'LK'
       }
 
       if (formData.role === 'ADMIN') {
@@ -296,6 +302,7 @@ export default function AdminAdmins() {
               <tr>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Admin</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Role</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Region</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Province</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service Edit</th>
@@ -332,6 +339,17 @@ export default function AdminAdmins() {
                         <><FiUser size={12} /> Admin</>
                       )}
                     </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    {admin.region !== 'LK' ? (
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 flex items-center gap-1 w-fit">
+                        <FiMapPin size={10} /> {admin.region}
+                      </span>
+                    ) : admin.role === 'SUPER_ADMIN' ? (
+                      <span className="text-purple-600 text-sm">All Regions</span>
+                    ) : (
+                      <span className="text-gray-400 text-sm">LK</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     {admin.province ? (
@@ -502,7 +520,23 @@ export default function AdminAdmins() {
                 </p>
               </div>
 
-              {formData.role === 'ADMIN' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+                <select
+                  value={formData.region}
+                  onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+                  className="input-field"
+                >
+                  {Object.entries(REGIONS).map(([key, config]) => (
+                    <option key={key} value={key}>{config.label} ({key})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Region determines district list, currency, and contact info for this admin
+                </p>
+              </div>
+
+              {formData.role === 'ADMIN' && formData.region === 'LK' && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>

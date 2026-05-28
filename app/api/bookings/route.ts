@@ -21,9 +21,14 @@ export async function GET(request: NextRequest) {
 
     const isSuper = session.role === 'SUPER_ADMIN'
     const userBranchId = session.branchId
+    const userRegion = session.region
 
     const where: any = serviceId ? { serviceId } : {}
     if (status) where.status = status
+
+    if (userRegion && !isSuper) {
+      where.region = userRegion
+    }
 
     if (!isSuper && userBranchId) {
       where.branchId = userBranchId
@@ -115,11 +120,18 @@ export async function POST(request: NextRequest) {
     // Address is optional
     address = address || ''
 
-    // Calculate province from district
-    const province = getProvinceFromDistrict(district)
+    // Determine region from cookie
+    const region = request.cookies.get('region')?.value || 'LK'
 
-    if (!province) {
-      return NextResponse.json({ error: 'Invalid district. Please select a valid district from Sri Lanka.' }, { status: 400 })
+    // Calculate province from district (LK only; CA uses default)
+    let province: string | null = null
+    if (region === 'CA') {
+      province = 'Ontario'
+    } else {
+      province = getProvinceFromDistrict(district)
+      if (!province) {
+        return NextResponse.json({ error: 'Invalid district. Please select a valid district.' }, { status: 400 })
+      }
     }
 
     let serviceId = body.serviceId
@@ -132,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     // Find branch by province
     let branchId = body.branchId
-    if (!branchId) {
+    if (!branchId && province) {
       const branch = await prisma.branch.findFirst({
         where: { province, isActive: true }
       })
@@ -177,6 +189,7 @@ export async function POST(request: NextRequest) {
         email,
         district,
         province,
+        region,
         address,
         time
       }

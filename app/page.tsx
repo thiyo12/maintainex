@@ -6,6 +6,7 @@ import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import FlashOfferBanner from '@/components/ui/FlashOfferBanner'
 import FlashOfferSplash from '@/components/ui/FlashOfferSplash'
+import CTASection from '@/components/ui/CTASection'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import HomeServices from '@/components/ui/HomeServices'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
@@ -259,14 +260,7 @@ export default async function HomePage() {
             <p className="text-xl text-dark-900/80 mb-8">
               Book your service today and experience the Maintainex difference. Shine Beyond Expectations!
             </p>
-            <div className="flex flex-col md:flex-row gap-4 justify-center">
-              <Link href="/booking" className="btn-secondary inline-flex items-center justify-center">
-                Book Now <FiArrowRight className="ml-2" />
-              </Link>
-              <a href="tel:0770867609" className="bg-white/20 backdrop-blur-sm text-dark-900 font-semibold px-6 py-3 rounded-lg hover:bg-white/30 transition-all inline-flex items-center justify-center">
-                Call 0770867609
-              </a>
-            </div>
+            <CTASection />
           </div>
         </section>
       </main>

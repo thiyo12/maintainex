@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
       role: admin.role,
       branchId: admin.branchId,
       province: admin.province || null,
+      region: admin.region,
       name: admin.name,
       canEditServices: admin.canEditServices
     })
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
         role: admin.role,
         branchId: admin.branchId,
         province: admin.province || null,
+        region: admin.region,
         canEditServices: admin.canEditServices
       }
     })

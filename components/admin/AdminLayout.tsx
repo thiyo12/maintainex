@@ -202,6 +202,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                   {user.province}
                 </span>
               )}
+              {user.region && user.region !== 'LK' && (
+                <span className="text-sm text-white bg-blue-600 px-3 py-1 rounded-full">
+                  {user.region}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-4">
               <span className="text-gray-600 text-sm">{user.email}</span>

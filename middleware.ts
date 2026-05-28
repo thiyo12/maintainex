@@ -46,6 +46,7 @@ async function getSession(request: NextRequest) {
           role: decoded.role,
           branchId: decoded.branchId || null,
           province: decoded.province || null,
+          region: decoded.region || null,
           name: decoded.name || null,
           canEditServices: decoded.canEditServices || false
         }
@@ -87,6 +88,7 @@ async function getSession(request: NextRequest) {
     role: payload.role,
     branchId: payload.branchId,
     province: payload.province || null,
+    region: payload.region || null,
     name: payload.name,
     canEditServices: payload.canEditServices || false
   }

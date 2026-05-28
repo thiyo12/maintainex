@@ -43,6 +43,7 @@ model Admin {
   name            String?
   role            String   @default("ADMIN")
   province        String?
+  region          String  @default("LK")
   branchId        String?
   branch          Branch?  @relation(fields: [branchId], references: [id])
   canEditServices Boolean  @default(false)
@@ -195,6 +196,7 @@ model Booking {
   email      String?
   district   String?
   province   String?
+  region     String  @default("LK")
   address    String?
   time       String?
   taskerId   String?

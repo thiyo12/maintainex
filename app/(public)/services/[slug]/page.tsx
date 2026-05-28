@@ -9,8 +9,7 @@ import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
-
-const WHATSAPP_NUMBER = '94770867609'
+import { useRegion } from '@/lib/region-context'
 
 interface Service {
   id: string
@@ -50,6 +49,7 @@ interface RelatedService {
 export default function ServiceDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const region = useRegion()
   const slug = params.slug as string
   const [service, setService] = useState<Service | null>(null)
   const [relatedServices, setRelatedServices] = useState<RelatedService[]>([])
@@ -93,7 +93,7 @@ export default function ServiceDetailPage() {
     if (!service) return '#'
     
     const message = `Hi, I'm interested in the ${service.name} service. Can you provide more information?`
-    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+    return `https://wa.me/${region.whatsapp}?text=${encodeURIComponent(message)}`
   }
 
   const formatPrice = (_price: number | null) => {
@@ -191,7 +191,7 @@ export default function ServiceDetailPage() {
     provider: {
       '@type': 'LocalBusiness',
       name: 'Maintainex',
-      telephone: WHATSAPP_NUMBER,
+      telephone: region.whatsapp,
       url: 'https://maintain.lk'
     },
     areaServed: {
@@ -406,11 +406,11 @@ export default function ServiceDetailPage() {
 
                   {/* Call Button */}
                   <a
-                    href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`}
+                    href={`tel:${region.phoneRaw}`}
                     className="flex items-center justify-center gap-3 w-full bg-gray-100 hover:bg-gray-200 text-dark-900 font-semibold py-4 px-6 rounded-xl transition-all duration-300 text-lg mb-6"
                   >
                     <FiPhone className="w-5 h-5" />
-                    Call: {WHATSAPP_NUMBER.replace('94', '0')}
+                    Call: {region.phone}
                   </a>
 
                   {/* Quick Info */}

@@ -6,7 +6,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiUser, FiPhone, FiMail, FiMapPin, FiCalendar, FiClock, FiCheck, FiChevronRight, FiChevronLeft, FiMessageCircle } from 'react-icons/fi'
-import { DISTRICTS } from '@/lib/districts'
+import { useRegion } from '@/lib/region-context'
 
 interface Service {
   id: string
@@ -28,8 +28,6 @@ interface StoredService {
   price: number
   category?: string
 }
-
-const WHATSAPP_NUMBER = '94770867609'
 
 const TIME_SLOTS = [
   '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
@@ -63,6 +61,7 @@ function BookingLoading() {
 function BookingContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const region = useRegion()
   const [step, setStep] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -301,13 +300,13 @@ ${formData.email ? `✉️ *Email:* ${formData.email}` : ''}
 ${formData.address ? `📍 *Address:* ${formData.address}` : ''}
 📅 *Date:* ${formData.date}
 ⏰ *Time:* ${formData.time}
-${formData.budgetMin && formData.budgetMax ? `💰 *Budget:* LKR ${Number(formData.budgetMin).toLocaleString()} - ${Number(formData.budgetMax).toLocaleString()}` : ''}
+${formData.budgetMin && formData.budgetMax ? `💰 *Budget:* ${region.currencySymbol} ${Number(formData.budgetMin).toLocaleString()} - ${Number(formData.budgetMax).toLocaleString()}` : ''}
 ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
 ─────────────────────
       Sent from maintainex.lk`
 
-    return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+    return `https://wa.me/${region.whatsapp}?text=${encodeURIComponent(message)}`
   }
 
   const formatDate = (dateStr: string) => {
@@ -338,10 +337,10 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             
             <div className="space-y-4 mb-8">
               <a 
-                href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`}
+                href={`tel:${region.phoneRaw}`}
                 className="block w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all"
               >
-                📞 Call Us: {WHATSAPP_NUMBER.replace('94', '0')}
+                📞 Call Us: {region.phone}
               </a>
               <a 
                 href={generateWhatsAppLink()}
@@ -556,8 +555,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       onChange={(e) => setFormData({ ...formData, district: e.target.value })}
                       className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
                     >
-                      <option value="">Select District</option>
-                      {DISTRICTS.map(d => (
+                      <option value="">Select {region.label === 'Canada' ? 'City' : 'District'}</option>
+                      {region.districts.map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
@@ -677,7 +676,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       value={formData.budgetMin}
                       onChange={(e) => {
                         const val = e.target.value
-                        const max = formData.budgetMax || '100000'
+                        const max = formData.budgetMax || String(region.budgetMax)
                         setFormData({ ...formData, budgetMin: val && Number(val) > Number(max) ? max : val })
                       }}
                       placeholder="Min"
@@ -695,19 +694,19 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       placeholder="Max"
                       className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
                     />
-                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">LKR</span>
+                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">{region.currencySymbol}</span>
                   </div>
                   <div className="mt-4 mb-2">
                     <div className="relative h-10">
                       <input
                         type="range"
                         min="0"
-                        max="100000"
-                        step="500"
+                        max={region.budgetMax}
+                        step={region.budgetStep}
                         value={formData.budgetMin || '0'}
                         onChange={(e) => {
                           const val = e.target.value
-                          const max = Number(formData.budgetMax || '100000')
+                          const max = Number(formData.budgetMax || String(region.budgetMax))
                           const clamped = Number(val) > max ? String(max) : val
                           setFormData({ ...formData, budgetMin: clamped })
                         }}
@@ -717,9 +716,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       <input
                         type="range"
                         min="0"
-                        max="100000"
-                        step="500"
-                        value={formData.budgetMax || '100000'}
+                        max={region.budgetMax}
+                        step={region.budgetStep}
+                        value={formData.budgetMax || String(region.budgetMax)}
                         onChange={(e) => {
                           const val = e.target.value
                           const min = Number(formData.budgetMin || '0')
@@ -733,14 +732,14 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       <div
                         className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-primary-400 rounded-full"
                         style={{
-                          left: `${(Number(formData.budgetMin || 0) / 100000) * 100}%`,
-                          right: `${100 - (Number(formData.budgetMax || 100000) / 100000) * 100}%`,
+                          left: `${(Number(formData.budgetMin || 0) / region.budgetMax) * 100}%`,
+                          right: `${100 - (Number(formData.budgetMax || region.budgetMax) / region.budgetMax) * 100}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-gray-400 mt-1">
-                      <span>LKR 0</span>
-                      <span>LKR 100,000</span>
+                      <span>{region.currencySymbol} 0</span>
+                      <span>{region.currencySymbol} {region.budgetMax.toLocaleString()}</span>
                     </div>
                   </div>
                   {!formData.budgetMin && !formData.budgetMax ? (
@@ -821,7 +820,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
           {/* Help Text */}
           <div className="text-center mt-6 text-gray-500 text-sm space-y-2">
-            <p>Need help? <a href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`} className="text-primary-600 font-medium">Call {WHATSAPP_NUMBER.replace('94', '0')}</a></p>
+            <p>Need help? <a href={`tel:${region.phoneRaw}`} className="text-primary-600 font-medium">Call {region.phone}</a></p>
             <p className="text-xs text-gray-400">or book via WhatsApp</p>
           </div>
         </div>

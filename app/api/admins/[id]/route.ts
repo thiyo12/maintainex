@@ -60,7 +60,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, email, password, role, branchId, isActive, canEditServices } = body
+    const { name, email, password, role, branchId, province, region, isActive, canEditServices } = body
 
     const isUpdatingSelf = session.id === params.id
     const isSuper = session.role === 'SUPER_ADMIN'
@@ -87,6 +87,8 @@ export async function PUT(
     }
     if (isSuper && role !== undefined) updateData.role = role
     if (isSuper && branchId !== undefined) updateData.branchId = branchId
+    if (isSuper && province !== undefined) updateData.province = province
+    if (isSuper && region !== undefined) updateData.region = region
     if (isSuper && isActive !== undefined) updateData.isActive = isActive
     if (isSuper && canEditServices !== undefined) updateData.canEditServices = canEditServices
 

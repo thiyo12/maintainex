@@ -7,8 +7,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiCheck, FiPhone, FiMessageCircle, FiHome, FiCalendar, FiClock, FiUser, FiMapPin } from 'react-icons/fi'
-
-const WHATSAPP_NUMBER = '94770867609'
+import { useRegion } from '@/lib/region-context'
 
 interface BookingData {
   name?: string
@@ -55,6 +54,7 @@ function ConfirmationLoading() {
 
 function ConfirmationContent() {
   const searchParams = useSearchParams()
+  const region = useRegion()
   const [bookingData, setBookingData] = useState<BookingData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -156,12 +156,12 @@ function ConfirmationContent() {
 
   const handleWhatsAppClick = () => {
     const message = generateWhatsAppMessage()
-    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`
+    const url = `https://wa.me/${region.whatsapp}?text=${encodeURIComponent(message)}`
     window.open(url, '_blank')
   }
 
   const handleCallClick = () => {
-    window.location.href = `tel:${WHATSAPP_NUMBER.replace('94', '0')}`
+    window.location.href = `tel:${region.phoneRaw}`
   }
 
   if (loading) {
@@ -311,7 +311,7 @@ function ConfirmationContent() {
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-bold text-dark-900">Budget Range</span>
                     <span className="text-2xl font-bold text-primary-600">
-                      Rs. {bookingData.budgetMin.toLocaleString()} – Rs. {bookingData.budgetMax.toLocaleString()}
+                      {region.currencySymbol} {bookingData.budgetMin.toLocaleString()} – {region.currencySymbol} {bookingData.budgetMax.toLocaleString()}
                     </span>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Price will change based on requirements</p>
@@ -359,7 +359,7 @@ function ConfirmationContent() {
                 className="w-full flex items-center justify-center gap-3 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 sm:py-5 rounded-xl transition-all text-lg shadow-lg hover:shadow-xl active:scale-95"
               >
                 <FiPhone className="text-xl" />
-                Call Us: {WHATSAPP_NUMBER.replace('94', '0')}
+                Call Us: {region.phone}
               </button>
 
               <button
@@ -376,8 +376,8 @@ function ConfirmationContent() {
               <p>Need help with your booking?</p>
               <p className="mt-1">
                 Call us at{' '}
-                <a href={`tel:${WHATSAPP_NUMBER.replace('94', '0')}`} className="text-primary-600 font-medium">
-                  {WHATSAPP_NUMBER.replace('94', '0')}
+                <a href={`tel:${region.phoneRaw}`} className="text-primary-600 font-medium">
+                  {region.phone}
                 </a>{' '}
                 or{' '}
                 <button onClick={handleWhatsAppClick} className="text-green-600 font-medium">

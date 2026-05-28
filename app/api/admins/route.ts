@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email, password, name, role, branchId } = body
+    const { email, password, name, role, branchId, region } = body
 
     if (!email || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
@@ -56,8 +56,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
 
-    if (role === 'ADMIN' && !branchId) {
-      return NextResponse.json({ error: 'Branch is required for admin users' }, { status: 400 })
+    if (role === 'ADMIN' && !branchId && !region) {
+      return NextResponse.json({ error: 'Branch or region is required for admin users' }, { status: 400 })
     }
 
     const existingAdmin = await prisma.admin.findUnique({
@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         name: name || null,
         role,
-        branchId: role === 'ADMIN' ? branchId : null
+        branchId: role === 'ADMIN' ? branchId : null,
+        region: region || 'LK',
       },
       include: {
         branch: {
