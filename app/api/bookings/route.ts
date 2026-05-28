@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         })
       }
       
-      return { ...booking, service, branch }
+      return { ...booking, budgetMin: booking.budgetMin, budgetMax: booking.budgetMax, service, branch }
     }))
 
     return NextResponse.json(bookings)

@@ -126,7 +126,7 @@ export default function QuickBooking() {
         </ScrollView>
 
         <Text style={styles.sectionTitle}>Select Time Slot</Text>
-        <View style={styles.slotsWrap}>
+        <View style={styles.slotsGrid}>
           {TIME_SLOTS.map((slot) => {
             const isSelected = selectedSlot === slot
             return (
@@ -218,17 +218,20 @@ const styles = StyleSheet.create({
   dateCardSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
   dateText: { fontSize: 13, color: '#374151' },
   dateTextSelected: { color: colors.primary, fontWeight: '600' },
-  slotsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  slotsGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16, marginHorizontal: -4 },
   slotCard: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    width: '50%',
+    paddingHorizontal: 4,
+    marginBottom: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    alignItems: 'center',
   },
   slotCardSelected: { borderColor: colors.primary, backgroundColor: colors.primary + '10' },
-  slotText: { fontSize: 12, color: '#374151' },
+  slotText: { fontSize: 13, color: '#374151' },
   slotTextSelected: { color: colors.primary, fontWeight: '600' },
   input: {
     backgroundColor: '#fff',
