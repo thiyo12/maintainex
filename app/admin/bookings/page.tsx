@@ -319,6 +319,7 @@ export default function AdminBookings() {
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Customer</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">District</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Service</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Budget</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Date</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-red-900">Actions</th>
                 </tr>
@@ -332,6 +333,15 @@ export default function AdminBookings() {
                     </td>
                     <td className="px-4 py-3 text-gray-700">{booking.district}</td>
                     <td className="px-4 py-3 text-gray-700">{booking.service?.name}</td>
+                    <td className="px-4 py-3">
+                      {booking.budgetMin && booking.budgetMax ? (
+                        <span className="text-gray-700 font-medium text-sm">
+                          LKR {Number(booking.budgetMin).toLocaleString()} – {Number(booking.budgetMax).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="text-gray-900">{booking.date ? new Date(booking.date).toLocaleDateString() : '-'}</div>
                       <div className="text-sm text-gray-500">{booking.time}</div>
