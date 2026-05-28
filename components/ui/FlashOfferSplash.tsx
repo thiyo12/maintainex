@@ -102,16 +102,18 @@ export default function FlashOfferSplash() {
     setPhase('launching')
     sessionStorage.setItem('flash_splash_shown', '1')
 
-    // Rocket launch: inner content shoots upward
+    // Double rAF to ensure CSS transitions fire correctly
     requestAnimationFrame(() => {
-      // Fade background
+      // First frame: set up transitions (values unchanged)
       splashEl.style.transition = 'opacity 0.3s ease-out'
-      splashEl.style.opacity = '0'
-
-      // Launch inner content upward
       innerEl.style.transition = 'transform 0.6s cubic-bezier(0.1, 0.9, 0.3, 1), opacity 0.4s ease-out'
-      innerEl.style.transform = 'translateY(-120vh) scale(1.3)'
-      innerEl.style.opacity = '0'
+
+      requestAnimationFrame(() => {
+        // Second frame: change values — browser sees a diff and fires transitions
+        splashEl.style.opacity = '0'
+        innerEl.style.transform = 'translateY(-120vh) scale(1.3)'
+        innerEl.style.opacity = '0'
+      })
 
       setTimeout(() => {
         setVisible(false)
@@ -121,7 +123,7 @@ export default function FlashOfferSplash() {
         innerEl.style.transition = ''
         innerEl.style.transform = ''
         innerEl.style.opacity = ''
-      }, 600)
+      }, 650) // slightly after transition completes (600ms + rAF delay)
     })
   }
 
@@ -136,7 +138,7 @@ export default function FlashOfferSplash() {
   return (
     <div
       ref={splashRef}
-      className="fixed inset-0 z-[9999] items-center justify-center hidden md:flex"
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
       style={{ backgroundColor: offer.bgColor }}
     >
       <div

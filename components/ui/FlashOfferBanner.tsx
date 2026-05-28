@@ -165,7 +165,7 @@ export default function FlashOfferBanner() {
   return (
     <div
       id="flash-offer-target"
-      className={`hidden md:block text-center sm:text-left transition-all duration-500 ease-out rounded-xl px-3 py-2 ${
+      className={`text-center sm:text-left transition-all duration-500 ease-out rounded-xl px-3 py-2 ${
         visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 pointer-events-none'
       }`}
       style={expired ? {
