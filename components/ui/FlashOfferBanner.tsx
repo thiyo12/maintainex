@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 
 interface FlashOffer {
   id: string
   title: string
   description: string | null
+  discountType: string
+  discountValue: number
   badgeText: string
   bgColor: string
   textColor: string
@@ -77,7 +78,7 @@ function Colon() {
   return (
     <span
       className="inline-flex items-center justify-center w-[0.25em] align-middle font-bold font-mono"
-      style={{ animation: 'foColonBlink 1s step-end infinite' }}
+      style={{ animation: 'foBlink 1s step-end infinite' }}
     >
       :
     </span>
@@ -88,6 +89,8 @@ export default function FlashOfferBanner() {
   const [offer, setOffer] = useState<FlashOffer | null>(null)
   const [loading, setLoading] = useState(true)
   const [remaining, setRemaining] = useState(0)
+  const [visible, setVisible] = useState(false)
+  const [claiming, setClaiming] = useState(false)
   const prevRef = useRef({ hh: '00', mm: '00', ss: '00' })
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
@@ -96,9 +99,8 @@ export default function FlashOfferBanner() {
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
-          const active = data[0]
-          setOffer(active)
-          setRemaining(getRemaining(active.expiresAt))
+          setOffer(data[0])
+          setRemaining(getRemaining(data[0].expiresAt))
         }
       })
       .catch(() => {})
@@ -110,10 +112,35 @@ export default function FlashOfferBanner() {
     intervalRef.current = setInterval(() => {
       setRemaining(getRemaining(offer.expiresAt))
     }, 1000)
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [offer])
+
+  useEffect(() => {
+    if (loading) return
+    const done = sessionStorage.getItem('flash_splash_shown')
+    if (done) {
+      setVisible(true)
+    } else {
+      const t = setTimeout(() => setVisible(true), 2600)
+      return () => clearTimeout(t)
+    }
+  }, [loading])
+
+  const handleClaim = async () => {
+    if (!offer || claiming || offer.currentClaims >= offer.maxClaims) return
+    setClaiming(true)
+    try {
+      await fetch('/api/flash-offers/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: offer.id }),
+      })
+      const res = await fetch('/api/flash-offers')
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) setOffer(data[0])
+    } catch {}
+    setClaiming(false)
+  }
 
   if (loading || !offer || remaining <= 0) return null
 
@@ -121,12 +148,21 @@ export default function FlashOfferBanner() {
   const claimPct = Math.min((offer.currentClaims / offer.maxClaims) * 100, 100)
   const prev = prevRef.current
   prevRef.current = { hh, mm, ss }
+  const fullyClaimed = offer.currentClaims >= offer.maxClaims
 
   return (
-    <div className="text-center sm:text-left">
-      <div className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl text-dark-900">
+    <div
+      id="flash-offer-target"
+      className={`text-center sm:text-left transition-all duration-500 ease-out ${
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
+      }`}
+    >
+      <div
+        className="flex items-center gap-1.5 justify-center sm:justify-start text-3xl md:text-4xl"
+        style={{ color: offer.textColor }}
+      >
         <span
-          className="text-lg md:text-xl"
+          className="text-lg md:text-xl font-sans leading-none"
           style={{ animation: 'foPulse 2s ease-in-out infinite' }}
         >
           {offer.badgeText.split(' ')[0] || '🔥'}
@@ -141,35 +177,39 @@ export default function FlashOfferBanner() {
         <FlipDigit digit={ss[1]} prevDigit={prev.ss[1]} />
       </div>
       <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
-        <div className="w-14 h-1.5 bg-dark-900/10 rounded-full overflow-hidden flex-shrink-0">
+        <div className="w-14 h-1.5 rounded-full overflow-hidden flex-shrink-0" style={{ backgroundColor: offer.bgColor + '40' }}>
           <div
             className="h-full rounded-full transition-all duration-1000"
             style={{
               width: `${claimPct}%`,
-              backgroundColor: claimPct >= 100 ? '#EF4444' : '#48BB78',
+              backgroundColor: fullyClaimed ? '#EF4444' : '#48BB78',
             }}
           />
         </div>
         <span className="text-dark-900/70 text-xs whitespace-nowrap font-medium">
-          {offer.currentClaims}/{offer.maxClaims}
+          {fullyClaimed ? 'Fully Claimed' : `${offer.currentClaims}/${offer.maxClaims}`}
         </span>
       </div>
-      <div className="text-dark-900/70 text-xs md:text-sm mt-0.5">
-        {offer.linkUrl ? (
-          <Link href={offer.linkUrl} className="hover:underline font-medium">
-            {offer.badgeText} Offer
-          </Link>
-        ) : (
-          <span>{offer.badgeText} Offer</span>
-        )}
-      </div>
+      <button
+        onClick={handleClaim}
+        disabled={fullyClaimed || claiming}
+        className={`text-xs md:text-sm mt-0.5 font-medium transition-colors ${
+          fullyClaimed
+            ? 'text-gray-400 cursor-not-allowed'
+            : offer.textColor === '#FFFFFF' || offer.textColor === '#ffffff'
+              ? 'text-white/70 hover:text-white'
+              : 'text-dark-900/70 hover:text-dark-900'
+        }`}
+      >
+        {fullyClaimed ? 'All claimed' : claiming ? 'Claiming...' : `${offer.badgeText} Offer`}
+      </button>
 
       <style>{`
         @keyframes foPulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.15); }
         }
-        @keyframes foColonBlink {
+        @keyframes foBlink {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.2; }
         }

@@ -5,6 +5,7 @@ import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import FlashOfferBanner from '@/components/ui/FlashOfferBanner'
+import FlashOfferSplash from '@/components/ui/FlashOfferSplash'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import HomeServices from '@/components/ui/HomeServices'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
@@ -123,6 +124,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <FlashOfferSplash />
       <WelcomeBanner />
       <Header />
       <WhatsAppButton />
