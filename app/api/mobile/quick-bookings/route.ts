@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { jobId, taskerId, date, timeSlot, address, district, notes } = await request.json()
+    const { jobId, taskerId, date, timeSlot, address, district, notes, budgetMin, budgetMax } = await request.json()
 
     if (!jobId || !taskerId || !date || !timeSlot || !address || !district) {
       return NextResponse.json({ error: 'Missing required fields: jobId, taskerId, date, timeSlot, address, district' }, { status: 400 })
@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
         date: new Date(date),
         timeSlot,
         totalPrice,
+        budgetMin: budgetMin ? parseFloat(budgetMin) : null,
+        budgetMax: budgetMax ? parseFloat(budgetMax) : null,
         status: 'PENDING',
         notes: notes || null,
       },

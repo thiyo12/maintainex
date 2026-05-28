@@ -20,6 +20,7 @@ interface Booking {
   branch: { id: string; name: string; location: string } | null
   createdAt: string
   date: string | null
+  totalPrice: number
   budgetMin: number | null
   budgetMax: number | null
 }
@@ -319,6 +320,7 @@ export default function AdminBookings() {
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Customer</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">District</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Service</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Price</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Budget</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-red-900">Date</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-red-900">Actions</th>
@@ -333,6 +335,11 @@ export default function AdminBookings() {
                     </td>
                     <td className="px-4 py-3 text-gray-700">{booking.district}</td>
                     <td className="px-4 py-3 text-gray-700">{booking.service?.name}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-gray-700 text-sm">
+                        LKR {Number(booking.totalPrice).toLocaleString()}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       {booking.budgetMin && booking.budgetMax ? (
                         <span className="text-gray-700 font-medium text-sm">
@@ -406,6 +413,7 @@ export default function AdminBookings() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">District</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Branch</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Service</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Price</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Budget</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Date & Time</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Status</th>
@@ -438,6 +446,11 @@ export default function AdminBookings() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-gray-600">{booking.service?.name}</td>
+                    <td className="px-6 py-4">
+                      <span className="font-medium text-gray-700">
+                        LKR {Number(booking.totalPrice).toLocaleString()}
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       {booking.budgetMin && booking.budgetMax ? (
                         <span className="text-gray-700 font-medium">
@@ -515,7 +528,7 @@ export default function AdminBookings() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-gray-500">
                     No bookings found
                   </td>
                 </tr>
@@ -559,11 +572,15 @@ export default function AdminBookings() {
                 <div className="font-medium">{selectedBooking.service?.name}</div>
               </div>
               <div>
+                <label className="text-sm text-gray-500">Price</label>
+                <div className="font-medium">LKR {Number(selectedBooking.totalPrice).toLocaleString()}</div>
+              </div>
+              <div>
                 <label className="text-sm text-gray-500">Budget Range</label>
                 <div className="font-medium">
                   {selectedBooking.budgetMin && selectedBooking.budgetMax
                     ? `LKR ${Number(selectedBooking.budgetMin).toLocaleString()} – ${Number(selectedBooking.budgetMax).toLocaleString()}`
-                    : '—'}
+                    : 'Not set'}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
