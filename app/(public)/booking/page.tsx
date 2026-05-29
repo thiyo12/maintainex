@@ -133,8 +133,7 @@ function BookingContent() {
 
   const fetchServices = async () => {
     try {
-      const regionCookie = document.cookie.split('; ').find(r => r.startsWith('region='))?.split('=')[1] || 'LK'
-      const res = await fetch(`/api/categories?country=${regionCookie}`)
+      const res = await fetch('/api/categories')
       if (res.ok) {
         const data = await res.json()
         setCategories(data)

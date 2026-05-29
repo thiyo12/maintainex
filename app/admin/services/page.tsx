@@ -12,7 +12,6 @@ import ImageUploader from '@/components/admin/ImageUploader'
 import PriceSuggestion, { PriceSuggestionButton } from '@/components/admin/PriceSuggestion'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
-import { REGIONS } from '@/lib/regions'
 
 interface Service {
   id: string
@@ -25,7 +24,6 @@ interface Service {
   categoryId: string
   category: { name: string }
   isActive: boolean
-  countries: string[]
   views: number
   isTrending: boolean
   displayOrder: number
@@ -117,13 +115,6 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, isSu
                 Trending
               </span>
             )}
-            {service.countries?.map(c => (
-              <span key={c} className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${
-                c === 'CA' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-              }`}>
-                {c}
-              </span>
-            ))}
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
               service.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
             }`}>
@@ -193,8 +184,7 @@ export default function AdminServices() {
     price: '',
     duration: '',
     categoryId: '',
-    isActive: true,
-    countries: ['LK']
+    isActive: true
   })
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -311,8 +301,7 @@ export default function AdminServices() {
         image: formData.image || null,
         price: formData.price ? parseFloat(formData.price) : null,
         duration: formData.duration ? parseInt(formData.duration) : null,
-        isActive: formData.isActive,
-        countries: formData.countries
+        isActive: formData.isActive
       }
 
       console.log('=== Service Update Debug ===')
@@ -453,8 +442,7 @@ export default function AdminServices() {
       price: service.price?.toString() || '',
       duration: service.duration?.toString() || '',
       categoryId: service.categoryId,
-      isActive: service.isActive,
-      countries: service.countries || ['LK']
+      isActive: service.isActive
     })
     console.log('Form data set with image:', service.image || '')
     setShowModal(true)
@@ -479,8 +467,7 @@ export default function AdminServices() {
       price: '',
       duration: '',
       categoryId: '',
-      isActive: true,
-      countries: ['LK']
+      isActive: true
     })
   }
 
@@ -806,29 +793,6 @@ export default function AdminServices() {
                   value={formData.image}
                   onChange={(url) => setFormData(prev => ({ ...prev, image: url }))}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Available in</label>
-                <div className="flex flex-wrap gap-3">
-                  {Object.entries(REGIONS).map(([key, config]) => (
-                    <label key={key} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.countries.includes(key)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({ ...prev, countries: [...prev.countries, key] }))
-                          } else {
-                            setFormData(prev => ({ ...prev, countries: prev.countries.filter(c => c !== key) }))
-                          }
-                        }}
-                        className="w-4 h-4 rounded"
-                      />
-                      <span className="text-sm">{config.label} ({key})</span>
-                    </label>
-                  ))}
-                </div>
               </div>
 
               <div className="flex items-center">

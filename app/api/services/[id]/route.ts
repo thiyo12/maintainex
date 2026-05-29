@@ -94,7 +94,7 @@ export async function PATCH(
     console.log('Request body:', body)
     console.log('Image field:', body.image)
     
-    const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features, countries } = body
+    const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features } = body
 
     const service = await prisma.service.update({
       where: { id: params.id },
@@ -109,8 +109,7 @@ export async function PATCH(
         ...(isActive !== undefined && { isActive }),
         ...(isTrending !== undefined && { isTrending }),
         ...(displayOrder !== undefined && { displayOrder: parseInt(displayOrder) || 0 }),
-        ...(features !== undefined && { features }),
-        ...(countries !== undefined && { countries })
+        ...(features !== undefined && { features })
       },
       include: { category: true }
     })

@@ -10,21 +10,17 @@ function serializeService(service: any) {
     description: service.description || '',
     image: service.image || null,
     price: service.price ? Number(service.price) : null,
-    duration: service.duration ? Number(service.duration) : null,
-    countries: service.countries || []
+    duration: service.duration ? Number(service.duration) : null
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const country = searchParams.get('country') || 'LK'
-
     const categories = await prisma.category.findMany({
-      where: { isActive: true, countries: { has: country } },
+      where: { isActive: true },
       include: {
         services: {
-          where: { isActive: true, countries: { has: country } },
+          where: { isActive: true },
           orderBy: { displayOrder: 'asc' }
         },
         _count: {
@@ -42,7 +38,6 @@ export async function GET(request: NextRequest) {
       icon: cat.icon,
       image: cat.image,
       displayOrder: cat.displayOrder,
-      countries: cat.countries,
       _count: {
         services: cat._count.services
       },
@@ -69,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, slug, description, icon, image, displayOrder, countries } = body
+    const { name, slug, description, icon, image, displayOrder } = body
 
     if (!name || !slug) {
       return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 })
@@ -105,7 +100,6 @@ export async function POST(request: NextRequest) {
         icon: icon || null,
         image: image || null,
         displayOrder: order,
-        countries: countries || ['LK'],
         isActive: true
       },
       include: {
@@ -129,7 +123,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, name, slug, description, icon, image, isActive, displayOrder, countries } = body
+    const { id, name, slug, description, icon, image, isActive, displayOrder } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Category ID is required' }, { status: 400 })
@@ -144,8 +138,7 @@ export async function PUT(request: NextRequest) {
         ...(icon !== undefined && { icon }),
         ...(image !== undefined && { image }),
         ...(isActive !== undefined && { isActive }),
-        ...(displayOrder !== undefined && { displayOrder }),
-        ...(countries !== undefined && { countries })
+        ...(displayOrder !== undefined && { displayOrder })
       },
       include: {
         services: true,

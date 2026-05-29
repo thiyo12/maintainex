@@ -73,11 +73,6 @@ export default function ServiceDetailPage() {
       }
       
       const data = await res.json()
-      const country = document.cookie.split('; ').find(r => r.startsWith('region='))?.split('=')[1] || 'LK'
-      if (data.countries && !data.countries.includes(country)) {
-        setError('This service is not available in your region')
-        return
-      }
       setService(data)
       setRelatedServices(data.relatedServices || [])
     } catch (err) {

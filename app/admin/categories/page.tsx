@@ -6,7 +6,6 @@ import { FiPlus, FiEdit2, FiTrash2, FiUpload, FiX, FiCheck, FiImage, FiSave } fr
 import Image from 'next/image'
 import { getAuthHeader } from '@/lib/auth-client'
 import { getImageUrl } from '@/lib/images'
-import { REGIONS } from '@/lib/regions'
 
 interface Category {
   id: string
@@ -16,7 +15,6 @@ interface Category {
   icon: string | null
   image: string | null
   isActive: boolean
-  countries: string[]
   _count: {
     services: number
   }
@@ -36,8 +34,7 @@ export default function AdminCategories() {
     description: '',
     icon: '🧹',
     image: '',
-    isActive: true,
-    countries: ['LK']
+    isActive: true
   })
 
   useEffect(() => {
@@ -144,8 +141,7 @@ export default function AdminCategories() {
       description: category.description || '',
       icon: category.icon || '🧹',
       image: category.image || '',
-      isActive: category.isActive,
-      countries: category.countries || ['LK']
+      isActive: category.isActive
     })
     setShowModal(true)
   }
@@ -182,8 +178,7 @@ export default function AdminCategories() {
       description: '',
       icon: '🧹',
       image: '',
-      isActive: true,
-      countries: ['LK']
+      isActive: true
     })
   }
 
@@ -257,15 +252,6 @@ export default function AdminCategories() {
                   <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded">
                     {category._count.services} services
                   </span>
-                  <div className="flex items-center gap-1">
-                    {category.countries?.map(c => (
-                      <span key={c} className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        c === 'CA' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {c}
-                      </span>
-                    ))}
-                  </div>
                   <div className="flex gap-1">
                     <button 
                       onClick={() => handleEdit(category)}
@@ -405,30 +391,6 @@ export default function AdminCategories() {
                       disabled={uploading}
                     />
                   </label>
-                </div>
-              </div>
-
-              {/* Countries */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Available in</label>
-                <div className="flex flex-wrap gap-3">
-                  {Object.entries(REGIONS).map(([key, config]) => (
-                    <label key={key} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.countries.includes(key)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({ ...prev, countries: [...prev.countries, key] }))
-                          } else {
-                            setFormData(prev => ({ ...prev, countries: prev.countries.filter(c => c !== key) }))
-                          }
-                        }}
-                        className="w-4 h-4 rounded"
-                      />
-                      <span className="text-sm">{config.label} ({key})</span>
-                    </label>
-                  ))}
                 </div>
               </div>
 

@@ -64,8 +64,7 @@ function ServicesContent() {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const country = document.cookie.split('; ').find(r => r.startsWith('region='))?.split('=')[1] || 'LK'
-      const res = await fetch(`/api/categories?country=${country}`)
+      const res = await fetch('/api/categories')
       if (res.ok) {
         const data = await res.json()
         setCategories(data)

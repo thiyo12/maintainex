@@ -109,7 +109,6 @@ model Category {
   coverImage   String?
   displayOrder Int      @default(0)
   isActive     Boolean  @default(true)
-  countries    String[]
   createdAt    DateTime @default(now())
 
   services Service[]
@@ -144,7 +143,6 @@ model Service {
   views            Int      @default(0)
   isTrending       Boolean  @default(false)
   isActive         Boolean  @default(true)
-  countries        String[]
   createdAt        DateTime @default(now())
 
   bookings Booking[]

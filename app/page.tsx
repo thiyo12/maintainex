@@ -15,16 +15,15 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi'
 import { prisma } from '@/lib/prisma'
-import { cookies } from 'next/headers'
 
-async function getServicesByCategory(region = 'LK') {
+async function getServicesByCategory() {
   const categories = await prisma.category.findMany({
-    where: { isActive: true, countries: { has: region } },
+    where: { isActive: true },
     orderBy: { displayOrder: 'asc' }
   })
   
   const allServices = await prisma.service.findMany({
-    where: { isActive: true, countries: { has: region } },
+    where: { isActive: true },
     orderBy: { displayOrder: 'asc' }
   })
   
@@ -69,9 +68,9 @@ async function getServicesByCategory(region = 'LK') {
   return { categories: categoriesWithServices, services }
 }
 
-async function getTrendingServices(region = 'LK') {
+async function getTrendingServices() {
   const trending = await prisma.service.findMany({
-    where: { isActive: true, countries: { has: region } },
+    where: { isActive: true },
     orderBy: [
       { isTrending: 'desc' },
       { views: 'desc' }
@@ -93,10 +92,8 @@ async function getTrendingServices(region = 'LK') {
 }
 
 export default async function HomePage() {
-  const cookieStore = cookies()
-  const region = cookieStore.get('region')?.value || 'LK'
-  const { categories = [], services = [] } = await getServicesByCategory(region)
-  const trendingServices = await getTrendingServices(region)
+  const { categories = [], services = [] } = await getServicesByCategory()
+  const trendingServices = await getTrendingServices()
 
   const features = [
     { icon: FiCheck, title: 'Professional Team', description: 'Trained and vetted cleaning professionals' },
