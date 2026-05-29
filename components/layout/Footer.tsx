@@ -54,7 +54,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-gray-400 mb-6">
-              Shine Beyond Expectations. Professional cleaning services for homes and businesses across Sri Lanka.
+              Shine Beyond Expectations. Professional cleaning services for homes and businesses across {region.countryName}.
             </p>
             <div>
               <h4 className="text-sm font-semibold text-gray-400 mb-4">Follow Us</h4>

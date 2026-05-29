@@ -1,23 +1,31 @@
-import type { Metadata } from 'next'
-import { headers } from 'next/headers'
 import { Toaster } from 'react-hot-toast'
+import { headers } from 'next/headers'
 import { Providers } from './providers'
+import { REGIONS } from '@/lib/regions'
+import type { Metadata } from 'next'
 import './globals.css'
 
-export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
-  title: 'Maintain - Shine Beyond Expectations',
-  description: 'Professional cleaning services in Sri Lanka. Home cleaning, office cleaning, industrial cleaning, and more.',
-  keywords: 'cleaning services, Sri Lanka, home cleaning, office cleaning, deep cleaning, industrial cleaning',
-  icons: {
-    icon: '/favicon.svg',
-    shortcut: '/favicon.svg',
-  },
-  openGraph: {
-    title: 'Maintain - Professional Cleaning Services',
-    description: 'Premium cleaning services for homes and businesses in Sri Lanka',
-    type: 'website',
-  },
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const regionKey = host.includes('ca.') ? 'CA' : 'LK'
+  const c = REGIONS[regionKey].countryName
+
+  return {
+    metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
+    title: 'Maintain - Shine Beyond Expectations',
+    description: `Professional cleaning services in ${c}. Home cleaning, office cleaning, industrial cleaning, and more.`,
+    keywords: `cleaning services, ${c}, home cleaning, office cleaning, deep cleaning, industrial cleaning`,
+    icons: {
+      icon: '/favicon.svg',
+      shortcut: '/favicon.svg',
+    },
+    openGraph: {
+      title: 'Maintain - Professional Cleaning Services',
+      description: `Premium cleaning services for homes and businesses in ${c}`,
+      type: 'website',
+    },
+  }
 }
 
 export default function RootLayout({

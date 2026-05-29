@@ -1,9 +1,16 @@
+import { headers } from 'next/headers'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import IndustriesCarousel from '@/components/ui/IndustriesCarousel'
+import { REGIONS, getRegionFromHost } from '@/lib/regions'
 
 export default function AboutPage() {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const regionKey = getRegionFromHost(host)
+  const c = REGIONS[regionKey].countryName
+  const cp = REGIONS[regionKey].countryNamePossessive
   return (
     <>
       <Header />
@@ -17,7 +24,7 @@ export default function AboutPage() {
               About Maintain
             </h1>
             <p className="text-xl text-dark-900/80 max-w-3xl mx-auto">
-              Shine Beyond Expectations - Your trusted partner for professional cleaning services in Sri Lanka
+              Shine Beyond Expectations - Your trusted partner for professional cleaning services in {c}
             </p>
           </div>
         </section>
@@ -31,7 +38,7 @@ export default function AboutPage() {
                   Our Story
                 </h2>
                 <p className="text-lg text-gray-600 mb-4">
-                  Founded with a mission to revolutionize cleaning services in Sri Lanka, Maintain has grown to become the nation's leading provider of professional cleaning solutions.
+                  Founded with a mission to revolutionize cleaning services in {c}, Maintain has grown to become {cp} leading provider of professional cleaning solutions.
                 </p>
                 <p className="text-lg text-gray-600 mb-4">
                   We believe that everyone deserves a clean, healthy environment. Our team of trained professionals delivers exceptional results with attention to detail and a commitment to customer satisfaction.
@@ -193,7 +200,7 @@ export default function AboutPage() {
               Ready to Experience the Maintain Difference?
             </h2>
             <p className="text-xl text-dark-900/80 mb-8">
-              Book your first cleaning service today and see why we're Sri Lanka's #1 choice.
+              Book your first cleaning service today and see why we're {cp} #1 choice.
             </p>
             <a href="/booking" className="inline-block bg-dark-900 hover:bg-dark-800 text-white font-semibold px-8 py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
               Book Now

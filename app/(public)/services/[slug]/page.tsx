@@ -196,7 +196,7 @@ export default function ServiceDetailPage() {
     },
     areaServed: {
       '@type': 'Country',
-      name: 'Sri Lanka'
+      name: region.countryName
     },
     ...(service.price && {
       offers: {

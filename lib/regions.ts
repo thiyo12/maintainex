@@ -9,6 +9,8 @@ export interface RegionConfig {
   districts: string[]
   budgetMax: number
   budgetStep: number
+  countryName: string
+  countryNamePossessive: string
 }
 
 export const REGIONS: Record<string, RegionConfig> = {
@@ -20,6 +22,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     phoneRaw: '94770867609',
     email: 'maintainex.lk@gmail.com',
     whatsapp: '94770867609',
+    countryName: 'Sri Lanka',
+    countryNamePossessive: "Sri Lanka's",
     districts: [
       'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
       'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara',
@@ -38,6 +42,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     phoneRaw: '14164279518',
     email: 'maintainex.canada@gmail.com',
     whatsapp: '14164279518',
+    countryName: 'Canada',
+    countryNamePossessive: "Canada's",
     districts: [
       'Toronto (Downtown)', 'Scarborough', 'North York', 'Etobicoke',
       'York', 'East York', 'Mississauga', 'Brampton',

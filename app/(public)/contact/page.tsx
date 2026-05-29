@@ -259,7 +259,7 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h4 className="font-bold text-dark-900">Head Office - Jaffna</h4>
-                        <p className="text-gray-600">Jaffna, Sri Lanka</p>
+                        <p className="text-gray-600">Jaffna, {region.countryName}</p>
                         <p className="text-sm text-gray-500">Main operations center</p>
                       </div>
                     </div>
@@ -270,7 +270,7 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h4 className="font-bold text-dark-900">Colombo Branch</h4>
-                        <p className="text-gray-600">Colombo, Sri Lanka</p>
+                        <p className="text-gray-600">Colombo, {region.countryName}</p>
                         <p className="text-sm text-gray-500">Commercial services</p>
                       </div>
                     </div>
@@ -281,7 +281,7 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <h4 className="font-bold text-dark-900">Kandy Branch</h4>
-                        <p className="text-gray-600">Kandy, Sri Lanka</p>
+                        <p className="text-gray-600">Kandy, {region.countryName}</p>
                         <p className="text-sm text-gray-500">Central region services</p>
                       </div>
                     </div>
@@ -313,7 +313,7 @@ export default function ContactPage() {
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-xl p-6">
                 <h4 className="font-bold text-dark-900 mb-2">What areas do you service?</h4>
-                <p className="text-gray-600">We currently service Jaffna, Colombo, Kandy, and surrounding districts across Sri Lanka.</p>
+                <p className="text-gray-600">We currently service Jaffna, Colombo, Kandy, and surrounding districts across {region.countryName}.</p>
               </div>
               
               <div className="bg-gray-50 rounded-xl p-6">

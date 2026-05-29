@@ -83,13 +83,14 @@ function generateReasoning(
   serviceName: string,
   categorySlug: string | null,
   priceRange: PriceRange,
-  complexityMultiplier: number
+  complexityMultiplier: number,
+  countryName: string = 'Sri Lanka'
 ): string {
   const categoryName = categorySlug 
     ? categorySlug.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
     : 'general services'
 
-  let reasoning = `Based on Sri Lanka market rates for ${categoryName}. `
+  let reasoning = `Based on ${countryName} market rates for ${categoryName}. `
 
   if (complexityMultiplier > 1.2) {
     reasoning += 'This is a complex service, so the price is on the higher end. '
@@ -97,7 +98,7 @@ function generateReasoning(
     reasoning += 'This appears to be a basic/quick service. '
   }
 
-  reasoning += `Standard rates in Sri Lanka range from Rs. ${priceRange.min.toLocaleString()} to Rs. ${priceRange.max.toLocaleString()}.`
+  reasoning += `Standard rates in ${countryName} range from Rs. ${priceRange.min.toLocaleString()} to Rs. ${priceRange.max.toLocaleString()}.`
 
   return reasoning
 }

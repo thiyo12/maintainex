@@ -184,7 +184,7 @@ export default function CareersPage() {
               Join Our Team
             </h1>
             <p className="text-xl text-dark-900/80 max-w-3xl mx-auto">
-              Be part of Sri Lanka's leading cleaning service team. We offer great benefits, training, and growth opportunities.
+              Be part of {region.countryNamePossessive} leading cleaning service team. We offer great benefits, training, and growth opportunities.
             </p>
           </div>
         </section>

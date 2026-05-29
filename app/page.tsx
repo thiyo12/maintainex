@@ -1,4 +1,5 @@
 export const dynamic = "force-dynamic";
+import { headers } from 'next/headers'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
@@ -15,6 +16,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi'
 import { prisma } from '@/lib/prisma'
+import { REGIONS, getRegionFromHost } from '@/lib/regions'
 
 async function getServicesByCategory() {
   const categories = await prisma.category.findMany({
@@ -92,6 +94,11 @@ async function getTrendingServices() {
 }
 
 export default async function HomePage() {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const regionKey = getRegionFromHost(host)
+  const c = REGIONS[regionKey].countryName
+
   const { categories = [], services = [] } = await getServicesByCategory()
   const trendingServices = await getTrendingServices()
 
@@ -105,14 +112,14 @@ export default async function HomePage() {
   const testimonials = [
     {
       name: 'Sivapragasam R.',
-      role: 'Business Owner, Sri Lanka',
+      role: `Business Owner, ${c}`,
       content: 'Maintainex transformed our office space. Their team is professional, punctual, and thorough. Highly recommended!',
       rating: 5
     },
     {
       name: 'Kumari S.',
-      role: 'Homeowner, Colombo',
-      content: 'Best cleaning service in Sri Lanka! They deep cleaned my entire house before my daughters wedding. Immaculate work.',
+      role: `Homeowner, Colombo`,
+      content: `Best cleaning service in ${c}! They deep cleaned my entire house before my daughters wedding. Immaculate work.`,
       rating: 5
     },
     {
@@ -141,7 +148,7 @@ export default async function HomePage() {
               <div className="order-2 lg:order-1">
                 <div className="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-3 md:px-4 py-1.5 md:py-2 mb-4 md:mb-8">
                   <span className="text-dark-900 mr-2">✨</span>
-                  <span className="text-dark-900 font-medium text-sm md:text-base">#1 Service Experts in Sri Lanka</span>
+                  <span className="text-dark-900 font-medium text-sm md:text-base">#1 Service Experts in {c}</span>
                 </div>
                 
                 <AnimatedHero />

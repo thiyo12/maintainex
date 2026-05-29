@@ -1,6 +1,12 @@
+import { headers } from 'next/headers'
 import { FiMail, FiPhone, FiMapPin, FiTool } from 'react-icons/fi'
+import { REGIONS, getRegionFromHost } from '@/lib/regions'
 
 export default async function MaintenancePage() {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const regionKey = getRegionFromHost(host)
+  const c = REGIONS[regionKey].countryName
   return (
     <div style={{
       minHeight: '100vh',
@@ -87,7 +93,7 @@ export default async function MaintenancePage() {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#9CA3AF' }}>
               <FiMapPin style={{ width: '16px', height: '16px' }} />
-              <span>Sri Lanka</span>
+              <span>{c}</span>
             </div>
           </div>
 

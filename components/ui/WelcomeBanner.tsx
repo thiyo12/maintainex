@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRegion } from '@/lib/region-context'
 
 const WELCOME_KEY = 'maintain_welcome_shown'
 
 export default function WelcomeBanner() {
+  const region = useRegion()
   const [isVisible, setIsVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [showStep, setShowStep] = useState(1)
@@ -69,7 +71,7 @@ export default function WelcomeBanner() {
         </h2>
         
         <p className="text-3xl md:text-5xl lg:text-6xl font-bold text-dark-900 mt-2">
-          in Sri Lanka
+          in {region.countryName}
         </p>
 
         {showStep >= 2 && (
