@@ -162,6 +162,7 @@ model Branch {
   location  String?
   districts String?
   province  String?
+  region    String  @default("LK")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 

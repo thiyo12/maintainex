@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, location, phone, email, address } = body
+    const { name, location, phone, email, address, province, districts, region } = body
 
     if (!name || !location) {
       return NextResponse.json({ error: 'Name and location are required' }, { status: 400 })
@@ -61,7 +61,10 @@ export async function POST(request: NextRequest) {
         location,
         city: location.split(',')[0]?.trim() || location,
         phone: phone || null,
-        address: address || null
+        address: address || null,
+        province: province || null,
+        districts: districts || null,
+        region: region || 'LK'
       }
     })
 

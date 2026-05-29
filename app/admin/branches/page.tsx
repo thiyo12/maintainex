@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiMapPin, FiPlus, FiEdit2, FiTrash2, FiRefreshCw, FiX, FiPhone, FiMail, FiCheck, FiEye, FiAlertCircle } from 'react-icons/fi'
+import { REGIONS } from '@/lib/regions'
+import { PROVINCES } from '@/lib/provinces'
 import { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { getAuthHeader } from '@/lib/auth-client'
 
@@ -16,6 +18,8 @@ interface Branch {
   email: string | null
   address: string | null
   districts: string
+  province: string | null
+  region: string
   isActive: boolean
   createdAt: string
   _count?: {
@@ -33,6 +37,8 @@ interface BranchFormData {
   email: string
   address: string
   districts: string[]
+  province: string
+  region: string
 }
 
 export default function AdminBranches() {
@@ -48,7 +54,9 @@ export default function AdminBranches() {
     phone: '',
     email: '',
     address: '',
-    districts: []
+    districts: [],
+    province: '',
+    region: 'LK'
   })
   const [saving, setSaving] = useState(false)
 
@@ -90,11 +98,13 @@ export default function AdminBranches() {
         phone: branch.phone || '',
         email: branch.email || '',
         address: branch.address || '',
-        districts: branchDistricts
+        districts: branchDistricts,
+        province: branch.province || '',
+        region: branch.region || 'LK'
       })
     } else {
       setEditingBranch(null)
-      setFormData({ name: '', location: '', phone: '', email: '', address: '', districts: [] })
+      setFormData({ name: '', location: '', phone: '', email: '', address: '', districts: [], province: '', region: 'LK' })
     }
     setShowModal(true)
   }
@@ -103,7 +113,7 @@ export default function AdminBranches() {
     setShowModal(false)
     setEditingBranch(null)
     setError(null)
-    setFormData({ name: '', location: '', phone: '', email: '', address: '', districts: [] })
+    setFormData({ name: '', location: '', phone: '', email: '', address: '', districts: [], province: '', region: 'LK' })
   }
 
   const toggleDistrict = (district: string) => {
@@ -133,7 +143,13 @@ export default function AdminBranches() {
         method,
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
         body: JSON.stringify({
-          ...formData,
+          name: formData.name,
+          location: formData.location,
+          phone: formData.phone,
+          email: formData.email,
+          address: formData.address,
+          province: formData.province,
+          region: formData.region,
           districts: JSON.stringify(formData.districts)
         })
       })
@@ -223,7 +239,8 @@ export default function AdminBranches() {
           // Skip invalid JSON
         }
       })
-    return DISTRICTS.filter(d => !assignedDistricts.includes(d))
+    const allDistricts = formData.region === 'LK' ? DISTRICTS : REGIONS.CA.districts
+    return allDistricts.filter(d => !assignedDistricts.includes(d))
   }
 
   if (loading) {
@@ -294,6 +311,19 @@ export default function AdminBranches() {
                   </span>
                 </div>
 
+                {branch.province && (
+                  <div className="mb-2">
+                    <span className="text-xs text-gray-500">Province: </span>
+                    <span className="text-xs font-medium text-gray-700">{branch.province}</span>
+                  </div>
+                )}
+                {branch.region !== 'LK' && (
+                  <div className="mb-2">
+                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                      {REGIONS[branch.region]?.label || branch.region}
+                    </span>
+                  </div>
+                )}
                 {branchDistricts.length > 0 && (
                   <div className="mb-4">
                     <label className="text-xs text-gray-500 mb-2 block">Districts Served:</label>
@@ -468,13 +498,53 @@ export default function AdminBranches() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Region *</label>
+                <select
+                  value={formData.region}
+                  onChange={(e) => setFormData({ ...formData, region: e.target.value, province: '', districts: [] })}
+                  className="input-field"
+                >
+                  {Object.entries(REGIONS).map(([key, config]) => (
+                    <option key={key} value={key}>{config.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Region determines which district list and province options are available</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Province *</label>
+                {formData.region === 'LK' ? (
+                  <select
+                    value={formData.province}
+                    onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Select a province</option>
+                    {PROVINCES.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={formData.province}
+                    onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                    className="input-field"
+                    placeholder="e.g., Ontario"
+                    required
+                  />
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Districts Served *</label>
                 <p className="text-xs text-gray-500 mb-3">
                   Select all districts that this branch will serve. Customers from these districts will be assigned to this branch automatically.
                 </p>
                 
                 <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {DISTRICTS.map((district) => {
+                  {(formData.region === 'LK' ? DISTRICTS : REGIONS.CA.districts).map((district) => {
                     const isAssigned = branches.some(b => {
                       if (editingBranch && b.id === editingBranch.id) return false
                       try {

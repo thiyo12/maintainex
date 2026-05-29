@@ -69,7 +69,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { name, location, phone, email, address, isActive } = body
+    const { name, location, phone, email, address, isActive, province, districts, region } = body
 
     const branch = await prisma.branch.update({
       where: { id: params.id },
@@ -79,7 +79,10 @@ export async function PUT(
         ...(phone !== undefined && { phone }),
         ...(email !== undefined && { email }),
         ...(address !== undefined && { address }),
-        ...(isActive !== undefined && { isActive })
+        ...(isActive !== undefined && { isActive }),
+        ...(province !== undefined && { province }),
+        ...(districts !== undefined && { districts }),
+        ...(region !== undefined && { region })
       }
     })
 

@@ -142,17 +142,19 @@ export async function POST(request: NextRequest) {
       serviceId = generalService?.id || null
     }
 
-    // Find branch by province
+    // Find branch by province (region-aware)
     let branchId = body.branchId
     if (!branchId && province) {
       const branch = await prisma.branch.findFirst({
-        where: { province, isActive: true }
+        where: { province, region, isActive: true }
       })
       branchId = branch?.id || null
     }
-    // Fallback: if no branch found by province, use first active branch
+    // Fallback: if no branch found by province, use first active branch in same region
     if (!branchId) {
-      const anyBranch = await prisma.branch.findFirst({ where: { isActive: true } })
+      const anyBranch = await prisma.branch.findFirst({
+        where: { region, isActive: true }
+      })
       branchId = anyBranch?.id || null
     }
 
