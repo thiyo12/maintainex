@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
 
     const isSuper = session.role === 'SUPER_ADMIN'
     const userBranchId = session.branchId
+    const userRegion = session.region
 
     const searchParams = request.nextUrl.searchParams
     const period = searchParams.get('period') || 'month'
@@ -53,16 +54,18 @@ export async function GET(request: NextRequest) {
     }
 
     const [currentPeriodStats, previousPeriodStats, recentActivity, activityTotal] = await Promise.all([
-      getStatsForPeriod(start, end, branchId),
+      getStatsForPeriod(start, end, branchId, userRegion),
       getStatsForPeriod(
         new Date(start.getTime() - (end.getTime() - start.getTime())),
         new Date(start.getTime() - 1),
-        branchId
+        branchId,
+        userRegion
       ),
       getActivityLogs({
         adminId,
         entityType,
         branchId,
+        region: userRegion,
         startDate: start,
         endDate: end,
         limit,
@@ -72,6 +75,7 @@ export async function GET(request: NextRequest) {
         adminId,
         entityType,
         branchId,
+        region: userRegion,
         startDate: start,
         endDate: end,
         limit: 10000
@@ -102,18 +106,23 @@ export async function GET(request: NextRequest) {
       by: ['adminId', 'adminEmail', 'adminName'],
       where: {
         createdAt: { gte: start, lte: end },
-        ...(branchId ? { branchId } : {})
+        ...(branchId ? { branchId } : {}),
+        ...(userRegion ? {
+          branchId: {
+            in: await prisma.branch.findMany({ where: { region: userRegion }, select: { id: true } }).then(b => b.map(x => x.id))
+          }
+        } : {})
       },
       _count: true,
       orderBy: { _count: { createdAt: 'desc' } }
     })
 
     const branches = isSuper ? await prisma.branch.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...(userRegion ? { region: userRegion } : {}) },
       select: { id: true, name: true, location: true }
     }) : []
 
-    const dailyStats = await getDailyStats(start, end, branchId)
+    const dailyStats = await getDailyStats(start, end, branchId, userRegion)
 
     return NextResponse.json({
       period,
@@ -144,24 +153,35 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getDailyStats(start: Date, end: Date, branchId?: string | null) {
+async function getDailyStats(start: Date, end: Date, branchId?: string | null, region?: string | null) {
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
   
-  const whereClause = {
+  const bookingWhere: any = {
     createdAt: { gte: start, lte: end },
-    ...(branchId ? { branchId } : {})
+    ...(branchId ? { branchId } : {}),
+    ...(region ? { region } : {})
+  }
+
+  const appBranchFilter = region
+    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
+    : null
+
+  const appWhere: any = {
+    createdAt: { gte: start, lte: end },
+    ...(branchId ? { branchId } : {}),
+    ...(appBranchFilter && appBranchFilter.length > 0 ? { branchId: { in: appBranchFilter } } : {})
   }
 
   const bookings = await prisma.booking.groupBy({
     by: ['status'],
     _count: true,
-    where: whereClause
+    where: bookingWhere
   })
 
   const applications = await prisma.application.groupBy({
     by: ['status'],
     _count: true,
-    where: whereClause
+    where: appWhere
   })
 
   return {

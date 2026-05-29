@@ -12,10 +12,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
-    const isSuper = session.role === 'SUPER_ADMIN'
+    const canEdit = session.role === 'SUPER_ADMIN' || session.canEditServices
 
-    if (!isSuper) {
-      return NextResponse.json({ error: 'Only Super Admin can delete services' }, { status: 403 })
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Only Super Admin or authorized admins can delete services' }, { status: 403 })
     }
 
     const serviceId = params.id
@@ -82,11 +82,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized', reason: 'No session' }, { status: 401 })
     }
     
-    const isSuper = session.role === 'SUPER_ADMIN'
-    console.log('isSuper:', isSuper)
+    const canEdit = session.role === 'SUPER_ADMIN' || session.canEditServices
+    console.log('canEdit:', canEdit)
 
-    if (!isSuper) {
-      return NextResponse.json({ error: 'Only Super Admin can update services' }, { status: 403 })
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Only Super Admin or authorized admins can update services' }, { status: 403 })
     }
 
     const body = await request.json()

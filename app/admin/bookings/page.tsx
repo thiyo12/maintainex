@@ -6,6 +6,7 @@ import { FiEye, FiTrash2, FiCheck, FiX, FiRefreshCw, FiMapPin, FiEdit2, FiAlertC
 import DistrictSelector, { DISTRICTS } from '@/components/ui/DistrictSelector'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
+import { REGIONS } from '@/lib/regions'
 
 interface Booking {
   id: string
@@ -43,6 +44,7 @@ const statusColors: Record<string, string> = {
 
 export default function AdminBookings() {
   const { user } = useAdminSession()
+  const currencySymbol = user?.region && REGIONS[user.region] ? REGIONS[user.region].currencySymbol : 'LKR'
   const [bookings, setBookings] = useState<Booking[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -337,13 +339,13 @@ export default function AdminBookings() {
                     <td className="px-4 py-3 text-gray-700">{booking.service?.name}</td>
                     <td className="px-4 py-3">
                       <span className="font-medium text-gray-700 text-sm">
-                        LKR {Number(booking.totalPrice).toLocaleString()}
+                        {currencySymbol} {Number(booking.totalPrice).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       {booking.budgetMin && booking.budgetMax ? (
                         <span className="text-gray-700 font-medium text-sm">
-                          LKR {Number(booking.budgetMin).toLocaleString()} – {Number(booking.budgetMax).toLocaleString()}
+                          {currencySymbol} {Number(booking.budgetMin).toLocaleString()} – {Number(booking.budgetMax).toLocaleString()}
                         </span>
                       ) : (
                         <span className="text-gray-400 text-xs">—</span>
@@ -448,13 +450,13 @@ export default function AdminBookings() {
                     <td className="px-6 py-4 text-gray-600">{booking.service?.name}</td>
                     <td className="px-6 py-4">
                       <span className="font-medium text-gray-700">
-                        LKR {Number(booking.totalPrice).toLocaleString()}
+                        {currencySymbol} {Number(booking.totalPrice).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       {booking.budgetMin && booking.budgetMax ? (
                         <span className="text-gray-700 font-medium">
-                          LKR {Number(booking.budgetMin).toLocaleString()} – {Number(booking.budgetMax).toLocaleString()}
+                          {currencySymbol} {Number(booking.budgetMin).toLocaleString()} – {Number(booking.budgetMax).toLocaleString()}
                         </span>
                       ) : (
                         <span className="text-gray-400 text-sm">—</span>
@@ -573,13 +575,13 @@ export default function AdminBookings() {
               </div>
               <div>
                 <label className="text-sm text-gray-500">Price</label>
-                <div className="font-medium">LKR {Number(selectedBooking.totalPrice).toLocaleString()}</div>
+                <div className="font-medium">{currencySymbol} {Number(selectedBooking.totalPrice).toLocaleString()}</div>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Budget Range</label>
                 <div className="font-medium">
                   {selectedBooking.budgetMin && selectedBooking.budgetMax
-                    ? `LKR ${Number(selectedBooking.budgetMin).toLocaleString()} – ${Number(selectedBooking.budgetMax).toLocaleString()}`
+                    ? `${currencySymbol} ${Number(selectedBooking.budgetMin).toLocaleString()} – ${Number(selectedBooking.budgetMax).toLocaleString()}`
                     : 'Not set'}
                 </div>
               </div>

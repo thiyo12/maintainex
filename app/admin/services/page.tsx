@@ -12,6 +12,7 @@ import ImageUploader from '@/components/admin/ImageUploader'
 import PriceSuggestion, { PriceSuggestionButton } from '@/components/admin/PriceSuggestion'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
+import { REGIONS } from '@/lib/regions'
 
 interface Service {
   id: string
@@ -43,10 +44,11 @@ interface ServiceItemProps {
   onEdit: (service: Service) => void
   onDelete: (id: string) => void
   onToggleTrending: (service: Service) => void
-  isSuperAdmin: boolean
+  canEdit: boolean
+  currencySymbol: string
 }
 
-function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, isSuperAdmin }: ServiceItemProps) {
+function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, canEdit, currencySymbol }: ServiceItemProps) {
   const [imgError, setImgError] = useState(false)
   
   const {
@@ -71,7 +73,7 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, isSu
       className={`bg-white border border-gray-200 rounded-xl p-4 ${isDragging ? 'shadow-lg ring-2 ring-primary-400' : 'hover:border-gray-300'}`}
     >
       <div className="flex items-center gap-3">
-        {isSuperAdmin && (
+        {canEdit && (
           <button
             {...attributes}
             {...listeners}
@@ -123,7 +125,7 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, isSu
           </div>
           <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
             <span className="font-medium text-primary-600">
-              {service.price ? `Rs. ${service.price.toLocaleString()}` : 'Quote'}
+              {service.price ? `${currencySymbol} ${service.price.toLocaleString()}` : 'Quote'}
             </span>
             <span className="flex items-center gap-1">
               <FiEye className="w-3 h-3" />
@@ -133,7 +135,7 @@ function SortableServiceItem({ service, onEdit, onDelete, onToggleTrending, isSu
         </div>
 
         <div className="flex items-center gap-2">
-          {isSuperAdmin && (
+          {canEdit && (
             <>
               <button
                 onClick={() => onToggleTrending(service)}
@@ -201,6 +203,8 @@ export default function AdminServices() {
   )
 
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const canEdit = isSuperAdmin || !!user?.canEditServices
+  const currencySymbol = user?.region && REGIONS[user.region] ? REGIONS[user.region].currencySymbol : 'Rs.'
 
   useEffect(() => {
     fetchData()
@@ -284,7 +288,7 @@ export default function AdminServices() {
       return
     }
     
-    if (!formData.categoryId && isSuperAdmin) {
+    if (!formData.categoryId && canEdit) {
       toast.error('Please select a category')
       return
     }
@@ -309,7 +313,7 @@ export default function AdminServices() {
       console.log('bodyData.image:', bodyData.image)
       console.log('editingService.id:', editingService?.id)
 
-      if (isSuperAdmin && formData.categoryId) {
+      if (canEdit && formData.categoryId) {
         bodyData.categoryId = formData.categoryId
       }
 
@@ -427,7 +431,7 @@ export default function AdminServices() {
   }
 
   const editService = (service: Service) => {
-    if (!isSuperAdmin) {
+    if (!canEdit) {
       toast.error('You do not have permission to edit services')
       return
     }
@@ -449,7 +453,7 @@ export default function AdminServices() {
   }
 
   const openAddModal = () => {
-    if (!isSuperAdmin) {
+    if (!canEdit) {
       toast.error('You do not have permission to add services')
       return
     }
@@ -506,14 +510,14 @@ export default function AdminServices() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Services</h1>
           <p className="text-gray-600">
-            {isSuperAdmin ? 'Manage your services, drag to reorder categories' : 'View services and pricing'}
+            {canEdit ? 'Manage your services, drag to reorder categories' : 'View services and pricing'}
           </p>
         </div>
         <div className="flex gap-3">
           <button onClick={fetchData} className="btn-outline flex items-center">
             <FiRefreshCw className="mr-2" /> Refresh
           </button>
-          {isSuperAdmin && (
+          {canEdit && (
             <button onClick={openAddModal} className="btn-primary flex items-center">
               <FiPlus className="mr-2" /> Add Service
             </button>
@@ -521,7 +525,7 @@ export default function AdminServices() {
         </div>
       </div>
 
-      {!isSuperAdmin && (
+      {!canEdit && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
           <p className="text-sm text-amber-700">
             You have view-only access. Contact Super Admin to get permission for editing services.
@@ -587,7 +591,7 @@ export default function AdminServices() {
                       <p className="text-sm text-gray-500">{category.services.length} services</p>
                     </div>
                   </div>
-                  {isSuperAdmin && (
+                  {canEdit && (
                     <button
                       onClick={() => {
                         resetForm()
@@ -616,13 +620,14 @@ export default function AdminServices() {
                           onEdit={editService}
                           onDelete={handleDelete}
                           onToggleTrending={handleToggleTrending}
-                          isSuperAdmin={isSuperAdmin}
+                          canEdit={canEdit}
+                          currencySymbol={currencySymbol}
                         />
                       ))
                     ) : (
                       <div className="bg-white border border-dashed border-gray-300 rounded-xl p-8 text-center">
                         <p className="text-gray-500">No services in this category yet</p>
-                        {isSuperAdmin && (
+                        {canEdit && (
                           <button
                             onClick={() => {
                               resetForm()
@@ -644,7 +649,7 @@ export default function AdminServices() {
           ) : (
             <div className="bg-white rounded-xl p-12 text-center">
               <p className="text-gray-500 mb-4">No categories found</p>
-              {isSuperAdmin && (
+              {canEdit && (
                 <button
                   onClick={() => setShowAddCategory(true)}
                   className="btn-primary"
@@ -658,7 +663,7 @@ export default function AdminServices() {
       </DndContext>
 
       <div className="mt-6">
-        {isSuperAdmin && categories.length > 0 && (
+        {canEdit && categories.length > 0 && (
           <button onClick={openAddModal} className="btn-outline w-full py-4">
             <FiPlus className="inline mr-2" /> Add New Service (General)
           </button>
@@ -776,7 +781,7 @@ export default function AdminServices() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Price (Rs.)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Price ({currencySymbol})</label>
                 <input
                   type="number"
                   value={formData.price}

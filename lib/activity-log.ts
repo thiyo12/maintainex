@@ -66,6 +66,7 @@ export async function getActivityLogs(options?: {
   action?: string
   entityType?: string
   branchId?: string | null
+  region?: string | null
   startDate?: Date
   endDate?: Date
   limit?: number
@@ -82,6 +83,16 @@ export async function getActivityLogs(options?: {
     if (options.endDate) where.createdAt.lte = options.endDate
   }
 
+  if (options?.region) {
+    const regionBranchIds = await prisma.branch.findMany({
+      where: { region: options.region },
+      select: { id: true }
+    }).then(branches => branches.map(b => b.id))
+    if (regionBranchIds.length > 0) {
+      where.branchId = { in: regionBranchIds }
+    }
+  }
+
   const [logs, total] = await Promise.all([
     prisma.activityLog.findMany({
       where,
@@ -95,11 +106,32 @@ export async function getActivityLogs(options?: {
   return { logs, total }
 }
 
-export async function getStatsForPeriod(startDate: Date, endDate: Date, branchId?: string | null) {
-  const whereClause = {
+export async function getStatsForPeriod(startDate: Date, endDate: Date, branchId?: string | null, region?: string | null) {
+  const bookingWhere: any = {
     createdAt: { gte: startDate, lte: endDate },
-    ...(branchId && { branchId })
   }
+  if (branchId) bookingWhere.branchId = branchId
+  if (region) bookingWhere.region = region
+
+  const appBranchFilter = region
+    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
+    : null
+
+  const appWhere: any = {
+    createdAt: { gte: startDate, lte: endDate },
+  }
+  if (branchId) appWhere.branchId = branchId
+  if (appBranchFilter && appBranchFilter.length > 0) appWhere.branchId = { in: appBranchFilter }
+
+  const activityBranchFilter = region
+    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
+    : null
+
+  const activityWhere: any = {
+    createdAt: { gte: startDate, lte: endDate },
+  }
+  if (branchId) activityWhere.branchId = branchId
+  if (activityBranchFilter && activityBranchFilter.length > 0) activityWhere.branchId = { in: activityBranchFilter }
 
   const [
     bookingStats,
@@ -109,20 +141,17 @@ export async function getStatsForPeriod(startDate: Date, endDate: Date, branchId
     prisma.booking.groupBy({
       by: ['status'],
       _count: true,
-      where: whereClause
+      where: bookingWhere
     }),
     prisma.application.groupBy({
       by: ['status'],
       _count: true,
-      where: whereClause
+      where: appWhere
     }),
     prisma.activityLog.groupBy({
       by: ['action'],
       _count: true,
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-        ...(branchId ? { branchId } : {})
-      }
+      where: activityWhere
     })
   ])
 

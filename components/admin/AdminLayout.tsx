@@ -168,7 +168,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
           <div className="pt-4 border-t border-white/10 space-y-2">
             {/* View Website */}
             <Link 
-              href="/" 
+              href={user?.region === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'} 
+              target="_blank"
               className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
               onClick={() => setSidebarOpen(false)}
             >

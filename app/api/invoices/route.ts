@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
     const isSuper = session.role === 'SUPER_ADMIN'
     const userBranchId = session.branchId
+    const userRegion = session.region
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -26,8 +27,18 @@ export async function GET(request: NextRequest) {
 
     const where: any = { isDeleted: false }
 
-    if (!isSuper && userBranchId) {
-      where.branchId = userBranchId
+    if (!isSuper) {
+      if (userBranchId) {
+        where.branchId = userBranchId
+      } else if (userRegion) {
+        const regionBranchIds = await prisma.branch.findMany({
+          where: { region: userRegion },
+          select: { id: true }
+        }).then(branches => branches.map(b => b.id))
+        if (regionBranchIds.length > 0) {
+          where.branchId = { in: regionBranchIds }
+        }
+      }
     }
 
     if (status) where.status = status

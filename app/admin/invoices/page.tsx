@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { FiPlus, FiDownload, FiTrash2, FiEdit2, FiEye, FiX, FiCheck } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import { getAuthHeader } from '@/lib/auth-client'
+import { REGIONS } from '@/lib/regions'
 
 interface InvoiceItem {
   id?: string
@@ -54,6 +55,7 @@ const paymentStatusColors: Record<string, string> = {
 
 export default function AdminInvoices() {
   const { user } = useAdminSession()
+  const currencySymbol = user?.region && REGIONS[user.region] ? REGIONS[user.region].currencySymbol : 'LKR'
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -359,7 +361,7 @@ export default function AdminInvoices() {
                       <div className="text-sm text-gray-500">{invoice.customerPhone}</div>
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      LKR {invoice.total.toLocaleString()}
+                      {currencySymbol} {invoice.total.toLocaleString()}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[invoice.status] || 'bg-gray-100'}`}>
@@ -502,7 +504,7 @@ export default function AdminInvoices() {
                       className="w-24 px-2 py-2 border rounded-lg text-sm"
                     />
                     <div className="w-24 px-2 py-2 text-sm font-medium">
-                      LKR {item.totalPrice.toLocaleString()}
+                      {currencySymbol} {item.totalPrice.toLocaleString()}
                     </div>
                     <button type="button" onClick={() => removeItem(index)} className="p-2 text-red-600">
                       <FiX className="w-4 h-4" />
@@ -528,7 +530,7 @@ export default function AdminInvoices() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Total</label>
                   <div className="w-full px-3 py-2 bg-gray-100 rounded-lg font-bold">
-                    LKR {formData.total.toLocaleString()}
+                    {currencySymbol} {formData.total.toLocaleString()}
                   </div>
                 </div>
                 <div>

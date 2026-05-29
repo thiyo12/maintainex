@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FiArrowLeft, FiEdit2, FiTrash2, FiMessageCircle, FiCalendar } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { REGIONS } from '@/lib/regions'
 import { 
   CustomerProfile, 
   ActivityTimeline, 
@@ -73,6 +74,7 @@ export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAdminSession()
+  const currencySymbol = user?.region && REGIONS[user.region] ? REGIONS[user.region].currencySymbol : 'LKR'
   const customerId = params.id as string
 
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
@@ -316,7 +318,7 @@ export default function CustomerDetailPage() {
                         </div>
                         <div className="text-right">
                           <div className="font-medium text-gray-900">
-                            {new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(booking.totalPrice)}
+                            {new Intl.NumberFormat('en-' + (user?.region || 'LK'), { style: 'currency', currency: user?.region || 'LKR' }).format(booking.totalPrice)}
                           </div>
                           <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
                             booking.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
