@@ -207,14 +207,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     <div className="text-xs text-gray-500">Available</div>
                   </div>
                   <div className="h-8 w-px bg-gray-200" />
-                  <div>
-                    <div className="text-lg font-bold text-gray-900">
-                      Starting at
-                    </div>
-                    <div className="text-sm font-bold text-primary-600">
-                      Rs. {Math.min(...featuredServices.filter(s => s.price).map(s => s.price!)).toLocaleString()}
-                    </div>
-                  </div>
+
                 </div>
 
                 <div className="flex flex-wrap gap-3">

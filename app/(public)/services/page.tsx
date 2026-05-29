@@ -182,9 +182,7 @@ function ServicesContent() {
                           <p className="text-gray-600 text-sm mb-2 line-clamp-2">
                             {service.description || 'Professional service'}
                           </p>
-                          <p className="text-lg font-bold text-primary-600 mb-3">
-                            {service.price ? `Rs. ${service.price.toLocaleString()}` : 'Contact us'}
-                          </p>
+
                           <button 
                             onClick={() => {
                               localStorage.setItem('selectedService', JSON.stringify({
