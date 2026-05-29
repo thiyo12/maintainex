@@ -6,8 +6,10 @@ function serializeService(service: any) {
   return {
     ...service,
     price: service.price ? Number(service.price) : null,
+    countries: service.countries || [],
   }
 }
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +17,7 @@ export async function GET(request: NextRequest) {
     const categorySlug = searchParams.get('category')
     const includeReviews = searchParams.get('reviews') === 'true'
     const includeAll = searchParams.get('all') === 'true'
+    const country = searchParams.get('country')
 
     // Test simple query first
     const testCount = await prisma.service.count()
@@ -25,6 +28,9 @@ export async function GET(request: NextRequest) {
     const where: any = includeAll ? {} : { isActive: true }
     if (categorySlug) {
       where.category = { slug: categorySlug }
+    }
+    if (country) {
+      where.countries = { has: country }
     }
 
     const services = await prisma.service.findMany({
@@ -121,6 +127,7 @@ export async function POST(request: NextRequest) {
           categoryId: body.categoryId,
           displayOrder: body.displayOrder ? parseInt(body.displayOrder) : 0,
           features: body.features || [],
+          countries: body.countries || ['LK'],
           isActive: body.isActive ?? true
         },
         include: { category: true }

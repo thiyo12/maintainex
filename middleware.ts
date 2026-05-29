@@ -218,6 +218,10 @@ export async function middleware(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
              request.headers.get('x-real-ip') || 
              'unknown'
+
+  // Set region cookie from host for multi-region support
+  const host = request.headers.get('host') || ''
+  const region = host.startsWith('ca.') || host.includes('.ca.') ? 'CA' : 'LK'
   
   const rateLimitType = pathname.startsWith('/api/auth') ? 'auth' : 'admin'
   const rateLimit = await checkRateLimit(ip, 'IP', rateLimitType)
@@ -301,18 +305,21 @@ export async function middleware(request: NextRequest) {
     !pathname.includes('admin')
   ) {
     response = NextResponse.next()
+    response.cookies.set('region', region, { path: '/', maxAge: 2592000, sameSite: 'lax' })
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   // Allow public access to vacancies API for careers page
   if (pathname.startsWith('/api/vacancies')) {
     response = NextResponse.next()
+    response.cookies.set('region', region, { path: '/', maxAge: 2592000, sameSite: 'lax' })
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   // Allow all mobile API paths (they handle auth via Bearer token)
   if (pathname.startsWith('/api/mobile/')) {
     response = NextResponse.next()
+    response.cookies.set('region', region, { path: '/', maxAge: 2592000, sameSite: 'lax' })
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
@@ -381,6 +388,7 @@ export async function middleware(request: NextRequest) {
   }
 
   response = NextResponse.next()
+  response.cookies.set('region', region, { path: '/', maxAge: 2592000, sameSite: 'lax' })
   return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
 }
 
