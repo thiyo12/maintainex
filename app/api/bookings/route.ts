@@ -150,6 +150,11 @@ export async function POST(request: NextRequest) {
       })
       branchId = branch?.id || null
     }
+    // Fallback: if no branch found by province, use first active branch
+    if (!branchId) {
+      const anyBranch = await prisma.branch.findFirst({ where: { isActive: true } })
+      branchId = anyBranch?.id || null
+    }
 
     let user = await prisma.user.findUnique({ where: { email } })
     
