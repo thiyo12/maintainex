@@ -513,10 +513,10 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
-                      placeholder="0712345678"
+                      placeholder={region.phoneExample}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Enter 9-10 digits (mobile) or more (with country code)</p>
+                  <p className="text-xs text-gray-500 mt-1">{region.phoneHint}</p>
                 </div>
 
                 <div>

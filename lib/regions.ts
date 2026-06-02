@@ -11,6 +11,8 @@ export interface RegionConfig {
   budgetStep: number
   countryName: string
   countryNamePossessive: string
+  phoneExample: string
+  phoneHint: string
 }
 
 export const REGIONS: Record<string, RegionConfig> = {
@@ -33,6 +35,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     ],
     budgetMax: 100000,
     budgetStep: 500,
+    phoneExample: '0712345678',
+    phoneHint: 'Enter 9-10 digits (mobile) or more (with country code)',
   },
   CA: {
     label: 'Canada',
@@ -53,6 +57,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     ],
     budgetMax: 5000,
     budgetStep: 50,
+    phoneExample: '+1 416 555 0123',
+    phoneHint: 'Enter 10 digits (mobile) or more (with country code)',
   },
 }
 
