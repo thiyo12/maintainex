@@ -5,13 +5,7 @@ import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import ServiceDetailClient from './ServiceDetailClient'
 
-export async function generateStaticParams() {
-  const services = await prisma.service.findMany({
-    where: { isActive: true, slug: { not: null } },
-    select: { slug: true }
-  })
-  return services.filter(s => s.slug).map(s => ({ slug: s.slug! }))
-}
+export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const headersList = headers()
