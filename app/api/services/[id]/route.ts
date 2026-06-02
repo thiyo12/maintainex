@@ -44,8 +44,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const service = await prisma.service.findUnique({
-      where: { id: params.id },
+    const service = await prisma.service.findFirst({
+      where: {
+        OR: [
+          { id: params.id },
+          { slug: params.id },
+        ]
+      },
       include: { category: true }
     })
 
@@ -54,13 +59,26 @@ export async function GET(
     }
 
     await prisma.service.update({
-      where: { id: params.id },
+      where: { id: service.id },
       data: { views: { increment: 1 } }
+    })
+
+    // Fetch related services
+    const relatedServices = await prisma.service.findMany({
+      where: {
+        categoryId: service.categoryId,
+        id: { not: service.id },
+        isActive: true,
+      },
+      take: 4,
+      orderBy: { views: 'desc' },
+      include: { category: { select: { name: true } } }
     })
 
     return NextResponse.json({
       ...service,
       price: service.price ? Number(service.price) : null,
+      relatedServices,
     })
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch service' }, { status: 500 })

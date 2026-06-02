@@ -1,9 +1,21 @@
+import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import IndustriesCarousel from '@/components/ui/IndustriesCarousel'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const c = REGIONS[getRegionFromHost(host)].countryName
+  return {
+    title: 'About',
+    description: `Learn about Maintainex ${c} - ${c}'s trusted cleaning and home maintenance company. Our story, mission, and team.`,
+    openGraph: { title: `About Maintainex ${c}`, description: `${c}'s trusted cleaning company.` },
+  }
+}
 
 export default function AboutPage() {
   const headersList = headers()

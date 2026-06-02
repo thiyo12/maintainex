@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
+import type { Metadata } from 'next'
 import { headers } from 'next/headers'
+import { REGIONS, getRegionFromHost } from '@/lib/regions'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
@@ -13,10 +15,23 @@ import HomeServices from '@/components/ui/HomeServices'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
 import TrendingServices from '@/components/ui/TrendingServices'
 import Link from 'next/link'
+
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const c = REGIONS[host.includes('ca.') ? 'CA' : 'LK'].countryName
+  return {
+    title: `Professional Cleaning & Home Services in ${c} | Maintainex ${c}`,
+    description: `${c}'s #1 professional cleaning and home maintenance services. Book online for home cleaning, office cleaning, deep cleaning and more. Free quote!`,
+    openGraph: {
+      title: `Maintainex ${c} - Professional Cleaning & Home Services`,
+      description: `Book ${c}'s top cleaning services online. Free quotes, trusted professionals.`,
+    },
+  }
+}
 import Image from 'next/image'
 import { FiCheck, FiClock, FiShield, FiStar, FiArrowRight } from 'react-icons/fi'
 import { prisma } from '@/lib/prisma'
-import { REGIONS, getRegionFromHost } from '@/lib/regions'
 
 async function getServicesByCategory() {
   const categories = await prisma.category.findMany({
