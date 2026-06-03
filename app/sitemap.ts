@@ -6,14 +6,19 @@ import type { MetadataRoute } from 'next'
 export const dynamic = 'force-dynamic'
 
 const STATIC_PATHS = ['/', '/services', '/about', '/contact', '/booking', '/careers']
-const FALLBACK_SLUGS = ['cleaning', 'plumbing', 'electrical', 'painting', 'roofing', 'hvac', 'appliance-repair', 'carpentry', 'landscaping', 'pest-control', 'moving', 'handyman', 'deep-cleaning', 'carpet-cleaning', 'window-cleaning', 'office-cleaning', 'disinfection', 'construction']
+
+const ALL_SERVICE_SLUGS = [
+  'cleaning', 'plumbing', 'electrical', 'painting', 'roofing', 'hvac',
+  'appliance-repair', 'carpentry', 'landscaping', 'pest-control', 'moving',
+  'handyman', 'deep-cleaning', 'carpet-cleaning', 'window-cleaning',
+  'office-cleaning', 'disinfection', 'construction',
+]
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const headersList = headers()
   const host = headersList.get('host') || ''
   const region = getRegionFromHost(host)
-  const isCA = region === 'CA'
-  const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
+  const baseUrl = region === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
   const entries: MetadataRoute.Sitemap = STATIC_PATHS.map(path => ({
     url: `${baseUrl}${path}`,
@@ -22,23 +27,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === '/' ? 1.0 : 0.8,
   }))
 
-  let slugs: string[] = FALLBACK_SLUGS
-
-  try {
-    const { prisma } = await import('@/lib/prisma')
-    const services = await prisma.service.findMany({
-      where: { isActive: true, slug: { not: null } },
-      select: { slug: true },
-    })
-    const dbSlugs = services.map(s => s.slug).filter(Boolean) as string[]
-    if (dbSlugs.length > 0) slugs = dbSlugs
-  } catch (e) {
-    // DB unavailable — use fallback slugs
-  }
-
   const districts = REGIONS[region]?.districts || []
 
-  for (const slug of slugs) {
+  for (const slug of ALL_SERVICE_SLUGS) {
     entries.push({
       url: `${baseUrl}/services/${slug}`,
       lastModified: new Date(),
