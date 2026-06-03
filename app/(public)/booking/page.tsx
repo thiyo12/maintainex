@@ -129,6 +129,10 @@ function BookingContent() {
         setStep(1)
       }
     }
+    const district = searchParams.get('district')
+    if (district) {
+      setFormData(prev => ({ ...prev, district }))
+    }
   }, [searchParams])
 
   const fetchServices = async () => {

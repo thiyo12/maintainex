@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
-import { FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone } from 'react-icons/fi'
+import { FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone, FiMapPin } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 import { useRegion } from '@/lib/region-context'
 
@@ -49,10 +49,14 @@ export default function ServiceDetailClient({
   service,
   relatedServices,
   region: _region,
+  city,
+  citySlug,
 }: {
   service: ServiceData | null
   relatedServices: RelatedService[]
   region: string
+  city?: string
+  citySlug?: string
 }) {
   const router = useRouter()
   const region = useRegion()
@@ -119,7 +123,8 @@ export default function ServiceDetailClient({
               <span className="text-gray-400">/</span>
               <Link href="/services" className="text-gray-500 hover:text-primary-600 transition-colors">Services</Link>
               <span className="text-gray-400">/</span>
-              <span className="text-gray-900 font-medium truncate">{service.name}</span>
+              <Link href={`/services/${service.slug}`} className="text-gray-500 hover:text-primary-600 transition-colors truncate">{service.name}</Link>
+              {city && (<><span className="text-gray-400">/</span><span className="text-gray-900 font-medium truncate">{city}</span></>)}
             </nav>
           </div>
         </div>
@@ -141,7 +146,7 @@ export default function ServiceDetailClient({
                     {service.category.name}
                   </Link>
                 )}
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">{service.name}</h1>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">{service.name}{city ? <span className="block text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-primary-300 mt-2">in {city}</span> : ''}</h1>
                 <div className="flex flex-wrap items-center gap-4 text-white/90">
                   {service.reviews && service.reviews.length > 0 && (
                     <span className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
@@ -165,11 +170,16 @@ export default function ServiceDetailClient({
                 
                 {/* Description */}
                 <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                  <h2 className="text-2xl font-bold text-dark-900 mb-4">About This Service</h2>
+                  <h2 className="text-2xl font-bold text-dark-900 mb-4">About This Service{city ? ` in ${city}` : ''}</h2>
                   <div className="prose prose-gray max-w-none">
                     <p className="text-gray-600 text-lg leading-relaxed whitespace-pre-line">
-                      {service.description || 'Professional cleaning service tailored to your needs. Our experienced team ensures a thorough and efficient clean every time.'}
+                      {service.description || `Professional ${service.name.toLowerCase()} service tailored to your needs. Our experienced team ensures a thorough and efficient clean every time.`}
                     </p>
+                    {city && (
+                      <p className="text-gray-600 text-lg leading-relaxed mt-4">
+                        We proudly serve {city} and surrounding areas with reliable, professional {service.name.toLowerCase()} services. Our local team is ready to help you.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -191,6 +201,31 @@ export default function ServiceDetailClient({
                     ))}
                   </div>
                 </div>
+
+                {/* Available Cities */}
+                {!city && (
+                  <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+                    <h2 className="text-2xl font-bold text-dark-900 mb-4">Available in</h2>
+                    <p className="text-gray-600 mb-4">
+                      We serve the following areas in {region.countryName}. Select your city to book {service.name.toLowerCase()} locally.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {region.districts.map(d => {
+                        const slug = d.toLowerCase().replace(/[()]/g, '').replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '')
+                        return (
+                          <Link
+                            key={d}
+                            href={`/services/${service.slug}/${slug}`}
+                            className="inline-flex items-center gap-1.5 bg-gray-50 hover:bg-primary-50 border border-gray-200 hover:border-primary-300 text-gray-700 hover:text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                          >
+                            <FiMapPin className="w-3.5 h-3.5" />
+                            {d}
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Reviews */}
                 {service.reviews && service.reviews.length > 0 && (
@@ -232,6 +267,12 @@ export default function ServiceDetailClient({
               {/* Right Column - Booking Card */}
               <div className="lg:col-span-1">
                 <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 sticky top-28">
+                  {city && (
+                    <div className="flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 mb-6">
+                      <FiMapPin className="w-5 h-5 text-primary-600 flex-shrink-0" />
+                      <span className="text-primary-800 font-medium">Serving <strong>{city}</strong></span>
+                    </div>
+                  )}
                   <h3 className="text-2xl font-bold text-dark-900 mb-6">Book This Service</h3>
                   
                   <button
@@ -239,11 +280,12 @@ export default function ServiceDetailClient({
                       localStorage.setItem('selectedService', JSON.stringify({
                         id: service.id, name: service.name, price: service.price, category: service.category?.name
                       }))
-                      router.push(`/booking?serviceId=${service.id}&category=${service.category?.slug}`)
+                      const districtParam = city ? `&district=${encodeURIComponent(city)}` : ''
+                      router.push(`/booking?serviceId=${service.id}&category=${service.category?.slug}${districtParam}`)
                     }}
                     className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-center text-lg mb-4"
                   >
-                    Book Now
+                    {city ? `Book ${service.name} in ${city}` : 'Book Now'}
                   </button>
 
                   <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer"
@@ -287,7 +329,7 @@ export default function ServiceDetailClient({
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h2 className="text-2xl sm:text-3xl font-bold text-dark-900">Related Services</h2>
-                  <p className="text-gray-600 mt-2">More services in {service.category?.name}</p>
+                  <p className="text-gray-600 mt-2">More services in {service.category?.name}{city ? ` in ${city}` : ''}</p>
                 </div>
                 <Link href="/services" className="hidden sm:flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-700 transition-colors">
                   View All <FiArrowRight className="w-5 h-5" />
@@ -295,7 +337,7 @@ export default function ServiceDetailClient({
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                 {relatedServices.map((related) => (
-                  <Link key={related.id} href={`/services/${related.slug || related.id}`}
+                  <Link key={related.id} href={`/services/${related.slug || related.id}${citySlug ? `/${citySlug}` : ''}`}
                     className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
                   >
                     <div className="relative h-40 overflow-hidden bg-gray-200">
@@ -334,10 +376,10 @@ export default function ServiceDetailClient({
               Book now and let our professional team handle the cleaning. Easy scheduling, instant confirmation.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href={`/booking?serviceId=${service.id}&category=${service.category?.slug}`}
+              <Link href={`/booking?serviceId=${service.id}&category=${service.category?.slug}${city ? `&district=${encodeURIComponent(city)}` : ''}`}
                 className="bg-dark-900 hover:bg-dark-800 text-white font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-lg"
               >
-                Book Now
+                {city ? `Book ${service.name} in ${city}` : 'Book Now'}
               </Link>
               <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer"
                 className="bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-lg inline-flex items-center justify-center gap-2"
