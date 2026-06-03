@@ -1,4 +1,3 @@
-import { prisma } from '@/lib/prisma'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
 import { slugifyCity } from '@/lib/cities'
 import { headers } from 'next/headers'
@@ -7,6 +6,7 @@ import type { MetadataRoute } from 'next'
 export const dynamic = 'force-dynamic'
 
 const STATIC_PATHS = ['/', '/services', '/about', '/contact', '/booking', '/careers']
+const FALLBACK_SLUGS = ['cleaning', 'plumbing', 'electrical', 'painting', 'roofing', 'hvac', 'appliance-repair', 'carpentry', 'landscaping', 'pest-control', 'moving', 'handyman', 'deep-cleaning', 'carpet-cleaning', 'window-cleaning', 'office-cleaning', 'disinfection', 'construction']
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const headersList = headers()
@@ -22,27 +22,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === '/' ? 1.0 : 0.8,
   }))
 
-  const services = await prisma.service.findMany({
-    where: { isActive: true },
-    select: { slug: true, createdAt: true },
-  })
+  let slugs: string[] = FALLBACK_SLUGS
 
-  for (const service of services) {
-    if (!service.slug) continue
+  try {
+    const { prisma } = await import('@/lib/prisma')
+    const services = await prisma.service.findMany({
+      where: { isActive: true, slug: { not: null } },
+      select: { slug: true },
+    })
+    const dbSlugs = services.map(s => s.slug).filter(Boolean) as string[]
+    if (dbSlugs.length > 0) slugs = dbSlugs
+  } catch (e) {
+    // DB unavailable — use fallback slugs
+  }
 
+  const districts = REGIONS[region]?.districts || []
+
+  for (const slug of slugs) {
     entries.push({
-      url: `${baseUrl}/services/${service.slug}`,
-      lastModified: service.createdAt,
+      url: `${baseUrl}/services/${slug}`,
+      lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     })
 
-    const districts = REGIONS[region]?.districts || []
     for (const district of districts) {
       const citySlug = slugifyCity(district)
       entries.push({
-        url: `${baseUrl}/services/${service.slug}/${citySlug}`,
-        lastModified: service.createdAt,
+        url: `${baseUrl}/services/${slug}/${citySlug}`,
+        lastModified: new Date(),
         changeFrequency: 'weekly' as const,
         priority: 0.6,
       })
