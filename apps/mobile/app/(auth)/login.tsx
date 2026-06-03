@@ -3,9 +3,11 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { colors } from '../../lib/colors'
+import { fonts } from '../../lib/fonts'
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -44,7 +46,8 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Ionicons name="arrow-back" size={22} color={colors.amber} />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
         <Text style={styles.title}>Welcome back</Text>
@@ -59,6 +62,7 @@ export default function LoginScreen() {
             placeholder="your@email.com"
             keyboardType="email-address"
             autoCapitalize="none"
+            placeholderTextColor={colors.muted}
           />
 
           <Text style={styles.label}>Password</Text>
@@ -68,6 +72,7 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             placeholder="Enter your password"
             secureTextEntry
+            placeholderTextColor={colors.muted}
           />
 
           <TouchableOpacity
@@ -83,7 +88,7 @@ export default function LoginScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color={colors.dark} />
+              <ActivityIndicator color={colors.ink} />
             ) : (
               <Text style={styles.buttonText}>Sign In</Text>
             )}
@@ -101,34 +106,35 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.cream },
   scrollContent: { padding: 32, paddingTop: 60 },
   backButton: { marginBottom: 32 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
-  title: { fontSize: 32, fontWeight: '800', color: colors.dark, marginBottom: 8 },
-  subtitle: { fontSize: 16, color: colors.gray, marginBottom: 40 },
+  backText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.amber },
+  title: { fontSize: 32, fontFamily: fonts.heading, color: colors.ink, marginBottom: 8 },
+  subtitle: { fontSize: 16, fontFamily: fonts.body, color: colors.muted, marginBottom: 40 },
   form: { gap: 4 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 6, marginTop: 12 },
+  label: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6, marginTop: 12 },
   input: {
     backgroundColor: colors.white,
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: colors.dark,
+    fontFamily: fonts.body,
+    color: colors.ink,
   },
   forgotPassword: { alignSelf: 'flex-end', marginTop: 12, marginBottom: 24 },
-  forgotText: { color: colors.primary, fontSize: 14, fontWeight: '500' },
+  forgotText: { color: colors.amber, fontSize: 14, fontFamily: fonts.bodyMedium },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.amber,
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
     marginTop: 8,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 18, fontWeight: '700', color: colors.dark },
-  footerText: { textAlign: 'center', marginTop: 40, fontSize: 14, color: colors.gray },
-  footerLink: { color: colors.primary, fontWeight: '600' },
+  buttonText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
+  footerText: { textAlign: 'center', marginTop: 40, fontSize: 14, fontFamily: fonts.body, color: colors.muted },
+  footerLink: { fontFamily: fonts.headingBold, color: colors.amber },
 })

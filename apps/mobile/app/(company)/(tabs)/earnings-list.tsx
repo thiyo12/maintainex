@@ -39,7 +39,7 @@ export default function CompanyEarnings() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.companyAccent} />
         </View>
       </SafeAreaView>
     )
@@ -100,14 +100,14 @@ export default function CompanyEarnings() {
             return (
               <View key={p.id || i} style={styles.payoutCard}>
                 <View style={styles.payoutLeft}>
-                  <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.green : colors.companyAccent }]} />
+                  <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.success : colors.companyAccent }]} />
                   <View style={styles.payoutInfo}>
                     <Text style={styles.payoutContract} numberOfLines={1}>{p.contract || p.title}</Text>
                     <Text style={styles.payoutDate}>{p.date || (p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '')}</Text>
                   </View>
                 </View>
                 <View style={styles.payoutRight}>
-                  <Text style={[styles.payoutAmount, { color: isPaid ? colors.green : colors.companyAccent }]}>
+                  <Text style={[styles.payoutAmount, { color: isPaid ? colors.success : colors.companyAccent }]}>
                     LKR {Number(p.amount).toLocaleString()}
                   </Text>
                   <Text style={styles.payoutStatus}>{status}</Text>
@@ -122,9 +122,9 @@ export default function CompanyEarnings() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   revenueCard: {
     backgroundColor: colors.companyAccent,
     marginHorizontal: 24,
@@ -156,22 +156,22 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  statLabel: { fontSize: 11, color: colors.gray, marginBottom: 4 },
-  statValue: { fontSize: 13, fontWeight: '800', color: colors.dark },
+  statLabel: { fontSize: 11, color: colors.muted, marginBottom: 4 },
+  statValue: { fontSize: 13, fontWeight: '800', color: colors.ink },
   periodTabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.border,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
   },
   periodTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   periodTabActive: { backgroundColor: colors.white },
-  periodTabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
+  periodTabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
   periodTabTextActive: { color: colors.companyAccent, fontWeight: '700' },
   payoutTitle: {
-    fontSize: 16, fontWeight: '700', color: colors.dark,
+    fontSize: 16, fontWeight: '700', color: colors.ink,
     paddingHorizontal: 24, marginBottom: 10,
   },
   payoutCard: {
@@ -192,10 +192,10 @@ const styles = StyleSheet.create({
   payoutLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   payoutDot: { width: 8, height: 8, borderRadius: 4 },
   payoutInfo: { flex: 1 },
-  payoutContract: { fontSize: 13, fontWeight: '600', color: colors.dark },
-  payoutDate: { fontSize: 11, color: colors.gray, marginTop: 2 },
+  payoutContract: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  payoutDate: { fontSize: 11, color: colors.muted, marginTop: 2 },
   payoutRight: { alignItems: 'flex-end' },
   payoutAmount: { fontSize: 14, fontWeight: '700' },
-  payoutStatus: { fontSize: 11, color: colors.gray, marginTop: 2 },
-  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 20, fontSize: 14 },
+  payoutStatus: { fontSize: 11, color: colors.muted, marginTop: 2 },
+  emptyText: { textAlign: 'center', color: colors.muted, marginTop: 20, fontSize: 14 },
 })

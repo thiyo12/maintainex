@@ -3,6 +3,7 @@ import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../lib/colors'
+import { fonts } from '../../../lib/fonts'
 
 const tabs = [
   { name: 'index', title: 'Dashboard', icon: 'grid-outline' as const },
@@ -22,9 +23,9 @@ export default function CompanyTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.white,
+          backgroundColor: colors.cream,
           borderTopWidth: 1,
-          borderTopColor: colors.lightGray,
+          borderTopColor: colors.border,
           height: 56 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 6,
@@ -33,9 +34,9 @@ export default function CompanyTabs() {
             default: { elevation: 8 },
           }),
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.gray,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarActiveTintColor: colors.companyAccent,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: { fontSize: 10, fontFamily: fonts.bodyMedium, color: colors.ink },
         tabBarShowLabel: true,
       }}
     >
@@ -46,7 +47,7 @@ export default function CompanyTabs() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <Ionicons name={tab.icon} size={20} color={focused ? colors.primary : colors.gray} />
+              <Ionicons name={tab.icon} size={20} color={focused ? colors.companyAccent : colors.muted} />
             ),
           }}
         />

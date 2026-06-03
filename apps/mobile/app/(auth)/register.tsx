@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { colors } from '../../lib/colors'
+import { fonts } from '../../lib/fonts'
 
 export default function RegisterScreen() {
   const router = useRouter()
@@ -23,6 +24,8 @@ export default function RegisterScreen() {
 
   const role = paramRole || 'CUSTOMER'
   const allFilled = name && phone && email && password && confirmPassword && agreeTerms
+
+  const roleLabel = role === 'TASKER' ? 'Join as a tasker' : role === 'COMPANY' ? 'Register your company' : 'Join as a customer'
 
   const handleNext = async () => {
     if (!name || !phone || !email || !password || !confirmPassword) {
@@ -70,13 +73,12 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Ionicons name="arrow-back" size={22} color={colors.amber} />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
 
         <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>
-          {role === 'TASKER' ? 'Join as a tasker' : role === 'COMPANY' ? 'Register your company' : 'Join as a customer'}
-        </Text>
+        <Text style={styles.subtitle}>{roleLabel}</Text>
 
         <View style={styles.form}>
           <Text style={styles.label}>Full Name</Text>
@@ -85,6 +87,7 @@ export default function RegisterScreen() {
             value={name}
             onChangeText={setName}
             placeholder="Your full name"
+            placeholderTextColor={colors.muted}
           />
 
           <Text style={styles.label}>Phone Number</Text>
@@ -94,6 +97,7 @@ export default function RegisterScreen() {
             onChangeText={setPhone}
             placeholder="0712345678"
             keyboardType="phone-pad"
+            placeholderTextColor={colors.muted}
           />
 
           <Text style={styles.label}>Email Address</Text>
@@ -104,6 +108,7 @@ export default function RegisterScreen() {
             placeholder="your@email.com"
             keyboardType="email-address"
             autoCapitalize="none"
+            placeholderTextColor={colors.muted}
           />
 
           <Text style={styles.label}>Password</Text>
@@ -113,6 +118,7 @@ export default function RegisterScreen() {
             onChangeText={setPassword}
             placeholder="Create a password"
             secureTextEntry
+            placeholderTextColor={colors.muted}
           />
 
           <Text style={styles.label}>Confirm Password</Text>
@@ -122,6 +128,7 @@ export default function RegisterScreen() {
             onChangeText={setConfirmPassword}
             placeholder="Confirm your password"
             secureTextEntry
+            placeholderTextColor={colors.muted}
           />
 
           <TouchableOpacity
@@ -156,59 +163,44 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.cream },
   scrollContent: { padding: 32, paddingTop: 60 },
   backButton: { marginBottom: 24 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
-  title: { fontSize: 32, fontWeight: '800', color: colors.dark, marginBottom: 8 },
-  subtitle: { fontSize: 16, color: colors.gray, marginBottom: 32 },
-  form: { gap: 4 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 6, marginTop: 12 },
+  backText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.amber },
+  title: { fontSize: 32, fontFamily: fonts.heading, color: colors.ink, marginBottom: 8 },
+  subtitle: { fontSize: 16, fontFamily: fonts.body, color: colors.muted, marginBottom: 24 },
+  form: { gap: 2 },
+  label: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6, marginTop: 12 },
   input: {
     backgroundColor: colors.white,
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
+    borderColor: colors.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: colors.dark,
+    fontFamily: fonts.body,
+    color: colors.ink,
   },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-    gap: 12,
-  },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 10 },
   checkbox: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: colors.lightGray,
+    borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  checkboxLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.dark,
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
+  checkboxActive: { backgroundColor: colors.amber, borderColor: colors.amber },
+  checkboxLabel: { flex: 1, fontSize: 13, fontFamily: fonts.body, color: colors.muted, lineHeight: 18 },
+  termsLink: { fontFamily: fonts.headingBold, color: colors.amber },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.amber,
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 24,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 18, fontWeight: '700', color: colors.white },
+  buttonText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
 })

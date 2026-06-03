@@ -75,13 +75,13 @@ export default function CompanyContracts() {
               <Text style={styles.contractClient}>{c.clientName} • #{c.id}</Text>
               <View style={styles.progressRow}>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? colors.green : colors.companyAccent }]} />
+                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? colors.success : colors.companyAccent }]} />
                 </View>
                 <Text style={styles.progressText}>{c.progress}%</Text>
               </View>
               <View style={styles.cardBottom}>
                 <View style={[styles.contractStatus, { backgroundColor: c.status === 'Completed' || c.status === 'completed' ? '#D1FAE5' : '#FFF7ED' }]}>
-                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? colors.green : colors.companyAccent }]}>
+                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? colors.success : colors.companyAccent }]}>
                     {c.status}
                   </Text>
                 </View>
@@ -96,20 +96,20 @@ export default function CompanyContracts() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.border,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
   },
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
-  tabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
+  tabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
   tabTextActive: { color: colors.companyAccent, fontWeight: '700' },
   contractCard: {
     backgroundColor: colors.white,
@@ -124,22 +124,22 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  contractTitle: { fontSize: 15, fontWeight: '700', color: colors.dark, flex: 1, marginRight: 8 },
+  contractTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1, marginRight: 8 },
   contractValue: { fontSize: 15, fontWeight: '700', color: colors.companyAccent },
-  contractClient: { fontSize: 13, color: colors.gray, marginBottom: 10 },
+  contractClient: { fontSize: 13, color: colors.muted, marginBottom: 10 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   progressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.border,
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 4 },
-  progressText: { fontSize: 12, fontWeight: '600', color: colors.dark, width: 36 },
+  progressText: { fontSize: 12, fontWeight: '600', color: colors.ink, width: 36 },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   contractStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   contractStatusText: { fontSize: 12, fontWeight: '600' },
   viewDetails: { fontSize: 13, color: colors.companyAccent, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 40, fontSize: 14 },
+  emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
 })

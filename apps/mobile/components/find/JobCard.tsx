@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import PressScale from './PressScale'
+import { colors } from '../../lib/colors'
 
 interface Props {
   name: string
@@ -16,7 +17,7 @@ interface Props {
 export default function JobCard({ name, description, priceMin, priceMax, typicalDurationMinutes, isPopular, colorHex, onPress }: Props) {
   return (
     <PressScale onPress={onPress}>
-      <View style={[styles.card, isPopular && { borderColor: colors.primary, borderWidth: 1 }]}>
+      <View style={[styles.card, isPopular && { borderColor: colors.amber, borderWidth: 1 }]}>
         {isPopular && (
           <View style={styles.badge}>
             <Ionicons name="flame" size={10} color="#fff" />
@@ -43,11 +44,9 @@ export default function JobCard({ name, description, priceMin, priceMax, typical
   )
 }
 
-import { colors } from '../../lib/colors'
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -60,7 +59,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F59E0B',
+    backgroundColor: colors.amber,
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -68,12 +67,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 4,
   },
-  badgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  badgeText: { fontSize: 10, fontWeight: '700', color: colors.white },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  name: { fontSize: 15, fontWeight: '600', color: '#1F2937', flex: 1, marginRight: 8 },
-  price: { fontSize: 13, fontWeight: '600', color: '#059669' },
-  desc: { fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 18 },
+  name: { fontSize: 15, fontWeight: '600', color: colors.ink, flex: 1, marginRight: 8 },
+  price: { fontSize: 13, fontWeight: '600', color: colors.success },
+  desc: { fontSize: 13, color: colors.muted, marginTop: 4, lineHeight: 18 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaText: { fontSize: 12, color: '#9CA3AF' },
+  metaText: { fontSize: 12, color: colors.muted },
 })

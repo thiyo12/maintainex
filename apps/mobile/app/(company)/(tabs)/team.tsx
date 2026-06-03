@@ -35,7 +35,7 @@ export default function CompanyTeam() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.companyAccent} />
         </View>
       </SafeAreaView>
     )
@@ -91,7 +91,7 @@ export default function CompanyTeam() {
                 </View>
               </View>
               <View style={[styles.statusBadge, { backgroundColor: m.online ? '#D1FAE5' : '#FEE2E2' }]}>
-                <Text style={[styles.statusText, { color: m.online ? colors.green : '#EF4444' }]}>
+                <Text style={[styles.statusText, { color: m.online ? colors.success : '#EF4444' }]}>
                   {m.online ? 'Online' : 'Offline'}
                 </Text>
               </View>
@@ -104,7 +104,7 @@ export default function CompanyTeam() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   addBtn: {
     backgroundColor: colors.companyAccent,
     paddingHorizontal: 16,
@@ -136,9 +136,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   summaryStat: { alignItems: 'center' },
-  summaryValue: { fontSize: 20, fontWeight: '800', color: colors.dark },
-  summaryLabel: { fontSize: 11, color: colors.gray, marginTop: 2 },
-  summaryDivider: { width: 1, backgroundColor: colors.lightGray },
+  summaryValue: { fontSize: 20, fontWeight: '800', color: colors.ink },
+  summaryLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
+  summaryDivider: { width: 1, backgroundColor: colors.border },
   memberCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -167,13 +167,13 @@ const styles = StyleSheet.create({
   onlineDot: {
     position: 'absolute', bottom: 0, right: 0,
     width: 14, height: 14, borderRadius: 7,
-    backgroundColor: colors.green, borderWidth: 2, borderColor: colors.white,
+    backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white,
   },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  memberRole: { fontSize: 13, color: colors.gray, marginTop: 2 },
-  memberMeta: { fontSize: 11, color: colors.gray, marginTop: 2 },
+  memberName: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  memberRole: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  memberMeta: { fontSize: 11, color: colors.muted, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 11, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 40, fontSize: 14 },
+  emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
 })

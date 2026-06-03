@@ -1,13 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  green: '#10B981',
-  red: '#EF4444',
-  white: '#FFFFFF',
-}
+import { colors } from '../../lib/colors'
+import { fonts } from '../../lib/fonts'
 
 interface Props {
   current: number
@@ -57,23 +50,23 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dotDone: { backgroundColor: colors.green },
-  dotCurrent: { backgroundColor: colors.primary },
-  dotText: { fontSize: 12, fontWeight: '700', color: colors.gray },
+  dotDone: { backgroundColor: colors.success },
+  dotCurrent: { backgroundColor: colors.amber },
+  dotText: { fontSize: 12, fontFamily: fonts.headingBold, color: colors.muted },
   dotTextActive: { color: colors.white },
   line: {
     width: 40,
     height: 3,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
     marginHorizontal: 4,
     borderRadius: 2,
   },
-  lineDone: { backgroundColor: colors.green },
+  lineDone: { backgroundColor: colors.success },
   labelRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
-  label: { fontSize: 11, color: colors.gray, fontWeight: '500' },
-  labelActive: { color: colors.primary, fontWeight: '700' },
+  label: { fontSize: 11, fontFamily: fonts.body, color: colors.muted },
+  labelActive: { color: colors.amber, fontFamily: fonts.headingBold },
 })

@@ -1,37 +1,40 @@
 export const colors = {
-  // Brand palette (V2+)
+  // Brand palette (exact spec values)
+  primary: '#F59E0B',       // Amber — buttons, CTAs, active states
+  primaryDark: '#D97706',   // Amber Dark — pressed states, prices
+  primaryLight: '#FDE68A',  // Amber Light — highlights, fills
+  ink: '#0F0A00',           // Near-black — primary text, dark headers
+  cream: '#FFFBF0',         // Warm white — main background
+  muted: '#8B7355',         // Warm brown — secondary text, captions
+  white: '#FFFFFF',         // Cards, inputs
+  surface: '#FFF8E6',       // Slightly amber-tinted surface
+  border: 'rgba(245,158,11,0.18)', // Amber-tinted borders
+  success: '#10B981',       // Green — online, confirmed, completed
+  info: '#3B82F6',          // Blue — customer accent
+  company: '#8B5CF6',       // Purple — company accent
+  error: '#DC2626',
+
+  // Legacy aliases (existing non-V2 screens still compile)
   amber: '#F59E0B',
   amberDark: '#D97706',
   amberLight: '#FDE68A',
   amberBg: '#FEF3CD',
-  ink: '#0F0A00',
-  cream: '#FFFBF0',
   creamDarker: '#F5EDD6',
-  muted: '#8B7355',
-
-  // Legacy (keep for existing screens)
-  primary: '#FFC300',
-  primaryDark: '#D97706',
-  primaryLight: '#FEF3C7',
-  dark: '#1F2937',
-  darkMid: '#374151',
-  darkLight: '#4B5563',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-
-  white: '#FFFFFF',
-  error: '#DC2626',
-  success: '#059669',
+  dark: '#0F0A00',
+  darkMid: '#0F0A00',
+  darkLight: '#8B7355',
+  gray: '#8B7355',
+  lightGray: 'rgba(245,158,11,0.18)',
+  background: '#FFFBF0',
+  green: '#10B981',
+  teal: '#10B981',
   warning: '#F59E0B',
-  teal: '#0D9488',
-  green: '#059669',
   red: '#DC2626',
 
-  border: '#E8DDCC',
-  customerAccent: '#7C3AED',
-  taskerAccent: '#0D9488',
-  companyAccent: '#F97316',
+  // Role accents — aligned with spec: customer=blue, tasker=amber, company=purple
+  customerAccent: '#3B82F6',
+  taskerAccent: '#F59E0B',
+  companyAccent: '#8B5CF6',
 }
 
 export type ColorKey = keyof typeof colors

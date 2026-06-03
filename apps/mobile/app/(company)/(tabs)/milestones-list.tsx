@@ -32,7 +32,7 @@ export default function CompanyMilestones() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       </SafeAreaView>
     )
@@ -67,9 +67,9 @@ export default function CompanyMilestones() {
               <View style={styles.cardLeft}>
                 <View style={[styles.statusDot, {
                   backgroundColor: m.status === 'Approved' || m.status === 'approved'
-                    ? colors.green
+                    ? colors.success
                     : m.status === 'Pending' || m.status === 'pending'
-                    ? colors.primary
+                    ? colors.amber
                     : colors.companyAccent,
                 }]} />
                 <View style={styles.cardContent}>
@@ -90,9 +90,9 @@ export default function CompanyMilestones() {
               }]}>
                 <Text style={[styles.statusText, {
                   color: m.status === 'Approved' || m.status === 'approved'
-                    ? colors.green
+                    ? colors.success
                     : m.status === 'Pending' || m.status === 'pending'
-                    ? colors.primary
+                    ? colors.amber
                     : colors.companyAccent,
                 }]}>
                   {m.status}
@@ -107,20 +107,20 @@ export default function CompanyMilestones() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.border,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
   },
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
-  tabText: { fontSize: 12, fontWeight: '600', color: colors.gray },
+  tabText: { fontSize: 12, fontWeight: '600', color: colors.muted },
   tabTextActive: { color: colors.companyAccent, fontWeight: '700' },
   milestoneCard: {
     flexDirection: 'row',
@@ -140,12 +140,12 @@ const styles = StyleSheet.create({
   cardLeft: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, gap: 12 },
   statusDot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
   cardContent: { flex: 1 },
-  milestoneTitle: { fontSize: 14, fontWeight: '700', color: colors.dark, marginBottom: 2 },
-  milestoneContract: { fontSize: 12, color: colors.gray, marginBottom: 6 },
+  milestoneTitle: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 2 },
+  milestoneContract: { fontSize: 12, color: colors.muted, marginBottom: 6 },
   milestoneBottom: { flexDirection: 'row', gap: 12 },
-  milestoneAmount: { fontSize: 13, fontWeight: '700', color: colors.dark },
-  milestoneDate: { fontSize: 12, color: colors.gray },
+  milestoneAmount: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  milestoneDate: { fontSize: 12, color: colors.muted },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginLeft: 8 },
   statusText: { fontSize: 11, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.gray, marginTop: 40, fontSize: 14 },
+  emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
 })

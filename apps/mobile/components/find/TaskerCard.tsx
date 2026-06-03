@@ -25,7 +25,7 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
           <View style={styles.info}>
             <View style={styles.nameRow}>
               <Text style={styles.name}>{name}</Text>
-              {isVerified && <Ionicons name="checkmark-circle" size={16} color={colors.primary} />}
+              {isVerified && <Ionicons name="checkmark-circle" size={16} color={colors.amber} />}
             </View>
             <View style={styles.stats}>
               <View style={styles.stat}>

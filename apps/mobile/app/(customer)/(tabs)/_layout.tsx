@@ -6,7 +6,7 @@ import { colors } from '../../../lib/colors'
 
 const tabs = [
   { name: 'index', title: 'Home', icon: 'home-outline' as const },
-  { name: 'explore', title: 'Explore', icon: 'compass-outline' as const },
+  { name: 'explore', title: 'Browse', icon: 'compass-outline' as const },
   { name: 'inbox', title: 'Chat', icon: 'chatbubble-ellipses-outline' as const },
   { name: 'settings', title: 'Profile', icon: 'person-outline' as const },
 ]
@@ -20,9 +20,9 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.white,
+          backgroundColor: colors.cream,
           borderTopWidth: 1,
-          borderTopColor: colors.lightGray,
+          borderTopColor: colors.border,
           height: 56 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 6,
@@ -31,9 +31,9 @@ export default function TabsLayout() {
             default: { elevation: 8 },
           }),
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.gray,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveTintColor: colors.amber,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'DMSans_500Medium' },
         tabBarShowLabel: true,
       }}
     >
@@ -44,7 +44,7 @@ export default function TabsLayout() {
           options={{
             title: tab.title,
             tabBarIcon: ({ focused }) => (
-              <Ionicons name={tab.icon} size={22} color={focused ? colors.primary : colors.gray} />
+              <Ionicons name={tab.icon} size={22} color={focused ? colors.amber : colors.muted} />
             ),
           }}
         />

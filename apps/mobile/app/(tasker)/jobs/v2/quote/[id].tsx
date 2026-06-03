@@ -68,7 +68,7 @@ export default function V2SubmitQuoteScreen() {
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Job Preview */}
         <View style={styles.jobPreview}>
-          <View style={styles.previewBadge}>Open</View>
+          <View style={styles.previewBadge}><Text style={styles.previewBadgeText}>Open</Text></View>
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
@@ -152,7 +152,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
 
   jobPreview: { backgroundColor: colors.amberBg, marginHorizontal: 20, marginTop: 20, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.amberLight },
-  previewBadge: { alignSelf: 'flex-start', backgroundColor: colors.amber, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, fontSize: 11, fontWeight: '700', color: colors.ink, marginBottom: 10, overflow: 'hidden' },
+  previewBadge: { alignSelf: 'flex-start', backgroundColor: colors.amber, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginBottom: 10 },
+  previewBadgeText: { fontSize: 11, fontWeight: '700', color: colors.ink },
   previewTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 6 },
   previewDesc: { fontSize: 13, color: colors.ink, opacity: 0.7, lineHeight: 20, marginBottom: 12 },
   previewMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

@@ -1,15 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  white: '#FFFFFF',
-  green: '#10B981',
-  red: '#EF4444',
-  purple: '#7C3AED',
-}
+import { colors } from '../../lib/colors'
 
 interface Props {
   title: string
@@ -26,7 +16,7 @@ interface Props {
 const statusColors: Record<string, string> = {
   OPEN: colors.green,
   ASSIGNED: colors.primary,
-  IN_PROGRESS: colors.purple,
+  IN_PROGRESS: colors.company,
   COMPLETED: colors.gray,
   CANCELLED: colors.red,
 }
@@ -56,7 +46,7 @@ export default function JobCard({ title, category, budget, location, distance, u
           ) : null}
         </View>
         {location ? (
-          <Text style={styles.location}>📍 {location}{distance ? ` • ${distance}` : ''}</Text>
+          <Text style={styles.location}> {location}{distance ? ` • ${distance}` : ''}</Text>
         ) : null}
         {onApply ? (
           <TouchableOpacity style={styles.applyButton} onPress={onApply}>

@@ -48,17 +48,17 @@ export default function ExploreScreen() {
       </View>
 
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={colors.gray} style={{ marginRight: 10 }} />
+        <Ionicons name="search" size={18} color={colors.muted} style={{ marginRight: 10 }} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search taskers or skills..."
-          placeholderTextColor={colors.gray}
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
         />
         {search ? (
           <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={colors.gray} />
+            <Ionicons name="close-circle" size={18} color={colors.muted} />
           </TouchableOpacity>
         ) : null}
       </View>
@@ -81,10 +81,10 @@ export default function ExploreScreen() {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.customerAccent} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchTaskers} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchTaskers} tintColor={colors.customerAccent} />}
         >
           <View style={styles.mapPlaceholder}>
             <Ionicons name="map" size={36} color="rgba(255,255,255,0.9)" />
@@ -134,23 +134,23 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
-  count: { fontSize: 14, color: colors.gray, fontWeight: '500' },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  count: { fontSize: 14, color: colors.muted, fontWeight: '500' },
   searchBar: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
     marginHorizontal: 24, paddingHorizontal: 16, borderRadius: 14,
-    height: 48, borderWidth: 1.5, borderColor: colors.lightGray, marginBottom: 12,
+    height: 48, borderWidth: 1.5, borderColor: colors.border, marginBottom: 12,
   },
-  searchInput: { flex: 1, fontSize: 15, color: colors.dark },
+  searchInput: { flex: 1, fontSize: 15, color: colors.ink },
   filterRow: { paddingLeft: 24, marginBottom: 14, maxHeight: 40 },
   filterPill: {
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.lightGray, marginRight: 8,
+    backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border, marginRight: 8,
   },
   filterPillActive: { backgroundColor: colors.customerAccent, borderColor: colors.customerAccent },
-  filterPillText: { fontSize: 13, fontWeight: '600', color: colors.dark },
+  filterPillText: { fontSize: 13, fontWeight: '600', color: colors.ink },
   filterPillTextActive: { color: colors.white },
   mapPlaceholder: {
     backgroundColor: colors.customerAccent, marginHorizontal: 24, borderRadius: 20,
@@ -172,14 +172,14 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
   onlineDot: {
     position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7,
-    backgroundColor: colors.green, borderWidth: 2, borderColor: colors.white,
+    backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white,
   },
   taskerInfo: { flex: 1 },
-  taskerName: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  taskerSkill: { fontSize: 13, color: colors.gray, marginTop: 2 },
-  taskerRating: { fontSize: 13, color: colors.dark },
+  taskerName: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  taskerSkill: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  taskerRating: { fontSize: 13, color: colors.ink },
   taskerRight: { alignItems: 'flex-end', gap: 8 },
-  taskerPrice: { fontSize: 14, fontWeight: '800', color: colors.primary },
+  taskerPrice: { fontSize: 14, fontWeight: '800', color: colors.primaryDark },
   hireBtn: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.customerAccent,
     paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8,

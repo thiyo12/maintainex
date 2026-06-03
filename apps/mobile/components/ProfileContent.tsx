@@ -20,7 +20,7 @@ function MenuRow({ icon, label, onPress, color }: any) {
           <Ionicons name={icon} size={20} color={color || colors.customerAccent} />
         </View>
         <Text style={styles.menuLabel}>{label}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.gray} />
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </Animated.View>
     </TouchableOpacity>
   )
@@ -88,16 +88,16 @@ export default function ProfileContent() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 24 },
   avatar: {
     width: 72, height: 72, borderRadius: 36, backgroundColor: colors.customerAccent,
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
   avatarText: { fontSize: 28, fontWeight: '700', color: colors.white },
-  name: { fontSize: 22, fontWeight: '800', color: colors.dark, marginBottom: 4 },
-  email: { fontSize: 14, color: colors.gray, marginBottom: 2 },
-  phone: { fontSize: 14, color: colors.gray, marginBottom: 14 },
+  name: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 4 },
+  email: { fontSize: 14, color: colors.muted, marginBottom: 2 },
+  phone: { fontSize: 14, color: colors.muted, marginBottom: 14 },
   editProfileBtn: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: colors.customerAccent,
@@ -115,12 +115,12 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 10,
     justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.dark, flex: 1 },
+  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.ink, flex: 1 },
   logoutBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginHorizontal: 24, backgroundColor: colors.white, padding: 16,
     borderRadius: 12, borderWidth: 1.5, borderColor: colors.red, marginBottom: 12,
   },
   logoutBtnText: { fontSize: 16, fontWeight: '700', color: colors.red },
-  version: { textAlign: 'center', fontSize: 12, color: colors.gray, marginBottom: 32 },
+  version: { textAlign: 'center', fontSize: 12, color: colors.muted, marginBottom: 32 },
 })

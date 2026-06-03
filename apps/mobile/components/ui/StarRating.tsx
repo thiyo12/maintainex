@@ -1,12 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  white: '#FFFFFF',
-}
+import { colors } from '../../lib/colors'
 
 interface Props {
   stars: number
@@ -65,6 +59,6 @@ const styles = StyleSheet.create({
   container: { flexDirection: 'row', gap: 4 },
   starWrap: { padding: 2 },
   starFilled: { opacity: 1 },
-  star: { color: colors.gray },
-  starActive: { color: '#F59E0B' },
+  star: { color: colors.muted },
+  starActive: { color: colors.amber },
 })

@@ -53,11 +53,11 @@ export default function CustomerInbox() {
       </View>
 
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={colors.gray} style={{ marginRight: 10 }} />
+        <Ionicons name="search" size={18} color={colors.muted} style={{ marginRight: 10 }} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search messages"
-          placeholderTextColor={colors.gray}
+          placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
         />
@@ -71,7 +71,7 @@ export default function CustomerInbox() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={colors.customerAccent} />}
           renderItem={({ item }) => (
             <PressScale onPress={() => router.push(`/(chat)/${item.id}`)}>
               <View style={styles.conversationCard}>
@@ -114,9 +114,9 @@ export default function CustomerInbox() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -126,10 +126,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     height: 48,
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
+    borderColor: colors.border,
     marginBottom: 12,
   },
-  searchInput: { flex: 1, fontSize: 15, color: colors.dark },
+  searchInput: { flex: 1, fontSize: 15, color: colors.ink },
   conversationCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -156,11 +156,11 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
   content: { flex: 1 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  name: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  time: { fontSize: 11, color: colors.gray },
+  name: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  time: { fontSize: 11, color: colors.muted },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  lastMsg: { fontSize: 13, color: colors.gray, flex: 1, marginRight: 8 },
-  lastMsgUnread: { fontWeight: '600', color: colors.dark },
+  lastMsg: { fontSize: 13, color: colors.muted, flex: 1, marginRight: 8 },
+  lastMsgUnread: { fontWeight: '600', color: colors.ink },
   unreadBadge: {
     backgroundColor: colors.warning,
     minWidth: 20, height: 20, borderRadius: 10,
@@ -169,5 +169,5 @@ const styles = StyleSheet.create({
   unreadText: { fontSize: 11, fontWeight: '700', color: colors.white },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.dark },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.ink },
 })

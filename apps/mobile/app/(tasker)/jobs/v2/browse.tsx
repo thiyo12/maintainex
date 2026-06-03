@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/colors'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 
@@ -41,7 +42,7 @@ export default function V2BrowseJobsScreen() {
         <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>🔍</Text>
+          <Ionicons name="search-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>No open jobs</Text>
           <Text style={styles.emptySub}>Check back later for new job postings</Text>
         </View>
@@ -89,7 +90,6 @@ const styles = StyleSheet.create({
   headerBadgeText: { fontSize: 14, fontWeight: '700', color: colors.ink },
 
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
   emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22 },
 

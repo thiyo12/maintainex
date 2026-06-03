@@ -1,10 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { View, StyleSheet, Animated } from 'react-native'
-
-const colors = {
-  green: '#10B981',
-  primary: '#F59E0B',
-}
+import { Ionicons } from '@expo/vector-icons'
+import { colors } from '../../lib/colors'
 
 interface Props {
   type?: 'checkmark' | 'clock' | 'cross'
@@ -31,7 +28,7 @@ export default function SuccessAnimation({ type = 'checkmark', size = 80 }: Prop
     ]).start()
   }, [])
 
-  const bgColor = type === 'checkmark' ? colors.green : type === 'cross' ? '#EF4444' : colors.primary
+  const bgColor = type === 'checkmark' ? colors.success : type === 'cross' ? colors.error : colors.amber
 
   return (
     <Animated.View
@@ -47,9 +44,11 @@ export default function SuccessAnimation({ type = 'checkmark', size = 80 }: Prop
         },
       ]}
     >
-      <Animated.Text style={[styles.icon, { fontSize: size * 0.5 }]}>
-        {type === 'checkmark' ? '✓' : type === 'cross' ? '✕' : '🕐'}
-      </Animated.Text>
+      <Ionicons
+        name={type === 'checkmark' ? 'checkmark' : type === 'cross' ? 'close' : 'time'}
+        size={size * 0.5}
+        color={colors.white}
+      />
     </Animated.View>
   )
 }

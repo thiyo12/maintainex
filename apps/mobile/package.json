@@ -11,6 +11,8 @@
     "build:ios": "eas build --platform ios"
   },
   "dependencies": {
+    "@expo-google-fonts/dm-sans": "^0.4.2",
+    "@expo-google-fonts/syne": "^0.4.2",
     "@gorhom/bottom-sheet": "^4.6.3",
     "@react-native-community/slider": "4.5.2",
     "@react-navigation/bottom-tabs": "^6.5.20",
@@ -18,6 +20,7 @@
     "@react-navigation/native-stack": "^6.9.26",
     "expo": "~51.0.0",
     "expo-constants": "~16.0.1",
+    "expo-font": "~12.0.10",
     "expo-image-picker": "~15.1.0",
     "expo-linking": "~6.3.1",
     "expo-location": "~17.0.1",

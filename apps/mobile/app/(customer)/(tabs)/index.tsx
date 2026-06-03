@@ -1,307 +1,303 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, RefreshControl, Dimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
-import { categories, taskers } from '../../../lib/api'
+import { v2Jobs } from '../../../lib/api-v2'
 import { colors } from '../../../lib/colors'
-import type { Category, TaskerProfile } from '../../../lib/types'
-import PressScale from '../../../components/find/PressScale'
+import { fonts } from '../../../lib/fonts'
+import Badge from '../../../components/ui/Badge'
+import Card from '../../../components/ui/Card'
 
-const catIcons: Record<string, keyof typeof Ionicons.glyphMap> = {
-  construction: 'construct-outline', cleaning: 'sparkles-outline', electrical: 'flash-outline',
-  plumbing: 'water-outline', painting: 'color-palette-outline', moving: 'cube-outline',
-  gardening: 'leaf-outline', handyman: 'build-outline', assembly: 'settings-outline',
-  mounting: 'easel-outline', outdoor: 'sunny-outline', repairs: 'hammer-outline',
-  trending: 'trending-up-outline',
+const { width } = Dimensions.get('window')
+
+const categories = [
+  { id: '1', icon: '🔧', name: 'Plumbing' },
+  { id: '2', icon: '⚡', name: 'Electric' },
+  { id: '3', icon: '🏠', name: 'Cleaning' },
+  { id: '4', icon: '🎨', name: 'Painting' },
+  { id: '5', icon: '🌿', name: 'Garden' },
+  { id: '6', icon: '❄️', name: 'AC' },
+  { id: '7', icon: '📦', name: 'Moving' },
+]
+
+const statusBadgeVariant = (status: string) => {
+  const map: Record<string, 'open' | 'pending' | 'inProgress' | 'completed' | 'cancelled'> = {
+    OPEN: 'open',
+    QUOTE_ACCEPTED: 'pending',
+    IN_PROGRESS: 'inProgress',
+    COMPLETED: 'completed',
+    CANCELLED: 'cancelled',
+  }
+  return map[status] || 'muted'
 }
 
 export default function CustomerHome() {
   const router = useRouter()
   const { user } = useAuth()
   const fadeAnim = useRef(new Animated.Value(0)).current
-  const [catList, setCatList] = useState<Category[]>([])
-  const [taskerList, setTaskerList] = useState<TaskerProfile[]>([])
+  const [myJobs, setMyJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [search, setSearch] = useState('')
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start()
-    loadData()
+    loadJobs()
   }, [])
 
-  const loadData = async () => {
+  const loadJobs = async () => {
     try {
-      const [catsResult, tksResult] = await Promise.allSettled([categories.list(), taskers.list()])
-      if (catsResult.status === 'fulfilled') setCatList(catsResult.value)
-      else console.error('Categories error:', catsResult.reason)
-      if (tksResult.status === 'fulfilled') setTaskerList(tksResult.value)
-      else console.error('Taskers error:', tksResult.reason)
+      const res = await v2Jobs.list()
+      setMyJobs((res.jobs || []).slice(0, 5))
     } catch (e) {
-      console.error('Home load error:', e)
+      console.error('Load jobs error:', e)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    loadData()
-  }, [])
-
-  const filteredTaskers = taskerList.filter(t =>
-    t.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
-    (t.skills || []).some(s => s.toLowerCase().includes(search.toLowerCase()))
-  )
+  const getGreeting = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good morning'
+    if (h < 17) return 'Good afternoon'
+    return 'Good evening'
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <View style={styles.topBar}>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.greeting}>Hello, {user?.name || 'User'}</Text>
-              <Ionicons name="hand-left-outline" size={22} color={colors.primary} style={{ marginLeft: 6 }} />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <Ionicons name="location-outline" size={14} color={colors.gray} />
-              <Text style={styles.location}> Sri Lanka</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(customer)/settings')}>
-            <Text style={styles.avatarText}>{(user?.name || 'U')[0]}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.gray} style={{ marginRight: 10 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for a service or tasker..."
-            placeholderTextColor={colors.gray}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={colors.gray} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <PressScale onPress={() => router.push('/(customer)/find')}>
-          <View style={styles.findCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <View style={styles.findIconWrap}>
-                <Ionicons name="search-circle" size={32} color={colors.dark} />
-              </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={styles.findTitle}>Find a Tasker</Text>
-                <Text style={styles.findSub}>Browse 19 categories of services near you</Text>
-              </View>
-            </View>
-            <Ionicons name="arrow-forward" size={20} color={colors.dark} />
-          </View>
-        </PressScale>
-
-        <PressScale onPress={() => router.push('/(customer)/jobs/v2')}>
-          <View style={[styles.findCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <View style={[styles.findIconWrap, { backgroundColor: colors.amberLight }]}>
-                <Ionicons name="briefcase-outline" size={28} color={colors.amberDark} />
-              </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={[styles.findTitle, { color: colors.ink }]}>My Marketplace Jobs</Text>
-                <Text style={[styles.findSub, { color: colors.amberDark }]}>Post, track, and manage jobs</Text>
-              </View>
-            </View>
-            <Ionicons name="arrow-forward" size={20} color={colors.amber} />
-          </View>
-        </PressScale>
-
-        <PressScale onPress={() => router.push('/(customer)/wallet')}>
-          <View style={[styles.findCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <View style={[styles.findIconWrap, { backgroundColor: colors.amberLight }]}>
-                <Ionicons name="wallet-outline" size={28} color={colors.amberDark} />
-              </View>
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={[styles.findTitle, { color: colors.ink }]}>Wallet</Text>
-                <Text style={[styles.findSub, { color: colors.amberDark }]}>Manage balance and transactions</Text>
-              </View>
-            </View>
-            <Ionicons name="arrow-forward" size={20} color={colors.dark} />
-          </View>
-        </PressScale>
-
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
-        ) : (
-          <ScrollView showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-          >
-            <Text style={styles.sectionTitle}>Categories</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoriesRow}>
-              {catList.map((cat) => (
-                <PressScale key={cat.id} onPress={() => router.push(`/(customer)/(tabs)/explore`)}>
-                  <View style={styles.categoryCard}>
-                    <View style={styles.catIconWrap}>
-                      <Ionicons name={catIcons[cat.slug] || 'grid-outline'} size={24} color={colors.dark} />
-                    </View>
-                    <Text style={styles.catLabel}>{cat.name}</Text>
+        <ScrollView showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadJobs() }} tintColor={colors.amber} />}
+        >
+          {/* Ink Gradient Header */}
+          <View style={styles.header}>
+            <SafeAreaView edges={['top']}>
+              <View style={styles.headerRow}>
+                <View>
+                  <Text style={styles.greeting}>{getGreeting()} 👋</Text>
+                  <Text style={styles.userName}>{user?.name || 'User'}</Text>
+                </View>
+                <TouchableOpacity style={styles.avatarBtn}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{(user?.name || 'U')[0]}</Text>
                   </View>
-                </PressScale>
+                </TouchableOpacity>
+              </View>
+
+              {/* Post a New Job CTA */}
+              <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(customer)/jobs/v2/create')} activeOpacity={0.8}>
+                <View style={styles.ctaIconBox}>
+                  <Text style={styles.ctaIcon}>+</Text>
+                </View>
+                <Text style={styles.ctaText}>Post a New Job</Text>
+              </TouchableOpacity>
+            </SafeAreaView>
+          </View>
+
+          {/* Categories */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Services</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+              {categories.map((cat) => (
+                <TouchableOpacity key={cat.id} style={styles.catChip} activeOpacity={0.7}>
+                  <Text style={styles.catIcon}>{cat.icon}</Text>
+                  <Text style={styles.catName}>{cat.name}</Text>
+                </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
 
-            <Text style={styles.sectionTitle}>
-              {search ? 'Results' : 'Nearby Taskers'}
-              {search ? ` (${filteredTaskers.length})` : ''}
-            </Text>
-            {filteredTaskers.length === 0 && !search ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <Ionicons name="people-outline" size={48} color={colors.lightGray} />
-                <Text style={{ color: colors.gray, marginTop: 12 }}>No taskers available yet</Text>
-              </View>
+          {/* My Posted Jobs */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>My Posted Jobs</Text>
+            {loading ? (
+              <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 20 }} />
+            ) : myJobs.length === 0 ? (
+              <Card padded style={styles.emptyCard}>
+                <Text style={styles.emptyIcon}>📋</Text>
+                <Text style={styles.emptyText}>No jobs yet</Text>
+                <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(customer)/jobs/v2/create')}>
+                  <Text style={styles.emptyBtnText}>Post your first job</Text>
+                </TouchableOpacity>
+              </Card>
             ) : (
-              filteredTaskers.map((t, i) => (
-                <PressScale key={t.id || i}>
-                  <View style={styles.taskerCard}>
-                    <View style={styles.taskerLeft}>
-                      <View style={styles.taskerAvatar}>
-                        <Text style={styles.taskerAvatarText}>{t.user?.name?.[0] || 'T'}</Text>
-                        {t.isOnline ? <View style={styles.onlineDot} /> : null}
-                      </View>
-                      <View style={styles.taskerInfo}>
-                        <Text style={styles.taskerName}>{t.user?.name || 'Tasker'}</Text>
-                        <Text style={styles.taskerSkill}>{t.skills?.[0] || 'Professional'} • {t.serviceAreas?.[0] || 'Sri Lanka'}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                          <Ionicons name="star" size={13} color="#F59E0B" />
-                          <Text style={styles.taskerRating}> {t.rating?.toFixed(1) || '5.0'}</Text>
-                        </View>
-                      </View>
+              myJobs.map((job) => (
+                <TouchableOpacity
+                  key={job.id}
+                  style={styles.jobCard}
+                  onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.jobTop}>
+                    <View style={styles.jobIconBox}>
+                      <Ionicons name="briefcase-outline" size={20} color={colors.amber} />
                     </View>
-                    <View style={styles.badges}>
-                      {t.isOnline ? (
-                        <View style={styles.availableBadge}>
-                          <View style={styles.availableDot} />
-                          <Text style={styles.availableText}>Available</Text>
-                        </View>
-                      ) : null}
-                      {t.isVerified ? (
-                        <View style={styles.verifiedBadge}>
-                          <Ionicons name="checkmark-circle" size={12} color="#2563EB" />
-                          <Text style={styles.verifiedText}> Verified</Text>
-                        </View>
-                      ) : null}
+                    <View style={styles.jobInfo}>
+                      <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+                      <Text style={styles.jobMeta}>
+                        {job.locationName || 'No location'} • LKR {job.budgetAmount}
+                      </Text>
                     </View>
+                    <Badge label={job.status.replace(/_/g, ' ')} variant={statusBadgeVariant(job.status)} dot />
                   </View>
-                </PressScale>
+                </TouchableOpacity>
               ))
             )}
-          </ScrollView>
-        )}
-
-        <PressScale onPress={() => router.push('/(customer)/jobs/new')}>
-          <View style={styles.fab}>
-            <Ionicons name="add" size={22} color={colors.white} />
-            <Text style={styles.fabLabel}>Post a job</Text>
           </View>
-        </PressScale>
+
+          {/* Quick Nav */}
+          <View style={styles.navSection}>
+            <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(customer)/jobs/v2')} activeOpacity={0.7}>
+              <View style={[styles.navIcon, { backgroundColor: colors.amberLight }]}>
+                <Ionicons name="briefcase-outline" size={22} color={colors.amberDark} />
+              </View>
+              <View style={styles.navInfo}>
+                <Text style={styles.navTitle}>My Marketplace Jobs</Text>
+                <Text style={styles.navSub}>Post, track, and manage jobs</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(customer)/wallet')} activeOpacity={0.7}>
+              <View style={[styles.navIcon, { backgroundColor: colors.amberLight }]}>
+                <Ionicons name="wallet-outline" size={22} color={colors.amberDark} />
+              </View>
+              <View style={styles.navInfo}>
+                <Text style={styles.navTitle}>Wallet</Text>
+                <Text style={styles.navSub}>Manage balance and transactions</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  topBar: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16,
+  container: { flex: 1, backgroundColor: colors.cream },
+
+  // Header
+  header: {
+    backgroundColor: colors.ink,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
-  greeting: { fontSize: 22, fontWeight: '800', color: colors.dark },
-  location: { fontSize: 13, color: colors.gray, marginTop: 4 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  greeting: { fontSize: 14, fontFamily: fonts.body, color: colors.muted, marginBottom: 2 },
+  userName: { fontSize: 22, fontFamily: fonts.headingBold, color: colors.white },
+  avatarBtn: {},
   avatar: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.customerAccent,
-    justifyContent: 'center', alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.amber,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
-    marginHorizontal: 24, paddingHorizontal: 16, borderRadius: 14,
-    height: 48, borderWidth: 1.5, borderColor: colors.lightGray, marginBottom: 20,
+  avatarText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
+
+  // CTA
+  ctaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.amber,
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 14,
+    gap: 12,
   },
-  searchInput: { flex: 1, fontSize: 15, color: colors.dark },
-  sectionTitle: {
-    fontSize: 18, fontWeight: '700', color: colors.dark,
-    paddingHorizontal: 24, marginBottom: 12, marginTop: 8,
+  ctaIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.ink,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  categoriesRow: { paddingLeft: 24, marginBottom: 24 },
-  categoryCard: { alignItems: 'center', marginRight: 16, width: 76 },
-  catIconWrap: {
-    width: 56, height: 56, borderRadius: 16, backgroundColor: colors.white,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 6,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
+  ctaIcon: { fontSize: 20, fontFamily: fonts.heading, color: colors.amber, lineHeight: 22 },
+  ctaText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink, flex: 1 },
+
+  // Sections
+  section: { paddingHorizontal: 20, marginTop: 24 },
+  sectionTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 14 },
+
+  // Categories
+  catScroll: { marginLeft: -20, paddingLeft: 20 },
+  catChip: {
+    alignItems: 'center',
+    marginRight: 16,
+    backgroundColor: colors.white,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    minWidth: 72,
   },
-  catLabel: { fontSize: 12, fontWeight: '600', color: colors.dark, textAlign: 'center' },
-  taskerCard: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: colors.white, marginHorizontal: 24, marginBottom: 10,
-    padding: 16, borderRadius: 14,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
+  catIcon: { fontSize: 24, marginBottom: 4 },
+  catName: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
+
+  // Empty
+  emptyCard: { alignItems: 'center', paddingVertical: 32 },
+  emptyIcon: { fontSize: 40, marginBottom: 8 },
+  emptyText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 12 },
+  emptyBtn: { backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
+  emptyBtnText: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
+
+  // Job Card
+  jobCard: {
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  taskerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  taskerAvatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.customerAccent,
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
+  jobTop: { flexDirection: 'row', alignItems: 'center' },
+  jobIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.amberBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  taskerAvatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
-  onlineDot: {
-    position: 'absolute', bottom: 0, right: 0, width: 14, height: 14,
-    borderRadius: 7, backgroundColor: colors.green, borderWidth: 2, borderColor: colors.white,
+  jobInfo: { flex: 1, marginRight: 8 },
+  jobTitle: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 2 },
+  jobMeta: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
+
+  // Nav
+  navSection: { paddingHorizontal: 20, marginTop: 24, gap: 10, paddingBottom: 100 },
+  navCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
-  taskerInfo: { flex: 1 },
-  taskerName: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  taskerSkill: { fontSize: 13, color: colors.gray, marginTop: 2 },
-  taskerRating: { fontSize: 13, color: colors.dark },
-  badges: { gap: 4 },
-  availableBadge: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#D1FAE5',
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
-  },
-  availableDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green, marginRight: 4 },
-  availableText: { fontSize: 11, fontWeight: '600', color: colors.green },
-  verifiedBadge: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF',
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
-  },
-  verifiedText: { fontSize: 11, fontWeight: '600', color: '#2563EB' },
-  findCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7',
-    marginHorizontal: 24, marginBottom: 16, padding: 14, borderRadius: 14,
-    borderWidth: 1, borderColor: '#FDE68A',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
-  },
-  findIconWrap: {
-    width: 48, height: 48, borderRadius: 14, backgroundColor: '#fff',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
-  },
-  findTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
-  findSub: { fontSize: 12, color: '#92400E', marginTop: 2 },
-  fab: {
-    position: 'absolute', bottom: 100, right: 24, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.customerAccent, paddingHorizontal: 20, paddingVertical: 14,
-    borderRadius: 28,
-    shadowColor: colors.customerAccent, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 8, gap: 8,
-  },
-  fabLabel: { fontSize: 15, fontWeight: '700', color: colors.white },
+  navIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  navInfo: { flex: 1, marginLeft: 12 },
+  navTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
+  navSub: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 1 },
 })

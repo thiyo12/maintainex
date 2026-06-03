@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
-
-const colors = {
-  primary: '#F59E0B',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-}
+import { colors } from '../../lib/colors'
+import { fonts } from '../../lib/fonts'
 
 interface Props {
   icon?: string
@@ -44,17 +40,6 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   icon: { fontSize: 64, marginBottom: 16 },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.gray,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  title: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, textAlign: 'center', marginBottom: 8 },
+  subtitle: { fontSize: 14, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 20 },
 })

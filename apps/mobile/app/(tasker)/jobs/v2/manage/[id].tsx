@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../../lib/colors'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 
@@ -142,7 +143,12 @@ export default function V2ProviderManageJobScreen() {
                 <Text style={styles.detailValue}>{job.budgetType}</Text>
               </View>
             </View>
-            {job.locationName && <Text style={styles.detailLocation}>📍 {job.locationName}</Text>}
+            {job.locationName && (
+              <View style={styles.locationRow}>
+                <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginRight: 4 }} />
+                <Text style={styles.detailLocation}>{job.locationName}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -155,7 +161,12 @@ export default function V2ProviderManageJobScreen() {
                 {job.addressStreet}{job.addressBuilding ? `, ${job.addressBuilding}` : ''}
                 {job.addressApartment ? `, ${job.addressApartment}` : ''}
               </Text>
-              {job.addressLandmark ? <Text style={styles.addressLandmark}>📍 {job.addressLandmark}</Text> : null}
+              {job.addressLandmark ? (
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginRight: 4 }} />
+                  <Text style={styles.addressLandmark}>{job.addressLandmark}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
         )}
@@ -186,7 +197,7 @@ export default function V2ProviderManageJobScreen() {
                   return (
                     <View key={step} style={styles.progressStep}>
                       <View style={[styles.progressDot, isDone && styles.progressDotDone]}>
-                        {isDone ? <Text style={styles.progressCheck}>✓</Text> : <Text style={styles.progressNum}>{i + 1}</Text>}
+                        {isDone ? <Ionicons name="checkmark" size={16} color={colors.ink} /> : <Text style={styles.progressNum}>{i + 1}</Text>}
                       </View>
                       <Text style={[styles.progressLabel, isDone && styles.progressLabelDone]}>
                         {step === 'COMPLETION_REQUESTED' ? 'REVIEW' : step === 'COMPLETED' ? 'DONE' : step.replace('_', ' ')}
@@ -211,7 +222,7 @@ export default function V2ProviderManageJobScreen() {
         {/* Mark Complete */}
         {job.status === 'IN_PROGRESS' && escrow?.status === 'PROTECTED' && (
           <View style={[styles.section, styles.highlightSection]}>
-            <Text style={styles.highlightIcon}>🏁</Text>
+            <Ionicons name="flag-outline" size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
             <Text style={styles.highlightTitle}>Finish Job</Text>
             <Text style={styles.highlightDesc}>Mark as complete and request customer approval for payment release</Text>
             {ActionBtn({ label: 'Mark Complete', loadingKey: 'complete', onPress: handleMarkComplete })}
@@ -237,7 +248,7 @@ export default function V2ProviderManageJobScreen() {
         {job.status === 'COMPLETED' && reviews?.providerReviews?.length > 0 && (
           <View style={styles.section}>
             <View style={styles.reviewedCard}>
-              <Text style={styles.reviewedIcon}>✅</Text>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
               <Text style={styles.reviewedText}>You reviewed this customer</Text>
             </View>
           </View>
@@ -282,11 +293,12 @@ const styles = StyleSheet.create({
   detailItem: { flex: 1 },
   detailLabel: { fontSize: 11, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   detailValue: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 2 },
-  detailLocation: { fontSize: 13, color: colors.muted, marginTop: 4 },
+  detailLocation: { fontSize: 13, color: colors.muted },
+  locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
 
   addressCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   addressText: { fontSize: 14, color: colors.ink, lineHeight: 22 },
-  addressLandmark: { fontSize: 13, color: colors.muted, marginTop: 6 },
+  addressLandmark: { fontSize: 13, color: colors.muted },
 
   escrowCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   escrowAmount: { fontSize: 20, fontWeight: '800', color: colors.ink },
@@ -300,14 +312,12 @@ const styles = StyleSheet.create({
   progressStep: { alignItems: 'center', flex: 1 },
   progressDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
   progressDotDone: { backgroundColor: colors.amber },
-  progressCheck: { fontSize: 14, color: colors.ink, fontWeight: '700' },
   progressNum: { fontSize: 13, fontWeight: '700', color: colors.muted },
   progressLabel: { fontSize: 10, color: colors.muted, fontWeight: '600', textAlign: 'center' },
   progressLabelDone: { color: colors.amberDark },
   progressActions: { gap: 8 },
 
   highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight, alignItems: 'center' },
-  highlightIcon: { fontSize: 32, marginBottom: 8 },
   highlightTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
   highlightDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
 
@@ -322,7 +332,6 @@ const styles = StyleSheet.create({
   textArea: { height: 80, textAlignVertical: 'top' },
 
   reviewedCard: { backgroundColor: '#D1FAE5', borderRadius: 14, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  reviewedIcon: { fontSize: 20 },
   reviewedText: { fontSize: 14, color: colors.success, fontWeight: '600' },
 
   disputeBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 12 },

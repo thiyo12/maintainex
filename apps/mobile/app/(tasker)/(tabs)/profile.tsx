@@ -40,7 +40,7 @@ export default function TaskerProfile() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       </SafeAreaView>
     )
@@ -68,11 +68,11 @@ export default function TaskerProfile() {
           </View>
           <View style={styles.badgeRow}>
             <View style={styles.badge}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.green} />
+              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
               <Text style={styles.badgeText}> Verified</Text>
             </View>
             <View style={styles.badge}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green, marginRight: 4 }} />
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success, marginRight: 4 }} />
               <Text style={styles.badgeText}>Online</Text>
             </View>
           </View>
@@ -119,21 +119,21 @@ export default function TaskerProfile() {
           <Text style={styles.sectionTitle}>Account</Text>
           <PressScale onPress={() => router.push('/settings/edit-profile')}>
             <View style={styles.menuRow}>
-              <Ionicons name="create-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
+              <Ionicons name="create-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Edit profile</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
           <PressScale onPress={() => Alert.alert('Coming soon', 'Payment features will be available in a future update.')}>
             <View style={styles.menuRow}>
-              <Ionicons name="card-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
+              <Ionicons name="card-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Payment details</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
           <PressScale onPress={() => Alert.alert('Coming soon', 'Notification settings will be available in a future update.')}>
             <View style={styles.menuRow}>
-              <Ionicons name="notifications-outline" size={20} color={colors.dark} style={{ marginRight: 12 }} />
+              <Ionicons name="notifications-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
               <Text style={styles.menuLabel}>Notifications</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
@@ -152,21 +152,21 @@ export default function TaskerProfile() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.teal,
+    backgroundColor: colors.amber,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   avatarText: { fontSize: 28, fontWeight: '700', color: colors.white },
-  name: { fontSize: 22, fontWeight: '800', color: colors.dark, marginBottom: 4 },
-  role: { fontSize: 15, color: colors.gray, marginBottom: 10 },
+  name: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 4 },
+  role: { fontSize: 15, color: colors.muted, marginBottom: 10 },
   badgeRow: { flexDirection: 'row', gap: 8 },
   badge: {
     paddingHorizontal: 14,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  badgeText: { fontSize: 13, fontWeight: '600', color: colors.green },
+  badgeText: { fontSize: 13, fontWeight: '600', color: colors.success },
   statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 8, marginBottom: 20 },
   statCard: {
     flex: 1,
@@ -190,10 +190,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  statValue: { fontSize: 18, fontWeight: '800', color: colors.dark },
-  statLabel: { fontSize: 11, color: colors.gray, marginTop: 2 },
+  statValue: { fontSize: 18, fontWeight: '800', color: colors.ink },
+  statLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
   section: { paddingHorizontal: 24, marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.dark, marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 10 },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: {
     paddingHorizontal: 14,
@@ -201,9 +201,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: colors.white,
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
+    borderColor: colors.border,
   },
-  tagText: { fontSize: 13, fontWeight: '600', color: colors.dark },
+  tagText: { fontSize: 13, fontWeight: '600', color: colors.ink },
   menuRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -218,6 +218,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.dark },
-  menuArrow: { fontSize: 22, color: colors.gray, fontWeight: '300' },
+  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
+  menuArrow: { fontSize: 22, color: colors.muted, fontWeight: '300' },
 })

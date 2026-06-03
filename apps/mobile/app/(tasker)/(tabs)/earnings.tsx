@@ -45,7 +45,7 @@ export default function TaskerEarnings() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       ) : (
         <>
@@ -87,26 +87,26 @@ export default function TaskerEarnings() {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadEarnings} tintColor={colors.primary} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadEarnings} tintColor={colors.amber} />}
           >
             <Text style={styles.transactionTitle}>Recent transactions</Text>
             {(data?.transactions || []).length === 0 ? (
               <View style={styles.empty}>
-                <Ionicons name="cash-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
+                <Ionicons name="cash-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
                 <Text style={styles.emptyTitle}>No transactions yet</Text>
               </View>
             ) : (
               (data?.transactions || []).map((tx, i) => (
                 <View key={i} style={styles.txCard}>
                   <View style={styles.txLeft}>
-                    <View style={[styles.txDot, { backgroundColor: tx.status === 'Cleared' ? colors.green : colors.primary }]} />
+                    <View style={[styles.txDot, { backgroundColor: tx.status === 'Cleared' ? colors.success : colors.amber }]} />
                     <View>
                       <Text style={styles.txJob}>{tx.job}</Text>
                       <Text style={styles.txDate}>{tx.date} • {tx.status}</Text>
                     </View>
                   </View>
                   <View style={styles.txRight}>
-                    <Text style={[styles.txAmount, { color: tx.status === 'Cleared' ? colors.green : colors.primary }]}>
+                    <Text style={[styles.txAmount, { color: tx.status === 'Cleared' ? colors.success : colors.amber }]}>
                       +LKR {tx.amount.toLocaleString()}
                     </Text>
                   </View>
@@ -121,12 +121,12 @@ export default function TaskerEarnings() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
+  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   balanceCard: {
-    backgroundColor: colors.teal,
+    backgroundColor: colors.amber,
     marginHorizontal: 24,
     padding: 24,
     borderRadius: 20,
@@ -155,12 +155,12 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  statLabel: { fontSize: 11, color: colors.gray, marginBottom: 4 },
-  statValue: { fontSize: 14, fontWeight: '800', color: colors.dark },
+  statLabel: { fontSize: 11, color: colors.muted, marginBottom: 4 },
+  statValue: { fontSize: 14, fontWeight: '800', color: colors.ink },
   periodTabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.border,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -172,12 +172,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   periodTabActive: { backgroundColor: colors.white },
-  periodTabText: { fontSize: 14, fontWeight: '600', color: colors.gray },
-  periodTabTextActive: { color: colors.teal, fontWeight: '700' },
+  periodTabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  periodTabTextActive: { color: colors.amber, fontWeight: '700' },
   transactionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.dark,
+    color: colors.ink,
     paddingHorizontal: 24,
     marginBottom: 10,
   },
@@ -198,10 +198,10 @@ const styles = StyleSheet.create({
   },
   txLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   txDot: { width: 8, height: 8, borderRadius: 4 },
-  txJob: { fontSize: 14, fontWeight: '600', color: colors.dark },
-  txDate: { fontSize: 12, color: colors.gray, marginTop: 2 },
+  txJob: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  txDate: { fontSize: 12, color: colors.muted, marginTop: 2 },
   txRight: {},
   txAmount: { fontSize: 15, fontWeight: '700' },
   empty: { alignItems: 'center', paddingTop: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.gray },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.muted },
 })

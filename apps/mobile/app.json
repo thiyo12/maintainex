@@ -53,7 +53,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#F59E0B"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
