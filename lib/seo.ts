@@ -95,6 +95,25 @@ export function serviceSchema(service: {
   return obj
 }
 
+export function websiteSchema(region: string) {
+  const isCA = region === 'CA'
+  const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: `Maintainex ${isCA ? 'Canada' : 'Sri Lanka'}`,
+    url: baseUrl,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${baseUrl}/services?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  }
+}
+
 export function faqSchema(faqs: { question: string; answer: string }[]) {
   return {
     '@context': 'https://schema.org',

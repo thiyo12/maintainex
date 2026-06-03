@@ -1,0 +1,53 @@
+# Maintainex - Professional Home Services
+> Maintainex connects you with verified professionals for cleaning, repairs, assembly, and more across Sri Lanka and Canada.
+
+## About
+Maintainex is a platform that offers professional home and commercial services including cleaning, plumbing, electrical work, painting, assembly, mounting, moving, outdoor maintenance, and repairs. We operate in Sri Lanka (maintainex.lk) and Canada (ca.maintainex.lk).
+
+## Key Pages
+- Homepage: https://maintainex.lk/
+- Services: https://maintainex.lk/services
+- About Us: https://maintainex.lk/about
+- Contact: https://maintainex.lk/contact
+- Booking: https://maintainex.lk/booking
+- Canada Homepage: https://ca.maintainex.lk/
+- Canada Services: https://ca.maintainex.lk/services
+
+## Service Categories
+- Cleaning: https://maintainex.lk/services/cleaning (residential, deep, office, carpet, sofa)
+- Assembly: https://maintainex.lk/services/furniture-assembly (furniture, crib, desk, bookshelf)
+- Mounting: https://maintainex.lk/services/tv-mounting (TV, art, shelf, mirror, curtain)
+- Moving: https://maintainex.lk/services/help-moving (moving, heavy lifting, furniture removal, appliance)
+- Repairs: https://maintainex.lk/services/painting (plumbing, electrical, painting, door/window, home repairs)
+- Outdoor: https://maintainex.lk/services/garden-maintenance (garden, lawn, pool, gutter)
+
+## Sri Lanka - Cities Served
+- Colombo: https://maintainex.lk/services/cleaning/colombo
+- Kandy: https://maintainex.lk/services/cleaning/kandy
+- Galle: https://maintainex.lk/services/cleaning/galle
+- Jaffna: https://maintainex.lk/services/cleaning/jaffna
+- Negombo: https://maintainex.lk/services/cleaning/negombo
+- All 25 districts available (replace "cleaning" with any service slug, "jaffna" with any district)
+
+## Canada (Ontario) - Cities Served
+- Scarborough: https://ca.maintainex.lk/services/cleaning/scarborough
+- Toronto: https://ca.maintainex.lk/services/cleaning/toronto-downtown
+- Mississauga: https://ca.maintainex.lk/services/cleaning/mississauga
+- Brampton: https://ca.maintainex.lk/services/cleaning/brampton
+- Markham: https://ca.maintainex.lk/services/cleaning/markham
+- All 20 GTA cities available
+
+## Contact
+- Sri Lanka: Phone +94 77 086 7609, Email maintainex.lk@gmail.com, WhatsApp https://wa.me/94770867609
+- Canada: Phone +1 (416) 427-9518, Email maintainex.canada@gmail.com, WhatsApp https://wa.me/14164279518
+- Website: https://maintainex.lk/contact
+- Booking: https://maintainex.lk/booking
+
+## Structured Data
+- All service pages include JSON-LD (Service, LocalBusiness, BreadcrumbList, FAQPage schemas)
+- Homepage includes Organization and Website schemas
+- City service pages include LocalBusiness schema with city-specific areaServed
+
+## Sitemaps
+- Sri Lanka: https://maintainex.lk/sitemap.xml
+- Canada: https://ca.maintainex.lk/sitemap.xml

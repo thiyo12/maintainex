@@ -9,6 +9,8 @@ import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FiCheck, FiArrowRight, FiStar, FiMessageCircle, FiArrowLeft, FiPhone, FiMapPin } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 import { useRegion } from '@/lib/region-context'
+import FaqSection from '@/components/services/FaqSection'
+import type { FaqItem } from '@/lib/faq'
 
 interface ServiceData {
   id: string
@@ -51,12 +53,14 @@ export default function ServiceDetailClient({
   region: _region,
   city,
   citySlug,
+  faqs,
 }: {
   service: ServiceData | null
   relatedServices: RelatedService[]
   region: string
   city?: string
   citySlug?: string
+  faqs?: FaqItem[]
 }) {
   const router = useRouter()
   const region = useRegion()
@@ -225,6 +229,11 @@ export default function ServiceDetailClient({
                       })}
                     </div>
                   </div>
+                )}
+
+                {/* FAQ Section */}
+                {faqs && faqs.length > 0 && (
+                  <FaqSection faqs={faqs} />
                 )}
 
                 {/* Reviews */}

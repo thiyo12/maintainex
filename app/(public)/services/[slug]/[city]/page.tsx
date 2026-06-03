@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
-import { serviceSchema, breadcrumbSchema, localBusinessSchema } from '@/lib/seo'
+import { serviceSchema, breadcrumbSchema, localBusinessSchema, faqSchema } from '@/lib/seo'
+import { getServiceFaqs } from '@/lib/faq'
 import { getCityBySlug } from '@/lib/cities'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
@@ -113,12 +114,16 @@ export default async function CityServicePage({ params }: { params: { slug: stri
 
   const localBusinessJson = localBusinessSchema(regionKey, cityName)
 
+  const faqs = getServiceFaqs(service.name, regionKey, cityName, service.category?.name)
+  const faqJson = faqSchema(faqs)
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJson) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJson) }} />
-      <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} city={cityName} citySlug={params.city} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }} />
+      <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} city={cityName} citySlug={params.city} faqs={faqs} />
     </>
   )
 }

@@ -2,7 +2,7 @@ import { Toaster } from 'react-hot-toast'
 import { headers } from 'next/headers'
 import { Providers } from './providers'
 import { REGIONS } from '@/lib/regions'
-import { organizationSchema } from '@/lib/seo'
+import { organizationSchema, websiteSchema } from '@/lib/seo'
 import type { Metadata } from 'next'
 import './globals.css'
 
@@ -74,6 +74,7 @@ export default function RootLayout({
   const baseUrl = region === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
   const gaId = process.env.NEXT_PUBLIC_GA_ID
   const orgJson = organizationSchema(region)
+  const siteJson = websiteSchema(region)
 
   return (
     <html lang="en">
@@ -81,6 +82,8 @@ export default function RootLayout({
         <link rel="canonical" href={baseUrl} />
         <link rel="alternate" hrefLang="en-LK" href="https://maintainex.lk" />
         <link rel="alternate" hrefLang="en-CA" href="https://ca.maintainex.lk" />
+        <link rel="llms-txt" href={`${baseUrl}/llms.txt`} />
+        <meta name="llms" content={`${baseUrl}/llms.txt`} />
         {gaId && (
           <>
             <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
@@ -94,6 +97,10 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJson) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJson) }}
         />
       </head>
       <body className="min-h-screen bg-gray-50">

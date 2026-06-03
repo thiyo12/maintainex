@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
-import { serviceSchema, breadcrumbSchema } from '@/lib/seo'
+import { serviceSchema, breadcrumbSchema, faqSchema } from '@/lib/seo'
+import { getServiceFaqs } from '@/lib/faq'
 import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import ServiceDetailClient from './ServiceDetailClient'
@@ -101,11 +102,15 @@ export default async function ServiceDetailPage({ params }: { params: { slug: st
     { name: service.name, url: `${baseUrl}/services/${service.slug}` },
   ])
 
+  const faqs = getServiceFaqs(service.name, regionKey, undefined, service.category?.name)
+  const faqJson = faqSchema(faqs)
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJson) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson) }} />
-      <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }} />
+      <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} faqs={faqs} />
     </>
   )
 }

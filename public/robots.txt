@@ -1,3 +1,22 @@
+# Allow all AI crawlers to read and cite our content
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
 User-agent: *
 Allow: /
 Disallow: /admin/
@@ -7,3 +26,7 @@ Disallow: /maintenance
 
 Sitemap: https://maintainex.lk/sitemap.xml
 Sitemap: https://ca.maintainex.lk/sitemap.xml
+
+# AI content discovery
+LLMs.txt: https://maintainex.lk/llms.txt
+LLMs.txt: https://ca.maintainex.lk/llms.txt
