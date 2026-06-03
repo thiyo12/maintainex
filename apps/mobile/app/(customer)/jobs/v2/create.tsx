@@ -4,6 +4,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/colors'
 import { fonts } from '../../../../lib/fonts'
 import { getAuthToken } from '../../../../lib/api'
@@ -18,9 +19,9 @@ interface State { id: string; name: string; cities: City[] }
 interface Country { id: string; name: string; code: string; states: State[] }
 
 const budgetTiers = [
-  { key: 'SMALL', label: 'Small', range: 'LKR 1,000 – 3,000', emoji: '💵' },
-  { key: 'MEDIUM', label: 'Medium', range: 'LKR 3,000 – 8,000', emoji: '💰' },
-  { key: 'LARGE', label: 'Large', range: 'LKR 8,000+', emoji: '💎' },
+  { key: 'SMALL', label: 'Small', range: 'LKR 1,000 – 3,000', icon: 'cash-outline' as const },
+  { key: 'MEDIUM', label: 'Medium', range: 'LKR 3,000 – 8,000', icon: 'wallet-outline' as const },
+  { key: 'LARGE', label: 'Large', range: 'LKR 8,000+', icon: 'diamond-outline' as const },
 ]
 
 const providerTypes = ['FREELANCER', 'COMPANY', 'BOTH']
@@ -101,6 +102,7 @@ export default function CreateJobScreen() {
           categoryId: selectedCategory.id,
           budgetType: budget.type,
           budgetAmount: budget.amount,
+          providerType: providerType || null,
           areaId: selectedArea?.id || null,
           postalCode: null,
           preferredDate: null,
@@ -133,7 +135,7 @@ export default function CreateJobScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <Ionicons name="arrow-back" size={22} color={colors.amber} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post a Job</Text>
         <View style={styles.backBtn} />
@@ -157,9 +159,7 @@ export default function CreateJobScreen() {
                   onPress={() => setSelectedCategory(cat)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.catEmoji}>
-                    {cat.iconName === 'hammer' ? '🔨' : cat.iconName === 'tools' ? '🔧' : cat.iconName === 'cleaning' ? '🧹' : cat.iconName === 'paint' ? '🎨' : cat.iconName === 'truck' ? '🚚' : '📋'}
-                  </Text>
+                  <Ionicons name="construct-outline" size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />
                   <Text style={[styles.catName, selectedCategory?.id === cat.id && styles.catNameSelected]}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -172,7 +172,7 @@ export default function CreateJobScreen() {
             <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="Describe what needs to be done in detail..." placeholderTextColor={colors.muted} multiline numberOfLines={4} />
 
             <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]} onPress={() => { if (selectedCategory && title && description) setStep(1); else Alert.alert('Error', 'Fill in all fields') }}>
-              <Text style={styles.nextBtnText}>Next →</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
@@ -191,7 +191,7 @@ export default function CreateJobScreen() {
                   onPress={() => setSelectedTier(t.key)}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.tierEmoji}>{t.emoji}</Text>
+                  <Ionicons name={t.icon} size={24} color={selectedTier === t.key ? colors.amberDark : colors.muted} />
                   <Text style={styles.tierLabel}>{t.label}</Text>
                   <Text style={[styles.tierRange, selectedTier === t.key && styles.tierRangeSelected]}>{t.range}</Text>
                 </TouchableOpacity>
@@ -215,7 +215,7 @@ export default function CreateJobScreen() {
             </View>
 
             <TouchableOpacity style={[styles.nextBtn, !selectedTier && styles.btnDisabled]} onPress={() => { if (selectedTier) setStep(2); else Alert.alert('Error', 'Select a budget') }}>
-              <Text style={styles.nextBtnText}>Next →</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
@@ -304,7 +304,7 @@ export default function CreateJobScreen() {
             />
 
             <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]} onPress={() => { if (selectedCountry && selectedState && selectedCity) setStep(3); else Alert.alert('Error', 'Select country, state, and city') }}>
-              <Text style={styles.nextBtnText}>Next →</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
@@ -343,15 +343,16 @@ export default function CreateJobScreen() {
             </View>
 
             <View style={styles.reviewFooter}>
-              <TouchableOpacity onPress={() => setStep(0)}>
-                <Text style={styles.editLink}>← Edit Details</Text>
+              <TouchableOpacity onPress={() => setStep(0)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="arrow-back" size={18} color={colors.amber} />
+                <Text style={styles.editLink}> Edit Details</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, submitting && styles.btnDisabled]}
                 onPress={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.submitBtnText}>Post Job</Text>}
+                {submitting ? <ActivityIndicator color={colors.ink} /> : <Ionicons name="checkmark-circle-outline" size={20} color={colors.ink} />}
               </TouchableOpacity>
             </View>
           </View>
@@ -365,7 +366,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn: { width: 60 },
-  backText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.amber },
   headerTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
   content: { flex: 1, padding: 20 },
   sectionTitle: { fontSize: 22, fontFamily: fonts.heading, color: colors.ink, marginBottom: 4 },
@@ -375,9 +375,8 @@ const styles = StyleSheet.create({
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   categoryCard: { width: '47%', padding: 16, borderRadius: 16, backgroundColor: colors.white, alignItems: 'center', marginBottom: 8, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   categoryCardSelected: { backgroundColor: colors.amberBg, borderWidth: 2, borderColor: colors.amber },
-  catEmoji: { fontSize: 32, marginBottom: 6 },
   catName: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink, textAlign: 'center' },
-  catNameSelected: { color: colors.amberDark, fontFamily: fonts.headingBold },
+  catNameSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
 
   // Fields
   label: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6, marginTop: 16 },
@@ -388,8 +387,7 @@ const styles = StyleSheet.create({
   tierRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   tierCard: { flex: 1, backgroundColor: colors.white, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
   tierCardSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  tierEmoji: { fontSize: 24, marginBottom: 6 },
-  tierLabel: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 4 },
+  tierLabel: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 4 },
   tierRange: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted },
   tierRangeSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
 
@@ -397,27 +395,25 @@ const styles = StyleSheet.create({
   providerChip: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
   providerChipSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
   providerText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
-  providerTextSelected: { color: colors.amberDark, fontFamily: fonts.headingBold },
+  providerTextSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
 
   // Step 3 — Location
   pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border },
   pillSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
   pillText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
-  pillTextSelected: { color: colors.amberDark, fontFamily: fonts.headingBold },
+  pillTextSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
 
   // Buttons
   nextBtn: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
-  nextBtnText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
   btnDisabled: { opacity: 0.5 },
 
   // Step 4 — Review
   reviewCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   reviewRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   reviewLabel: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-  reviewValue: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink },
+  reviewValue: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
   reviewFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 24 },
   editLink: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
   submitBtn: { backgroundColor: colors.amber, paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center' },
-  submitBtnText: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
 })

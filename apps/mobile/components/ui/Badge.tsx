@@ -44,5 +44,5 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  label: { fontSize: 11, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.3 },
+  label: { fontSize: 11, fontFamily: fonts.bodyMedium, textTransform: 'uppercase', letterSpacing: 0.3 },
 })

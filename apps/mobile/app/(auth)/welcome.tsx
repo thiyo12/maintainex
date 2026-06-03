@@ -107,9 +107,9 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   cardText: { flex: 1 },
-  cardTitle: { fontSize: 15, fontFamily: fonts.headingBold, marginBottom: 2 },
+  cardTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, marginBottom: 2 },
   cardSub: { fontSize: 12, fontFamily: fonts.body, color: colors.ink, opacity: 0.6 },
   bottom: { alignItems: 'center', marginTop: 40 },
   signIn: { fontSize: 14, fontFamily: fonts.body, color: colors.muted },
-  signInLink: { fontFamily: fonts.headingBold, color: colors.amber },
+  signInLink: { fontFamily: fonts.bodyMedium, color: colors.amber },
 })

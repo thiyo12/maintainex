@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
   },
   fullWidth: { width: '100%' },
   disabled: { opacity: 0.5 },
-  label: { fontSize: 15, fontFamily: fonts.headingBold },
+  label: { fontSize: 15, fontFamily: fonts.bodyMedium },
 })

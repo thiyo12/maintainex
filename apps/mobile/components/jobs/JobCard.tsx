@@ -57,10 +57,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  price: { fontSize: 16, fontFamily: fonts.heading, color: colors.primaryDark },
-  title: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 6 },
+  price: { fontSize: 16, fontFamily: fonts.body, color: colors.primaryDark },
+  title: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6 },
   desc: { fontSize: 13, fontFamily: fonts.body, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 12 },
   footer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   meta: { fontSize: 12, fontFamily: fonts.bodyLight, color: colors.muted },
-  type: { fontSize: 11, fontFamily: fonts.headingBold, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  type: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
 })

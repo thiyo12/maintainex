@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
   },
   dotDone: { backgroundColor: colors.success },
   dotCurrent: { backgroundColor: colors.amber },
-  dotText: { fontSize: 12, fontFamily: fonts.headingBold, color: colors.muted },
+  dotText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted },
   dotTextActive: { color: colors.white },
   line: {
     width: 40,

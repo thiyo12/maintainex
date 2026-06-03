@@ -104,7 +104,7 @@ export default function V2ConfirmBookingScreen() {
         {/* Payment Freeze Card */}
         <View style={styles.freezeCard}>
           <View style={styles.freezeIconWrap}>
-            <Text style={styles.freezeIcon}>🔐</Text>
+            <Ionicons name="lock-closed-outline" size={28} color={colors.ink} />
           </View>
           <Text style={styles.freezeLabel}>Amount Frozen</Text>
           <Text style={styles.freezeAmount}>
@@ -171,33 +171,32 @@ const styles = StyleSheet.create({
   providerSection: { marginTop: 16 },
   providerRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   providerInfo: { flex: 1, marginLeft: 12 },
-  providerName: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
+  providerName: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
   providerType: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
   providerPrice: { fontSize: 18, fontFamily: fonts.heading, color: colors.primaryDark },
 
   jobSection: { marginTop: 16 },
-  jobTitle: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
+  jobTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
 
   freezeCard: { backgroundColor: colors.ink, borderRadius: 20, padding: 24, alignItems: 'center', marginTop: 20 },
   freezeIconWrap: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.amberBg, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  freezeIcon: { fontSize: 28 },
   freezeLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginBottom: 4 },
   freezeAmount: { fontSize: 28, fontFamily: fonts.heading, color: colors.amber, marginBottom: 8 },
   freezeDesc: { fontSize: 12, fontFamily: fonts.bodyLight, color: colors.muted, textAlign: 'center', lineHeight: 18, marginBottom: 20 },
   depositBtn: { backgroundColor: colors.amber, paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14, width: '100%', alignItems: 'center' },
-  depositBtnText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
+  depositBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
   frozenBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  frozenBadgeText: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.success },
+  frozenBadgeText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.success },
 
   stepsSection: { marginTop: 24, marginBottom: 40 },
   stepRow: { flexDirection: 'row', marginBottom: 4 },
   stepLeft: { alignItems: 'center', width: 32, marginRight: 12 },
   stepDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center' },
   stepDotDone: { backgroundColor: colors.success },
-  stepNum: { fontSize: 12, fontFamily: fonts.headingBold, color: colors.muted },
+  stepNum: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted },
   stepLine: { width: 2, height: 28, backgroundColor: colors.border },
   stepLineDone: { backgroundColor: colors.success },
   stepContent: { paddingTop: 4, flex: 1 },
   stepLabel: { fontSize: 14, fontFamily: fonts.body, color: colors.muted },
-  stepLabelDone: { color: colors.ink, fontFamily: fonts.headingBold },
+  stepLabelDone: { color: colors.ink, fontFamily: fonts.bodyMedium },
 })

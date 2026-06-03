@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   },
   checkboxActive: { backgroundColor: colors.amber, borderColor: colors.amber },
   checkboxLabel: { flex: 1, fontSize: 13, fontFamily: fonts.body, color: colors.muted, lineHeight: 18 },
-  termsLink: { fontFamily: fonts.headingBold, color: colors.amber },
+  termsLink: { fontFamily: fonts.bodyMedium, color: colors.amber },
   button: {
     backgroundColor: colors.amber,
     paddingVertical: 18,
@@ -202,5 +202,5 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
+  buttonText: { fontSize: 18, fontFamily: fonts.bodyMedium, color: colors.ink },
 })

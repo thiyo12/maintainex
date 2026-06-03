@@ -88,9 +88,9 @@ export default function CustomerHome() {
 
               {/* Post a New Job CTA */}
               <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(customer)/jobs/v2/create')} activeOpacity={0.8}>
-                <View style={styles.ctaIconBox}>
-                  <Text style={styles.ctaIcon}>+</Text>
-                </View>
+                  <View style={styles.ctaIconBox}>
+                    <Ionicons name="add" size={24} color={colors.amber} />
+                  </View>
                 <Text style={styles.ctaText}>Post a New Job</Text>
               </TouchableOpacity>
             </SafeAreaView>
@@ -102,7 +102,7 @@ export default function CustomerHome() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
               {categories.map((cat) => (
                 <TouchableOpacity key={cat.id} style={styles.catChip} activeOpacity={0.7}>
-                  <Text style={styles.catIcon}>{cat.icon}</Text>
+                  <Ionicons name="construct-outline" size={24} color={colors.muted} />
                   <Text style={styles.catName}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
+  avatarText: { fontSize: 18, fontFamily: fonts.bodyMedium, color: colors.ink },
 
   // CTA
   ctaBtn: {
@@ -226,8 +226,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  ctaIcon: { fontSize: 20, fontFamily: fonts.heading, color: colors.amber, lineHeight: 22 },
-  ctaText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink, flex: 1 },
+  ctaText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink, flex: 1 },
 
   // Sections
   section: { paddingHorizontal: 20, marginTop: 24 },
@@ -246,15 +245,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     minWidth: 72,
   },
-  catIcon: { fontSize: 24, marginBottom: 4 },
   catName: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
 
   // Empty
   emptyCard: { alignItems: 'center', paddingVertical: 32 },
   emptyIcon: { fontSize: 40, marginBottom: 8 },
-  emptyText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 12 },
+  emptyText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 12 },
   emptyBtn: { backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  emptyBtnText: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
+  emptyBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
 
   // Job Card
   jobCard: {
@@ -279,7 +277,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   jobInfo: { flex: 1, marginRight: 8 },
-  jobTitle: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 2 },
+  jobTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 2 },
   jobMeta: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
 
   // Nav
@@ -298,6 +296,6 @@ const styles = StyleSheet.create({
   },
   navIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   navInfo: { flex: 1, marginLeft: 12 },
-  navTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
+  navTitle: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
   navSub: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 1 },
 })

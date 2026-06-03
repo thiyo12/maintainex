@@ -225,17 +225,17 @@ const styles = StyleSheet.create({
 
   statsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, gap: 8 },
   statCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 10, alignItems: 'center' },
-  statValue: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.white, marginTop: 6 },
+  statValue: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.white, marginTop: 6 },
   statLabel: { fontSize: 9, fontFamily: fonts.body, color: colors.muted, marginTop: 2, textAlign: 'center' },
 
   actionRow: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 16, gap: 10 },
   actionBtn: { flexDirection: 'row', flex: 1, backgroundColor: colors.companyAccent, paddingVertical: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.companyAccent },
-  actionBtnText: { fontSize: 13, fontFamily: fonts.headingBold, color: colors.white },
+  actionBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.white },
 
   chartCard: { backgroundColor: colors.white, marginHorizontal: 20, marginTop: 20, padding: 18, borderRadius: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
   chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  chartTitle: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
+  chartTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
   chartSub: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
   chartBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 90 },
   chartBarWrap: { flex: 1, alignItems: 'center', height: 90, justifyContent: 'flex-end' },
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   navCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 14, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   navIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   navInfo: { flex: 1, marginLeft: 12 },
-  navTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
+  navTitle: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
   navSub: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 1 },
 
   activitySection: { padding: 20, paddingBottom: 100 },

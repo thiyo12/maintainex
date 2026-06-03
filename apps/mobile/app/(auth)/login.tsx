@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
+  buttonText: { fontSize: 18, fontFamily: fonts.bodyMedium, color: colors.ink },
   footerText: { textAlign: 'center', marginTop: 40, fontSize: 14, fontFamily: fonts.body, color: colors.muted },
-  footerLink: { fontFamily: fonts.headingBold, color: colors.amber },
+  footerLink: { fontFamily: fonts.bodyMedium, color: colors.amber },
 })
