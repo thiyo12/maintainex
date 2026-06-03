@@ -35,7 +35,7 @@ export default function CustomerWalletScreen() {
       const res = await v2Wallet.topUp(parseFloat(amount))
       setWallet({ ...wallet, balance: res.balance })
       setAmount('')
-      Alert.alert('Success', `Added LKR ${amount} to wallet`)
+      Alert.alert('Done!', `LKR ${amount} added to your wallet`)
       loadWallet()
     } catch (e: any) {
       Alert.alert('Error', e.message)
@@ -47,65 +47,81 @@ export default function CustomerWalletScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* Balance Card */}
           <View style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Available Balance</Text>
             <Text style={styles.balanceAmount}>LKR {wallet.balance?.toLocaleString() || '0'}</Text>
+            <Text style={styles.balanceSub}>Secure funds for marketplace jobs</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Top Up Wallet</Text>
-          <View style={styles.topUpRow}>
-            {[500, 1000, 2000, 5000].map((amt) => (
-              <TouchableOpacity
-                key={amt}
-                style={[styles.quickAmt, parseFloat(amount) === amt && styles.quickAmtSelected]}
-                onPress={() => setAmount(amt.toString())}
-              >
-                <Text style={[styles.quickAmtText, parseFloat(amount) === amt && styles.quickAmtTextSelected]}>
-                  LKR {amt}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* Quick Top Up */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Quick Top Up</Text>
+            <View style={styles.quickRow}>
+              {[500, 1000, 2000, 5000].map((amt) => (
+                <TouchableOpacity
+                  key={amt}
+                  style={[styles.quickBtn, parseFloat(amount) === amt && styles.quickBtnSelected]}
+                  onPress={() => setAmount(amt.toString())}
+                >
+                  <Text style={[styles.quickBtnText, parseFloat(amount) === amt && styles.quickBtnTextSelected]}>
+                    LKR {amt}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="Custom amount"
+              placeholderTextColor={colors.muted}
+              keyboardType="numeric"
+            />
+            <TouchableOpacity
+              style={[styles.topUpBtn, submitting && styles.btnDisabled]}
+              onPress={handleTopUp}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator color={colors.ink} />
+              ) : (
+                <Text style={styles.topUpBtnText}>Add Funds</Text>
+              )}
+            </TouchableOpacity>
           </View>
-          <TextInput
-            style={styles.input}
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="Custom amount"
-            placeholderTextColor="#999"
-            keyboardType="numeric"
-          />
-          <TouchableOpacity
-            style={[styles.topUpBtn, submitting && styles.topUpBtnDisabled]}
-            onPress={handleTopUp}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#1a1a1a" />
-            ) : (
-              <Text style={styles.topUpBtnText}>Add Funds</Text>
-            )}
-          </TouchableOpacity>
 
-          <Text style={styles.sectionTitle}>Transactions</Text>
-          {transactions.length === 0 ? (
-            <Text style={styles.emptyText}>No transactions yet</Text>
-          ) : (
-            transactions.map((tx) => (
-              <View key={tx.id} style={styles.txCard}>
-                <View style={styles.txLeft}>
-                  <Text style={styles.txType}>{tx.type === 'CREDIT' ? 'Deposit' : 'Payment'}</Text>
-                  <Text style={styles.txRef}>{tx.reference}</Text>
-                  <Text style={styles.txDate}>{new Date(tx.createdAt).toLocaleDateString()}</Text>
-                </View>
-                <Text style={[styles.txAmount, tx.type === 'CREDIT' ? styles.credit : styles.debit]}>
-                  {tx.type === 'CREDIT' ? '+' : '-'}LKR {tx.amount}
-                </Text>
+          {/* Transactions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Transaction History</Text>
+            {transactions.length === 0 ? (
+              <View style={styles.emptyTx}>
+                <Text style={styles.emptyTxIcon}>💳</Text>
+                <Text style={styles.emptyTxText}>No transactions yet</Text>
               </View>
-            ))
-          )}
+            ) : (
+              transactions.map((tx) => (
+                <View key={tx.id} style={styles.txCard}>
+                  <View style={styles.txLeft}>
+                    <View style={[styles.txIcon, tx.type === 'CREDIT' ? styles.txIconCredit : styles.txIconDebit]}>
+                      <Text style={styles.txIconText}>{tx.type === 'CREDIT' ? '↓' : '↑'}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.txType}>{tx.type === 'CREDIT' ? 'Deposit' : 'Payment'}</Text>
+                      <Text style={styles.txRef}>{tx.reference}</Text>
+                      <Text style={styles.txDate}>{new Date(tx.createdAt).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.txAmount, tx.type === 'CREDIT' ? styles.credit : styles.debit]}>
+                    {tx.type === 'CREDIT' ? '+' : '-'} LKR {tx.amount}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
         </ScrollView>
       )}
     </SafeAreaView>
@@ -113,28 +129,41 @@ export default function CustomerWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  content: { flex: 1, padding: 20 },
-  balanceCard: { backgroundColor: colors.primary, borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 24 },
-  balanceLabel: { fontSize: 14, color: 'rgba(0,0,0,0.6)', marginBottom: 8 },
-  balanceAmount: { fontSize: 36, fontWeight: '800', color: '#1a1a1a' },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a', marginTop: 20, marginBottom: 12 },
-  topUpRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  quickAmt: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: '#e0e0e0', alignItems: 'center' },
-  quickAmtSelected: { borderColor: colors.primary, backgroundColor: '#FFF8E1' },
-  quickAmtText: { fontSize: 13, fontWeight: '600', color: '#666' },
-  quickAmtTextSelected: { color: colors.primary },
-  input: { borderWidth: 1.5, borderColor: '#e0e0e0', borderRadius: 10, padding: 14, fontSize: 15, color: '#333', marginBottom: 12 },
-  topUpBtn: { backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  topUpBtnDisabled: { opacity: 0.6 },
-  topUpBtnText: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
-  emptyText: { fontSize: 14, color: '#999', textAlign: 'center', marginTop: 20 },
-  txCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f9f9f9', borderRadius: 10, padding: 14, marginBottom: 8 },
-  txLeft: { flex: 1 },
-  txType: { fontSize: 14, fontWeight: '600', color: '#333' },
-  txRef: { fontSize: 12, color: '#999', marginTop: 2 },
-  txDate: { fontSize: 11, color: '#bbb', marginTop: 2 },
+  container: { flex: 1, backgroundColor: colors.cream },
+  scroll: { flex: 1 },
+  balanceCard: { backgroundColor: colors.amber, marginHorizontal: 20, marginTop: 20, borderRadius: 20, padding: 28, alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6 },
+  balanceLabel: { fontSize: 13, color: colors.ink, opacity: 0.7, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
+  balanceAmount: { fontSize: 40, fontWeight: '800', color: colors.ink, marginTop: 8, marginBottom: 4 },
+  balanceSub: { fontSize: 12, color: colors.ink, opacity: 0.6 },
+
+  section: { padding: 20, paddingBottom: 8 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 14 },
+
+  quickRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  quickBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
+  quickBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  quickBtnText: { fontSize: 13, fontWeight: '600', color: colors.muted },
+  quickBtnTextSelected: { color: colors.amberDark },
+
+  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 15, color: colors.ink, backgroundColor: colors.white, marginBottom: 12 },
+  topUpBtn: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
+  btnDisabled: { opacity: 0.5 },
+  topUpBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+
+  emptyTx: { alignItems: 'center', paddingVertical: 30 },
+  emptyTxIcon: { fontSize: 36, marginBottom: 8 },
+  emptyTxText: { fontSize: 14, color: colors.muted },
+
+  txCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 10, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  txLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  txIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  txIconCredit: { backgroundColor: '#D1FAE5' },
+  txIconDebit: { backgroundColor: '#FEE2E2' },
+  txIconText: { fontSize: 16, fontWeight: '800' },
+  txType: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  txRef: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  txDate: { fontSize: 11, color: colors.muted, marginTop: 1 },
   txAmount: { fontSize: 16, fontWeight: '700' },
-  credit: { color: '#10B981' },
-  debit: { color: '#EF4444' },
+  credit: { color: colors.success },
+  debit: { color: colors.error },
 })

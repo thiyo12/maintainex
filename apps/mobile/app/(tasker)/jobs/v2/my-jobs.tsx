@@ -5,6 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { colors } from '../../../../lib/colors'
 import { v2Jobs, v2Quotes, V2Job } from '../../../../lib/api-v2'
 
+const statusColors: Record<string, string> = {
+  OPEN: colors.amber,
+  IN_PROGRESS: '#3B82F6',
+  COMPLETED: colors.success,
+  CANCELLED: colors.error,
+}
+
 export default function V2ProviderMyJobsScreen() {
   const router = useRouter()
   const [jobs, setJobs] = useState<any[]>([])
@@ -35,53 +42,56 @@ export default function V2ProviderMyJobsScreen() {
 
   useEffect(() => { loadJobs() }, [loadJobs])
 
-  const statusColors: Record<string, string> = {
-    OPEN: '#F59E0B',
-    IN_PROGRESS: '#3B82F6',
-    COMPLETED: '#10B981',
-    CANCELLED: '#EF4444',
-  }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Marketplace Jobs</Text>
-        <Text style={styles.headerCount}>{jobs.length} active</Text>
+        <View>
+          <Text style={styles.headerTitle}>My Jobs</Text>
+          <Text style={styles.headerSub}>{jobs.length} active quote{jobs.length !== 1 ? 's' : ''}</Text>
+        </View>
+        <TouchableOpacity onPress={() => router.push('/(tasker)/jobs/v2/browse')} style={styles.browseBtn}>
+          <Text style={styles.browseBtnText}>Browse</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>📭</Text>
           <Text style={styles.emptyTitle}>No jobs yet</Text>
           <Text style={styles.emptySub}>Browse open jobs and submit quotes to get started</Text>
           <TouchableOpacity onPress={() => router.push('/(tasker)/jobs/v2/browse')} style={styles.emptyBtn}>
-            <Text style={styles.emptyBtnText}>Browse Jobs</Text>
+            <Text style={styles.emptyBtnText}>Browse Open Jobs</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <ScrollView
           style={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.primary} />}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.amber} />}
         >
           {jobs.map((job) => (
             <TouchableOpacity
               key={job.id}
               style={styles.jobCard}
               onPress={() => router.push(`/(tasker)/jobs/v2/manage/${job.id}`)}
+              activeOpacity={0.7}
             >
-              <View style={styles.jobHeader}>
-                <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || '#999' }]}>
-                  <Text style={styles.statusText}>{job.status.replace('_', ' ')}</Text>
+              <View style={styles.cardTop}>
+                <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
+                  <Text style={styles.statusText}>{job.status.replace(/_/g, ' ')}</Text>
                 </View>
               </View>
+              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
               <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.jobFooter}>
+              <View style={styles.cardFooter}>
                 <Text style={styles.jobBudget}>LKR {job.budgetAmount}</Text>
-                {job.myQuote && (
-                  <Text style={styles.myQuote}>My quote: LKR {job.myQuote.price}</Text>
-                )}
+                {job.myQuote ? (
+                  <View style={styles.myQuotePill}>
+                    <Text style={styles.myQuoteText}>My quote: LKR {job.myQuote.price}</Text>
+                  </View>
+                ) : null}
               </View>
             </TouchableOpacity>
           ))}
@@ -92,23 +102,29 @@ export default function V2ProviderMyJobsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#1a1a1a' },
-  headerCount: { fontSize: 14, color: '#999' },
+  container: { flex: 1, backgroundColor: colors.cream },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink },
+  headerSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  browseBtn: { backgroundColor: colors.amber, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
+  browseBtnText: { fontSize: 14, fontWeight: '700', color: colors.ink },
+
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: '#999', textAlign: 'center', marginBottom: 24 },
-  emptyBtn: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  emptyBtnText: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
-  list: { flex: 1, padding: 16 },
-  jobCard: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 16, marginBottom: 12 },
-  jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  jobTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', flex: 1, marginRight: 8 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  emptyIcon: { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
+  emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  emptyBtn: { backgroundColor: colors.amber, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
+  emptyBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+
+  list: { flex: 1, padding: 16, paddingTop: 4 },
+  jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  cardTop: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 8 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  jobDesc: { fontSize: 13, color: '#666', marginBottom: 8 },
-  jobFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  jobBudget: { fontSize: 14, fontWeight: '600', color: colors.primary },
-  myQuote: { fontSize: 13, fontWeight: '600', color: '#059669' },
+  jobTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 6 },
+  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 12 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  jobBudget: { fontSize: 15, fontWeight: '700', color: colors.amberDark },
+  myQuotePill: { backgroundColor: '#D1FAE5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  myQuoteText: { fontSize: 12, fontWeight: '600', color: colors.success },
 })

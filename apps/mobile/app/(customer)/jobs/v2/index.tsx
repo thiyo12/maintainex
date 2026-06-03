@@ -6,10 +6,10 @@ import { colors } from '../../../../lib/colors'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 
 const statusColors: Record<string, string> = {
-  OPEN: '#F59E0B',
+  OPEN: colors.amber,
   IN_PROGRESS: '#3B82F6',
-  COMPLETED: '#10B981',
-  CANCELLED: '#EF4444',
+  COMPLETED: colors.success,
+  CANCELLED: colors.error,
 }
 
 export default function V2MyJobsScreen() {
@@ -37,18 +37,22 @@ export default function V2MyJobsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Jobs</Text>
+        <View>
+          <Text style={styles.greeting}>My Marketplace Jobs</Text>
+          <Text style={styles.subtitle}>{jobs.length} job{jobs.length !== 1 ? 's' : ''}</Text>
+        </View>
         <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.createBtn}>
           <Text style={styles.createBtnText}>+ New</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>📋</Text>
           <Text style={styles.emptyTitle}>No jobs yet</Text>
-          <Text style={styles.emptySub}>Post your first job and get quotes from providers</Text>
+          <Text style={styles.emptySub}>Post your first job and get quotes from top providers</Text>
           <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.emptyBtn}>
             <Text style={styles.emptyBtnText}>Post a Job</Text>
           </TouchableOpacity>
@@ -56,19 +60,23 @@ export default function V2MyJobsScreen() {
       ) : (
         <ScrollView
           style={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.amber} />}
         >
           {jobs.map((job) => (
-            <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}>
-              <View style={styles.jobHeader}>
-                <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || '#999' }]}>
-                  <Text style={styles.statusText}>{job.status.replace('_', ' ')}</Text>
+            <TouchableOpacity key={job.id} style={styles.jobCard} onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)} activeOpacity={0.7}>
+              <View style={styles.cardTop}>
+                <View style={[styles.statusDot, { backgroundColor: statusColors[job.status] || colors.muted }]} />
+                <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
+                  <Text style={styles.statusText}>{job.status.replace(/_/g, ' ')}</Text>
                 </View>
               </View>
+              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
               <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.jobFooter}>
-                <Text style={styles.jobBudget}>{job.budgetType} — LKR {job.budgetAmount}</Text>
+              <View style={styles.cardFooter}>
+                <View style={styles.budgetPill}>
+                  <Text style={styles.budgetText}>LKR {job.budgetAmount}</Text>
+                </View>
                 <Text style={styles.jobDate}>{new Date(job.createdAt).toLocaleDateString()}</Text>
               </View>
             </TouchableOpacity>
@@ -80,24 +88,30 @@ export default function V2MyJobsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: '#1a1a1a' },
-  createBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  createBtnText: { fontSize: 14, fontWeight: '700', color: '#1a1a1a' },
+  container: { flex: 1, backgroundColor: colors.cream },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.cream },
+  greeting: { fontSize: 22, fontWeight: '800', color: colors.ink },
+  subtitle: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  createBtn: { backgroundColor: colors.amber, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
+  createBtnText: { fontSize: 14, fontWeight: '700', color: colors.ink },
+
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: '#999', textAlign: 'center', marginBottom: 24 },
-  emptyBtn: { backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  emptyBtnText: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
-  list: { flex: 1, padding: 16 },
-  jobCard: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 16, marginBottom: 12 },
-  jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  jobTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', flex: 1, marginRight: 8 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  emptyIcon: { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
+  emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  emptyBtn: { backgroundColor: colors.amber, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 12 },
+  emptyBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+
+  list: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
+  jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  jobDesc: { fontSize: 13, color: '#666', marginBottom: 10 },
-  jobFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  jobBudget: { fontSize: 13, fontWeight: '600', color: colors.primary },
-  jobDate: { fontSize: 12, color: '#999' },
+  jobTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 6 },
+  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 12 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  budgetPill: { backgroundColor: colors.amberBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  budgetText: { fontSize: 13, fontWeight: '700', color: colors.amberDark },
+  jobDate: { fontSize: 12, color: colors.muted },
 })

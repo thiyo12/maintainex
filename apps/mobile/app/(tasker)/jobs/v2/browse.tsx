@@ -28,14 +28,20 @@ export default function V2BrowseJobsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Open Jobs</Text>
-        <Text style={styles.headerCount}>{jobs.length} available</Text>
+        <View>
+          <Text style={styles.headerTitle}>Open Jobs</Text>
+          <Text style={styles.headerSub}>{jobs.length} job{jobs.length !== 1 ? 's' : ''} available</Text>
+        </View>
+        <View style={styles.headerBadge}>
+          <Text style={styles.headerBadgeText}>{jobs.length}</Text>
+        </View>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
+          <Text style={styles.emptyIcon}>🔍</Text>
           <Text style={styles.emptyTitle}>No open jobs</Text>
           <Text style={styles.emptySub}>Check back later for new job postings</Text>
         </View>
@@ -43,22 +49,28 @@ export default function V2BrowseJobsScreen() {
         <ScrollView
           style={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.amber} />}
         >
           {jobs.map((job) => (
             <TouchableOpacity
               key={job.id}
               style={styles.jobCard}
               onPress={() => router.push(`/(tasker)/jobs/v2/quote/${job.id}`)}
+              activeOpacity={0.7}
             >
-              <View style={styles.jobHeader}>
-                <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                <Text style={styles.jobBudget}>LKR {job.budgetAmount}</Text>
+              <View style={styles.cardHeader}>
+                <View style={styles.budgetBadge}>
+                  <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount}</Text>
+                </View>
+                <Text style={styles.budgetType}>{job.budgetType}</Text>
               </View>
+              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
               <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.jobMeta}>
-                <Text style={styles.jobType}>{job.budgetType}</Text>
-                <Text style={styles.jobDate}>{new Date(job.createdAt).toLocaleDateString()}</Text>
+              <View style={styles.cardFooter}>
+                <Text style={styles.jobDate}>Posted {new Date(job.createdAt).toLocaleDateString()}</Text>
+                <View style={styles.quoteBtn}>
+                  <Text style={styles.quoteBtnText}>Quote →</Text>
+                </View>
               </View>
             </TouchableOpacity>
           ))}
@@ -69,20 +81,28 @@ export default function V2BrowseJobsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#1a1a1a' },
-  headerCount: { fontSize: 14, color: '#999' },
+  container: { flex: 1, backgroundColor: colors.cream },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink },
+  headerSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  headerBadge: { backgroundColor: colors.amber, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  headerBadgeText: { fontSize: 14, fontWeight: '700', color: colors.ink },
+
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#1a1a1a', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: '#999', textAlign: 'center' },
-  list: { flex: 1, padding: 16 },
-  jobCard: { backgroundColor: '#f9f9f9', borderRadius: 12, padding: 16, marginBottom: 12 },
-  jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  jobTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a', flex: 1, marginRight: 8 },
-  jobBudget: { fontSize: 16, fontWeight: '800', color: colors.primary },
-  jobDesc: { fontSize: 13, color: '#666', marginBottom: 8 },
-  jobMeta: { flexDirection: 'row', justifyContent: 'space-between' },
-  jobType: { fontSize: 12, fontWeight: '600', color: '#3B82F6' },
-  jobDate: { fontSize: 12, color: '#999' },
+  emptyIcon: { fontSize: 48, marginBottom: 16 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
+  emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22 },
+
+  list: { flex: 1, padding: 16, paddingTop: 4 },
+  jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 18, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  budgetBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  budgetBadgeText: { fontSize: 14, fontWeight: '700', color: colors.amberDark },
+  budgetType: { fontSize: 12, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  jobTitle: { fontSize: 17, fontWeight: '700', color: colors.ink, marginBottom: 6 },
+  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 14 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  jobDate: { fontSize: 12, color: colors.muted },
+  quoteBtn: { backgroundColor: colors.amber, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
+  quoteBtnText: { fontSize: 13, fontWeight: '700', color: colors.ink },
 })
