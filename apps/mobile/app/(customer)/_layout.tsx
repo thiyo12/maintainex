@@ -28,6 +28,10 @@ export default function CustomerLayout() {
       <Stack.Screen name="jobs/receipt/[id]" options={{ headerShown: true, headerTitle: 'Receipt', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
       <Stack.Screen name="jobs/review/[id]" options={{ headerShown: true, headerTitle: 'Review', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
       <Stack.Screen name="jobs/dispute/[id]" options={{ headerShown: true, headerTitle: 'Dispute', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="jobs/v2/create" options={{ headerShown: true, headerTitle: 'Post a Job (V2)', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="jobs/v2/index" options={{ headerShown: true, headerTitle: 'My Jobs', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="jobs/v2/[id]" options={{ headerShown: true, headerTitle: 'Job Details', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="wallet/index" options={{ headerShown: true, headerTitle: 'Wallet', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
       <Stack.Screen name="find/index" options={{ headerShown: true, headerTitle: 'Find a Tasker', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
       <Stack.Screen name="find/[categoryId]" options={{ headerShown: true, headerTitle: 'Services', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
       <Stack.Screen name="find/job/[jobId]" options={{ headerShown: true, headerTitle: 'Service Details', headerBackTitle: 'Back', headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.white } }} />
