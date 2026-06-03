@@ -105,6 +105,11 @@ export const v2JobActions = {
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
 }
 
+export const v2Match = {
+  getProviders: (jobId: string) =>
+    v2Request<{ providers: any[] }>(`/api/mobile/v2/match/${jobId}`),
+}
+
 export const v2Wallet = {
   get: (role: string) =>
     v2Request<{ wallet: any; transactions: any[] }>(`/api/mobile/v2/wallet?role=${role}`),
