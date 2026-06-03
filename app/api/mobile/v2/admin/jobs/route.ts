@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')

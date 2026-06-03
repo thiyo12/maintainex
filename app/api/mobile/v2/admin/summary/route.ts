@@ -6,7 +6,7 @@ export async function GET(_request: NextRequest) {
   try {
     const user = await authenticateRequest(_request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+
 
     const [
       totalJobs,
