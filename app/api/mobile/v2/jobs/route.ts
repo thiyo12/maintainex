@@ -57,10 +57,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const role = searchParams.get('role')
+    const myQuotes = searchParams.get('myQuotes')
 
     let where: any = { isActive: true }
 
-    if (role === 'provider') {
+    if (myQuotes === 'true') {
+      const quoteJobIds = await prisma.jobQuote.findMany({
+        where: { providerId: user.id },
+        select: { jobId: true },
+        distinct: ['jobId'],
+      })
+      where.id = { in: quoteJobIds.map(q => q.jobId) }
+    } else if (role === 'provider') {
       where.status = 'OPEN'
     } else {
       where.customerId = user.id

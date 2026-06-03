@@ -13,7 +13,7 @@ export default function V2ProviderMyJobsScreen() {
 
   const loadJobs = useCallback(async () => {
     try {
-      const res = await v2Jobs.list('role=provider')
+      const res = await v2Jobs.list('myQuotes=true')
       const allJobs = res.jobs
       const quoted = await Promise.all(
         allJobs.map(async (j) => {
@@ -24,7 +24,7 @@ export default function V2ProviderMyJobsScreen() {
           } catch { return { ...j, myQuote: null } }
         })
       )
-      setJobs(quoted.filter(j => j.myQuote))
+      setJobs(quoted)
     } catch (e) {
       console.error('Load my jobs error:', e)
     } finally {
