@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { notifyQuoteSubmitted } from '@/lib/notifications'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
         attachments: attachments || [],
       },
     })
+
+    notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
     return NextResponse.json({ quote }, { status: 201 })
   } catch (error) {

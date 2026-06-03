@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -55,6 +56,8 @@ export async function POST(
       }),
     ])
 
+    notifyPaymentReleased(job.id, escrow.providerId, job.title, escrow.amount)
+    notifyJobCompleted(job.id, job.customerId, job.title)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Release escrow error:', error)

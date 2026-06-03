@@ -89,7 +89,7 @@ export default function V2JobDetailScreen() {
   const handleApproveCompletion = async () => {
     setActionLoading('approve')
     try {
-      const res = await v2JobActions.markComplete(id, 'APPROVE_COMPLETION')
+      const res = await v2JobActions.complete(id, 'APPROVE_COMPLETION')
       Alert.alert('Success', res.message || 'Job completed!')
       loadJob()
     } catch (e: any) {

@@ -89,13 +89,15 @@ export const v2JobActions = {
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow`, { method: 'POST', body: JSON.stringify({ amount }) }),
   getEscrow: (jobId: string) =>
     v2Request<{ escrow: any }>(`/api/mobile/v2/jobs/${jobId}/escrow`),
+  refundEscrow: (jobId: string) =>
+    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow/refund`, { method: 'POST' }),
   shareAddress: (jobId: string, data: { street?: string; building?: string; apartment?: string; landmark?: string }) =>
     v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}/share-address`, { method: 'POST', body: JSON.stringify(data) }),
   getWorkspace: (jobId: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`),
   updateProgress: (jobId: string, progressStatus: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`, { method: 'PATCH', body: JSON.stringify({ progressStatus }) }),
-  markComplete: (jobId: string, action: string) =>
+  complete: (jobId: string, action: string) =>
     v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action }) }),
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
@@ -103,6 +105,19 @@ export const v2JobActions = {
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
+  dispute: (jobId: string) =>
+    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action: 'DISPUTE' }) }),
+}
+
+export const v2Admin = {
+  summary: () =>
+    v2Request<{ summary: any }>('/api/mobile/v2/admin/summary'),
+  jobs: (params?: string) =>
+    v2Request<{ jobs: any[]; total: number }>(`/api/mobile/v2/admin/jobs${params ? `?${params}` : ''}`),
+  escrows: (params?: string) =>
+    v2Request<{ escrows: any[]; total: number }>(`/api/mobile/v2/admin/escrows${params ? `?${params}` : ''}`),
+  resolveEscrow: (escrowId: string, action: string) =>
+    v2Request<{ success: boolean }>('/api/mobile/v2/admin/escrows', { method: 'PATCH', body: JSON.stringify({ escrowId, action }) }),
 }
 
 export const v2Match = {

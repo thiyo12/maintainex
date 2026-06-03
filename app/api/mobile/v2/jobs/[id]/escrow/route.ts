@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { notifyEscrowDeposited } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -63,6 +64,8 @@ export async function POST(
         },
       })
     })
+
+    notifyEscrowDeposited(job.id, quote.providerId, job.title)
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { notifyQuoteAccepted } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -29,6 +30,8 @@ export async function POST(
       prisma.marketplaceJob.update({ where: { id: job.id }, data: { status: 'IN_PROGRESS' } }),
       prisma.jobWorkspace.create({ data: { jobId: job.id } }),
     ])
+
+    notifyQuoteAccepted(job.id, quote.providerId, job.title)
 
     return NextResponse.json({ success: true, quote })
   } catch (error) {

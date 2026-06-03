@@ -40,7 +40,7 @@ export default function V2ProviderManageJobScreen() {
   const handleMarkComplete = async () => {
     setActionLoading('complete')
     try {
-      await v2JobActions.markComplete(id, 'MARK_COMPLETE')
+      await v2JobActions.complete(id, 'MARK_COMPLETE')
       Alert.alert('Success', 'Marked complete! Waiting for customer approval.')
       loadJob()
     } catch (e: any) { Alert.alert('Error', e.message) }
