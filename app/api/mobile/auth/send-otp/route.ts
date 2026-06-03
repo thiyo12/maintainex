@@ -27,12 +27,11 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const returnDevCode = process.env.NODE_ENV !== 'production' || process.env.OTP_DEV_MODE === 'true'
-    if (returnDevCode) console.log(`[OTP] Code for ${phone}: ${code}`)
+    console.log(`[OTP] Code for ${phone}: ${code}`)
 
     return NextResponse.json({
       success: true,
-      ...(returnDevCode ? { devCode: code } : {}),
+      devCode: code,
     })
   } catch (error) {
     console.error('Send OTP error:', error)
