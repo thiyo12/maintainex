@@ -1240,3 +1240,197 @@ model FlashOffer {
   @@index([isActive])
   @@index([expiresAt])
 }
+
+// ============================================
+// MARKETPLACE V2 — Job Marketplace System
+// ADD-ONLY — Does not affect existing tables
+// Scalar foreign keys only — no Prisma relations
+// to avoid modifying User/JobCategory models
+// ============================================
+
+model Country {
+  id   String @id @default(cuid())
+  name String
+  code String @unique
+
+  states State[]
+
+  @@index([code])
+}
+
+model State {
+  id        String  @id @default(cuid())
+  name      String
+  countryId String
+  country   Country @relation(fields: [countryId], references: [id])
+
+  cities City[]
+
+  @@index([countryId])
+}
+
+model City {
+  id      String @id @default(cuid())
+  name    String
+  stateId String
+  state   State  @relation(fields: [stateId], references: [id])
+
+  areas Area[]
+
+  @@index([stateId])
+}
+
+model Area {
+  id     String @id @default(cuid())
+  name   String
+  cityId String
+  city   City   @relation(fields: [cityId], references: [id])
+
+  @@index([cityId])
+}
+
+model MarketplaceJob {
+  id               String    @id @default(cuid())
+  customerId       String
+  title            String
+  description      String
+  categoryId       String
+  photos           String[]
+  budgetType       String    // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
+  budgetAmount     Float
+  areaId           String?
+  postalCode       String?
+  preferredDate    DateTime?
+  addressStreet    String?   // Only shared after escrow payment
+  addressBuilding  String?
+  addressApartment String?
+  addressLandmark  String?
+  addressSharedAt  DateTime?
+  status           String    @default("OPEN") // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([categoryId])
+  @@index([areaId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model JobQuote {
+  id                       String   @id @default(cuid())
+  jobId                    String
+  providerId               String
+  providerType             String   // INDIVIDUAL, COMPANY
+  price                    Float
+  estimatedCompletionTime  String
+  message                  String?
+  attachments              String[]
+  status                   String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, WITHDRAWN
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model JobEscrow {
+  id          String    @id @default(cuid())
+  jobId       String
+  quoteId     String
+  customerId  String
+  providerId  String
+  amount      Float     // quote price
+  serviceFee  Float     // platform fee
+  totalAmount Float     // amount + fee
+  status      String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
+  heldAt      DateTime?
+  releasedAt  DateTime?
+  refundedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([jobId])
+  @@index([customerId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model ProviderWallet {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  availableBalance Float    @default(0)
+  pendingBalance   Float    @default(0)
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+}
+
+model CustomerWallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model WalletTransaction {
+  id             String   @id @default(cuid())
+  userId         String
+  walletType     String   // PROVIDER, CUSTOMER
+  type           String   // CREDIT, DEBIT
+  amount         Float
+  balanceBefore  Float
+  balanceAfter   Float
+  reference      String
+  referenceType  String   // ESCROW_RELEASE, ESCROW_REFUND, WITHDRAWAL, SERVICE_FEE
+  referenceId    String?
+  status         String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([walletType])
+  @@index([referenceType])
+  @@index([createdAt])
+}
+
+model JobWorkspace {
+  id             String   @id @default(cuid())
+  jobId          String   @unique
+  progressStatus String   @default("ACCEPTED") // ACCEPTED, IN_PROGRESS, WAITING_CUSTOMER, COMPLETION_REQUESTED, COMPLETED, DISPUTED
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([jobId])
+}
+
+model JobReview {
+  id            String   @id @default(cuid())
+  jobId         String
+  customerId    String
+  providerId    String
+  quality       Int      // 1-5
+  communication Int      // 1-5
+  timeliness    Int      // 1-5
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@unique([jobId, customerId])
+  @@index([providerId])
+}
+
+model ProviderReview {
+  id                String   @id @default(cuid())
+  jobId             String
+  providerId        String
+  customerId        String
+  cooperation       Int      // 1-5
+  communication     Int      // 1-5
+  overallExperience Int      // 1-5
+  comment           String?
+  createdAt         DateTime @default(now())
+
+  @@unique([jobId, providerId])
+  @@index([customerId])
+}
