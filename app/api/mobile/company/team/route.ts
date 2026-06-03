@@ -17,13 +17,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
 
-    const members = await prisma.teamMember.findMany({
-      where: { companyId: profile.id },
-      orderBy: [{ isOnline: 'desc' }, { rating: 'desc' }],
-    })
+    const [members, invites] = await Promise.all([
+      prisma.teamMember.findMany({
+        where: { companyId: profile.id },
+        orderBy: [{ isOnline: 'desc' }, { rating: 'desc' }],
+      }),
+      prisma.teamInvite.findMany({
+        where: { companyId: profile.id, status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
 
-    return NextResponse.json(
-      members.map(m => ({
+    return NextResponse.json({
+      members: members.map(m => ({
         id: m.id,
         name: m.name,
         role: m.role,
@@ -32,8 +38,17 @@ export async function GET(request: NextRequest) {
         rating: m.rating,
         completedJobs: m.completedJobs,
         joinedAt: m.joinedAt.toISOString(),
-      }))
-    )
+      })),
+      pendingInvites: invites.map(i => ({
+        id: i.id,
+        name: i.name,
+        email: i.email,
+        phone: i.phone,
+        role: i.role,
+        createdAt: i.createdAt.toISOString(),
+        expiresAt: i.expiresAt.toISOString(),
+      })),
+    })
   } catch (error) {
     console.error('Team list error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

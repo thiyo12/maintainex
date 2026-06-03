@@ -84,7 +84,8 @@ export default function OtpScreen() {
       await auth.verifyOtp({ phone: phone || '', code })
 
       const userRole = role || 'CUSTOMER'
-      if (userRole === 'TASKER') router.replace('/(tasker)')
+      if (userRole === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
+      else if (userRole === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
       else router.replace('/(customer)')
     } catch (err: any) {
       Alert.alert('Verification Failed', 'Invalid or expired code. Please try again.')

@@ -7,6 +7,8 @@ export default function AuthLayout() {
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
       <Stack.Screen name="otp" />
+      <Stack.Screen name="onboarding/tasker-services" options={{ presentation: 'fullScreenModal' }} />
+      <Stack.Screen name="onboarding/company-setup" options={{ presentation: 'fullScreenModal' }} />
     </Stack>
   )
 }

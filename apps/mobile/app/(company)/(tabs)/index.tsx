@@ -77,7 +77,7 @@ export default function CompanyDashboard() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.companyAccent} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       </SafeAreaView>
     )
@@ -87,7 +87,7 @@ export default function CompanyDashboard() {
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={colors.companyAccent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={colors.amber} />}
       >
         {/* Ink Header */}
         <View style={styles.header}>
@@ -103,7 +103,7 @@ export default function CompanyDashboard() {
               </View>
             </View>
             <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/(company)/settings/edit-profile')}>
-              <Ionicons name="settings-outline" size={20} color={colors.companyAccent} />
+              <Ionicons name="settings-outline" size={20} color={colors.amber} />
             </TouchableOpacity>
           </View>
 
@@ -111,7 +111,7 @@ export default function CompanyDashboard() {
           <View style={styles.statsRow}>
             {stats.map((s, i) => (
               <View key={i} style={styles.statCard}>
-                <Ionicons name={s.icon as any} size={18} color={colors.companyAccent} />
+                <Ionicons name={s.icon as any} size={18} color={colors.amber} />
                 <Text style={styles.statValue}>{s.value}</Text>
                 <Text style={styles.statLabel}>{s.label}</Text>
               </View>
@@ -125,8 +125,8 @@ export default function CompanyDashboard() {
               <Text style={styles.actionBtnText}>New Contract</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionBtn, styles.actionBtnOutline]} activeOpacity={0.7}>
-              <Ionicons name="people-outline" size={18} color={colors.companyAccent} style={{ marginRight: 6 }} />
-              <Text style={[styles.actionBtnText, { color: colors.companyAccent }]}>Invite Team</Text>
+              <Ionicons name="people-outline" size={18} color={colors.amber} style={{ marginRight: 6 }} />
+              <Text style={[styles.actionBtnText, { color: colors.amber }]}>Invite Team</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -138,7 +138,7 @@ export default function CompanyDashboard() {
               <Text style={styles.chartTitle}>Revenue Overview</Text>
               <Text style={styles.chartSub}>{revenueMonth} this month</Text>
             </View>
-            <Ionicons name="trending-up-outline" size={24} color={colors.companyAccent} />
+            <Ionicons name="trending-up-outline" size={24} color={colors.amber} />
           </View>
           <View style={styles.chartBars}>
             {(chartData.length > 0 ? chartData : [40, 65, 45, 80, 55, 90, 70]).map((h: number, i: number) => (
@@ -153,7 +153,7 @@ export default function CompanyDashboard() {
         <View style={styles.navSection}>
           <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/(tabs)/contracts-list')} activeOpacity={0.7}>
             <View style={[styles.navIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="document-text-outline" size={22} color={colors.companyAccent} />
+              <Ionicons name="document-text-outline" size={22} color={colors.amber} />
             </View>
             <View style={styles.navInfo}>
               <Text style={styles.navTitle}>All Contracts</Text>
@@ -164,7 +164,7 @@ export default function CompanyDashboard() {
 
           <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/(tabs)/milestones-list')} activeOpacity={0.7}>
             <View style={[styles.navIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="flag-outline" size={22} color={colors.companyAccent} />
+              <Ionicons name="flag-outline" size={22} color={colors.amber} />
             </View>
             <View style={styles.navInfo}>
               <Text style={styles.navTitle}>Milestones</Text>
@@ -173,13 +173,24 @@ export default function CompanyDashboard() {
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/(tabs)/team')} activeOpacity={0.7}>
-            <View style={[styles.navIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="people-outline" size={22} color={colors.companyAccent} />
+          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/team')} activeOpacity={0.7}>
+            <View style={[styles.navIcon, { backgroundColor: colors.amberBg }]}>
+              <Ionicons name="people-outline" size={22} color={colors.amber} />
             </View>
             <View style={styles.navInfo}>
               <Text style={styles.navTitle}>Team</Text>
               <Text style={styles.navSub}>Manage your team members</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/settings/subscription')} activeOpacity={0.7}>
+            <View style={[styles.navIcon, { backgroundColor: colors.amberBg }]}>
+              <Ionicons name="card-outline" size={22} color={colors.amber} />
+            </View>
+            <View style={styles.navInfo}>
+              <Text style={styles.navTitle}>Subscription</Text>
+              <Text style={styles.navSub}>Manage your plan and billing</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </TouchableOpacity>
@@ -216,7 +227,7 @@ const styles = StyleSheet.create({
   header: { backgroundColor: colors.ink, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 12 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.companyAccent, justifyContent: 'center', alignItems: 'center' },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.amber, justifyContent: 'center', alignItems: 'center' },
   avatarText: { fontSize: 20, fontFamily: fonts.headingBold, color: colors.white },
   greeting: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
   companyName: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.white },
@@ -229,8 +240,8 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 9, fontFamily: fonts.body, color: colors.muted, marginTop: 2, textAlign: 'center' },
 
   actionRow: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 16, gap: 10 },
-  actionBtn: { flexDirection: 'row', flex: 1, backgroundColor: colors.companyAccent, paddingVertical: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.companyAccent },
+  actionBtn: { flexDirection: 'row', flex: 1, backgroundColor: colors.amber, paddingVertical: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.amber },
   actionBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.white },
 
   chartCard: { backgroundColor: colors.white, marginHorizontal: 20, marginTop: 20, padding: 18, borderRadius: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
@@ -239,7 +250,7 @@ const styles = StyleSheet.create({
   chartSub: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
   chartBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 90 },
   chartBarWrap: { flex: 1, alignItems: 'center', height: 90, justifyContent: 'flex-end' },
-  chartBar: { width: '100%', backgroundColor: colors.companyAccent, borderRadius: 6, opacity: 0.6, minHeight: 8 },
+  chartBar: { width: '100%', backgroundColor: colors.amber, borderRadius: 6, opacity: 0.6, minHeight: 8 },
 
   navSection: { paddingHorizontal: 20, marginTop: 24, gap: 10 },
   navCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 14, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
@@ -252,7 +263,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 14 },
 
   activityCard: { flexDirection: 'row', marginBottom: 12, gap: 12 },
-  activityDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.companyAccent, marginTop: 5 },
+  activityDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber, marginTop: 5 },
   activityContent: { flex: 1 },
   activityText: { fontSize: 13, fontFamily: fonts.body, color: colors.ink, lineHeight: 18 },
   activityTime: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 2 },

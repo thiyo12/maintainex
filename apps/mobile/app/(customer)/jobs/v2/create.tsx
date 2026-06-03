@@ -199,6 +199,17 @@ export default function CreateJobScreen() {
               ))}
             </View>
 
+            {selectedTier && (
+              <View style={styles.recommendBox}>
+                <Ionicons name="bulb-outline" size={18} color={colors.amber} />
+                <Text style={styles.recommendText}>
+                  {selectedTier === 'LARGE'
+                    ? 'Recommended for companies — jobs over LKR 15,000 are best handled by professional companies.'
+                    : 'Recommended for individual taskers — this budget range is ideal for freelancers.'}
+                </Text>
+              </View>
+            )}
+
             <Text style={styles.label}>Who can do this job?</Text>
             <View style={styles.providerRow}>
               {providerTypes.map((p) => (
@@ -393,6 +404,8 @@ const styles = StyleSheet.create({
   tierLabel: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 4 },
   tierRange: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted },
   tierRangeSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
+  recommendBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, backgroundColor: colors.amberBg, borderRadius: 12, marginBottom: 12 },
+  recommendText: { flex: 1, fontSize: 13, fontFamily: fonts.body, color: colors.muted, lineHeight: 18 },
 
   providerRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   providerChip: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },

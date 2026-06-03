@@ -36,7 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(JSON.parse(storedUser))
         // Validate token against server — if stale, clear session
         try {
-          await auth.me()
+        const meRes = await auth.me()
+        setUser({ ...JSON.parse(storedUser), needsOnboarding: meRes.needsOnboarding })
+        await SecureStore.setItemAsync('auth_user', JSON.stringify({ ...JSON.parse(storedUser), needsOnboarding: meRes.needsOnboarding }))
         } catch {
           await SecureStore.deleteItemAsync('auth_token')
           await SecureStore.deleteItemAsync('auth_user')

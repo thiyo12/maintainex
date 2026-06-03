@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../../lib/colors'
+import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 
 export default function V2ProviderManageJobScreen() {
@@ -20,6 +21,9 @@ export default function V2ProviderManageJobScreen() {
   const [reviewComm, setReviewComm] = useState('5')
   const [reviewExp, setReviewExp] = useState('5')
   const [reviewComment, setReviewComment] = useState('')
+
+  const [generatedOtp, setGeneratedOtp] = useState('')
+  const [otpLoading, setOtpLoading] = useState(false)
 
   const loadJob = async () => {
     try {
@@ -55,6 +59,19 @@ export default function V2ProviderManageJobScreen() {
       loadJob()
     } catch (e: any) { Alert.alert('Error', e.message) }
     finally { setActionLoading('') }
+  }
+
+  const handleGenerateOtp = async () => {
+    setOtpLoading(true)
+    setGeneratedOtp('')
+    try {
+      const res = await v2JobActions.generateOtp(id)
+      setGeneratedOtp(res.otp)
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to generate code')
+    } finally {
+      setOtpLoading(false)
+    }
   }
 
   const handleSubmitReview = async () => {
@@ -209,11 +226,43 @@ export default function V2ProviderManageJobScreen() {
             </View>
 
             <View style={styles.progressActions}>
-              {workspace.progressStatus === 'ACCEPTED' && (
-                ActionBtn({ label: 'Start Job', loadingKey: 'IN_PROGRESS', onPress: () => handleUpdateProgress('IN_PROGRESS') })
+              {workspace.progressStatus === 'ACCEPTED' && !generatedOtp && (
+                <TouchableOpacity
+                  style={[styles.otpGenBtn, otpLoading && styles.btnDisabled]}
+                  onPress={handleGenerateOtp}
+                  disabled={otpLoading}
+                >
+                  {otpLoading ? (
+                    <ActivityIndicator color={colors.ink} />
+                  ) : (
+                    <>
+                      <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
+                      <Text style={styles.otpGenText}>Generate Confirmation Code</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               )}
-              {workspace.progressStatus === 'IN_PROGRESS' && (
-                ActionBtn({ label: 'Request Completion', loadingKey: 'COMPLETION_REQUESTED', onPress: () => handleUpdateProgress('COMPLETION_REQUESTED') })
+              {workspace.progressStatus === 'ACCEPTED' && generatedOtp && (
+                <View style={styles.otpDisplay}>
+                  <Ionicons name="lock-closed-outline" size={24} color={colors.amberDark} />
+                  <Text style={styles.otpDisplayLabel}>Show this code to the customer</Text>
+                  <Text style={styles.otpCode}>{generatedOtp}</Text>
+                  <Text style={styles.otpDisplayHint}>Customer will enter this code to confirm you arrived</Text>
+                </View>
+              )}
+              {workspace.progressStatus !== 'ACCEPTED' && workspace.progressStatus !== 'COMPLETED' && (
+                <TouchableOpacity
+                  style={[styles.progressBtn, actionLoading === workspace.progressStatus && styles.btnDisabled]}
+                  onPress={() => {
+                    if (workspace.progressStatus === 'IN_PROGRESS') handleUpdateProgress('COMPLETION_REQUESTED')
+                    else handleUpdateProgress(workspace.progressStatus === 'ACCEPTED' ? 'IN_PROGRESS' : workspace.progressStatus)
+                  }}
+                  disabled={actionLoading === workspace.progressStatus}
+                >
+                  <Text style={styles.progressBtnText}>
+                    {workspace.progressStatus === 'IN_PROGRESS' ? 'Request Completion' : 'Update Progress'}
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
           </View>
@@ -316,6 +365,20 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 10, color: colors.muted, fontWeight: '600', textAlign: 'center' },
   progressLabelDone: { color: colors.amberDark },
   progressActions: { gap: 8 },
+  progressBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
+  },
+  progressBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
+  otpGenBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
+  },
+  otpGenText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
+  otpDisplay: { alignItems: 'center', padding: 20, backgroundColor: colors.amberBg, borderRadius: 16, borderWidth: 2, borderColor: colors.amber, marginBottom: 8 },
+  otpDisplayLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginBottom: 12 },
+  otpCode: { fontSize: 40, fontFamily: fonts.headingBold, color: colors.ink, letterSpacing: 12, marginBottom: 8 },
+  otpDisplayHint: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, textAlign: 'center' },
 
   highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight, alignItems: 'center' },
   highlightTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },

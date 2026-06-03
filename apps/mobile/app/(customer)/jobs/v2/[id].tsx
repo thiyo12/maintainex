@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../../lib/colors'
+import { fonts } from '../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job, V2Quote } from '../../../../lib/api-v2'
 
 export default function V2JobDetailScreen() {
@@ -21,6 +23,9 @@ export default function V2JobDetailScreen() {
   const [addressBuilding, setAddressBuilding] = useState('')
   const [addressApartment, setAddressApartment] = useState('')
   const [addressLandmark, setAddressLandmark] = useState('')
+
+  const [otpInput, setOtpInput] = useState('')
+  const [otpError, setOtpError] = useState('')
 
   const loadJob = async () => {
     try {
@@ -81,6 +86,25 @@ export default function V2JobDetailScreen() {
       setShowAddressForm(false)
     } catch (e: any) {
       Alert.alert('Error', e.message)
+    } finally {
+      setActionLoading('')
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    if (!otpInput || otpInput.length !== 4) {
+      setOtpError('Please enter the 4-digit code')
+      return
+    }
+    setOtpError('')
+    setActionLoading('otp')
+    try {
+      await v2JobActions.verifyOtp(id, otpInput)
+      Alert.alert('Confirmed!', 'Provider can now start working.')
+      setOtpInput('')
+      loadJob()
+    } catch (e: any) {
+      setOtpError(e.message || 'Invalid code. Ask the provider for the correct code.')
     } finally {
       setActionLoading('')
     }
@@ -254,7 +278,7 @@ export default function V2JobDetailScreen() {
         {/* Share Address */}
         {escrow && escrow.status === 'PROTECTED' && !job.addressSharedAt && (
           <View style={[styles.section, styles.highlightSection]}>
-            <Text style={styles.highlightIcon}>📍</Text>
+            <Ionicons name="location-outline" size={28} color={colors.amber} style={{ marginBottom: 8 }} />
             <Text style={styles.highlightTitle}>Share Your Address</Text>
             <Text style={styles.highlightDesc}>Let the provider know where to go</Text>
             {!showAddressForm ? (
@@ -268,6 +292,28 @@ export default function V2JobDetailScreen() {
                 <ActionBtn label="Save Address" loadingKey="address" onPress={handleShareAddress} />
               </View>
             )}
+          </View>
+        )}
+
+        {/* Confirm Start with OTP */}
+        {workspace && workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
+          <View style={[styles.section, styles.otpSection]}>
+            <Ionicons name="shield-checkmark-outline" size={28} color={colors.amber} style={{ marginBottom: 8 }} />
+            <Text style={styles.highlightTitle}>Confirm Provider Arrival</Text>
+            <Text style={styles.highlightDesc}>
+              Ask the provider for the 4-digit confirmation code and enter it below to start the job.
+            </Text>
+            <TextInput
+              style={[styles.otpInput, otpError ? styles.otpInputError : null]}
+              value={otpInput}
+              onChangeText={(t) => { setOtpInput(t.replace(/\D/g, '').slice(0, 4)); setOtpError('') }}
+              placeholder="Enter 4-digit code"
+              placeholderTextColor={colors.muted}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+            {otpError ? <Text style={styles.otpErrorText}>{otpError}</Text> : null}
+            <ActionBtn label="Confirm & Start Job" loadingKey="otp" onPress={handleVerifyOtp} />
           </View>
         )}
 
@@ -394,4 +440,9 @@ const styles = StyleSheet.create({
   starActive: { color: colors.amber },
   reviewScores: { fontSize: 13, color: colors.muted, marginBottom: 6 },
   reviewComment: { fontSize: 13, color: colors.ink, opacity: 0.7, lineHeight: 20 },
+
+  otpSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 20, marginBottom: 12, padding: 20, borderWidth: 1, borderColor: colors.amber, alignItems: 'center' },
+  otpInput: { width: '80%', borderWidth: 2, borderColor: colors.amber, borderRadius: 12, padding: 16, fontSize: 28, fontFamily: fonts.headingBold, color: colors.ink, backgroundColor: colors.white, textAlign: 'center', letterSpacing: 8, marginBottom: 8 },
+  otpInputError: { borderColor: colors.error },
+  otpErrorText: { fontSize: 13, color: colors.error, fontFamily: fonts.body, marginBottom: 8 },
 })

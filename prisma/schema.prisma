@@ -43,7 +43,7 @@ model Admin {
   name            String?
   role            String   @default("ADMIN")
   province        String?
-  region          String  @default("LK")
+  region          String   @default("LK")
   branchId        String?
   branch          Branch?  @relation(fields: [branchId], references: [id])
   canEditServices Boolean  @default(false)
@@ -162,7 +162,7 @@ model Branch {
   location  String?
   districts String?
   province  String?
-  region    String  @default("LK")
+  region    String   @default("LK")
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -178,34 +178,34 @@ model Branch {
 }
 
 model Booking {
-  id         String   @id @default(cuid())
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  serviceId  String?
-  service    Service? @relation(fields: [serviceId], references: [id])
-  branchId   String?
-  branch     Branch?  @relation(fields: [branchId], references: [id])
-  date       DateTime
-  timeSlot   String
-  status     String   @default("PENDING")
-  notes      String?
-  totalPrice Float
-  budgetMin  Float?
-  budgetMax  Float?
-  name       String?
-  phone      String?
-  email      String?
-  district   String?
-  province   String?
-  region     String  @default("LK")
-  address    String?
-  time       String?
-  taskerId   String?
-  tasker     TaskerProfile? @relation(fields: [taskerId], references: [id], onDelete: SetNull)
+  id            String         @id @default(cuid())
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceId     String?
+  service       Service?       @relation(fields: [serviceId], references: [id])
+  branchId      String?
+  branch        Branch?        @relation(fields: [branchId], references: [id])
+  date          DateTime
+  timeSlot      String
+  status        String         @default("PENDING")
+  notes         String?
+  totalPrice    Float
+  budgetMin     Float?
+  budgetMax     Float?
+  name          String?
+  phone         String?
+  email         String?
+  district      String?
+  province      String?
+  region        String         @default("LK")
+  address       String?
+  time          String?
+  taskerId      String?
+  tasker        TaskerProfile? @relation(fields: [taskerId], references: [id], onDelete: SetNull)
   templateJobId String?
-  templateJob   TemplateJob? @relation(fields: [templateJobId], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  templateJob   TemplateJob?   @relation(fields: [templateJobId], references: [id], onDelete: SetNull)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([userId])
   @@index([serviceId])
@@ -850,21 +850,21 @@ model JobCategory {
 }
 
 model TemplateJob {
-  id                    String   @id @default(cuid())
-  categoryId            String
-  category              JobCategory @relation(fields: [categoryId], references: [id])
-  name                  String
-  description           String
-  whatIsIncluded        String[]
+  id                     String      @id @default(cuid())
+  categoryId             String
+  category               JobCategory @relation(fields: [categoryId], references: [id])
+  name                   String
+  description            String
+  whatIsIncluded         String[]
   typicalDurationMinutes Int
-  priceMin              Float
-  priceMax              Float
-  currency              String   @default("LKR")
-  isPopular             Boolean  @default(false)
-  isCompanyOnly         Boolean  @default(false)
-  countries             String[]
-  isActive              Boolean  @default(true)
-  createdAt             DateTime @default(now())
+  priceMin               Float
+  priceMax               Float
+  currency               String      @default("LKR")
+  isPopular              Boolean     @default(false)
+  isCompanyOnly          Boolean     @default(false)
+  countries              String[]
+  isActive               Boolean     @default(true)
+  createdAt              DateTime    @default(now())
 
   taskerSkills TaskerSkill[]
   bookings     Booking[]
@@ -875,15 +875,15 @@ model TemplateJob {
 }
 
 model TaskerSkill {
-  id             String       @id @default(cuid())
-  taskerId       String
-  tasker         TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  jobId          String
-  job            TemplateJob  @relation(fields: [jobId], references: [id])
-  experienceYears Int         @default(0)
-  hourlyRate     Float        @default(0)
-  fixedRate      Float        @default(0)
-  currency       String       @default("LKR")
+  id              String        @id @default(cuid())
+  taskerId        String
+  tasker          TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  jobId           String
+  job             TemplateJob   @relation(fields: [jobId], references: [id])
+  experienceYears Int           @default(0)
+  hourlyRate      Float         @default(0)
+  fixedRate       Float         @default(0)
+  currency        String        @default("LKR")
 
   @@unique([taskerId, jobId])
   @@index([taskerId])
@@ -929,11 +929,11 @@ model TaskerProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bids        Bid[]
-  assignments Assignment[]
-  reviews     TaskerReview[]
+  bids         Bid[]
+  assignments  Assignment[]
+  reviews      TaskerReview[]
   taskerSkills TaskerSkill[]
-  bookings    Booking[]
+  bookings     Booking[]
 
   @@index([isOnline])
   @@index([isVerified])
@@ -1120,15 +1120,22 @@ model CompanyProfile {
   isVerified        Boolean  @default(false)
   logo              String?
 
+  commissionRate        Float     @default(15.0)
+  subscriptionStatus    String    @default("TRIAL") // TRIAL, ACTIVE, PAST_DUE, CANCELLED
+  subscriptionExpiresAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contracts    Contract[]
-  teamMembers  TeamMember[]
-  specialties  CompanySpecialty[]
+  contracts     Contract[]
+  teamMembers   TeamMember[]
+  specialties   CompanySpecialty[]
+  invites       TeamInvite[]
+  subscriptions CompanySubscription[]
 
   @@index([isVerified])
   @@index([rating])
+  @@index([subscriptionStatus])
 }
 
 model TeamMember {
@@ -1149,6 +1156,58 @@ model TeamMember {
   createdAt DateTime @default(now())
 
   @@index([companyId])
+}
+
+model TeamInvite {
+  id        String         @id @default(cuid())
+  companyId String
+  company   CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  email     String?
+  phone     String?
+  name      String
+  role      String   @default("MEMBER") // MEMBER, ADMIN
+  token     String   @unique
+  status    String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, CANCELLED
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([token])
+  @@index([status])
+}
+
+model SubscriptionPlan {
+  id          String   @id @default(cuid())
+  name        String
+  price       Float
+  description String?
+  features    String[]
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subscriptions CompanySubscription[]
+}
+
+model CompanySubscription {
+  id        String           @id @default(cuid())
+  companyId String
+  company   CompanyProfile   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+  status    String           @default("ACTIVE") // ACTIVE, PAST_DUE, CANCELLED, EXPIRED
+  startDate DateTime         @default(now())
+  endDate   DateTime?
+  autoRenew Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([companyId])
+  @@index([planId])
+  @@index([status])
 }
 
 model Contract {
@@ -1214,28 +1273,28 @@ model Payout {
 // ============================================
 
 model FlashOffer {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   title         String
   description   String?
-  discountType  String   // PERCENTAGE or FLAT
+  discountType  String // PERCENTAGE or FLAT
   discountValue Float
   couponCode    String?
   linkUrl       String?
-  badgeText     String   @default("🔥 FLASH")
-  bgColor       String   @default("#FFC300")
-  textColor     String   @default("#1a1a1a")
+  badgeText     String  @default("🔥 FLASH")
+  bgColor       String  @default("#FFC300")
+  textColor     String  @default("#1a1a1a")
 
-  startsAt      DateTime
-  expiresAt     DateTime
+  startsAt  DateTime
+  expiresAt DateTime
 
-  maxClaims     Int      @default(50)
-  currentClaims Int      @default(0)
+  maxClaims     Int @default(50)
+  currentClaims Int @default(0)
 
-  isActive      Boolean  @default(true)
-  displayOrder  Int      @default(0)
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive])
   @@index([expiresAt])
@@ -1296,12 +1355,12 @@ model MarketplaceJob {
   description      String
   categoryId       String
   photos           String[]
-  budgetType       String    // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
+  budgetType       String // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
   budgetAmount     Float
   areaId           String?
   postalCode       String?
   preferredDate    DateTime?
-  addressStreet    String?   // Only shared after escrow payment
+  addressStreet    String? // Only shared after escrow payment
   addressBuilding  String?
   addressApartment String?
   addressLandmark  String?
@@ -1319,17 +1378,17 @@ model MarketplaceJob {
 }
 
 model JobQuote {
-  id                       String   @id @default(cuid())
-  jobId                    String
-  providerId               String
-  providerType             String   // INDIVIDUAL, COMPANY
-  price                    Float
-  estimatedCompletionTime  String
-  message                  String?
-  attachments              String[]
-  status                   String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, WITHDRAWN
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                      String   @id @default(cuid())
+  jobId                   String
+  providerId              String
+  providerType            String // INDIVIDUAL, COMPANY
+  price                   Float
+  estimatedCompletionTime String
+  message                 String?
+  attachments             String[]
+  status                  String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, WITHDRAWN
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@index([jobId])
   @@index([providerId])
@@ -1342,9 +1401,9 @@ model JobEscrow {
   quoteId     String
   customerId  String
   providerId  String
-  amount      Float     // quote price
-  serviceFee  Float     // platform fee
-  totalAmount Float     // amount + fee
+  amount      Float // quote price
+  serviceFee  Float // platform fee
+  totalAmount Float // amount + fee
   status      String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
   heldAt      DateTime?
   releasedAt  DateTime?
@@ -1356,6 +1415,16 @@ model JobEscrow {
   @@index([customerId])
   @@index([providerId])
   @@index([status])
+}
+
+model JobOtp {
+  id          String    @id @default(cuid())
+  jobId       String    @unique
+  otp         String // 4-digit code
+  generatedAt DateTime  @default(now())
+  verifiedAt  DateTime?
+
+  @@index([jobId])
 }
 
 model ProviderWallet {
@@ -1376,18 +1445,18 @@ model CustomerWallet {
 }
 
 model WalletTransaction {
-  id             String   @id @default(cuid())
-  userId         String
-  walletType     String   // PROVIDER, CUSTOMER
-  type           String   // CREDIT, DEBIT
-  amount         Float
-  balanceBefore  Float
-  balanceAfter   Float
-  reference      String
-  referenceType  String   // ESCROW_RELEASE, ESCROW_REFUND, WITHDRAWAL, SERVICE_FEE
-  referenceId    String?
-  status         String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
-  createdAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  userId        String
+  walletType    String // PROVIDER, CUSTOMER
+  type          String // CREDIT, DEBIT
+  amount        Float
+  balanceBefore Float
+  balanceAfter  Float
+  reference     String
+  referenceType String // ESCROW_RELEASE, ESCROW_REFUND, WITHDRAWAL, SERVICE_FEE
+  referenceId   String?
+  status        String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
+  createdAt     DateTime @default(now())
 
   @@index([userId])
   @@index([walletType])
@@ -1410,9 +1479,9 @@ model JobReview {
   jobId         String
   customerId    String
   providerId    String
-  quality       Int      // 1-5
-  communication Int      // 1-5
-  timeliness    Int      // 1-5
+  quality       Int // 1-5
+  communication Int // 1-5
+  timeliness    Int // 1-5
   comment       String?
   createdAt     DateTime @default(now())
 
@@ -1425,9 +1494,9 @@ model ProviderReview {
   jobId             String
   providerId        String
   customerId        String
-  cooperation       Int      // 1-5
-  communication     Int      // 1-5
-  overallExperience Int      // 1-5
+  cooperation       Int // 1-5
+  communication     Int // 1-5
+  overallExperience Int // 1-5
   comment           String?
   createdAt         DateTime @default(now())
 

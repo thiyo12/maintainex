@@ -81,7 +81,7 @@ export const auth = {
     request<{ success: boolean; devCode?: string }>('/api/mobile/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
   verifyOtp: (data: { phone: string; code: string }) =>
     request<{ success: boolean }>('/api/mobile/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
-  me: () => request<{ user: import('./types').User }>('/api/mobile/auth/me'),
+  me: () => request<{ user: import('./types').User; needsOnboarding?: boolean }>('/api/mobile/auth/me'),
   updateProfile: (data: { name?: string; phone?: string }) =>
     request<{ user: import('./types').User }>('/api/mobile/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
 }

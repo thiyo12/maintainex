@@ -8,6 +8,7 @@ export interface User {
   role: UserRole
   isActive: boolean
   createdAt: string
+  needsOnboarding?: boolean
 }
 
 export interface AuthResponse {

@@ -15,6 +15,8 @@ export default function SplashScreen() {
     if (isLoading) return
     if (isAuthenticated) {
       if (user?.role === 'ADMIN') router.replace('/(admin)')
+      else if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
+      else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
       else if (user?.role === 'TASKER') router.replace('/(tasker)')
       else if (user?.role === 'COMPANY') router.replace('/(company)')
       else router.replace('/(customer)')

@@ -10,7 +10,10 @@ export default function CompanyLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="settings/edit-profile" options={{ headerShown: true, headerTitle: 'Edit Company Profile', headerBackTitle: 'Back', headerTintColor: colors.companyAccent, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="team/index" options={{ headerShown: true, headerTitle: 'Team', headerBackTitle: 'Back', headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.cream } }} />
+      <Stack.Screen name="team/invite" options={{ headerShown: true, headerTitle: 'Invite Member', headerBackTitle: 'Back', headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.cream } }} />
+      <Stack.Screen name="settings/edit-profile" options={{ headerShown: true, headerTitle: 'Edit Company Profile', headerBackTitle: 'Back', headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="settings/subscription" options={{ headerShown: true, headerTitle: 'Subscription', headerBackTitle: 'Back', headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.cream } }} />
     </Stack>
   )
 }

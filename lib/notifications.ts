@@ -73,6 +73,16 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
   })
 }
 
+export async function notifyJobStarted(jobId: string, customerId: string, jobTitle: string) {
+  return createNotification({
+    userId: customerId,
+    title: 'Job Started',
+    body: `Your provider has started work on "${jobTitle}"`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
 export async function notifyPaymentReleased(jobId: string, providerId: string, jobTitle: string, amount: number) {
   return createNotification({
     userId: providerId,
