@@ -9,17 +9,10 @@ export async function GET(
 ) {
   try {
     const user = await authenticateRequest(_request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const job = await prisma.marketplaceJob.findUnique({
-      where: { id: params.id },
-    })
-
-    if (!job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    }
+    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const customer = await prisma.user.findUnique({
       where: { id: job.customerId },
@@ -28,72 +21,45 @@ export async function GET(
 
     const quotes = await prisma.jobQuote.findMany({
       where: { jobId: job.id },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { price: 'asc' },
     })
 
-    const escrow = await prisma.jobEscrow.findFirst({
-      where: { jobId: job.id },
-    })
+    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
+    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
 
-    const workspace = await prisma.jobWorkspace.findUnique({
-      where: { jobId: job.id },
-    })
-
-    const reviews = await prisma.jobReview.findMany({
-      where: { jobId: job.id },
-    })
+    const [customerReviews, providerReviews] = await Promise.all([
+      prisma.jobReview.findMany({ where: { jobId: job.id } }),
+      prisma.providerReview.findMany({ where: { jobId: job.id } }),
+    ])
 
     const locationName = job.areaId ? getLocationName(job.areaId) : null
 
     const enrichedQuotes = await Promise.all(
-      quotes.map(async (quote) => {
+      quotes.map(async (q) => {
         const provider = await prisma.user.findUnique({
-          where: { id: quote.providerId },
+          where: { id: q.providerId },
           select: { id: true, name: true, phone: true, email: true },
         })
-
-        let providerRating = 0
-        let completedJobs = 0
-
-        if (quote.providerType === 'INDIVIDUAL') {
-          const profile = await prisma.taskerProfile.findUnique({
-            where: { userId: quote.providerId },
+        let providerRating = 0, completedJobs = 0
+        if (q.providerType === 'INDIVIDUAL') {
+          const p = await prisma.taskerProfile.findUnique({
+            where: { userId: q.providerId },
             select: { rating: true, completedJobs: true },
           })
-          if (profile) {
-            providerRating = profile.rating
-            completedJobs = profile.completedJobs
-          }
+          if (p) { providerRating = p.rating; completedJobs = p.completedJobs }
         } else {
-          const profile = await prisma.companyProfile.findUnique({
-            where: { userId: quote.providerId },
+          const p = await prisma.companyProfile.findUnique({
+            where: { userId: q.providerId },
             select: { rating: true, completedProjects: true },
           })
-          if (profile) {
-            providerRating = profile.rating
-            completedJobs = profile.completedProjects
-          }
+          if (p) { providerRating = p.rating; completedJobs = p.completedProjects }
         }
-
-        return {
-          ...quote,
-          provider: provider || { id: quote.providerId, name: 'Unknown', phone: null, email: null },
-          providerRating,
-          completedJobs,
-        }
+        return { ...q, provider, providerRating, completedJobs }
       })
     )
 
     return NextResponse.json({
-      job: {
-        ...job,
-        customer: customer || null,
-        locationName,
-        quotes: enrichedQuotes,
-        escrow: escrow || null,
-        workspace: workspace || null,
-        reviews,
-      },
+      job: { ...job, customer, locationName, quotes: enrichedQuotes, escrow: escrow || null, workspace: workspace || null, reviews: { customerReviews, providerReviews } },
     })
   } catch (error) {
     console.error('Get job error:', error)
