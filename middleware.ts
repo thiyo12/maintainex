@@ -212,8 +212,32 @@ function applyCoconutHeaders(response: NextResponse, remaining: number, resetAt:
   return response
 }
 
+const AI_CRAWLER_AGENTS = [
+  'GPTBot', 'Google-Extended', 'CCBot', 'PerplexityBot',
+  'Claude-Web', 'ClaudeBot', 'anthropic-ai', 'cohere-ai',
+  'Bytespider', 'Applebot-Extended', 'FacebookBot',
+  'Amazonbot', 'YouBot', 'Meltwater', 'omgili',
+  'ChatGPT-User', 'OAI-SearchBot',
+]
+
+function isAiCrawler(request: NextRequest): boolean {
+  const ua = request.headers.get('user-agent') || ''
+  return AI_CRAWLER_AGENTS.some(agent => ua.includes(agent))
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // Bypass all middleware checks for known AI crawlers
+  if (isAiCrawler(request)) {
+    const response = NextResponse.next()
+    // Allow AI crawlers to index and read content
+    response.headers.set('X-Robots-Tag', 'all')
+    response.headers.set('Cache-Control', 'public, max-age=3600')
+    // Remove restrictive CSP for AI crawlers that blocks their fetch
+    response.headers.set('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:;")
+    return response
+  }
   
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
              request.headers.get('x-real-ip') || 
