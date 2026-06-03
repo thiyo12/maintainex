@@ -16,8 +16,8 @@ function MenuRow({ icon, label, onPress, color }: any) {
       onPress={onPress}
     >
       <Animated.View style={[styles.menuRow, { transform: [{ scale }] }]}>
-        <View style={[styles.menuIconWrap, { backgroundColor: (color || colors.customerAccent) + '20' }]}>
-          <Ionicons name={icon} size={20} color={color || colors.customerAccent} />
+        <View style={[styles.menuIconWrap, { backgroundColor: (color || colors.amber) + '20' }]}>
+          <Ionicons name={icon} size={20} color={color || colors.amber} />
         </View>
         <Text style={styles.menuLabel}>{label}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.muted} />
@@ -49,15 +49,15 @@ export default function ProfileContent() {
             style={styles.editProfileBtn}
             onPress={() => router.push('/settings/edit-profile')}
           >
-            <Ionicons name="create-outline" size={16} color={colors.customerAccent} />
+            <Ionicons name="create-outline" size={16} color={colors.amber} />
             <Text style={styles.editProfileText}> Edit profile</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="person-outline" label="My profile" color={colors.customerAccent}
+          <MenuRow icon="person-outline" label="My profile" color={colors.amber}
             onPress={() => router.push('/settings/my-profile')} />
-          <MenuRow icon="create-outline" label="Edit profile" color={colors.customerAccent}
+          <MenuRow icon="create-outline" label="Edit profile" color={colors.amber}
             onPress={() => router.push('/settings/edit-profile')} />
           <MenuRow icon="notifications-outline" label="Notifications" color="#F59E0B"
             onPress={() => router.push('/settings/notifications')} />
@@ -91,19 +91,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 24 },
   avatar: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: colors.customerAccent,
+    width: 72, height: 72, borderRadius: 36, backgroundColor: colors.amber,
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  avatarText: { fontSize: 28, fontWeight: '700', color: colors.white },
+  avatarText: { fontSize: 28, fontWeight: '700', color: colors.ink },
   name: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 4 },
   email: { fontSize: 14, color: colors.muted, marginBottom: 2 },
   phone: { fontSize: 14, color: colors.muted, marginBottom: 14 },
   editProfileBtn: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: colors.customerAccent,
+    borderWidth: 1.5, borderColor: colors.amber,
     paddingHorizontal: 24, paddingVertical: 8, borderRadius: 20,
   },
-  editProfileText: { fontSize: 14, fontWeight: '600', color: colors.customerAccent },
+  editProfileText: { fontSize: 14, fontWeight: '600', color: colors.amber },
   section: { paddingHorizontal: 24, marginBottom: 16 },
   menuRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,

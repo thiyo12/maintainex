@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { taskers } from '../../../lib/api'
 import { colors } from '../../../lib/colors'
+import { fonts } from '../../../lib/fonts'
 import type { TaskerProfile } from '../../../lib/types'
 import PressScale from '../../../components/find/PressScale'
 
@@ -81,10 +82,10 @@ export default function ExploreScreen() {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator size="large" color={colors.customerAccent} style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchTaskers} tintColor={colors.customerAccent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchTaskers} tintColor={colors.amber} />}
         >
           <View style={styles.mapPlaceholder}>
             <Ionicons name="map" size={36} color="rgba(255,255,255,0.9)" />
@@ -149,11 +150,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20,
     backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border, marginRight: 8,
   },
-  filterPillActive: { backgroundColor: colors.customerAccent, borderColor: colors.customerAccent },
-  filterPillText: { fontSize: 13, fontWeight: '600', color: colors.ink },
+  filterPillActive: { backgroundColor: colors.amber, borderColor: colors.amber },
+  filterPillText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
   filterPillTextActive: { color: colors.white },
   mapPlaceholder: {
-    backgroundColor: colors.customerAccent, marginHorizontal: 24, borderRadius: 20,
+    backgroundColor: colors.amber, marginHorizontal: 24, borderRadius: 20,
     height: 140, justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
   mapTitle: { fontSize: 16, fontWeight: '700', color: colors.white, marginTop: 6, marginBottom: 2 },
@@ -166,10 +167,10 @@ const styles = StyleSheet.create({
   },
   taskerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
   taskerAvatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.customerAccent,
+    width: 48, height: 48, borderRadius: 24, backgroundColor: colors.amber,
     justifyContent: 'center', alignItems: 'center',
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
+  avatarText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
   onlineDot: {
     position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderRadius: 7,
     backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white,
@@ -181,8 +182,8 @@ const styles = StyleSheet.create({
   taskerRight: { alignItems: 'flex-end', gap: 8 },
   taskerPrice: { fontSize: 14, fontWeight: '800', color: colors.primaryDark },
   hireBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.customerAccent,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.amber,
     paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8,
   },
-  hireBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
+  hireBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
 })

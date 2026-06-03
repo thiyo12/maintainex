@@ -42,8 +42,8 @@ export default function CompanyProfile() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.red} style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center', marginBottom: 20 }}>{error}</Text>
-          <TouchableOpacity style={{ backgroundColor: colors.companyAccent, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
-            <Text style={{ color: colors.white, fontWeight: '700' }}>Retry</Text>
+          <TouchableOpacity style={{ backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
+            <Text style={{ color: colors.ink, fontWeight: '700' }}>Retry</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -66,7 +66,7 @@ export default function CompanyProfile() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.companyAccent} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       </SafeAreaView>
     )
@@ -178,12 +178,12 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.companyAccent,
+    backgroundColor: colors.amber,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  avatarText: { fontSize: 24, fontWeight: '700', color: colors.white },
+  avatarText: { fontSize: 24, fontWeight: '700', color: colors.ink },
   companyName: { fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: 4 },
   companyReg: { fontSize: 13, color: colors.muted, marginBottom: 10 },
   badgeRow: { flexDirection: 'row', gap: 8 },

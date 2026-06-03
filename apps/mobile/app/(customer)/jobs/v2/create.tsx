@@ -172,7 +172,8 @@ export default function CreateJobScreen() {
             <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="Describe what needs to be done in detail..." placeholderTextColor={colors.muted} multiline numberOfLines={4} />
 
             <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]} onPress={() => { if (selectedCategory && title && description) setStep(1); else Alert.alert('Error', 'Fill in all fields') }}>
-              <Ionicons name="arrow-forward" size={20} color={colors.ink} />
+              <Text style={styles.btnText}>Next</Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
@@ -215,7 +216,8 @@ export default function CreateJobScreen() {
             </View>
 
             <TouchableOpacity style={[styles.nextBtn, !selectedTier && styles.btnDisabled]} onPress={() => { if (selectedTier) setStep(2); else Alert.alert('Error', 'Select a budget') }}>
-              <Ionicons name="arrow-forward" size={20} color={colors.ink} />
+              <Text style={styles.btnText}>Next</Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
@@ -304,7 +306,8 @@ export default function CreateJobScreen() {
             />
 
             <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]} onPress={() => { if (selectedCountry && selectedState && selectedCity) setStep(3); else Alert.alert('Error', 'Select country, state, and city') }}>
-              <Ionicons name="arrow-forward" size={20} color={colors.ink} />
+              <Text style={styles.btnText}>Review</Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
         )}
@@ -352,7 +355,7 @@ export default function CreateJobScreen() {
                 onPress={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? <ActivityIndicator color={colors.ink} /> : <Ionicons name="checkmark-circle-outline" size={20} color={colors.ink} />}
+                {submitting ? <ActivityIndicator color={colors.ink} /> : <><Ionicons name="checkmark-circle-outline" size={18} color={colors.ink} /><Text style={styles.submitBtnText}> Post Job</Text></>}
               </TouchableOpacity>
             </View>
           </View>
@@ -405,7 +408,8 @@ const styles = StyleSheet.create({
   pillTextSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
 
   // Buttons
-  nextBtn: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
+  nextBtn: { flexDirection: 'row', backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 8 },
+  btnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
   btnDisabled: { opacity: 0.5 },
 
   // Step 4 — Review
@@ -415,5 +419,6 @@ const styles = StyleSheet.create({
   reviewValue: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
   reviewFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 24 },
   editLink: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
-  submitBtn: { backgroundColor: colors.amber, paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center' },
+  submitBtn: { flexDirection: 'row', backgroundColor: colors.amber, paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  submitBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
 })
