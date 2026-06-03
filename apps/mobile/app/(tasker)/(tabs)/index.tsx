@@ -103,6 +103,35 @@ export default function TaskerHome() {
             <Text style={styles.mapSub}>{nearbyJobs.length} jobs available within 5 km</Text>
           </View>
 
+          <PressScale onPress={() => router.push('/(tasker)/jobs/v2/browse')}>
+            <View style={[styles.marketplaceCard]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={[styles.findIconWrap, { backgroundColor: '#FFF8E1' }]}>
+                  <Ionicons name="storefront-outline" size={28} color="#D97706" />
+                </View>
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={styles.findTitle}>Marketplace Jobs</Text>
+                  <Text style={styles.findSub}>Browse open jobs and submit quotes</Text>
+                </View>
+              </View>
+              <Ionicons name="arrow-forward" size={20} color={colors.dark} />
+            </View>
+          </PressScale>
+          <PressScale onPress={() => router.push('/(tasker)/tabs/my-jobs')}>
+            <View style={[styles.marketplaceCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <View style={[styles.findIconWrap, { backgroundColor: '#DBEAFE' }]}>
+                  <Ionicons name="briefcase-outline" size={28} color="#2563EB" />
+                </View>
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={styles.findTitle}>My Marketplace Jobs</Text>
+                  <Text style={[styles.findSub, { color: '#1E40AF' }]}>Track accepted jobs and progress</Text>
+                </View>
+              </View>
+              <Ionicons name="arrow-forward" size={20} color={colors.dark} />
+            </View>
+          </PressScale>
+
           <Text style={styles.sectionTitle}>Nearby jobs</Text>
           {nearbyJobs.map((job, i) => (
             <TouchableOpacity
@@ -239,4 +268,19 @@ const styles = StyleSheet.create({
   jobTagText: { fontSize: 12, fontWeight: '600', color: '#D97706' },
   jobLocation: { fontSize: 13, color: colors.gray },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
+  marketplaceCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7',
+    marginHorizontal: 24, marginBottom: 10, padding: 14, borderRadius: 14,
+    borderWidth: 1, borderColor: '#FDE68A',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 6, elevation: 3,
+  },
+  findIconWrap: {
+    width: 48, height: 48, borderRadius: 14, backgroundColor: '#fff',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+  },
+  findTitle: { fontSize: 15, fontWeight: '700', color: '#1F2937' },
+  findSub: { fontSize: 12, color: '#92400E', marginTop: 2 },
 })

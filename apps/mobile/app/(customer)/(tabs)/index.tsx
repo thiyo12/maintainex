@@ -107,6 +107,36 @@ export default function CustomerHome() {
           </View>
         </PressScale>
 
+        <PressScale onPress={() => router.push('/(customer)/jobs/v2')}>
+          <View style={[styles.findCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={styles.findIconWrap}>
+                <Ionicons name="briefcase-outline" size={32} color={colors.dark} />
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.findTitle}>My Marketplace Jobs</Text>
+                <Text style={[styles.findSub, { color: '#1E40AF' }]}>Post, track, and manage jobs</Text>
+              </View>
+            </View>
+            <Ionicons name="arrow-forward" size={20} color={colors.dark} />
+          </View>
+        </PressScale>
+
+        <PressScale onPress={() => router.push('/(customer)/wallet')}>
+          <View style={[styles.findCard, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={styles.findIconWrap}>
+                <Ionicons name="wallet-outline" size={32} color={colors.dark} />
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.findTitle}>Wallet</Text>
+                <Text style={[styles.findSub, { color: '#065F46' }]}>Manage balance and transactions</Text>
+              </View>
+            </View>
+            <Ionicons name="arrow-forward" size={20} color={colors.dark} />
+          </View>
+        </PressScale>
+
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
         ) : (
