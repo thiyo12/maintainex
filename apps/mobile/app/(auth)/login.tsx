@@ -5,12 +5,15 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../lib/auth'
 import { colors } from '../../lib/colors'
 import { fonts } from '../../lib/fonts'
+import LanguageSelector from '../../components/ui/LanguageSelector'
 
 export default function LoginScreen() {
   const router = useRouter()
+  const { t } = useTranslation()
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,7 +28,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields')
+      Alert.alert(t('common.error'), t('errors.fillAllFields'))
       return
     }
     setLoading(true)
@@ -33,7 +36,7 @@ export default function LoginScreen() {
       const user = await login(email, password)
       redirectByRole(user.role)
     } catch (err: any) {
-      Alert.alert('Login Failed', err.message || 'Invalid credentials')
+      Alert.alert(t('common.error'), err.message || t('auth.login.title'))
     } finally {
       setLoading(false)
     }
@@ -47,14 +50,14 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color={colors.amber} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('common.back')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
+        <Text style={styles.title}>{t('auth.login.title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.login.subtitle')}</Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('auth.login.email')}</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -65,12 +68,12 @@ export default function LoginScreen() {
             placeholderTextColor={colors.muted}
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t('auth.login.password')}</Text>
           <TextInput
             style={styles.input}
             value={password}
             onChangeText={setPassword}
-            placeholder="Enter your password"
+            placeholder={t('auth.login.password')}
             secureTextEntry
             placeholderTextColor={colors.muted}
           />
@@ -79,7 +82,7 @@ export default function LoginScreen() {
             style={styles.forgotPassword}
             onPress={() => router.push('/(auth)/otp')}
           >
-            <Text style={styles.forgotText}>Login with OTP instead</Text>
+            <Text style={styles.forgotText}>{t('auth.login.loginWithOtp')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -90,16 +93,18 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator color={colors.ink} />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>{t('auth.login.button')}</Text>
             )}
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity onPress={() => router.push('/(auth)/welcome')}>
           <Text style={styles.footerText}>
-            Don't have an account? <Text style={styles.footerLink}>Sign up</Text>
+            {t('auth.login.noAccount')} <Text style={styles.footerLink}>{t('auth.login.signUp')}</Text>
           </Text>
         </TouchableOpacity>
+
+        <LanguageSelector style={{ alignSelf: 'center', marginTop: 24 }} />
       </ScrollView>
     </KeyboardAvoidingView>
   )

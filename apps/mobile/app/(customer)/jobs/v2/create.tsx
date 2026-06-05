@@ -5,10 +5,12 @@ import {
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { colors } from '../../../../lib/colors'
 import { fonts } from '../../../../lib/fonts'
 import { getAuthToken } from '../../../../lib/api'
 import ProgressSteps from '../../../../components/ui/ProgressSteps'
+import { getCategoryIcon } from '../../../../lib/category-icons'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -28,6 +30,7 @@ const providerTypes = ['FREELANCER', 'COMPANY', 'BOTH']
 
 export default function CreateJobScreen() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -71,7 +74,7 @@ export default function CreateJobScreen() {
         setCountries(data.countries || [])
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to load data')
+      Alert.alert(t('common.error'), t('errors.network'))
     } finally {
       setLoading(false)
     }
@@ -86,7 +89,7 @@ export default function CreateJobScreen() {
 
   const handleSubmit = async () => {
     if (!selectedCategory || !title || !description || !selectedTier) {
-      Alert.alert('Error', 'Please fill in all required fields')
+      Alert.alert(t('postJob.noCategory'), t('postJob.noCategoryMsg'))
       return
     }
     setSubmitting(true)
@@ -110,14 +113,14 @@ export default function CreateJobScreen() {
       })
       const data = await res.json()
       if (!res.ok) {
-        Alert.alert('Error', data.error || 'Failed to create job')
+        Alert.alert(t('common.error'), data.error || t('postJob.failed'))
         return
       }
-      Alert.alert('Published!', 'Your job is now live. Providers can start quoting.', [
+      Alert.alert(t('postJob.published'), t('postJob.publishedMsg'), [
         { text: 'OK', onPress: () => router.back() },
       ])
     } catch (err) {
-      Alert.alert('Error', 'Network error. Please try again.')
+      Alert.alert(t('common.error'), t('postJob.networkError'))
     } finally {
       setSubmitting(false)
     }
@@ -137,20 +140,20 @@ export default function CreateJobScreen() {
         <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.amber} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post a Job</Text>
+        <Text style={styles.headerTitle}>{t('postJob.header')}</Text>
         <View style={styles.backBtn} />
       </View>
 
-      <ProgressSteps current={step} total={4} labels={['Details', 'Budget', 'Location', 'Review']} />
+      <ProgressSteps current={step} total={4} labels={[t('common.next'), t('postJob.step2.title'), t('postJob.step3.title'), t('postJob.step4.title')]} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* STEP 1: Job Details */}
         {step === 0 && (
           <View>
-            <Text style={styles.sectionTitle}>What do you need done?</Text>
-            <Text style={styles.sectionSub}>Choose a category and describe your job</Text>
+            <Text style={styles.sectionTitle}>{t('postJob.step1.title')}</Text>
+            <Text style={styles.sectionSub}>{t('postJob.step1.subtitle')}</Text>
 
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>{t('postJob.step1.category')}</Text>
             <View style={styles.categoryGrid}>
               {categories.map((cat) => (
                 <TouchableOpacity
@@ -159,20 +162,20 @@ export default function CreateJobScreen() {
                   onPress={() => setSelectedCategory(cat)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="construct-outline" size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />
+                  <Ionicons name={getCategoryIcon(cat.iconName)} size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />
                   <Text style={[styles.catName, selectedCategory?.id === cat.id && styles.catNameSelected]}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.label}>Job Title *</Text>
-            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Kitchen cleaning needed" placeholderTextColor={colors.muted} />
+            <Text style={styles.label}>{t('postJob.step1.jobTitle')}</Text>
+            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={t('postJob.step1.jobTitlePlaceholder')} placeholderTextColor={colors.muted} />
 
-            <Text style={styles.label}>Description *</Text>
-            <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder="Describe what needs to be done in detail..." placeholderTextColor={colors.muted} multiline numberOfLines={4} />
+            <Text style={styles.label}>{t('postJob.step1.description')}</Text>
+            <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder={t('postJob.step1.descriptionPlaceholder')} placeholderTextColor={colors.muted} multiline numberOfLines={4} />
 
-            <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]} onPress={() => { if (selectedCategory && title && description) setStep(1); else Alert.alert('Error', 'Fill in all fields') }}>
-              <Text style={styles.btnText}>Next</Text>
+            <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]} onPress={() => { if (selectedCategory && title && description) setStep(1); else Alert.alert(t('postJob.noCategory'), t('postJob.noCategoryMsg')) }}>
+              <Text style={styles.btnText}>{t('common.next')}</Text>
               <Ionicons name="arrow-forward" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
@@ -181,20 +184,20 @@ export default function CreateJobScreen() {
         {/* STEP 2: Budget & Type */}
         {step === 1 && (
           <View>
-            <Text style={styles.sectionTitle}>Set your budget</Text>
-            <Text style={styles.sectionSub}>Choose a budget range</Text>
+            <Text style={styles.sectionTitle}>{t('postJob.step2.title')}</Text>
+            <Text style={styles.sectionSub}>{t('postJob.step2.subtitle')}</Text>
 
             <View style={styles.tierRow}>
-              {budgetTiers.map((t) => (
+              {budgetTiers.map((tier) => (
                 <TouchableOpacity
-                  key={t.key}
-                  style={[styles.tierCard, selectedTier === t.key && styles.tierCardSelected]}
-                  onPress={() => setSelectedTier(t.key)}
+                  key={tier.key}
+                  style={[styles.tierCard, selectedTier === tier.key && styles.tierCardSelected]}
+                  onPress={() => setSelectedTier(tier.key)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name={t.icon} size={24} color={selectedTier === t.key ? colors.amberDark : colors.muted} />
-                  <Text style={styles.tierLabel}>{t.label}</Text>
-                  <Text style={[styles.tierRange, selectedTier === t.key && styles.tierRangeSelected]}>{t.range}</Text>
+                  <Ionicons name={tier.icon} size={24} color={selectedTier === tier.key ? colors.amberDark : colors.muted} />
+                  <Text style={styles.tierLabel}>{tier.label}</Text>
+                  <Text style={[styles.tierRange, selectedTier === tier.key && styles.tierRangeSelected]}>{tier.range}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -204,13 +207,13 @@ export default function CreateJobScreen() {
                 <Ionicons name="bulb-outline" size={18} color={colors.amber} />
                 <Text style={styles.recommendText}>
                   {selectedTier === 'LARGE'
-                    ? 'Recommended for companies — jobs over LKR 15,000 are best handled by professional companies.'
-                    : 'Recommended for individual taskers — this budget range is ideal for freelancers.'}
+                    ? t('postJob.step2.recommendCompany')
+                    : t('postJob.step2.recommendTasker')}
                 </Text>
               </View>
             )}
 
-            <Text style={styles.label}>Who can do this job?</Text>
+            <Text style={styles.label}>{t('postJob.step2.providerType')}</Text>
             <View style={styles.providerRow}>
               {providerTypes.map((p) => (
                 <TouchableOpacity
@@ -220,14 +223,14 @@ export default function CreateJobScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.providerText, providerType === p && styles.providerTextSelected]}>
-                    {p === 'FREELANCER' ? 'Freelancer' : p === 'COMPANY' ? 'Company' : 'Both'}
+                    {p === 'FREELANCER' ? t('postJob.step2.freelancer') : p === 'COMPANY' ? t('postJob.step2.company') : t('postJob.step2.both')}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <TouchableOpacity style={[styles.nextBtn, !selectedTier && styles.btnDisabled]} onPress={() => { if (selectedTier) setStep(2); else Alert.alert('Error', 'Select a budget') }}>
-              <Text style={styles.btnText}>Next</Text>
+            <TouchableOpacity style={[styles.nextBtn, !selectedTier && styles.btnDisabled]} onPress={() => { if (selectedTier) setStep(2); else Alert.alert(t('postJob.selectBudget'), t('postJob.selectBudgetMsg')) }}>
+              <Text style={styles.btnText}>{t('common.next')}</Text>
               <Ionicons name="arrow-forward" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
@@ -236,10 +239,10 @@ export default function CreateJobScreen() {
         {/* STEP 3: Location */}
         {step === 2 && (
           <View>
-            <Text style={styles.sectionTitle}>Where is the job?</Text>
-            <Text style={styles.sectionSub}>Select your location</Text>
+            <Text style={styles.sectionTitle}>{t('postJob.step3.title')}</Text>
+            <Text style={styles.sectionSub}>{t('postJob.step3.subtitle')}</Text>
 
-            <Text style={styles.label}>Country *</Text>
+            <Text style={styles.label}>{t('postJob.step3.country')}</Text>
             <View style={styles.pickerRow}>
               {countries.map((c) => (
                 <TouchableOpacity
@@ -255,7 +258,7 @@ export default function CreateJobScreen() {
 
             {selectedCountry && (
               <>
-                <Text style={styles.label}>State/Province *</Text>
+                <Text style={styles.label}>{t('postJob.step3.state')}</Text>
                 <View style={styles.pickerRow}>
                   {selectedCountry.states.map((s) => (
                     <TouchableOpacity
@@ -273,7 +276,7 @@ export default function CreateJobScreen() {
 
             {selectedState && (
               <>
-                <Text style={styles.label}>City *</Text>
+                <Text style={styles.label}>{t('postJob.step3.city')}</Text>
                 <View style={styles.pickerRow}>
                   {selectedState.cities.map((c) => (
                     <TouchableOpacity
@@ -291,7 +294,7 @@ export default function CreateJobScreen() {
 
             {selectedCity && selectedCity.areas.length > 0 && (
               <>
-                <Text style={styles.label}>Area</Text>
+                <Text style={styles.label}>{t('postJob.step3.area')}</Text>
                 <View style={styles.pickerRow}>
                   {selectedCity.areas.map((a) => (
                     <TouchableOpacity
@@ -307,17 +310,17 @@ export default function CreateJobScreen() {
               </>
             )}
 
-            <Text style={styles.label}>Street Address</Text>
+            <Text style={styles.label}>{t('postJob.step3.address')}</Text>
             <TextInput
               style={styles.input}
               value={addressText}
               onChangeText={setAddressText}
-              placeholder="Enter your full street address"
+              placeholder={t('postJob.step3.addressPlaceholder')}
               placeholderTextColor={colors.muted}
             />
 
-            <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]} onPress={() => { if (selectedCountry && selectedState && selectedCity) setStep(3); else Alert.alert('Error', 'Select country, state, and city') }}>
-              <Text style={styles.btnText}>Review</Text>
+            <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]} onPress={() => { if (selectedCountry && selectedState && selectedCity) setStep(3); else Alert.alert(t('postJob.selectLocation'), t('postJob.selectLocationMsg')) }}>
+              <Text style={styles.btnText}>{t('postJob.step4.title')}</Text>
               <Ionicons name="arrow-forward" size={18} color={colors.ink} />
             </TouchableOpacity>
           </View>
@@ -326,32 +329,32 @@ export default function CreateJobScreen() {
         {/* STEP 4: Review & Post */}
         {step === 3 && (
           <View>
-            <Text style={styles.sectionTitle}>Review your job</Text>
-            <Text style={styles.sectionSub}>Make sure everything looks right</Text>
+            <Text style={styles.sectionTitle}>{t('postJob.step4.title')}</Text>
+            <Text style={styles.sectionSub}>{t('postJob.step4.subtitle')}</Text>
 
             <View style={styles.reviewCard}>
               <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>Category</Text>
+                <Text style={styles.reviewLabel}>{t('postJob.step4.category')}</Text>
                 <Text style={styles.reviewValue}>{selectedCategory?.name}</Text>
               </View>
               <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>Title</Text>
+                <Text style={styles.reviewLabel}>{t('postJob.step4.title_lbl')}</Text>
                 <Text style={styles.reviewValue}>{title}</Text>
               </View>
               <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>Description</Text>
+                <Text style={styles.reviewLabel}>{t('postJob.step4.description')}</Text>
                 <Text style={styles.reviewValue} numberOfLines={3}>{description}</Text>
               </View>
               <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>Budget</Text>
-                <Text style={styles.reviewValue}>{budgetTiers.find(t => t.key === selectedTier)?.label} — {budgetTiers.find(t => t.key === selectedTier)?.range}</Text>
+                <Text style={styles.reviewLabel}>{t('postJob.step4.budget')}</Text>
+                <Text style={styles.reviewValue}>{budgetTiers.find(tier => tier.key === selectedTier)?.label} — {budgetTiers.find(tier => tier.key === selectedTier)?.range}</Text>
               </View>
               <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>Provider</Text>
-                <Text style={styles.reviewValue}>{providerType || 'Any'}</Text>
+                <Text style={styles.reviewLabel}>{t('postJob.step4.provider')}</Text>
+                <Text style={styles.reviewValue}>{providerType || t('postJob.step4.any')}</Text>
               </View>
               <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>Location</Text>
+                <Text style={styles.reviewLabel}>{t('postJob.step4.location')}</Text>
                 <Text style={styles.reviewValue}>{selectedArea?.name || selectedCity?.name}, {selectedState?.name}</Text>
               </View>
             </View>
@@ -359,14 +362,14 @@ export default function CreateJobScreen() {
             <View style={styles.reviewFooter}>
               <TouchableOpacity onPress={() => setStep(0)} style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Ionicons name="arrow-back" size={18} color={colors.amber} />
-                <Text style={styles.editLink}> Edit Details</Text>
+                <Text style={styles.editLink}> {t('postJob.step4.editDetails')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.submitBtn, submitting && styles.btnDisabled]}
                 onPress={handleSubmit}
                 disabled={submitting}
               >
-                {submitting ? <ActivityIndicator color={colors.ink} /> : <><Ionicons name="checkmark-circle-outline" size={18} color={colors.ink} /><Text style={styles.submitBtnText}> Post Job</Text></>}
+                {submitting ? <ActivityIndicator color={colors.ink} /> : <><Ionicons name="checkmark-circle-outline" size={18} color={colors.ink} /><Text style={styles.submitBtnText}> {t('postJob.step4.post')}</Text></>}
               </TouchableOpacity>
             </View>
           </View>
