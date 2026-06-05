@@ -2,16 +2,19 @@ import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 
-const JWT_SECRET: string = process.env.NEXTAUTH_SECRET || ''
-if (!JWT_SECRET) {
-  throw new Error('NEXTAUTH_SECRET environment variable is required')
-}
-
 const TOKEN_MAX_AGE = '30d'
+
+function getJwtSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET environment variable is required')
+  }
+  return secret
+}
 
 export function createToken(data: object): string | null {
   try {
-    return jwt.sign(data, JWT_SECRET, { expiresIn: TOKEN_MAX_AGE })
+    return jwt.sign(data, getJwtSecret(), { expiresIn: TOKEN_MAX_AGE })
   } catch {
     return null
   }
@@ -19,7 +22,7 @@ export function createToken(data: object): string | null {
 
 export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, JWT_SECRET)
+    return jwt.verify(token, getJwtSecret())
   } catch {
     return null
   }
