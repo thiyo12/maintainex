@@ -250,26 +250,18 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.otpDisplayHint}>Customer will enter this code to confirm you arrived</Text>
                 </View>
               )}
-              {workspace.progressStatus !== 'ACCEPTED' && workspace.progressStatus !== 'COMPLETED' && (
-                <TouchableOpacity
-                  style={[styles.progressBtn, actionLoading === workspace.progressStatus && styles.btnDisabled]}
-                  onPress={() => {
-                    if (workspace.progressStatus === 'IN_PROGRESS') handleUpdateProgress('COMPLETION_REQUESTED')
-                    else handleUpdateProgress(workspace.progressStatus === 'ACCEPTED' ? 'IN_PROGRESS' : workspace.progressStatus)
-                  }}
-                  disabled={actionLoading === workspace.progressStatus}
-                >
-                  <Text style={styles.progressBtnText}>
-                    {workspace.progressStatus === 'IN_PROGRESS' ? 'Request Completion' : 'Update Progress'}
-                  </Text>
-                </TouchableOpacity>
+              {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="hourglass-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Waiting for customer approval</Text>
+                </View>
               )}
             </View>
           </View>
         )}
 
         {/* Mark Complete */}
-        {job.status === 'IN_PROGRESS' && escrow?.status === 'PROTECTED' && (
+        {workspace?.progressStatus === 'IN_PROGRESS' && (
           <View style={[styles.section, styles.highlightSection]}>
             <Ionicons name="flag-outline" size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
             <Text style={styles.highlightTitle}>Finish Job</Text>
@@ -399,4 +391,7 @@ const styles = StyleSheet.create({
 
   disputeBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 12 },
   disputeBtnText: { fontSize: 13, color: colors.muted, fontWeight: '600', textDecorationLine: 'underline' },
+
+  waitingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amberBg, borderRadius: 12, padding: 16 },
+  waitingText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amberDark },
 })

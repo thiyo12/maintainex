@@ -58,28 +58,13 @@ export async function POST(
           amount: netAmount,
           balanceBefore: currentBalance,
           balanceAfter: currentBalance + netAmount,
-          reference: `Escrow release for job ${job.id}`,
+          reference: commission > 0
+            ? `Escrow release for job ${job.id} (${commissionRate}% commission: LKR ${commission})`
+            : `Escrow release for job ${job.id}`,
           referenceType: 'ESCROW_RELEASE',
           referenceId: escrow.id,
         },
       }),
-      ...(commission > 0
-        ? [
-            prisma.walletTransaction.create({
-              data: {
-                userId: escrow.providerId,
-                walletType: 'PROVIDER',
-                type: 'DEBIT',
-                amount: commission,
-                balanceBefore: currentBalance + netAmount,
-                balanceAfter: currentBalance + netAmount,
-                reference: `Commission (${commissionRate}%) for job ${job.id}`,
-                referenceType: 'COMMISSION',
-                referenceId: escrow.id,
-              },
-            }),
-          ]
-        : []),
       prisma.marketplaceJob.update({
         where: { id: job.id },
         data: { status: 'COMPLETED' },

@@ -11,6 +11,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email, password, and name required' }, { status: 400 })
     }
 
+    if (password.length < 6) {
+      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
+    }
+
     const validRoles = ['CUSTOMER', 'TASKER', 'COMPANY']
     const userRole = validRoles.includes(role) ? role : 'CUSTOMER'
 

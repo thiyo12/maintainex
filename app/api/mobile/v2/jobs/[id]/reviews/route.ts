@@ -105,10 +105,13 @@ export async function POST(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const user = await authenticateRequest(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const [customerReview, providerReview] = await Promise.all([
       prisma.jobReview.findMany({ where: { jobId: params.id } }),
       prisma.providerReview.findMany({ where: { jobId: params.id } }),

@@ -56,39 +56,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'TOP_UP') {
-      const wallet = await prisma.customerWallet.upsert({
-        where: { userId: user.id },
-        create: { userId: user.id, balance: amount },
-        update: {},
-      })
-      const newBalance = wallet.balance + amount
-
-      await prisma.$transaction([
-        prisma.customerWallet.update({
-          where: { userId: user.id },
-          data: { balance: newBalance },
-        }),
-        prisma.walletTransaction.create({
-          data: {
-            userId: user.id,
-            walletType: 'CUSTOMER',
-            type: 'CREDIT',
-            amount,
-            balanceBefore: wallet.balance,
-            balanceAfter: newBalance,
-            reference: 'Wallet top-up',
-            referenceType: 'SERVICE_FEE',
-            referenceId: '',
-          },
-        }),
-      ])
-      return NextResponse.json({ success: true, balance: newBalance })
+      return NextResponse.json({ error: 'Payment gateway not yet integrated. Top-up coming soon.' }, { status: 501 })
     }
 
     if (action === 'WITHDRAW') {
       const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
       if (!wallet || wallet.balance < amount) {
         return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 })
+      }
+      if (amount < 100) {
+        return NextResponse.json({ error: 'Minimum withdrawal is LKR 100' }, { status: 400 })
       }
       const newBalance = wallet.balance - amount
 

@@ -16,6 +16,7 @@ export async function POST(
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the customer can share address' }, { status: 403 })
+    if (job.addressSharedAt) return NextResponse.json({ error: 'Address already shared' }, { status: 409 })
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id, status: 'PROTECTED' } })
     if (!escrow) return NextResponse.json({ error: 'Escrow must be deposited first' }, { status: 400 })

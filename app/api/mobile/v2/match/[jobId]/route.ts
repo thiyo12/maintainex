@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { matchProvidersForJob } from '@/lib/matching-engine'
 
@@ -9,6 +10,10 @@ export async function GET(
   try {
     const user = await authenticateRequest(_request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.jobId } })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the job owner can view matches' }, { status: 403 })
 
     const providers = await matchProvidersForJob(params.jobId)
 

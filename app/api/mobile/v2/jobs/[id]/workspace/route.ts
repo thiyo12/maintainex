@@ -52,6 +52,32 @@ export async function PATCH(
     const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: params.id } })
     if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
 
+    // State machine: only allow valid transitions
+    const validTransitions: Record<string, string[]> = {
+      ACCEPTED: ['IN_PROGRESS', 'DISPUTED'],
+      IN_PROGRESS: ['WAITING_CUSTOMER', 'COMPLETION_REQUESTED', 'DISPUTED'],
+      WAITING_CUSTOMER: ['IN_PROGRESS', 'COMPLETION_REQUESTED', 'DISPUTED'],
+      COMPLETION_REQUESTED: ['COMPLETED', 'DISPUTED'],
+      COMPLETED: [],
+      DISPUTED: [],
+    }
+    const allowed = validTransitions[workspace.progressStatus]
+    if (!allowed || !allowed.includes(progressStatus)) {
+      return NextResponse.json({
+        error: `Cannot transition from ${workspace.progressStatus} to ${progressStatus}`,
+      }, { status: 400 })
+    }
+
+    // Role-based transition restrictions
+    const providerOnly: string[] = ['COMPLETION_REQUESTED']
+    const customerOnly: string[] = ['IN_PROGRESS']
+    if (providerOnly.includes(progressStatus) && !isProvider) {
+      return NextResponse.json({ error: 'Only the provider can perform this action' }, { status: 403 })
+    }
+    if (customerOnly.includes(progressStatus) && !isCustomer) {
+      return NextResponse.json({ error: 'Only the customer can perform this action' }, { status: 403 })
+    }
+
     const updated = await prisma.jobWorkspace.update({
       where: { jobId: params.id },
       data: { progressStatus },
