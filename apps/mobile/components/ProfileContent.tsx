@@ -1,10 +1,14 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { colors } from '../lib/colors'
+import { getAuthToken } from '../lib/api'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
 function MenuRow({ icon, label, onPress, color }: any) {
   const scale = useRef(new Animated.Value(1)).current
@@ -28,7 +32,24 @@ function MenuRow({ icon, label, onPress, color }: any) {
 
 export default function ProfileContent() {
   const router = useRouter()
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
+  const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const token = await getAuthToken()
+        const res = await fetch(`${API_URL}/api/mobile/v2/identity`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setIdentityStatus(data.identityStatus)
+        }
+      } catch (e) { console.error('Load identity error:', e) }
+    })()
+  }, [])
 
   const handleLogout = async () => {
     await logout()
@@ -46,29 +67,38 @@ export default function ProfileContent() {
           <Text style={styles.email}>{user?.email || ''}</Text>
           <Text style={styles.phone}>{user?.phone || ''}</Text>
           <TouchableOpacity
-            style={styles.editProfileBtn}
-            onPress={() => router.push('/settings/edit-profile')}
+            style={[styles.identityBadge, identityStatus === 'APPROVED' ? styles.identityApproved : identityStatus === 'PENDING' ? styles.identityPending : styles.identityUnverified]}
+            onPress={() => router.push('/(tasker)/identity')}
+            activeOpacity={0.7}
           >
-            <Ionicons name="create-outline" size={16} color={colors.amber} />
-            <Text style={styles.editProfileText}> Edit profile</Text>
+            <Ionicons
+              name={identityStatus === 'APPROVED' ? 'shield-checkmark' : identityStatus === 'PENDING' ? 'time' : 'shield-outline'}
+              size={14}
+              color={identityStatus === 'APPROVED' ? '#059669' : identityStatus === 'PENDING' ? '#D97706' : '#DC2626'}
+            />
+            <Text style={[styles.identityBadgeText, { color: identityStatus === 'APPROVED' ? '#059669' : identityStatus === 'PENDING' ? '#D97706' : '#DC2626' }]}>
+              {identityStatus === 'APPROVED' ? t('verify.status.verified') : identityStatus === 'PENDING' ? t('verify.status.pending') : identityStatus === 'REJECTED' ? t('verify.status.rejected') : t('verify.status.notSubmitted')}
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="person-outline" label="My profile" color={colors.amber}
+          <MenuRow icon="person-outline" label={t('profile.title')} color={colors.amber}
             onPress={() => router.push('/settings/my-profile')} />
-          <MenuRow icon="create-outline" label="Edit profile" color={colors.amber}
+          <MenuRow icon="create-outline" label={t('profile.edit')} color={colors.amber}
             onPress={() => router.push('/settings/edit-profile')} />
-          <MenuRow icon="notifications-outline" label="Notifications" color="#F59E0B"
+          <MenuRow icon="shield-checkmark-outline" label={t('verify.title')} color="#8B5CF6"
+            onPress={() => router.push('/(tasker)/identity')} />
+          <MenuRow icon="notifications-outline" label={t('profile.notifications')} color="#F59E0B"
             onPress={() => router.push('/settings/notifications')} />
-          <MenuRow icon="card-outline" label="Payment methods" color="#10B981"
+          <MenuRow icon="card-outline" label={t('profile.payment')} color="#10B981"
             onPress={() => router.push('/settings/payment')} />
-          <MenuRow icon="location-outline" label="Saved addresses" color="#3B82F6"
+          <MenuRow icon="location-outline" label={t('profile.serviceAreas')} color="#3B82F6"
             onPress={() => router.push('/settings/addresses')} />
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="help-circle-outline" label="Help & support" color="#8B5CF6"
+          <MenuRow icon="help-circle-outline" label={t('common.help') || 'Help & support'} color="#8B5CF6"
             onPress={() => router.push('/settings/help')} />
           <MenuRow icon="document-text-outline" label="Terms & privacy" color="#6B7280"
             onPress={() => router.push('/settings/terms')} />
@@ -78,7 +108,7 @@ export default function ProfileContent() {
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color={colors.red} />
-          <Text style={styles.logoutBtnText}> Log out</Text>
+          <Text style={styles.logoutBtnText}> {t('profile.logout') || 'Log out'}</Text>
         </TouchableOpacity>
 
         <Text style={styles.version}>Version 1.0.0</Text>
@@ -104,6 +134,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 8, borderRadius: 20,
   },
   editProfileText: { fontSize: 14, fontWeight: '600', color: colors.amber },
+  identityBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20,
+    marginBottom: 14,
+  },
+  identityApproved: { backgroundColor: '#D1FAE5' },
+  identityPending: { backgroundColor: '#FEF3C7' },
+  identityUnverified: { backgroundColor: '#FEE2E2' },
+  identityBadgeText: { fontSize: 13, fontWeight: '600' },
   section: { paddingHorizontal: 24, marginBottom: 16 },
   menuRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,

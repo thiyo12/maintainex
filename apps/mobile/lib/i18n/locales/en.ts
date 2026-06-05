@@ -16,6 +16,7 @@ const en = {
     confirm: 'Confirm',
     retry: 'Retry',
     done: 'Done',
+    help: 'Help & support',
   },
   auth: {
     login: {
@@ -219,6 +220,9 @@ const en = {
     team: 'Team',
     subscription: 'Subscription',
     profile: 'Profile',
+    activeContracts: 'Active contracts',
+    projectsDone: 'Projects done',
+    inBusiness: 'In business',
   },
   tasker: {
     dashboard: 'Dashboard',

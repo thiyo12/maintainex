@@ -3,15 +3,21 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { colors } from '../../../lib/colors'
 import { company } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
+import { getAuthToken } from '../../../lib/api'
 import PressScale from '../../../components/find/PressScale'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
 export default function CompanyProfile() {
   const router = useRouter()
+  const { t } = useTranslation()
   const { logout } = useAuth()
   const [loading, setLoading] = useState(true)
+  const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
 
   const handleLogout = async () => {
     await logout()
@@ -34,6 +40,18 @@ export default function CompanyProfile() {
 
   useEffect(() => {
     fetchProfile()
+    ;(async () => {
+      try {
+        const token = await getAuthToken()
+        const res = await fetch(`${API_URL}/api/mobile/v2/identity`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setIdentityStatus(data.identityStatus)
+        }
+      } catch (e) { console.error('Load identity error:', e) }
+    })()
   }, [fetchProfile])
 
   if (error && !profile) {
@@ -82,10 +100,24 @@ export default function CompanyProfile() {
           <Text style={styles.companyName}>{name}</Text>
           <Text style={styles.companyReg}>Registered • {regNumber}</Text>
           <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-              <Text style={styles.badgeText}> Verified</Text>
-            </View>
+            {identityStatus === 'APPROVED' ? (
+              <View style={styles.badge}>
+                <Ionicons name="shield-checkmark" size={14} color={colors.success} />
+                <Text style={styles.badgeText}> {t('verify.status.verified')}</Text>
+              </View>
+            ) : identityStatus === 'PENDING' ? (
+              <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="time" size={14} color="#D97706" />
+                <Text style={[styles.badgeText, { color: '#D97706' }]}> {t('verify.status.pending')}</Text>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => router.push('/(tasker)/identity')}>
+                <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="shield-outline" size={14} color="#DC2626" />
+                  <Text style={[styles.badgeText, { color: '#DC2626' }]}> {t('verify.status.notSubmitted')}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
             <View style={styles.badge}>
               <Ionicons name="star" size={14} color={colors.success} />
               <Text style={styles.badgeText}> {rating}</Text>
@@ -96,29 +128,29 @@ export default function CompanyProfile() {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{activeContracts}</Text>
-            <Text style={styles.statLabel}>Active contracts</Text>
+            <Text style={styles.statLabel}>{t('company.activeContracts') || 'Active contracts'}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{teamMembers}</Text>
-            <Text style={styles.statLabel}>Team members</Text>
+            <Text style={styles.statLabel}>{t('company.team')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{projectsDone}</Text>
-            <Text style={styles.statLabel}>Projects done</Text>
+            <Text style={styles.statLabel}>{t('company.projectsDone') || 'Projects done'}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{inBusiness}</Text>
-            <Text style={styles.statLabel}>In business</Text>
+            <Text style={styles.statLabel}>{t('company.inBusiness') || 'In business'}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionTitle}>{t('profile.about')}</Text>
           <Text style={styles.aboutText}>{about}</Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Services</Text>
+          <Text style={styles.sectionTitle}>{t('profile.skills')}</Text>
           <View style={styles.tagRow}>
             {services.map((s: string) => (
               <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
@@ -127,7 +159,7 @@ export default function CompanyProfile() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service areas</Text>
+          <Text style={styles.sectionTitle}>{t('profile.serviceAreas')}</Text>
           <View style={styles.tagRow}>
             {serviceAreas.map((a: string) => (
               <View key={a} style={styles.tag}><Text style={styles.tagText}>{a}</Text></View>
@@ -136,25 +168,35 @@ export default function CompanyProfile() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>{t('profile.account')}</Text>
+          <PressScale onPress={() => router.push('/(tasker)/identity')}>
+            <View style={styles.menuRow}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
+              <Text style={styles.menuLabel}>{t('verify.title')}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: identityStatus === 'APPROVED' ? colors.success : identityStatus === 'PENDING' ? '#D97706' : colors.muted, marginRight: 4 }}>
+                {identityStatus === 'APPROVED' ? t('verify.status.verified') : identityStatus === 'PENDING' ? t('verify.status.pending') : identityStatus === 'REJECTED' ? t('verify.status.rejected') : ''}
+              </Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </PressScale>
           <PressScale onPress={() => router.push('/settings/edit-profile')}>
             <View style={styles.menuRow}>
               <Ionicons name="create-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Edit company profile</Text>
+              <Text style={styles.menuLabel}>{t('profile.edit')}</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
           <PressScale onPress={() => Alert.alert('Coming soon', 'Payment features will be available in a future update.')}>
             <View style={styles.menuRow}>
               <Ionicons name="card-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Payment & banking</Text>
+              <Text style={styles.menuLabel}>{t('profile.payment')}</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
           <PressScale onPress={() => Alert.alert('Coming soon', 'Notification settings will be available in a future update.')}>
             <View style={styles.menuRow}>
               <Ionicons name="notifications-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Notifications</Text>
+              <Text style={styles.menuLabel}>{t('profile.notifications')}</Text>
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
