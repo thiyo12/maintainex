@@ -1398,23 +1398,44 @@ model JobQuote {
 }
 
 model JobEscrow {
-  id          String    @id @default(cuid())
-  jobId       String
-  quoteId     String
-  customerId  String
-  providerId  String
-  amount      Float // quote price
-  serviceFee  Float // platform fee
-  totalAmount Float // amount + fee
-  status      String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
-  heldAt      DateTime?
-  releasedAt  DateTime?
-  refundedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  jobId         String
+  quoteId       String
+  customerId    String
+  providerId    String
+  amount        Float // quote price
+  serviceFee    Float // platform fee
+  totalAmount   Float // amount + fee
+  paymentMethod String    @default("CARD") // CARD, CASH
+  status        String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
+  heldAt        DateTime?
+  releasedAt    DateTime?
+  refundedAt    DateTime?
+  cashConfirmedAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([jobId])
   @@index([customerId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model CommissionSettlement {
+  id               String    @id @default(cuid())
+  jobId            String
+  escrowId         String
+  providerId       String
+  customerId       String
+  jobAmount        Float // total job amount (excl. fees)
+  commissionRate   Float    @default(15.0)
+  commissionAmount Float // jobAmount * commissionRate / 100
+  status           String   @default("PENDING") // PENDING, SETTLED
+  settledAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([jobId])
   @@index([providerId])
   @@index([status])
 }

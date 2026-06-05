@@ -101,6 +101,8 @@ export const v2JobActions = {
     v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action }) }),
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
+  confirmCashPayment: (jobId: string) =>
+    v2Request<{ success: boolean; commission: number; netAmount: number }>(`/api/mobile/v2/jobs/${jobId}/cash-payment`, { method: 'POST' }),
   createReview: (jobId: string, data: any) =>
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
