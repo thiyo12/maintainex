@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { seedJobCategories } from '@/lib/v2-job-categories'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = searchParams.get('country') || 'LK'
+
+    const count = await prisma.jobCategory.count()
+    if (count === 0) {
+      await seedJobCategories(prisma)
+    }
 
     const categories = await prisma.jobCategory.findMany({
       where: { isActive: true, countries: { has: country } },
