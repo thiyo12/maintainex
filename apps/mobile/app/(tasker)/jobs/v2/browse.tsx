@@ -3,18 +3,29 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { colors } from '../../../../lib/colors'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
+import { getAuthToken } from '../../../../lib/api'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
 export default function V2BrowseJobsScreen() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [jobs, setJobs] = useState<V2Job[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [filterArea, setFilterArea] = useState<string | null>(null)
+  const [filterCity, setFilterCity] = useState<string | null>(null)
 
-  const loadJobs = useCallback(async () => {
+  const [inited, setInited] = useState(false)
+
+  const loadJobs = useCallback(async (area?: string | null) => {
     try {
-      const res = await v2Jobs.list('role=provider')
+      let params = 'role=provider'
+      if (area) params += `&areaId=${area}`
+      const res = await v2Jobs.list(params)
       setJobs(res.jobs)
     } catch (e) {
       console.error('Browse jobs error:', e)
@@ -24,18 +35,48 @@ export default function V2BrowseJobsScreen() {
     }
   }, [])
 
-  useEffect(() => { loadJobs() }, [loadJobs])
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const token = await getAuthToken()
+        const res = await fetch(`${API_URL}/api/mobile/user/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const city = data.cityId || null
+          const area = data.areaId || null
+          if (city) setFilterCity(city)
+          if (area) setFilterArea(area)
+          await loadJobs(area)
+        } else {
+          await loadJobs(null)
+        }
+      } catch (e) {
+        console.error('Profile load error:', e)
+        await loadJobs(null)
+      }
+      setInited(true)
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (inited) {
+      setLoading(true)
+      loadJobs(filterArea)
+    }
+  }, [filterArea, inited])
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.headerTitle}>Open Jobs</Text>
-          <Text style={styles.headerSub}>{jobs.length} job{jobs.length !== 1 ? 's' : ''} available</Text>
+          <Text style={styles.headerTitle}>{t('tasker.browse')}</Text>
+          <Text style={styles.headerSub}>{t('location.showing')} {filterCity || t('location.all')}</Text>
         </View>
-        <View style={styles.headerBadge}>
-          <Text style={styles.headerBadgeText}>{jobs.length}</Text>
-        </View>
+        <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterArea(null)} activeOpacity={0.7}>
+          <Ionicons name={filterArea ? 'funnel' : 'funnel-outline'} size={20} color={colors.amber} />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -43,8 +84,8 @@ export default function V2BrowseJobsScreen() {
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="search-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
-          <Text style={styles.emptyTitle}>No open jobs</Text>
-          <Text style={styles.emptySub}>Check back later for new job postings</Text>
+          <Text style={styles.emptyTitle}>{t('jobs.noJobs')}</Text>
+          <Text style={styles.emptySub}>{t('jobs.checkLater')}</Text>
         </View>
       ) : (
         <ScrollView
@@ -68,9 +109,9 @@ export default function V2BrowseJobsScreen() {
               <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
               <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
               <View style={styles.cardFooter}>
-                <Text style={styles.jobDate}>Posted {new Date(job.createdAt).toLocaleDateString()}</Text>
+                <Text style={styles.jobDate}>{t('jobs.posted')} {new Date(job.createdAt).toLocaleDateString()}</Text>
                 <View style={styles.quoteBtn}>
-                  <Text style={styles.quoteBtnText}>Quote →</Text>
+                  <Text style={styles.quoteBtnText}>{t('quotes.quote')} →</Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -86,8 +127,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink },
   headerSub: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  headerBadge: { backgroundColor: colors.amber, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  headerBadgeText: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  filterBtn: { backgroundColor: colors.white, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
 
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
   emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },

@@ -160,9 +160,12 @@ const en = {
     noJobs: 'No jobs yet',
     postFirst: 'Post your first job',
     newJob: 'New',
+    posted: 'Posted',
+    checkLater: 'Check back later for new job postings',
   },
   quotes: {
     title: 'Quotes',
+    quote: 'Quote',
     submit: 'Send Quote',
     accept: 'Accept Quote',
     reject: 'Reject',

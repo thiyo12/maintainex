@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const role = searchParams.get('role')
     const myQuotes = searchParams.get('myQuotes')
+    const areaId = searchParams.get('areaId')
 
     let where: any = { isActive: true }
 
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
       where.id = { in: quoteJobIds.map(q => q.jobId) }
     } else if (role === 'provider') {
       where.status = 'OPEN'
+      if (areaId) where.areaId = areaId
     } else {
       where.customerId = user.id
     }
