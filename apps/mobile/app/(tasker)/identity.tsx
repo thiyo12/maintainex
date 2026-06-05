@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { colors } from '../../../lib/colors'
-import { v2Identity } from '../../../lib/api-v2'
+import { colors } from '../../lib/colors'
+import { v2Identity } from '../../lib/api-v2'
 
 const DOC_TYPES = [
   { key: 'NATIONAL_ID', label: 'National ID Card', icon: 'id-card-outline' },
@@ -23,7 +23,7 @@ export default function IdentityVerificationScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    v2Identity.getStatus().then((data) => {
+    v2Identity.getStatus().then((data: any) => {
       if (data.identityStatus === 'APPROVED') {
         Alert.alert('Already Verified', 'Your identity has already been verified.')
         router.back()

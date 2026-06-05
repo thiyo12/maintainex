@@ -162,7 +162,7 @@ export default function CreateJobScreen() {
                   onPress={() => setSelectedCategory(cat)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name={getCategoryIcon(cat.iconName)} size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />
+                  <Ionicons name={getCategoryIcon(cat.iconName) as any} size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />
                   <Text style={[styles.catName, selectedCategory?.id === cat.id && styles.catNameSelected]}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}

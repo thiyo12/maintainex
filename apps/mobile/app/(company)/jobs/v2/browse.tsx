@@ -101,7 +101,7 @@ export default function CompanyBrowseJobsScreen() {
             <TouchableOpacity
               key={job.id}
               style={styles.jobCard}
-              onPress={() => router.push(`/(company)/jobs/v2/quote/${job.id}`)}
+              onPress={() => router.push(`/(company)/jobs/v2/quote/${job.id}` as any)}
               activeOpacity={0.7}
             >
               <View style={styles.cardHeader}>
