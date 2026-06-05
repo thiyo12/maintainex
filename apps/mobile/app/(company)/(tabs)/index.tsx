@@ -151,6 +151,16 @@ export default function CompanyDashboard() {
 
         {/* Quick Nav */}
         <View style={styles.navSection}>
+          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/jobs/v2/browse')} activeOpacity={0.7}>
+            <View style={[styles.navIcon, { backgroundColor: '#D1FAE5' }]}>
+              <Ionicons name="search-outline" size={22} color={colors.amber} />
+            </View>
+            <View style={styles.navInfo}>
+              <Text style={styles.navTitle}>Browse Jobs</Text>
+              <Text style={styles.navSub}>Find new projects to quote on</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/(tabs)/contracts-list')} activeOpacity={0.7}>
             <View style={[styles.navIcon, { backgroundColor: '#EDE9FE' }]}>
               <Ionicons name="document-text-outline" size={22} color={colors.amber} />
