@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const user = await authenticateRequest(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const category = await prisma.jobCategory.findFirst({
       where: { id: params.id, isActive: true },
       include: {
