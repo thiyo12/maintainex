@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 
+const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
+
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -10,10 +12,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
+    let {
       title, description, categoryId, photos,
       budgetType, budgetAmount, areaId, postalCode, preferredDate,
     } = body
+
+    title = sanitize(title, 200)
+    description = sanitize(description, 5000)
+    categoryId = sanitize(categoryId, 50)
+    if (areaId) areaId = sanitize(areaId, 50)
+    if (postalCode) postalCode = sanitize(postalCode, 20)
 
     if (!title || !description || !categoryId || !budgetType || budgetAmount == null) {
       return NextResponse.json({ error: 'Missing required fields: title, description, categoryId, budgetType, budgetAmount' }, { status: 400 })

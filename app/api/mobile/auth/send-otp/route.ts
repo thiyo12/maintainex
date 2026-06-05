@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const { allowed } = checkRateLimit(ip, 3)
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
+    }
+
     const { phone } = await request.json()
 
     if (!phone) {
@@ -12,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findFirst({ where: { phone } })
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ success: true })
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString()
@@ -27,12 +34,11 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    console.log(`[OTP] Code for ${phone}: ${code}`)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[OTP] Code for ${phone}: ${code}`)
+    }
 
-    return NextResponse.json({
-      success: true,
-      devCode: code,
-    })
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Send OTP error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

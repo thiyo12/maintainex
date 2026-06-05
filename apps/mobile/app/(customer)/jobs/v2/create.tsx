@@ -172,7 +172,19 @@ export default function CreateJobScreen() {
             <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={t('postJob.step1.jobTitlePlaceholder')} placeholderTextColor={colors.muted} />
 
             <Text style={styles.label}>{t('postJob.step1.description')}</Text>
-            <TextInput style={[styles.input, styles.textArea]} value={description} onChangeText={setDescription} placeholder={t('postJob.step1.descriptionPlaceholder')} placeholderTextColor={colors.muted} multiline numberOfLines={4} />
+            <View style={styles.charCountRow}>
+              <Text style={styles.charCountHint}>{t('postJob.step1.descHint')}</Text>
+              <Text style={[styles.charCount, description.length > 1000 && styles.charCountWarn]}>{description.length}/2000</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.textArea, description.length > 1000 && { borderColor: description.length > 1500 ? '#EF4444' : '#F59E0B' }]}
+              value={description}
+              onChangeText={(t) => setDescription(t.slice(0, 2000))}
+              placeholder={t('postJob.step1.descriptionPlaceholder')}
+              placeholderTextColor={colors.muted}
+              multiline
+              numberOfLines={5}
+            />
 
             <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]} onPress={() => { if (selectedCategory && title && description) setStep(1); else Alert.alert(t('postJob.noCategory'), t('postJob.noCategoryMsg')) }}>
               <Text style={styles.btnText}>{t('common.next')}</Text>
@@ -398,7 +410,11 @@ const styles = StyleSheet.create({
   // Fields
   label: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6, marginTop: 16 },
   input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 15, fontFamily: fonts.body, color: colors.ink, backgroundColor: colors.white },
-  textArea: { height: 100, textAlignVertical: 'top' },
+  textArea: { height: 140, textAlignVertical: 'top' },
+  charCountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginTop: -2 },
+  charCountHint: { fontSize: 12, color: colors.muted, flex: 1, fontFamily: fonts.bodyLight },
+  charCount: { fontSize: 12, color: colors.muted, fontFamily: fonts.bodyMedium },
+  charCountWarn: { color: '#F59E0B' },
 
   // Step 2 — Budget tiers
   tierRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },

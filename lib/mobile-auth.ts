@@ -1,25 +1,25 @@
 import { NextRequest } from 'next/server'
+import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'development-fallback-secret'
+const JWT_SECRET = process.env.NEXTAUTH_SECRET
+if (!JWT_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is required')
+}
 
-export function createToken(data: any): string {
-  const payload = { ...data, created: Date.now() }
-  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64')
-  const signature = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-  return `${encoded}.${signature}`
+const TOKEN_MAX_AGE = '30d'
+
+export function createToken(data: object): string | null {
+  try {
+    return jwt.sign(data, JWT_SECRET, { expiresIn: TOKEN_MAX_AGE })
+  } catch {
+    return null
+  }
 }
 
 export function verifyToken(token: string): any {
   try {
-    const [encoded, signature] = token.split('.')
-    if (!encoded || !signature) return null
-    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-    if (signature !== expectedSig) return null
-    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
-    const maxAge = 30 * 24 * 60 * 60 * 1000
-    if (Date.now() - payload.created > maxAge) return null
-    return payload
+    return jwt.verify(token, JWT_SECRET)
   } catch {
     return null
   }

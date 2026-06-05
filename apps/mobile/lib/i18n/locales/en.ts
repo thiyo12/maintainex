@@ -72,6 +72,7 @@ const en = {
       jobTitlePlaceholder: 'e.g. Kitchen cleaning needed',
       description: 'Description *',
       descriptionPlaceholder: 'Describe what needs to be done in detail...',
+      descHint: 'Include details like quantity, measurements, materials, and any special requirements',
     },
     step2: {
       title: 'Set your budget',

@@ -2,9 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { createToken } from '@/lib/mobile-auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const { allowed } = checkRateLimit(ip, 5)
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
+    }
+
     const { email, password, name, phone, role } = await request.json()
 
     if (!email || !password || !name) {
@@ -13,6 +20,11 @@ export async function POST(request: NextRequest) {
 
     if (password.length < 6) {
       return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
     }
 
     const validRoles = ['CUSTOMER', 'TASKER', 'COMPANY']
@@ -35,6 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = createToken({ id: user.id, email: user.email, role: user.role })
+    if (!token) return NextResponse.json({ error: 'Server error' }, { status: 500 })
 
     return NextResponse.json({
       token,

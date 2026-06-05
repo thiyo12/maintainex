@@ -69,9 +69,12 @@ export async function GET(request: NextRequest) {
 
     const enriched = await Promise.all(
       quotes.map(async (q) => {
+        const providerFields = isOwner
+          ? { id: true, name: true, phone: true, email: true }
+          : { id: true, name: true }
         const provider = await prisma.user.findUnique({
           where: { id: q.providerId },
-          select: { id: true, name: true, phone: true, email: true },
+          select: providerFields,
         })
         let rating = 0, completedJobs = 0
         if (q.providerType === 'INDIVIDUAL') {

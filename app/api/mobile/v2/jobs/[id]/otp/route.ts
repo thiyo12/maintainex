@@ -63,10 +63,16 @@ export async function GET(
 
     const otpRecord = await prisma.jobOtp.findUnique({ where: { jobId: params.id } })
     if (!otpRecord || otpRecord.verifiedAt) {
-      return NextResponse.json({ otp: null })
+      return NextResponse.json({ hasOtp: false })
     }
 
-    return NextResponse.json({ otp: otpRecord.otp })
+    const quote = await prisma.jobQuote.findFirst({
+      where: { jobId: params.id, status: 'ACCEPTED' },
+      select: { providerId: true },
+    })
+    const isProvider = quote?.providerId === user.id
+
+    return NextResponse.json({ hasOtp: true, otp: isProvider ? otpRecord.otp : null })
   } catch (error) {
     console.error('Get OTP error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
