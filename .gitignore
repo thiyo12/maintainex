@@ -25,6 +25,7 @@ yarn-error.log*
 
 # Local env files - NEVER commit these
 .env
+.env.local
 .env.*.local
 apps/mobile/.env
 apps/mobile/.env.*
