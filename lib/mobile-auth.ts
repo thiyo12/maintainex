@@ -5,16 +5,14 @@ import { prisma } from './prisma'
 const TOKEN_MAX_AGE = '30d'
 
 function getJwtSecret(): string {
-  const secret = process.env.NEXTAUTH_SECRET
-  if (!secret) {
-    throw new Error('NEXTAUTH_SECRET environment variable is required')
-  }
-  return secret
+  return process.env.NEXTAUTH_SECRET || ''
 }
 
 export function createToken(data: object): string | null {
   try {
-    return jwt.sign(data, getJwtSecret(), { expiresIn: TOKEN_MAX_AGE })
+    const secret = getJwtSecret()
+    if (!secret) return null
+    return jwt.sign(data, secret, { expiresIn: TOKEN_MAX_AGE })
   } catch {
     return null
   }
@@ -22,7 +20,9 @@ export function createToken(data: object): string | null {
 
 export function verifyToken(token: string): any {
   try {
-    return jwt.verify(token, getJwtSecret())
+    const secret = getJwtSecret()
+    if (!secret) return null
+    return jwt.verify(token, secret)
   } catch {
     return null
   }
