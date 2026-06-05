@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../../lib/colors'
-import { taskers } from '../../../lib/api'
+import { taskers, getAuthToken } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import type { TaskerProfile } from '../../../lib/types'
 import PressScale from '../../../components/find/PressScale'
@@ -19,9 +19,11 @@ export default function TaskerProfile() {
     router.replace('/')
   }
   const [profile, setProfile] = useState<TaskerProfile | null>(null)
+  const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
 
   useEffect(() => {
     loadProfile()
+    loadIdentity()
   }, [])
 
   async function loadProfile() {
@@ -33,6 +35,22 @@ export default function TaskerProfile() {
       console.error(e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadIdentity() {
+    try {
+      const token = await getAuthToken()
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/v2/identity`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setIdentityStatus(data.identityStatus)
+      }
+    } catch (e) {
+      console.error('Load identity error:', e)
     }
   }
 
@@ -67,10 +85,24 @@ export default function TaskerProfile() {
             <Text style={[styles.role, { marginBottom: 0 }]}> {rating.toFixed(1)}</Text>
           </View>
           <View style={styles.badgeRow}>
-            <View style={styles.badge}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-              <Text style={styles.badgeText}> Verified</Text>
-            </View>
+            {identityStatus === 'APPROVED' ? (
+              <View style={styles.badge}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                <Text style={styles.badgeText}> Verified</Text>
+              </View>
+            ) : identityStatus === 'PENDING' ? (
+              <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="time-outline" size={14} color="#D97706" />
+                <Text style={[styles.badgeText, { color: '#D97706' }]}> Pending</Text>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => router.push('/(tasker)/identity')}>
+                <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
+                  <Ionicons name="close-circle-outline" size={14} color="#DC2626" />
+                  <Text style={[styles.badgeText, { color: '#DC2626' }]}> Not Verified</Text>
+                </View>
+              </TouchableOpacity>
+            )}
             <View style={styles.badge}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success, marginRight: 4 }} />
               <Text style={styles.badgeText}>Online</Text>
@@ -117,6 +149,22 @@ export default function TaskerProfile() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
+          <PressScale onPress={() => router.push('/(tasker)/identity')}>
+            <View style={styles.menuRow}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
+              <Text style={styles.menuLabel}>Identity Verification</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {identityStatus === 'APPROVED' ? (
+                  <Text style={{ fontSize: 12, color: colors.success, fontWeight: '600' }}>Verified</Text>
+                ) : identityStatus === 'PENDING' ? (
+                  <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '600' }}>Pending</Text>
+                ) : identityStatus === 'REJECTED' ? (
+                  <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '600' }}>Rejected</Text>
+                ) : null}
+                <Text style={styles.menuArrow}>›</Text>
+              </View>
+            </View>
+          </PressScale>
           <PressScale onPress={() => router.push('/settings/edit-profile')}>
             <View style={styles.menuRow}>
               <Ionicons name="create-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />

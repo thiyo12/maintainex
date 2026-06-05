@@ -34,6 +34,8 @@ model User {
   companyProfile     CompanyProfile?
   teamMembers        TeamMember[]
   payouts            Payout[]
+  identityDocs       IdentityDocument[]
+  identityStatus     String               @default("NOT_SUBMITTED")
 }
 
 model Admin {
@@ -1502,4 +1504,22 @@ model ProviderReview {
 
   @@unique([jobId, providerId])
   @@index([customerId])
+}
+
+model IdentityDocument {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  docType    String    // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
+  side       String    // FRONT or BACK
+  imageUrl   String
+  status     String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewNote String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

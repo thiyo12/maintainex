@@ -163,3 +163,14 @@ export const v2Subscription = {
   cancel: () =>
     v2Request<{ success: boolean }>('/api/mobile/company/subscription', { method: 'DELETE' }),
 }
+
+export const v2Identity = {
+  getStatus: () =>
+    v2Request<{ identityStatus: string; documents: any[] }>('/api/mobile/v2/identity'),
+
+  uploadDocument: (docType: string, side: string, imageUrl: string) =>
+    v2Request<{ document: any }>('/api/mobile/v2/identity', {
+      method: 'POST',
+      body: JSON.stringify({ docType, side, imageUrl }),
+    }),
+}
