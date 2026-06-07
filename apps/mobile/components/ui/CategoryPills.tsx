@@ -1,6 +1,8 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius } from '../../lib/tokens'
 
 interface CategoryItem {
   id: string
@@ -28,10 +30,11 @@ const FALLBACK_CATEGORIES: CategoryItem[] = [
 ]
 
 export default function CategoryPills({ items, selected, onSelect, loading }: Props) {
+  const colors = useColors()
   const list = items || FALLBACK_CATEGORIES
 
   if (loading) {
-    return <Text style={{ fontSize: 13, color: '#9CA3AF', paddingVertical: 12 }}>Loading categories...</Text>
+    return <Text style={{ fontSize: fontSizes.caption, color: colors.muted, paddingVertical: spacing.md }}>Loading categories...</Text>
   }
 
   return (
@@ -41,12 +44,18 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
         return (
           <TouchableOpacity
             key={cat.id}
-            style={[styles.pill, isSelected && { borderColor: cat.colorHex, backgroundColor: cat.colorHex + '15' }]}
+            style={[
+              styles.pill,
+              {
+                backgroundColor: isSelected ? cat.colorHex : colors.surface,
+                borderColor: isSelected ? cat.colorHex : colors.border,
+              },
+            ]}
             onPress={() => onSelect(cat.id)}
             activeOpacity={0.7}
           >
-            <Ionicons name={cat.iconName as any} size={16} color={isSelected ? cat.colorHex : '#6B7280'} />
-            <Text style={[styles.pillLabel, isSelected && { color: cat.colorHex, fontWeight: '700' }]}>
+            <Ionicons name={cat.iconName as any} size={16} color={isSelected ? '#FFFFFF' : colors.muted} />
+            <Text style={[styles.pillLabel, { color: isSelected ? '#FFFFFF' : colors.ink }]}>
               {cat.name}
             </Text>
           </TouchableOpacity>
@@ -60,23 +69,20 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    paddingVertical: 8,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.full,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    gap: 6,
+    gap: spacing.xs,
   },
   pillLabel: {
-    fontSize: 13,
+    fontSize: fontSizes.captionSmall,
     fontWeight: '600',
-    color: '#1F2937',
   },
 })

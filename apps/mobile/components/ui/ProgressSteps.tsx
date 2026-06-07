@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native'
-import { colors } from '../../lib/colors'
-import { fonts } from '../../lib/fonts'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius } from '../../lib/tokens'
 
 interface Props {
   current: number
@@ -9,6 +10,8 @@ interface Props {
 }
 
 export default function ProgressSteps({ current, total, labels }: Props) {
+  const colors = useColors()
+
   return (
     <View style={styles.container}>
       <View style={styles.barRow}>
@@ -17,13 +20,20 @@ export default function ProgressSteps({ current, total, labels }: Props) {
           const isCurrent = i === current
           return (
             <View key={i} style={styles.stepWrap}>
-              <View style={[styles.dot, isDone && styles.dotDone, isCurrent && styles.dotCurrent]}>
-                <Text style={[styles.dotText, (isDone || isCurrent) && styles.dotTextActive]}>
+              <View
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor: isDone ? colors.success : isCurrent ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text style={[styles.dotText, (isDone || isCurrent) && { color: colors.white }]}>
                   {isDone ? '✓' : i + 1}
                 </Text>
               </View>
               {i < total - 1 ? (
-                <View style={[styles.line, isDone && styles.lineDone]} />
+                <View style={[styles.line, { backgroundColor: isDone ? colors.success : colors.border }]} />
               ) : null}
             </View>
           )
@@ -32,7 +42,14 @@ export default function ProgressSteps({ current, total, labels }: Props) {
       {labels ? (
         <View style={styles.labelRow}>
           {labels.map((l, i) => (
-            <Text key={i} style={[styles.label, i === current && styles.labelActive]}>
+            <Text
+              key={i}
+              style={[
+                styles.label,
+                { color: i === current ? colors.primary : colors.muted },
+                i === current && { fontFamily: fonts.headingBold },
+              ]}
+            >
               {l}
             </Text>
           ))}
@@ -43,30 +60,23 @@ export default function ProgressSteps({ current, total, labels }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { marginVertical: 16 },
+  container: { marginVertical: spacing.lg },
   barRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   stepWrap: { flexDirection: 'row', alignItems: 'center' },
   dot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.border,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dotDone: { backgroundColor: colors.success },
-  dotCurrent: { backgroundColor: colors.amber },
-  dotText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted },
-  dotTextActive: { color: colors.white },
+  dotText: { fontSize: fontSizes.captionSmall, fontFamily: fonts.bodyMedium },
   line: {
-    width: 40,
+    width: 48,
     height: 3,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
-    borderRadius: 2,
+    marginHorizontal: spacing.xs,
+    borderRadius: borderRadius.sm,
   },
-  lineDone: { backgroundColor: colors.success },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
-  label: { fontSize: 11, fontFamily: fonts.body, color: colors.muted },
-  labelActive: { color: colors.amber, fontFamily: fonts.headingBold },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: spacing.sm },
+  label: { fontSize: fontSizes.label, fontFamily: fonts.body, textAlign: 'center', flex: 1 },
 })

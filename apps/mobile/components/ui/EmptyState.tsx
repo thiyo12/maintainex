@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
-import { colors } from '../../lib/colors'
-import { fonts } from '../../lib/fonts'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing } from '../../lib/tokens'
 
 interface Props {
   icon?: string
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function EmptyState({ icon = '📭', title, subtitle }: Props) {
+  const colors = useColors()
   const fadeAnim = useRef(new Animated.Value(0)).current
   const bounceAnim = useRef(new Animated.Value(0)).current
 
@@ -25,8 +27,8 @@ export default function EmptyState({ icon = '📭', title, subtitle }: Props) {
       <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: bounceAnim }] }}>
         <Text style={styles.icon}>{icon}</Text>
       </Animated.View>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
+      {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
     </View>
   )
 }
@@ -36,10 +38,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 60,
+    paddingHorizontal: spacing.xxxl,
+    paddingVertical: spacing.xxxxl,
   },
-  icon: { fontSize: 64, marginBottom: 16 },
-  title: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 14, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 20 },
+  icon: { fontSize: 64, marginBottom: spacing.lg },
+  title: { fontSize: fontSizes.h3, fontFamily: fonts.headingBold, textAlign: 'center', marginBottom: spacing.sm },
+  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, textAlign: 'center', lineHeight: 20 },
 })

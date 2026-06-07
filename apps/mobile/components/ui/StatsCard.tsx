@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius, shadows } from '../../lib/tokens'
 
 interface Props {
   label: string
@@ -8,8 +12,10 @@ interface Props {
   icon?: string
 }
 
-export default function StatsCard({ label, value, color = '#F59E0B', icon }: Props) {
+export default function StatsCard({ label, value, color: propColor, icon }: Props) {
+  const colors = useColors()
   const fadeAnim = useRef(new Animated.Value(0)).current
+  const color = propColor || colors.primary
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -20,10 +26,17 @@ export default function StatsCard({ label, value, color = '#F59E0B', icon }: Pro
   }, [])
 
   return (
-    <Animated.View style={[styles.card, { opacity: fadeAnim }]}>
-      {icon ? <Text style={styles.icon}>{icon}</Text> : null}
+    <Animated.View style={[styles.card, { backgroundColor: colors.surface, opacity: fadeAnim }, shadows.md]}>
+      {icon ? (
+        <Ionicons
+          name={icon as any}
+          size={24}
+          color={color}
+          style={styles.icon}
+        />
+      ) : null}
       <Text style={[styles.value, { color }]}>{value}</Text>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.muted }]}>{label}</Text>
     </Animated.View>
   )
 }
@@ -31,29 +44,21 @@ export default function StatsCard({ label, value, color = '#F59E0B', icon }: Pro
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
   },
   icon: {
-    fontSize: 24,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   value: {
-    fontSize: 24,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: fontSizes.h2,
+    fontFamily: fonts.headingBold,
+    marginBottom: spacing.xxs,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontSize: fontSizes.caption,
+    fontFamily: fonts.body,
     textAlign: 'center',
   },
 })

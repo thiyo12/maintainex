@@ -1,16 +1,10 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
-
-const colors = {
-  primary: '#F59E0B',
-  dark: '#1A1A2E',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  background: '#F9FAFB',
-  white: '#FFFFFF',
-  green: '#10B981',
-}
+import { Ionicons } from '@expo/vector-icons'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius } from '../../lib/tokens'
 
 interface PhotoItem {
   uri: string
@@ -24,6 +18,7 @@ interface Props {
 }
 
 export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingPhotos = [] }: Props) {
+  const colors = useColors()
   const [photos, setPhotos] = useState<PhotoItem[]>(existingPhotos)
 
   const pickImage = async () => {
@@ -46,21 +41,27 @@ export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingP
 
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
+      <View style={styles.grid}>
         {photos.map((photo, i) => (
           <View key={i} style={styles.thumbnailWrap}>
-            <View style={[styles.thumbnail, { backgroundColor: '#E5E7EB' }]}>
-              <Text style={styles.thumbIcon}>📷</Text>
+            <View style={[styles.thumbnail, { backgroundColor: colors.border }]}>
+              <Ionicons name="image-outline" size={28} color={colors.muted} />
             </View>
-            <TouchableOpacity style={styles.removeBtn} onPress={() => removePhoto(i)}>
-              <Text style={styles.removeText}>✕</Text>
+            <TouchableOpacity style={[styles.removeBtn, { backgroundColor: colors.error }]} onPress={() => removePhoto(i)}>
+              <Ionicons name="close" size={12} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         ))}
         {photos.length < maxPhotos ? (
-          <TouchableOpacity style={styles.addBox} onPress={pickImage} activeOpacity={0.7}>
-            <Text style={styles.addIcon}>+</Text>
-            <Text style={styles.addLabel}>{photos.length === 0 ? 'Tap to add' : 'Add more'}</Text>
+          <TouchableOpacity
+            style={[styles.addBox, { borderColor: colors.border, backgroundColor: colors.background }]}
+            onPress={pickImage}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="camera-outline" size={28} color={colors.muted} />
+            <Text style={[styles.addLabel, { color: colors.muted }]}>
+              {photos.length === 0 ? 'Tap to add' : 'Add more'}
+            </Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -69,17 +70,16 @@ export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingP
 }
 
 const styles = StyleSheet.create({
-  container: { marginVertical: 8 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  container: { marginVertical: spacing.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   thumbnailWrap: { position: 'relative' },
   thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 90,
+    height: 90,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  thumbIcon: { fontSize: 28 },
   removeBtn: {
     position: 'absolute',
     top: -6,
@@ -87,22 +87,17 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  removeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
   addBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 90,
+    height: 90,
+    borderRadius: borderRadius.md,
     borderWidth: 2,
-    borderColor: colors.lightGray,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
-  addIcon: { fontSize: 28, color: colors.gray, fontWeight: '300' },
-  addLabel: { fontSize: 10, color: colors.gray, marginTop: 4 },
+  addLabel: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body, marginTop: spacing.xs },
 })

@@ -1,36 +1,43 @@
-import React from 'react'
-import { View, StyleSheet, ViewStyle } from 'react-native'
-import { colors } from '../../lib/colors'
+import { type ReactNode } from 'react'
+import { View, TouchableOpacity, StyleSheet } from 'react-native'
+import { useColors } from '../../lib/ThemeContext'
+import { spacing, borderRadius, shadows } from '../../lib/tokens'
 
 interface Props {
-  children: React.ReactNode
-  style?: ViewStyle
+  children: ReactNode
+  variant?: 'default' | 'elevated' | 'pressable'
+  onPress?: () => void
+  style?: any
   padded?: boolean
-  highlighted?: boolean
 }
 
-export default function Card({ children, style, padded = true, highlighted }: Props) {
-  return (
-    <View style={[styles.card, padded && styles.padded, highlighted && styles.highlighted, style]}>
-      {children}
-    </View>
-  )
+export default function Card({ children, variant = 'default', onPress, style }: Props) {
+  const colors = useColors()
+
+  const cardStyle = [
+    styles.base,
+    {
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+    },
+    variant === 'elevated' && shadows.lg,
+    variant !== 'elevated' && shadows.md,
+    style,
+  ]
+
+  if (variant === 'pressable' && onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={cardStyle}>
+        {children}
+      </TouchableOpacity>
+    )
+  }
+
+  return <View style={cardStyle}>{children}</View>
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    shadowColor: colors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  padded: { padding: 16 },
-  highlighted: {
-    backgroundColor: colors.amberBg,
-    borderWidth: 1,
-    borderColor: colors.amberLight,
+  base: {
+    padding: spacing.xl,
   },
 })

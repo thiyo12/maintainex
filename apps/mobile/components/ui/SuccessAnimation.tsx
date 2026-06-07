@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { View, StyleSheet, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
+import { shadows } from '../../lib/tokens'
 
 interface Props {
   type?: 'checkmark' | 'clock' | 'cross'
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function SuccessAnimation({ type = 'checkmark', size = 80 }: Props) {
+  const colors = useColors()
   const scaleAnim = useRef(new Animated.Value(0)).current
   const opacityAnim = useRef(new Animated.Value(0)).current
 
@@ -28,7 +30,7 @@ export default function SuccessAnimation({ type = 'checkmark', size = 80 }: Prop
     ]).start()
   }, [])
 
-  const bgColor = type === 'checkmark' ? colors.success : type === 'cross' ? colors.error : colors.amber
+  const bgColor = type === 'checkmark' ? colors.success : type === 'cross' ? colors.error : colors.accent
 
   return (
     <Animated.View
@@ -42,6 +44,7 @@ export default function SuccessAnimation({ type = 'checkmark', size = 80 }: Prop
           transform: [{ scale: scaleAnim }],
           opacity: opacityAnim,
         },
+        shadows.lg,
       ]}
     >
       <Ionicons
@@ -57,14 +60,5 @@ const styles = StyleSheet.create({
   circle: {
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  icon: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
 })

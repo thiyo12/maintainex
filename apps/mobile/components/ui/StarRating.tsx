@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
+import { spacing } from '../../lib/tokens'
 
 interface Props {
   stars: number
@@ -9,7 +10,10 @@ interface Props {
   readonly?: boolean
 }
 
+const GOLD = '#EAB308'
+
 export default function StarRating({ stars, size = 32, onRate, readonly = false }: Props) {
+  const colors = useColors()
   const animValues = useRef(Array.from({ length: 5 }, () => new Animated.Value(1))).current
 
   useEffect(() => {
@@ -27,7 +31,7 @@ export default function StarRating({ stars, size = 32, onRate, readonly = false 
         }).start()
       })
     }
-  }, [stars])
+  }, [stars, readonly])
 
   return (
     <View style={styles.container}>
@@ -41,11 +45,12 @@ export default function StarRating({ stars, size = 32, onRate, readonly = false 
           <Animated.View
             style={[
               styles.starWrap,
-              readonly && i <= stars && styles.starFilled,
               !readonly && { transform: [{ scale: animValues[i - 1] || 1 }] },
             ]}
           >
-            <Text style={[styles.star, { fontSize: size }, i <= stars && styles.starActive]}>
+            <Text style={[styles.star, { fontSize: size }, i <= stars && { color: GOLD },
+              i > stars && { color: colors.muted },
+            ]}>
               {i <= stars ? '★' : '☆'}
             </Text>
           </Animated.View>
@@ -56,9 +61,7 @@ export default function StarRating({ stars, size = 32, onRate, readonly = false 
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', gap: 4 },
-  starWrap: { padding: 2 },
-  starFilled: { opacity: 1 },
-  star: { color: colors.muted },
-  starActive: { color: colors.amber },
+  container: { flexDirection: 'row', gap: spacing.xs },
+  starWrap: { padding: spacing.xs },
+  star: {},
 })

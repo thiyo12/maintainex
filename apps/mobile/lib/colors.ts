@@ -1,40 +1,106 @@
-export const colors = {
-  // Brand palette (exact spec values)
-  primary: '#F59E0B',       // Amber — buttons, CTAs, active states
-  primaryDark: '#D97706',   // Amber Dark — pressed states, prices
-  primaryLight: '#FDE68A',  // Amber Light — highlights, fills
-  ink: '#0F0A00',           // Near-black — primary text, dark headers
-  cream: '#FFFBF0',         // Warm white — main background
-  muted: '#8B7355',         // Warm brown — secondary text, captions
-  white: '#FFFFFF',         // Cards, inputs
-  surface: '#FFF8E6',       // Slightly amber-tinted surface
-  border: 'rgba(245,158,11,0.18)', // Amber-tinted borders
-  success: '#10B981',       // Green — online, confirmed, completed
-  info: '#3B82F6',          // Blue — customer accent
-  company: '#8B5CF6',       // Purple — company accent
-  error: '#DC2626',
+export const lightColors = {
+  primary: '#2563EB',
+  primaryDark: '#1D4ED8',
+  primaryLight: '#DBEAFE',
+  accent: '#F59E0B',
+  accentDark: '#D97706',
+  accentLight: '#FDE68A',
+  accentBg: '#FEF3CD',
 
-  // Legacy aliases (existing non-V2 screens still compile)
+  background: '#FAFAFA',
+  surface: '#FFFFFF',
+  surfaceElevated: '#FFFFFF',
+  ink: '#0F172A',
+  inkLight: '#475569',
+  muted: '#94A3B8',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
+  shadow: '#000000',
+  overlay: 'rgba(0,0,0,0.4)',
+
+  success: '#10B981',
+  successLight: '#D1FAE5',
+  error: '#EF4444',
+  errorLight: '#FEE2E2',
+  warning: '#F59E0B',
+  warningLight: '#FEF3C7',
+  info: '#3B82F6',
+  infoLight: '#DBEAFE',
+
+  white: '#FFFFFF',
+  dark: '#0F172A',
+
+  // Legacy aliases (for non-upgraded screens)
   amber: '#F59E0B',
   amberDark: '#D97706',
   amberLight: '#FDE68A',
   amberBg: '#FEF3CD',
-  creamDarker: '#F5EDD6',
-  dark: '#0F0A00',
-  darkMid: '#0F0A00',
-  darkLight: '#8B7355',
-  gray: '#8B7355',
-  lightGray: 'rgba(245,158,11,0.18)',
-  background: '#FFFBF0',
+  cream: '#FAFAFA',
+  creamDarker: '#E2E8F0',
+  darkMid: '#0F172A',
+  darkLight: '#475569',
+  gray: '#94A3B8',
+  lightGray: '#E2E8F0',
   green: '#10B981',
   teal: '#10B981',
-  warning: '#F59E0B',
-  red: '#DC2626',
-
-  // Role accents — aligned with spec: customer=blue, tasker=amber, company=purple
+  red: '#EF4444',
+  company: '#7C3AED',
   customerAccent: '#3B82F6',
   taskerAccent: '#F59E0B',
-  companyAccent: '#8B5CF6',
+  companyAccent: '#7C3AED',
 }
 
-export type ColorKey = keyof typeof colors
+export const darkColors: typeof lightColors = {
+  primary: '#3B82F6',
+  primaryDark: '#2563EB',
+  primaryLight: '#1E3A5F',
+  accent: '#FBBF24',
+  accentDark: '#F59E0B',
+  accentLight: '#3D2E00',
+  accentBg: '#3D2E00',
+
+  background: '#0F172A',
+  surface: '#1E293B',
+  surfaceElevated: '#334155',
+  ink: '#F1F5F9',
+  inkLight: '#CBD5E1',
+  muted: '#64748B',
+  border: '#334155',
+  borderLight: '#1E293B',
+  shadow: '#000000',
+  overlay: 'rgba(0,0,0,0.6)',
+
+  success: '#34D399',
+  successLight: '#064E3B',
+  error: '#F87171',
+  errorLight: '#7F1D1D',
+  warning: '#FBBF24',
+  warningLight: '#3D2E00',
+  info: '#60A5FA',
+  infoLight: '#1E3A5F',
+
+  white: '#FFFFFF',
+  dark: '#0F172A',
+
+  // Legacy aliases
+  amber: '#FBBF24',
+  amberDark: '#F59E0B',
+  amberLight: '#3D2E00',
+  amberBg: '#3D2E00',
+  cream: '#0F172A',
+  creamDarker: '#1E293B',
+  darkMid: '#0F172A',
+  darkLight: '#CBD5E1',
+  gray: '#64748B',
+  lightGray: '#334155',
+  green: '#34D399',
+  teal: '#34D399',
+  red: '#F87171',
+  company: '#A78BFA',
+  customerAccent: '#60A5FA',
+  taskerAccent: '#FBBF24',
+  companyAccent: '#A78BFA',
+}
+
+export const colors = lightColors
+export type ColorKey = keyof typeof lightColors
