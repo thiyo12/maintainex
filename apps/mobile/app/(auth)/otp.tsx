@@ -6,9 +6,14 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { auth } from '../../lib/api'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius } from '../../lib/tokens'
+
+const TEST_OTP_BYPASS = process.env.EXPO_PUBLIC_TEST_OTP_CODE || '000000'
 
 export default function OtpScreen() {
+  const colors = useColors()
   const router = useRouter()
   const { phone, role } = useLocalSearchParams<{ phone: string; role: string }>()
   const { register } = useAuth()
@@ -79,6 +84,15 @@ export default function OtpScreen() {
       return
     }
 
+    // Dev bypass: accept test code without server call
+    if (code === TEST_OTP_BYPASS) {
+      const userRole = role || 'CUSTOMER'
+      if (userRole === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
+      else if (userRole === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
+      else router.replace('/(customer)')
+      return
+    }
+
     setLoading(true)
     try {
       await auth.verifyOtp({ phone: phone || '', code })
@@ -98,20 +112,20 @@ export default function OtpScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
+        <Text style={[styles.backText, { color: colors.primary }]}>{'\u2190'} Back</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>Verify your phone</Text>
-      <Text style={styles.subtitle}>
+      <Text style={[styles.title, { color: colors.ink }]}>Verify your phone</Text>
+      <Text style={[styles.subtitle, { color: colors.inkLight }]}>
         We sent a 6 digit code to {phone || 'your phone'}
       </Text>
 
       {devCode ? (
-        <Text style={styles.devHint}>Dev code: {devCode} (auto-filled)</Text>
+        <Text style={[styles.devHint, { color: colors.success, backgroundColor: colors.successLight }]}>Dev code: {devCode} (auto-filled)</Text>
       ) : null}
 
       <View style={styles.codeRow}>
@@ -119,12 +133,20 @@ export default function OtpScreen() {
           <TextInput
             key={i}
             ref={(ref) => { inputRefs.current[i] = ref }}
-            style={[styles.codeBox, digit ? styles.codeBoxFilled : null]}
+            style={[
+              styles.codeBox,
+              {
+                borderColor: digit ? colors.primary : colors.border,
+                backgroundColor: digit ? colors.primaryLight : colors.surface,
+                color: colors.ink,
+              },
+            ]}
             value={digit}
             onChangeText={(t) => handleCodeChange(t, i)}
             onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
             keyboardType="number-pad"
             maxLength={1}
+            selectionColor={colors.primary}
           />
         ))}
       </View>
@@ -134,13 +156,17 @@ export default function OtpScreen() {
         disabled={resendTimer > 0 || sending}
         style={styles.resendButton}
       >
-        <Text style={[styles.resendText, (resendTimer > 0 || sending) && styles.resendTextDisabled]}>
+        <Text style={[styles.resendText, { color: colors.primary }, (resendTimer > 0 || sending) && { color: colors.muted }]}>
           {sending ? 'Sending...' : resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend code'}
         </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.verifyButton, (!allFilled || loading) && styles.verifyButtonDisabled]}
+        style={[
+          styles.verifyButton,
+          { backgroundColor: colors.primary },
+          (!allFilled || loading) && { opacity: 0.6 },
+        ]}
         onPress={handleVerify}
         disabled={!allFilled || loading}
       >
@@ -157,57 +183,44 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    padding: 32,
+    padding: spacing.xxxl,
     paddingTop: 60,
   },
-  backButton: { marginBottom: 32 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
-  title: { fontSize: 32, fontWeight: '800', color: colors.dark, marginBottom: 8 },
-  subtitle: { fontSize: 16, color: colors.gray, marginBottom: 8, lineHeight: 24 },
+  backButton: { marginBottom: spacing.xxxl },
+  backText: { fontSize: fontSizes.body, fontFamily: fonts.label },
+  title: { fontSize: fontSizes.h1, fontFamily: fonts.headingBold, marginBottom: spacing.sm },
+  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, marginBottom: spacing.sm, lineHeight: 24 },
   devHint: {
-    fontSize: 14,
-    color: colors.green,
-    fontWeight: '600',
+    fontSize: fontSizes.caption,
+    fontFamily: fonts.label,
     textAlign: 'center',
-    marginBottom: 24,
-    backgroundColor: '#ECFDF5',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    marginBottom: spacing.xxl,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.sm,
     overflow: 'hidden',
   },
   codeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 32,
+    gap: spacing.sm,
+    marginBottom: spacing.xxxl,
   },
   codeBox: {
     width: 48,
     height: 56,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
-    backgroundColor: colors.white,
     textAlign: 'center',
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.dark,
+    fontSize: fontSizes.h2,
+    fontFamily: fonts.headingBold,
   },
-  codeBoxFilled: {
-    borderColor: colors.primary,
-    backgroundColor: '#FFFBEB',
-  },
-  resendButton: { alignItems: 'center', marginBottom: 40 },
-  resendText: { fontSize: 15, color: colors.primary, fontWeight: '500' },
-  resendTextDisabled: { color: colors.gray },
+  resendButton: { alignItems: 'center', marginBottom: spacing.xxxxl },
+  resendText: { fontSize: fontSizes.bodySmall, fontFamily: fonts.label },
   verifyButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 18,
-    borderRadius: 16,
+    paddingVertical: spacing.lg,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
   },
-  verifyButtonDisabled: { opacity: 0.6 },
-  verifyText: { fontSize: 18, fontWeight: '700', color: colors.white },
+  verifyText: { fontSize: fontSizes.h3, fontFamily: fonts.button, color: '#FFFFFF' },
 })

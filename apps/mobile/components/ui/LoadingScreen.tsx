@@ -1,10 +1,15 @@
-import { View, ActivityIndicator, StyleSheet } from 'react-native'
-import { colors } from '../../lib/colors'
+import { View, ActivityIndicator, StyleSheet, Text } from 'react-native'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing } from '../../lib/tokens'
 
 export function LoadingScreen() {
+  const colors = useColors()
+
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color={colors.amber} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={[styles.text, { color: colors.muted }]}>Loading...</Text>
     </View>
   )
 }
@@ -14,6 +19,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.cream,
+  },
+  text: {
+    marginTop: spacing.lg,
+    fontSize: fontSizes.bodySmall,
+    fontFamily: fonts.body,
   },
 })

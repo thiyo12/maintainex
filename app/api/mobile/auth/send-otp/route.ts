@@ -34,11 +34,12 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (process.env.NODE_ENV !== 'production') {
+    const isDev = process.env.NODE_ENV !== 'production'
+    if (isDev) {
       console.log(`[OTP] Code for ${phone}: ${code}`)
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, devCode: isDev ? code : undefined })
   } catch (error) {
     console.error('Send OTP error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

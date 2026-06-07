@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../lib/auth'
 import { LoadingScreen } from '../components/ui/LoadingScreen'
 import Logo from '../components/ui/Logo'
-import { colors } from '../lib/colors'
-import { fonts } from '../lib/fonts'
+import { useColors } from '../lib/ThemeContext'
+import { fonts, fontSizes } from '../lib/fonts'
+import { spacing } from '../lib/tokens'
 
 export default function SplashScreen() {
+  const colors = useColors()
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
 
@@ -29,11 +31,11 @@ export default function SplashScreen() {
   if (isLoading) return <LoadingScreen />
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.primary }]}>
       <View style={styles.logoWrapper}>
         <Logo size={120} />
-        <Text style={styles.appName}>Maintainex</Text>
-        <Text style={styles.tagline}>Professional Services at Your Doorstep</Text>
+        <Text style={[styles.appName, { color: colors.white }]}>Maintainex</Text>
+        <Text style={[styles.tagline, { color: colors.white }]}>Professional Services at Your Doorstep</Text>
       </View>
     </View>
   )
@@ -42,12 +44,22 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.amber,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing.xxxl,
   },
   logoWrapper: { alignItems: 'center' },
-  appName: { fontSize: 36, fontFamily: fonts.heading, color: colors.ink, marginBottom: 8, marginTop: 24 },
-  tagline: { fontSize: 16, fontFamily: fonts.bodyLight, color: colors.ink, opacity: 0.8, textAlign: 'center' },
+  appName: {
+    fontSize: fontSizes.display,
+    fontFamily: fonts.display,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xxl,
+    opacity: 0.9,
+  },
+  tagline: {
+    fontSize: fontSizes.body,
+    fontFamily: fonts.bodyLight,
+    opacity: 0.7,
+    textAlign: 'center',
+  },
 })

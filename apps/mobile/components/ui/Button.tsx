@@ -1,6 +1,7 @@
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native'
 import { colors } from '../../lib/colors'
-import { fonts } from '../../lib/fonts'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius } from '../../lib/tokens'
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost'
 
@@ -19,15 +20,15 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
   const isDisabled = disabled || loading
 
   const bgColor = () => {
-    if (variant === 'primary') return color || colors.amber
+    if (variant === 'primary') return color || colors.primary
     if (variant === 'secondary') return colors.surface
     return 'transparent'
   }
 
   const textColor = () => {
-    if (variant === 'primary') return colors.ink
-    if (variant === 'outline') return color || colors.amber
-    if (variant === 'ghost') return color || colors.muted
+    if (variant === 'primary') return colors.white
+    if (variant === 'outline') return color || colors.primary
+    if (variant === 'ghost') return color || colors.inkLight
     return colors.ink
   }
 
@@ -37,7 +38,7 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
         styles.base,
         fullWidth && styles.fullWidth,
         { backgroundColor: bgColor() },
-        variant === 'outline' && { borderWidth: 2, borderColor: color || colors.amber },
+        variant === 'outline' && { borderWidth: 2, borderColor: color || colors.primary },
         variant === 'ghost' && { borderWidth: 0 },
         isDisabled && styles.disabled,
         style,
@@ -47,7 +48,7 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.ink : (color || colors.amber)} />
+        <ActivityIndicator color={variant === 'primary' ? colors.white : (color || colors.primary)} />
       ) : (
         <Text style={[styles.label, { color: textColor() }]}>{label}</Text>
       )}
@@ -57,14 +58,14 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
   },
   fullWidth: { width: '100%' },
   disabled: { opacity: 0.5 },
-  label: { fontSize: 15, fontFamily: fonts.bodyMedium },
+  label: { fontSize: fontSizes.button, fontFamily: fonts.button },
 })

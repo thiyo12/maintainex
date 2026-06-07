@@ -3,8 +3,9 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import Logo from '../../components/ui/Logo'
-import { colors } from '../../lib/colors'
-import { fonts } from '../../lib/fonts'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts, fontSizes } from '../../lib/fonts'
+import { spacing, borderRadius } from '../../lib/tokens'
 
 const roles = [
   {
@@ -14,16 +15,16 @@ const roles = [
     subtitle: 'Post jobs, hire taskers & companies',
     bg: '#EFF6FF',
     border: '#3B82F6',
-    accent: colors.info as string,
+    accent: '#3B82F6',
   },
   {
     id: 'TASKER',
     icon: 'construct-outline' as const,
     title: 'I am a tasker',
     subtitle: 'Find jobs & send quotes',
-    bg: '#FFF8E6',
-    border: colors.amber as string,
-    accent: colors.amber as string,
+    bg: '#FFFBEB',
+    border: '#F59E0B',
+    accent: '#F59E0B',
   },
   {
     id: 'COMPANY',
@@ -32,22 +33,23 @@ const roles = [
     subtitle: 'Manage team & bid on projects',
     bg: '#F5F3FF',
     border: '#8B5CF6',
-    accent: colors.company as string,
+    accent: '#8B5CF6',
   },
 ]
 
 export default function WelcomeScreen() {
+  const colors = useColors()
   const router = useRouter()
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <View style={styles.logoWrapper}>
           <Logo size={72} />
         </View>
 
-        <Text style={styles.heading}>Welcome to{'\n'}Maintainex</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.heading, { color: colors.ink }]}>Welcome to{'\n'}Maintainex</Text>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>
           Choose how you want to use Maintainex
         </Text>
 
@@ -64,7 +66,7 @@ export default function WelcomeScreen() {
               </View>
               <View style={styles.cardText}>
                 <Text style={[styles.cardTitle, { color: role.accent }]}>{role.title}</Text>
-                <Text style={styles.cardSub}>{role.subtitle}</Text>
+                <Text style={[styles.cardSub, { color: colors.ink }]}>{role.subtitle}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={role.accent} />
             </TouchableOpacity>
@@ -73,8 +75,8 @@ export default function WelcomeScreen() {
 
         <View style={styles.bottom}>
           <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.signIn}>
-              Already have an account? <Text style={styles.signInLink}>Sign in</Text>
+            <Text style={[styles.signIn, { color: colors.muted }]}>
+              Already have an account? <Text style={[styles.signInLink, { color: colors.primary }]}>Sign in</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -84,32 +86,32 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  content: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
-  logoWrapper: { alignItems: 'center', marginBottom: 8 },
-  heading: { fontSize: 32, fontFamily: fonts.heading, color: colors.ink, textAlign: 'center', marginBottom: 8 },
-  subtitle: { fontSize: 15, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
-  cardList: { gap: 12 },
+  container: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: spacing.xxl, justifyContent: 'center' },
+  logoWrapper: { alignItems: 'center', marginBottom: spacing.sm },
+  heading: { fontSize: fontSizes.h1, fontFamily: fonts.heading, textAlign: 'center', marginBottom: spacing.sm },
+  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, textAlign: 'center', marginBottom: spacing.xxxl, lineHeight: 22 },
+  cardList: { gap: spacing.md },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 14,
+    padding: spacing.lg,
+    borderRadius: borderRadius.lg,
     borderWidth: 1.5,
     minHeight: 64,
   },
   iconBox: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    marginRight: spacing.md,
   },
   cardText: { flex: 1 },
-  cardTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, marginBottom: 2 },
-  cardSub: { fontSize: 12, fontFamily: fonts.body, color: colors.ink, opacity: 0.6 },
-  bottom: { alignItems: 'center', marginTop: 40 },
-  signIn: { fontSize: 14, fontFamily: fonts.body, color: colors.muted },
-  signInLink: { fontFamily: fonts.bodyMedium, color: colors.amber },
+  cardTitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.bodyMedium, marginBottom: spacing.xxs },
+  cardSub: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body, opacity: 0.6 },
+  bottom: { alignItems: 'center', marginTop: spacing.xxxxl },
+  signIn: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body },
+  signInLink: { fontFamily: fonts.label },
 })
