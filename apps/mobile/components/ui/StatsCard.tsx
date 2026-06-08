@@ -5,17 +5,24 @@ import { useColors } from '../../lib/ThemeContext'
 import { fonts, fontSizes } from '../../lib/fonts'
 import { spacing, borderRadius, shadows } from '../../lib/tokens'
 
+const iconMap: Record<string, { name: keyof typeof Ionicons.glyphMap; bg: string; iconColor: string }> = {
+  default: { name: 'briefcase-outline', bg: '#FEF3C7', iconColor: '#D97706' },
+}
+
 interface Props {
   label: string
   value: string | number
   color?: string
   icon?: string
+  iconBg?: string
+  iconColor?: string
 }
 
-export default function StatsCard({ label, value, color: propColor, icon }: Props) {
+export default function StatsCard({ label, value, color: propColor, icon, iconBg, iconColor: propIconColor }: Props) {
   const colors = useColors()
   const fadeAnim = useRef(new Animated.Value(0)).current
   const color = propColor || colors.primary
+  const ic = iconMap[icon || 'default'] || iconMap.default
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -27,15 +34,15 @@ export default function StatsCard({ label, value, color: propColor, icon }: Prop
 
   return (
     <Animated.View style={[styles.card, { backgroundColor: colors.surface, opacity: fadeAnim }, shadows.md]}>
-      {icon ? (
+      <View style={[styles.bottomBar, { backgroundColor: color }]} />
+      <View style={[styles.iconWrap, { backgroundColor: iconBg || ic.bg }]}>
         <Ionicons
-          name={icon as any}
-          size={24}
-          color={color}
-          style={styles.icon}
+          name={(icon || ic.name) as any}
+          size={16}
+          color={propIconColor || ic.iconColor}
         />
-      ) : null}
-      <Text style={[styles.value, { color }]}>{value}</Text>
+      </View>
+      <Text style={[styles.value, { color: colors.ink }]}>{value}</Text>
       <Text style={[styles.label, { color: colors.muted }]}>{label}</Text>
     </Animated.View>
   )
@@ -45,20 +52,38 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     borderRadius: borderRadius.lg,
-    padding: spacing.lg,
+    padding: spacing.md,
     alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
-  icon: {
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.sm,
   },
   value: {
-    fontSize: fontSizes.h2,
+    fontSize: fontSizes.h3,
     fontFamily: fonts.headingBold,
-    marginBottom: spacing.xxs,
+    letterSpacing: -0.5,
+    marginBottom: 2,
   },
   label: {
-    fontSize: fontSizes.caption,
-    fontFamily: fonts.body,
+    fontSize: 9,
+    fontWeight: '700',
+    fontFamily: fonts.label,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
     textAlign: 'center',
   },
 })

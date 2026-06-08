@@ -1,19 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { useColors } from '../../lib/ThemeContext'
 import { spacing } from '../../lib/tokens'
+
+const GOLD = '#F59E0B'
 
 interface Props {
   stars: number
   size?: number
   onRate?: (rating: number) => void
   readonly?: boolean
+  starColor?: string
+  emptyColor?: string
 }
 
-const GOLD = '#EAB308'
-
-export default function StarRating({ stars, size = 32, onRate, readonly = false }: Props) {
-  const colors = useColors()
+export default function StarRating({ stars, size = 18, onRate, readonly = false, starColor, emptyColor }: Props) {
   const animValues = useRef(Array.from({ length: 5 }, () => new Animated.Value(1))).current
 
   useEffect(() => {
@@ -41,17 +41,19 @@ export default function StarRating({ stars, size = 32, onRate, readonly = false 
           onPress={() => onRate?.(i)}
           disabled={readonly}
           activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         >
           <Animated.View
             style={[
-              styles.starWrap,
               !readonly && { transform: [{ scale: animValues[i - 1] || 1 }] },
             ]}
           >
-            <Text style={[styles.star, { fontSize: size }, i <= stars && { color: GOLD },
-              i > stars && { color: colors.muted },
+            <Text style={[
+              styles.star,
+              { fontSize: size },
+              i <= stars ? { color: starColor || GOLD } : { color: emptyColor || '#E5E7EB' },
             ]}>
-              {i <= stars ? '★' : '☆'}
+              ★
             </Text>
           </Animated.View>
         </TouchableOpacity>
@@ -61,7 +63,6 @@ export default function StarRating({ stars, size = 32, onRate, readonly = false 
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', gap: spacing.xs },
-  starWrap: { padding: spacing.xs },
+  container: { flexDirection: 'row', gap: 2 },
   star: {},
 })

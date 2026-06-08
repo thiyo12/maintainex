@@ -45,7 +45,9 @@ export default function WelcomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <View style={styles.logoWrapper}>
-          <Logo size={72} />
+          <View style={[styles.logoBox, { backgroundColor: colors.primary }]}>
+            <Ionicons name="briefcase" size={28} color="#111" />
+          </View>
         </View>
 
         <Text style={[styles.heading, { color: colors.ink }]}>Welcome to{'\n'}Maintainex</Text>
@@ -88,7 +90,14 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1, paddingHorizontal: spacing.xxl, justifyContent: 'center' },
-  logoWrapper: { alignItems: 'center', marginBottom: spacing.sm },
+  logoWrapper: { alignItems: 'center', marginBottom: spacing.md },
+  logoBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heading: { fontSize: fontSizes.h1, fontFamily: fonts.heading, textAlign: 'center', marginBottom: spacing.sm },
   subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, textAlign: 'center', marginBottom: spacing.xxxl, lineHeight: 22 },
   cardList: { gap: spacing.md },

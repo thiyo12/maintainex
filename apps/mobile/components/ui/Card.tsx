@@ -11,7 +11,7 @@ interface Props {
   padded?: boolean
 }
 
-export default function Card({ children, variant = 'default', onPress, style }: Props) {
+export default function Card({ children, variant = 'default', onPress, style, padded }: Props) {
   const colors = useColors()
 
   const cardStyle = [
@@ -22,6 +22,7 @@ export default function Card({ children, variant = 'default', onPress, style }: 
     },
     variant === 'elevated' && shadows.lg,
     variant !== 'elevated' && shadows.md,
+    padded === false && { padding: 0 },
     style,
   ]
 
@@ -38,6 +39,6 @@ export default function Card({ children, variant = 'default', onPress, style }: 
 
 const styles = StyleSheet.create({
   base: {
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
 })

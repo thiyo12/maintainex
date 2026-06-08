@@ -1,7 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
+import { fonts } from '../../lib/fonts'
 import { spacing, borderRadius, shadows } from '../../lib/tokens'
 
 interface Tab {
@@ -20,31 +20,29 @@ export default function BottomNav({ tabs, active, onSelect }: Props) {
   const colors = useColors()
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderTopColor: colors.border, ...shadows.lg }]}>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }, shadows.lg]}>
       {tabs.map((tab) => {
         const isActive = active === tab.key
         return (
           <TouchableOpacity
             key={tab.key}
-            style={styles.tab}
+            style={[styles.tab, isActive && { backgroundColor: colors.primaryBg }]}
             onPress={() => onSelect(tab.key)}
             activeOpacity={0.7}
           >
             <Ionicons
               name={isActive ? tab.iconName as any : (`${tab.iconName}-outline`) as any}
-              size={24}
-              color={isActive ? colors.primary : colors.muted}
+              size={22}
+              color={isActive ? colors.primaryDark : colors.muted}
             />
             <Text
               style={[
                 styles.label,
-                { color: isActive ? colors.primary : colors.muted },
-                isActive && { fontFamily: fonts.label },
+                { color: isActive ? colors.primaryDark : colors.muted },
               ]}
             >
               {tab.label}
             </Text>
-            {isActive ? <View style={[styles.indicator, { backgroundColor: colors.primary }]} /> : null}
           </TouchableOpacity>
         )
       })}
@@ -55,30 +53,26 @@ export default function BottomNav({ tabs, active, onSelect }: Props) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
-    borderTopWidth: 1,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
+    paddingVertical: spacing.sm + 2,
+    marginHorizontal: spacing.sm,
+    borderRadius: 20,
+    paddingHorizontal: spacing.xs,
+    borderTopWidth: 0,
+    marginBottom: spacing.sm,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.xs,
-    position: 'relative',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: borderRadius.md,
+    gap: 3,
   },
   label: {
-    fontSize: fontSizes.label,
-    fontFamily: fonts.body,
-    marginTop: 4,
-  },
-  indicator: {
-    position: 'absolute',
-    top: 0,
-    width: 24,
-    height: 3,
-    borderRadius: 2,
+    fontSize: 9,
+    fontFamily: fonts.label,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 })

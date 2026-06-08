@@ -73,6 +73,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: spacing.xxs,
   },
 })

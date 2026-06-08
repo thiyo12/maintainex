@@ -26,10 +26,10 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
   }
 
   const textColor = () => {
-    if (variant === 'primary') return colors.white
+    if (variant === 'primary') return '#111'
     if (variant === 'outline') return color || colors.primary
     if (variant === 'ghost') return color || colors.inkLight
-    return colors.ink
+    return '#111'
   }
 
   return (
@@ -48,7 +48,7 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
       activeOpacity={0.7}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.white : (color || colors.primary)} />
+        <ActivityIndicator color={variant === 'primary' ? '#111' : (color || colors.primary)} />
       ) : (
         <Text style={[styles.label, { color: textColor() }]}>{label}</Text>
       )}

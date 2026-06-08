@@ -19,14 +19,12 @@ interface Props {
 }
 
 const FALLBACK_CATEGORIES: CategoryItem[] = [
+  { id: 'all', name: 'All', iconName: 'grid-outline', colorHex: '#F59E0B' },
   { id: 'cleaning', name: 'Cleaning', iconName: 'sparkles-outline', colorHex: '#0EA5E9' },
   { id: 'electrical', name: 'Electrical', iconName: 'flash-outline', colorHex: '#F59E0B' },
   { id: 'plumbing', name: 'Plumbing', iconName: 'water-outline', colorHex: '#3B82F6' },
-  { id: 'painting', name: 'Painting', iconName: 'color-palette-outline', colorHex: '#EC4899' },
-  { id: 'moving', name: 'Moving', iconName: 'cube-outline', colorHex: '#F97316' },
-  { id: 'gardening', name: 'Gardening', iconName: 'leaf-outline', colorHex: '#16A34A' },
+  { id: 'gardening', name: 'Garden', iconName: 'leaf-outline', colorHex: '#16A34A' },
   { id: 'repairs', name: 'Repairs', iconName: 'hammer-outline', colorHex: '#78716C' },
-  { id: 'assembly', name: 'Assembly', iconName: 'settings-outline', colorHex: '#7C3AED' },
 ]
 
 export default function CategoryPills({ items, selected, onSelect, loading }: Props) {
@@ -47,15 +45,19 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
             style={[
               styles.pill,
               {
-                backgroundColor: isSelected ? cat.colorHex : colors.surface,
-                borderColor: isSelected ? cat.colorHex : colors.border,
+                backgroundColor: isSelected ? colors.primaryBg : colors.surface,
+                borderColor: isSelected ? colors.primary : colors.border,
               },
             ]}
             onPress={() => onSelect(cat.id)}
             activeOpacity={0.7}
           >
-            <Ionicons name={cat.iconName as any} size={16} color={isSelected ? '#FFFFFF' : colors.muted} />
-            <Text style={[styles.pillLabel, { color: isSelected ? '#FFFFFF' : colors.ink }]}>
+            <Ionicons
+              name={cat.iconName as any}
+              size={14}
+              color={isSelected ? colors.primaryDark : colors.muted}
+            />
+            <Text style={[styles.pillLabel, { color: isSelected ? colors.primaryDark : colors.ink }]}>
               {cat.name}
             </Text>
           </TouchableOpacity>
@@ -70,19 +72,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.full,
     borderWidth: 1.5,
-    gap: spacing.xs,
   },
   pillLabel: {
     fontSize: fontSizes.captionSmall,
-    fontWeight: '600',
+    fontFamily: fonts.label,
   },
 })
