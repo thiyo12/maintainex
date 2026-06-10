@@ -1,58 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getSessionFromCookie, adminAuthorize, getIp } from '@/lib/admin-rbac'
 
 export async function GET(request: NextRequest) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
+  const session = rawSession!
   try {
-    const [totalUsers, activeJobs, openDisputes, pendingKyc, totalEscrows, recentActivity] =
-      await Promise.all([
-        prisma.user.count({ where: { isActive: true } }),
-        prisma.marketplaceJob.count({
-          where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
-        }),
-        prisma.dispute.count({ where: { status: 'OPEN' } }),
-        prisma.identityDocument.count({ where: { status: 'PENDING' } }),
-        prisma.jobEscrow.count(),
-        prisma.auditLog.findMany({
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-          select: {
-            id: true,
-            adminEmail: true,
-            action: true,
-            targetLabel: true,
-            createdAt: true,
-          },
-        }),
-      ])
+    const [totalUsers, activeJobs, openDisputes, pendingKyc, totalEscrows] = await Promise.all([
+      prisma.user.count({ where: { isActive: true } }),
+      prisma.marketplaceJob.count({
+        where: { status: { in: ['OPEN', 'IN_PROGRESS'] }, isActive: true },
+      }),
+      prisma.dispute.count({ where: { status: 'OPEN' } }),
+      prisma.identityDocument.count({ where: { status: 'PENDING' } }),
+      prisma.jobEscrow.count(),
+    ])
+
+    const monthlyRevenueAgg = await prisma.jobEscrow.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'RELEASED',
+        releasedAt: {
+          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+        },
+      },
+    })
 
     return NextResponse.json({
       success: true,
       data: {
-        stats: {
-          totalUsers,
-          activeJobs,
-          monthlyRevenue: 0,
-          openDisputes,
-          pendingKyc,
-          totalEscrows,
-        },
-        recentActivity: recentActivity.map((a) => ({
-          ...a,
-          createdAt: a.createdAt.toISOString(),
-        })),
+        totalUsers,
+        activeJobs,
+        monthlyRevenueCents: monthlyRevenueAgg._sum.amount ?? 0,
+        openDisputes,
+        pendingKyc,
+        totalEscrows,
       },
     })
-  } catch (error) {
-    console.error('Summary error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch summary' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('Reports summary error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to fetch summary' }, { status: 500 })
   }
 }

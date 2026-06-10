@@ -1,86 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getSessionFromCookie, adminAuthorize, createAuditLog, getIp } from '@/lib/admin-rbac'
+import { updateAdminSchema } from '@/lib/admin-schemas'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  if (session.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
+  const session = rawSession!
   try {
     if (params.id === session.id) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot modify own account' },
-        { status: 400 },
-      )
+      return NextResponse.json({ success: false, error: 'Cannot modify own account' }, { status: 400 })
     }
 
-    const existing = await prisma.adminUser.findUnique({
-      where: { id: params.id },
-    })
+    const existing = await prisma.adminUser.findUnique({ where: { id: params.id } })
     if (!existing || existing.deletedAt) {
-      return NextResponse.json(
-        { success: false, error: 'Admin not found' },
-        { status: 404 },
-      )
+      return NextResponse.json({ success: false, error: 'Admin not found' }, { status: 404 })
     }
 
     if (existing.parentId !== session.id) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot manage this admin' },
-        { status: 403 },
-      )
+      return NextResponse.json({ success: false, error: 'Cannot manage this admin' }, { status: 403 })
     }
 
     const body = await request.json()
+    const data = updateAdminSchema.parse(body)
+
     const updates: any = {}
-    if (body.role !== undefined) updates.role = body.role
-    if (body.firstName !== undefined) updates.firstName = body.firstName
-    if (body.lastName !== undefined) updates.lastName = body.lastName
-    if (body.isActive !== undefined) updates.isActive = body.isActive
-    if (body.assignedCountries !== undefined)
-      updates.assignedCountries = body.assignedCountries
-    if (body.password) {
-      updates.passwordHash = await bcrypt.hash(body.password, 12)
-    }
+    if (data.role !== undefined) updates.role = data.role
+    if (data.assignedCountries !== undefined) updates.assignedCountries = data.assignedCountries
+    if (data.isActive !== undefined) updates.isActive = data.isActive
 
     const updated = await prisma.adminUser.update({
       where: { id: params.id },
       data: updates,
     })
 
-    await prisma.auditLog.create({
-      data: {
-        adminUserId: session.id,
-        adminEmail: session.email,
-        adminRole: session.role,
-        action: 'ADMIN_UPDATE',
-        targetTable: 'AdminUser',
-        targetId: params.id,
-        targetLabel: `${existing.firstName} ${existing.lastName}`,
-        oldValue: existing,
-        newValue: updated,
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-      },
+    await createAuditLog({
+      session,
+      action: 'ADMIN_UPDATE',
+      targetTable: 'AdminUser',
+      targetId: params.id,
+      targetLabel: `${existing.firstName} ${existing.lastName}`,
+      oldValue: JSON.parse(JSON.stringify({ role: existing.role, assignedCountries: existing.assignedCountries, isActive: existing.isActive })),
+      newValue: JSON.parse(JSON.stringify(updates)),
+      ipAddress: getIp(request),
+      userAgent: request.headers.get('user-agent'),
     })
 
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('Admin update error:', e)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update admin' },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: 'Failed to update admin' }, { status: 500 })
   }
 }
 
@@ -88,38 +63,24 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  if (session.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
+  const session = rawSession!
   try {
     if (params.id === session.id) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot delete own account' },
-        { status: 400 },
-      )
+      return NextResponse.json({ success: false, error: 'Cannot delete own account' }, { status: 400 })
     }
 
-    const existing = await prisma.adminUser.findUnique({
-      where: { id: params.id },
-    })
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'Admin not found' },
-        { status: 404 },
-      )
+    const existing = await prisma.adminUser.findUnique({ where: { id: params.id } })
+    if (!existing || existing.deletedAt) {
+      return NextResponse.json({ success: false, error: 'Admin not found' }, { status: 404 })
     }
 
     if (existing.parentId !== session.id) {
-      return NextResponse.json(
-        { success: false, error: 'Cannot manage this admin' },
-        { status: 403 },
-      )
+      return NextResponse.json({ success: false, error: 'Cannot manage this admin' }, { status: 403 })
     }
 
     await prisma.adminUser.update({
@@ -127,26 +88,21 @@ export async function DELETE(
       data: { deletedAt: new Date(), isActive: false },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        adminUserId: session.id,
-        adminEmail: session.email,
-        adminRole: session.role,
-        action: 'DELETE',
-        targetTable: 'AdminUser',
-        targetId: params.id,
-        targetLabel: `${existing.firstName} ${existing.lastName}`,
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-      },
+    await createAuditLog({
+      session,
+      action: 'DELETE',
+      targetTable: 'AdminUser',
+      targetId: params.id,
+      targetLabel: `${existing.firstName} ${existing.lastName}`,
+      oldValue: JSON.parse(JSON.stringify({ isActive: existing.isActive, deletedAt: null })),
+      newValue: JSON.parse(JSON.stringify({ isActive: false, deletedAt: new Date().toISOString() })),
+      ipAddress: getIp(request),
+      userAgent: request.headers.get('user-agent'),
     })
 
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('Admin delete error:', e)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete admin' },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: 'Failed to delete admin' }, { status: 500 })
   }
 }

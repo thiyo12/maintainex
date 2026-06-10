@@ -1,0 +1,76 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from './prisma'
+import { verifySimpleToken } from './admin-auth'
+import type { AdminRole, AuditAction, AdminSession } from './admin-types'
+
+export function getSessionFromCookie(request: NextRequest): AdminSession | null {
+  const token = request.cookies.get('admin_token')?.value
+  if (!token) return null
+  const payload = verifySimpleToken(token)
+  if (!payload || payload.authType !== 'adminUser') return null
+  return {
+    id: payload.id,
+    email: payload.email,
+    role: payload.role as AdminRole,
+    firstName: payload.firstName || '',
+    lastName: payload.lastName || '',
+    assignedCountries: payload.assignedCountries || [],
+    authType: 'adminUser',
+  }
+}
+
+export function adminAuthorize(allowedRoles: AdminRole[]) {
+  return (session: AdminSession | null): { authorized: boolean; error?: string; status?: number } => {
+    if (!session) {
+      return { authorized: false, error: 'Unauthorized', status: 401 }
+    }
+    if (!allowedRoles.includes(session.role)) {
+      return { authorized: false, error: 'Forbidden', status: 403 }
+    }
+    return { authorized: true }
+  }
+}
+
+export function getCountryFilter(session: AdminSession): Record<string, any> {
+  if (session.role === 'SUPER_ADMIN') return {}
+  if (session.assignedCountries.length === 0) return { id: '__NONE__' }
+  return { country: { in: session.assignedCountries } }
+}
+
+export async function createAuditLog(params: {
+  session: AdminSession
+  action: AuditAction
+  targetTable?: string
+  targetId?: string
+  targetLabel?: string
+  oldValue?: any
+  newValue?: any
+  ipAddress: string
+  userAgent?: string | null
+}) {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        adminUserId: params.session.id,
+        adminEmail: params.session.email,
+        adminRole: params.session.role,
+        action: params.action,
+        targetTable: params.targetTable,
+        targetId: params.targetId,
+        targetLabel: params.targetLabel,
+        oldValue: params.oldValue ?? null,
+        newValue: params.newValue ?? null,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+      },
+    })
+  } catch (e) {
+    console.error('Audit log error:', e)
+  }
+}
+
+export function getIp(request: NextRequest): string {
+  return request.headers.get('x-forwarded-for')?.split(',')[0]
+    || request.headers.get('x-real-ip')
+    || 'unknown'
+}

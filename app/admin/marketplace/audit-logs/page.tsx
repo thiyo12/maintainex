@@ -1,10 +1,24 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import toast from 'react-hot-toast'
-import { FiChevronLeft, FiChevronRight, FiAlertCircle } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { FiChevronLeft, FiChevronRight, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
+import api from '@/lib/api'
+import { useAuthStore } from '@/lib/auth-store'
+import { can, PERMISSION } from '@/lib/permissions'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 interface AuditLogEntry {
   id: string
@@ -48,59 +62,61 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export default function MarketplaceAuditLogs() {
-  const { user } = useAdminSession()
-  const [logs, setLogs] = useState<AuditLogEntry[]>([])
-  const [meta, setMeta] = useState<PaginatedMeta>({ total: 0, page: 1, limit: 50, totalPages: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const adminUser = useAuthStore((s) => s.adminUser)
   const [actionFilter, setActionFilter] = useState('')
   const [tableFilter, setTableFilter] = useState('')
+  const [page, setPage] = useState(1)
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null)
 
-  const fetchLogs = useCallback(async (page = 1) => {
-    setLoading(true)
-    setError('')
-    try {
-      const params = new URLSearchParams()
-      if (actionFilter) params.set('action', actionFilter)
-      if (tableFilter) params.set('target_table', tableFilter)
-      params.set('page', String(page))
-      params.set('limit', '50')
-
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/audit-logs?${params}`, {
-        headers: { ...authHeaders }
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin-marketplace-audit-logs', actionFilter, tableFilter, page],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/marketplace/audit-logs', {
+        params: { action: actionFilter, target_table: tableFilter, page, limit: 50 },
       })
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return { logs: body.data as AuditLogEntry[], meta: body.meta as PaginatedMeta }
+    },
+  })
 
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
+  const logs = data?.logs || []
+  const meta = data?.meta || { total: 0, page: 1, limit: 50, totalPages: 0 }
 
-      const result = await res.json()
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div><h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1><p className="text-gray-500">Loading...</p></div>
+        </div>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>{['Admin', 'Action', 'Target', 'IP', 'Time', ''].map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-24" /></TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+    )
+  }
 
-      if (result.error) {
-        toast.error(result.error)
-        setError(result.error)
-        return
-      }
-
-      setLogs(result.data)
-      setMeta(result.meta)
-    } catch (error) {
-      console.error('Audit logs fetch error:', error)
-      toast.error('Failed to load audit logs')
-      setError('Failed to load audit logs')
-    } finally {
-      setLoading(false)
-    }
-  }, [actionFilter, tableFilter])
-
-  useEffect(() => { fetchLogs() }, [fetchLogs])
-
-  const actionBadge = (action: string) => {
-    const color = ACTION_COLORS[action] || 'bg-gray-100 text-gray-800'
-    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${color}`}>{action}</span>
+  if (error) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FiAlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-gray-600">{error instanceof Error ? error.message : 'Failed to load logs'}</p>
+          <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -108,131 +124,114 @@ export default function MarketplaceAuditLogs() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
-          <p className="text-gray-600 mt-1">{meta.total} entries</p>
+          <p className="text-gray-500">{meta.total} entries</p>
         </div>
+        <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-4 md:p-6 border-b">
+      <Card>
+        <CardHeader>
           <div className="flex flex-wrap gap-3">
-            <select
-              className="input-field w-44"
-              value={actionFilter}
-              onChange={(e) => setActionFilter(e.target.value)}
-            >
-              <option value="">All Actions</option>
-              {Object.keys(ACTION_COLORS).map((a) => (
-                <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>
-              ))}
-            </select>
-            <select
-              className="input-field w-44"
-              value={tableFilter}
-              onChange={(e) => setTableFilter(e.target.value)}
-            >
-              <option value="">All Tables</option>
-              <option value="User">User</option>
-              <option value="IdentityDocument">IdentityDocument</option>
-              <option value="MarketplaceJob">MarketplaceJob</option>
-              <option value="JobEscrow">JobEscrow</option>
-              <option value="JobCategory">JobCategory</option>
-              <option value="AdminUser">AdminUser</option>
-              <option value="PlatformSettings">PlatformSettings</option>
-            </select>
+            <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v ?? ''); setPage(1) }}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="All Actions" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Actions</SelectItem>
+                {Object.keys(ACTION_COLORS).map((a) => (
+                  <SelectItem key={a} value={a}>{a.replace(/_/g, ' ')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={tableFilter} onValueChange={(v) => { setTableFilter(v ?? ''); setPage(1) }}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="All Tables" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Tables</SelectItem>
+                <SelectItem value="User">User</SelectItem>
+                <SelectItem value="IdentityDocument">IdentityDocument</SelectItem>
+                <SelectItem value="MarketplaceJob">MarketplaceJob</SelectItem>
+                <SelectItem value="JobEscrow">JobEscrow</SelectItem>
+                <SelectItem value="JobCategory">JobCategory</SelectItem>
+                <SelectItem value="AdminUser">AdminUser</SelectItem>
+                <SelectItem value="PlatformSettings">PlatformSettings</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
-              <FiAlertCircle className="w-12 h-12 text-red-500" />
-              <p className="text-gray-600">{error}</p>
-              <button onClick={() => fetchLogs()} className="btn-primary px-4 py-2 rounded-lg text-sm">Try Again</button>
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <p className="text-gray-500">No logs found</p>
+        </CardHeader>
+        <CardContent className="p-0">
+          {logs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <FiAlertCircle className="w-12 h-12 text-gray-300" />
+              <h3 className="text-lg font-semibold text-gray-900">No logs found</h3>
+              <p className="text-gray-500">Try adjusting your filters</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Admin</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IP</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                  <th className="px-4 md:px-6 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-4">
-                      <div>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Admin</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Target</TableHead>
+                    <TableHead>IP</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead className="w-16" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((log) => (
+                    <TableRow key={log.id} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedLog(log)}>
+                      <TableCell>
                         <p className="text-sm text-gray-900">{log.adminEmail}</p>
                         <p className="text-xs text-gray-500">{log.adminRole}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4">{actionBadge(log.action)}</td>
-                    <td className="px-4 md:px-6 py-4">
-                      <p className="text-sm text-gray-900">{log.targetLabel || log.targetId || '\u2014'}</p>
-                      {log.targetTable && <p className="text-xs text-gray-500">{log.targetTable}</p>}
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm font-mono text-gray-500">{log.ipAddress}</td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</td>
-                    <td className="px-4 md:px-6 py-4">
-                      {(log.oldValue || log.newValue) && (
-                        <button
-                          onClick={() => setSelectedLog(log)}
-                          className="text-sm font-medium text-primary-600 hover:text-primary-700"
-                        >
-                          Diff
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={ACTION_COLORS[log.action] || 'bg-gray-100 text-gray-800'}>{log.action}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm text-gray-900">{log.targetLabel || log.targetId || '\u2014'}</p>
+                        {log.targetTable && <p className="text-xs text-gray-500">{log.targetTable}</p>}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm text-gray-500">{log.ipAddress}</TableCell>
+                      <TableCell className="text-sm text-gray-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</TableCell>
+                      <TableCell>
+                        {(log.oldValue || log.newValue) && (
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedLog(log) }}>
+                            Diff
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {meta.totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t">
+                  <p className="text-sm text-gray-500">Page {meta.page} of {meta.totalPages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => setPage(p => p - 1)}>
+                      <FiChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={meta.page >= meta.totalPages} onClick={() => setPage(p => p + 1)}>
+                      <FiChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Page {meta.page} of {meta.totalPages}</p>
-          <div className="flex gap-2">
-            <button
-              className="btn-outline px-3 py-2 rounded-lg text-sm disabled:opacity-50"
-              disabled={meta.page <= 1}
-              onClick={() => fetchLogs(meta.page - 1)}
-            >
-              <FiChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              className="btn-outline px-3 py-2 rounded-lg text-sm disabled:opacity-50"
-              disabled={meta.page >= meta.totalPages}
-              onClick={() => fetchLogs(meta.page + 1)}
-            >
-              <FiChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedLog(null)}>
-          <div className="w-full max-w-2xl rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="mb-4 text-lg font-bold">Audit Log Detail</h2>
+      <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null) }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Audit Log Detail</DialogTitle>
+          </DialogHeader>
+          {selectedLog && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs font-medium text-gray-500">Action</p>
-                  {actionBadge(selectedLog.action)}
+                  <Badge className={ACTION_COLORS[selectedLog.action] || 'bg-gray-100 text-gray-800'}>{selectedLog.action}</Badge>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500">Admin</p>
@@ -251,20 +250,24 @@ export default function MarketplaceAuditLogs() {
                 {selectedLog.oldValue && (
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-1">Old Value</p>
-                    <pre className="rounded bg-gray-50 p-3 text-xs overflow-auto max-h-60">{JSON.stringify(selectedLog.oldValue, null, 2)}</pre>
+                    <pre className="rounded bg-gray-50 p-3 text-xs overflow-auto max-h-60">
+                      {JSON.stringify(selectedLog.oldValue, null, 2)}
+                    </pre>
                   </div>
                 )}
                 {selectedLog.newValue && (
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-1">New Value</p>
-                    <pre className="rounded bg-gray-50 p-3 text-xs overflow-auto max-h-60">{JSON.stringify(selectedLog.newValue, null, 2)}</pre>
+                    <pre className="rounded bg-gray-50 p-3 text-xs overflow-auto max-h-60">
+                      {JSON.stringify(selectedLog.newValue, null, 2)}
+                    </pre>
                   </div>
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
-
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR']
+import { getSessionFromCookie, adminAuthorize, createAuditLog, getIp } from '@/lib/admin-rbac'
+import { cancelJobSchema } from '@/lib/admin-schemas'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
+  const session = rawSession!
   try {
     const job = await prisma.marketplaceJob.findUnique({
       where: { id: params.id },
@@ -23,12 +23,9 @@ export async function GET(
     }
 
     return NextResponse.json({ success: true, data: job })
-  } catch (error) {
-    console.error('Job detail error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch job' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('Job detail error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to fetch job' }, { status: 500 })
   }
 }
 
@@ -36,25 +33,15 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN', 'MODERATOR'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  if (!ALLOWED_ROLES.includes(session.role)) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
+  const session = rawSession!
   try {
     const body = await request.json()
-    const { action, reason } = body
-
-    if (action !== 'cancel') {
-      return NextResponse.json(
-        { success: false, error: 'Invalid action' },
-        { status: 400 },
-      )
-    }
+    const { reason } = cancelJobSchema.parse(body)
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) {
@@ -66,28 +53,21 @@ export async function PATCH(
       data: { status: 'CANCELLED', isActive: false },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        adminUserId: session.id,
-        adminEmail: session.email,
-        adminRole: session.role,
-        action: 'JOB_CANCEL',
-        targetTable: 'MarketplaceJob',
-        targetId: params.id,
-        targetLabel: job.title,
-        oldValue: { status: job.status, isActive: job.isActive },
-        newValue: { status: 'CANCELLED', isActive: false, reason: reason || null },
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-      },
+    await createAuditLog({
+      session,
+      action: 'JOB_CANCEL',
+      targetTable: 'MarketplaceJob',
+      targetId: params.id,
+      targetLabel: job.title,
+      oldValue: JSON.parse(JSON.stringify({ status: job.status, isActive: job.isActive })),
+      newValue: JSON.parse(JSON.stringify({ status: 'CANCELLED', isActive: false, reason })),
+      ipAddress: getIp(request),
+      userAgent: request.headers.get('user-agent'),
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Job action error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update job' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('Job action error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to update job' }, { status: 500 })
   }
 }

@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         userId: settlement.providerId,
         walletType: 'PROVIDER',
         type: 'DEBIT',
-        amount: settlement.commissionAmount,
+        amount: Number(settlement.commissionAmount),
         balanceBefore: 0,
         balanceAfter: 0,
         reference: `Commission settlement for job ${settlement.jobId}`,

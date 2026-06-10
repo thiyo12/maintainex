@@ -1,10 +1,23 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import toast from 'react-hot-toast'
-import { FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiAlertCircle, FiBriefcase } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { FiSearch, FiChevronLeft, FiChevronRight, FiEye, FiAlertCircle, FiBriefcase, FiRefreshCw } from 'react-icons/fi'
+import api from '@/lib/api'
+import { useAuthStore } from '@/lib/auth-store'
+import { formatMoney } from '@/lib/money'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 interface Job {
   id: string
@@ -24,182 +37,160 @@ interface PaginatedMeta {
   totalPages: number
 }
 
+const STATUS_MAP: Record<string, string> = {
+  OPEN: 'bg-green-100 text-green-800',
+  IN_PROGRESS: 'bg-blue-100 text-blue-800',
+  COMPLETED: 'bg-gray-100 text-gray-800',
+  CANCELLED: 'bg-red-100 text-red-800',
+  ON_HOLD: 'bg-yellow-100 text-yellow-800',
+}
+
 export default function MarketplaceJobs() {
-  const { user } = useAdminSession()
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [meta, setMeta] = useState<PaginatedMeta>({ total: 0, page: 1, limit: 20, totalPages: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const adminUser = useAuthStore((s) => s.adminUser)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
 
-  const fetchJobs = useCallback(async (page = 1) => {
-    setLoading(true)
-    setError('')
-    try {
-      const params = new URLSearchParams()
-      if (search) params.set('search', search)
-      if (statusFilter) params.set('status', statusFilter)
-      params.set('page', String(page))
-      params.set('limit', '20')
-
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/jobs?${params}`, {
-        headers: { ...authHeaders }
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin-marketplace-jobs', search, statusFilter, page],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/marketplace/jobs', {
+        params: { search, status: statusFilter, page, limit: 20 },
       })
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return { jobs: body.data as Job[], meta: body.meta as PaginatedMeta }
+    },
+  })
 
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
+  const jobs = data?.jobs || []
+  const meta = data?.meta || { total: 0, page: 1, limit: 20, totalPages: 0 }
 
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        setError(result.error)
-        return
-      }
-
-      setJobs(result.data)
-      setMeta(result.meta)
-    } catch (error) {
-      console.error('Jobs fetch error:', error)
-      toast.error('Failed to load jobs')
-      setError('Failed to load jobs')
-    } finally {
-      setLoading(false)
-    }
-  }, [search, statusFilter])
-
-  useEffect(() => { fetchJobs() }, [fetchJobs])
-
-  const formatMoney = (cents: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div><h1 className="text-2xl font-bold text-gray-900">Marketplace Jobs</h1><p className="text-gray-500">Loading jobs...</p></div>
+        </div>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>{['Title', 'Client', 'Budget', 'Status', 'Created', ''].map((h) => <TableHead key={h}>{h}</TableHead>)}</TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  {Array.from({ length: 6 }).map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-24" /></TableCell>)}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      </div>
+    )
   }
 
-  const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      OPEN: 'bg-green-100 text-green-800',
-      IN_PROGRESS: 'bg-blue-100 text-blue-800',
-      COMPLETED: 'bg-gray-100 text-gray-800',
-      CANCELLED: 'bg-red-100 text-red-800',
-      ON_HOLD: 'bg-yellow-100 text-yellow-800',
-    }
-    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-800'}`}>{status}</span>
+  if (error) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FiAlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-gray-600">{error instanceof Error ? error.message : 'Failed to load jobs'}</p>
+          <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex items-center justify-between mb-6 md:mb-8">
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Marketplace Jobs</h1>
-          <p className="text-gray-600 mt-1">{meta.total} total jobs</p>
+          <p className="text-gray-500">{meta.total} total jobs</p>
         </div>
+        <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm mb-6">
-        <div className="p-4 md:p-6 border-b">
+      <Card>
+        <CardHeader>
           <div className="flex flex-wrap gap-3">
             <div className="relative flex-1 min-w-[200px]">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
+              <Input
+                className="pl-9"
                 placeholder="Search jobs..."
-                className="input-field pl-9 w-full"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               />
             </div>
-            <select
-              className="input-field w-40"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="">All Status</option>
-              <option value="OPEN">Open</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-              <option value="ON_HOLD">On Hold</option>
-            </select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v ?? ''); setPage(1) }}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Status</SelectItem>
+                <SelectItem value="OPEN">Open</SelectItem>
+                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                <SelectItem value="ON_HOLD">On Hold</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
-              <FiAlertCircle className="w-12 h-12 text-red-500" />
-              <p className="text-gray-600">{error}</p>
-              <button onClick={() => fetchJobs()} className="btn-primary px-4 py-2 rounded-lg text-sm">Try Again</button>
-            </div>
-          ) : jobs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-2">
+        </CardHeader>
+        <CardContent className="p-0">
+          {jobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
               <FiBriefcase className="w-12 h-12 text-gray-300" />
-              <p className="text-gray-500">No jobs found</p>
+              <h3 className="text-lg font-semibold text-gray-900">No jobs found</h3>
+              <p className="text-gray-500">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Budget</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                  <th className="px-4 md:px-6 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-4 text-sm font-medium text-gray-900">{job.title}</td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-gray-600">{job.client.name || job.client.email}</td>
-                    <td className="px-4 md:px-6 py-4 text-sm font-medium text-gray-900">
-                      {job.budgetCents ? formatMoney(job.budgetCents) : '\u2014'}
-                    </td>
-                    <td className="px-4 md:px-6 py-4">{statusBadge(job.status)}</td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-gray-500">{new Date(job.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 md:px-6 py-4">
-                      <a
-                        href={`/admin/marketplace/jobs/${job.id}`}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
-                      >
-                        <FiEye className="w-4 h-4" /> View
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Budget</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow key={job.id}>
+                      <TableCell className="font-medium">{job.title}</TableCell>
+                      <TableCell className="text-gray-600">{job.client.name || job.client.email}</TableCell>
+                      <TableCell className="font-medium">{job.budgetCents ? formatMoney(job.budgetCents) : '\u2014'}</TableCell>
+                      <TableCell>
+                        <Badge className={STATUS_MAP[job.status] || 'bg-gray-100 text-gray-800'}>{job.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-500">{new Date(job.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <a href={`/admin/marketplace/jobs/${job.id}`} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "inline-flex items-center")}><FiEye className="w-4 h-4 mr-1" /> View</a>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {meta.totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t">
+                  <p className="text-sm text-gray-500">Page {meta.page} of {meta.totalPages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => setPage(p => p - 1)}>
+                      <FiChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={meta.page >= meta.totalPages} onClick={() => setPage(p => p + 1)}>
+                      <FiChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-        </div>
-      </div>
-
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Page {meta.page} of {meta.totalPages}</p>
-          <div className="flex gap-2">
-            <button
-              className="btn-outline px-3 py-2 rounded-lg text-sm disabled:opacity-50"
-              disabled={meta.page <= 1}
-              onClick={() => fetchJobs(meta.page - 1)}
-            >
-              <FiChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              className="btn-outline px-3 py-2 rounded-lg text-sm disabled:opacity-50"
-              disabled={meta.page >= meta.totalPages}
-              onClick={() => fetchJobs(meta.page + 1)}
-            >
-              <FiChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getSessionFromCookie, adminAuthorize, createAuditLog, getIp } from '@/lib/admin-rbac'
+import { z } from 'zod'
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'ADMIN']
+const actionSchema = z.object({
+  action: z.enum(['suspend', 'unsuspend', 'ban', 'unban']),
+})
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
+  const session = rawSession!
   try {
     const user = await prisma.user.findUnique({
       where: { id: params.id },
@@ -63,12 +67,9 @@ export async function GET(
     }
 
     return NextResponse.json({ success: true, data: user })
-  } catch (error) {
-    console.error('User detail error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch user' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('User detail error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to fetch user' }, { status: 500 })
   }
 }
 
@@ -76,18 +77,15 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  if (!ALLOWED_ROLES.includes(session.role)) {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
+  const session = rawSession!
   try {
     const body = await request.json()
-    const { action, reason } = body
+    const { action } = actionSchema.parse(body)
 
     const user = await prisma.user.findUnique({ where: { id: params.id } })
     if (!user) {
@@ -95,7 +93,7 @@ export async function PATCH(
     }
 
     let updateData: any = {}
-    let auditAction = ''
+    let auditAction: string = ''
 
     switch (action) {
       case 'suspend':
@@ -114,37 +112,25 @@ export async function PATCH(
         updateData = { isActive: true }
         auditAction = 'UNBAN'
         break
-      default:
-        return NextResponse.json(
-          { success: false, error: 'Invalid action' },
-          { status: 400 },
-        )
     }
 
     await prisma.user.update({ where: { id: params.id }, data: updateData })
 
-    await prisma.auditLog.create({
-      data: {
-        adminUserId: session.id,
-        adminEmail: session.email,
-        adminRole: session.role,
-        action: auditAction,
-        targetTable: 'User',
-        targetId: params.id,
-        targetLabel: `${user.name} (${user.email})`,
-        oldValue: { isActive: user.isActive },
-        newValue: updateData,
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-      },
+    await createAuditLog({
+      session,
+      action: auditAction as any,
+      targetTable: 'User',
+      targetId: params.id,
+      targetLabel: `${user.name} (${user.email})`,
+      oldValue: JSON.parse(JSON.stringify({ isActive: user.isActive })),
+      newValue: JSON.parse(JSON.stringify(updateData)),
+      ipAddress: getIp(request),
+      userAgent: request.headers.get('user-agent'),
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('User update error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update user' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('User update error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to update user' }, { status: 500 })
   }
 }

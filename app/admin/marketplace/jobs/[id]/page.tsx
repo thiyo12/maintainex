@@ -1,11 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiAlertCircle } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
+import { FiArrowLeft, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
+import api from '@/lib/api'
+import { useAuthStore } from '@/lib/auth-store'
+import { can, PERMISSION } from '@/lib/permissions'
+import { PermissionGate } from '@/components/admin/PermissionGate'
+import { formatMoney } from '@/lib/money'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface JobDetail {
   id: string
@@ -21,124 +28,79 @@ interface JobDetail {
   createdAt: string
 }
 
+const STATUS_MAP: Record<string, string> = {
+  OPEN: 'bg-green-100 text-green-800',
+  IN_PROGRESS: 'bg-blue-100 text-blue-800',
+  COMPLETED: 'bg-gray-100 text-gray-800',
+  CANCELLED: 'bg-red-100 text-red-800',
+  ON_HOLD: 'bg-yellow-100 text-yellow-800',
+}
+
 export default function MarketplaceJobDetail() {
   const params = useParams()
   const router = useRouter()
-  const { user: currentUser } = useAdminSession()
-  const [job, setJob] = useState<JobDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [cancelling, setCancelling] = useState(false)
+  const adminUser = useAuthStore((s) => s.adminUser)
+  const queryClient = useQueryClient()
 
-  const canCancel = (currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN')
+  const canCancel = adminUser ? can(adminUser.role, PERMISSION.forceCancelJob) : false
 
-  useEffect(() => {
-    fetchJob()
-  }, [])
+  const { data: job, isLoading, error, refetch } = useQuery<JobDetail>({
+    queryKey: ['admin-marketplace-job', params.id],
+    queryFn: async () => {
+      const res = await api.get(`/api/admin/marketplace/jobs/${params.id}`)
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return body.data
+    },
+  })
 
-  const fetchJob = async () => {
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/jobs/${params.id}`, {
-        headers: { ...authHeaders }
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.patch(`/api/admin/marketplace/jobs/${params.id}`, {
+        action: 'cancel',
+        reason: 'Admin force cancellation',
       })
-
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        setError(result.error)
-        return
-      }
-
-      setJob(result.data)
-    } catch (error) {
-      console.error('Job detail error:', error)
-      toast.error('Failed to load job')
-      setError('Failed to load job')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCancel = async () => {
-    if (!confirm('Are you sure you want to force cancel this job?')) return
-    setCancelling(true)
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/jobs/${params.id}`, {
-        method: 'PATCH',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'cancel', reason: 'Admin force cancellation' })
-      })
-
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        return
-      }
-
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-marketplace-job', params.id] })
       toast.success('Job cancelled successfully')
-      const refreshRes = await fetch(`/api/admin/marketplace/jobs/${params.id}`, {
-        headers: { ...getAuthHeader() }
-      })
-      const refreshData = await refreshRes.json()
-      setJob(refreshData.data)
-    } catch (error) {
-      console.error('Cancel error:', error)
-      toast.error('Failed to cancel job')
-    } finally {
-      setCancelling(false)
-    }
-  }
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to cancel job')
+    },
+  })
 
-  const formatMoney = (cents: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
-  }
-
-  const statusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      OPEN: 'bg-green-100 text-green-800',
-      IN_PROGRESS: 'bg-blue-100 text-blue-800',
-      COMPLETED: 'bg-gray-100 text-gray-800',
-      CANCELLED: 'bg-red-100 text-red-800',
-      ON_HOLD: 'bg-yellow-100 text-yellow-800',
-    }
-    return <span className={`px-3 py-1 rounded-full text-xs font-medium ${map[status] || 'bg-gray-100 text-gray-800'}`}>{status}</span>
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <Skeleton className="h-8 w-64" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2"><Card><CardHeader><Skeleton className="h-5 w-24" /></CardHeader><CardContent><Skeleton className="h-32 w-full" /></CardContent></Card></div>
+          <Card><CardHeader><Skeleton className="h-5 w-20" /></CardHeader><CardContent><Skeleton className="h-16 w-full" /></CardContent></Card>
+        </div>
       </div>
     )
   }
 
-  if (error && !job) {
+  if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <FiAlertCircle className="w-12 h-12 text-red-500" />
-        <p className="text-gray-600">{error}</p>
-        <button onClick={fetchJob} className="btn-primary px-4 py-2 rounded-lg text-sm">Try Again</button>
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FiAlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-gray-600">{error instanceof Error ? error.message : 'Failed to load job'}</p>
+          <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+        </div>
       </div>
     )
   }
 
   if (!job) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="p-4 md:p-6 flex items-center justify-center h-64">
         <p className="text-gray-500">Job not found</p>
       </div>
     )
@@ -146,71 +108,77 @@ export default function MarketplaceJobDetail() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-lg">
-          <FiArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
-        {statusBadge(job.status)}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <FiArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
+          <Badge className={STATUS_MAP[job.status] || 'bg-gray-100 text-gray-800'}>{job.status}</Badge>
+        </div>
+        <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Details</h2>
-          </div>
-          <div className="p-4 md:p-6 space-y-4">
-            {job.description && (
-              <div>
-                <p className="text-xs font-medium text-gray-500">Description</p>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader><CardTitle>Details</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {job.description && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Description</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Budget</p>
+                  <p className="text-sm text-gray-900">{job.budgetCents ? formatMoney(job.budgetCents) : '\u2014'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Created</p>
+                  <p className="text-sm text-gray-900">{new Date(job.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Client</p>
+                  <p className="text-sm text-gray-900">{job.client.name || job.client.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Worker</p>
+                  <p className="text-sm text-gray-900">{job.worker?.name || job.worker?.email || 'Not assigned'}</p>
+                </div>
               </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium text-gray-500">Budget</p>
-                <p className="text-sm text-gray-900">{job.budgetCents ? formatMoney(job.budgetCents) : '\u2014'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Created</p>
-                <p className="text-sm text-gray-900">{new Date(job.createdAt).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Client</p>
-                <p className="text-sm text-gray-900">{job.client.name || job.client.email}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Worker</p>
-                <p className="text-sm text-gray-900">{job.worker?.name || job.worker?.email || 'Not assigned'}</p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Actions</h2>
-          </div>
-          <div className="p-4 md:p-6 space-y-3">
-            {canCancel && job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
-              <button
-                onClick={handleCancel}
-                disabled={cancelling}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-sm font-medium disabled:opacity-50"
-              >
-                {cancelling ? 'Cancelling...' : 'Force Cancel Job'}
-              </button>
-            )}
-          </div>
-        </div>
+        <PermissionGate roles={PERMISSION.forceCancelJob}>
+          <Card>
+            <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => {
+                    if (confirm('Are you sure you want to force cancel this job?')) {
+                      cancelMutation.mutate()
+                    }
+                  }}
+                  disabled={cancelMutation.isPending}
+                >
+                  {cancelMutation.isPending ? 'Cancelling...' : 'Force Cancel Job'}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </PermissionGate>
       </div>
 
       {job.escrow && (
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Escrow</h2>
-          </div>
-          <div className="p-4 md:p-6">
+        <Card>
+          <CardHeader><CardTitle>Escrow</CardTitle></CardHeader>
+          <CardContent>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-xs font-medium text-gray-500">Amount</p>
@@ -225,8 +193,8 @@ export default function MarketplaceJobDetail() {
                 <p className="text-sm text-gray-900 font-mono text-xs">{job.escrow.id}</p>
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

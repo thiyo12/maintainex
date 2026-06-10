@@ -63,17 +63,17 @@ export async function PATCH(request: NextRequest) {
         }),
         prisma.providerWallet.upsert({
           where: { userId: escrow.providerId },
-          create: { userId: escrow.providerId, availableBalance: escrow.amount },
-          update: { availableBalance: { increment: escrow.amount } },
+          create: { userId: escrow.providerId, availableBalance: Number(escrow.amount) },
+          update: { availableBalance: { increment: Number(escrow.amount) } },
         }),
         prisma.walletTransaction.create({
           data: {
             userId: escrow.providerId,
             walletType: 'PROVIDER',
             type: 'CREDIT',
-            amount: escrow.amount,
+            amount: Number(escrow.amount),
             balanceBefore: providerWallet?.availableBalance || 0,
-            balanceAfter: (providerWallet?.availableBalance || 0) + escrow.amount,
+            balanceAfter: (providerWallet?.availableBalance || 0) + Number(escrow.amount),
             reference: 'Admin force-release escrow',
             referenceType: 'ESCROW_RELEASE',
             referenceId: escrow.id,
@@ -105,16 +105,16 @@ export async function PATCH(request: NextRequest) {
         }),
         prisma.customerWallet.update({
           where: { userId: escrow.customerId },
-          data: { balance: balanceBefore + escrow.totalAmount },
+          data: { balance: balanceBefore + Number(escrow.totalAmount) },
         }),
         prisma.walletTransaction.create({
           data: {
             userId: escrow.customerId,
             walletType: 'CUSTOMER',
             type: 'CREDIT',
-            amount: escrow.totalAmount,
+            amount: Number(escrow.totalAmount),
             balanceBefore,
-            balanceAfter: balanceBefore + escrow.totalAmount,
+            balanceAfter: balanceBefore + Number(escrow.totalAmount),
             reference: 'Admin force-refund escrow',
             referenceType: 'ESCROW_REFUND',
             referenceId: escrow.id,

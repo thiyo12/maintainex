@@ -1257,7 +1257,7 @@ model Payout {
   id          String    @id @default(cuid())
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount      Float
+  amount      BigInt
   description String?
   status      String    @default("PENDING") // PENDING, CLEARED, FAILED
   source      String // JOB, CONTRACT, MILESTONE
@@ -1358,7 +1358,7 @@ model MarketplaceJob {
   categoryId       String
   photos           String[]
   budgetType       String // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
-  budgetAmount     Float
+  budgetAmount     BigInt
   areaId           String?
   postalCode       String?
   preferredDate    DateTime?
@@ -1384,7 +1384,8 @@ model JobQuote {
   jobId                   String
   providerId              String
   providerType            String // INDIVIDUAL, COMPANY
-  price                   Float
+  price                   BigInt
+
   estimatedCompletionTime String
   message                 String?
   attachments             String[]
@@ -1403,9 +1404,9 @@ model JobEscrow {
   quoteId       String
   customerId    String
   providerId    String
-  amount        Float // quote price
-  serviceFee    Float // platform fee
-  totalAmount   Float // amount + fee
+  amount        BigInt // quote price in cents
+  serviceFee    BigInt // platform fee in cents
+  totalAmount   BigInt // amount + fee in cents
   paymentMethod String    @default("CARD") // CARD, CASH
   status        String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
   heldAt        DateTime?
@@ -1427,9 +1428,9 @@ model CommissionSettlement {
   escrowId         String
   providerId       String
   customerId       String
-  jobAmount        Float // total job amount (excl. fees)
+  jobAmount        BigInt // total job amount in cents (excl. fees)
   commissionRate   Float    @default(15.0)
-  commissionAmount Float // jobAmount * commissionRate / 100
+  commissionAmount BigInt // jobAmount * commissionRate / 10000 (bps calc)
   status           String   @default("PENDING") // PENDING, SETTLED
   settledAt        DateTime?
   createdAt        DateTime @default(now())

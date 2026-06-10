@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getSessionFromCookie, adminAuthorize, getIp } from '@/lib/admin-rbac'
 
 export async function GET(request: NextRequest) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
+  const session = rawSession!
   try {
     const disputes = await prisma.dispute.findMany({
       orderBy: { createdAt: 'desc' },
@@ -25,11 +26,8 @@ export async function GET(request: NextRequest) {
         updatedAt: d.updatedAt.toISOString(),
       })),
     })
-  } catch (error) {
-    console.error('Disputes error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch disputes' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('Disputes error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to fetch disputes' }, { status: 500 })
   }
 }

@@ -16,10 +16,10 @@ export async function GET(request: NextRequest) {
 
     const totalEarned = payouts
       .filter(p => p.status === 'CLEARED')
-      .reduce((sum, p) => sum + p.amount, 0)
+      .reduce((sum, p) => sum + Number(p.amount), 0) / 100
     const pendingAmount = payouts
       .filter(p => p.status === 'PENDING')
-      .reduce((sum, p) => sum + p.amount, 0)
+      .reduce((sum, p) => sum + Number(p.amount), 0) / 100
 
     const completedJobs = await prisma.jobPosting.count({
       where: {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       completedJobs,
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
-        amount: p.amount,
+        amount: Number(p.amount) / 100,
         description: p.description,
         status: p.status,
         source: p.source,

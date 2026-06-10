@@ -21,7 +21,7 @@ export async function POST(
 
     const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
     const balanceBefore = wallet?.balance || 0
-    const newBalance = balanceBefore + escrow.totalAmount
+    const newBalance = balanceBefore + Number(escrow.totalAmount)
 
     await prisma.$transaction([
       prisma.jobEscrow.update({
@@ -37,7 +37,7 @@ export async function POST(
           userId: user.id,
           walletType: 'CUSTOMER',
           type: 'CREDIT',
-          amount: escrow.totalAmount,
+          amount: Number(escrow.totalAmount),
           balanceBefore,
           balanceAfter: newBalance,
           reference: `Escrow refund for job ${job.title}`,

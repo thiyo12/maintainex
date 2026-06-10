@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getSessionFromCookie, adminAuthorize, createAuditLog, getIp } from '@/lib/admin-rbac'
+import { createAdminSchema } from '@/lib/admin-schemas'
 
 export async function GET(request: NextRequest) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  if (session.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
+  const session = rawSession!
   try {
     const admins = await prisma.adminUser.findMany({
       where: { deletedAt: null, parentId: session.id },
@@ -41,40 +39,24 @@ export async function GET(request: NextRequest) {
     })
   } catch (e) {
     console.error('Admins list error:', e)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch admins' },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: 'Failed to fetch admins' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  if (session.role !== 'SUPER_ADMIN') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
-  }
-
+  const session = rawSession!
   try {
     const body = await request.json()
-    const { email, firstName, lastName, role, assignedCountries } = body
+    const data = createAdminSchema.parse(body)
 
-    if (!email || !firstName || !lastName || !role) {
-      return NextResponse.json(
-        { success: false, error: 'Email, firstName, lastName, role required' },
-        { status: 400 },
-      )
-    }
-
-    const existing = await prisma.adminUser.findUnique({ where: { email } })
+    const existing = await prisma.adminUser.findUnique({ where: { email: data.email } })
     if (existing) {
-      return NextResponse.json(
-        { success: false, error: 'Admin with this email already exists' },
-        { status: 409 },
-      )
+      return NextResponse.json({ success: false, error: 'Admin with this email already exists' }, { status: 409 })
     }
 
     const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
@@ -82,29 +64,27 @@ export async function POST(request: NextRequest) {
 
     const newAdmin = await prisma.adminUser.create({
       data: {
-        email,
+        email: data.email,
         passwordHash,
-        role,
-        firstName,
-        lastName,
-        assignedCountries: assignedCountries || [],
+        role: data.role,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        assignedCountries: data.assignedCountries,
         parentId: session.id,
         createdBy: session.id,
       },
     })
 
-    await prisma.auditLog.create({
-      data: {
-        adminUserId: session.id,
-        adminEmail: session.email,
-        adminRole: session.role,
-        action: 'ADMIN_CREATE',
-        targetTable: 'AdminUser',
-        targetId: newAdmin.id,
-        targetLabel: `${firstName} ${lastName} (${email})`,
-        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-      },
+    await createAuditLog({
+      session,
+      action: 'ADMIN_CREATE',
+      targetTable: 'AdminUser',
+      targetId: newAdmin.id,
+      targetLabel: `${data.firstName} ${data.lastName} (${data.email})`,
+      oldValue: null,
+      newValue: JSON.parse(JSON.stringify({ email: data.email, role: data.role, firstName: data.firstName, lastName: data.lastName, assignedCountries: data.assignedCountries })),
+      ipAddress: getIp(request),
+      userAgent: request.headers.get('user-agent'),
     })
 
     return NextResponse.json({
@@ -120,9 +100,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (e) {
     console.error('Admin create error:', e)
-    return NextResponse.json(
-      { success: false, error: 'Failed to create admin' },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: 'Failed to create admin' }, { status: 500 })
   }
 }

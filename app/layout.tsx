@@ -6,6 +6,7 @@ import { organizationSchema, websiteSchema } from '@/lib/seo'
 import type { Metadata } from 'next'
 import './globals.css'
 
+
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = headers()
   const host = headersList.get('host') || ''

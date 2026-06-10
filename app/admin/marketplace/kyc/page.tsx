@@ -1,10 +1,30 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { FiSearch, FiChevronLeft, FiChevronRight, FiCheckCircle, FiXCircle, FiEye, FiAlertCircle } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
+import { FiChevronLeft, FiChevronRight, FiEye, FiAlertCircle, FiRefreshCw, FiCheckCircle, FiXCircle } from 'react-icons/fi'
+import api from '@/lib/api'
+import { useAuthStore } from '@/lib/auth-store'
+import { can, PERMISSION } from '@/lib/permissions'
+import { PermissionGate } from '@/components/admin/PermissionGate'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 interface KycDoc {
   id: string
@@ -24,89 +44,98 @@ interface PaginatedMeta {
   totalPages: number
 }
 
+const reviewSchema = z.object({
+  reason: z.string().optional(),
+})
+
+type ReviewForm = z.infer<typeof reviewSchema>
+
 export default function MarketplaceKyc() {
-  const { user: currentUser } = useAdminSession()
-  const [docs, setDocs] = useState<KycDoc[]>([])
-  const [meta, setMeta] = useState<PaginatedMeta>({ total: 0, page: 1, limit: 20, totalPages: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const adminUser = useAuthStore((s) => s.adminUser)
+  const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('PENDING')
+  const [page, setPage] = useState(1)
   const [selectedDoc, setSelectedDoc] = useState<KycDoc | null>(null)
 
-  const canReview = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role === 'MODERATOR'
+  const canReview = adminUser ? can(adminUser.role, PERMISSION.approveKyc) : false
 
-  const fetchKyc = useCallback(async (page = 1) => {
-    setLoading(true)
-    setError('')
-    try {
-      const params = new URLSearchParams()
-      if (statusFilter) params.set('status', statusFilter)
-      params.set('page', String(page))
-      params.set('limit', '20')
+  const form = useForm<ReviewForm>({
+    resolver: zodResolver(reviewSchema),
+  })
 
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/kyc?${params}`, {
-        headers: { ...authHeaders }
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin-marketplace-kyc', statusFilter, page],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/marketplace/kyc', {
+        params: { status: statusFilter, page, limit: 20 },
       })
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return { docs: body.data as KycDoc[], meta: body.meta as PaginatedMeta }
+    },
+  })
 
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
+  const docs = data?.docs || []
+  const meta = data?.meta || { total: 0, page: 1, limit: 20, totalPages: 0 }
 
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        setError(result.error)
-        return
-      }
-
-      setDocs(result.data)
-      setMeta(result.meta)
-    } catch (error) {
-      console.error('KYC fetch error:', error)
-      toast.error('Failed to load KYC documents')
-      setError('Failed to load KYC documents')
-    } finally {
-      setLoading(false)
-    }
-  }, [statusFilter])
-
-  useEffect(() => { fetchKyc() }, [fetchKyc])
-
-  const handleReview = async (id: string, action: 'approve' | 'reject') => {
-    setActionLoading(id)
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/kyc/${id}`, {
-        method: 'PATCH',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: action === 'approve' ? 'APPROVE' : 'REJECT' })
+  const reviewMutation = useMutation({
+    mutationFn: async ({ id, action, reason }: { id: string; action: 'APPROVE' | 'REJECT'; reason?: string }) => {
+      const res = await api.patch(`/api/admin/marketplace/kyc/${id}`, {
+        action,
+        ...(reason ? { reason } : {}),
       })
-
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        return
-      }
-
-      toast.success(`Document ${action === 'approve' ? 'approved' : 'rejected'} successfully`)
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-marketplace-kyc'] })
+      toast.success('Document reviewed successfully')
       setSelectedDoc(null)
-      await fetchKyc()
-    } catch (error) {
-      console.error('KYC review error:', error)
-      toast.error('Failed to process review')
-    } finally {
-      setActionLoading(null)
-    }
+      form.reset()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to process review')
+    },
+  })
+
+  const handleApprove = () => {
+    if (!selectedDoc) return
+    reviewMutation.mutate({ id: selectedDoc.id, action: 'APPROVE' })
+  }
+
+  const handleReject = (data: ReviewForm) => {
+    if (!selectedDoc) return
+    reviewMutation.mutate({ id: selectedDoc.id, action: 'REJECT', reason: data.reason })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">KYC Review</h1>
+          <p className="text-gray-500">Loading documents...</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-4 w-32" /></CardHeader>
+              <CardContent><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-4 w-20" /></CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FiAlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-gray-600">{error instanceof Error ? error.message : 'Failed to load documents'}</p>
+          <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -114,158 +143,154 @@ export default function MarketplaceKyc() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">KYC Review</h1>
-          <p className="text-gray-600 mt-1">{meta.total} documents</p>
+          <p className="text-gray-500">{meta.total} documents</p>
         </div>
+        <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-4 md:p-6 border-b">
-          <div className="flex gap-3">
-            <select
-              className="input-field w-44"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="PENDING">Pending</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="">All</option>
-            </select>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
-              <FiAlertCircle className="w-12 h-12 text-red-500" />
-              <p className="text-gray-600">{error}</p>
-              <button onClick={() => fetchKyc()} className="btn-primary px-4 py-2 rounded-lg text-sm">Try Again</button>
-            </div>
-          ) : docs.length === 0 ? (
-            <div className="flex items-center justify-center h-64">
-              <p className="text-gray-500">No documents found</p>
+      <Card>
+        <CardHeader>
+          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v ?? ''); setPage(1) }}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+              <SelectItem value="">All</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardHeader>
+        <CardContent className="p-0">
+          {docs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-2">
+              <FiAlertCircle className="w-12 h-12 text-gray-300" />
+              <h3 className="text-lg font-semibold text-gray-900">No documents found</h3>
+              <p className="text-gray-500">No KYC documents match the current filter</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document Type</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 md:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted</th>
-                  <th className="px-4 md:px-6 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {docs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-4">
-                      <div>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Document Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {docs.map((doc) => (
+                    <TableRow key={doc.id}>
+                      <TableCell>
                         <p className="text-sm font-medium text-gray-900">{doc.user.name || '\u2014'}</p>
                         <p className="text-xs text-gray-500">{doc.user.email}</p>
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-gray-600">{doc.documentType}</td>
-                    <td className="px-4 md:px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        doc.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                        doc.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>{doc.status}</span>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 text-sm text-gray-500">{new Date(doc.createdAt).toLocaleDateString()}</td>
-                    <td className="px-4 md:px-6 py-4">
-                      <button
-                        onClick={() => setSelectedDoc(doc)}
-                        className="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
-                      >
-                        <FiEye className="w-4 h-4" /> Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </TableCell>
+                      <TableCell className="text-gray-600">{doc.documentType}</TableCell>
+                      <TableCell>
+                        <Badge className={
+                          doc.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                          doc.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }>{doc.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-500">{new Date(doc.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedDoc(doc)}>
+                          <FiEye className="w-4 h-4 mr-1" /> Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {meta.totalPages > 1 && (
+                <div className="flex items-center justify-between p-4 border-t">
+                  <p className="text-sm text-gray-500">Page {meta.page} of {meta.totalPages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={meta.page <= 1} onClick={() => setPage(p => p - 1)}>
+                      <FiChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={meta.page >= meta.totalPages} onClick={() => setPage(p => p + 1)}>
+                      <FiChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500">Page {meta.page} of {meta.totalPages}</p>
-          <div className="flex gap-2">
-            <button
-              className="btn-outline px-3 py-2 rounded-lg text-sm disabled:opacity-50"
-              disabled={meta.page <= 1}
-              onClick={() => fetchKyc(meta.page - 1)}
-            >
-              <FiChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              className="btn-outline px-3 py-2 rounded-lg text-sm disabled:opacity-50"
-              disabled={meta.page >= meta.totalPages}
-              onClick={() => fetchKyc(meta.page + 1)}
-            >
-              <FiChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelectedDoc(null)}>
-          <div className="w-full max-w-lg rounded-lg bg-white p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="mb-4 text-lg font-bold">Review Document</h2>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-gray-500">User</p>
-                <p className="text-sm">{selectedDoc.user.name} ({selectedDoc.user.email})</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Type</p>
-                <p className="text-sm">{selectedDoc.documentType}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Submitted</p>
-                <p className="text-sm">{new Date(selectedDoc.createdAt).toLocaleString()}</p>
+      <Dialog open={!!selectedDoc} onOpenChange={(open) => { if (!open) { setSelectedDoc(null); form.reset() }}}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Review Document</DialogTitle>
+            <DialogDescription>Review and approve or reject this identity document</DialogDescription>
+          </DialogHeader>
+          {selectedDoc && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs font-medium text-gray-500">User</p>
+                  <p className="text-sm">{selectedDoc.user.name} ({selectedDoc.user.email})</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Type</p>
+                  <p className="text-sm">{selectedDoc.documentType}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Submitted</p>
+                  <p className="text-sm">{new Date(selectedDoc.createdAt).toLocaleString()}</p>
+                </div>
               </div>
               {selectedDoc.frontImageUrl && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Front Image</p>
-                  <img src={selectedDoc.frontImageUrl} alt="Front" className="mt-1 max-h-48 rounded border" />
+                  <p className="text-xs font-medium text-gray-500 mb-1">Front Image</p>
+                  <img src={selectedDoc.frontImageUrl} alt="Front" className="max-h-48 rounded border" />
                 </div>
               )}
               {selectedDoc.backImageUrl && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Back Image</p>
-                  <img src={selectedDoc.backImageUrl} alt="Back" className="mt-1 max-h-48 rounded border" />
+                  <p className="text-xs font-medium text-gray-500 mb-1">Back Image</p>
+                  <img src={selectedDoc.backImageUrl} alt="Back" className="max-h-48 rounded border" />
+                </div>
+              )}
+              {canReview && selectedDoc.status === 'PENDING' && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1"
+                      onClick={handleApprove}
+                      disabled={reviewMutation.isPending}
+                    >
+                      <FiCheckCircle className="w-4 h-4 mr-2" /> Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      disabled={reviewMutation.isPending}
+                      onClick={() => {
+                        const reason = form.getValues('reason')
+                        handleReject({ reason })
+                      }}
+                    >
+                      <FiXCircle className="w-4 h-4 mr-2" /> Reject
+                    </Button>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Rejection Reason (optional)</p>
+                    <Textarea
+                      placeholder="Enter reason for rejection..."
+                      {...form.register('reason')}
+                    />
+                  </div>
                 </div>
               )}
             </div>
-            {canReview && selectedDoc.status === 'PENDING' && (
-              <div className="mt-6 flex gap-3">
-                <button
-                  className="btn-primary flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm"
-                  onClick={() => handleReview(selectedDoc.id, 'approve')}
-                  disabled={actionLoading === selectedDoc.id}
-                >
-                  <FiCheckCircle className="w-4 h-4" /> Approve
-                </button>
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-sm font-medium disabled:opacity-50"
-                  onClick={() => handleReview(selectedDoc.id, 'reject')}
-                  disabled={actionLoading === selectedDoc.id}
-                >
-                  <FiXCircle className="w-4 h-4" /> Reject
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,25 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getSessionFromCookie, adminAuthorize, getIp } from '@/lib/admin-rbac'
+import { kycQuerySchema } from '@/lib/admin-schemas'
 
 export async function GET(request: NextRequest) {
-  const session = await getAdminSession(request)
-  if (!session) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+  const rawSession = getSessionFromCookie(request)
+  const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN', 'MODERATOR'])(rawSession)
+  if (!auth.authorized) {
+    return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
-
-  const status = request.nextUrl.searchParams.get('status') || 'PENDING'
-  const page = Math.max(1, parseInt(request.nextUrl.searchParams.get('page') || '1'))
-  const limit = Math.min(100, Math.max(1, parseInt(request.nextUrl.searchParams.get('limit') || '20')))
-  const skip = (page - 1) * limit
-
+  const session = rawSession!
   try {
-    const where: any = { status }
+    const { searchParams } = request.nextUrl
+    const query = kycQuerySchema.parse({
+      page: searchParams.get('page') || 1,
+      limit: searchParams.get('limit') || 25,
+      status: searchParams.get('status') || 'PENDING',
+    })
+
+    const where: any = { status: query.status }
+    const skip = (query.page - 1) * query.limit
+
     const [docs, total] = await Promise.all([
       prisma.identityDocument.findMany({
         where,
         skip,
-        take: limit,
+        take: query.limit,
         orderBy: { createdAt: 'asc' },
         include: {
           user: { select: { id: true, name: true, email: true } },
@@ -44,13 +50,10 @@ export async function GET(request: NextRequest) {
         reviewedAt: d.reviewedAt?.toISOString() || null,
         createdAt: d.createdAt.toISOString(),
       })),
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      meta: { total, page: query.page, limit: query.limit, totalPages: Math.ceil(total / query.limit) },
     })
-  } catch (error) {
-    console.error('KYC list error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch KYC documents' },
-      { status: 500 },
-    )
+  } catch (e) {
+    console.error('KYC list error:', e)
+    return NextResponse.json({ success: false, error: 'Failed to fetch KYC documents' }, { status: 500 })
   }
 }

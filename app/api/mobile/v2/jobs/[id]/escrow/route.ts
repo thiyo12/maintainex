@@ -25,26 +25,27 @@ export async function POST(
     if (existingEscrow) return NextResponse.json({ error: 'Escrow already exists' }, { status: 409 })
 
     const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
-    if (!wallet || wallet.balance < quote.price) {
+    const quotePrice = Number(quote.price)
+    if (!wallet || wallet.balance < quotePrice) {
       return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 })
     }
 
-    const serviceFee = Math.round(quote.price * 0.1 * 100) / 100
-    const totalAmount = quote.price + serviceFee
+    const serviceFeeCents = Math.round(quotePrice * 0.1 * 100) / 100
+    const totalAmountCents = quotePrice + serviceFeeCents
 
     await prisma.$transaction(async (tx) => {
       await tx.customerWallet.update({
         where: { userId: user.id },
-        data: { balance: { decrement: totalAmount } },
+        data: { balance: { decrement: totalAmountCents } },
       })
       await tx.walletTransaction.create({
         data: {
           userId: user.id,
           walletType: 'CUSTOMER',
           type: 'DEBIT',
-          amount: totalAmount,
+          amount: totalAmountCents,
           balanceBefore: wallet.balance,
-          balanceAfter: wallet.balance - totalAmount,
+          balanceAfter: wallet.balance - totalAmountCents,
           reference: `Escrow deposit for job ${job.id}`,
           referenceType: 'ESCROW_RELEASE',
           referenceId: params.id,
@@ -57,8 +58,8 @@ export async function POST(
           customerId: user.id,
           providerId: quote.providerId,
           amount: quote.price,
-          serviceFee,
-          totalAmount,
+          serviceFee: BigInt(Math.round(serviceFeeCents)),
+          totalAmount: BigInt(Math.round(totalAmountCents)),
           status: 'PROTECTED',
           heldAt: new Date(),
         },

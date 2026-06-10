@@ -1,20 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import toast from 'react-hot-toast'
-import { FiUsers, FiBriefcase, FiDollarSign, FiAlertCircle, FiClock, FiShield, FiAlertTriangle } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
+import { useQuery } from '@tanstack/react-query'
+import { FiUsers, FiBriefcase, FiDollarSign, FiAlertTriangle, FiShield, FiClock, FiRefreshCw, FiAlertCircle } from 'react-icons/fi'
+import api from '@/lib/api'
+import { useAuthStore } from '@/lib/auth-store'
+import { formatMoney } from '@/lib/money'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 
 interface DashboardData {
-  stats: {
-    totalUsers: number
-    activeJobs: number
-    monthlyRevenue: number
-    openDisputes: number
-    pendingKyc: number
-    totalEscrows: number
-  }
+  totalUsers: number
+  activeJobs: number
+  monthlyRevenue: number
+  openDisputes: number
+  pendingKyc: number
+  totalEscrows: number
   recentActivity: Array<{
     id: string
     adminEmail: string
@@ -24,125 +27,94 @@ interface DashboardData {
   }>
 }
 
-const initialStats = {
-  totalUsers: 0,
-  activeJobs: 0,
-  monthlyRevenue: 0,
-  openDisputes: 0,
-  pendingKyc: 0,
-  totalEscrows: 0,
-}
-
 export default function MarketplaceDashboard() {
-  const { user } = useAdminSession()
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const adminUser = useAuthStore((s) => s.adminUser)
 
-  useEffect(() => {
-    fetchDashboard()
-  }, [])
+  const { data, isLoading, error, refetch } = useQuery<DashboardData>({
+    queryKey: ['admin-marketplace-dashboard'],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/marketplace/reports/summary')
+      const body = res.data
+      if (body.error || !body.success) throw new Error(body.error || 'Failed to load dashboard')
+      return body.data
+    },
+  })
 
-  const fetchDashboard = async () => {
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/admin/marketplace/reports/summary', {
-        headers: { ...authHeaders }
-      })
-
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
-      const result = await res.json()
-
-      if (result.error || !result.success) {
-        toast.error(result.error || 'Failed to load dashboard')
-        setError(result.error || 'Failed to load dashboard')
-        return
-      }
-
-      setData(result.data)
-    } catch (error) {
-      console.error('Dashboard fetch error:', error)
-      toast.error('Failed to load dashboard')
-      setError('Failed to load dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      <div className="p-4 md:p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Marketplace Dashboard</h1>
+          <p className="text-gray-500">Overview of your marketplace platform.</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}><CardHeader><Skeleton className="h-4 w-20" /></CardHeader><CardContent><Skeleton className="h-8 w-24" /></CardContent></Card>
+          ))}
+        </div>
       </div>
     )
   }
 
-  if (error && !data) {
+  if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <FiAlertCircle className="w-12 h-12 text-red-500" />
-        <p className="text-gray-600">{error}</p>
-        <button onClick={fetchDashboard} className="btn-primary px-4 py-2 rounded-lg text-sm">
-          Try Again
-        </button>
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FiAlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-gray-600">{error instanceof Error ? error.message : 'Failed to load dashboard'}</p>
+          <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+        </div>
       </div>
     )
   }
 
-  const stats = data?.stats || initialStats
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
-  }
-
-  const kpiCards = [
-    { label: 'Total Users', value: stats.totalUsers.toLocaleString(), icon: FiUsers, color: 'bg-blue-500' },
-    { label: 'Active Jobs', value: stats.activeJobs.toLocaleString(), icon: FiBriefcase, color: 'bg-green-500' },
-    { label: 'Monthly Revenue', value: formatMoney(stats.monthlyRevenue), icon: FiDollarSign, color: 'bg-primary-500' },
-    { label: 'Open Disputes', value: stats.openDisputes.toLocaleString(), icon: FiAlertTriangle, color: 'bg-red-500' },
-    { label: 'Pending KYC', value: stats.pendingKyc.toLocaleString(), icon: FiShield, color: 'bg-yellow-500' },
-    { label: 'Total Escrows', value: stats.totalEscrows.toLocaleString(), icon: FiClock, color: 'bg-purple-500' },
+  const stats = [
+    { label: 'Total Users', value: data?.totalUsers.toLocaleString() || '0', icon: FiUsers, color: 'bg-blue-500' },
+    { label: 'Active Jobs', value: data?.activeJobs.toLocaleString() || '0', icon: FiBriefcase, color: 'bg-green-500' },
+    { label: 'Monthly Revenue', value: formatMoney(data?.monthlyRevenue || 0), icon: FiDollarSign, color: 'bg-indigo-500' },
+    { label: 'Open Disputes', value: data?.openDisputes.toLocaleString() || '0', icon: FiAlertTriangle, color: 'bg-red-500' },
+    { label: 'Pending KYC', value: data?.pendingKyc.toLocaleString() || '0', icon: FiShield, color: 'bg-yellow-500' },
+    { label: 'Total Escrows', value: data?.totalEscrows.toLocaleString() || '0', icon: FiClock, color: 'bg-purple-500' },
   ]
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Marketplace Dashboard</h1>
-        <p className="text-gray-600 mt-1">Overview of your marketplace platform.</p>
+    <div className="p-4 md:p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Marketplace Dashboard</h1>
+          <p className="text-gray-500">Overview of your marketplace platform.</p>
+        </div>
+        <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mb-8">
-        {kpiCards.map((kpi) => (
-          <div key={kpi.label} className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <div className={`w-10 h-10 md:w-12 md:h-12 ${kpi.color} rounded-xl flex items-center justify-center`}>
-                <kpi.icon className="text-white text-lg md:text-xl" />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        {stats.map((kpi) => (
+          <Card key={kpi.label}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-500">{kpi.label}</CardTitle>
+              <div className={`w-8 h-8 ${kpi.color} rounded-lg flex items-center justify-center`}>
+                <kpi.icon className="w-4 h-4 text-white" />
               </div>
-            </div>
-            <div className="text-2xl md:text-3xl font-bold text-gray-900">{kpi.value}</div>
-            <div className="text-gray-500 text-sm">{kpi.label}</div>
-          </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpi.value}</div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
-          </div>
-          <div className="p-4 md:p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
             {data?.recentActivity && data.recentActivity.length > 0 ? (
               <div className="space-y-3">
                 {data.recentActivity.slice(0, 10).map((activity) => (
                   <div key={activity.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                    <div>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mr-2">
-                        {activity.action}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{activity.action}</Badge>
                       <span className="text-sm text-gray-600">{activity.adminEmail}</span>
                     </div>
                     <span className="text-xs text-gray-400">
@@ -154,46 +126,34 @@ export default function MarketplaceDashboard() {
             ) : (
               <p className="text-sm text-gray-500">No recent activity</p>
             )}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-          </div>
-          <div className="p-4 md:p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => window.location.href = '/admin/marketplace/kyc'}
-                className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700"
-              >
+              <a href="/admin/marketplace/kyc" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
                 <FiShield className="w-4 h-4" />
-                Review KYC ({stats.pendingKyc})
-              </button>
-              <button
-                onClick={() => window.location.href = '/admin/marketplace/escrow'}
-                className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700"
-              >
+                Review KYC ({data?.pendingKyc || 0})
+              </a>
+              <a href="/admin/marketplace/escrow" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
                 <FiAlertTriangle className="w-4 h-4" />
-                Disputes ({stats.openDisputes})
-              </button>
-              <button
-                onClick={() => window.location.href = '/admin/marketplace/users'}
-                className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700"
-              >
+                Disputes ({data?.openDisputes || 0})
+              </a>
+              <a href="/admin/marketplace/users" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
                 <FiUsers className="w-4 h-4" />
                 Manage Users
-              </button>
-              <button
-                onClick={() => window.location.href = '/admin/marketplace/jobs'}
-                className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700"
-              >
+              </a>
+              <a href="/admin/marketplace/jobs" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
                 <FiBriefcase className="w-4 h-4" />
                 View Jobs
-              </button>
+              </a>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

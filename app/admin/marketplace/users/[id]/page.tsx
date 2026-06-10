@@ -1,11 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiSlash, FiCheckCircle, FiXCircle, FiFileText, FiAlertCircle } from 'react-icons/fi'
-import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
+import { FiArrowLeft, FiSlash, FiCheckCircle, FiXCircle, FiFileText, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
+import api from '@/lib/api'
+import { useAuthStore } from '@/lib/auth-store'
+import { can, PERMISSION } from '@/lib/permissions'
+import { PermissionGate } from '@/components/admin/PermissionGate'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 
 interface UserDetail {
   id: string
@@ -33,101 +40,65 @@ interface UserDetail {
 export default function MarketplaceUserDetail() {
   const params = useParams()
   const router = useRouter()
-  const { user: currentUser } = useAdminSession()
-  const [user, setUser] = useState<UserDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const adminUser = useAuthStore((s) => s.adminUser)
+  const queryClient = useQueryClient()
 
-  const canAct = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role === 'MODERATOR'
+  const canAct = adminUser ? can(adminUser.role, PERMISSION.manageUsers) : false
 
-  useEffect(() => {
-    fetchUser()
-  }, [])
+  const { data: user, isLoading, error, refetch } = useQuery<UserDetail>({
+    queryKey: ['admin-marketplace-user', params.id],
+    queryFn: async () => {
+      const res = await api.get(`/api/admin/marketplace/users/${params.id}`)
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return body.data
+    },
+  })
 
-  const fetchUser = async () => {
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/users/${params.id}`, {
-        headers: { ...authHeaders }
-      })
+  const actionMutation = useMutation({
+    mutationFn: async (action: string) => {
+      const res = await api.patch(`/api/admin/marketplace/users/${params.id}`, { action })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-marketplace-user', params.id] })
+      toast.success('Action performed successfully')
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to perform action')
+    },
+  })
 
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        setError(result.error)
-        return
-      }
-
-      setUser(result.data)
-    } catch (error) {
-      console.error('User detail error:', error)
-      toast.error('Failed to load user')
-      setError('Failed to load user')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleAction = async (action: string) => {
-    setActionLoading(action)
-    try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch(`/api/admin/marketplace/users/${params.id}`, {
-        method: 'PATCH',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      })
-
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
-      const result = await res.json()
-
-      if (result.error) {
-        toast.error(result.error)
-        return
-      }
-
-      toast.success(`User ${action}ed successfully`)
-      await fetchUser()
-    } catch (error) {
-      console.error('User action error:', error)
-      toast.error('Failed to perform action')
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <Skeleton className="h-8 w-48" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2"><Card><CardHeader><Skeleton className="h-5 w-32" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card></div>
+          <Card><CardHeader><Skeleton className="h-5 w-20" /></CardHeader><CardContent><Skeleton className="h-24 w-full" /></CardContent></Card>
+        </div>
       </div>
     )
   }
 
-  if (error && !user) {
+  if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <FiAlertCircle className="w-12 h-12 text-red-500" />
-        <p className="text-gray-600">{error}</p>
-        <button onClick={fetchUser} className="btn-primary px-4 py-2 rounded-lg text-sm">Try Again</button>
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <FiAlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-gray-600">{error instanceof Error ? error.message : 'Failed to load user'}</p>
+          <Button variant="outline" onClick={() => refetch()}>Try Again</Button>
+        </div>
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-2">
+      <div className="p-4 md:p-6 flex items-center justify-center h-64">
         <p className="text-gray-500">User not found</p>
       </div>
     )
@@ -135,105 +106,106 @@ export default function MarketplaceUserDetail() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-lg">
-          <FiArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900">{user.name || 'Unnamed User'}</h1>
-        <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{user.role}</span>
-        {user.isBanned && <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Banned</span>}
-        {!user.isActive && !user.isBanned && <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Suspended</span>}
-        {user.isActive && !user.isBanned && <span className="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <FiArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">{user.name || 'Unnamed User'}</h1>
+          <Badge variant="outline">{user.role}</Badge>
+          {user.isBanned && <Badge variant="destructive">Banned</Badge>}
+          {!user.isActive && !user.isBanned && <Badge variant="secondary">Suspended</Badge>}
+          {user.isActive && !user.isBanned && <Badge className="bg-green-100 text-green-800">Active</Badge>}
+        </div>
+        <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Profile Information</h2>
-          </div>
-          <div className="p-4 md:p-6 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium text-gray-500">Email</p>
-                <p className="text-sm text-gray-900">{user.email}</p>
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader><CardTitle>Profile Information</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Email</p>
+                  <p className="text-sm text-gray-900">{user.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Phone</p>
+                  <p className="text-sm text-gray-900">{user.phone || '\u2014'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Country</p>
+                  <p className="text-sm text-gray-900">{user.country || '\u2014'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Joined</p>
+                  <p className="text-sm text-gray-900">{new Date(user.createdAt).toLocaleDateString()}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Phone</p>
-                <p className="text-sm text-gray-900">{user.phone || '\u2014'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Country</p>
-                <p className="text-sm text-gray-900">{user.country || '\u2014'}</p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-gray-500">Joined</p>
-                <p className="text-sm text-gray-900">{new Date(user.createdAt).toLocaleDateString()}</p>
-              </div>
-            </div>
-            {user.bio && (
-              <div>
-                <p className="text-xs font-medium text-gray-500">Bio</p>
-                <p className="text-sm text-gray-700">{user.bio}</p>
-              </div>
-            )}
-          </div>
+              {user.bio && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Bio</p>
+                  <p className="text-sm text-gray-700">{user.bio}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Actions</h2>
-          </div>
-          <div className="p-4 md:p-6 space-y-3">
-            {canAct && user.isActive && !user.isBanned && (
-              <button
-                onClick={() => handleAction('suspend')}
-                disabled={actionLoading === 'suspend'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 disabled:opacity-50"
-              >
-                <FiXCircle className="w-4 h-4" />
-                Suspend Account
-              </button>
-            )}
-            {canAct && !user.isActive && !user.isBanned && (
-              <button
-                onClick={() => handleAction('unsuspend')}
-                disabled={actionLoading === 'unsuspend'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 disabled:opacity-50"
-              >
-                <FiCheckCircle className="w-4 h-4" />
-                Unsuspend Account
-              </button>
-            )}
-            {canAct && !user.isBanned && (
-              <button
-                onClick={() => handleAction('ban')}
-                disabled={actionLoading === 'ban'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-sm font-medium disabled:opacity-50"
-              >
-                <FiSlash className="w-4 h-4" />
-                Ban Account
-              </button>
-            )}
-            {canAct && user.isBanned && (
-              <button
-                onClick={() => handleAction('unban')}
-                disabled={actionLoading === 'unban'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 disabled:opacity-50"
-              >
-                <FiCheckCircle className="w-4 h-4" />
-                Unban Account
-              </button>
-            )}
-          </div>
-        </div>
+        <PermissionGate roles={PERMISSION.manageUsers}>
+          <Card>
+            <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {user.isActive && !user.isBanned && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => actionMutation.mutate('suspend')}
+                  disabled={actionMutation.isPending}
+                >
+                  <FiXCircle className="w-4 h-4 mr-2" /> Suspend Account
+                </Button>
+              )}
+              {!user.isActive && !user.isBanned && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => actionMutation.mutate('unsuspend')}
+                  disabled={actionMutation.isPending}
+                >
+                  <FiCheckCircle className="w-4 h-4 mr-2" /> Unsuspend Account
+                </Button>
+              )}
+              {!user.isBanned && (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() => actionMutation.mutate('ban')}
+                  disabled={actionMutation.isPending}
+                >
+                  <FiSlash className="w-4 h-4 mr-2" /> Ban Account
+                </Button>
+              )}
+              {user.isBanned && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => actionMutation.mutate('unban')}
+                  disabled={actionMutation.isPending}
+                >
+                  <FiCheckCircle className="w-4 h-4 mr-2" /> Unban Account
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </PermissionGate>
       </div>
 
       {user.identityDocuments.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm">
-          <div className="p-4 md:p-6 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Identity Documents</h2>
-          </div>
-          <div className="p-4 md:p-6">
+        <Card>
+          <CardHeader><CardTitle>Identity Documents</CardTitle></CardHeader>
+          <CardContent>
             <div className="space-y-3">
               {user.identityDocuments.map((doc) => (
                 <div key={doc.id} className="flex items-center justify-between rounded-lg border p-3">
@@ -244,18 +216,18 @@ export default function MarketplaceUserDetail() {
                       <p className="text-xs text-gray-500">{new Date(doc.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  <Badge className={
                     doc.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
                     doc.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
                     'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  }>
                     {doc.status}
-                  </span>
+                  </Badge>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   )

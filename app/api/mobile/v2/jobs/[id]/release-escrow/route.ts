@@ -26,9 +26,10 @@ export async function POST(
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id, status: 'PROTECTED' } })
     if (!escrow) return NextResponse.json({ error: 'No protected escrow found' }, { status: 404 })
 
+    const escrowAmount = Number(escrow.amount)
     const commissionRate = await getProviderCommissionRate(escrow.providerId)
-    const commission = commissionRate > 0 ? Math.round(escrow.amount * (commissionRate / 100) * 100) / 100 : 0
-    const netAmount = escrow.amount - commission
+    const commission = commissionRate > 0 ? Math.round(escrowAmount * (commissionRate / 100) * 100) / 100 : 0
+    const netAmount = escrowAmount - commission
 
     const providerWallet = await prisma.providerWallet.findUnique({
       where: { userId: escrow.providerId },

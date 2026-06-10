@@ -27,9 +27,10 @@ export async function POST(
     })
     const currentBalance = providerWallet?.availableBalance || 0
 
-    const commissionRate = escrow.serviceFee
-    const commission = commissionRate > 0 ? Math.round(escrow.amount * (commissionRate / 100) * 100) / 100 : 0
-    const netAmount = escrow.amount - commission
+    const escrowAmount = Number(escrow.amount)
+    const commissionRate = Number(escrow.serviceFee)
+    const commission = commissionRate > 0 ? Math.round(escrowAmount * (commissionRate / 100) * 100) / 100 : 0
+    const netAmount = escrowAmount - commission
 
     const updated = await prisma.$transaction([
       prisma.jobEscrow.update({
@@ -68,7 +69,7 @@ export async function POST(
           customerId: escrow.customerId,
           jobAmount: escrow.amount,
           commissionRate,
-          commissionAmount: commission,
+          commissionAmount: BigInt(Math.round(commission)),
           status: 'PENDING',
         },
       }),
