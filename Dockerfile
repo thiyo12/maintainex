@@ -18,4 +18,4 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD ["next", "start"]
+CMD npx prisma db push --accept-data-loss && next start
