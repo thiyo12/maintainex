@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
 
 if (!process.env.NEXTAUTH_SECRET) {
   console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
@@ -98,9 +97,11 @@ async function checkRateLimit(
   limitType = 'default'
 ): Promise<{ remaining: number; resetAt: Date }> {
   const config = RATE_LIMITS[limitType as keyof typeof RATE_LIMITS] || RATE_LIMITS.default
-  const windowStart = new Date(Date.now() - config.windowSeconds * 1000)
-  
+  const now = new Date()
+  const windowStart = new Date(now.getTime() - config.windowSeconds * 1000)
+
   try {
+    const { prisma } = await import('@/lib/prisma')
     const existing = await prisma.rateLimitLog.findFirst({
       where: {
         identifier,
@@ -118,15 +119,15 @@ async function checkRateLimit(
           endpoint: 'middleware',
           method: 'ALL',
           requestCount: 1,
-          windowStart: new Date(),
-          windowEnd: new Date(Date.now() + config.windowSeconds * 1000),
+          windowStart: now,
+          windowEnd: new Date(now.getTime() + config.windowSeconds * 1000),
           limited: false,
         },
       })
       
       return {
         remaining: config.maxRequests - 1,
-        resetAt: new Date(Date.now() + config.windowSeconds * 1000),
+        resetAt: new Date(now.getTime() + config.windowSeconds * 1000),
       }
     }
 
@@ -138,7 +139,7 @@ async function checkRateLimit(
       data: { 
         requestCount: newCount,
         limited,
-        blockUntil: limited ? new Date(Date.now() + config.windowSeconds * 1000) : null,
+        blockUntil: limited ? new Date(now.getTime() + config.windowSeconds * 1000) : null,
       },
     })
 
@@ -149,7 +150,7 @@ async function checkRateLimit(
   } catch {
     return {
       remaining: config.maxRequests,
-      resetAt: new Date(Date.now() + config.windowSeconds * 1000),
+      resetAt: new Date(now.getTime() + config.windowSeconds * 1000),
     }
   }
 }
@@ -164,6 +165,7 @@ async function logAccessAttempt(
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW'
 ) {
   try {
+    const { prisma } = await import('@/lib/prisma')
     await prisma.securityAudit.create({
       data: {
         action,
