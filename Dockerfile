@@ -18,4 +18,4 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD npx prisma db push 2>/dev/null; next start
