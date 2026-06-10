@@ -20,8 +20,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
 
   const redirectByRole = (role: string) => {
-    if (role === 'ADMIN') router.replace('/(admin)')
-    else if (role === 'TASKER') router.replace('/(tasker)')
+    if (role === 'TASKER') router.replace('/(tasker)')
     else if (role === 'COMPANY') router.replace('/(company)')
     else router.replace('/(customer)')
   }

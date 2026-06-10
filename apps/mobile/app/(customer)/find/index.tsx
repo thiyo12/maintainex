@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { colors } from '../../../lib/colors'
 import { jobCategories } from '../../../lib/api'
+import { useCountry } from '../../../lib/country'
 import CategoryCard from '../../../components/find/CategoryCard'
 import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
@@ -14,11 +15,12 @@ export default function FindJobCategories() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const { selectedCountry } = useCountry()
   const router = useRouter()
 
   const fetch = useCallback(async () => {
     try {
-      const data = await jobCategories.list()
+      const data = await jobCategories.list(selectedCountry?.code)
       setCategories(data)
       setFiltered(data)
     } catch (e) {
@@ -27,7 +29,9 @@ export default function FindJobCategories() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [selectedCountry])
+
+  useEffect(() => { fetch() }, [fetch])
 
   useEffect(() => { fetch() }, [fetch])
 

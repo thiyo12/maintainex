@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { AuthProvider } from '../lib/auth'
 import i18next, { initI18n } from '../lib/i18n'
 import { ThemeProvider } from '../lib/ThemeContext'
+import { CountryProvider } from '../lib/country'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -29,6 +30,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
+        <CountryProvider>
         <I18nextProvider i18n={i18next}>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false }}>
@@ -38,9 +40,9 @@ export default function RootLayout() {
           <Stack.Screen name="(tasker)" />
           <Stack.Screen name="(company)" />
           <Stack.Screen name="(chat)" />
-          <Stack.Screen name="(admin)" />
         </Stack>
       </I18nextProvider>
+      </CountryProvider>
     </AuthProvider>
     </ThemeProvider>
   )

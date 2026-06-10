@@ -10,6 +10,7 @@ export interface StoredUser {
   province: string | null
   region?: string | null
   canEditServices?: boolean
+  authType?: string
 }
 
 export function getStoredUser(): StoredUser | null {
@@ -41,7 +42,7 @@ export function getAuthHeader(): Record<string, string> {
   const user = getStoredUser()
   if (user) {
     return {
-      'Authorization': `Bearer ${btoa(JSON.stringify({ id: user.id, email: user.email, role: user.role, branchId: user.branchId, region: user.region, canEditServices: user.canEditServices }))}`
+      'Authorization': `Bearer ${btoa(JSON.stringify({ id: user.id, email: user.email, role: user.role, branchId: user.branchId, region: user.region, canEditServices: user.canEditServices, authType: user.authType }))}`
     }
   }
   return {}

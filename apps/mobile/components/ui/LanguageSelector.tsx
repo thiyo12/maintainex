@@ -52,11 +52,11 @@ export default function LanguageSelector({ style }: { style?: any }) {
               return (
                 <TouchableOpacity
                   key={l.code}
-                  style={[styles.option, isSelected && { backgroundColor: colors.accentBg }]}
+                  style={[styles.option, isSelected && { backgroundColor: colors.primaryBg }]}
                   onPress={() => select(l.code)}
                 >
                   <Text style={styles.optionFlag}>{flagEmojis[l.flag]}</Text>
-                  <Text style={[styles.optionName, { color: colors.ink }, isSelected && { color: colors.accentDark }]}>
+                  <Text style={[styles.optionName, { color: colors.ink }, isSelected && { color: colors.primaryDark }]}>
                     {l.name}
                   </Text>
                   {isSelected ? (

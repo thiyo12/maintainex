@@ -93,6 +93,8 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
     { name: 'Careers', href: '/admin/careers', icon: FiShield },
     { name: 'Admins', href: '/admin/admins', icon: FiUserCheck },
+    { name: 'App Super Admins', href: '/admin/app-admins', icon: FiShield },
+    { name: 'App Management', href: '/admin/marketplace/dashboard', icon: FiGrid },
     { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
     { name: 'Settings', href: '/admin/settings', icon: FiSettings },
   ]

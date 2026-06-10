@@ -31,6 +31,23 @@ const RATE_LIMITS = {
   admin: { maxRequests: 200, windowSeconds: 60 },
 }
 
+const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
+
+function verifySimpleToken(token: string): any {
+  try {
+    const [encoded, signature] = token.split('.')
+    if (!encoded || !signature) return null
+    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+    if (signature !== expectedSig) return null
+    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
+    const maxAge = 30 * 24 * 60 * 60 * 1000
+    if (Date.now() - payload.created > maxAge) return null
+    return payload
+  } catch {
+    return null
+  }
+}
+
 async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
   
@@ -48,31 +65,11 @@ async function getSession(request: NextRequest) {
           province: decoded.province || null,
           region: decoded.region || null,
           name: decoded.name || null,
-          canEditServices: decoded.canEditServices || false
+          canEditServices: decoded.canEditServices || false,
+          authType: decoded.authType || 'admin',
         }
       }
     } catch {}
-  }
-
-  const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
-  
-  function verifySimpleToken(token: string): any {
-    try {
-      const [encoded, signature] = token.split('.')
-      if (!encoded || !signature) return null
-      
-      const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-      if (signature !== expectedSig) return null
-      
-      const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
-      
-      const maxAge = 30 * 24 * 60 * 60 * 1000
-      if (Date.now() - payload.created > maxAge) return null
-      
-      return payload
-    } catch {
-      return null
-    }
   }
 
   const token = request.cookies.get('admin_token')?.value
@@ -90,7 +87,8 @@ async function getSession(request: NextRequest) {
     province: payload.province || null,
     region: payload.region || null,
     name: payload.name,
-    canEditServices: payload.canEditServices || false
+    canEditServices: payload.canEditServices || false,
+    authType: payload.authType || 'admin',
   }
 }
 
@@ -284,17 +282,19 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    if (session.role !== 'SUPER_ADMIN' && session.role !== 'ADMIN') {
-      await logAccessAttempt(
-        'ACCESS_DENIED',
-        'AUTH',
-        request,
-        session,
-        false,
-        'Invalid role',
-        'HIGH'
-      )
-      
+    const isMarketplaceRoute = pathname.startsWith('/admin/marketplace/')
+    const isWebAdmin = session.authType === 'admin'
+    const validWebRoles = ['SUPER_ADMIN', 'ADMIN']
+    const validMarketplaceRoles = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT']
+
+    if (isMarketplaceRoute) {
+      if (!validMarketplaceRoles.includes(session.role)) {
+        await logAccessAttempt('ACCESS_DENIED', 'AUTH', request, session, false, 'Invalid marketplace role', 'HIGH')
+        response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
+        return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+      }
+    } else if (!validWebRoles.includes(session.role)) {
+      await logAccessAttempt('ACCESS_DENIED', 'AUTH', request, session, false, 'Invalid role', 'HIGH')
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }

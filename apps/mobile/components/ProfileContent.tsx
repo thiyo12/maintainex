@@ -1,10 +1,11 @@
 import { useRef, useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
+import { useCountry } from '../lib/country'
 import { colors } from '../lib/colors'
 import { getAuthToken } from '../lib/api'
 
@@ -34,6 +35,7 @@ export default function ProfileContent() {
   const router = useRouter()
   const { t } = useTranslation()
   const { user, logout } = useAuth()
+  const { selectedCountry, countries, setCountry } = useCountry()
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
 
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function ProfileContent() {
 
   const handleLogout = async () => {
     await logout()
-    router.replace('/')
+    router.replace('/(auth)/welcome')
   }
 
   return (
@@ -93,8 +95,22 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/notifications')} />
           <MenuRow icon="card-outline" label={t('profile.payment')} color="#10B981"
             onPress={() => router.push('/settings/payment')} />
-          <MenuRow icon="location-outline" label={t('profile.serviceAreas')} color="#3B82F6"
+          <MenuRow icon="location-outline" label={t('profile.serviceAreas') || 'Addresses'} color="#3B82F6"
             onPress={() => router.push('/settings/addresses')} />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Region</Text>
+          <MenuRow icon="globe-outline" label={`Country: ${selectedCountry?.name || 'Not set'}`} color="#F59E0B"
+            onPress={() => {
+              const labels = countries.map(c => c.name)
+              Alert.alert('Select Country', '', [
+                ...labels.map((name, i) => ({ text: name, onPress: () => setCountry(countries[i].code) })),
+                { text: 'Cancel', style: 'cancel' as const },
+              ])
+            }} />
+          <MenuRow icon="swap-horizontal" label="Switch to Work as a Tasker" color="#F59E0B"
+            onPress={() => router.push('/(auth)/role-switch?target=TASKER')} />
         </View>
 
         <View style={styles.section}>
@@ -144,6 +160,7 @@ const styles = StyleSheet.create({
   identityUnverified: { backgroundColor: '#FEE2E2' },
   identityBadgeText: { fontSize: 13, fontWeight: '600' },
   section: { paddingHorizontal: 24, marginBottom: 16 },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
   menuRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
     padding: 16, borderRadius: 12, marginBottom: 8,

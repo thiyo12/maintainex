@@ -21,7 +21,7 @@ export default function CompanyProfile() {
 
   const handleLogout = async () => {
     await logout()
-    router.replace('/')
+    router.replace('/(auth)/welcome')
   }
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)

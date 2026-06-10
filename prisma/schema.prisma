@@ -1544,3 +1544,80 @@ model IdentityDocument {
   @@index([userId])
   @@index([status])
 }
+
+// ============================================
+// ADMIN PANEL MODELS
+// ============================================
+
+model AdminUser {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  role                String    @default("ADMIN")
+  firstName           String
+  lastName            String
+  totpSecret          String?
+  totpEnabled         Boolean   @default(false)
+  assignedCountries   String[]  @default([])
+  isActive            Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  parentId            String?
+  createdBy           String?
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([email])
+  @@index([parentId])
+}
+
+model AdminRefreshToken {
+  id                String    @id @default(cuid())
+  adminUserId       String
+  tokenHash         String    @unique
+  deviceFingerprint String?
+  ipAddress         String?
+  userAgent         String?
+  expiresAt         DateTime
+  isRevoked         Boolean   @default(false)
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([adminUserId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  adminUserId String
+  adminEmail  String
+  adminRole   String
+  action      String
+  targetTable String?
+  targetId    String?
+  targetLabel String?
+  oldValue    Json?
+  newValue    Json?
+  ipAddress   String
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([adminUserId, createdAt])
+  @@index([targetTable, targetId])
+  @@index([action, createdAt])
+}
+
+model PlatformSettings {
+  id                String   @id @default(cuid())
+  platformFeeBps    Int      @default(1000)
+  minJobAmountCents BigInt   @default(500)
+  maxJobAmountCents BigInt   @default(1000000)
+  escrowReleaseDays Int      @default(3)
+  supportEmail      String?
+  updatedBy         String?
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+}

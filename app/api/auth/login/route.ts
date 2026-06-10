@@ -88,62 +88,99 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
     }
 
-    const admin = await prisma.admin.findUnique({
-      where: { email }
-    })
+    // Try website Admin table first
+    const webAdmin = await prisma.admin.findUnique({ where: { email } })
 
-    if (!admin) {
+    if (webAdmin) {
+      if (!webAdmin.isActive) {
+        return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
+      }
+
+      const isValid = await bcrypt.compare(password, webAdmin.password)
+      if (!isValid) {
+        recordFailedAttempt(ip)
+        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      }
+
+      const token = createSimpleToken({
+        id: webAdmin.id,
+        email: webAdmin.email,
+        role: webAdmin.role,
+        branchId: webAdmin.branchId,
+        province: webAdmin.province || null,
+        region: webAdmin.region,
+        name: webAdmin.name,
+        canEditServices: webAdmin.canEditServices,
+        authType: 'admin',
+      })
+
+      const response = NextResponse.json({
+        success: true,
+        user: {
+          id: webAdmin.id,
+          email: webAdmin.email,
+          name: webAdmin.name,
+          role: webAdmin.role,
+          branchId: webAdmin.branchId,
+          province: webAdmin.province || null,
+          region: webAdmin.region,
+          canEditServices: webAdmin.canEditServices,
+          authType: 'admin',
+        }
+      })
+
+      const isProduction = process.env.NODE_ENV === 'production'
+      const isHttpUrl = process.env.NEXTAUTH_URL?.startsWith('http://')
+      response.cookies.set('admin_token', token, {
+        httpOnly: true, secure: isProduction && !isHttpUrl,
+        sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60
+      })
+
+      return response
+    }
+
+    // Then try App AdminUser table
+    const appAdmin = await prisma.adminUser.findUnique({ where: { email } })
+
+    if (!appAdmin) {
       recordFailedAttempt(ip)
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    if (!admin.isActive) {
+    if (!appAdmin.isActive || appAdmin.deletedAt) {
       return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
     }
 
-    const isValid = await bcrypt.compare(password, admin.password)
-
+    const isValid = await bcrypt.compare(password, appAdmin.passwordHash)
     if (!isValid) {
       recordFailedAttempt(ip)
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     const token = createSimpleToken({
-      id: admin.id,
-      email: admin.email,
-      role: admin.role,
-      branchId: admin.branchId,
-      province: admin.province || null,
-      region: admin.region,
-      name: admin.name,
-      canEditServices: admin.canEditServices
+      id: appAdmin.id,
+      email: appAdmin.email,
+      role: appAdmin.role,
+      name: `${appAdmin.firstName} ${appAdmin.lastName}`.trim(),
+      authType: 'adminUser',
     })
-    
-    console.log('✅ Admin login successful')
 
     const response = NextResponse.json({
       success: true,
       user: {
-        id: admin.id,
-        email: admin.email,
-        name: admin.name,
-        role: admin.role,
-        branchId: admin.branchId,
-        province: admin.province || null,
-        region: admin.region,
-        canEditServices: admin.canEditServices
+        id: appAdmin.id,
+        email: appAdmin.email,
+        name: `${appAdmin.firstName} ${appAdmin.lastName}`.trim(),
+        role: appAdmin.role,
+        authType: 'adminUser',
       }
     })
 
     const isProduction = process.env.NODE_ENV === 'production'
     const isHttpUrl = process.env.NEXTAUTH_URL?.startsWith('http://')
-
     response.cookies.set('admin_token', token, {
-      httpOnly: true,
-      secure: isProduction && !isHttpUrl,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 30 * 24 * 60 * 60
+      httpOnly: true, secure: isProduction && !isHttpUrl,
+      sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60
     })
 
     return response

@@ -1,126 +1,120 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import Logo from '../../components/ui/Logo'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
+import { useAuth } from '../../lib/auth'
 import { spacing, borderRadius } from '../../lib/tokens'
 
 const roles = [
   {
     id: 'CUSTOMER',
     icon: 'person-outline' as const,
-    title: 'I need work done',
-    subtitle: 'Post jobs, hire taskers & companies',
-    bg: '#EFF6FF',
-    border: '#3B82F6',
+    title: 'Hire a Professional',
+    subtitle: 'Post a job and find the right expert for your needs',
     accent: '#3B82F6',
+    iconBg: '#EFF6FF',
   },
   {
     id: 'TASKER',
     icon: 'construct-outline' as const,
-    title: 'I am a tasker',
-    subtitle: 'Find jobs & send quotes',
-    bg: '#FFFBEB',
-    border: '#F59E0B',
+    title: 'Work as a Tasker',
+    subtitle: 'Find local jobs, set your own rates, and grow your business',
     accent: '#F59E0B',
+    iconBg: '#FFFBEB',
   },
   {
     id: 'COMPANY',
     icon: 'business-outline' as const,
-    title: 'We are a company',
-    subtitle: 'Manage team & bid on projects',
-    bg: '#F5F3FF',
-    border: '#8B5CF6',
+    title: 'Register Your Company',
+    subtitle: 'Manage your team, bid on projects, and scale operations',
     accent: '#8B5CF6',
+    iconBg: '#F5F3FF',
   },
 ]
 
+const AMBER = '#F59E0B'
+
 export default function WelcomeScreen() {
-  const colors = useColors()
   const router = useRouter()
+  const pulseAnim = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    )
+    pulse.start()
+    return () => pulse.stop()
+  }, [])
+
+  const pulseScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] })
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.logoWrapper}>
-          <View style={[styles.logoBox, { backgroundColor: colors.primary }]}>
-            <Ionicons name="briefcase" size={28} color="#111" />
-          </View>
+          <Animated.View style={[styles.logoCircle, { transform: [{ scale: pulseScale }] }]}>
+            <Logo size={40} />
+          </Animated.View>
         </View>
 
-        <Text style={[styles.heading, { color: colors.ink }]}>Welcome to{'\n'}Maintainex</Text>
-        <Text style={[styles.subtitle, { color: colors.muted }]}>
-          Choose how you want to use Maintainex
-        </Text>
+        <Text style={styles.heading}>Welcome to{'\n'}Maintainex</Text>
+        <Text style={styles.subtitle}>Select how you'd like to get started</Text>
 
         <View style={styles.cardList}>
           {roles.map((role) => (
             <TouchableOpacity
               key={role.id}
-              style={[styles.card, { backgroundColor: role.bg, borderColor: role.border }]}
+              style={styles.card}
               onPress={() => router.push({ pathname: '/(auth)/register', params: { role: role.id } })}
               activeOpacity={0.7}
             >
-              <View style={[styles.iconBox, { backgroundColor: role.accent + '20' }]}>
-                <Ionicons name={role.icon} size={22} color={role.accent} />
+              <View style={[styles.iconBox, { backgroundColor: role.iconBg }]}>
+                <Ionicons name={role.icon} size={24} color={role.accent} />
               </View>
               <View style={styles.cardText}>
                 <Text style={[styles.cardTitle, { color: role.accent }]}>{role.title}</Text>
-                <Text style={[styles.cardSub, { color: colors.ink }]}>{role.subtitle}</Text>
+                <Text style={styles.cardSub}>{role.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={role.accent} />
+              <View style={styles.arrowBox}>
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
 
-        <View style={styles.bottom}>
-          <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-            <Text style={[styles.signIn, { color: colors.muted }]}>
-              Already have an account? <Text style={[styles.signInLink, { color: colors.primary }]}>Sign in</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.signInBtn} onPress={() => router.push('/(auth)/login')} activeOpacity={0.7}>
+          <Text style={styles.signInText}>
+            Already have an account?{' '}
+            <Text style={styles.signInLink}>Sign in</Text>
+          </Text>
+        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#FAFAFA' },
   content: { flex: 1, paddingHorizontal: spacing.xxl, justifyContent: 'center' },
-  logoWrapper: { alignItems: 'center', marginBottom: spacing.md },
-  logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heading: { fontSize: fontSizes.h1, fontFamily: fonts.heading, textAlign: 'center', marginBottom: spacing.sm },
-  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, textAlign: 'center', marginBottom: spacing.xxxl, lineHeight: 22 },
+  logoWrapper: { alignItems: 'center', marginBottom: spacing.lg },
+  logoCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: AMBER + '30' },
+  heading: { fontSize: 28, fontWeight: '800', color: '#111827', textAlign: 'center', lineHeight: 34, marginBottom: spacing.sm },
+  subtitle: { fontSize: 15, color: '#6B7280', textAlign: 'center', marginBottom: spacing.xxxl },
   cardList: { gap: spacing.md },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1.5,
-    minHeight: 64,
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
+  card: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, backgroundColor: '#FFFFFF', borderRadius: borderRadius.lg, borderWidth: 1, borderColor: '#F3F4F6', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2, minHeight: 72 },
+  iconBox: { width: 48, height: 48, borderRadius: borderRadius.md, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
   cardText: { flex: 1 },
-  cardTitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.bodyMedium, marginBottom: spacing.xxs },
-  cardSub: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body, opacity: 0.6 },
-  bottom: { alignItems: 'center', marginTop: spacing.xxxxl },
-  signIn: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body },
-  signInLink: { fontFamily: fonts.label },
+  cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 3 },
+  cardSub: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
+  arrowBox: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm },
+  signInBtn: { alignItems: 'center', marginTop: spacing.xxxxl, paddingVertical: spacing.sm },
+  signInText: { fontSize: 14, color: '#6B7280' },
+  signInLink: { fontWeight: '700', color: AMBER },
+
 })

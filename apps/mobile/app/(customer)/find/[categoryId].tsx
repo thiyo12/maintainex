@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { colors } from '../../../lib/colors'
 import { jobCategories, templateJobs } from '../../../lib/api'
+import { useCountry } from '../../../lib/country'
 import JobCard from '../../../components/find/JobCard'
 import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
@@ -16,13 +17,14 @@ export default function JobList() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const { selectedCountry } = useCountry()
   const router = useRouter()
 
   const fetch = useCallback(async () => {
     try {
       const [catData, jobsData] = await Promise.all([
         jobCategories.get(categoryId!),
-        templateJobs.listByCategory(categoryId!),
+        templateJobs.listByCategory(categoryId!, selectedCountry?.code),
       ])
       setCategory(catData)
       setJobs(jobsData)
@@ -33,7 +35,7 @@ export default function JobList() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [categoryId])
+  }, [categoryId, selectedCountry])
 
   useEffect(() => { fetch() }, [fetch])
 

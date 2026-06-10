@@ -16,7 +16,7 @@ export default function TaskerProfile() {
 
   const handleLogout = async () => {
     await logout()
-    router.replace('/')
+    router.replace('/(auth)/welcome')
   }
   const [profile, setProfile] = useState<TaskerProfile | null>(null)
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
@@ -71,9 +71,24 @@ export default function TaskerProfile() {
   const rating = profile?.rating || 0
   const completedJobs = profile?.completedJobs || 0
 
+  const showVerificationBanner = identityStatus !== 'APPROVED'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {showVerificationBanner && (
+          <TouchableOpacity
+            style={styles.verifyBanner}
+            onPress={() => router.push('/(tasker)/identity')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="shield-checkmark-outline" size={18} color="#92400E" />
+            <Text style={styles.verifyBannerText}>
+              Complete identity verification to appear in customer searches
+            </Text>
+            <Text style={styles.verifyBannerAction}>Verify Now</Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.profileHeader}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initial}</Text>
@@ -186,6 +201,13 @@ export default function TaskerProfile() {
               <Text style={styles.menuArrow}>›</Text>
             </View>
           </PressScale>
+          <PressScale onPress={() => router.push('/(auth)/role-switch?target=CUSTOMER')}>
+            <View style={styles.menuRow}>
+              <Ionicons name="swap-horizontal" size={20} color={colors.amber} style={{ marginRight: 12 }} />
+              <Text style={[styles.menuLabel, { color: colors.amber }]}>Switch to Hire a Professional</Text>
+              <Text style={styles.menuArrow}>›</Text>
+            </View>
+          </PressScale>
           <PressScale onPress={handleLogout}>
             <View style={styles.menuRow}>
               <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 12 }} />
@@ -202,6 +224,16 @@ export default function TaskerProfile() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  verifyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  verifyBannerText: { flex: 1, fontSize: 12, color: '#92400E', lineHeight: 16 },
+  verifyBannerAction: { fontSize: 12, fontWeight: '700', color: '#D97706' },
   profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
   avatar: {
     width: 72,

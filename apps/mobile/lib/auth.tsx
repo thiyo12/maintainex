@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store'
 import { auth, setAuthToken } from './api'
 import { User } from './types'
 
+const SESSION_DURATION = 5 * 24 * 60 * 60 * 1000
+
 interface AuthContextType {
   user: User | null
   isLoading: boolean
@@ -12,6 +14,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<any>
   loginWithOtp: (phone: string, otp: string) => Promise<any>
   register: (data: { email: string; password: string; name: string; phone: string; role: string }) => Promise<any>
+  switchRole: (role: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -32,6 +35,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = await SecureStore.getItemAsync('auth_token')
       const storedUser = await SecureStore.getItemAsync('auth_user')
       if (token && storedUser) {
+        const lastActive = await SecureStore.getItemAsync('last_active_at')
+        if (lastActive) {
+          const elapsed = Date.now() - parseInt(lastActive, 10)
+          if (elapsed > SESSION_DURATION) {
+            await SecureStore.deleteItemAsync('auth_token')
+            await SecureStore.deleteItemAsync('auth_user')
+            await SecureStore.deleteItemAsync('last_active_at')
+            setAuthToken(null)
+            setUser(null)
+            return
+          }
+        }
+        await SecureStore.setItemAsync('last_active_at', String(Date.now()))
         await setAuthToken(token)
         setUser(JSON.parse(storedUser))
         // Validate token against server — if stale, clear session
@@ -42,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch {
           await SecureStore.deleteItemAsync('auth_token')
           await SecureStore.deleteItemAsync('auth_user')
+          await SecureStore.deleteItemAsync('last_active_at')
           setAuthToken(null)
           setUser(null)
         }
@@ -61,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    await SecureStore.setItemAsync('last_active_at', String(Date.now()))
     return res.user
   }, [])
 
@@ -69,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    await SecureStore.setItemAsync('last_active_at', String(Date.now()))
     return res.user
   }, [])
 
@@ -77,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    await SecureStore.setItemAsync('last_active_at', String(Date.now()))
     return res.user
   }, [])
 
@@ -86,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSignupData(null)
     await SecureStore.deleteItemAsync('auth_token')
     await SecureStore.deleteItemAsync('auth_user')
+    await SecureStore.deleteItemAsync('last_active_at')
   }, [])
 
   const refreshUser = useCallback(async () => {
@@ -98,6 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [logout])
 
+  const switchRole = useCallback(async (role: string) => {
+    const res = await auth.switchRole(role)
+    await setAuthToken(res.token)
+    setUser(res.user)
+    await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    await SecureStore.setItemAsync('last_active_at', String(Date.now()))
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -109,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         loginWithOtp,
         register,
+        switchRole,
         logout,
         refreshUser,
       }}

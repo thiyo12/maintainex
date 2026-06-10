@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { colors } from '../../../../lib/colors'
 import { templateJobs, findTasker } from '../../../../lib/api'
+import { useCountry } from '../../../../lib/country'
 import TaskerCard from '../../../../components/find/TaskerCard'
 import SkeletonLoader from '../../../../components/find/SkeletonLoader'
 import EmptyState from '../../../../components/find/EmptyState'
@@ -15,13 +16,14 @@ export default function FindTaskerList() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const { selectedCountry } = useCountry()
   const router = useRouter()
 
   const fetch = useCallback(async () => {
     try {
       const [jobData, taskerData] = await Promise.all([
         templateJobs.get(jobId!),
-        findTasker.search({ jobId: jobId! }),
+        findTasker.search({ jobId: jobId!, country: selectedCountry?.code }),
       ])
       setJob(jobData)
       setTaskers(taskerData)
@@ -31,7 +33,7 @@ export default function FindTaskerList() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [jobId])
+  }, [jobId, selectedCountry])
 
   useEffect(() => { fetch() }, [fetch])
 
@@ -60,7 +62,7 @@ export default function FindTaskerList() {
       {loading ? (
         <SkeletonLoader count={5} height={110} />
       ) : taskers.length === 0 ? (
-        <EmptyState icon="people-outline" title="No taskers available" subtitle="Check back later or try a different service" />
+        <EmptyState icon="shield-checkmark-outline" title="No verified taskers available" subtitle="Only taskers who have completed identity verification appear in search results. Check back later or try a different service." />
       ) : viewMode === 'list' ? (
         <FlatList
           data={taskers}

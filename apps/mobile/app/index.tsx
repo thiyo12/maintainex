@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../lib/auth'
 import { LoadingScreen } from '../components/ui/LoadingScreen'
@@ -6,21 +6,28 @@ import { LoadingScreen } from '../components/ui/LoadingScreen'
 export default function SplashScreen() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const navigated = useRef(false)
+  const animationReady = useRef(false)
 
-  useEffect(() => {
+  const navigate = useCallback(() => {
+    if (navigated.current) return
     if (isLoading) return
+    if (!animationReady.current) return
+    navigated.current = true
     if (isAuthenticated) {
-      if (user?.role === 'ADMIN') router.replace('/(admin)')
-      else if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
+      if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
       else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
       else if (user?.role === 'TASKER') router.replace('/(tasker)')
       else if (user?.role === 'COMPANY') router.replace('/(company)')
       else router.replace('/(customer)')
-      return
+    } else {
+      router.replace('/(auth)/welcome')
     }
-    const timer = setTimeout(() => router.replace('/(auth)/welcome'), 2000)
-    return () => clearTimeout(timer)
-  }, [isAuthenticated, isLoading, user])
+  }, [isAuthenticated, isLoading, user, router])
 
-  return <LoadingScreen />
+  useEffect(() => {
+    if (!isLoading) navigate()
+  }, [isLoading, navigate])
+
+  return <LoadingScreen onDone={() => { animationReady.current = true; navigate() }} />
 }

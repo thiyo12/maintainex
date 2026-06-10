@@ -84,6 +84,8 @@ export const auth = {
   me: () => request<{ user: import('./types').User; needsOnboarding?: boolean }>('/api/mobile/auth/me'),
   updateProfile: (data: { name?: string; phone?: string }) =>
     request<{ user: import('./types').User }>('/api/mobile/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  switchRole: (role: string) =>
+    request<import('./types').AuthResponse>('/api/mobile/auth/switch-role', { method: 'PUT', body: JSON.stringify({ role }) }),
 }
 
 // Categories & Services
@@ -224,11 +226,12 @@ export const templateJobs = {
 }
 
 export const findTasker = {
-  search: (params: { jobId: string; latitude?: number; longitude?: number; maxDistance?: number }) => {
+  search: (params: { jobId: string; latitude?: number; longitude?: number; maxDistance?: number; country?: string }) => {
     const qs = new URLSearchParams({ jobId: params.jobId })
     if (params.latitude) qs.set('latitude', params.latitude.toString())
     if (params.longitude) qs.set('longitude', params.longitude.toString())
     if (params.maxDistance) qs.set('maxDistance', params.maxDistance.toString())
+    if (params.country) qs.set('country', params.country)
     return request<FindTaskerResult[]>(`/api/mobile/find-tasker?${qs.toString()}`)
   },
   getTaskerProfile: (taskerId: string) =>

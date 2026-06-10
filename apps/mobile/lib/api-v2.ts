@@ -117,17 +117,6 @@ export const v2JobActions = {
     v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/otp/verify`, { method: 'POST', body: JSON.stringify({ otp }) }),
 }
 
-export const v2Admin = {
-  summary: () =>
-    v2Request<{ summary: any }>('/api/mobile/v2/admin/summary'),
-  jobs: (params?: string) =>
-    v2Request<{ jobs: any[]; total: number }>(`/api/mobile/v2/admin/jobs${params ? `?${params}` : ''}`),
-  escrows: (params?: string) =>
-    v2Request<{ escrows: any[]; total: number }>(`/api/mobile/v2/admin/escrows${params ? `?${params}` : ''}`),
-  resolveEscrow: (escrowId: string, action: string) =>
-    v2Request<{ success: boolean }>('/api/mobile/v2/admin/escrows', { method: 'PATCH', body: JSON.stringify({ escrowId, action }) }),
-}
-
 export const v2Match = {
   getProviders: (jobId: string) =>
     v2Request<{ providers: any[] }>(`/api/mobile/v2/match/${jobId}`),
@@ -157,7 +146,7 @@ export const v2Team = {
 
 export const v2Subscription = {
   getPlans: () =>
-    v2Request<any[]>('/api/mobile/admin/subscription-plans'),
+    v2Request<any[]>('/api/mobile/v2/subscription-plans'),
   getStatus: () =>
     v2Request<{ commissionRate: number; subscriptionStatus: string; subscriptionExpiresAt: string | null; activeSubscription: any | null }>('/api/mobile/company/subscription'),
   subscribe: (planId: string, autoRenew?: boolean) =>
