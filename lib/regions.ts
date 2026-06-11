@@ -22,7 +22,7 @@ export const REGIONS: Record<string, RegionConfig> = {
     currencySymbol: 'LKR',
     phone: '0770867609',
     phoneRaw: '94770867609',
-    email: 'maintainex.lk@gmail.com',
+    email: 'info@maintainex.lk',
     whatsapp: '94770867609',
     countryName: 'Sri Lanka',
     countryNamePossessive: "Sri Lanka's",

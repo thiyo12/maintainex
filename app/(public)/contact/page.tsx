@@ -258,9 +258,9 @@ export default function ContactPage() {
                         <FiMapPin className="text-xl text-primary-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-dark-900">Head Office - Jaffna</h4>
+                        <h4 className="font-bold text-dark-900">Jaffna — Headquarters</h4>
                         <p className="text-gray-600">Jaffna, {region.countryName}</p>
-                        <p className="text-sm text-gray-500">Main operations center</p>
+                        <p className="text-sm text-gray-500">Main operations center — serving all 25 districts</p>
                       </div>
                     </div>
 
@@ -269,20 +269,9 @@ export default function ContactPage() {
                         <FiMapPin className="text-xl text-primary-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-dark-900">Colombo Branch</h4>
-                        <p className="text-gray-600">Colombo, {region.countryName}</p>
-                        <p className="text-sm text-gray-500">Commercial services</p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <FiMapPin className="text-xl text-primary-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-dark-900">Kandy Branch</h4>
-                        <p className="text-gray-600">Kandy, {region.countryName}</p>
-                        <p className="text-sm text-gray-500">Central region services</p>
+                        <h4 className="font-bold text-dark-900">Canada — Toronto</h4>
+                        <p className="text-gray-600">Toronto, Ontario, Canada</p>
+                        <p className="text-sm text-gray-500">Serving GTA and surrounding areas</p>
                       </div>
                     </div>
                   </div>
@@ -313,7 +302,7 @@ export default function ContactPage() {
             <div className="space-y-4">
               <div className="bg-gray-50 rounded-xl p-6">
                 <h4 className="font-bold text-dark-900 mb-2">What areas do you service?</h4>
-                <p className="text-gray-600">We currently service Jaffna, Colombo, Kandy, and surrounding districts across {region.countryName}.</p>
+                <p className="text-gray-600">We service all districts across {region.countryName} from our Jaffna headquarters, plus the Greater Toronto Area in Canada.</p>
               </div>
               
               <div className="bg-gray-50 rounded-xl p-6">

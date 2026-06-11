@@ -5,15 +5,12 @@ import Image from 'next/image'
 import { FiMail, FiPhone, FiMapPin } from 'react-icons/fi'
 import { FaFacebookF, FaTwitter, FaInstagram, FaTiktok, FaLinkedinIn, FaWhatsapp } from 'react-icons/fa'
 import { useRegion } from '@/lib/region-context'
-import AppStoreModal from './AppStoreModal'
 
 export default function Footer() {
   const region = useRegion()
 
   return (
     <footer className="bg-dark-900 text-white">
-      <AppStoreModal />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12">
           {/* Brand Section */}
@@ -45,13 +42,6 @@ export default function Footer() {
                 <a href="https://linkedin.com/company/maintainex.lk" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="w-11 h-11 bg-white/10 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors">
                   <FaLinkedinIn className="text-lg" />
                 </a>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <h4 className="text-lg font-semibold mb-4">Download Our App</h4>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <AppStoreModal />
               </div>
             </div>
           </div>
