@@ -174,7 +174,7 @@ export default async function HomePage() {
                 
                 {/* Mobile: Services Slider - Below Hero Text, Above Buttons */}
                 <div className="lg:hidden mb-6 md:mb-8">
-                  <h3 className="text-lg md:text-xl font-bold text-dark-900 mb-3 md:mb-4">Our Services</h3>
+                  <h2 className="text-lg md:text-xl font-bold text-dark-900 mb-3 md:mb-4">Our Services</h2>
                   <ServiceCategorySlider categories={categories} />
                 </div>
                 
@@ -250,7 +250,7 @@ export default async function HomePage() {
             <div className="text-center mb-16">
               <span className="text-primary-500 font-semibold">TESTIMONIALS</span>
               <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">What Our Clients Say</h2>
-              <p className="text-gray-400 max-w-2xl mx-auto">
+              <p className="text-gray-300 max-w-2xl mx-auto">
                 Don&apos;t just take our word for it. Here&apos;s what our satisfied customers have to say.
               </p>
             </div>
@@ -263,10 +263,10 @@ export default async function HomePage() {
                       <FiStar key={i} className="text-primary-500 fill-current" />
                     ))}
                   </div>
-                  <p className="text-gray-300 mb-6 italic">&ldquo;{testimonial.content}&rdquo;</p>
+                  <p className="text-gray-200 mb-6 italic">&ldquo;{testimonial.content}&rdquo;</p>
                   <div>
                     <div className="font-bold text-white">{testimonial.name}</div>
-                    <div className="text-gray-400 text-sm">{testimonial.role}</div>
+                    <div className="text-gray-300 text-sm">{testimonial.role}</div>
                   </div>
                 </div>
               ))}

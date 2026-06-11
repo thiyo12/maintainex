@@ -90,8 +90,13 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(255, 195, 0, 0.4); }
-  50% { box-shadow: 0 0 40px rgba(255, 195, 0, 0.8); }
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  box-shadow: 0 0 20px rgba(255, 195, 0, 0.6);
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .animate-float {

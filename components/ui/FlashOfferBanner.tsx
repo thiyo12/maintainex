@@ -247,8 +247,12 @@ export default function FlashOfferBanner() {
           50% { opacity: 0.2; }
         }
         @keyframes bnGlow {
-          0%, 100% { box-shadow: 0 0 8px 2px var(--glow-color, #FFC300)40; }
-          50% { box-shadow: 0 0 20px 6px var(--glow-color, #FFC300)60, 0 0 40px 10px var(--glow-color, #FFC300)20; }
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
+        }
+
+        [style*="bnGlow"] {
+          box-shadow: 0 0 8px 2px var(--glow-color, #FFC300);
         }
       `}</style>
     </div>

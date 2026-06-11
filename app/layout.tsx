@@ -4,6 +4,7 @@ import { Providers } from './providers'
 import { REGIONS } from '@/lib/regions'
 import { organizationSchema, websiteSchema } from '@/lib/seo'
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 
 
@@ -80,6 +81,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="canonical" href={baseUrl} />
         <link rel="alternate" hrefLang="en-LK" href="https://maintainex.lk" />
         <link rel="alternate" hrefLang="en-CA" href="https://ca.maintainex.lk" />
@@ -87,29 +90,23 @@ export default function RootLayout({
         <meta name="llms" content={`${baseUrl}/llms.txt`} />
         {gaId && (
           <>
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}',{page_path:window.location.pathname});`,
-              }}
-            />
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} strategy="afterInteractive" />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaId}',{page_path:window.location.pathname});`}
+            </Script>
           </>
         )}
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJson) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJson) }}
-        />
+        <Script id="schema-org" type="application/ld+json" strategy="afterInteractive">
+          {JSON.stringify(orgJson)}
+        </Script>
+        <Script id="schema-website" type="application/ld+json" strategy="afterInteractive">
+          {JSON.stringify(siteJson)}
+        </Script>
       </head>
       <body className="min-h-screen bg-gray-50">
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `document.cookie="region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax"`,
-          }}
-        />
+        <Script id="region-cookie" strategy="afterInteractive">
+          {`document.cookie="region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax"`}
+        </Script>
         <Providers>
           <Toaster 
             position="top-right"

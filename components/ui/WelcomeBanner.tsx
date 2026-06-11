@@ -38,6 +38,9 @@ export default function WelcomeBanner() {
 
   return (
     <div 
+      role="dialog"
+      aria-modal="true"
+      aria-label="Welcome to Maintainex"
       className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-all duration-1000 ${
         isExiting ? 'opacity-0 scale-105' : 'opacity-100 scale-100'
       }`}

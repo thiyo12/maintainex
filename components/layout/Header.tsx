@@ -44,6 +44,7 @@ export default function Header() {
           <div className="hidden md:flex items-center space-x-4">
             <a
               href={`tel:${region.phoneRaw}`}
+              aria-label={`Call us at ${region.phone}`}
               className="flex items-center space-x-2 text-primary-600 font-semibold"
             >
               <FiPhone className="animate-pulse" />

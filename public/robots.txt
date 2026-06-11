@@ -1,21 +1,4 @@
-# Allow all AI crawlers to read and cite our content
-User-agent: GPTBot
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: ChatGPT-User
-Allow: /
-
-User-agent: CCBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Claude-Web
-Allow: /
+# AI crawlers — Cloudflare manages block rules at the top of this file
 
 User-agent: *
 Allow: /

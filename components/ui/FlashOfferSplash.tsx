@@ -136,11 +136,14 @@ export default function FlashOfferSplash() {
   const isLight = offer.textColor === '#FFFFFF' || offer.textColor === '#ffffff'
 
   return (
-    <div
-      ref={splashRef}
-      className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto"
-      style={{ backgroundColor: offer.bgColor }}
-    >
+      <div
+        ref={splashRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={offer.title}
+        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto"
+        style={{ backgroundColor: offer.bgColor }}
+      >
       <div
         ref={innerRef}
         className="flex flex-col items-center text-center px-4 sm:px-6 max-w-lg mx-auto py-8"
