@@ -299,8 +299,8 @@ export default function MarketplaceAdminUsers() {
             <DialogTitle>{editing ? 'Edit' : 'New'} Admin</DialogTitle>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
                 <label className="text-xs font-medium text-gray-500">First Name</label>
                 <Input {...form.register('firstName')} placeholder="John" />
                 {form.formState.errors.firstName && <p className="text-xs text-red-500">{form.formState.errors.firstName.message}</p>}

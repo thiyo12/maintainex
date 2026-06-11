@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { FiUsers, FiBriefcase, FiDollarSign, FiAlertTriangle, FiShield, FiClock, FiRefreshCw, FiAlertCircle } from 'react-icons/fi'
+import { FiUsers, FiBriefcase, FiDollarSign, FiShield, FiClock, FiRefreshCw, FiAlertCircle } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
 import { formatMoney } from '@/lib/money'
@@ -15,7 +15,6 @@ interface DashboardData {
   totalUsers: number
   activeJobs: number
   monthlyRevenue: number
-  openDisputes: number
   pendingKyc: number
   totalEscrows: number
   recentActivity: Array<{
@@ -47,8 +46,8 @@ export default function MarketplaceDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Marketplace Dashboard</h1>
           <p className="text-gray-500">Overview of your marketplace platform.</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}><CardHeader><Skeleton className="h-4 w-20" /></CardHeader><CardContent><Skeleton className="h-8 w-24" /></CardContent></Card>
           ))}
         </div>
@@ -72,7 +71,6 @@ export default function MarketplaceDashboard() {
     { label: 'Total Users', value: data?.totalUsers.toLocaleString() || '0', icon: FiUsers, color: 'bg-blue-500' },
     { label: 'Active Jobs', value: data?.activeJobs.toLocaleString() || '0', icon: FiBriefcase, color: 'bg-green-500' },
     { label: 'Monthly Revenue', value: formatMoney(data?.monthlyRevenue || 0), icon: FiDollarSign, color: 'bg-indigo-500' },
-    { label: 'Open Disputes', value: data?.openDisputes.toLocaleString() || '0', icon: FiAlertTriangle, color: 'bg-red-500' },
     { label: 'Pending KYC', value: data?.pendingKyc.toLocaleString() || '0', icon: FiShield, color: 'bg-yellow-500' },
     { label: 'Total Escrows', value: data?.totalEscrows.toLocaleString() || '0', icon: FiClock, color: 'bg-purple-500' },
   ]
@@ -87,7 +85,7 @@ export default function MarketplaceDashboard() {
         <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         {stats.map((kpi) => (
           <Card key={kpi.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -134,14 +132,14 @@ export default function MarketplaceDashboard() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <a href="/admin/marketplace/kyc" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
                 <FiShield className="w-4 h-4" />
                 Review KYC ({data?.pendingKyc || 0})
               </a>
               <a href="/admin/marketplace/escrow" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
-                <FiAlertTriangle className="w-4 h-4" />
-                Disputes ({data?.openDisputes || 0})
+                <FiClock className="w-4 h-4" />
+                Escrows ({data?.totalEscrows || 0})
               </a>
               <a href="/admin/marketplace/users" className={cn(buttonVariants({ variant: "outline" }), "flex items-center gap-2")}>
                 <FiUsers className="w-4 h-4" />

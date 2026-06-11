@@ -10,15 +10,32 @@ export async function GET(request: NextRequest) {
   }
   const session = rawSession!
   try {
-    const [totalUsers, activeJobs, openDisputes, pendingKyc, totalEscrows] = await Promise.all([
-      prisma.user.count({ where: { isActive: true } }),
+    const [jobCustomers, quoteProviders, activeJobs, pendingKyc, totalEscrows] = await Promise.all([
+      prisma.marketplaceJob.findMany({
+        where: { isActive: true },
+        select: { customerId: true },
+        distinct: ['customerId'],
+      }),
+      prisma.jobQuote.findMany({
+        where: { status: { not: 'WITHDRAWN' } },
+        select: { providerId: true },
+        distinct: ['providerId'],
+      }),
       prisma.marketplaceJob.count({
         where: { status: { in: ['OPEN', 'IN_PROGRESS'] }, isActive: true },
       }),
-      prisma.dispute.count({ where: { status: 'OPEN' } }),
       prisma.identityDocument.count({ where: { status: 'PENDING' } }),
       prisma.jobEscrow.count(),
     ])
+
+    const uniqueUserIds = Array.from(new Set([
+      ...jobCustomers.map((j) => j.customerId),
+      ...quoteProviders.map((j) => j.providerId),
+    ]))
+
+    const marketplaceUsers = uniqueUserIds.length > 0
+      ? await prisma.user.count({ where: { id: { in: uniqueUserIds }, isActive: true } })
+      : 0
 
     const monthlyRevenueAgg = await prisma.jobEscrow.aggregate({
       _sum: { amount: true },
@@ -30,15 +47,30 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    const recentActivity = await prisma.auditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        adminEmail: true,
+        action: true,
+        targetLabel: true,
+        createdAt: true,
+      },
+    })
+
     return NextResponse.json({
       success: true,
       data: {
-        totalUsers,
+        totalUsers: marketplaceUsers,
         activeJobs,
-        monthlyRevenueCents: Number(monthlyRevenueAgg._sum.amount ?? 0),
-        openDisputes,
+        monthlyRevenue: Number(monthlyRevenueAgg._sum.amount ?? 0),
         pendingKyc,
         totalEscrows,
+        recentActivity: recentActivity.map((a) => ({
+          ...a,
+          createdAt: a.createdAt.toISOString(),
+        })),
       },
     })
   } catch (e) {

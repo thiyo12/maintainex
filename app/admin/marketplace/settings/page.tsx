@@ -118,7 +118,7 @@ export default function MarketplaceSettings() {
         <Card>
           <CardHeader><Skeleton className="h-5 w-40" /></CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
               ))}
@@ -158,7 +158,7 @@ export default function MarketplaceSettings() {
         <Card>
           <CardHeader><CardTitle>Fee Configuration</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-gray-500">Platform Fee (%)</label>
                 <Input
@@ -211,7 +211,7 @@ export default function MarketplaceSettings() {
           <Card>
             <CardHeader><CardTitle>Current Values</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div><span className="text-gray-500">Fee:</span> <span className="font-medium">{formatBps(settings.platformFeeBps)}</span></div>
                 <div><span className="text-gray-500">Release Days:</span> <span className="font-medium">{settings.escrowReleaseDays}</span></div>
                 <div><span className="text-gray-500">Min Amount:</span> <span className="font-medium">{formatMoney(Number(settings.minJobAmountCents))}</span></div>

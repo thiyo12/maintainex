@@ -230,8 +230,8 @@ export default function MarketplaceKyc() {
           </DialogHeader>
           {selectedDoc && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
                   <p className="text-xs font-medium text-gray-500">User</p>
                   <p className="text-sm">{selectedDoc.user.name} ({selectedDoc.user.email})</p>
                 </div>

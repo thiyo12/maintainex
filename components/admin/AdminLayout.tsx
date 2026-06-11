@@ -223,7 +223,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page Content */}
-        <main className="p-4 lg:p-6 lg:pt-20">
+        <main className="p-4 pt-16 lg:p-6 lg:pt-20">
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>
       </div>

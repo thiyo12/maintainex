@@ -130,7 +130,7 @@ export default function MarketplaceJobDetail() {
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{job.description}</p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500">Budget</p>
                   <p className="text-sm text-gray-900">{job.budgetCents ? formatMoney(job.budgetCents) : '\u2014'}</p>
@@ -141,7 +141,7 @@ export default function MarketplaceJobDetail() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500">Client</p>
-                  <p className="text-sm text-gray-900">{job.client.name || job.client.email}</p>
+                  <p className="text-sm text-gray-900 break-all">{job.client.name || job.client.email}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500">Worker</p>

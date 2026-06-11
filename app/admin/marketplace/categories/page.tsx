@@ -252,7 +252,7 @@ export default function MarketplaceCategories() {
             <DialogTitle>{editing ? 'Edit' : 'New'} Category</DialogTitle>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-gray-500">Name</label>
                 <Input {...form.register('name')} placeholder="Category name" />

@@ -228,10 +228,23 @@ export default function MarketplaceAuditLogs() {
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Action</p>
-                  <Badge className={ACTION_COLORS[selectedLog.action] || 'bg-gray-100 text-gray-800'}>{selectedLog.action}</Badge>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Action</p>
+                    <p className="text-sm font-medium">{selectedLog.action}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Admin</p>
+                    <p className="text-sm">{selectedLog.adminEmail}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Target</p>
+                    <p className="text-sm break-all">{selectedLog.targetLabel || '\u2014'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">IP Address</p>
+                    <p className="text-sm">{selectedLog.ipAddress}</p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500">Admin</p>
@@ -245,8 +258,7 @@ export default function MarketplaceAuditLogs() {
                   <p className="text-xs font-medium text-gray-500">IP Address</p>
                   <p className="text-sm font-mono">{selectedLog.ipAddress}</p>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {selectedLog.oldValue && (
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-1">Old Value</p>
