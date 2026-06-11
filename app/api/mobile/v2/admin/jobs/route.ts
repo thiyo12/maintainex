@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       prisma.marketplaceJob.count({ where }),
     ])
 
-    return NextResponse.json({ jobs, total, page, limit })
+    return NextResponse.json({ jobs: jobs.map((j) => ({ ...j, budgetAmount: Number(j.budgetAmount) })), total, page, limit })
   } catch (error) {
     console.error('Admin jobs error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

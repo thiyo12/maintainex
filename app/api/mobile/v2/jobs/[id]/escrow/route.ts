@@ -91,7 +91,7 @@ export async function GET(
     if (!isParticipant) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: params.id } })
-    return NextResponse.json({ escrow: escrow || null })
+    return NextResponse.json({ escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null })
   } catch (error) {
     console.error('Get escrow error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

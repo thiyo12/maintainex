@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       id: payout.id,
-      amount: payout.amount,
+      amount: Number(payout.amount),
       status: payout.status,
       createdAt: payout.createdAt.toISOString(),
     })

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    return NextResponse.json({ settlements })
+    return NextResponse.json({ settlements: settlements.map((s) => ({ ...s, jobAmount: Number(s.jobAmount), commissionAmount: Number(s.commissionAmount) })) })
   } catch (error) {
     console.error('List commission settlements error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ settlement: updated })
+    return NextResponse.json({ settlement: { ...updated, jobAmount: Number(updated.jobAmount), commissionAmount: Number(updated.commissionAmount) } })
   } catch (error) {
     console.error('Settle commission error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

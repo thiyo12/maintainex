@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
-    return NextResponse.json({ quote }, { status: 201 })
+    return NextResponse.json({ quote: { ...quote, price: Number(quote.price) } }, { status: 201 })
   } catch (error) {
     console.error('Create quote error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
           })
           if (p) { rating = p.rating; completedJobs = p.completedProjects }
         }
-        return { ...q, provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
+        return { ...q, price: Number(q.price), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
       })
     )
 

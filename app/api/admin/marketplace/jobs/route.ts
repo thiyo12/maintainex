@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: jobs.map((j) => ({ ...j, createdAt: j.createdAt.toISOString() })),
+      data: jobs.map((j) => ({ ...j, budgetAmount: Number(j.budgetAmount), createdAt: j.createdAt.toISOString() })),
       meta: { total, page: query.page, limit: query.limit, totalPages: Math.ceil(total / query.limit) },
     })
   } catch (e) {

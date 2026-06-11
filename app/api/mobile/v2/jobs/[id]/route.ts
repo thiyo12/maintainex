@@ -54,12 +54,12 @@ export async function GET(
           })
           if (p) { providerRating = p.rating; completedJobs = p.completedProjects }
         }
-        return { ...q, provider, providerRating, completedJobs }
+        return { ...q, price: Number(q.price), provider, providerRating, completedJobs }
       })
     )
 
     return NextResponse.json({
-      job: { ...job, customer, locationName, quotes: enrichedQuotes, escrow: escrow || null, workspace: workspace || null, reviews: { customerReviews, providerReviews } },
+      job: { ...job, budgetAmount: Number(job.budgetAmount), customer, locationName, quotes: enrichedQuotes, escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null, workspace: workspace || null, reviews: { customerReviews, providerReviews } },
     })
   } catch (error) {
     console.error('Get job error:', error)

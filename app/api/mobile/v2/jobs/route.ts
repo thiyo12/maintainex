@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ job }, { status: 201 })
+    return NextResponse.json({ job: { ...job, budgetAmount: Number(job.budgetAmount) } }, { status: 201 })
   } catch (error) {
     console.error('Create job error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    return NextResponse.json({ jobs })
+    return NextResponse.json({ jobs: jobs.map((j) => ({ ...j, budgetAmount: Number(j.budgetAmount) })) })
   } catch (error) {
     console.error('List jobs error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

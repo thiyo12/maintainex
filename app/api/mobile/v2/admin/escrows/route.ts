@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       prisma.jobEscrow.count({ where }),
     ])
 
-    return NextResponse.json({ escrows, total, page, limit })
+    return NextResponse.json({ escrows: escrows.map((e) => ({ ...e, amount: Number(e.amount), serviceFee: Number(e.serviceFee), totalAmount: Number(e.totalAmount) })), total, page, limit })
   } catch (error) {
     console.error('Admin escrows error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

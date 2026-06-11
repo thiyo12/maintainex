@@ -33,7 +33,7 @@ export async function POST(
 
     notifyQuoteAccepted(job.id, quote.providerId, job.title)
 
-    return NextResponse.json({ success: true, quote })
+    return NextResponse.json({ success: true, quote: { ...quote, price: Number(quote.price) } })
   } catch (error) {
     console.error('Select quote error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

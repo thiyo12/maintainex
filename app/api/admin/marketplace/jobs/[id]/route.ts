@@ -22,7 +22,7 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Job not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, data: job })
+    return NextResponse.json({ success: true, data: { ...job, budgetAmount: Number(job.budgetAmount) } })
   } catch (e) {
     console.error('Job detail error:', e)
     return NextResponse.json({ success: false, error: 'Failed to fetch job' }, { status: 500 })

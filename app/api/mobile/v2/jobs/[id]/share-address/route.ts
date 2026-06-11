@@ -32,7 +32,7 @@ export async function POST(
       },
     })
 
-    return NextResponse.json({ job: updated })
+    return NextResponse.json({ job: { ...updated, budgetAmount: Number(updated.budgetAmount) } })
   } catch (error) {
     console.error('Share address error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
