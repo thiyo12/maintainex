@@ -18,4 +18,4 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD npx prisma db push --accept-data-loss 2>&1 | tee /tmp/prisma-push.log; echo "--- Starting Next.js ---"; npx next start 2>&1
+CMD npx next start
