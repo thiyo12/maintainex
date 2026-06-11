@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       data: {
         totalUsers,
         activeJobs,
-        monthlyRevenueCents: monthlyRevenueAgg._sum.amount ?? 0,
+        monthlyRevenueCents: Number(monthlyRevenueAgg._sum.amount ?? 0),
         openDisputes,
         pendingKyc,
         totalEscrows,
