@@ -201,6 +201,7 @@ export default function CareersPage() {
                     {vacancy.location && (
                       <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
                         <FiMapPin className="w-3.5 h-3.5 text-primary-500" /> {vacancy.location}
+                      </p>
                     )}
                     {vacancy.description && (
                       <p className="text-sm text-gray-600 line-clamp-2">{vacancy.description}</p>
