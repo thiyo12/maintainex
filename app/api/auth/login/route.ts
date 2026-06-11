@@ -151,11 +151,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
     }
 
+    if (appAdmin.lockedUntil && appAdmin.lockedUntil > new Date()) {
+      return NextResponse.json({ error: 'Account locked. Try again later.' }, { status: 423 })
+    }
+
     const isValid = await bcrypt.compare(password, appAdmin.passwordHash)
     if (!isValid) {
       recordFailedAttempt(ip)
+      const newAttempts = (appAdmin.failedLoginAttempts || 0) + 1
+      const updateData: any = { failedLoginAttempts: newAttempts }
+      if (newAttempts >= 10) {
+        updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000)
+      }
+      await prisma.adminUser.update({ where: { id: appAdmin.id }, data: updateData })
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
+
+    await prisma.adminUser.update({
+      where: { id: appAdmin.id },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: new Date(),
+        lastLoginIp: ip,
+      },
+    })
 
     const token = createSimpleToken({
       id: appAdmin.id,

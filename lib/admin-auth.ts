@@ -1,3 +1,6 @@
+if (!process.env.NEXTAUTH_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('NEXTAUTH_SECRET environment variable is required in production')
+}
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
 
 export function verifySimpleToken(token: string): any {

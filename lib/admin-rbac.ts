@@ -4,9 +4,20 @@ import { verifySimpleToken } from './admin-auth'
 import type { AdminRole, AuditAction, AdminSession } from './admin-types'
 
 export function getSessionFromCookie(request: NextRequest): AdminSession | null {
-  const token = request.cookies.get('admin_token')?.value
-  if (!token) return null
-  const payload = verifySimpleToken(token)
+  const authHeader = request.headers.get('Authorization')
+  let rawToken: string | null = null
+
+  if (authHeader?.startsWith('Bearer ')) {
+    rawToken = authHeader.slice(7)
+  }
+
+  if (!rawToken) {
+    rawToken = request.cookies.get('admin_token')?.value || null
+  }
+
+  if (!rawToken) return null
+
+  const payload = verifySimpleToken(rawToken)
   if (!payload || payload.authType !== 'adminUser') return null
   return {
     id: payload.id,
