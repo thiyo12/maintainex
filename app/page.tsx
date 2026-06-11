@@ -1,17 +1,17 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 60
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
 import dynamicImport from 'next/dynamic'
 import Header from '@/components/layout/Header'
-import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import FlashOfferBanner from '@/components/ui/FlashOfferBanner'
-import FlashOfferSplash from '@/components/ui/FlashOfferSplash'
-import WelcomeBanner from '@/components/ui/WelcomeBanner'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
 
+const FlashOfferSplash = dynamicImport(() => import('@/components/ui/FlashOfferSplash'), { ssr: false })
+const WelcomeBanner = dynamicImport(() => import('@/components/ui/WelcomeBanner'), { ssr: false })
+const WhatsAppButton = dynamicImport(() => import('@/components/layout/WhatsAppButton'), { ssr: false })
 const HomeServices = dynamicImport(() => import('@/components/ui/HomeServices'))
 const TrendingServices = dynamicImport(() => import('@/components/ui/TrendingServices'))
 const CTASection = dynamicImport(() => import('@/components/ui/CTASection'))

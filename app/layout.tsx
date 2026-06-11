@@ -5,7 +5,10 @@ import { REGIONS } from '@/lib/regions'
 import { organizationSchema, websiteSchema } from '@/lib/seo'
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { Inter } from 'next/font/google'
 import './globals.css'
+
+const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -81,10 +84,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
         <link rel="canonical" href={baseUrl} />
         <link rel="alternate" hrefLang="en-LK" href="https://maintainex.lk" />
         <link rel="alternate" hrefLang="en-CA" href="https://ca.maintainex.lk" />
@@ -105,7 +104,7 @@ export default function RootLayout({
           {JSON.stringify(siteJson)}
         </Script>
       </head>
-      <body className="min-h-screen bg-gray-50">
+      <body className={`${inter.className} min-h-screen bg-gray-50`}>
         <Script id="region-cookie" strategy="afterInteractive">
           {`document.cookie="region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax"`}
         </Script>

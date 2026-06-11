@@ -179,7 +179,7 @@ export default function MarketplaceJobDetail() {
         <Card>
           <CardHeader><CardTitle>Escrow</CardTitle></CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <p className="text-xs font-medium text-gray-500">Amount</p>
                 <p className="text-sm text-gray-900">{formatMoney(job.escrow.amountCents)}</p>

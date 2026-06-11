@@ -1,10 +1,9 @@
-'use client'
-
-import { useState } from 'react'
+import { headers } from 'next/headers'
+import { REGIONS, getRegionFromHost } from '@/lib/regions'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiMenu, FiX, FiPhone } from 'react-icons/fi'
-import { useRegion } from '@/lib/region-context'
+import { FiPhone } from 'react-icons/fi'
+import MobileMenu from './MobileMenu'
 
 const navigation = [
   { name: 'Home', href: '/' },
@@ -15,8 +14,10 @@ const navigation = [
 ]
 
 export default function Header() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const region = useRegion()
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  const regionKey = getRegionFromHost(host)
+  const region = REGIONS[regionKey]
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm">
@@ -55,47 +56,8 @@ export default function Header() {
             </Link>
           </div>
 
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <FiX size={28} /> : <FiMenu size={28} />}
-          </button>
+          <MobileMenu navigation={navigation} phoneRaw={region.phoneRaw} phone={region.phone} />
         </div>
-
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-100 py-4">
-            <div className="flex flex-col space-y-2">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-gray-700 hover:text-primary-500 hover:bg-gray-50 font-medium py-3 px-4 rounded-lg transition-colors"
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <div className="pt-4 border-t border-gray-100 mt-4">
-                <a
-                  href={`tel:${region.phoneRaw}`}
-                  className="flex items-center space-x-2 text-primary-600 font-semibold py-3 px-4"
-                >
-                  <FiPhone className="animate-pulse" />
-                  <span>{region.phone}</span>
-                </a>
-                <Link
-                  href="/booking"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="btn-primary w-full text-center"
-                >
-                  Book Now
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
       </nav>
     </header>
   )

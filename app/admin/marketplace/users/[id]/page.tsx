@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiSlash, FiCheckCircle, FiXCircle, FiFileText, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
+import { FiArrowLeft, FiSlash, FiCheckCircle, FiXCircle, FiFileText, FiAlertCircle, FiRefreshCw, FiLogIn, FiUserCheck, FiBriefcase, FiDollarSign } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
 import { can, PERMISSION } from '@/lib/permissions'
@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
 
 interface UserDetail {
   id: string
@@ -35,6 +34,14 @@ interface UserDetail {
     backImageUrl: string | null
     createdAt: string
   }>
+}
+
+interface Activity {
+  id: string
+  type: 'LOGIN' | 'ADMIN_ACTION' | 'JOB_CREATED' | 'QUOTE_SUBMITTED'
+  description: string
+  timestamp: string
+  metadata: Record<string, any>
 }
 
 export default function MarketplaceUserDetail() {
@@ -67,6 +74,17 @@ export default function MarketplaceUserDetail() {
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Failed to perform action')
     },
+  })
+
+  const { data: activities, isLoading: activitiesLoading } = useQuery<Activity[]>({
+    queryKey: ['admin-marketplace-user-activity', params.id],
+    queryFn: async () => {
+      const res = await api.get(`/api/admin/marketplace/users/${params.id}/activity`)
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return body.data
+    },
+    enabled: !!user,
   })
 
   if (isLoading) {
@@ -107,7 +125,7 @@ export default function MarketplaceUserDetail() {
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <FiArrowLeft className="w-5 h-5" />
           </Button>
@@ -229,6 +247,55 @@ export default function MarketplaceUserDetail() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Activity History</CardTitle>
+          {activitiesLoading && <FiRefreshCw className="w-4 h-4 animate-spin text-gray-400" />}
+        </CardHeader>
+        <CardContent>
+          {activities && activities.length > 0 ? (
+            <div className="space-y-0">
+              {activities.map((act, i) => (
+                <div key={act.id} className="relative flex gap-4 pb-6">
+                  {i < activities.length - 1 && (
+                    <div className="absolute left-[17px] top-8 bottom-0 w-px bg-gray-200" />
+                  )}
+                  <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white text-sm ${
+                    act.type === 'LOGIN' ? 'bg-blue-500' :
+                    act.type === 'ADMIN_ACTION' ? 'bg-purple-500' :
+                    act.type === 'JOB_CREATED' ? 'bg-green-500' :
+                    'bg-orange-500'
+                  }`}>
+                    {act.type === 'LOGIN' ? <FiLogIn className="w-4 h-4" /> :
+                     act.type === 'ADMIN_ACTION' ? <FiUserCheck className="w-4 h-4" /> :
+                     act.type === 'JOB_CREATED' ? <FiBriefcase className="w-4 h-4" /> :
+                     <FiDollarSign className="w-4 h-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700">{act.description}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{new Date(act.timestamp).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : activities && activities.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">No activity recorded yet.</p>
+          ) : (
+            <div className="space-y-3 py-4">
+              {[1,2,3].map((i) => (
+                <div key={i} className="flex gap-4">
+                  <Skeleton className="w-9 h-9 rounded-full flex-shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

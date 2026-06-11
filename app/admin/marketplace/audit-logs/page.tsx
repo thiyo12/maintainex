@@ -222,7 +222,7 @@ export default function MarketplaceAuditLogs() {
       </Card>
 
       <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null) }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Audit Log Detail</DialogTitle>
           </DialogHeader>

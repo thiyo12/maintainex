@@ -223,7 +223,7 @@ export default function MarketplaceKyc() {
       </Card>
 
       <Dialog open={!!selectedDoc} onOpenChange={(open) => { if (!open) { setSelectedDoc(null); form.reset() }}}>
-        <DialogContent className="max-w-lg">
+          <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Review Document</DialogTitle>
             <DialogDescription>Review and approve or reject this identity document</DialogDescription>
@@ -247,13 +247,13 @@ export default function MarketplaceKyc() {
               {selectedDoc.frontImageUrl && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Front Image</p>
-                  <img src={selectedDoc.frontImageUrl} alt="Front" className="max-h-48 rounded border" />
+                  <img src={selectedDoc.frontImageUrl} alt="Front" className="max-h-48 max-w-full h-auto rounded border" />
                 </div>
               )}
               {selectedDoc.backImageUrl && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Back Image</p>
-                  <img src={selectedDoc.backImageUrl} alt="Back" className="max-h-48 rounded border" />
+                  <img src={selectedDoc.backImageUrl} alt="Back" className="max-h-48 max-w-full h-auto rounded border" />
                 </div>
               )}
               {canReview && selectedDoc.status === 'PENDING' && (
