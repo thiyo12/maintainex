@@ -9,7 +9,7 @@
     "dev:all:prod": "bash dev.sh production",
     "build": "npx prisma generate && next build",
     "postbuild": "",
-    "start": "npx prisma db push && next start",
+    "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
