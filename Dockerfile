@@ -1,6 +1,6 @@
 FROM node:20-slim
 
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl build-essential python3 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -18,4 +18,4 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD npx prisma db push --accept-data-loss && next start
+CMD npx prisma db push --accept-data-loss 2>&1 | tee /tmp/prisma-push.log; echo "--- Starting Next.js ---"; next start 2>&1
