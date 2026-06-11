@@ -2,6 +2,7 @@
   "name": "maintainex",
   "version": "1.0.0",
   "private": true,
+  "browserslist": { "production": [">0.5%", "not dead"] },
   "scripts": {
     "dev": "next dev",
     "dev:mobile": "cd apps/mobile && npx expo start",

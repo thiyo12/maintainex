@@ -2,18 +2,20 @@ export const dynamic = "force-dynamic";
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
+import dynamicImport from 'next/dynamic'
 import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import FlashOfferBanner from '@/components/ui/FlashOfferBanner'
 import FlashOfferSplash from '@/components/ui/FlashOfferSplash'
-import CTASection from '@/components/ui/CTASection'
 import WelcomeBanner from '@/components/ui/WelcomeBanner'
-import HomeServices from '@/components/ui/HomeServices'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
-import TrendingServices from '@/components/ui/TrendingServices'
+
+const HomeServices = dynamicImport(() => import('@/components/ui/HomeServices'))
+const TrendingServices = dynamicImport(() => import('@/components/ui/TrendingServices'))
+const CTASection = dynamicImport(() => import('@/components/ui/CTASection'))
+const Footer = dynamicImport(() => import('@/components/layout/Footer'))
 import Link from 'next/link'
 
 export async function generateMetadata(): Promise<Metadata> {

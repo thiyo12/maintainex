@@ -83,6 +83,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" />
         <link rel="canonical" href={baseUrl} />
         <link rel="alternate" hrefLang="en-LK" href="https://maintainex.lk" />
         <link rel="alternate" hrefLang="en-CA" href="https://ca.maintainex.lk" />
