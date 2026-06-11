@@ -1,16 +1,14 @@
-import { headers } from 'next/headers'
-import { REGIONS, getRegionFromHost } from '@/lib/regions'
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiMail, FiPhone, FiMapPin } from 'react-icons/fi'
 import { FaFacebookF, FaTwitter, FaInstagram, FaTiktok, FaLinkedinIn, FaWhatsapp } from 'react-icons/fa'
+import { useRegion } from '@/lib/region-context'
 import AppStoreModal from './AppStoreModal'
 
 export default function Footer() {
-  const headersList = headers()
-  const host = headersList.get('host') || ''
-  const regionKey = getRegionFromHost(host)
-  const region = REGIONS[regionKey]
+  const region = useRegion()
 
   return (
     <footer className="bg-dark-900 text-white">

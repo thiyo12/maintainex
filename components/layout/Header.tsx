@@ -1,8 +1,10 @@
-import { headers } from 'next/headers'
-import { REGIONS, getRegionFromHost } from '@/lib/regions'
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { FiPhone } from 'react-icons/fi'
+import { useRegion } from '@/lib/region-context'
 import MobileMenu from './MobileMenu'
 
 const navigation = [
@@ -14,10 +16,7 @@ const navigation = [
 ]
 
 export default function Header() {
-  const headersList = headers()
-  const host = headersList.get('host') || ''
-  const regionKey = getRegionFromHost(host)
-  const region = REGIONS[regionKey]
+  const region = useRegion()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md shadow-sm">
