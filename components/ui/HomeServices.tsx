@@ -310,15 +310,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
               {industries.length > 0 ? (
                 <>
                   {industries.map((industry) => {
-                    const imgSrc = industry.image?.startsWith('/uploads/')
-                      ? `/api/files${industry.image}`
-                      : industry.image || ''
                     return (
                     <div key={industry.id} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                       <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
                         {industry.image && industry.image.length > 10 ? (
                           <img
-                            src={imgSrc}
+                            src={getImageUrl(industry.image)}
                             alt={industry.name}
                             className="w-full h-full object-cover"
                           />
@@ -335,15 +332,12 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     )
                   })}
                   {industries.map((industry) => {
-                    const imgSrc = industry.image?.startsWith('/uploads/')
-                      ? `/api/files${industry.image}`
-                      : industry.image || ''
                     return (
                     <div key={`${industry.id}-dup`} className="flex-shrink-0 w-40 md:w-48 bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow">
                       <div className="h-24 md:h-28 overflow-hidden bg-gray-100">
                         {industry.image && industry.image.length > 10 ? (
                           <img
-                            src={imgSrc}
+                            src={getImageUrl(industry.image)}
                             alt={industry.name}
                             className="w-full h-full object-cover"
                           />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface FlashOffer {
   id: string
@@ -86,11 +87,11 @@ function Colon() {
 }
 
 export default function FlashOfferBanner() {
+  const router = useRouter()
   const [offer, setOffer] = useState<FlashOffer | null>(null)
   const [loading, setLoading] = useState(true)
   const [remaining, setRemaining] = useState(0)
   const [visible, setVisible] = useState(false)
-  const [claiming, setClaiming] = useState(false)
   const prevRef = useRef({ hh: '00', mm: '00', ss: '00' })
   const intervalRef = useRef<ReturnType<typeof setInterval>>()
 
@@ -137,20 +138,9 @@ export default function FlashOfferBanner() {
     return () => { cancelled = true; clearInterval(poll); clearTimeout(fallback) }
   }, [loading])
 
-  const handleClaim = async () => {
-    if (!offer || claiming || offer.currentClaims >= offer.maxClaims) return
-    setClaiming(true)
-    try {
-      await fetch('/api/flash-offers/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: offer.id }),
-      })
-      const res = await fetch('/api/flash-offers')
-      const data = await res.json()
-      if (Array.isArray(data) && data.length > 0) setOffer(data[0])
-    } catch {}
-    setClaiming(false)
+  const handleClaim = () => {
+    if (!offer || offer.currentClaims >= offer.maxClaims) return
+    router.push('/services')
   }
 
   if (loading || !offer) return null
@@ -210,7 +200,7 @@ export default function FlashOfferBanner() {
           </div>
           <button
             onClick={handleClaim}
-            disabled={fullyClaimed || claiming}
+            disabled={fullyClaimed}
             className={`text-xs md:text-sm mt-0.5 font-medium transition-colors ${
               fullyClaimed
                 ? 'text-gray-400 cursor-not-allowed'
@@ -219,7 +209,7 @@ export default function FlashOfferBanner() {
                   : 'text-dark-900/70 hover:text-dark-900'
             }`}
           >
-            {fullyClaimed ? 'Offer Ended' : claiming ? 'Claiming...' : `${offer.badgeText} Offer`}
+            {fullyClaimed ? 'Offer Ended' : `${offer.badgeText} Offer`}
           </button>
         </>
       ) : (

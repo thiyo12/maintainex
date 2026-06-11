@@ -155,10 +155,12 @@ export default async function HomePage() {
       <WhatsAppButton />
       
       <main className="pt-20">
-        <section className="relative min-h-[90vh] flex items-center gradient-bg overflow-hidden">
+        <section className="relative min-h-[50vh] md:min-h-[90vh] flex items-center gradient-bg overflow-hidden">
           <div className="absolute inset-0 bg-black/10" />
-          <div className="absolute top-20 right-10 w-72 h-72 bg-white/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-20 left-10 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 right-10 w-72 h-72 bg-white/20 rounded-full blur-3xl" />
+            <div className="absolute bottom-20 left-10 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+          </div>
           
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-20 relative z-10">
             <div className="grid lg:grid-cols-2 gap-6 md:gap-10 lg:gap-12 items-center">
