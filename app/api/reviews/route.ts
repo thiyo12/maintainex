@@ -49,12 +49,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 })
     }
 
-    let guestUser = await prisma.user.findFirst({ where: { email: 'guest@maintain.lk' } })
-    
+    let guestUser = await prisma.user.findFirst({ where: { email: 'maintainex.lk@gmail.com' } })
+
     if (!guestUser) {
       guestUser = await prisma.user.create({
         data: {
-          email: 'guest@maintain.lk',
+          name: 'Guest User',
+          email: 'maintainex.lk@gmail.com',
           passwordHash: 'guest',
           name: 'Guest User'
         }

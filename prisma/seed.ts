@@ -245,14 +245,13 @@ async function main() {
     where: { id: 'branch-northern-province-branch' }
   })
 
-  const superAdminEmail = process.env.ADMIN_EMAIL || 'super@maintain.lk'
-  const superAdminPasswordPlain = process.env.ADMIN_PASSWORD || 'M@int@in2024!'
-  const superAdminPassword = await bcrypt.hash(superAdminPasswordPlain, 12)
-  const superAdmin = await prisma.admin.upsert({
-    where: { email: superAdminEmail },
-    update: {},
-    create: {
-      email: superAdminEmail,
+  const superAdminEmail = process.env.ADMIN_EMAIL || 'maintainex.lk@gmail.com'
+
+  if (!existingSuper) {
+    await prisma.admin.create({
+      data: {
+        name: 'Super Admin',
+        email: superAdminEmail,
       password: superAdminPassword,
       name: 'Super Admin',
       role: 'SUPER_ADMIN',
@@ -262,7 +261,7 @@ async function main() {
   console.log(`Created Super Admin: ${superAdmin.email}`)
 
   if (northernBranch) {
-    const adminEmail = 'admin@maintain.lk'
+    const adminEmail = 'admin.maintainex.lk@gmail.com'
     const adminPasswordPlain = 'Adm1n@M4int@in!'
     const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
     const branchAdmin = await prisma.admin.upsert({
@@ -285,8 +284,8 @@ async function main() {
   console.log('')
   console.log('Login Credentials:')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Super Admin:  super@maintain.lk / M@int@in2024!')
-  console.log('Branch Admin: admin@maintain.lk / Adm1n@M4int@in!')
+  console.log('Super Admin:  maintainex.lk@gmail.com / M@int@in2024!')
+  console.log('Branch Admin: admin.maintainex.lk@gmail.com / Adm1n@M4int@in!')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('⚠️  Change these passwords immediately in production!')
   console.log('⚠️  Use environment variables: ADMIN_EMAIL, ADMIN_PASSWORD')

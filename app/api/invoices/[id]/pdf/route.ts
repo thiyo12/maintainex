@@ -46,7 +46,8 @@ export async function GET(
     // Company Info in header
     doc.setFontSize(9)
     doc.text('Tel: 077 086 7609', 140, 15)
-    doc.text('Email: info@maintainex.lk', 140, 22)
+    doc.text('Email: maintainex.lk@gmail.com', 140, 22)
+
     doc.text('Web: www.maintainex.lk', 140, 29)
 
     // Invoice Details

@@ -5,7 +5,7 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { useRegion } from '@/lib/region-context'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
-import { FiSend, FiCheck, FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase, FiUpload, FiFile } from 'react-icons/fi'
+import { FiSend, FiCheck, FiUser, FiMail, FiPhone, FiMapPin, FiBriefcase, FiUpload, FiFile, FiDollarSign, FiHeart, FiBook, FiStar } from 'react-icons/fi'
 
 interface Vacancy {
   id: string
@@ -199,7 +199,8 @@ export default function CareersPage() {
                   <div key={vacancy.id} className="bg-primary-50 rounded-xl p-5 border border-primary-200">
                     <h3 className="font-bold text-dark-900 mb-2">{vacancy.title}</h3>
                     {vacancy.location && (
-                      <p className="text-sm text-gray-600 mb-2">📍 {vacancy.location}</p>
+                      <p className="text-sm text-gray-600 mb-2 flex items-center gap-1">
+                        <FiMapPin className="w-3.5 h-3.5 text-primary-500" /> {vacancy.location}
                     )}
                     {vacancy.description && (
                       <p className="text-sm text-gray-600 line-clamp-2">{vacancy.description}</p>
@@ -221,22 +222,30 @@ export default function CareersPage() {
             
             <div className="grid md:grid-cols-4 gap-6">
               <div className="text-center p-6 bg-gray-50 rounded-xl">
-                <div className="text-4xl mb-4">💰</div>
+                <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <FiDollarSign className="w-7 h-7 text-primary-600" />
+                </div>
                 <h3 className="font-bold text-dark-900 mb-2">Competitive Pay</h3>
                 <p className="text-sm text-gray-600">Above market rates + bonuses</p>
               </div>
               <div className="text-center p-6 bg-gray-50 rounded-xl">
-                <div className="text-4xl mb-4">🏥</div>
+                <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <FiHeart className="w-7 h-7 text-primary-600" />
+                </div>
                 <h3 className="font-bold text-dark-900 mb-2">Health Insurance</h3>
                 <p className="text-sm text-gray-600">Full medical coverage</p>
               </div>
               <div className="text-center p-6 bg-gray-50 rounded-xl">
-                <div className="text-4xl mb-4">📚</div>
+                <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <FiBook className="w-7 h-7 text-primary-600" />
+                </div>
                 <h3 className="font-bold text-dark-900 mb-2">Training</h3>
                 <p className="text-sm text-gray-600">Professional development</p>
               </div>
               <div className="text-center p-6 bg-gray-50 rounded-xl">
-                <div className="text-4xl mb-4">🎉</div>
+                <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <FiStar className="w-7 h-7 text-primary-600" />
+                </div>
                 <h3 className="font-bold text-dark-900 mb-2">Work-Life Balance</h3>
                 <p className="text-sm text-gray-600">Flexible schedules</p>
               </div>
@@ -452,8 +461,8 @@ export default function CareersPage() {
         <section className="py-12 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h3 className="text-xl font-bold text-dark-900 mb-4">Or contact us directly</h3>
-            <p className="text-gray-600 mb-2">📞 {region.phone}</p>
-            <p className="text-gray-600">✉️ careers@maintain.lk</p>
+            <p className="text-gray-600 mb-2 flex items-center justify-center gap-2"><FiPhone className="w-4 h-4 text-primary-500" /> {region.phone}</p>
+            <p className="text-gray-600 flex items-center justify-center gap-2"><FiMail className="w-4 h-4 text-primary-500" /> maintainex.lk@gmail.com</p>
           </div>
         </section>
       </main>

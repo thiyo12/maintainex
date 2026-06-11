@@ -20,7 +20,7 @@ interface Settings {
 export default function AdminSettings() {
   const [settings, setSettings] = useState<Settings>({
     companyName: 'Maintainex',
-    email: 'info@maintainex.lk',
+    email: 'maintainex.lk@gmail.com',
     phone: '+94 XX XXX XXXX',
     address: 'Jaffna, Sri Lanka',
     mapEmbedUrl: '',
@@ -49,7 +49,7 @@ export default function AdminSettings() {
       const data = await res.json()
       setSettings({
         companyName: data.companyName || 'Maintainex',
-        email: data.email || 'info@maintainex.lk',
+        email: data.email || 'maintainex.lk@gmail.com',
         phone: data.phone || '+94 XX XXX XXXX',
         address: data.address || 'Jaffna, Sri Lanka',
         mapEmbedUrl: data.mapEmbedUrl || '',
