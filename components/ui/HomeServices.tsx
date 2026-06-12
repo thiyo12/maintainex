@@ -158,6 +158,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                   <img
                     src={getImageUrl(featuredServices[0]?.image)}
                     alt={featuredCategory?.name || 'Featured service'}
+                    width="800"
+                    height="450"
                     className="w-full h-full object-cover"
                     onLoad={() => setImgLoading(prev => ({ ...prev, featured: false }))}
                     onError={() => setImgLoading(prev => ({ ...prev, featured: false }))}
@@ -244,6 +246,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                     <img
                       src={getImageUrl(service.image)}
                       alt={service.title}
+                      width="400"
+                      height="250"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       loading="lazy"
                       decoding="async"
@@ -317,6 +321,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                           <img
                             src={getImageUrl(industry.image)}
                             alt={industry.name}
+                            width="320"
+                            height="200"
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -339,6 +345,8 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                           <img
                             src={getImageUrl(industry.image)}
                             alt={industry.name}
+                            width="320"
+                            height="200"
                             className="w-full h-full object-cover"
                           />
                         ) : (

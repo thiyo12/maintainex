@@ -233,7 +233,7 @@ export default function ServiceDetailClient({
 
                 {/* FAQ Section */}
                 {faqs && faqs.length > 0 && (
-                  <FaqSection faqs={faqs} />
+                  <FaqSection faqs={faqs} serviceName={service?.name} />
                 )}
 
                 {/* Reviews */}

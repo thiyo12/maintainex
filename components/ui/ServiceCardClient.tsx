@@ -37,6 +37,8 @@ export default function ServiceCardClient({ service }: ServiceCardClientProps) {
           <img 
             src={getImageUrl(service.image)} 
             alt={service.name}
+            width="400"
+            height="250"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             decoding="async"

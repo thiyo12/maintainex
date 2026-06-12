@@ -37,6 +37,8 @@ export default function ServiceCardNew({ service }: ServiceCardNewProps) {
             <img
               src={imageSrc}
               alt={service.title}
+              width="400"
+              height="300"
               onError={() => setImgError(true)}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               loading="lazy"

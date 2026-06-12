@@ -21,6 +21,8 @@ export function ServiceCard({ title, description, image, slug, price }: ServiceC
             <img
               src={imageSrc}
               alt={title}
+              width="400"
+              height="300"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               loading="lazy"
               decoding="async"

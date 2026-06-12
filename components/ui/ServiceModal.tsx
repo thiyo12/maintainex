@@ -76,6 +76,8 @@ export default function ServiceModal({ service, isOpen, onClose }: ServiceModalP
               <img
                 src={imageSrc}
                 alt={service.title}
+                width="800"
+                height="450"
                 className="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"

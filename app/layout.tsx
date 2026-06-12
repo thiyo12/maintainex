@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(process.env.NEXTAUTH_URL || baseUrl),
     title: {
       default: `Maintainex ${c} - Professional Cleaning & Home Services in ${c}`,
-      template: `%s | Maintainex ${c}`,
+      template: `%s — Maintainex`,
     },
     description: `${cp} #1 professional cleaning services. Home cleaning, office cleaning, deep cleaning, and maintenance services across ${c}. Book online or call us today.`,
     keywords: `cleaning services ${c}, home cleaning ${c}, office cleaning ${c}, deep cleaning, maintenance services, ${c} cleaners, professional cleaning company ${c}`,

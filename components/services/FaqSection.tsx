@@ -4,12 +4,12 @@ import { useState } from 'react'
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi'
 import type { FaqItem } from '@/lib/faq'
 
-export default function FaqSection({ faqs }: { faqs: FaqItem[] }) {
+export default function FaqSection({ faqs, serviceName }: { faqs: FaqItem[]; serviceName?: string }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
 
   return (
     <section className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-      <h2 className="text-2xl font-bold text-dark-900 mb-6">Frequently Asked Questions</h2>
+      <h2 className="text-2xl font-bold text-dark-900 mb-6">{serviceName ? `${serviceName} FAQs` : 'Frequently Asked Questions'}</h2>
       <div className="space-y-3">
         {faqs.map((faq, index) => {
           const isOpen = openIndex === index

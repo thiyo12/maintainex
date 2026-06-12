@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!service) return { title: 'Service Not Found' }
 
   const title = `${service.name} Services in ${c} | Maintainex ${c}`
-  const description = `${service.description?.slice(0, 155) || `Professional ${service.name} services in ${c}.`}`
+  const description = `${service.description?.slice(0, 155) || `Book professional ${service.name} services in ${c}. Trusted ${service.category?.name?.toLowerCase() || 'home'} service providers. Free quotes, same-day service.`}`
   const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
   return {

@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: { slug: string; cit
   if (!service) return { title: 'Service Not Found' }
 
   const title = `${service.name} in ${cityName}, ${c} | Maintainex ${c}`
-  const description = `Professional ${service.name.toLowerCase()} in ${cityName}, ${c}. Book trusted ${service.category?.name?.toLowerCase()} near you in ${cityName}.`
+  const description = `Book professional ${service.name.toLowerCase()} in ${cityName}, ${c}. Trusted ${service.category?.name?.toLowerCase() || 'home service'} providers. Free quotes & same-day service in ${cityName}.`
   const canonicalPath = `/services/${service.slug}/${params.city}`
 
   return {
