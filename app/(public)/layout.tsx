@@ -7,9 +7,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = headersList.get('host') || ''
   const c = REGIONS[getRegionFromHost(host)].countryName
   return {
-    title: 'Services',
-    description: `Browse our professional cleaning and home maintenance services in ${c}. Book online with Maintainex ${c} today.`,
-    openGraph: { title: `Services | Maintainex ${c}`, description: `Professional services in ${c}.` },
+    description: `Browse professional cleaning and home maintenance services in ${c}. Book online with Maintainex ${c} today.`,
+    openGraph: { description: `Professional home services in ${c}.` },
   }
 }
 

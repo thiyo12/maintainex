@@ -137,7 +137,7 @@ export default function ServiceDetailClient({
         <section className="relative">
           <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] overflow-hidden bg-gray-200">
             {isUploadedImage(service.image) ? (
-              <img src={getImageSrc(service.image)} alt={service.name} className="w-full h-full object-cover" />
+              <img src={getImageSrc(service.image)} alt={service.name} width="1200" height="675" className="w-full h-full object-cover" />
             ) : (
               <Image src={getImageSrc(service.image)} alt={service.name} fill priority sizes="100vw" className="w-full h-full object-cover" />
             )}
@@ -174,7 +174,7 @@ export default function ServiceDetailClient({
                 
                 {/* Description */}
                 <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                  <h2 className="text-2xl font-bold text-dark-900 mb-4">About This Service{city ? ` in ${city}` : ''}</h2>
+                  <h2 className="text-2xl font-bold text-dark-900 mb-4">About {service?.name}{city ? ` in ${city}` : ''}</h2>
                   <div className="prose prose-gray max-w-none">
                     <p className="text-gray-600 text-lg leading-relaxed whitespace-pre-line">
                       {service.description || `Professional ${service.name.toLowerCase()} service tailored to your needs. Our experienced team ensures a thorough and efficient clean every time.`}
@@ -189,7 +189,7 @@ export default function ServiceDetailClient({
 
                 {/* Features */}
                 <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                  <h2 className="text-2xl font-bold text-dark-900 mb-6">What's Included</h2>
+                  <h2 className="text-2xl font-bold text-dark-900 mb-6">What's Included in {service?.name}</h2>
                   <div className="grid sm:grid-cols-2 gap-4">
                     {[
                       'Professional equipment', 'Trained & verified staff',
@@ -209,7 +209,7 @@ export default function ServiceDetailClient({
                 {/* Available Cities */}
                 {!city && (
                   <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                    <h2 className="text-2xl font-bold text-dark-900 mb-4">Available in</h2>
+                    <h2 className="text-2xl font-bold text-dark-900 mb-4">Areas Where {service?.name} Is Available</h2>
                     <p className="text-gray-600 mb-4">
                       We serve the following areas in {region.countryName}. Select your city to book {service.name.toLowerCase()} locally.
                     </p>
@@ -240,7 +240,7 @@ export default function ServiceDetailClient({
                 {service.reviews && service.reviews.length > 0 && (
                   <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
                     <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-2xl font-bold text-dark-900">Customer Reviews</h2>
+                      <h2 className="text-2xl font-bold text-dark-900">Customer Reviews for {service?.name}</h2>
                       <div className="flex items-center gap-2 bg-primary-50 px-4 py-2 rounded-full">
                         <FiStar className="w-5 h-5 text-yellow-500 fill-yellow-500" />
                         <span className="font-bold text-dark-900">{getAverageRating(service.reviews)}</span>
@@ -337,7 +337,7 @@ export default function ServiceDetailClient({
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-dark-900">Related Services</h2>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-dark-900">More {service?.category?.name || 'Services'} You Might Like</h2>
                   <p className="text-gray-600 mt-2">More services in {service.category?.name}{city ? ` in ${city}` : ''}</p>
                 </div>
                 <Link href="/services" className="hidden sm:flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-700 transition-colors">
@@ -351,7 +351,7 @@ export default function ServiceDetailClient({
                   >
                     <div className="relative h-40 overflow-hidden bg-gray-200">
                       {isUploadedImage(related.image) ? (
-                        <img src={getImageSrc(related.image)} alt={related.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <img src={getImageSrc(related.image)} alt={related.name} width="400" height="300" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       ) : (
                         <Image src={getImageSrc(related.image)} alt={related.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       )}
@@ -380,7 +380,7 @@ export default function ServiceDetailClient({
         {/* CTA */}
         <section className="py-16 md:py-20 bg-gradient-to-br from-primary-400 to-primary-600">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-dark-900 mb-4">Ready to Get Started?</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-dark-900 mb-4">Ready to Book {service?.name}?</h2>
             <p className="text-xl text-dark-900/80 mb-8 max-w-2xl mx-auto">
               Book now and let our professional team handle the cleaning. Easy scheduling, instant confirmation.
             </p>

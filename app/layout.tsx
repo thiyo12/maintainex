@@ -42,6 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: {
       canonical: baseUrl,
       languages: {
+        'x-default': baseUrl,
         'en-LK': 'https://maintainex.lk',
         'en-CA': 'https://ca.maintainex.lk',
       },
@@ -84,9 +85,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="canonical" href={baseUrl} />
-        <link rel="alternate" hrefLang="en-LK" href="https://maintainex.lk" />
-        <link rel="alternate" hrefLang="en-CA" href="https://ca.maintainex.lk" />
         <link rel="llms-txt" href={`${baseUrl}/llms.txt`} />
         <meta name="llms" content={`${baseUrl}/llms.txt`} />
         {gaId && (

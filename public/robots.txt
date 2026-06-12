@@ -1,5 +1,3 @@
-# AI crawlers — Cloudflare manages block rules at the top of this file
-
 User-agent: *
 Allow: /
 Disallow: /admin/
@@ -9,7 +7,3 @@ Disallow: /maintenance
 
 Sitemap: https://maintainex.lk/sitemap.xml
 Sitemap: https://ca.maintainex.lk/sitemap.xml
-
-# AI content discovery
-LLMs.txt: https://maintainex.lk/llms.txt
-LLMs.txt: https://ca.maintainex.lk/llms.txt

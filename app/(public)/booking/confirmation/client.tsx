@@ -1,0 +1,394 @@
+'use client'
+
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import Header from '@/components/layout/Header'
+import Footer from '@/components/layout/Footer'
+import WhatsAppButton from '@/components/layout/WhatsAppButton'
+import { FiCheck, FiPhone, FiMessageCircle, FiHome, FiCalendar, FiClock, FiUser, FiMapPin } from 'react-icons/fi'
+import { useRegion } from '@/lib/region-context'
+
+interface BookingData {
+  name?: string
+  phone?: string
+  email?: string
+  service?: string
+  serviceId?: string
+  district?: string
+  address?: string
+  date?: string
+  time?: string
+  notes?: string
+  reference?: string
+  category?: string
+  price?: number
+  budgetMin?: number
+  budgetMax?: number
+  status?: string
+}
+
+export default function BookingConfirmationPage() {
+  return (
+    <Suspense fallback={<ConfirmationLoading />}>
+      <ConfirmationContent />
+    </Suspense>
+  )
+}
+
+function ConfirmationLoading() {
+  return (
+    <>
+      <Header />
+      <WhatsAppButton />
+      <main className="pt-20 min-h-screen bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading confirmation...</p>
+        </div>
+      </main>
+      <Footer />
+    </>
+  )
+}
+
+function ConfirmationContent() {
+  const searchParams = useSearchParams()
+  const region = useRegion()
+  const [bookingData, setBookingData] = useState<BookingData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Try to get booking data from URL params first (booking ID)
+    const bookingId = searchParams.get('id')
+    
+    const fetchBookingFromAPI = async () => {
+      if (bookingId) {
+        try {
+          const res = await fetch(`/api/bookings/${bookingId}`)
+          if (res.ok) {
+            const booking = await res.json()
+            return {
+              reference: booking.id?.slice(-8).toUpperCase() || 'MNT' + Date.now(),
+              name: booking.name,
+              phone: booking.phone,
+              email: booking.email,
+              service: booking.service?.name,
+              category: booking.service?.category?.name,
+              district: booking.district,
+              address: booking.address,
+              date: booking.date,
+              time: booking.time,
+              notes: booking.notes,
+              price: booking.totalPrice,
+              budgetMin: booking.budgetMin,
+              budgetMax: booking.budgetMax,
+              status: booking.status
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching booking:', err)
+        }
+      }
+      return null
+    }
+
+    // Try to get booking data from localStorage
+    const getBookingDataFromStorage = (): BookingData | null => {
+      try {
+        const stored = localStorage.getItem('lastBookingConfirmation')
+        if (stored) {
+          return JSON.parse(stored)
+        }
+      } catch (err) {
+        console.error('Error reading from localStorage:', err)
+      }
+      return null
+    }
+
+    // Try API first (if we have booking ID), then localStorage
+    const loadData = async () => {
+      let data: BookingData | null = await fetchBookingFromAPI()
+      if (!data) {
+        data = getBookingDataFromStorage()
+      }
+
+      if (data) {
+        setBookingData(data)
+        // Clear localStorage after reading
+        try {
+          localStorage.removeItem('lastBookingConfirmation')
+        } catch (err) {
+          console.error('Error clearing localStorage:', err)
+        }
+      }
+
+      setLoading(false)
+    }
+
+    loadData()
+  }, [searchParams])
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    try {
+      const date = new Date(dateStr)
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    } catch {
+      return dateStr
+    }
+  }
+
+  const generateWhatsAppMessage = () => {
+    if (!bookingData) return ''
+    
+    const service = bookingData.service || 'cleaning service'
+    const date = bookingData.date ? formatDate(bookingData.date) : 'the requested date'
+    const ref = bookingData.reference || 'N/A'
+    
+    return `Hi Maintain! I've just submitted a booking for ${service} on ${date}. Reference: ${ref}`
+  }
+
+  const handleWhatsAppClick = () => {
+    const message = generateWhatsAppMessage()
+    const url = `https://wa.me/${region.whatsapp}?text=${encodeURIComponent(message)}`
+    window.open(url, '_blank')
+  }
+
+  const handleCallClick = () => {
+    window.location.href = `tel:${region.phoneRaw}`
+  }
+
+  if (loading) {
+    return <ConfirmationLoading />
+  }
+
+  if (!bookingData) {
+    return (
+      <>
+        <Header />
+        <WhatsAppButton />
+        <main className="pt-20 min-h-screen bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center px-4">
+          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
+            <div className="w-24 h-24 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FiHome className="text-5xl text-primary-600" />
+            </div>
+            <h2 className="text-3xl font-bold text-dark-900 mb-4">No Booking Found</h2>
+            <p className="text-gray-600 mb-8">
+              We couldn&apos;t find any booking confirmation data. This may happen if you navigated here directly.
+            </p>
+            <Link href="/booking" className="block w-full btn-primary text-center mb-4">
+              Make a New Booking
+            </Link>
+            <Link href="/" className="block w-full text-gray-600 hover:text-dark-900 font-medium py-3">
+              <FiHome className="inline mr-2" />
+              Back to Home
+            </Link>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Header />
+      <WhatsAppButton />
+      <main className="pt-20 min-h-screen bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center px-4 py-12">
+        <div className="max-w-lg w-full bg-white rounded-3xl shadow-2xl overflow-hidden">
+          {/* Success Header */}
+          <div className="bg-gradient-to-br from-green-400 to-green-600 p-8 text-center">
+            <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
+              <FiCheck className="text-5xl text-green-600" />
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
+              Booking Submitted Successfully!
+            </h1>
+            <p className="text-white/90 text-lg">
+              Thank you for choosing Maintainex
+            </p>
+          </div>
+
+          {/* Booking Details */}
+          <div className="p-6 sm:p-8">
+            {/* Reference Number */}
+            {bookingData.reference && (
+              <div className="bg-primary-50 border-2 border-primary-500 rounded-2xl p-4 mb-6 text-center">
+                <p className="text-sm text-primary-600 font-medium mb-1">Booking Reference</p>
+                <p className="text-2xl sm:text-3xl font-bold text-dark-900">{bookingData.reference}</p>
+              </div>
+            )}
+
+            {/* Booking Summary */}
+            <div className="bg-gray-50 rounded-2xl p-5 mb-6 space-y-4">
+              <h3 className="font-bold text-dark-900 text-lg mb-3">Booking Summary</h3>
+              
+              {bookingData.service && (
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FiUser className="text-primary-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500">Service</p>
+                    <p className="font-semibold text-dark-900">
+                      {bookingData.service}
+                      {bookingData.category && (
+                        <span className="text-gray-500 text-sm ml-2">({bookingData.category})</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {(bookingData.name || bookingData.phone || bookingData.email) && (
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FiUser className="text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500">Contact Info</p>
+                    <p className="font-semibold text-dark-900">{bookingData.name}</p>
+                    {bookingData.phone && (
+                      <p className="text-gray-600 text-sm">{bookingData.phone}</p>
+                    )}
+                    {bookingData.email && (
+                      <p className="text-gray-600 text-sm">{bookingData.email}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {bookingData.district && (
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FiMapPin className="text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500">Location</p>
+                    <p className="font-semibold text-dark-900">{bookingData.district}</p>
+                    {bookingData.address && (
+                      <p className="text-gray-600 text-sm">{bookingData.address}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(bookingData.date || bookingData.time) && (
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FiCalendar className="text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-gray-500">Schedule</p>
+                    {bookingData.date && (
+                      <p className="font-semibold text-dark-900">{formatDate(bookingData.date)}</p>
+                    )}
+                    {bookingData.time && (
+                      <p className="text-gray-600 text-sm flex items-center">
+                        <FiClock className="mr-1" />
+                        {bookingData.time}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {bookingData.notes && (
+                <div className="border-t pt-4">
+                  <p className="text-sm text-gray-500 mb-1">Notes</p>
+                  <p className="text-dark-900">{bookingData.notes}</p>
+                </div>
+              )}
+
+              {bookingData.budgetMin && bookingData.budgetMax ? (
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-dark-900">Budget Range</span>
+                    <span className="text-2xl font-bold text-primary-600">
+                      {region.currencySymbol} {bookingData.budgetMin.toLocaleString()} – {region.currencySymbol} {bookingData.budgetMax.toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Price will change based on requirements</p>
+                </div>
+              ) : (
+                <div className="border-t pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-dark-900">Pricing</span>
+                    <span className="text-lg font-medium text-primary-600">To be discussed</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Our team will contact you within 2 hours</p>
+                </div>
+              )}
+            </div>
+
+            {/* What Happens Next */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
+              <h4 className="font-bold text-blue-900 mb-2">What happens next?</h4>
+              <p className="text-blue-800 text-sm">
+                Our team will review your booking and call you shortly to confirm the details. 
+                Please keep your phone available.
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <Link
+                href="/contact"
+                className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-all text-sm"
+              >
+                Contact Us
+              </Link>
+              <Link
+                href="/"
+                className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-4 rounded-xl transition-all text-sm"
+              >
+                <FiHome className="w-4 h-4" />
+                Go to Home
+              </Link>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={handleCallClick}
+                className="w-full flex items-center justify-center gap-3 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 sm:py-5 rounded-xl transition-all text-lg shadow-lg hover:shadow-xl active:scale-95"
+              >
+                <FiPhone className="text-xl" />
+                Call Us: {region.phone}
+              </button>
+
+              <button
+                onClick={handleWhatsAppClick}
+                className="w-full flex items-center justify-center gap-3 bg-green-500 hover:bg-green-600 text-white font-bold py-4 sm:py-5 rounded-xl transition-all text-lg shadow-lg hover:shadow-xl active:scale-95"
+              >
+                <FiMessageCircle className="text-xl" />
+                WhatsApp Us
+              </button>
+            </div>
+
+            {/* Additional Help */}
+            <div className="mt-6 text-center text-gray-500 text-sm">
+              <p>Need help with your booking?</p>
+              <p className="mt-1">
+                Call us at{' '}
+                <a href={`tel:${region.phoneRaw}`} className="text-primary-600 font-medium">
+                  {region.phone}
+                </a>{' '}
+                or{' '}
+                <button onClick={handleWhatsAppClick} className="text-green-600 font-medium">
+                  message on WhatsApp
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </>
+  )
+}

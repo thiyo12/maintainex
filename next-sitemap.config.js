@@ -7,6 +7,10 @@ module.exports = {
   alternateRefs: [
     {
       href: 'https://maintainex.lk',
+      hreflang: 'x-default',
+    },
+    {
+      href: 'https://maintainex.lk',
       hreflang: 'en-LK',
     },
     {
