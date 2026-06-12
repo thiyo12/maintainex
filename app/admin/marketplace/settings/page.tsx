@@ -114,7 +114,6 @@ export default function MarketplaceSettings() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
-        <div><h1 className="text-2xl font-bold text-gray-900">Platform Settings</h1><p className="text-gray-500">Loading settings...</p></div>
         <Card>
           <CardHeader><Skeleton className="h-5 w-40" /></CardHeader>
           <CardContent>
@@ -146,11 +145,7 @@ export default function MarketplaceSettings() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Platform Settings</h1>
-          <p className="text-gray-500">Manage marketplace platform configuration</p>
-        </div>
+      <div className="flex items-center justify-end flex-wrap gap-2">
         <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 

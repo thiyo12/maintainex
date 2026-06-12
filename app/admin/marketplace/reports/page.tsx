@@ -57,7 +57,6 @@ export default function MarketplaceReports() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
-        <div><h1 className="text-2xl font-bold text-gray-900">Reports</h1><p className="text-gray-500">Loading reports...</p></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}><CardHeader><Skeleton className="h-4 w-20" /></CardHeader><CardContent><Skeleton className="h-8 w-24" /></CardContent></Card>
@@ -90,11 +89,7 @@ export default function MarketplaceReports() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-          <p className="text-gray-500">Platform analytics and data export</p>
-        </div>
+      <div className="flex items-center justify-end flex-wrap gap-2">
         <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 

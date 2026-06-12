@@ -114,11 +114,7 @@ export default function MarketplaceEscrow() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Escrow & Disputes</h1>
-          <p className="text-gray-500">Manage escrow payments and disputes</p>
-        </div>
+      <div className="flex items-center justify-end flex-wrap gap-2">
         <Button variant="outline" onClick={() => { escrowQuery.refetch(); disputesQuery.refetch() }}>
           <FiRefreshCw className="mr-2 h-4 w-4" /> Refresh
         </Button>
