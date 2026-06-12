@@ -149,7 +149,7 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
         </header>
 
         <main className="p-4 pt-16 lg:p-6 lg:pt-20">
-          <div className="max-w-7xl mx-auto">{children}</div>
+          <div>{children}</div>
         </main>
       </div>
 
