@@ -86,7 +86,7 @@ export default function MarketplaceAuditLogs() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
           <div><h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1><p className="text-gray-500">Loading...</p></div>
         </div>
         <Card>
@@ -133,7 +133,7 @@ export default function MarketplaceAuditLogs() {
         <CardHeader>
           <div className="flex flex-wrap gap-3">
             <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v ?? ''); setPage(1) }}>
-              <SelectTrigger className="w-44"><SelectValue placeholder="All Actions" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All Actions" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Actions</SelectItem>
                 {Object.keys(ACTION_COLORS).map((a) => (
@@ -142,7 +142,7 @@ export default function MarketplaceAuditLogs() {
               </SelectContent>
             </Select>
             <Select value={tableFilter} onValueChange={(v) => { setTableFilter(v ?? ''); setPage(1) }}>
-              <SelectTrigger className="w-44"><SelectValue placeholder="All Tables" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="All Tables" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Tables</SelectItem>
                 <SelectItem value="User">User</SelectItem>
@@ -164,7 +164,7 @@ export default function MarketplaceAuditLogs() {
               <p className="text-gray-500">Try adjusting your filters</p>
             </div>
           ) : (
-            <>
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -216,7 +216,7 @@ export default function MarketplaceAuditLogs() {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -245,18 +245,6 @@ export default function MarketplaceAuditLogs() {
                     <p className="text-xs text-gray-500">IP Address</p>
                     <p className="text-sm">{selectedLog.ipAddress}</p>
                   </div>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Admin</p>
-                  <p className="text-sm">{selectedLog.adminEmail}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Target</p>
-                  <p className="text-sm">{selectedLog.targetLabel || '\u2014'}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500">IP Address</p>
-                  <p className="text-sm font-mono">{selectedLog.ipAddress}</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {selectedLog.oldValue && (

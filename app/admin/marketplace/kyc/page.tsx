@@ -114,7 +114,7 @@ export default function MarketplaceKyc() {
           <h1 className="text-2xl font-bold text-gray-900">KYC Review</h1>
           <p className="text-gray-500">Loading documents...</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}>
               <CardHeader><Skeleton className="h-4 w-32" /></CardHeader>
@@ -140,7 +140,7 @@ export default function MarketplaceKyc() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">KYC Review</h1>
           <p className="text-gray-500">{meta.total} documents</p>
@@ -168,7 +168,7 @@ export default function MarketplaceKyc() {
               <p className="text-gray-500">No KYC documents match the current filter</p>
             </div>
           ) : (
-            <>
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -217,7 +217,7 @@ export default function MarketplaceKyc() {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

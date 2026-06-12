@@ -181,7 +181,7 @@ export default function MarketplaceAdminUsers() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
           <div><h1 className="text-2xl font-bold text-gray-900">Admin Management</h1><p className="text-gray-500">Loading...</p></div>
         </div>
         <Card>
@@ -236,7 +236,8 @@ export default function MarketplaceAdminUsers() {
               <p className="text-gray-500">Create your first admin to get started</p>
             </div>
           ) : (
-            <Table>
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -274,7 +275,7 @@ export default function MarketplaceAdminUsers() {
                       {admin.lastLoginAt ? new Date(admin.lastLoginAt).toLocaleDateString() : 'Never'}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
                         <Button variant="ghost" size="icon" onClick={() => openEdit(admin)}>
                           <FiEdit2 className="w-4 h-4" />
                         </Button>
@@ -288,7 +289,8 @@ export default function MarketplaceAdminUsers() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

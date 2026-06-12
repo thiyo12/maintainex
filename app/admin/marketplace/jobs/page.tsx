@@ -69,7 +69,7 @@ export default function MarketplaceJobs() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
           <div><h1 className="text-2xl font-bold text-gray-900">Marketplace Jobs</h1><p className="text-gray-500">Loading jobs...</p></div>
         </div>
         <Card>
@@ -115,7 +115,7 @@ export default function MarketplaceJobs() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-0 w-full sm:min-w-[200px] sm:w-auto">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <Input
                 className="pl-9"
@@ -125,7 +125,7 @@ export default function MarketplaceJobs() {
               />
             </div>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v ?? ''); setPage(1) }}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Status</SelectItem>
                 <SelectItem value="OPEN">Open</SelectItem>
@@ -145,7 +145,7 @@ export default function MarketplaceJobs() {
               <p className="text-gray-500">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <>
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -187,7 +187,7 @@ export default function MarketplaceJobs() {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

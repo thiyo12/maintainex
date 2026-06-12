@@ -114,7 +114,7 @@ export default function MarketplaceEscrow() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Escrow & Disputes</h1>
           <p className="text-gray-500">Manage escrow payments and disputes</p>
@@ -195,7 +195,7 @@ export default function MarketplaceEscrow() {
                           <PermissionGate roles={PERMISSION.manageEscrow}>
                             <TableCell>
                               {(e.status === 'ON_HOLD' || e.status === 'PROTECTED') && (
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 flex-wrap">
                                   <Button size="sm" onClick={() => setConfirmAction({ escrowId: e.id, action: 'release' })}>
                                     Release
                                   </Button>
@@ -258,7 +258,8 @@ export default function MarketplaceEscrow() {
                   <p className="text-gray-500">All clear!</p>
                 </div>
               ) : (
-                <Table>
+                <div className="overflow-x-auto">
+                  <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Job</TableHead>
@@ -285,7 +286,8 @@ export default function MarketplaceEscrow() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

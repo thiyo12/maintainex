@@ -146,7 +146,7 @@ export default function MarketplaceSettings() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Platform Settings</h1>
           <p className="text-gray-500">Manage marketplace platform configuration</p>

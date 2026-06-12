@@ -117,7 +117,7 @@ export default function MarketplaceUsers() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Marketplace Users</h1>
           <p className="text-gray-500">{meta.total} total users</p>
@@ -128,7 +128,7 @@ export default function MarketplaceUsers() {
       <Card>
         <CardHeader>
           <div className="flex flex-wrap gap-3">
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-0 w-full sm:min-w-[200px] sm:w-auto">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <Input
                 className="pl-9"
@@ -138,7 +138,7 @@ export default function MarketplaceUsers() {
               />
             </div>
             <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v ?? ''); setPage(1) }}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="All Roles" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="All Roles" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Roles</SelectItem>
                 <SelectItem value="CLIENT">Client</SelectItem>
@@ -147,7 +147,7 @@ export default function MarketplaceUsers() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v ?? ''); setPage(1) }}>
-              <SelectTrigger className="w-36"><SelectValue placeholder="All Status" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
@@ -156,7 +156,7 @@ export default function MarketplaceUsers() {
               </SelectContent>
             </Select>
             <Select value={kycFilter} onValueChange={(v) => { setKycFilter(v ?? ''); setPage(1) }}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="All KYC" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="All KYC" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All KYC</SelectItem>
                 <SelectItem value="VERIFIED">Verified</SelectItem>
@@ -175,7 +175,7 @@ export default function MarketplaceUsers() {
               <p className="text-gray-500">Try adjusting your search or filters</p>
             </div>
           ) : (
-            <>
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -219,7 +219,7 @@ export default function MarketplaceUsers() {
                   </div>
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

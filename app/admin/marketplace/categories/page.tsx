@@ -131,7 +131,7 @@ export default function MarketplaceCategories() {
   if (isLoading) {
     return (
       <div className="p-4 md:p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
           <div><h1 className="text-2xl font-bold text-gray-900">Categories</h1><p className="text-gray-500">Loading categories...</p></div>
         </div>
         <Card>
@@ -188,7 +188,8 @@ export default function MarketplaceCategories() {
               <p className="text-gray-500">Create your first category to get started</p>
             </div>
           ) : (
-            <Table>
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10" />
@@ -224,7 +225,7 @@ export default function MarketplaceCategories() {
                     <TableCell className="text-gray-600">{(cat.countries || []).join(', ') || '\u2014'}</TableCell>
                     <PermissionGate roles={PERMISSION.manageCategories}>
                       <TableCell>
-                        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
                           <Button variant="ghost" size="icon" onClick={() => openEdit(cat)}>
                             <FiEdit2 className="w-4 h-4" />
                           </Button>
@@ -241,7 +242,8 @@ export default function MarketplaceCategories() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

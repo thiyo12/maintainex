@@ -246,19 +246,23 @@ async function main() {
   })
 
   const superAdminEmail = process.env.ADMIN_EMAIL || 'maintainex.lk@gmail.com'
+  const superAdminPasswordPlain = 'M@int@in2024!'
+  const superAdminPassword = await bcrypt.hash(superAdminPasswordPlain, 12)
+
+  const existingSuper = await prisma.admin.findUnique({ where: { email: superAdminEmail } })
 
   if (!existingSuper) {
     await prisma.admin.create({
       data: {
         name: 'Super Admin',
         email: superAdminEmail,
-      password: superAdminPassword,
-      name: 'Super Admin',
-      role: 'SUPER_ADMIN',
-      isActive: true
-    }
-  })
-  console.log(`Created Super Admin: ${superAdmin.email}`)
+        password: superAdminPassword,
+        role: 'SUPER_ADMIN',
+        isActive: true
+      }
+    })
+  }
+  console.log('Super Admin:', superAdminEmail)
 
   if (northernBranch) {
     const adminEmail = 'admin.maintainex.lk@gmail.com'

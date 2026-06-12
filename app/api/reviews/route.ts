@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
           name: 'Guest User',
           email: 'maintainex.lk@gmail.com',
           passwordHash: 'guest',
-          name: 'Guest User'
         }
       })
     }
