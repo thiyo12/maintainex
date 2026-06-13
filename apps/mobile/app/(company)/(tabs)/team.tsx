@@ -12,7 +12,7 @@ export default function CompanyTeam() {
   const fetchTeam = useCallback(async () => {
     try {
       const data = await company.team.list()
-      setMembers(data)
+      setMembers(Array.isArray(data) ? data : [])
     } catch {
       setMembers([])
     } finally {
