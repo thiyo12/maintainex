@@ -1,23 +1,28 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../../lib/colors'
-import { v2Jobs, v2Quotes, V2Job } from '../../../../lib/api-v2'
-
-const statusColors: Record<string, string> = {
-  OPEN: colors.amber,
-  IN_PROGRESS: '#3B82F6',
-  COMPLETED: colors.success,
-  CANCELLED: colors.error,
-}
+import { useColors } from '../../../../lib/ThemeContext'
+import { v2Jobs, v2Quotes, v2JobActions, V2Job } from '../../../../lib/api-v2'
+import JobLifecycleTracker from '../../../../components/ui/JobLifecycleTracker'
 
 export default function V2ProviderMyJobsScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
+  const statusColors: Record<string, string> = {
+    OPEN: colors.amber,
+    IN_PROGRESS: '#3B82F6',
+    QUOTE_ACCEPTED: '#8B5CF6',
+    ESCROW_DEPOSITED: '#06B6D4',
+    COMPLETED: colors.success,
+    CANCELLED: colors.error,
+  }
   const router = useRouter()
   const [jobs, setJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [cancelling, setCancelling] = useState<string | null>(null)
 
   const loadJobs = useCallback(async () => {
     try {
@@ -73,28 +78,57 @@ export default function V2ProviderMyJobsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.amber} />}
         >
           {jobs.map((job) => (
-            <TouchableOpacity
-              key={job.id}
-              style={styles.jobCard}
-              onPress={() => router.push(`/(tasker)/jobs/v2/manage/${job.id}`)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardTop}>
-                <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
-                  <Text style={styles.statusText}>{job.status.replace(/_/g, ' ')}</Text>
-                </View>
-              </View>
-              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-              <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.cardFooter}>
-                <Text style={styles.jobBudget}>LKR {job.budgetAmount}</Text>
-                {job.myQuote ? (
-                  <View style={styles.myQuotePill}>
-                    <Text style={styles.myQuoteText}>My quote: LKR {job.myQuote.price}</Text>
+            <View key={job.id}>
+              <TouchableOpacity
+                style={styles.jobCard}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${job.id}`)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardTop}>
+                  <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
+                    <Text style={styles.statusText}>{job.status.replace(/_/g, ' ')}</Text>
                   </View>
-                ) : null}
-              </View>
-            </TouchableOpacity>
+                </View>
+                <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+                <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
+                <View style={styles.cardFooter}>
+                  <Text style={styles.jobBudget}>LKR {job.budgetAmount}</Text>
+                  {job.myQuote ? (
+                    <View style={styles.myQuotePill}>
+                      <Text style={styles.myQuoteText}>My quote: LKR {job.myQuote.price}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+              {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+                <View style={{ paddingHorizontal: 4 }}>
+                  <JobLifecycleTracker status={job.status} createdAt={job.createdAt} />
+                  <TouchableOpacity
+                    style={styles.cancelSmall}
+                    onPress={() => {
+                      Alert.alert('Cancel Quote?', 'This will withdraw your quote for this job.', [
+                        { text: 'Keep', style: 'cancel' },
+                        { text: 'Withdraw', style: 'destructive', onPress: async () => {
+                          setCancelling(job.id)
+                          try {
+                            await v2JobActions.complete(job.id, 'CANCEL')
+                            Alert.alert('Withdrawn', 'Your quote has been withdrawn')
+                          } catch {}
+                          setCancelling(null)
+                        }},
+                      ])
+                    }}
+                    disabled={cancelling === job.id}
+                  >
+                    {cancelling === job.id ? (
+                      <ActivityIndicator size="small" color={colors.error} />
+                    ) : (
+                      <Text style={styles.cancelSmallText}>Cancel</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           ))}
         </ScrollView>
       )}
@@ -102,7 +136,7 @@ export default function V2ProviderMyJobsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: colors.ink },
@@ -127,4 +161,6 @@ const styles = StyleSheet.create({
   jobBudget: { fontSize: 15, fontWeight: '700', color: colors.amberDark },
   myQuotePill: { backgroundColor: '#D1FAE5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   myQuoteText: { fontSize: 12, fontWeight: '600', color: colors.success },
+  cancelSmall: { alignSelf: 'flex-end', paddingVertical: 6, paddingHorizontal: 12, marginBottom: 8 },
+  cancelSmallText: { fontSize: 12, fontWeight: '600', color: colors.error, textDecorationLine: 'underline' },
 })

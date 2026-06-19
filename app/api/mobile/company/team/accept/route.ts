@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           name: invite.name,
           role: invite.role,
-          skills: [],
+          skills: '[]',
         },
       }),
       prisma.teamInvite.update({

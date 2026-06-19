@@ -3,12 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { jobs } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/auth'
 import { JobPosting } from '../../../../lib/types'
 
 export default function JobCompleteScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const { user } = useAuth()
@@ -160,7 +162,7 @@ export default function JobCompleteScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   backBtn: { paddingHorizontal: 24, paddingTop: 8 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },

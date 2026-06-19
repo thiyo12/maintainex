@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 // Get single tasker
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -27,8 +28,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       userId: tasker.userId,
       bio: tasker.bio,
       hourlyRate: tasker.hourlyRate,
-      skills: tasker.skills,
-      serviceAreas: tasker.serviceAreas,
+      skills: safeParseJsonArr(tasker.skills),
+      serviceAreas: safeParseJsonArr(tasker.serviceAreas),
       rating: tasker.rating,
       completedJobs: tasker.completedJobs,
       isVerified: tasker.isVerified,

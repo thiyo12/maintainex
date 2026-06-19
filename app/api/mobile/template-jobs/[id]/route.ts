@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       categoryId: job.categoryId,
       name: job.name,
       description: job.description,
-      whatIsIncluded: job.whatIsIncluded,
+      whatIsIncluded: safeParseJsonArr(job.whatIsIncluded),
       typicalDurationMinutes: job.typicalDurationMinutes,
       priceMin: job.priceMin,
       priceMax: job.priceMax,

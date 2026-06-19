@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
   price: string
@@ -12,36 +12,36 @@ interface Props {
 }
 
 export default function StickyBottomBar({ price, label, buttonText, onPress, disabled, icon }: Props) {
+  const colors = useColors()
+    const styles = makeStyles(colors)
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { backgroundColor: colors.white, borderTopColor: colors.border }]}>
       <View style={styles.container}>
         <View style={styles.priceCol}>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.price}>{price}</Text>
+          <Text style={[styles.label, { color: colors.muted }]}>{label}</Text>
+          <Text style={[styles.price, { color: colors.ink }]}>{price}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.button, disabled && styles.buttonDisabled]}
+          style={[styles.button, { backgroundColor: colors.amber }, disabled && { opacity: 0.5 }]}
           onPress={onPress}
           disabled={disabled}
           activeOpacity={0.8}
         >
-          {icon && <Ionicons name={icon} size={18} color="#fff" style={{ marginRight: 6 }} />}
-          <Text style={styles.buttonText}>{buttonText}</Text>
+          {icon && <Ionicons name={icon} size={18} color={colors.white} style={{ marginRight: 6 }} />}
+          <Text style={[styles.buttonText, { color: colors.white }]}>{buttonText}</Text>
         </TouchableOpacity>
       </View>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   wrap: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.white,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
     paddingBottom: 34,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
@@ -57,16 +57,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   priceCol: {},
-  label: { fontSize: 11, color: colors.muted },
-  price: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  label: { fontSize: 11 },
+  price: { fontSize: 18, fontWeight: '700' },
   button: {
-    backgroundColor: colors.amber,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,
   },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { fontSize: 15, fontWeight: '600', color: colors.white },
+  buttonText: { fontSize: 15, fontWeight: '600' },
 })

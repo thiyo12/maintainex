@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { seedJobCategories } from '@/lib/v2-job-categories'
 
+function safeParseJsonArr(val: string | null | undefined): string[] {
+  if (!val) return []
+  try {
+    const parsed = JSON.parse(val)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return val ? val.split(',').map(s => s.trim()).filter(Boolean) : []
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -12,13 +22,22 @@ export async function GET(request: NextRequest) {
       await seedJobCategories(prisma)
     }
 
-    const categories = await prisma.jobCategory.findMany({
-      where: { isActive: true, countries: { has: country } },
+    const allCategories = await prisma.jobCategory.findMany({
+      where: { isActive: true },
       include: {
         jobs: { where: { isActive: true }, orderBy: { name: 'asc' } },
       },
       orderBy: { sortOrder: 'asc' },
     })
+
+    function matchesCountry(countriesJson: string, target: string): boolean {
+      try {
+        const arr = JSON.parse(countriesJson)
+        return Array.isArray(arr) && arr.includes(target)
+      } catch { return false }
+    }
+
+    const categories = allCategories.filter(c => matchesCountry(c.countries, country))
 
     return NextResponse.json(categories.map(c => ({
       id: c.id,
@@ -26,21 +45,21 @@ export async function GET(request: NextRequest) {
       iconName: c.iconName,
       colorHex: c.colorHex,
       sortOrder: c.sortOrder,
-      countries: c.countries,
+      countries: safeParseJsonArr(c.countries),
       isActive: c.isActive,
       jobs: c.jobs.map(j => ({
         id: j.id,
         categoryId: j.categoryId,
         name: j.name,
         description: j.description,
-        whatIsIncluded: j.whatIsIncluded,
+        whatIsIncluded: safeParseJsonArr(j.whatIsIncluded),
         typicalDurationMinutes: j.typicalDurationMinutes,
         priceMin: j.priceMin,
         priceMax: j.priceMax,
         currency: j.currency,
         isPopular: j.isPopular,
         isCompanyOnly: j.isCompanyOnly,
-        countries: j.countries,
+        countries: safeParseJsonArr(j.countries),
       })),
     })))
   } catch (error) {

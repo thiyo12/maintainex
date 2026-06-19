@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import PressScale from './PressScale'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
   name: string
@@ -12,27 +12,28 @@ interface Props {
 }
 
 export default function CategoryCard({ name, iconName, colorHex, jobCount, onPress }: Props) {
+  const colors = useColors()
+    const styles = makeStyles(colors)
   return (
     <PressScale onPress={onPress}>
-      <View style={[styles.card, { borderLeftColor: colorHex }]}>
+      <View style={[styles.card, { backgroundColor: colors.surface, borderLeftColor: colorHex }]}>
         <View style={[styles.iconWrap, { backgroundColor: colorHex + '20' }]}>
           <Ionicons name={iconName as any} size={24} color={colorHex} />
         </View>
         <View style={styles.content}>
-          <Text style={styles.name}>{name}</Text>
-          <Text style={styles.count}>{jobCount} jobs available</Text>
+          <Text style={[styles.name, { color: colors.ink }]}>{name}</Text>
+          <Text style={[styles.count, { color: colors.muted }]}>{jobCount} jobs available</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </View>
     </PressScale>
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,

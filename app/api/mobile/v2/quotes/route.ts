@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         price,
         estimatedCompletionTime: estimatedCompletionTime || '',
         message: message || '',
-        attachments: attachments || [],
+        attachments: JSON.stringify(attachments || []),
       },
     })
 

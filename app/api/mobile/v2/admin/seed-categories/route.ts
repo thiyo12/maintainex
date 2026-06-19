@@ -35,15 +35,15 @@ export async function POST(_request: NextRequest) {
     for (const cat of categories) {
       const created = await prisma.jobCategory.upsert({
         where: { name: cat.name },
-        update: { iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: cat.countries, isActive: true },
-        create: { name: cat.name, iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: cat.countries, isActive: true },
+        update: { iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: JSON.stringify(cat.countries), isActive: true },
+        create: { name: cat.name, iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: JSON.stringify(cat.countries), isActive: true },
       })
       for (const job of cat.jobs) {
         const jobId = `${cat.name.toLowerCase().replace(/\s+/g, '-')}-${job.name.toLowerCase().replace(/\s+/g, '-')}`
         await prisma.templateJob.upsert({
           where: { id: jobId },
-          update: { categoryId: created.id, name: job.name, description: job.description, whatIsIncluded: job.whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes, priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR', isPopular: job.isPopular, isCompanyOnly: false, countries: cat.countries, isActive: true },
-          create: { id: jobId, categoryId: created.id, name: job.name, description: job.description, whatIsIncluded: job.whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes, priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR', isPopular: job.isPopular, isCompanyOnly: false, countries: cat.countries, isActive: true },
+          update: { categoryId: created.id, name: job.name, description: job.description, whatIsIncluded: JSON.stringify(job.whatIsIncluded), typicalDurationMinutes: job.typicalDurationMinutes, priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR', isPopular: job.isPopular, isCompanyOnly: false, countries: JSON.stringify(cat.countries), isActive: true },
+          create: { id: jobId, categoryId: created.id, name: job.name, description: job.description, whatIsIncluded: JSON.stringify(job.whatIsIncluded), typicalDurationMinutes: job.typicalDurationMinutes, priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR', isPopular: job.isPopular, isCompanyOnly: false, countries: JSON.stringify(cat.countries), isActive: true },
         })
         totalJobs++
       }

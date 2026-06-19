@@ -3,11 +3,13 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, Activit
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { bookings } from '../../../../lib/api'
 import { Booking } from '../../../../lib/types'
 
 export default function ReceiptScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const [booking, setBooking] = useState<Booking | null>(null)
@@ -159,7 +161,7 @@ export default function ReceiptScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   backBtn: { paddingHorizontal: 24, paddingTop: 8 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },

@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { getAuthToken } from '../../../lib/api'
 
@@ -38,6 +38,8 @@ const FALLBACK_CATEGORIES: Category[] = [
 ]
 
 export default function TaskerServicesOnboarding() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { user, refreshUser } = useAuth()
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES)
@@ -184,7 +186,7 @@ export default function TaskerServicesOnboarding() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 24, paddingBottom: 48 },
   backButton: { marginBottom: 16, alignSelf: 'flex-start' },

@@ -2,7 +2,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'r
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
+import { fonts } from '../../lib/fonts'
+import { fontSizes } from '../../lib/tokens'
 import { spacing, borderRadius } from '../../lib/tokens'
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
 
 export default function ScreenHeader({ title, subtitle, onBack, rightAction }: Props) {
   const colors = useColors()
+    const styles = makeStyles(colors)
 
   return (
     <LinearGradient
@@ -39,7 +41,7 @@ export default function ScreenHeader({ title, subtitle, onBack, rightAction }: P
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   header: {
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + spacing.sm : spacing.sm,
     paddingBottom: spacing.xl,

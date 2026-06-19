@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -37,9 +38,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       profileImage: tasker.profileImage,
       latitude: tasker.latitude,
       longitude: tasker.longitude,
-      skills: tasker.skills,
+      skills: safeParseJsonArr(tasker.skills),
       hourlyRate: tasker.hourlyRate,
-      serviceAreas: tasker.serviceAreas,
+      serviceAreas: safeParseJsonArr(tasker.serviceAreas),
       phone: tasker.user.phone,
       email: tasker.user.email,
       reviews: tasker.reviews.map(r => ({

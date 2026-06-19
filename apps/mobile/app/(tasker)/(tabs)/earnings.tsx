@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { earnings } from '../../../lib/api'
 
 type Period = 'weekly' | 'monthly' | 'yearly'
@@ -16,6 +17,8 @@ interface EarningsData {
 }
 
 export default function TaskerEarnings() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('weekly')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -120,10 +123,9 @@ export default function TaskerEarnings() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
-  topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   balanceCard: {
     backgroundColor: colors.amber,
@@ -133,21 +135,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  balanceLabel: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
-  balanceValue: { fontSize: 36, fontWeight: '800', color: colors.white, marginBottom: 16 },
+  balanceLabel: { fontSize: 14, fontFamily: fonts.body, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
+  balanceValue: { fontSize: 36, fontFamily: fonts.heading, color: colors.white, marginBottom: 16 },
   withdrawBtn: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 32,
     paddingVertical: 12,
-    borderRadius: 24,
+    borderRadius: 100,
   },
-  withdrawBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  withdrawBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.white },
   statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 16 },
   statCard: {
     flex: 1,
     backgroundColor: colors.white,
     padding: 12,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -155,28 +157,28 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  statLabel: { fontSize: 11, color: colors.muted, marginBottom: 4 },
-  statValue: { fontSize: 14, fontWeight: '800', color: colors.ink },
+  statLabel: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginBottom: 4 },
+  statValue: { fontSize: 14, fontFamily: fonts.heading, color: colors.ink },
   periodTabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
     backgroundColor: colors.border,
-    borderRadius: 12,
+    borderRadius: 100,
     padding: 4,
     marginBottom: 16,
   },
   periodTab: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 100,
     alignItems: 'center',
   },
   periodTabActive: { backgroundColor: colors.white },
-  periodTabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
-  periodTabTextActive: { color: colors.amber, fontWeight: '700' },
+  periodTabText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.muted },
+  periodTabTextActive: { color: colors.amber, fontFamily: fonts.bodyMedium },
   transactionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.bodyMedium,
     color: colors.ink,
     paddingHorizontal: 24,
     marginBottom: 10,
@@ -188,7 +190,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     marginHorizontal: 24,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -198,10 +200,10 @@ const styles = StyleSheet.create({
   },
   txLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   txDot: { width: 8, height: 8, borderRadius: 4 },
-  txJob: { fontSize: 14, fontWeight: '600', color: colors.ink },
-  txDate: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  txJob: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
+  txDate: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
   txRight: {},
-  txAmount: { fontSize: 15, fontWeight: '700' },
+  txAmount: { fontSize: 15, fontFamily: fonts.bodyMedium },
   empty: { alignItems: 'center', paddingTop: 40 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.muted },
+  emptyTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.muted },
 })

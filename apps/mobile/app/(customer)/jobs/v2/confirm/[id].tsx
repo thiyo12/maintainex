@@ -3,12 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../../../lib/colors'
+import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions } from '../../../../../lib/api-v2'
 import Avatar from '../../../../../components/ui/Avatar'
 
 export default function V2ConfirmBookingScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [job, setJob] = useState<any>(null)
@@ -160,7 +162,7 @@ export default function V2ConfirmBookingScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.amber },

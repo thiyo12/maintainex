@@ -121,6 +121,18 @@ const si: Record<string, any> = {
     noCategory: 'දෝෂය',
     noCategoryMsg: 'සියලු ක්ෂේත්‍ර පුරවන්න',
   },
+  welcomeOnboarding: {
+    heading: 'Maintainex වෙත\nසාදරයෙන් පිළිගනිමු',
+    subtitle: 'ආරම්භ කිරීමට ඔබ කැමති ආකාරය තෝරන්න',
+    customerTitle: 'වෘත්තිකයෙකු බඳවා ගන්න',
+    customerDesc: 'රැකියාවක් පළ කර ඔබේ අවශ්‍යතා සඳහා නිවැරදි විශේෂඥයා සොයා ගන්න',
+    taskerTitle: 'සේවකයෙකු ලෙස වැඩ කරන්න',
+    taskerDesc: 'දේශීය රැකියා සොයා ගන්න, ඔබේ මිල ගණන් නියම කරන්න',
+    companyTitle: 'ඔබේ සමාගම ලියාපදිංචි කරන්න',
+    companyDesc: 'කණ්ඩායම කළමනාකරණය කරන්න, ව්‍යාපෘති සඳහා ලංසු කරන්න',
+    signIn: 'දැනටමත් ගිණුමක් තිබේද?',
+    signInLink: 'පුරනය වන්න',
+  },
   profile: {
     title: 'පැතිකඩ',
     edit: 'පැතිකඩ සංස්කරණය කරන්න',

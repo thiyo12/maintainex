@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,11 +18,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ categories: [], jobs: [], taskers: [], totalResults: 0 })
     }
 
-    const [categories, jobs, taskers] = await Promise.all([
+    const [allCategories, allJobs, taskers] = await Promise.all([
       prisma.jobCategory.findMany({
         where: {
           isActive: true,
-          countries: { has: country },
           name: { contains: query, mode: 'insensitive' },
         },
         orderBy: { sortOrder: 'asc' },
@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       prisma.templateJob.findMany({
         where: {
           isActive: true,
-          countries: { has: country },
           OR: [
             { name: { contains: query, mode: 'insensitive' } },
             { description: { contains: query, mode: 'insensitive' } },
@@ -51,6 +50,8 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
+    const categories = allCategories.filter(c => jsonArrayContains(c.countries, country))
+    const jobs = allJobs.filter(j => jsonArrayContains(j.countries, country))
     const totalResults = categories.length + jobs.length + taskers.length
 
     return NextResponse.json({

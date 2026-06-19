@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 type Tab = 'active' | 'completed' | 'all'
 
 export default function CompanyContracts() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [tab, setTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(true)
   const [contracts, setContracts] = useState<any[]>([])
@@ -75,13 +77,13 @@ export default function CompanyContracts() {
               <Text style={styles.contractClient}>{c.clientName} • #{c.id}</Text>
               <View style={styles.progressRow}>
                 <View style={styles.progressBar}>
-                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? colors.success : colors.companyAccent }]} />
+                  <View style={[styles.progressFill, { width: `${c.progress}%`, backgroundColor: c.progress >= 100 ? colors.success : colors.amber }]} />
                 </View>
                 <Text style={styles.progressText}>{c.progress}%</Text>
               </View>
               <View style={styles.cardBottom}>
                 <View style={[styles.contractStatus, { backgroundColor: c.status === 'Completed' || c.status === 'completed' ? '#D1FAE5' : '#FFF7ED' }]}>
-                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? colors.success : colors.companyAccent }]}>
+                  <Text style={[styles.contractStatusText, { color: c.status === 'Completed' || c.status === 'completed' ? colors.success : colors.amber }]}>
                     {c.status}
                   </Text>
                 </View>
@@ -95,7 +97,7 @@ export default function CompanyContracts() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
@@ -110,7 +112,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
   tabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
-  tabTextActive: { color: colors.companyAccent, fontWeight: '700' },
+  tabTextActive: { color: colors.amber, fontWeight: '700' },
   contractCard: {
     backgroundColor: colors.white,
     marginHorizontal: 24,
@@ -125,7 +127,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   contractTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1, marginRight: 8 },
-  contractValue: { fontSize: 15, fontWeight: '700', color: colors.companyAccent },
+  contractValue: { fontSize: 15, fontWeight: '700', color: colors.amber },
   contractClient: { fontSize: 13, color: colors.muted, marginBottom: 10 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   progressBar: {
@@ -140,6 +142,6 @@ const styles = StyleSheet.create({
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   contractStatus: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   contractStatusText: { fontSize: 12, fontWeight: '600' },
-  viewDetails: { fontSize: 13, color: colors.companyAccent, fontWeight: '600' },
+  viewDetails: { fontSize: 13, color: colors.amber, fontWeight: '600' },
   emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
 })

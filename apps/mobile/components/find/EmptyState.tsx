@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { fonts } from '../../lib/fonts'
 
 interface Props {
   icon?: keyof typeof Ionicons.glyphMap
@@ -19,6 +20,6 @@ export default function EmptyState({ icon = 'search-outline', title, subtitle }:
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  title: { fontSize: 16, fontWeight: '600', color: '#9CA3AF', marginTop: 12, textAlign: 'center' },
-  subtitle: { fontSize: 13, color: '#D1D5DB', marginTop: 4, textAlign: 'center' },
+  title: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: '#6B7280', marginTop: 12, textAlign: 'center' },
+  subtitle: { fontSize: 13, fontFamily: 'Outfit_500Medium', color: '#9CA3AF', marginTop: 4, textAlign: 'center' },
 })

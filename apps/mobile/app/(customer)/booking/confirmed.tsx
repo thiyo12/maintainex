@@ -4,10 +4,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { bookings } from '../../../lib/api'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import type { Booking } from '../../../lib/types'
 
 export default function BookingConfirmedScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { bookingId } = useLocalSearchParams()
   const scaleAnim = useRef(new Animated.Value(0)).current
@@ -92,7 +94,7 @@ export default function BookingConfirmedScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB', alignItems: 'center', paddingHorizontal: 24, paddingTop: 40 },
   circle: {
     width: 72, height: 72, borderRadius: 36,

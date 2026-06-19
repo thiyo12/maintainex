@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../../../lib/colors'
+import { useColors } from '../../../../../lib/ThemeContext'
 import { v2Jobs, v2Quotes } from '../../../../../lib/api-v2'
 
 export default function V2SubmitQuoteScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [job, setJob] = useState<any>(null)
@@ -147,7 +149,7 @@ export default function V2SubmitQuoteScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scroll: { flex: 1 },
 

@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { getLocationName } from './locations'
+import { jsonArrayContains, safeParseJsonArr } from './db-utils'
 
 export interface MatchedProvider {
   id: string
@@ -34,7 +35,6 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     prisma.taskerProfile.findMany({
       where: {
         isOnline: true,
-        skills: { has: categorySlug },
       },
       include: {
         user: { select: { id: true, name: true } },
@@ -43,7 +43,6 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     prisma.companyProfile.findMany({
       where: {
         isVerified: true,
-        services: { has: categorySlug },
       },
       include: {
         user: { select: { id: true, name: true } },
@@ -51,13 +50,16 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     }),
   ])
 
+  const filteredIndividuals = individuals.filter(ind => jsonArrayContains(ind.skills, categorySlug))
+  const filteredCompanies = companies.filter(comp => jsonArrayContains(comp.services, categorySlug))
+
   const providers: MatchedProvider[] = []
 
-  for (const ind of individuals) {
+  for (const ind of filteredIndividuals) {
     const completedJobs = ind.completedJobs
     const maxCompleted = 500
 
-    const areaMatch = areaId ? matchesArea(areaId, ind.serviceAreas || []) : true
+    const areaMatch = areaId ? matchesArea(areaId, ind.serviceAreas) : true
 
     const responseSpeed = 0.5
 
@@ -89,11 +91,11 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     })
   }
 
-  for (const comp of companies) {
+  for (const comp of filteredCompanies) {
     const completedJobs = comp.completedProjects
     const maxCompleted = 500
 
-    const areaMatch = areaId ? matchesArea(areaId, comp.serviceAreas || []) : true
+    const areaMatch = areaId ? matchesArea(areaId, comp.serviceAreas) : true
 
     const responseSpeed = 0.5
 
@@ -130,7 +132,8 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
   return providers.slice(0, 20)
 }
 
-function matchesArea(areaId: string, serviceAreas: string[]): boolean {
+function matchesArea(areaId: string, serviceAreas: string | null | undefined): boolean {
   const locationName = getLocationName(areaId).toLowerCase()
-  return serviceAreas.some((area) => locationName.includes(area.toLowerCase()))
+  const arr = safeParseJsonArr(serviceAreas)
+  return arr.some((area) => locationName.includes(area.toLowerCase()))
 }

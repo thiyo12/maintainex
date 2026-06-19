@@ -123,6 +123,18 @@ const en = {
     noCategory: 'Error',
     noCategoryMsg: 'Fill in all fields',
   },
+  welcomeOnboarding: {
+    heading: 'Welcome to\nMaintainex',
+    subtitle: 'Select how you\'d like to get started',
+    customerTitle: 'Hire a Professional',
+    customerDesc: 'Post a job and find the right expert for your needs',
+    taskerTitle: 'Work as a Tasker',
+    taskerDesc: 'Find local jobs, set your own rates, and grow your business',
+    companyTitle: 'Register Your Company',
+    companyDesc: 'Manage your team, bid on projects, and scale operations',
+    signIn: 'Already have an account?',
+    signInLink: 'Sign in',
+  },
   profile: {
     title: 'Profile',
     edit: 'Edit Profile',

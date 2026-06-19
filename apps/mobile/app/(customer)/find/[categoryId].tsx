@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TextInput, FlatList, StyleSheet, RefreshControl } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { jobCategories, templateJobs } from '../../../lib/api'
 import { useCountry } from '../../../lib/country'
 import JobCard from '../../../components/find/JobCard'
@@ -10,6 +10,8 @@ import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
 
 export default function JobList() {
+  const colors = useColors()
+    const styles = makeStyles(colors)
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>()
   const [category, setCategory] = useState<any>(null)
   const [jobs, setJobs] = useState<any[]>([])
@@ -111,7 +113,7 @@ export default function JobList() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16 },
   iconWrap: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },

@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { taskers } from '../../../lib/api'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import type { TaskerProfile } from '../../../lib/types'
 import PressScale from '../../../components/find/PressScale'
 
 export default function ExploreScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [filterSkill, setFilterSkill] = useState('')
@@ -134,7 +136,7 @@ export default function ExploreScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.ink },

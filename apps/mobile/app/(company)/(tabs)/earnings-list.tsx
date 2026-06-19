@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 type Period = 'monthly' | 'quarterly' | 'yearly'
 
 export default function CompanyEarnings() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('monthly')
   const [loading, setLoading] = useState(true)
   const [earnings, setEarnings] = useState<any>(null)
@@ -39,7 +41,7 @@ export default function CompanyEarnings() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.companyAccent} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       </SafeAreaView>
     )
@@ -100,14 +102,14 @@ export default function CompanyEarnings() {
             return (
               <View key={p.id || i} style={styles.payoutCard}>
                 <View style={styles.payoutLeft}>
-                  <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.success : colors.companyAccent }]} />
+                  <View style={[styles.payoutDot, { backgroundColor: isPaid ? colors.success : colors.amber }]} />
                   <View style={styles.payoutInfo}>
                     <Text style={styles.payoutContract} numberOfLines={1}>{p.contract || p.title}</Text>
                     <Text style={styles.payoutDate}>{p.date || (p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '')}</Text>
                   </View>
                 </View>
                 <View style={styles.payoutRight}>
-                  <Text style={[styles.payoutAmount, { color: isPaid ? colors.success : colors.companyAccent }]}>
+                  <Text style={[styles.payoutAmount, { color: isPaid ? colors.success : colors.amber }]}>
                     LKR {Number(p.amount).toLocaleString()}
                   </Text>
                   <Text style={styles.payoutStatus}>{status}</Text>
@@ -121,12 +123,12 @@ export default function CompanyEarnings() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   revenueCard: {
-    backgroundColor: colors.companyAccent,
+    backgroundColor: colors.amber,
     marginHorizontal: 24,
     padding: 24,
     borderRadius: 20,
@@ -169,7 +171,7 @@ const styles = StyleSheet.create({
   periodTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   periodTabActive: { backgroundColor: colors.white },
   periodTabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
-  periodTabTextActive: { color: colors.companyAccent, fontWeight: '700' },
+  periodTabTextActive: { color: colors.amber, fontWeight: '700' },
   payoutTitle: {
     fontSize: 16, fontWeight: '700', color: colors.ink,
     paddingHorizontal: 24, marginBottom: 10,

@@ -2,7 +2,8 @@ import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 
 const tabs = [
   { name: 'index', title: 'Home', icon: 'home-outline' as const },
@@ -12,6 +13,7 @@ const tabs = [
 ]
 
 export default function TabsLayout() {
+  const colors = useColors()
   const insets = useSafeAreaInsets()
   const bottomPad = Math.max(insets.bottom, 4)
 
@@ -33,7 +35,7 @@ export default function TabsLayout() {
         },
         tabBarActiveTintColor: colors.amber,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 11, fontFamily: 'DMSans_500Medium' },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: fonts.bodyMedium },
         tabBarShowLabel: true,
       }}
     >

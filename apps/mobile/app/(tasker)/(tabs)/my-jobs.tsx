@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { jobs } from '../../../lib/api'
 import type { JobPosting } from '../../../lib/types'
 import PressScale from '../../../components/find/PressScale'
@@ -11,6 +12,8 @@ import PressScale from '../../../components/find/PressScale'
 type Tab = 'active' | 'completed' | 'cancelled'
 
 export default function TaskerMyJobs() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const [tab, setTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(true)
@@ -117,10 +120,10 @@ export default function TaskerMyJobs() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 24,
@@ -136,16 +139,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabActive: { backgroundColor: colors.white },
-  tabText: { fontSize: 14, fontWeight: '600', color: colors.muted },
-  tabTextActive: { color: colors.amber, fontWeight: '700' },
+  tabText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.muted },
+  tabTextActive: { color: colors.amber, fontFamily: fonts.bodyMedium },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   empty: { alignItems: 'center', paddingTop: 80 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.muted },
+  emptyTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.muted },
   jobCard: {
     backgroundColor: colors.white,
     marginHorizontal: 24,
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 18,
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -154,29 +157,29 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   jobTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  jobTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1 },
-  jobAmount: { fontSize: 15, fontWeight: '700', color: colors.amber },
+  jobTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, flex: 1 },
+  jobAmount: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.amber },
   jobCustomer: { fontSize: 13, color: colors.muted, marginBottom: 8 },
   jobBottom: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 12, fontWeight: '600' },
+  statusText: { fontSize: 12, fontFamily: fonts.bodyMedium },
   jobTime: { fontSize: 12, color: colors.muted },
   actionRow: { flexDirection: 'row', gap: 10 },
   trackBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: 14,
     backgroundColor: colors.amber,
     alignItems: 'center',
   },
-  trackBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
+  trackBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#111827' },
   msgBtn: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
   },
-  msgBtnText: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  msgBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
 })

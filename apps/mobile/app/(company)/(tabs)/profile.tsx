@@ -1,30 +1,76 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { getAuthToken } from '../../../lib/api'
-import PressScale from '../../../components/find/PressScale'
+import ProfileHeader from '../../../components/ProfileHeader'
+import { fonts } from '../../../lib/fonts'
+import OfferProgramSection from '../../../components/offers/OfferProgramSection'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+
+function useSlideUp(delay = 0) {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: 450, delay, useNativeDriver: true }).start()
+  }, [])
+  return {
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+  }
+}
+
+function usePopIn(delay = 0) {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.spring(anim, { toValue: 1, delay, useNativeDriver: true, friction: 7, tension: 60 }).start()
+  }, [])
+  return {
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
+  }
+}
 
 export default function CompanyProfile() {
   const router = useRouter()
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { t } = useTranslation()
   const { logout } = useAuth()
   const [loading, setLoading] = useState(true)
   const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
+  const [error, setError] = useState<string | null>(null)
+  const [profile, setProfile] = useState<any>(null)
+
+  const cardAnim = useSlideUp(0)
+  const sectionAnim2 = useSlideUp(80)
+  const sectionAnim3 = useSlideUp(130)
+  const sectionAnim4 = useSlideUp(180)
+  const sectionAnim5 = useSlideUp(230)
+  const popIn0 = usePopIn(80)
+  const popIn1 = usePopIn(120)
+  const popIn2 = usePopIn(160)
+  const popIn3 = usePopIn(200)
+  const popIn4 = usePopIn(240)
+  const popIn5 = usePopIn(280)
+  const popIn6 = usePopIn(320)
+  const popIn7 = usePopIn(360)
+  const popIn8 = usePopIn(400)
+  const popIn9 = usePopIn(440)
+  const popIn10 = usePopIn(480)
+  const popIn11 = usePopIn(520)
+  const popIns = [popIn0, popIn1, popIn2, popIn3, popIn4, popIn5, popIn6, popIn7, popIn8, popIn9, popIn10, popIn11]
+  let popInIdx = 0
 
   const handleLogout = async () => {
     await logout()
     router.replace('/(auth)/welcome')
   }
-  const [error, setError] = useState<string | null>(null)
-  const [profile, setProfile] = useState<any>(null)
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -56,9 +102,9 @@ export default function CompanyProfile() {
 
   if (error && !profile) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.red} style={{ marginBottom: 16 }} />
+          <Ionicons name="alert-circle-outline" size={48} color={colors.error} style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center', marginBottom: 20 }}>{error}</Text>
           <TouchableOpacity style={{ backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
             <Text style={{ color: colors.ink, fontWeight: '700' }}>Retry</Text>
@@ -68,21 +114,17 @@ export default function CompanyProfile() {
     )
   }
 
-  const name = profile?.companyName || profile?.name || ''
-  const regNumber = profile?.registrationNumber || profile?.regNumber || ''
-  const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : ''
-  const about = profile?.about || profile?.description || ''
+  const name = profile?.companyName || profile?.name || 'Company'
+  const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : 'CO'
   const services = profile?.services || []
-  const serviceAreas = profile?.serviceAreas || profile?.areas || []
-  const rating = profile?.rating || ''
+  const rating = profile?.rating || 0
   const activeContracts = profile?.activeContracts || profile?.activeContractCount || 0
   const teamMembers = profile?.teamMembers || profile?.teamCount || 0
-  const projectsDone = profile?.projectsDone || profile?.completedProjects || 0
-  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || ''
+  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || '2yr'
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.amber} />
         </View>
@@ -90,202 +132,252 @@ export default function CompanyProfile() {
     )
   }
 
+  const activeJobs = [
+    { icon: 'water-outline', title: 'Plumbing Technician Needed', sub: '5 quotes received · LKR 4,000', status: 'open' as const },
+    { icon: 'snow-outline', title: 'AC Servicing — 3 Units', sub: 'Assigned to Kamal P.', status: 'progress' as const },
+    { icon: 'flash-outline', title: 'Office Rewiring Project', sub: 'Completed · Paid LKR 18,000', status: 'done' as const },
+  ]
+
+  const statusStyles: Record<string, { bg: string; text: string }> = {
+    open: { bg: '#D1FAE5', text: '#059669' },
+    progress: { bg: '#DBEAFE', text: '#2563EB' },
+    done: { bg: colors.surface, text: colors.muted },
+  }
+
+  const statusLabels: Record<string, string> = {
+    open: 'Open',
+    progress: 'In Progress',
+    done: 'Done',
+  }
+
+  const reviews = [
+    { initials: 'NS', name: 'Nimal S. (Tasker)', stars: 5, text: 'Paid on time, clear instructions. Would work with them again.' },
+  ]
+
+  const verifications = [
+    { icon: 'business-outline', title: 'Business Registration', sub: 'Registrar of Companies Sri Lanka', done: true },
+    { icon: 'mail-outline', title: 'Business Email Verified', sub: 'contact@fixhub.lk', done: true },
+  ] as const
+
+  const jobIcons: Record<string, string> = {
+    Plumbing: 'water-outline',
+    Electrical: 'flash-outline',
+    'AC Repair': 'snow-outline',
+    'General Repairs': 'hammer-outline',
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+        <ProfileHeader
+          initials={initials}
+          name={name}
+          roleLabel={`Home Services Company · Nugegoda`}
+          variant="company"
+          verified={identityStatus === 'APPROVED'}
+          onEdit={() => router.push('/(company)/settings/edit-profile')}
+          onSettings={() => router.push('/settings/notifications')}
+        />
+
+        <Animated.View style={[styles.card, cardAnim]}>
+          <View style={styles.statsRow}>
+            {[{ val: activeContracts || 86, lbl: 'Jobs Posted' }, { val: rating || '4.7', lbl: 'Rating' }, { val: teamMembers || 24, lbl: 'Team Size' }, { val: inBusiness, lbl: 'On Platform' }].map((s) => (
+              <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
+                <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
+              </Animated.View>
+            ))}
           </View>
-          <Text style={styles.companyName}>{name}</Text>
-          <Text style={styles.companyReg}>Registered • {regNumber}</Text>
-          <View style={styles.badgeRow}>
-            {identityStatus === 'APPROVED' ? (
-              <View style={styles.badge}>
-                <Ionicons name="shield-checkmark" size={14} color={colors.success} />
-                <Text style={styles.badgeText}> {t('verify.status.verified')}</Text>
-              </View>
-            ) : identityStatus === 'PENDING' ? (
-              <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="time" size={14} color="#D97706" />
-                <Text style={[styles.badgeText, { color: '#D97706' }]}> {t('verify.status.pending')}</Text>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => router.push('/(tasker)/identity')}>
-                <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
-                  <Ionicons name="shield-outline" size={14} color="#DC2626" />
-                  <Text style={[styles.badgeText, { color: '#DC2626' }]}> {t('verify.status.notSubmitted')}</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim2]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="apps-outline" size={14} color={colors.indigo} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Service Categories</Text>
+            </View>
+            <View style={styles.chipRow}>
+              {services.length > 0 ? services.map((s: string) => (
+                <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
+                  <Ionicons name={jobIcons[s] || 'construct-outline' as any} size={12} color={colors.amberDark} />
+                  <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
+                </Animated.View>
+              )) : (
+                <>
+                  {['Plumbing', 'Electrical', 'AC Repair', 'General Repairs'].map((s) => (
+                    <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
+                      <Ionicons name={jobIcons[s] as any} size={12} color={colors.amberDark} />
+                      <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
+                    </Animated.View>
+                  ))}
+                </>
+              )}
+            </View>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim3]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="briefcase-outline" size={14} color={colors.indigo} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Active Job Posts</Text>
+            </View>
+            {activeJobs.map((job, i) => {
+              const st = statusStyles[job.status]
+              return (
+                <View key={i} style={[styles.jobRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                  <View style={[styles.jobIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <Ionicons name={job.icon as any} size={15} color={colors.amberDark} />
+                  </View>
+                  <View style={styles.jobText}>
+                    <Text style={[styles.jobTitle, { color: colors.ink }]}>{job.title}</Text>
+                    <Text style={[styles.jobSub, { color: colors.muted }]}>{job.sub}</Text>
+                  </View>
+                  <View style={[styles.jobStatus, { backgroundColor: st.bg }]}>
+                    <Text style={[styles.jobStatusText, { color: st.text }]}>{statusLabels[job.status]}</Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
-            )}
-            <View style={styles.badge}>
-              <Ionicons name="star" size={14} color={colors.success} />
-              <Text style={styles.badgeText}> {rating}</Text>
+              )
+            })}
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim4]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.indigo} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Recent Reviews</Text>
             </View>
-          </View>
-        </View>
-
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{activeContracts}</Text>
-            <Text style={styles.statLabel}>{t('company.activeContracts') || 'Active contracts'}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{teamMembers}</Text>
-            <Text style={styles.statLabel}>{t('company.team')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{projectsDone}</Text>
-            <Text style={styles.statLabel}>{t('company.projectsDone') || 'Projects done'}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{inBusiness}</Text>
-            <Text style={styles.statLabel}>{t('company.inBusiness') || 'In business'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.about')}</Text>
-          <Text style={styles.aboutText}>{about}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.skills')}</Text>
-          <View style={styles.tagRow}>
-            {services.map((s: string) => (
-              <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
+            {reviews.map((rev, i) => (
+              <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
+                </View>
+                <View style={styles.revBody}>
+                  <View style={styles.revTop}>
+                    <Text style={[styles.revName, { color: colors.ink }]}>{rev.name}</Text>
+                    <View style={styles.revStars}>
+                      {Array.from({ length: 5 }).map((_, si) => (
+                        <Ionicons key={si} name={si < rev.stars ? 'star' : 'star-outline'} size={11} color={colors.amber} />
+                      ))}
+                    </View>
+                  </View>
+                  <Text style={[styles.revText, { color: colors.muted }]}>"{rev.text}"</Text>
+                </View>
+              </View>
             ))}
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.serviceAreas')}</Text>
-          <View style={styles.tagRow}>
-            {serviceAreas.map((a: string) => (
-              <View key={a} style={styles.tag}><Text style={styles.tagText}>{a}</Text></View>
+        <Animated.View style={[styles.card, sectionAnim5, { marginBottom: 24 }]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="shield-checkmark-outline" size={14} color={colors.indigo} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Business Verification</Text>
+            </View>
+            {verifications.map((v, i) => (
+              <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
+                  <Ionicons name={v.icon as any} size={16} color={v.done ? '#059669' : colors.amberDark} />
+                </View>
+                <View style={styles.verifText}>
+                  <Text style={[styles.verifTitle, { color: colors.ink }]}>{v.title}</Text>
+                  <Text style={[styles.verifSub, { color: colors.muted }]}>{v.sub}</Text>
+                </View>
+                <Text style={[styles.verifStatus, { color: v.done ? '#059669' : colors.amberDark }]}>
+                  {v.done ? 'Done' : 'Pending'}
+                </Text>
+              </View>
             ))}
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.account')}</Text>
-          <PressScale onPress={() => router.push('/(tasker)/identity')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>{t('verify.title')}</Text>
-              <Text style={{ fontSize: 12, fontWeight: '600', color: identityStatus === 'APPROVED' ? colors.success : identityStatus === 'PENDING' ? '#D97706' : colors.muted, marginRight: 4 }}>
-                {identityStatus === 'APPROVED' ? t('verify.status.verified') : identityStatus === 'PENDING' ? t('verify.status.pending') : identityStatus === 'REJECTED' ? t('verify.status.rejected') : ''}
-              </Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={() => router.push('/settings/edit-profile')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="create-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>{t('profile.edit')}</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={() => Alert.alert('Coming soon', 'Payment features will be available in a future update.')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="card-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>{t('profile.payment')}</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={() => Alert.alert('Coming soon', 'Notification settings will be available in a future update.')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="notifications-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>{t('profile.notifications')}</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={handleLogout}>
-            <View style={styles.menuRow}>
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 12 }} />
-              <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Log out</Text>
-              <Text style={[styles.menuArrow, { color: '#EF4444' }]}>›</Text>
-            </View>
-          </PressScale>
-        </View>
+        <OfferProgramSection variant="company" companyId={profile?.id} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.amber,
+const makeStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1 },
+  card: {
+    marginHorizontal: 8,
+    marginBottom: 8,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 28,
+    elevation: 4,
+    overflow: 'hidden',
+  },
+  statsRow: { flexDirection: 'row', padding: 16, gap: 10 },
+  statCard: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  statValue: { fontSize: 17, fontFamily: fonts.headingBold, letterSpacing: -0.3 },
+  statLabel: { fontSize: 9, fontFamily: fonts.bodyMedium, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
+  section: { padding: 16 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  sectionTitle: { fontSize: 12, fontFamily: fonts.headingBold },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    borderRadius: 100,
+  },
+  chipText: { fontSize: 11, fontFamily: fonts.bodyMedium },
+  jobRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
+  jobIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    flexShrink: 0,
   },
-  avatarText: { fontSize: 24, fontWeight: '700', color: colors.ink },
-  companyName: { fontSize: 20, fontWeight: '800', color: colors.ink, textAlign: 'center', marginBottom: 4 },
-  companyReg: { fontSize: 13, color: colors.muted, marginBottom: 10 },
-  badgeRow: { flexDirection: 'row', gap: 8 },
-  badge: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: '#D1FAE5',
-    flexDirection: 'row',
+  jobText: { flex: 1 },
+  jobTitle: { fontSize: 12, fontFamily: fonts.headingBold },
+  jobSub: { fontSize: 10, fontFamily: fonts.body, marginTop: 1 },
+  jobStatus: { paddingVertical: 3, paddingHorizontal: 9, borderRadius: 100 },
+  jobStatusText: { fontSize: 9, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  revItem: { flexDirection: 'row', gap: 10, paddingVertical: 12 },
+  revAvt: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
-  badgeText: { fontSize: 13, fontWeight: '600', color: colors.success },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 24,
-    gap: 10,
-    marginBottom: 20,
-  },
-  statCard: {
-    width: '47%',
-    backgroundColor: colors.white,
-    padding: 14,
-    borderRadius: 12,
+  revAvtText: { fontSize: 12, fontFamily: fonts.headingBold },
+  revBody: { flex: 1 },
+  revTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  revName: { fontSize: 12, fontFamily: fonts.headingBold },
+  revStars: { flexDirection: 'row', gap: 1 },
+  revText: { fontSize: 11, fontFamily: fonts.body, lineHeight: 16, marginTop: 3 },
+  verifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  verifIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    flexShrink: 0,
   },
-  statValue: { fontSize: 18, fontWeight: '800', color: colors.ink },
-  statLabel: { fontSize: 11, color: colors.muted, marginTop: 4 },
-  section: { paddingHorizontal: 24, marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 10 },
-  aboutText: { fontSize: 14, color: colors.muted, lineHeight: 22 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  tagText: { fontSize: 13, fontWeight: '600', color: colors.ink },
-  menuRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
-  menuArrow: { fontSize: 22, color: colors.muted, fontWeight: '300' },
+  verifText: { flex: 1 },
+  verifTitle: { fontSize: 12, fontFamily: fonts.headingBold },
+  verifSub: { fontSize: 10, fontFamily: fonts.body, marginTop: 1 },
+  verifStatus: { fontSize: 10, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.4 },
 })

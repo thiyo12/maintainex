@@ -7,13 +7,15 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { auth } from '../../lib/api'
 import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
+import { fonts } from '../../lib/fonts'
+import { fontSizes } from '../../lib/tokens'
 import { spacing, borderRadius } from '../../lib/tokens'
 
 const TEST_OTP_BYPASS = process.env.EXPO_PUBLIC_TEST_OTP_CODE || '000000'
 
 export default function OtpScreen() {
   const colors = useColors()
+    const styles = makeStyles(colors)
   const router = useRouter()
   const { phone, role } = useLocalSearchParams<{ phone: string; role: string }>()
   const { register } = useAuth()
@@ -180,7 +182,7 @@ export default function OtpScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     padding: spacing.xxxl,

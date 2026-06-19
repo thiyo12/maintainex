@@ -3,32 +3,33 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'reac
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import Logo from '../../components/ui/Logo'
-import { useAuth } from '../../lib/auth'
+import LanguageSelector from '../../components/ui/LanguageSelector'
 import { spacing, borderRadius } from '../../lib/tokens'
 
 const roles = [
   {
     id: 'CUSTOMER',
     icon: 'person-outline' as const,
-    title: 'Hire a Professional',
-    subtitle: 'Post a job and find the right expert for your needs',
+    titleKey: 'welcomeOnboarding.customerTitle',
+    subtitleKey: 'welcomeOnboarding.customerDesc',
     accent: '#3B82F6',
     iconBg: '#EFF6FF',
   },
   {
     id: 'TASKER',
     icon: 'construct-outline' as const,
-    title: 'Work as a Tasker',
-    subtitle: 'Find local jobs, set your own rates, and grow your business',
+    titleKey: 'welcomeOnboarding.taskerTitle',
+    subtitleKey: 'welcomeOnboarding.taskerDesc',
     accent: '#F59E0B',
     iconBg: '#FFFBEB',
   },
   {
     id: 'COMPANY',
     icon: 'business-outline' as const,
-    title: 'Register Your Company',
-    subtitle: 'Manage your team, bid on projects, and scale operations',
+    titleKey: 'welcomeOnboarding.companyTitle',
+    subtitleKey: 'welcomeOnboarding.companyDesc',
     accent: '#8B5CF6',
     iconBg: '#F5F3FF',
   },
@@ -38,6 +39,7 @@ const AMBER = '#F59E0B'
 
 export default function WelcomeScreen() {
   const router = useRouter()
+  const { t } = useTranslation()
   const pulseAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -62,8 +64,8 @@ export default function WelcomeScreen() {
           </Animated.View>
         </View>
 
-        <Text style={styles.heading}>Welcome to{'\n'}Maintainex</Text>
-        <Text style={styles.subtitle}>Select how you'd like to get started</Text>
+        <Text style={styles.heading}>{t('welcomeOnboarding.heading')}</Text>
+        <Text style={styles.subtitle}>{t('welcomeOnboarding.subtitle')}</Text>
 
         <View style={styles.cardList}>
           {roles.map((role) => (
@@ -77,8 +79,8 @@ export default function WelcomeScreen() {
                 <Ionicons name={role.icon} size={24} color={role.accent} />
               </View>
               <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: role.accent }]}>{role.title}</Text>
-                <Text style={styles.cardSub}>{role.subtitle}</Text>
+                <Text style={[styles.cardTitle, { color: role.accent }]}>{t(role.titleKey)}</Text>
+                <Text style={styles.cardSub}>{t(role.subtitleKey)}</Text>
               </View>
               <View style={styles.arrowBox}>
                 <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
@@ -87,10 +89,14 @@ export default function WelcomeScreen() {
           ))}
         </View>
 
+        <View style={styles.langRow}>
+          <LanguageSelector />
+        </View>
+
         <TouchableOpacity style={styles.signInBtn} onPress={() => router.push('/(auth)/login')} activeOpacity={0.7}>
           <Text style={styles.signInText}>
-            Already have an account?{' '}
-            <Text style={styles.signInLink}>Sign in</Text>
+            {t('welcomeOnboarding.signIn')}{' '}
+            <Text style={styles.signInLink}>{t('welcomeOnboarding.signInLink')}</Text>
           </Text>
         </TouchableOpacity>
 
@@ -113,7 +119,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 3 },
   cardSub: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
   arrowBox: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm },
-  signInBtn: { alignItems: 'center', marginTop: spacing.xxxxl, paddingVertical: spacing.sm },
+  langRow: { alignItems: 'center', marginTop: spacing.xxxl },
+  signInBtn: { alignItems: 'center', marginTop: spacing.sm, paddingVertical: spacing.sm },
   signInText: { fontSize: 14, color: '#6B7280' },
   signInLink: { fontWeight: '700', color: AMBER },
 

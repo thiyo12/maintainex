@@ -1,27 +1,34 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
-import { fonts } from '../../../lib/fonts'
+import { useTheme } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
+import { matchCategory } from '../../../lib/aiMatch'
+import StatsCard from '../../../components/ui/StatsCard'
+import JobCard from '../../../components/ui/JobCard'
+import AISearchBar from '../../../components/shared/AISearchBar'
+import PropertyCard from '../../../components/shared/PropertyCard'
 
 export default function CompanyDashboard() {
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [stats, setStats] = useState([
-    { icon: 'document-text-outline', label: 'Active contracts', value: '-' },
-    { icon: 'cash-outline', label: 'Revenue (month)', value: '-' },
-    { icon: 'people-outline', label: 'Team members', value: '-' },
-    { icon: 'star', label: 'Avg. rating', value: '-' },
+    { label: 'Active', value: '-' },
+    { label: 'Revenue', value: '-' },
+    { label: 'Team', value: '-' },
   ])
   const [revenueMonth, setRevenueMonth] = useState('LKR 0')
-  const [chartData, setChartData] = useState<number[]>([])
+  const [openJobs, setOpenJobs] = useState<any[]>([])
   const [recentActivity, setRecentActivity] = useState<{ text: string; time: string }[]>([])
+  const [aiQuery, setAiQuery] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchData = useCallback(async () => {
     try {
@@ -33,17 +40,16 @@ export default function CompanyDashboard() {
         (c: any) => c.status === 'In progress' || c.status === 'active'
       ).length
       const monthRevenue = earningsRes.monthlyRevenue || earningsRes.totalRevenue || 0
-      const teamMembers = earningsRes.teamCount || stats[2].value
-      const rating = earningsRes.rating || stats[3].value
+      const teamMembers = earningsRes.teamCount || '-'
+      const rating = earningsRes.rating || '—'
 
       setStats([
-        { icon: 'document-text-outline', label: 'Active contracts', value: String(activeContracts) },
-        { icon: 'cash-outline', label: 'Revenue (month)', value: `LKR ${(monthRevenue / 1000).toFixed(1)}K` },
-        { icon: 'people-outline', label: 'Team members', value: String(teamMembers) },
-        { icon: 'star', label: 'Avg. rating', value: String(rating) },
+        { label: 'Active', value: String(activeContracts) },
+        { label: 'Revenue', value: `LKR ${(monthRevenue / 1000).toFixed(1)}K` },
+        { label: 'Team', value: String(teamMembers) },
       ])
       setRevenueMonth(`LKR ${Number(monthRevenue).toLocaleString()}`)
-      setChartData(earningsRes.monthlyData || earningsRes.chartData || [40, 65, 45, 80, 55, 90, 70])
+      setOpenJobs((contractsRes || []).slice(0, 5))
 
       if (earningsRes.recentActivity) {
         setRecentActivity(earningsRes.recentActivity)
@@ -65,6 +71,14 @@ export default function CompanyDashboard() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  const handleAiChange = useCallback((text: string) => {
+    setAiQuery(text)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      matchCategory(text)
+    }, 400)
+  }, [])
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -89,195 +103,206 @@ export default function CompanyDashboard() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={colors.amber} />}
       >
-        {/* Ink Header */}
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <View style={styles.headerLeft}>
-              <View style={styles.avatar}>
+        {/* Header card */}
+        <View style={[styles.headerCard, { backgroundColor: colors.white }]}>
+          <View style={styles.headerRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={[styles.avatar, { backgroundColor: colors.indigo }]}>
                 <Text style={styles.avatarText}>{(user?.name || 'C')[0]}</Text>
               </View>
               <View>
-                <Text style={styles.greeting}>{getGreeting()}</Text>
-                <Text style={styles.companyName}>{user?.name || 'Company'}</Text>
-                <Text style={styles.role}>Company Account</Text>
+                <Text style={[styles.greeting, { color: colors.muted }]}>{getGreeting()}</Text>
+                <Text style={[styles.userName, { color: colors.ink }]}>{user?.name || 'Company'}</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/(company)/settings/edit-profile')}>
-              <Ionicons name="settings-outline" size={20} color={colors.amber} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Stats */}
-          <View style={styles.statsRow}>
-            {stats.map((s, i) => (
-              <View key={i} style={styles.statCard}>
-                <Ionicons name={s.icon as any} size={18} color={colors.amber} />
-                <Text style={styles.statValue}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-              <Ionicons name="add-circle-outline" size={18} color={colors.ink} style={{ marginRight: 6 }} />
-              <Text style={styles.actionBtnText}>New Contract</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnOutline]} activeOpacity={0.7}>
-              <Ionicons name="people-outline" size={18} color={colors.amber} style={{ marginRight: 6 }} />
-              <Text style={[styles.actionBtnText, { color: colors.amber }]}>Invite Team</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity style={[styles.headerIcon, { backgroundColor: colors.amberBg }]}>
+                <Ionicons name="notifications-outline" size={18} color={colors.amberDark} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.headerIcon, { backgroundColor: colors.amberBg }]} onPress={() => router.push('/(company)/settings/edit-profile')}>
+                <Ionicons name="settings-outline" size={18} color={colors.amberDark} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
-        {/* Revenue Chart */}
-        <View style={styles.chartCard}>
-          <View style={styles.chartHeader}>
-            <View>
-              <Text style={styles.chartTitle}>Revenue Overview</Text>
-              <Text style={styles.chartSub}>{revenueMonth} this month</Text>
-            </View>
-            <Ionicons name="trending-up-outline" size={24} color={colors.amber} />
-          </View>
-          <View style={styles.chartBars}>
-            {(chartData.length > 0 ? chartData : [40, 65, 45, 80, 55, 90, 70]).map((h: number, i: number) => (
-              <View key={i} style={styles.chartBarWrap}>
-                <View style={[styles.chartBar, { height: Math.min(h * 0.7 + 20, 100) }]} />
-              </View>
-            ))}
+        {/* AI Search Bar */}
+        <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+          <AISearchBar
+            value={aiQuery}
+            onChangeText={handleAiChange}
+            placeholder="Search jobs, contracts..."
+          />
+        </View>
+
+        {/* Stats row */}
+        <View style={styles.statsRow}>
+          {stats.map((s, i) => (
+            <StatsCard
+              key={i}
+              label={s.label}
+              value={s.value}
+              iconName={['📄', '💰', '👥'][i]}
+              color={[colors.amber, colors.success, colors.blue][i]}
+            />
+          ))}
+        </View>
+
+        {/* Revenue */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.ink }]}>Revenue Overview</Text>
+          <View style={[styles.revenueCard, { backgroundColor: colors.white }]}>
+            <Text style={[styles.revenueAmount, { color: colors.amberDark }]}>{revenueMonth}</Text>
+            <Text style={[styles.revenueLabel, { color: colors.muted }]}>this month</Text>
           </View>
         </View>
 
-        {/* Quick Nav */}
-        <View style={styles.navSection}>
-          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/jobs/v2/browse')} activeOpacity={0.7}>
-            <View style={[styles.navIcon, { backgroundColor: '#D1FAE5' }]}>
-              <Ionicons name="search-outline" size={22} color={colors.amber} />
-            </View>
-            <View style={styles.navInfo}>
-              <Text style={styles.navTitle}>Browse Jobs</Text>
-              <Text style={styles.navSub}>Find new projects to quote on</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/(tabs)/contracts-list')} activeOpacity={0.7}>
-            <View style={[styles.navIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="document-text-outline" size={22} color={colors.amber} />
-            </View>
-            <View style={styles.navInfo}>
-              <Text style={styles.navTitle}>All Contracts</Text>
-              <Text style={styles.navSub}>View and manage your contracts</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/(tabs)/milestones-list')} activeOpacity={0.7}>
-            <View style={[styles.navIcon, { backgroundColor: '#EDE9FE' }]}>
-              <Ionicons name="flag-outline" size={22} color={colors.amber} />
-            </View>
-            <View style={styles.navInfo}>
-              <Text style={styles.navTitle}>Milestones</Text>
-              <Text style={styles.navSub}>Track project progress and payments</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/team')} activeOpacity={0.7}>
-            <View style={[styles.navIcon, { backgroundColor: colors.amberBg }]}>
-              <Ionicons name="people-outline" size={22} color={colors.amber} />
-            </View>
-            <View style={styles.navInfo}>
-              <Text style={styles.navTitle}>Team</Text>
-              <Text style={styles.navSub}>Manage your team members</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.navCard} onPress={() => router.push('/(company)/settings/subscription')} activeOpacity={0.7}>
-            <View style={[styles.navIcon, { backgroundColor: colors.amberBg }]}>
-              <Ionicons name="card-outline" size={22} color={colors.amber} />
-            </View>
-            <View style={styles.navInfo}>
-              <Text style={styles.navTitle}>Subscription</Text>
-              <Text style={styles.navSub}>Manage your plan and billing</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </TouchableOpacity>
+        {/* Active Contracts */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Active Contracts</Text>
+            <TouchableOpacity onPress={() => router.push('/(company)/(tabs)/contracts-list')}>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          {openJobs.slice(0, 4).map((job) => (
+            <JobCard
+              key={job.id}
+              title={job.title || 'Contract'}
+              category={job.categoryName || 'General'}
+              budget={job.budgetAmount}
+              location={job.locationName}
+              status={job.status}
+              onPress={() => router.push(`/(company)/jobs/v2/browse`)}
+            />
+          ))}
         </View>
 
-        {/* Recent Activity */}
-        <View style={styles.activitySection}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {recentActivity.length === 0 ? (
-            <View style={styles.emptyActivity}>
-              <Ionicons name="time-outline" size={32} color={colors.muted} />
-              <Text style={styles.emptyText}>No recent activity</Text>
-            </View>
-          ) : (
-            recentActivity.map((a, i) => (
-              <View key={i} style={styles.activityCard}>
-                <View style={styles.activityDot} />
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>{a.text}</Text>
-                  {a.time ? <Text style={styles.activityTime}>{a.time}</Text> : null}
-                </View>
+        {/* Real Estate */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Real Estate</Text>
+            <TouchableOpacity onPress={() => router.push('/real-estate')}>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 16 }}>
+            <PropertyCard
+              title="Modern Apartment"
+              priceLkr={8500000}
+              type="sale"
+              bedrooms={3}
+              bathrooms={2}
+              areaSqft={1500}
+              location="Colombo 3"
+              onPress={() => router.push('/real-estate')}
+            />
+            <PropertyCard
+              title="Luxury Villa"
+              priceLkr={25000000}
+              type="sale"
+              bedrooms={5}
+              bathrooms={4}
+              areaSqft={3500}
+              location="Colombo 7"
+              onPress={() => router.push('/real-estate')}
+            />
+            <PropertyCard
+              title="Apartment for Rent"
+              priceLkr={85000}
+              type="rent"
+              bedrooms={2}
+              bathrooms={1}
+              areaSqft={900}
+              location="Colombo 4"
+              onPress={() => router.push('/real-estate')}
+            />
+          </ScrollView>
+        </View>
+
+        {/* Quick post grid */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>What would you like to post?</Text>
+          <View style={styles.grid}>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/post-job')}>
+              <View style={[styles.gridIcon, { backgroundColor: colors.amberBg }]}>
+                <Ionicons name="briefcase-outline" size={22} color={colors.amberDark} />
               </View>
-            ))
-          )}
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>Post a Job</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/team/invite')}>
+              <View style={[styles.gridIcon, { backgroundColor: colors.blueBg }]}>
+                <Ionicons name="people-outline" size={22} color={colors.blue} />
+              </View>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>Invite Team</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/(tabs)/milestones-list')}>
+              <View style={[styles.gridIcon, { backgroundColor: colors.successBg }]}>
+                <Ionicons name="flag-outline" size={22} color={colors.success} />
+              </View>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>Milestones</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/settings/subscription')}>
+              <View style={[styles.gridIcon, { backgroundColor: colors.purpleBg }]}>
+                <Ionicons name="card-outline" size={22} color={colors.purple} />
+              </View>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>Subscription</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-
-  header: { backgroundColor: colors.ink, paddingBottom: 20, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
-  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingTop: 12 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.amber, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 20, fontFamily: fonts.headingBold, color: colors.white },
-  greeting: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
-  companyName: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.white },
-  role: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 1 },
-  settingsBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-
-  statsRow: { flexDirection: 'row', marginHorizontal: 20, marginTop: 16, gap: 8 },
-  statCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 10, alignItems: 'center' },
-  statValue: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.white, marginTop: 6 },
-  statLabel: { fontSize: 9, fontFamily: fonts.body, color: colors.muted, marginTop: 2, textAlign: 'center' },
-
-  actionRow: { flexDirection: 'row', paddingHorizontal: 20, marginTop: 16, gap: 10 },
-  actionBtn: { flexDirection: 'row', flex: 1, backgroundColor: colors.amber, paddingVertical: 12, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  actionBtnOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: colors.amber },
-  actionBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.white },
-
-  chartCard: { backgroundColor: colors.white, marginHorizontal: 20, marginTop: 20, padding: 18, borderRadius: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 2 },
-  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  chartTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
-  chartSub: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
-  chartBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, height: 90 },
-  chartBarWrap: { flex: 1, alignItems: 'center', height: 90, justifyContent: 'flex-end' },
-  chartBar: { width: '100%', backgroundColor: colors.amber, borderRadius: 6, opacity: 0.6, minHeight: 8 },
-
-  navSection: { paddingHorizontal: 20, marginTop: 24, gap: 10 },
-  navCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 14, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  navIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  navInfo: { flex: 1, marginLeft: 12 },
-  navTitle: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
-  navSub: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 1 },
-
-  activitySection: { padding: 20, paddingBottom: 100 },
-  sectionTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 14 },
-
-  activityCard: { flexDirection: 'row', marginBottom: 12, gap: 12 },
-  activityDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber, marginTop: 5 },
-  activityContent: { flex: 1 },
-  activityText: { fontSize: 13, fontFamily: fonts.body, color: colors.ink, lineHeight: 18 },
-  activityTime: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 2 },
-
-  emptyActivity: { alignItems: 'center', paddingVertical: 20 },
-  emptyText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted, marginTop: 8 },
+const makeStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  headerCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 20,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  avatar: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontSize: 18, fontFamily: 'Outfit_900Black', color: '#FFFFFF' },
+  greeting: { fontSize: 11, fontFamily: 'Outfit_500Medium' },
+  userName: { fontSize: 16, fontFamily: 'Outfit_800ExtraBold', marginTop: 1 },
+  headerIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  statsRow: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginTop: 16 },
+  section: { marginHorizontal: 16, marginTop: 20 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontFamily: 'Outfit_800ExtraBold', letterSpacing: -0.2 },
+  seeAll: { fontSize: 12, fontFamily: 'Outfit_700Bold' },
+  revenueCard: {
+    borderRadius: 16,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
+    alignItems: 'center',
+  },
+  revenueAmount: { fontSize: 24, fontFamily: 'Outfit_900Black', letterSpacing: -0.5 },
+  revenueLabel: { fontSize: 11, fontFamily: 'Outfit_500Medium', marginTop: 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  gridCard: {
+    width: '48%',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  gridIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  gridLabel: { fontSize: 12, fontFamily: 'Outfit_700Bold', textAlign: 'center' },
 })

@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../../../lib/colors'
+import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job, V2Quote } from '../../../../../lib/api-v2'
 import QuoteCard from '../../../../../components/jobs/QuoteCard'
 
 export default function V2QuotesScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [job, setJob] = useState<V2Job | null>(null)
@@ -77,7 +79,7 @@ export default function V2QuotesScreen() {
       <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
         {sorted.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>💬</Text>
+            <Ionicons name="chatbubble-ellipses" size={48} color={colors.muted} style={{ marginBottom: 12 }} />
             <Text style={styles.emptyText}>No quotes yet</Text>
             <Text style={styles.emptySub}>Providers are reviewing your job</Text>
           </View>
@@ -102,7 +104,7 @@ export default function V2QuotesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.amber },

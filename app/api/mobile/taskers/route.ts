@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
 
 // List taskers (public-ish, requires auth)
 export async function GET(request: NextRequest) {
@@ -17,10 +18,8 @@ export async function GET(request: NextRequest) {
 
     const where: any = { isVerified: true }
     if (isOnline === 'true') where.isOnline = true
-    if (category) where.skills = { has: category }
-    if (area) where.serviceAreas = { has: area }
 
-    const taskers = await prisma.taskerProfile.findMany({
+    let taskers = await prisma.taskerProfile.findMany({
       where,
       include: {
         user: { select: { id: true, name: true, phone: true, email: true } },
@@ -28,14 +27,21 @@ export async function GET(request: NextRequest) {
       orderBy: [{ rating: 'desc' }, { completedJobs: 'desc' }],
     })
 
+    if (category) {
+      taskers = taskers.filter(t => jsonArrayContains(t.skills, category))
+    }
+    if (area) {
+      taskers = taskers.filter(t => jsonArrayContains(t.serviceAreas, area))
+    }
+
     return NextResponse.json(
       taskers.map(t => ({
         id: t.id,
         userId: t.userId,
         bio: t.bio,
         hourlyRate: t.hourlyRate,
-        skills: t.skills,
-        serviceAreas: t.serviceAreas,
+        skills: safeParseJsonArr(t.skills),
+        serviceAreas: safeParseJsonArr(t.serviceAreas),
         rating: t.rating,
         completedJobs: t.completedJobs,
         isVerified: t.isVerified,

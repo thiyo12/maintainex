@@ -1,7 +1,6 @@
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle } from 'react-native'
-import { colors } from '../../lib/colors'
-import { fonts, fontSizes } from '../../lib/fonts'
-import { spacing, borderRadius } from '../../lib/tokens'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts } from '../../lib/fonts'
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost'
 
@@ -17,6 +16,8 @@ interface Props {
 }
 
 export default function Button({ label, onPress, variant = 'primary', loading, disabled, color, style, fullWidth }: Props) {
+  const colors = useColors()
+    const styles = makeStyles(colors)
   const isDisabled = disabled || loading
 
   const bgColor = () => {
@@ -28,7 +29,7 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
   const textColor = () => {
     if (variant === 'primary') return '#111'
     if (variant === 'outline') return color || colors.primary
-    if (variant === 'ghost') return color || colors.inkLight
+    if (variant === 'ghost') return color || colors.muted
     return '#111'
   }
 
@@ -41,6 +42,13 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
         variant === 'outline' && { borderWidth: 2, borderColor: color || colors.primary },
         variant === 'ghost' && { borderWidth: 0 },
         isDisabled && styles.disabled,
+        variant === 'primary' && {
+          shadowColor: '#F59E0B',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.35,
+          shadowRadius: 12,
+          elevation: 6,
+        },
         style,
       ]}
       onPress={onPress}
@@ -56,16 +64,17 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   base: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.md,
+    paddingVertical: 13,
+    paddingHorizontal: 22,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    gap: 6,
   },
   fullWidth: { width: '100%' },
-  disabled: { opacity: 0.5 },
-  label: { fontSize: fontSizes.button, fontFamily: fonts.button },
+  disabled:  { opacity: 0.45 },
+  label:     { fontSize: 14, fontFamily: 'Outfit_700Bold', letterSpacing: 0.1 },
 })

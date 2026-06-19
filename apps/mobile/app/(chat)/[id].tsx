@@ -4,9 +4,11 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { conversations, auth } from '../../lib/api'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
 
 export default function ChatDetailScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const [messages, setMessages] = useState<any[]>([])
@@ -155,7 +157,7 @@ export default function ChatDetailScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   topBar: {
     flexDirection: 'row',

@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
           duration: body.duration ? parseInt(body.duration) : 0,
           categoryId: body.categoryId,
           displayOrder: body.displayOrder ? parseInt(body.displayOrder) : 0,
-          features: body.features || [],
+          features: JSON.stringify(body.features || []),
           isActive: body.isActive ?? true
         },
         include: { category: true }

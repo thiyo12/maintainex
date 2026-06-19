@@ -4,11 +4,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import StarRating from '../../../../components/ui/StarRating'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { jobs } from '../../../../lib/api'
 import { JobPosting } from '../../../../lib/types'
 
 export default function ReviewScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
   const [job, setJob] = useState<JobPosting | null>(null)
@@ -147,7 +149,7 @@ export default function ReviewScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   backBtn: { paddingHorizontal: 24, paddingTop: 8 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },

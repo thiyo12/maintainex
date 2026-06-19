@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function DELETE(
   request: NextRequest,
@@ -65,7 +66,7 @@ export async function GET(
       id: member.id,
       name: member.name,
       role: member.role,
-      skills: member.skills,
+      skills: safeParseJsonArr(member.skills),
       isOnline: member.isOnline,
       rating: member.rating,
       completedJobs: member.completedJobs,

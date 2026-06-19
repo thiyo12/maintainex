@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityI
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 
 const SETTINGS_KEY = 'notification_settings'
 
@@ -17,6 +17,8 @@ const DEFAULTS = {
 }
 
 export default function NotificationsScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState(DEFAULTS)
@@ -86,7 +88,7 @@ export default function NotificationsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },

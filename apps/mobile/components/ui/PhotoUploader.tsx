@@ -1,10 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
-import { spacing, borderRadius } from '../../lib/tokens'
+import { useTheme } from '../../lib/ThemeContext'
 
 interface PhotoItem {
   uri: string
@@ -18,7 +16,8 @@ interface Props {
 }
 
 export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingPhotos = [] }: Props) {
-  const colors = useColors()
+  const { colors } = useTheme()
+  const styles = useMemo(() => makeStyles(colors), [colors])
   const [photos, setPhotos] = useState<PhotoItem[]>(existingPhotos)
 
   const pickImage = async () => {
@@ -41,24 +40,24 @@ export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingP
 
   return (
     <View style={styles.container}>
-      <View style={styles.grid}>
+      <View style={styles.row}>
         {photos.map((photo, i) => (
           <View key={i} style={styles.thumbnailWrap}>
-            <View style={[styles.thumbnail, { backgroundColor: colors.border }]}>
-              <Ionicons name="image-outline" size={28} color={colors.muted} />
+            <View style={[styles.thumbnail, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="image-outline" size={26} color={colors.muted} />
             </View>
-            <TouchableOpacity style={[styles.removeBtn, { backgroundColor: colors.error }]} onPress={() => removePhoto(i)}>
-              <Ionicons name="close" size={12} color="#FFFFFF" />
+            <TouchableOpacity style={styles.removeBtn} onPress={() => removePhoto(i)}>
+              <Text style={styles.removeText}>×</Text>
             </TouchableOpacity>
           </View>
         ))}
         {photos.length < maxPhotos ? (
           <TouchableOpacity
-            style={[styles.addBox, { borderColor: colors.border, backgroundColor: colors.background }]}
+            style={[styles.addBox, { borderColor: colors.border, backgroundColor: colors.surface }]}
             onPress={pickImage}
             activeOpacity={0.7}
           >
-            <Ionicons name="camera-outline" size={28} color={colors.muted} />
+            <Ionicons name="camera-outline" size={26} color={colors.muted} />
             <Text style={[styles.addLabel, { color: colors.muted }]}>
               {photos.length === 0 ? 'Tap to add' : 'Add more'}
             </Text>
@@ -69,35 +68,30 @@ export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingP
   )
 }
 
-const styles = StyleSheet.create({
-  container: { marginVertical: spacing.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+const makeStyles = (colors: any) => StyleSheet.create({
+  container:     { marginVertical: 8 },
+  row:           { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   thumbnailWrap: { position: 'relative' },
   thumbnail: {
-    width: 90,
-    height: 90,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 80, height: 80, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1,
   },
+  thumbIcon: { fontSize: 26 },
   removeBtn: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', top: -6, right: -6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: '#EF4444',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35, shadowRadius: 4, elevation: 3,
   },
+  removeText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Outfit_700Bold' },
   addBox: {
-    width: 90,
-    height: 90,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 80, height: 80, borderRadius: 14,
+    borderWidth: 1.5, borderStyle: 'dashed',
+    justifyContent: 'center', alignItems: 'center',
   },
-  addLabel: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body, marginTop: spacing.xs },
+  addIcon:  { fontSize: 26, color: colors.muted },
+  addLabel: { fontSize: 10, color: colors.muted, marginTop: 4, fontFamily: 'Outfit_500Medium' },
 })

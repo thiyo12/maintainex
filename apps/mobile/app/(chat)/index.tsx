@@ -4,10 +4,12 @@ import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { conversations } from '../../lib/api'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
 import PressScale from '../../components/find/PressScale'
 
 export default function ChatListScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [conversationsData, setConversationsData] = useState<any[]>([])
@@ -118,7 +120,7 @@ export default function ChatListScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark },

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
         id: m.id,
         name: m.name,
         role: m.role,
-        skills: m.skills,
+        skills: safeParseJsonArr(m.skills),
         isOnline: m.isOnline,
         rating: m.rating,
         completedJobs: m.completedJobs,

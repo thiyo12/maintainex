@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,17 +29,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    const taskers = await prisma.taskerProfile.findMany({
+    let taskers = await prisma.taskerProfile.findMany({
       where: {
         isVerified: true,
         isOnline: true,
-        skills: { has: templateJob.category.name },
       },
       include: {
         user: { select: { id: true, name: true, phone: true, email: true } },
       },
       orderBy: [{ rating: 'desc' }, { completedJobs: 'desc' }],
     })
+
+    taskers = taskers.filter(t => jsonArrayContains(t.skills, templateJob.category.name))
 
     const results = taskers.map(t => {
       let distance: number | undefined
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
         latitude: t.latitude,
         longitude: t.longitude,
         distance,
-        skills: t.skills,
+        skills: safeParseJsonArr(t.skills),
         hourlyRate: t.hourlyRate,
         fixedRate: 0,
         experienceYears: 0,

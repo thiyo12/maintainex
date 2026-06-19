@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { templateJobs, findTasker } from '../../../../lib/api'
 import { useCountry } from '../../../../lib/country'
 import TaskerCard from '../../../../components/find/TaskerCard'
@@ -10,6 +10,8 @@ import SkeletonLoader from '../../../../components/find/SkeletonLoader'
 import EmptyState from '../../../../components/find/EmptyState'
 
 export default function FindTaskerList() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { jobId } = useLocalSearchParams<{ jobId: string }>()
   const [job, setJob] = useState<any>(null)
   const [taskers, setTaskers] = useState<any[]>([])
@@ -98,7 +100,7 @@ export default function FindTaskerList() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   jobSummary: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TextInput, FlatList, StyleSheet, RefreshControl } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { jobCategories } from '../../../lib/api'
 import { useCountry } from '../../../lib/country'
 import CategoryCard from '../../../components/find/CategoryCard'
@@ -10,6 +10,8 @@ import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
 
 export default function FindJobCategories() {
+  const colors = useColors()
+    const styles = makeStyles(colors)
   const [categories, setCategories] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
   const [search, setSearch] = useState('')
@@ -98,7 +100,7 @@ export default function FindJobCategories() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: '700', color: '#1F2937' },

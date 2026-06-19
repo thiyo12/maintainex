@@ -6,9 +6,11 @@ import { Ionicons } from '@expo/vector-icons'
 import Slider from '@react-native-community/slider'
 import { bookings } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 
 export default function BookingConfirmScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { user } = useAuth()
   const { jobId, bidId, taskerName, price } = useLocalSearchParams()
@@ -177,7 +179,7 @@ export default function BookingConfirmScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   summary: {

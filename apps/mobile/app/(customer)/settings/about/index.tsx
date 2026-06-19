@@ -3,9 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Animated
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 
 export default function AboutScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const fadeAnim = useRef(new Animated.Value(0)).current
 
@@ -56,7 +58,7 @@ export default function AboutScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },

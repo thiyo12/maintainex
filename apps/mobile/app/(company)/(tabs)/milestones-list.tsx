@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 export default function CompanyMilestones() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [filter, setFilter] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [milestones, setMilestones] = useState<any[]>([])
@@ -70,7 +72,7 @@ export default function CompanyMilestones() {
                     ? colors.success
                     : m.status === 'Pending' || m.status === 'pending'
                     ? colors.amber
-                    : colors.companyAccent,
+                    : colors.amber,
                 }]} />
                 <View style={styles.cardContent}>
                   <Text style={styles.milestoneTitle}>{m.title}</Text>
@@ -93,7 +95,7 @@ export default function CompanyMilestones() {
                     ? colors.success
                     : m.status === 'Pending' || m.status === 'pending'
                     ? colors.amber
-                    : colors.companyAccent,
+                    : colors.amber,
                 }]}>
                   {m.status}
                 </Text>
@@ -106,7 +108,7 @@ export default function CompanyMilestones() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
@@ -121,7 +123,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   tabActive: { backgroundColor: colors.white },
   tabText: { fontSize: 12, fontWeight: '600', color: colors.muted },
-  tabTextActive: { color: colors.companyAccent, fontWeight: '700' },
+  tabTextActive: { color: colors.amber, fontWeight: '700' },
   milestoneCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',

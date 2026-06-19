@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { getAuthToken } from '../../../../lib/api'
 import ProgressSteps from '../../../../components/ui/ProgressSteps'
@@ -29,6 +29,8 @@ const budgetTiers = [
 const providerTypes = ['FREELANCER', 'COMPANY', 'BOTH']
 
 export default function CreateJobScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
   const [step, setStep] = useState(0)
@@ -391,7 +393,7 @@ export default function CreateJobScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backBtn: { width: 60 },

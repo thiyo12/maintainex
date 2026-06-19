@@ -4,10 +4,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { jobs } from '../../../lib/api'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import type { JobPosting } from '../../../lib/types'
 
 export default function QuotesScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { jobId } = useLocalSearchParams()
   const [job, setJob] = useState<JobPosting | null>(null)
@@ -72,7 +74,7 @@ export default function QuotesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   heading: { fontSize: 22, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginTop: 16, marginBottom: 16 },
   jobSummary: { backgroundColor: colors.white, marginHorizontal: 24, padding: 16, borderRadius: 14, marginBottom: 8 },

@@ -4,13 +4,15 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 import { getAuthToken } from '../../../../lib/api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
 export default function CompanyBrowseJobsScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
   const [jobs, setJobs] = useState<V2Job[]>([])
@@ -126,7 +128,7 @@ export default function CompanyBrowseJobsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },

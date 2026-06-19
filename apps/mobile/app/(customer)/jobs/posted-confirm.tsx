@@ -3,9 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 
 export default function JobPostedConfirmation() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { jobId } = useLocalSearchParams()
   const scaleAnim = useRef(new Animated.Value(0)).current
@@ -53,7 +55,7 @@ export default function JobPostedConfirmation() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',

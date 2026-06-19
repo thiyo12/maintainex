@@ -18,6 +18,7 @@ interface Props {
 
 export default function BottomNav({ tabs, active, onSelect }: Props) {
   const colors = useColors()
+    const styles = makeStyles(colors)
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderTopColor: colors.border }, shadows.lg]}>
@@ -50,7 +51,7 @@ export default function BottomNav({ tabs, active, onSelect }: Props) {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     paddingVertical: spacing.sm + 2,

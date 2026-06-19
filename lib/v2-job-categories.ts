@@ -294,26 +294,28 @@ const categories = [
 export async function seedJobCategories(prisma: PrismaClient) {
   let totalJobs = 0
   for (const cat of categories) {
+    const countries = JSON.stringify(cat.countries)
     const created = await prisma.jobCategory.upsert({
       where: { name: cat.name },
-      update: { iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: cat.countries, isActive: true },
-      create: { name: cat.name, iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries: cat.countries, isActive: true },
+      update: { iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries, isActive: true },
+      create: { name: cat.name, iconName: cat.iconName, colorHex: cat.colorHex, sortOrder: cat.sortOrder, countries, isActive: true },
     })
     for (const job of cat.jobs) {
+      const whatIsIncluded = JSON.stringify(job.whatIsIncluded)
       await prisma.templateJob.upsert({
         where: { id: `${cat.name.toLowerCase().replace(/\s+/g, '-')}-${job.name.toLowerCase().replace(/\s+/g, '-')}` },
         update: {
           categoryId: created.id, name: job.name, description: job.description,
-          whatIsIncluded: job.whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes,
+          whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes,
           priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR',
-          isPopular: job.isPopular, isCompanyOnly: false, countries: cat.countries, isActive: true,
+          isPopular: job.isPopular, isCompanyOnly: false, countries, isActive: true,
         },
         create: {
           id: `${cat.name.toLowerCase().replace(/\s+/g, '-')}-${job.name.toLowerCase().replace(/\s+/g, '-')}`,
           categoryId: created.id, name: job.name, description: job.description,
-          whatIsIncluded: job.whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes,
+          whatIsIncluded, typicalDurationMinutes: job.typicalDurationMinutes,
           priceMin: job.priceMin, priceMax: job.priceMax, currency: 'LKR',
-          isPopular: job.isPopular, isCompanyOnly: false, countries: cat.countries, isActive: true,
+          isPopular: job.isPopular, isCompanyOnly: false, countries, isActive: true,
         },
       })
       totalJobs++

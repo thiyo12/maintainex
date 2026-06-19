@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
         name: p.name,
         price: p.price,
         description: p.description,
-        features: p.features,
+        features: safeParseJsonArr(p.features),
       }))
     )
   } catch (error) {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
         name,
         price,
         description,
-        features: features || [],
+        features: JSON.stringify(features || []),
       },
     })
 
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
         name: plan.name,
         price: plan.price,
         description: plan.description,
-        features: plan.features,
+        features: safeParseJsonArr(plan.features),
       },
     })
   } catch (error) {

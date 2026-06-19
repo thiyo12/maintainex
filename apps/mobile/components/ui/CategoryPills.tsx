@@ -1,8 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
-import { spacing, borderRadius } from '../../lib/tokens'
 
 interface CategoryItem {
   id: string
@@ -19,20 +16,25 @@ interface Props {
 }
 
 const FALLBACK_CATEGORIES: CategoryItem[] = [
-  { id: 'all', name: 'All', iconName: 'grid-outline', colorHex: '#F59E0B' },
-  { id: 'cleaning', name: 'Cleaning', iconName: 'sparkles-outline', colorHex: '#0EA5E9' },
-  { id: 'electrical', name: 'Electrical', iconName: 'flash-outline', colorHex: '#F59E0B' },
-  { id: 'plumbing', name: 'Plumbing', iconName: 'water-outline', colorHex: '#3B82F6' },
-  { id: 'gardening', name: 'Garden', iconName: 'leaf-outline', colorHex: '#16A34A' },
-  { id: 'repairs', name: 'Repairs', iconName: 'hammer-outline', colorHex: '#78716C' },
+  { id: 'all',        name: 'All',          iconName: 'grid-outline',           colorHex: '#F59E0B' },
+  { id: 'cleaning',   name: 'Cleaning',     iconName: 'sparkles-outline',       colorHex: '#0EA5E9' },
+  { id: 'electrical', name: 'Electrical',   iconName: 'flash-outline',          colorHex: '#F59E0B' },
+  { id: 'plumbing',   name: 'Plumbing',     iconName: 'water-outline',          colorHex: '#3B82F6' },
+  { id: 'painting',   name: 'Painting',     iconName: 'color-palette-outline',  colorHex: '#EC4899' },
+  { id: 'moving',     name: 'Moving',       iconName: 'cube-outline',           colorHex: '#F97316' },
+  { id: 'gardening',  name: 'Gardening',    iconName: 'leaf-outline',           colorHex: '#16A34A' },
+  { id: 'repairs',    name: 'Repairs',      iconName: 'hammer-outline',         colorHex: '#78716C' },
+  { id: 'assembly',   name: 'Assembly',     iconName: 'settings-outline',       colorHex: '#7C3AED' },
+  { id: 'webdesign',  name: 'Web Design',   iconName: 'laptop-outline',         colorHex: '#6366F1' },
+  { id: 'graphics',   name: 'Graphics',     iconName: 'brush-outline',          colorHex: '#A78BFA' },
+  { id: 'realestate', name: 'Real Estate',  iconName: 'home-outline',           colorHex: '#10B981' },
 ]
 
 export default function CategoryPills({ items, selected, onSelect, loading }: Props) {
-  const colors = useColors()
   const list = items || FALLBACK_CATEGORIES
 
   if (loading) {
-    return <Text style={{ fontSize: fontSizes.caption, color: colors.muted, paddingVertical: spacing.md }}>Loading categories...</Text>
+    return <Text style={styles.loadingText}>Loading categories...</Text>
   }
 
   return (
@@ -44,10 +46,7 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
             key={cat.id}
             style={[
               styles.pill,
-              {
-                backgroundColor: isSelected ? colors.primaryBg : colors.surface,
-                borderColor: isSelected ? colors.primary : colors.border,
-              },
+              isSelected && { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
             ]}
             onPress={() => onSelect(cat.id)}
             activeOpacity={0.7}
@@ -55,9 +54,9 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
             <Ionicons
               name={cat.iconName as any}
               size={14}
-              color={isSelected ? colors.primaryDark : colors.muted}
+              color={isSelected ? '#D97706' : '#6B7280'}
             />
-            <Text style={[styles.pillLabel, { color: isSelected ? colors.primaryDark : colors.ink }]}>
+            <Text style={[styles.pillLabel, { color: isSelected ? '#D97706' : '#111827' }]}>
               {cat.name}
             </Text>
           </TouchableOpacity>
@@ -68,23 +67,23 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
-  },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.full,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 100,
     borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  pillLabel: {
-    fontSize: fontSizes.captionSmall,
-    fontFamily: fonts.label,
-  },
+  pillLabel: { fontSize: 12, fontFamily: 'Outfit_700Bold' },
+  loadingText: { fontSize: 12, color: '#6B7280', paddingVertical: 8, fontFamily: 'Outfit_500Medium' },
 })

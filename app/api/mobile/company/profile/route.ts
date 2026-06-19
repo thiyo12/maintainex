@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 
+function safeParseJson(val: string | null | undefined): string[] {
+  if (!val) return []
+  try {
+    const parsed = JSON.parse(val)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return val ? val.split(',').map(s => s.trim()).filter(Boolean) : []
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -30,8 +40,8 @@ export async function GET(request: NextRequest) {
       companyName: profile.companyName,
       registrationNo: profile.registrationNo,
       description: profile.description,
-      services: profile.services,
-      serviceAreas: profile.serviceAreas,
+      services: safeParseJson(profile.services),
+      serviceAreas: safeParseJson(profile.serviceAreas),
       rating: profile.rating,
       completedProjects: profile.completedProjects,
       isVerified: profile.isVerified,
@@ -41,7 +51,7 @@ export async function GET(request: NextRequest) {
         id: t.id,
         name: t.name,
         role: t.role,
-        skills: t.skills,
+        skills: safeParseJson(t.skills),
         isOnline: t.isOnline,
         rating: t.rating,
         completedJobs: t.completedJobs,
@@ -76,15 +86,15 @@ export async function PUT(request: NextRequest) {
         companyName: data.companyName ?? undefined,
         registrationNo: data.registrationNo ?? undefined,
         description: data.description ?? undefined,
-        services: data.services ?? undefined,
-        serviceAreas: data.serviceAreas ?? undefined,
+        services: data.services ? JSON.stringify(data.services) : undefined,
+        serviceAreas: data.serviceAreas ? JSON.stringify(data.serviceAreas) : undefined,
         logo: data.logo ?? undefined,
       },
       create: {
         userId: user.id,
         companyName: data.companyName || 'My Company',
-        services: data.services || [],
-        serviceAreas: data.serviceAreas || [],
+        services: data.services ? JSON.stringify(data.services) : '[]',
+        serviceAreas: data.serviceAreas ? JSON.stringify(data.serviceAreas) : '[]',
       },
     })
 

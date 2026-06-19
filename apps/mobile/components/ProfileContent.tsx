@@ -6,37 +6,40 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useCountry } from '../lib/country'
-import { colors } from '../lib/colors'
+import { useColors } from '../lib/ThemeContext'
 import { getAuthToken } from '../lib/api'
+import LanguageSelector from './ui/LanguageSelector'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
-function MenuRow({ icon, label, onPress, color }: any) {
-  const scale = useRef(new Animated.Value(1)).current
-  return (
-    <TouchableOpacity
-      activeOpacity={1}
-      onPressIn={() => Animated.spring(scale, { toValue: 0.97, friction: 8, tension: 100, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
-      onPress={onPress}
-    >
-      <Animated.View style={[styles.menuRow, { transform: [{ scale }] }]}>
-        <View style={[styles.menuIconWrap, { backgroundColor: (color || colors.amber) + '20' }]}>
-          <Ionicons name={icon} size={20} color={color || colors.amber} />
-        </View>
-        <Text style={styles.menuLabel}>{label}</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-      </Animated.View>
-    </TouchableOpacity>
-  )
-}
-
 export default function ProfileContent() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const { selectedCountry, countries, setCountry } = useCountry()
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
+
+  function MenuRow({ icon, label, onPress, color }: any) {
+    const scale = useRef(new Animated.Value(1)).current
+    return (
+      <TouchableOpacity
+        activeOpacity={1}
+        onPressIn={() => Animated.spring(scale, { toValue: 0.97, friction: 8, tension: 100, useNativeDriver: true }).start()}
+        onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 8, tension: 100, useNativeDriver: true }).start()}
+        onPress={onPress}
+      >
+        <Animated.View style={[styles.menuRow, { transform: [{ scale }] }]}>
+          <View style={[styles.menuIconWrap, { backgroundColor: (color || colors.amber) + '20' }]}>
+            <Ionicons name={icon} size={20} color={color || colors.amber} />
+          </View>
+          <Text style={styles.menuLabel}>{label}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+        </Animated.View>
+      </TouchableOpacity>
+    )
+  }
 
   useEffect(() => {
     ;(async () => {
@@ -109,6 +112,13 @@ export default function ProfileContent() {
                 { text: 'Cancel', style: 'cancel' as const },
               ])
             }} />
+          <View style={styles.menuRow}>
+            <View style={[styles.menuIconWrap, { backgroundColor: colors.amber + '20' }]}>
+              <Ionicons name="language-outline" size={20} color={colors.amber} />
+            </View>
+            <Text style={styles.menuLabel}>Language</Text>
+            <LanguageSelector />
+          </View>
           <MenuRow icon="swap-horizontal" label="Switch to Work as a Tasker" color="#F59E0B"
             onPress={() => router.push('/(auth)/role-switch?target=TASKER')} />
         </View>
@@ -133,7 +143,7 @@ export default function ProfileContent() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 24 },
   avatar: {

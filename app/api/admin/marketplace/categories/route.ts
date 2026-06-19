@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         iconName: data.icon || 'Folder',
         colorHex: data.color || '#6366f1',
         sortOrder: data.sortOrder ?? 0,
-        countries: data.countries || [],
+        countries: data.countries ? JSON.stringify(data.countries) : '[]',
       },
     })
 

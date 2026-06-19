@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../lib/colors'
+import { Ionicons } from '@expo/vector-icons'
+import { useColors } from '../../../lib/ThemeContext'
 import { v2Wallet } from '../../../lib/api-v2'
 
 export default function CustomerWalletScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [wallet, setWallet] = useState<any>({ balance: 0 })
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -99,7 +102,7 @@ export default function CustomerWalletScreen() {
             <Text style={styles.sectionTitle}>Transaction History</Text>
             {transactions.length === 0 ? (
               <View style={styles.emptyTx}>
-                <Text style={styles.emptyTxIcon}>💳</Text>
+                <Ionicons name="card-outline" size={36} color={colors.muted} />
                 <Text style={styles.emptyTxText}>No transactions yet</Text>
               </View>
             ) : (
@@ -128,7 +131,7 @@ export default function CustomerWalletScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scroll: { flex: 1 },
   balanceCard: { backgroundColor: colors.amber, marginHorizontal: 20, marginTop: 20, borderRadius: 20, padding: 28, alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6 },

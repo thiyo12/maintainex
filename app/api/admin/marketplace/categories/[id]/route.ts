@@ -27,7 +27,7 @@ export async function PATCH(
     if (data.icon !== undefined) updates.iconName = data.icon
     if (data.color !== undefined) updates.colorHex = data.color
     if (data.sortOrder !== undefined) updates.sortOrder = data.sortOrder
-    if (data.countries !== undefined) updates.countries = data.countries
+    if (data.countries !== undefined) updates.countries = JSON.stringify(data.countries)
 
     const updated = await prisma.jobCategory.update({
       where: { id: params.id },

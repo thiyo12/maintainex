@@ -6,10 +6,12 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
-import { colors } from '../../lib/colors'
+import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 
 export default function RegisterScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { role: paramRole } = useLocalSearchParams<{ role: string }>()
   const { register, setSignupData } = useAuth()
@@ -162,7 +164,7 @@ export default function RegisterScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scrollContent: { padding: 32, paddingTop: 60 },
   backButton: { marginBottom: 24 },

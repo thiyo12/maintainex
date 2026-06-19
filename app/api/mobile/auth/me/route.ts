@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
         where: { userId: user.id },
         select: { skills: true },
       })
-      needsOnboarding = !profile || profile.skills.length === 0
+      needsOnboarding = !profile || safeParseJsonArr(profile.skills).length === 0
     } else if (fullUser.role === 'COMPANY') {
       const profile = await prisma.companyProfile.findUnique({
         where: { userId: user.id },

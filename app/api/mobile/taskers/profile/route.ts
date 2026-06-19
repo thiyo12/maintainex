@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function PUT(request: NextRequest) {
   try {
@@ -18,8 +19,8 @@ export async function PUT(request: NextRequest) {
     const updateData: any = {}
     if (bio !== undefined) updateData.bio = bio
     if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
-    if (skills !== undefined) updateData.skills = skills
-    if (serviceAreas !== undefined) updateData.serviceAreas = serviceAreas
+    if (skills !== undefined) updateData.skills = JSON.stringify(skills)
+    if (serviceAreas !== undefined) updateData.serviceAreas = JSON.stringify(serviceAreas)
     if (profileImage !== undefined) updateData.profileImage = profileImage
 
     const updated = await prisma.taskerProfile.update({
@@ -33,8 +34,8 @@ export async function PUT(request: NextRequest) {
       userId: updated.userId,
       bio: updated.bio,
       hourlyRate: updated.hourlyRate,
-      skills: updated.skills,
-      serviceAreas: updated.serviceAreas,
+      skills: safeParseJsonArr(updated.skills),
+      serviceAreas: safeParseJsonArr(updated.serviceAreas),
       rating: updated.rating,
       completedJobs: updated.completedJobs,
       isVerified: updated.isVerified,

@@ -1,25 +1,68 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { taskers, getAuthToken } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import type { TaskerProfile } from '../../../lib/types'
-import PressScale from '../../../components/find/PressScale'
+import ProfileHeader from '../../../components/ProfileHeader'
+import { fonts } from '../../../lib/fonts'
+import OfferProgramSection from '../../../components/offers/OfferProgramSection'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+
+function useSlideUp(delay = 0) {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: 450, delay, useNativeDriver: true }).start()
+  }, [])
+  return {
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+  }
+}
+
+function usePopIn(delay = 0) {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.spring(anim, { toValue: 1, delay, useNativeDriver: true, friction: 7, tension: 60 }).start()
+  }, [])
+  return {
+    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
+  }
+}
 
 export default function TaskerProfile() {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const colors = useColors()
+  const styles = makeStyles(colors)
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
-
-  const handleLogout = async () => {
-    await logout()
-    router.replace('/(auth)/welcome')
-  }
   const [profile, setProfile] = useState<TaskerProfile | null>(null)
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
+
+  const cardAnim = useSlideUp(0)
+  const sectionAnim2 = useSlideUp(80)
+  const sectionAnim3 = useSlideUp(130)
+  const sectionAnim4 = useSlideUp(180)
+  const sectionAnim5 = useSlideUp(230)
+  const popIn0 = usePopIn(80)
+  const popIn1 = usePopIn(120)
+  const popIn2 = usePopIn(160)
+  const popIn3 = usePopIn(200)
+  const popIn4 = usePopIn(240)
+  const popIn5 = usePopIn(280)
+  const popIn6 = usePopIn(320)
+  const popIn7 = usePopIn(360)
+  const popIn8 = usePopIn(400)
+  const popIn9 = usePopIn(440)
+  const popIn10 = usePopIn(480)
+  const popIn11 = usePopIn(520)
+  const popIns = [popIn0, popIn1, popIn2, popIn3, popIn4, popIn5, popIn6, popIn7, popIn8, popIn9, popIn10, popIn11]
+  let popInIdx = 0
 
   useEffect(() => {
     loadProfile()
@@ -41,10 +84,9 @@ export default function TaskerProfile() {
   async function loadIdentity() {
     try {
       const token = await getAuthToken()
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/v2/identity`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
+      const res = await fetch(`${API_URL}/api/mobile/v2/identity`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       if (res.ok) {
         const data = await res.json()
         setIdentityStatus(data.identityStatus)
@@ -56,7 +98,7 @@ export default function TaskerProfile() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.amber} />
         </View>
@@ -65,239 +107,219 @@ export default function TaskerProfile() {
   }
 
   const name = profile?.user?.name || user?.name || 'Tasker'
-  const initial = name[0]
+  const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase() || 'T'
   const skills = profile?.skills || []
-  const serviceAreas = profile?.serviceAreas || []
   const rating = profile?.rating || 0
   const completedJobs = profile?.completedJobs || 0
 
-  const showVerificationBanner = identityStatus !== 'APPROVED'
+  const reviews = [
+    { initials: 'PK', name: 'Priya K.', stars: 5, text: 'Fixed our wiring issue quickly and explained everything clearly. Highly recommend!' },
+    { initials: 'RJ', name: 'Ruwan J.', stars: 4, text: 'On time and professional. Slightly higher price but worth it.' },
+  ]
+
+  const verifications = [
+    { icon: 'card-outline', title: 'National ID Verified', sub: 'Checked against NIC database', done: true },
+    { icon: 'ribbon-outline', title: 'Trade Certificate', sub: 'Vocational Training Authority', done: true },
+    { icon: 'shield-outline', title: 'Skill Test', sub: 'Take a quick assessment', done: false },
+  ] as const
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {showVerificationBanner && (
-          <TouchableOpacity
-            style={styles.verifyBanner}
-            onPress={() => router.push('/(tasker)/identity')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="shield-checkmark-outline" size={18} color="#92400E" />
-            <Text style={styles.verifyBannerText}>
-              Complete identity verification to appear in customer searches
-            </Text>
-            <Text style={styles.verifyBannerAction}>Verify Now</Text>
-          </TouchableOpacity>
-        )}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
+        <ProfileHeader
+          initials={initials}
+          name={name}
+          roleLabel={`Electrician · Colombo 6`}
+          variant="tasker"
+          verified={identityStatus === 'APPROVED'}
+          onEdit={() => router.push('/(tasker)/settings/edit-profile')}
+          onSettings={() => router.push('/settings/notifications')}
+        />
+
+        <Animated.View style={[styles.card, cardAnim]}>
+          <View style={styles.statsRow}>
+            {[{ val: completedJobs, lbl: 'Jobs Done' }, { val: rating.toFixed(1), lbl: 'Rating' }, { val: '98%', lbl: 'On Time' }, { val: '3yr', lbl: 'Experience' }].map((s) => (
+              <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
+                <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
+                <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
+              </Animated.View>
+            ))}
           </View>
-          <Text style={styles.name}>{name}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-            <Text style={[styles.role, { marginBottom: 0 }]}>Plumber • </Text>
-            <Ionicons name="star" size={15} color="#F59E0B" />
-            <Text style={[styles.role, { marginBottom: 0 }]}> {rating.toFixed(1)}</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim2]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="construct-outline" size={14} color={colors.amberDark} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Skills</Text>
+            </View>
+            <View style={styles.chipRow}>
+              {skills.length > 0 ? skills.map((s: string) => (
+                <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
+                  <Ionicons name="flash-outline" size={12} color={colors.amberDark} />
+                  <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
+                </Animated.View>
+              )) : (
+                <>
+                  {[{ icon: 'flash-outline', label: 'Wiring' }, { icon: 'bulb-outline', label: 'Lighting' }, { icon: 'power-outline', label: 'Inverters' }, { icon: 'flash-outline', label: 'Wiring Repairs' }].map((s) => (
+                    <Animated.View key={s.label} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
+                      <Ionicons name={s.icon as any} size={12} color={colors.amberDark} />
+                      <Text style={[styles.chipText, { color: colors.amberDark }]}>{s.label}</Text>
+                    </Animated.View>
+                  ))}
+                </>
+              )}
+            </View>
           </View>
-          <View style={styles.badgeRow}>
-            {identityStatus === 'APPROVED' ? (
-              <View style={styles.badge}>
-                <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                <Text style={styles.badgeText}> Verified</Text>
-              </View>
-            ) : identityStatus === 'PENDING' ? (
-              <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="time-outline" size={14} color="#D97706" />
-                <Text style={[styles.badgeText, { color: '#D97706' }]}> Pending</Text>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => router.push('/(tasker)/identity')}>
-                <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
-                  <Ionicons name="close-circle-outline" size={14} color="#DC2626" />
-                  <Text style={[styles.badgeText, { color: '#DC2626' }]}> Not Verified</Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim3]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="images-outline" size={14} color={colors.amberDark} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Work Portfolio</Text>
+            </View>
+            <View style={styles.portGrid}>
+              {[1, 2, 3].map((i) => (
+                <Animated.View key={i} style={[styles.portItem, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
+                  <Ionicons name="image-outline" size={22} color={colors.muted} />
+                </Animated.View>
+              ))}
+            </View>
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim4]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Recent Reviews</Text>
+            </View>
+            {reviews.map((rev, i) => (
+              <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
                 </View>
-              </TouchableOpacity>
-            )}
-            <View style={styles.badge}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success, marginRight: 4 }} />
-              <Text style={styles.badgeText}>Online</Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{completedJobs}</Text>
-            <Text style={styles.statLabel}>Jobs</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{rating.toFixed(1)}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>99%</Text>
-            <Text style={styles.statLabel}>Completion</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>3 yr</Text>
-            <Text style={styles.statLabel}>Exp.</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Skills</Text>
-          <View style={styles.tagRow}>
-            {skills.map((s) => (
-              <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service areas</Text>
-          <View style={styles.tagRow}>
-            {serviceAreas.map((a) => (
-              <View key={a} style={styles.tag}><Text style={styles.tagText}>{a}</Text></View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <PressScale onPress={() => router.push('/(tasker)/identity')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Identity Verification</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                {identityStatus === 'APPROVED' ? (
-                  <Text style={{ fontSize: 12, color: colors.success, fontWeight: '600' }}>Verified</Text>
-                ) : identityStatus === 'PENDING' ? (
-                  <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '600' }}>Pending</Text>
-                ) : identityStatus === 'REJECTED' ? (
-                  <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '600' }}>Rejected</Text>
-                ) : null}
-                <Text style={styles.menuArrow}>›</Text>
+                <View style={styles.revBody}>
+                  <View style={styles.revTop}>
+                    <Text style={[styles.revName, { color: colors.ink }]}>{rev.name}</Text>
+                    <View style={styles.revStars}>
+                      {Array.from({ length: 5 }).map((_, si) => (
+                        <Ionicons key={si} name={si < rev.stars ? 'star' : 'star-outline'} size={11} color={colors.amber} />
+                      ))}
+                    </View>
+                  </View>
+                  <Text style={[styles.revText, { color: colors.muted }]}>"{rev.text}"</Text>
+                </View>
               </View>
+            ))}
+          </View>
+        </Animated.View>
+
+        <Animated.View style={[styles.card, sectionAnim5, { marginBottom: 24 }]}>
+          <View style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="shield-checkmark-outline" size={14} color={colors.amberDark} />
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Verification</Text>
             </View>
-          </PressScale>
-          <PressScale onPress={() => router.push('/settings/edit-profile')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="create-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Edit profile</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={() => Alert.alert('Coming soon', 'Payment features will be available in a future update.')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="card-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Payment details</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={() => Alert.alert('Coming soon', 'Notification settings will be available in a future update.')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="notifications-outline" size={20} color={colors.ink} style={{ marginRight: 12 }} />
-              <Text style={styles.menuLabel}>Notifications</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={() => router.push('/(auth)/role-switch?target=CUSTOMER')}>
-            <View style={styles.menuRow}>
-              <Ionicons name="swap-horizontal" size={20} color={colors.amber} style={{ marginRight: 12 }} />
-              <Text style={[styles.menuLabel, { color: colors.amber }]}>Switch to Hire a Professional</Text>
-              <Text style={styles.menuArrow}>›</Text>
-            </View>
-          </PressScale>
-          <PressScale onPress={handleLogout}>
-            <View style={styles.menuRow}>
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" style={{ marginRight: 12 }} />
-              <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Log out</Text>
-              <Text style={[styles.menuArrow, { color: '#EF4444' }]}>›</Text>
-            </View>
-          </PressScale>
-        </View>
+            {verifications.map((v, i) => (
+              <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
+                  <Ionicons name={v.icon as any} size={16} color={v.done ? '#059669' : colors.amberDark} />
+                </View>
+                <View style={styles.verifText}>
+                  <Text style={[styles.verifTitle, { color: colors.ink }]}>{v.title}</Text>
+                  <Text style={[styles.verifSub, { color: colors.muted }]}>{v.sub}</Text>
+                </View>
+                <Text style={[styles.verifStatus, { color: v.done ? '#059669' : colors.amberDark }]}>
+                  {v.done ? 'Done' : 'Pending'}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+
+        <OfferProgramSection variant="tasker" taskerId={user?.id} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+const makeStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  verifyBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+  card: {
+    marginHorizontal: 8,
+    marginBottom: 8,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 28,
+    elevation: 4,
+    overflow: 'hidden',
   },
-  verifyBannerText: { flex: 1, fontSize: 12, color: '#92400E', lineHeight: 16 },
-  verifyBannerAction: { fontSize: 12, fontWeight: '700', color: '#D97706' },
-  profileHeader: { alignItems: 'center', paddingTop: 24, paddingBottom: 20 },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.amber,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarText: { fontSize: 28, fontWeight: '700', color: colors.white },
-  name: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 4 },
-  role: { fontSize: 15, color: colors.muted, marginBottom: 10 },
-  badgeRow: { flexDirection: 'row', gap: 8 },
-  badge: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: '#D1FAE5',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  badgeText: { fontSize: 13, fontWeight: '600', color: colors.success },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 8, marginBottom: 20 },
+  statsRow: { flexDirection: 'row', padding: 16, gap: 10 },
   statCard: {
     flex: 1,
-    backgroundColor: colors.white,
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
   },
-  statValue: { fontSize: 18, fontWeight: '800', color: colors.ink },
-  statLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  section: { paddingHorizontal: 24, marginBottom: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 10 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  tagText: { fontSize: 13, fontWeight: '600', color: colors.ink },
-  menuRow: {
+  statValue: { fontSize: 17, fontFamily: fonts.headingBold, letterSpacing: -0.3 },
+  statLabel: { fontSize: 9, fontFamily: fonts.bodyMedium, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
+  section: { padding: 16 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  sectionTitle: { fontSize: 12, fontFamily: fonts.headingBold },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    borderRadius: 100,
   },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: colors.ink },
-  menuArrow: { fontSize: 22, color: colors.muted, fontWeight: '300' },
+  chipText: { fontSize: 11, fontFamily: fonts.bodyMedium },
+  portGrid: { flexDirection: 'row', gap: 8 },
+  portItem: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  revItem: { flexDirection: 'row', gap: 10, paddingVertical: 12 },
+  revAvt: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  revAvtText: { fontSize: 12, fontFamily: fonts.headingBold },
+  revBody: { flex: 1 },
+  revTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  revName: { fontSize: 12, fontFamily: fonts.headingBold },
+  revStars: { flexDirection: 'row', gap: 1 },
+  revText: { fontSize: 11, fontFamily: fonts.body, lineHeight: 16, marginTop: 3 },
+  verifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
+  verifIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  verifText: { flex: 1 },
+  verifTitle: { fontSize: 12, fontFamily: fonts.headingBold },
+  verifSub: { fontSize: 10, fontFamily: fonts.body, marginTop: 1 },
+  verifStatus: { fontSize: 10, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.4 },
 })

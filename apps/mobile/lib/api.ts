@@ -271,3 +271,15 @@ export const upload = {
     return res.json() as Promise<{ url: string; filename: string }>
   },
 }
+
+export const realEstate = {
+  list: (params?: { type?: string; status?: string }) =>
+    request<any[]>(`${API_URL}/api/real-estate?${new URLSearchParams(params || {}).toString()}`),
+
+  get: (id: string) =>
+    request<any>(`${API_URL}/api/real-estate/${id}`),
+
+  create: (data: any) => request<any>(`${API_URL}/api/real-estate`, {
+    method: 'POST', body: JSON.stringify(data),
+  }),
+}

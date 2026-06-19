@@ -2,18 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 
-const statusColors: Record<string, string> = {
-  OPEN: colors.amber,
-  IN_PROGRESS: '#3B82F6',
-  COMPLETED: colors.success,
-  CANCELLED: colors.error,
-}
-
 export default function V2MyJobsScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
+  const statusColors: Record<string, string> = {
+    OPEN: colors.amber,
+    IN_PROGRESS: '#3B82F6',
+    COMPLETED: colors.success,
+    CANCELLED: colors.error,
+  }
   const [jobs, setJobs] = useState<V2Job[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -50,7 +51,7 @@ export default function V2MyJobsScreen() {
         <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>📋</Text>
+          <Ionicons name="clipboard-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>No jobs yet</Text>
           <Text style={styles.emptySub}>Post your first job and get quotes from top providers</Text>
           <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.emptyBtn}>
@@ -87,7 +88,7 @@ export default function V2MyJobsScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.cream },
   greeting: { fontSize: 22, fontWeight: '800', color: colors.ink },

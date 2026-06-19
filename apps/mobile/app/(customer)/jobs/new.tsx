@@ -6,12 +6,14 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { jobs, jobCategories } from '../../../lib/api'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import ProgressSteps from '../../../components/ui/ProgressSteps'
 import CategoryPills from '../../../components/ui/CategoryPills'
 import PhotoUploader from '../../../components/ui/PhotoUploader'
 
 export default function PostJobScreen() {
+  const colors = useColors()
+    const styles = makeStyles(colors)
   const router = useRouter()
   const [step, setStep] = useState(0)
   const [cats, setCats] = useState<any[]>([])
@@ -230,7 +232,7 @@ export default function PostJobScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB', paddingHorizontal: 20 },
   backBtn: { marginTop: 12, marginBottom: 8 },
   backText: { fontSize: 15, color: '#6B7280', fontWeight: '500' },

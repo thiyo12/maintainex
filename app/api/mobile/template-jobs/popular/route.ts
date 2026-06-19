@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { jsonArrayContains } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,12 +13,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const country = searchParams.get('country') || 'LK'
 
-    const jobs = await prisma.templateJob.findMany({
-      where: { isActive: true, isPopular: true, countries: { has: country } },
+    let jobs = await prisma.templateJob.findMany({
+      where: { isActive: true, isPopular: true },
       include: { category: true },
       take: 10,
       orderBy: { name: 'asc' },
     })
+
+    jobs = jobs.filter(j => jsonArrayContains(j.countries, country))
 
     return NextResponse.json(jobs.map(j => ({
       id: j.id,

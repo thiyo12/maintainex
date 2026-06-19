@@ -1,8 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
-import { spacing, borderRadius } from '../../lib/tokens'
+import { useTheme } from '../../lib/ThemeContext'
 
 interface Props {
   current: number
@@ -13,66 +11,65 @@ interface Props {
 }
 
 export default function ProgressSteps({ current, total, labels, title, percentage }: Props) {
-  const colors = useColors()
+  const { colors } = useTheme()
+  const styles = makeStyles(colors)
   const pct = percentage || Math.round((current / total) * 100)
 
   return (
-    <View style={[styles.wrapper, { backgroundColor: colors.surface }]}>
+    <View style={[styles.container, { backgroundColor: colors.white }]}>
       {(title || percentage) ? (
         <View style={styles.header}>
           {title ? <Text style={[styles.title, { color: colors.ink }]}>{title}</Text> : null}
-          {percentage ? <Text style={[styles.pct, { color: colors.primary }]}>{pct}%</Text> : null}
+          {percentage ? <Text style={[styles.pct, { color: colors.amber }]}>{pct}%</Text> : null}
         </View>
       ) : null}
-      <View style={styles.stepsRow}>
+      <View style={styles.barRow}>
         {Array.from({ length: total }, (_, i) => {
           const isDone = i < current
           const isCurrent = i === current
-          const isUp = i > current
           return (
-            <View key={i} style={styles.step}>
-              <View
-                style={[
-                  styles.dot,
-                  isDone && { backgroundColor: colors.success },
-                  isCurrent && { backgroundColor: colors.primary, shadowColor: colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
-                  isUp && { backgroundColor: colors.border },
-                ]}
-              >
+            <View key={i} style={styles.stepWrap}>
+              <View style={[
+                styles.dot,
+                isDone && { backgroundColor: '#10B981' },
+                isCurrent && {
+                  backgroundColor: '#F59E0B',
+                  shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
+                },
+                !isDone && !isCurrent && { backgroundColor: colors.border },
+              ]}>
                 {isDone ? (
                   <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                 ) : (
                   <Text style={[
                     styles.dotText,
-                    isCurrent && { color: '#111' },
-                    isUp && { color: colors.muted },
+                    isCurrent && { color: '#111827' },
+                    !isCurrent && { color: '#6B7280' },
                   ]}>
                     {i + 1}
                   </Text>
                 )}
               </View>
               {i < total - 1 ? (
-                <View style={[styles.line, { backgroundColor: isDone ? colors.success : colors.border }]} />
+                <View style={[styles.line, { backgroundColor: isDone ? '#10B981' : colors.border }]} />
               ) : null}
             </View>
           )
         })}
       </View>
       {labels ? (
-        <View style={styles.lblRow}>
+        <View style={styles.labelRow}>
           {labels.map((l, i) => {
             const isDone = i < current
             const isCur = i === current
             return (
-              <Text
-                key={i}
-                style={[
-                  styles.lbl,
-                  isDone && { color: colors.success },
-                  isCur && { color: colors.primaryDark, fontFamily: fonts.headingBold },
-                  !isDone && !isCur && { color: colors.muted },
-                ]}
-              >
+              <Text key={i} style={[
+                styles.label,
+                isDone && { color: '#10B981' },
+                isCur && { color: '#D97706', fontFamily: 'Outfit_800ExtraBold' },
+                !isDone && !isCur && { color: '#6B7280' },
+              ]}>
                 {l}
               </Text>
             )
@@ -83,67 +80,19 @@ export default function ProgressSteps({ current, total, labels, title, percentag
   )
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    borderRadius: 18,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
-  title: {
-    fontSize: fontSizes.bodySmall,
-    fontFamily: fonts.headingBold,
-  },
-  pct: {
-    fontSize: fontSizes.bodySmall,
-    fontFamily: fonts.headingBold,
-  },
-  stepsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  step: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+const makeStyles = (colors: any) => StyleSheet.create({
+  container:   { marginVertical: 16, shadowOpacity: 0, padding: 0 },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
+  title:       { fontSize: 14, fontFamily: 'Outfit_800ExtraBold' },
+  pct:         { fontSize: 14, fontFamily: 'Outfit_800ExtraBold' },
+  barRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  stepWrap:    { flexDirection: 'row', alignItems: 'center' },
   dot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 32, height: 32, borderRadius: 16,
+    justifyContent: 'center', alignItems: 'center',
   },
-  dotText: {
-    fontSize: 13,
-    fontFamily: fonts.headingBold,
-  },
-  line: {
-    flex: 1,
-    height: 2,
-    marginHorizontal: 6,
-    borderRadius: 1,
-  },
-  lblRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm + 2,
-  },
-  lbl: {
-    fontSize: 9,
-    fontFamily: fonts.label,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    flex: 1,
-    textAlign: 'center',
-  },
+  dotText:       { fontSize: 13, fontFamily: 'Outfit_700Bold' },
+  line: { width: 40, height: 2, marginHorizontal: 6, borderRadius: 2 },
+  labelRow:     { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
+  label:        { fontSize: 9, fontFamily: 'Outfit_500Medium', textTransform: 'uppercase', letterSpacing: 0.4, flex: 1, textAlign: 'center' },
 })

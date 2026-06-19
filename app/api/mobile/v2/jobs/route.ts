@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         categoryId,
-        photos: photos || [],
+        photos: JSON.stringify(photos || []),
         budgetType,
         budgetAmount,
         areaId: areaId || null,

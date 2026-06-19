@@ -3,11 +3,23 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../../../lib/colors'
+import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 
 export default function V2ProviderManageJobScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
+  const statusColors: Record<string, string> = {
+    OPEN: colors.amber,
+    IN_PROGRESS: '#3B82F6',
+    QUOTE_ACCEPTED: '#8B5CF6',
+    ESCROW_DEPOSITED: '#06B6D4',
+    COMPLETED: colors.success,
+    COMPLETION_PENDING: colors.amber,
+    CANCELLED: colors.error,
+    DISPUTED: colors.error,
+  }
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const [job, setJob] = useState<V2Job | null>(null)
@@ -306,18 +318,7 @@ export default function V2ProviderManageJobScreen() {
   )
 }
 
-const statusColors: Record<string, string> = {
-  OPEN: colors.amber,
-  IN_PROGRESS: '#3B82F6',
-  QUOTE_ACCEPTED: '#8B5CF6',
-  ESCROW_DEPOSITED: '#06B6D4',
-  COMPLETED: colors.success,
-  COMPLETION_PENDING: colors.amber,
-  CANCELLED: colors.error,
-  DISPUTED: colors.error,
-}
-
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scroll: { flex: 1 },
   hero: { padding: 20, paddingBottom: 12 },

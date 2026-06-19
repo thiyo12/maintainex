@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { safeParseJsonArr } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -20,12 +21,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       iconName: category.iconName,
       colorHex: category.colorHex,
       sortOrder: category.sortOrder,
-      countries: category.countries,
+      countries: safeParseJsonArr(category.countries),
       jobs: category.jobs.map(j => ({
         id: j.id,
         name: j.name,
         description: j.description,
-        whatIsIncluded: j.whatIsIncluded,
+        whatIsIncluded: safeParseJsonArr(j.whatIsIncluded),
         typicalDurationMinutes: j.typicalDurationMinutes,
         priceMin: j.priceMin,
         priceMax: j.priceMax,

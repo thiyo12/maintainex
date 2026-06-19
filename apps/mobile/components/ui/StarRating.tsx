@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { spacing } from '../../lib/tokens'
-
-const GOLD = '#F59E0B'
+import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 
 interface Props {
   stars: number
@@ -43,18 +41,12 @@ export default function StarRating({ stars, size = 18, onRate, readonly = false,
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         >
-          <Animated.View
-            style={[
-              !readonly && { transform: [{ scale: animValues[i - 1] || 1 }] },
-            ]}
-          >
-            <Text style={[
-              styles.star,
-              { fontSize: size },
-              i <= stars ? { color: starColor || GOLD } : { color: emptyColor || '#E5E7EB' },
-            ]}>
-              ★
-            </Text>
+          <Animated.View style={[!readonly && { transform: [{ scale: animValues[i - 1] || 1 }] }]}>
+            <Ionicons
+              name="star"
+              size={size}
+              color={i <= stars ? (starColor || '#F59E0B') : (emptyColor || '#E5E7EB')}
+            />
           </Animated.View>
         </TouchableOpacity>
       ))}
@@ -63,6 +55,5 @@ export default function StarRating({ stars, size = 18, onRate, readonly = false,
 }
 
 const styles = StyleSheet.create({
-  container: { flexDirection: 'row', gap: 2 },
-  star: {},
+  container: { flexDirection: 'row', gap: 3 },
 })

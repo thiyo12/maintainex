@@ -4,11 +4,13 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Team } from '../../../lib/api-v2'
 
 export default function TeamManagement() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const [members, setMembers] = useState<any[]>([])
   const [pendingInvites, setPendingInvites] = useState<any[]>([])
@@ -130,7 +132,7 @@ export default function TeamManagement() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 20, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.cream },

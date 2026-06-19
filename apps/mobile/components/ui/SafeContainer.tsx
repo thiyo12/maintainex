@@ -12,6 +12,7 @@ interface Props {
 
 export default function SafeContainer({ children, withGradient = false, noPadding = false }: Props) {
   const colors = useColors()
+    const styles = makeStyles(colors)
 
   const content = (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -39,7 +40,7 @@ export default function SafeContainer({ children, withGradient = false, noPaddin
   return content
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   safe: {
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,

@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 export default function CompanyTeam() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [loading, setLoading] = useState(true)
   const [members, setMembers] = useState<any[]>([])
 
@@ -35,7 +37,7 @@ export default function CompanyTeam() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.companyAccent} />
+          <ActivityIndicator size="large" color={colors.amber} />
         </View>
       </SafeAreaView>
     )
@@ -103,7 +105,7 @@ export default function CompanyTeam() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: {
     flexDirection: 'row',
@@ -115,7 +117,7 @@ const styles = StyleSheet.create({
   },
   heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
   addBtn: {
-    backgroundColor: colors.companyAccent,
+    backgroundColor: colors.amber,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
@@ -159,7 +161,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.companyAccent,
+    backgroundColor: colors.amber,
     justifyContent: 'center',
     alignItems: 'center',
   },

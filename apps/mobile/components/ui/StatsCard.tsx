@@ -1,48 +1,38 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts, fontSizes } from '../../lib/fonts'
-import { spacing, borderRadius, shadows } from '../../lib/tokens'
-
-const iconMap: Record<string, { name: keyof typeof Ionicons.glyphMap; bg: string; iconColor: string }> = {
-  default: { name: 'briefcase-outline', bg: '#FEF3C7', iconColor: '#D97706' },
-}
+import { useTheme } from '../../lib/ThemeContext'
 
 interface Props {
   label: string
   value: string | number
   color?: string
   icon?: string
-  iconBg?: string
-  iconColor?: string
+  iconName?: string
 }
 
-export default function StatsCard({ label, value, color: propColor, icon, iconBg, iconColor: propIconColor }: Props) {
-  const colors = useColors()
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const color = propColor || colors.primary
-  const ic = iconMap[icon || 'default'] || iconMap.default
+export default function StatsCard({ label, value, color, icon, iconName }: Props) {
+  const { colors } = useTheme()
+  const accentColor = color || colors.amber
+  const fadeAnim  = useRef(new Animated.Value(0)).current
+  const scaleAnim = useRef(new Animated.Value(0.92)).current
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start()
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }),
+    ]).start()
   }, [])
 
   return (
-    <Animated.View style={[styles.card, { backgroundColor: colors.surface, opacity: fadeAnim }, shadows.md]}>
-      <View style={[styles.bottomBar, { backgroundColor: color }]} />
-      <View style={[styles.iconWrap, { backgroundColor: iconBg || ic.bg }]}>
-        <Ionicons
-          name={(icon || ic.name) as any}
-          size={16}
-          color={propIconColor || ic.iconColor}
-        />
+    <Animated.View style={[
+      styles.card,
+      { backgroundColor: colors.white, opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
+    ]}>
+      <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
+      <View style={[styles.iconBox, { backgroundColor: accentColor + '20' }]}>
+        <Text style={{ fontSize: 16 }}>{iconName || icon || '📊'}</Text>
       </View>
-      <Text style={[styles.value, { color: colors.ink }]}>{value}</Text>
+      <Text style={[styles.value, { color: accentColor }]}>{value}</Text>
       <Text style={[styles.label, { color: colors.muted }]}>{label}</Text>
     </Animated.View>
   )
@@ -50,40 +40,13 @@ export default function StatsCard({ label, value, color: propColor, icon, iconBg
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
+    flex: 1, borderRadius: 16, padding: 14, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07, shadowRadius: 16, elevation: 4,
+    overflow: 'hidden', position: 'relative',
   },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-  },
-  iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  value: {
-    fontSize: fontSizes.h3,
-    fontFamily: fonts.headingBold,
-    letterSpacing: -0.5,
-    marginBottom: 2,
-  },
-  label: {
-    fontSize: 9,
-    fontWeight: '700',
-    fontFamily: fonts.label,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
+  accentBar: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 3 },
+  iconBox:   { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  value:     { fontSize: 20, fontFamily: 'Outfit_900Black', letterSpacing: -0.5, marginBottom: 2 },
+  label:     { fontSize: 9,  fontFamily: 'Outfit_700Bold', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' },
 })

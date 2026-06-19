@@ -6,7 +6,7 @@ import {
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { getAuthToken } from '../../../lib/api'
 import { v2Team } from '../../../lib/api-v2'
@@ -47,6 +47,8 @@ interface InviteEntry {
 const STEPS = ['Company Info', 'Services', 'Team', 'Review']
 
 export default function CompanySetupOnboarding() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { user, refreshUser } = useAuth()
   const [step, setStep] = useState(0)
@@ -377,7 +379,7 @@ export default function CompanySetupOnboarding() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 24, paddingBottom: 48 },
   backButton: { marginBottom: 16, alignSelf: 'flex-start' },

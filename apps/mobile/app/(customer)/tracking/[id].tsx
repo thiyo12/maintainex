@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
-import { colors } from '../../../lib/colors'
+import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Jobs, v2JobActions } from '../../../lib/api-v2'
 import Avatar from '../../../components/ui/Avatar'
@@ -42,6 +42,8 @@ const progressSteps = [
 ]
 
 export default function LiveTrackingScreen() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuth()
@@ -156,7 +158,10 @@ export default function LiveTrackingScreen() {
           <Avatar name={job?.acceptedQuote?.provider?.name || 'Provider'} size={44} />
           <View style={styles.providerInfo}>
             <Text style={styles.providerName}>{job?.acceptedQuote?.provider?.name || 'Provider'}</Text>
-            <Text style={styles.providerRating}>★ 4.8</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="star" size={12} color={colors.amber} />
+                  <Text style={styles.providerRating}> 4.8</Text>
+                </View>
           </View>
           <View style={styles.providerActions}>
             <TouchableOpacity style={styles.callBtn}>
@@ -182,7 +187,7 @@ export default function LiveTrackingScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   mapContainer: { height: MAP_HEIGHT },
   map: { flex: 1 },

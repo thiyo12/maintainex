@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react'
 import { View, TouchableOpacity, StyleSheet } from 'react-native'
 import { useColors } from '../../lib/ThemeContext'
-import { spacing, borderRadius, shadows } from '../../lib/tokens'
 
 interface Props {
   children: ReactNode
@@ -13,15 +12,11 @@ interface Props {
 
 export default function Card({ children, variant = 'default', onPress, style, padded }: Props) {
   const colors = useColors()
+    const styles = makeStyles(colors)
 
   const cardStyle = [
-    styles.base,
-    {
-      backgroundColor: colors.surface,
-      borderRadius: borderRadius.lg,
-    },
-    variant === 'elevated' && shadows.lg,
-    variant !== 'elevated' && shadows.md,
+    styles.card,
+    { backgroundColor: colors.white },
     padded === false && { padding: 0 },
     style,
   ]
@@ -37,8 +32,15 @@ export default function Card({ children, variant = 'default', onPress, style, pa
   return <View style={cardStyle}>{children}</View>
 }
 
-const styles = StyleSheet.create({
-  base: {
-    padding: spacing.lg,
+const makeStyles = (colors: any) => StyleSheet.create({
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
   },
 })

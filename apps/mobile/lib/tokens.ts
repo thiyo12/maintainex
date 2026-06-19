@@ -13,6 +13,12 @@ export const spacing = {
 }
 
 export const borderRadius = {
+  pill: 100,
+  button: 14,
+  card: 18,
+  iconBox: 12,
+  iconBoxLg: 14,
+  bottomSheet: 24,
   sm: 6,
   md: 12,
   lg: 16,
@@ -34,6 +40,20 @@ export const shadows = {
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
+  },
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  amberGlow: {
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
   lg: {
     shadowColor: '#000',
@@ -57,6 +77,32 @@ export const opacity = {
   medium: 0.3,
   disabled: 0.5,
   pressed: 0.8,
+}
+
+export const fontSizes = {
+  display: 32,
+  h1: 28,
+  h2: 24,
+  h3: 20,
+  body: 16,
+  bodySmall: 14,
+  caption: 13,
+  captionSmall: 12,
+  label: 11,
+  button: 15,
+  buttonSmall: 13,
+}
+
+export const lineHeights = {
+  display: 40,
+  h1: 36,
+  h2: 32,
+  h3: 28,
+  body: 24,
+  bodySmall: 20,
+  caption: 18,
+  label: 16,
+  button: 20,
 }
 
 export const hitSlop = {

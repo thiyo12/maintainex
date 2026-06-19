@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { colors } from '../../../../lib/colors'
+import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { findTasker } from '../../../../lib/api'
 import StickyBottomBar from '../../../../components/find/StickyBottomBar'
 import SkeletonLoader from '../../../../components/find/SkeletonLoader'
 
 export default function TaskerProfileDetail() {
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { taskerId, jobId } = useLocalSearchParams<{ taskerId: string; jobId: string }>()
   const [tasker, setTasker] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -143,7 +145,7 @@ export default function TaskerProfileDetail() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 100 },
