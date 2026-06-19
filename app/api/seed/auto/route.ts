@@ -90,6 +90,7 @@ export async function GET() {
               shortDescription: service.description,
               price: service.price,
               duration: service.duration,
+              features: '[]',
               categoryId: category.id
             }
           })

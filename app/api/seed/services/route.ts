@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
               price: service.price,
               duration: service.duration,
               categoryId: category.id,
-              features: []
+              features: '[]'
             }
           })
           servicesCreated++
