@@ -1,5 +1,8 @@
 FROM node:20-slim
 
+ARG NEXTAUTH_SECRET=placeholder-build-only
+ENV NEXTAUTH_SECRET=$NEXTAUTH_SECRET
+
 RUN apt-get update && apt-get install -y openssl build-essential python3 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
