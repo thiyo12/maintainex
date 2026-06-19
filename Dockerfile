@@ -15,10 +15,13 @@ RUN npx prisma generate
 
 COPY . .
 
-RUN mkdir -p public/uploads/services && chmod 755 public/uploads/services
+RUN rm -rf prisma/migrations && \
+    sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma && \
+    npx prisma generate && \
+    mkdir -p public/uploads/services && chmod 755 public/uploads/services
 
 RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD npx prisma db push && npm start
