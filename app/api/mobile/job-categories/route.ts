@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     })
 
-    function matchesCountry(countriesJson: string, target: string): boolean {
+    const matchesCountry = (countriesJson: string, target: string): boolean => {
       try {
         const arr = JSON.parse(countriesJson)
         return Array.isArray(arr) && arr.includes(target)
