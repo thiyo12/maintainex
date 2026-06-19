@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
         role: 'SUPER_ADMIN',
         firstName,
         lastName,
-        assignedCountries: [],
+        assignedCountries: '[]',
         createdBy: session.id,
       },
     })
