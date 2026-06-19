@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         role: data.role,
         firstName: data.firstName,
         lastName: data.lastName,
-        assignedCountries: data.assignedCountries,
+        assignedCountries: JSON.stringify(data.assignedCountries),
         parentId: session.id,
         createdBy: session.id,
       },

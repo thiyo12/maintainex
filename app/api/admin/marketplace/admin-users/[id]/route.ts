@@ -32,7 +32,7 @@ export async function PATCH(
 
     const updates: any = {}
     if (data.role !== undefined) updates.role = data.role
-    if (data.assignedCountries !== undefined) updates.assignedCountries = data.assignedCountries
+    if (data.assignedCountries !== undefined) updates.assignedCountries = JSON.stringify(data.assignedCountries)
     if (data.isActive !== undefined) updates.isActive = data.isActive
 
     const updated = await prisma.adminUser.update({
