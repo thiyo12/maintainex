@@ -225,10 +225,10 @@ export default async function HomePage() {
           <TrendingServices services={trendingServices} />
         )}
 
-        <section className="py-24 bg-gray-50">
+        <section className="py-24 bg-gray-50 dark:bg-dark-800">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-16">
-              <span className="text-primary-600 font-semibold">WHY CHOOSE US</span>
+              <span className="text-primary-600 dark:text-primary-400 font-semibold">WHY CHOOSE US</span>
               <h2 className="section-title">The Maintainex Advantage</h2>
               <p className="section-subtitle">
                 We go above and beyond to ensure your space is not just clean, but exceptionally maintained.
@@ -237,12 +237,12 @@ export default async function HomePage() {
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {features.map((feature) => (
-                <div key={feature.title} className="bg-white rounded-2xl p-8 text-center shadow-lg hover:shadow-xl transition-shadow">
+                <div key={feature.title} className="bg-white dark:bg-dark-400 rounded-2xl p-8 text-center shadow-lg dark:shadow-dark-900/50 hover:shadow-xl transition-shadow">
                   <div className="w-16 h-16 gradient-bg rounded-2xl flex items-center justify-center mx-auto mb-6">
                     <feature.icon className="text-dark-900 text-2xl" />
                   </div>
-                  <h3 className="text-xl font-bold text-dark-900 mb-3">{feature.title}</h3>
-                  <p className="text-gray-600">{feature.description}</p>
+                  <h3 className="text-xl font-bold text-dark-900 dark:text-white mb-3">{feature.title}</h3>
+                  <p className="text-gray-600 dark:text-gray-400">{feature.description}</p>
                 </div>
               ))}
             </div>

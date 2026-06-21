@@ -11,13 +11,13 @@ export default function WhatsAppButton() {
   return (
     <div className="fixed bottom-6 right-6 z-50">
       {isOpen && (
-        <div className="absolute bottom-20 right-0 bg-white rounded-2xl shadow-2xl p-6 w-80 mb-2 animate-fade-in">
+        <div className="absolute bottom-20 right-0 bg-white dark:bg-dark-400 rounded-2xl shadow-2xl p-6 w-80 mb-2 animate-fade-in">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-            <span className="text-green-600 font-semibold text-sm">Live Support</span>
+            <span className="text-green-600 dark:text-green-400 font-semibold text-sm">Live Support</span>
           </div>
-          <h4 className="font-bold text-dark-900 mb-2">Chat with us on WhatsApp!</h4>
-          <p className="text-gray-600 text-sm mb-4">
+          <h4 className="font-bold text-dark-900 dark:text-white mb-2">Chat with us on WhatsApp!</h4>
+          <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
             Get instant responses. Click below to start chatting with our team.
           </p>
           <a

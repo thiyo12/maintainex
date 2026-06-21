@@ -38,7 +38,7 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
     : (firstService?.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=800')
 
   return (
-    <div className="bg-white rounded-3xl overflow-hidden shadow-xl mb-12">
+    <div className="bg-white dark:bg-dark-400 rounded-3xl overflow-hidden shadow-xl dark:shadow-dark-900/50 mb-12">
       <div className="grid lg:grid-cols-2">
         <div className="relative h-64 lg:h-auto">
           {isUploadedImage ? (
@@ -65,31 +65,31 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
         </div>
 
         <div className="p-8 lg:p-12 flex flex-col justify-center">
-          <div className="inline-block px-4 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-semibold mb-4 w-fit">
+          <div className="inline-block px-4 py-1 bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-400 rounded-full text-sm font-semibold mb-4 w-fit">
             Popular Category
           </div>
 
-          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
             {category.name}
           </h2>
 
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
             {category.description || `Professional ${category.name.toLowerCase()} services for your home and business.`}
           </p>
 
           <div className="flex items-center gap-4 mb-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {totalJobs.toLocaleString()}+
               </div>
-              <div className="text-sm text-gray-500">Jobs Done</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Jobs Done</div>
             </div>
-            <div className="h-12 w-px bg-gray-200" />
+            <div className="h-12 w-px bg-gray-200 dark:bg-dark-200" />
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {services.length}
               </div>
-              <div className="text-sm text-gray-500">Services</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Services</div>
             </div>
           </div>
 
@@ -98,13 +98,13 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
               <Link
                 key={service.id}
                 href={`/services/${service.slug}`}
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-primary-100 hover:text-primary-700 transition-colors"
+                className="px-3 py-1 bg-gray-100 dark:bg-dark-300 text-gray-700 dark:text-gray-200 rounded-full text-sm hover:bg-primary-100 dark:hover:bg-primary-900/40 hover:text-primary-700 dark:hover:text-primary-400 transition-colors"
               >
                 {service.title}
               </Link>
             ))}
             {services.length > 4 && (
-              <span className="px-3 py-1 text-gray-500 text-sm">
+              <span className="px-3 py-1 text-gray-500 dark:text-gray-400 text-sm">
                 +{services.length - 4} more
               </span>
             )}
@@ -120,7 +120,7 @@ export default function FeaturedService({ category, services }: FeaturedServiceP
             </Link>
             <Link
               href={`/booking?service=${firstService?.slug || ''}`}
-              className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold px-8 py-4 rounded-xl hover:bg-gray-200 transition-colors"
+              className="inline-flex items-center justify-center gap-2 bg-gray-100 dark:bg-dark-300 text-gray-700 dark:text-gray-200 font-bold px-8 py-4 rounded-xl hover:bg-gray-200 dark:hover:bg-dark-200 transition-colors"
             >
               Book Now
             </Link>
