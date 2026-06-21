@@ -348,7 +348,10 @@ export async function middleware(request: NextRequest) {
     pathname !== '/api/auth/logout' &&
     pathname !== '/api/seed/auto' &&
     !pathname.startsWith('/api/services') &&
-    !pathname.startsWith('/api/categories')
+    !pathname.startsWith('/api/categories') &&
+    !pathname.startsWith('/api/industries') &&
+    !pathname.startsWith('/api/testimonials') &&
+    !pathname.startsWith('/api/booking')
   ) {
     const session = await getSession(request)
     

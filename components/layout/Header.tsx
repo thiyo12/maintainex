@@ -57,6 +57,9 @@ export default function Header() {
             </Link>
           </div>
 
+          <div className="md:hidden flex items-center gap-1">
+            <ThemeToggle />
+          </div>
           <MobileMenu navigation={navigation} phoneRaw={region.phoneRaw} phone={region.phone} />
         </div>
       </nav>
