@@ -125,7 +125,8 @@ async function main() {
           duration: serviceData.duration,
           image: serviceData.image,
           categoryId: categoryData.id,
-          isActive: true
+          isActive: true,
+          features: '[]'
         }
       })
     }

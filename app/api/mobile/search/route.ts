@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       prisma.jobCategory.findMany({
         where: {
           isActive: true,
-          name: { contains: query, mode: 'insensitive' },
+          name: { contains: query },
         },
         orderBy: { sortOrder: 'asc' },
         take: 5,
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: query, mode: 'insensitive' } },
-            { description: { contains: query, mode: 'insensitive' } },
+            { name: { contains: query } },
+            { description: { contains: query } },
           ],
         },
         include: { category: true },
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       prisma.taskerProfile.findMany({
         where: {
           isVerified: true,
-          user: { name: { contains: query, mode: 'insensitive' } },
+          user: { name: { contains: query } },
         },
         include: { user: { select: { id: true, name: true } } },
         take: 5,
