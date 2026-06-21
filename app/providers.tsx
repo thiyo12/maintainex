@@ -4,6 +4,7 @@ import '@/lib/bigint-polyfill'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RegionProvider } from '@/lib/region-context'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeProvider } from 'next-themes'
 import { useState } from 'react'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -18,9 +19,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <RegionProvider>{children}</RegionProvider>
-      </TooltipProvider>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        <TooltipProvider>
+          <RegionProvider>{children}</RegionProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

@@ -83,7 +83,7 @@ export default function RootLayout({
   const siteJson = websiteSchema(region)
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="llms-txt" href={`${baseUrl}/llms.txt`} />
         <meta name="llms" content={`${baseUrl}/llms.txt`} />
@@ -102,7 +102,7 @@ export default function RootLayout({
           {JSON.stringify(siteJson)}
         </Script>
       </head>
-      <body className={`${inter.className} min-h-screen bg-gray-50`}>
+      <body className={`${inter.className} min-h-screen bg-gray-50 dark:bg-dark-900 dark:text-gray-100`}>
         <Script id="region-cookie" strategy="afterInteractive">
           {`document.cookie="region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax"`}
         </Script>
