@@ -44,21 +44,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     for (const district of districts) {
       const citySlug = slugifyCity(district)
+      const isJaffna = district === 'Jaffna'
       entries.push({
         url: `${baseUrl}/services/${slug}/${citySlug}`,
         lastModified: new Date(),
         changeFrequency: 'weekly' as const,
-        priority: 0.6,
+        priority: isJaffna ? 0.85 : 0.6,
       })
     }
   }
 
   for (const citySlug of CITY_PAGES[region] || []) {
+    const isJaffna = citySlug === 'jaffna'
     entries.push({
       url: `${baseUrl}/services/${citySlug}`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
-      priority: 0.7,
+      priority: isJaffna ? 0.9 : 0.7,
     })
   }
 

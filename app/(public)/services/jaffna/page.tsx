@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: `${baseUrl}/services/jaffna` },
     openGraph: {
       title: 'Services in Jaffna | Maintainex Sri Lanka',
-      description: 'Professional home services in Jaffna. Book cleaning, plumbing, electrical & more. Free quotes, vetted pros.',
+      description: 'Jaffna headquarters. Professional home services in Jaffna by trusted local providers. Book cleaning, plumbing, electrical & more. Free quotes, vetted pros.',
       url: `${baseUrl}/services/jaffna`,
     },
   }

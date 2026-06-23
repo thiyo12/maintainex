@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
 
   const description = isCA
     ? `Professional ${service.name.toLowerCase()} in Toronto & across Canada. Trusted ${catName} providers. Free quotes, vetted professionals. ${priceStr}. Book online.`
-    : `Book professional ${service.name.toLowerCase()} in Colombo, Kandy, Galle & Jaffna. Trusted ${catName} providers. Free quotes in minutes. ${priceStr}. Book on Maintainex.`
+    : `Book professional ${service.name.toLowerCase()} in Jaffna, Colombo, Kandy & Galle. Trusted ${catName} providers. Free quotes in minutes. ${priceStr}. Book on Maintainex.`
 
   return {
     title,

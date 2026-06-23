@@ -32,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: isCA
       ? `Book trusted home services in Toronto & Ontario. Cleaning, plumbing, electrical, movers & more. Free quotes. Starting from $50.`
-      : `Book trusted home services in Colombo, Kandy, Galle & Jaffna. Cleaning, plumbing, electrical, movers & more. Free quotes in minutes. Starting from LKR 1,200.`,
+      : `Book trusted home services in Jaffna, Colombo, Kandy & Galle. Cleaning, plumbing, electrical, movers & more. Free quotes in minutes. Starting from LKR 1,200.`,
     keywords: isCA
       ? `home services Canada, cleaning service Toronto, plumber Ontario, electrician Canada, house cleaning Toronto, handyman Toronto, mover Toronto`
       : `home services Sri Lanka, cleaning service Colombo, plumber Colombo, electrician Sri Lanka, house cleaning Sri Lanka, handyman Colombo, home repair Sri Lanka, movers Colombo`,
