@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { FiArrowRight, FiTrendingUp, FiEye } from 'react-icons/fi'
-import { getImageUrl } from '@/lib/images'
+import { MapPin, Star, ArrowRight } from 'lucide-react'
+import { FiArrowRight as FiArrowRightOld } from 'react-icons/fi'
 
 interface Service {
   id: string
@@ -22,8 +21,16 @@ interface TrendingServicesProps {
   services: Service[]
 }
 
+const JOB_CATEGORIES = ['Cleaning', 'Plumbing', 'Web Design', 'Painting', 'Electrical', 'Repairs']
+const LOCATIONS = ['Colombo 03', 'Colombo 05', 'Kandy', 'Galle', 'Jaffna', 'Negombo']
+const TIMES = ['Today', 'Urgent', 'This week', 'Weekend', 'Tomorrow']
+const QUOTES = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+function pick<T>(arr: T[], seed: number): T {
+  return arr[seed % arr.length]
+}
+
 export default function TrendingServices({ services }: TrendingServicesProps) {
-  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
   const [visible, setVisible] = useState<Set<number>>(new Set())
   const cardRefs = useRef<(HTMLAnchorElement | null)[]>([])
 
@@ -53,39 +60,33 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
     return () => observer.disconnect()
   }, [services])
 
-  if (!services || services.length === 0) {
-    return null
-  }
-
-  const handleImageError = (serviceId: string) => {
-    setImgErrors(prev => ({ ...prev, [serviceId]: true }))
-  }
+  if (!services || services.length === 0) return null
 
   return (
-    <section className="py-16 md:py-20 bg-gradient-to-b from-gray-50 to-white">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl">
-              <FiTrendingUp className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
-                Trending Services
-              </h2>
-              <p className="text-gray-500 text-sm mt-1">
-                Most popular services our customers love
-              </p>
-            </div>
+    <section className="py-24">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <span className="text-[10px] uppercase tracking-[0.15em] text-amber-600 font-semibold">Live now</span>
+            <h2 className="text-3xl md:text-4xl font-black tracking-[-0.03em] text-ink mt-1">
+              Jobs posted today
+            </h2>
           </div>
+          <Link
+            href="/services"
+            className="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-amber-600 transition-colors"
+          >
+            Browse all <FiArrowRightOld className="w-4 h-4" />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid sm:grid-cols-2 gap-4 md:gap-5">
           {services.map((service, index) => {
-            const isUploadedImage = service.image?.startsWith('/uploads/') && !imgErrors[service.id]
-            const fallbackImage = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'
-            const imageSrc = isUploadedImage ? getImageUrl(service.image) : (service.image || fallbackImage)
             const isVisible = visible.has(index)
+            const cat = pick(JOB_CATEGORIES, index)
+            const isRemote = cat === 'Web Design'
+            const location = isRemote ? 'Remote' : pick(LOCATIONS, index)
+            const time = pick(TIMES, index)
 
             return (
               <Link
@@ -93,63 +94,45 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
                 data-index={index}
                 ref={(el) => { cardRefs.current[index] = el }}
                 href={`/services/${service.slug || service.id}`}
-                className={`group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-orange-200 ${
-                  isVisible ? 'animate-pop-in' : 'opacity-0 scale-90'
+                className={`group bg-card rounded-3xl overflow-hidden border border-border hover:border-amber-300 transition-all duration-300 ${
+                  isVisible ? 'animate-fade-up' : 'opacity-0'
                 }`}
                 style={{
-                  animationDelay: `${index * 180}ms`,
-                  animationDuration: '900ms',
+                  animationDelay: `${index * 120}ms`,
+                  animationDuration: '700ms',
                   animationFillMode: 'both',
                 }}
               >
-                <div className="relative h-28 sm:h-36 md:h-44 overflow-hidden">
-                  {isUploadedImage ? (
-                    <img
-                      src={imageSrc}
-                      alt={service.name}
-                      width="400"
-                      height="300"
-                      onError={() => handleImageError(service.id)}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <Image
-                      src={imageSrc}
-                      alt={service.name}
-                      fill
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                      onError={() => handleImageError(service.id)}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                  
-                  <div className="absolute top-2 left-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                    <span>🔥</span>
-                    <span>#{index + 1}</span>
-                  </div>
-
-                  {service.isTrending && (
-                    <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                      Trending
+                <div className="flex">
+                  <div className={`w-1.5 flex-shrink-0 ${isRemote ? 'bg-indigo-400' : 'bg-amber-500'}`} />
+                  <div className="flex-1 p-4 md:p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-soft px-2 py-0.5 rounded-full">
+                        {cat}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{time}</span>
                     </div>
-                  )}
-
-                  <div className="absolute bottom-2 left-2 bg-gradient-to-r from-amber-500/90 to-orange-500/90 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 shadow-lg">
-                    <FiEye className="w-3.5 h-3.5" />
-                    <span>{service.views || 0}</span>
-                  </div>
-                </div>
-
-                <div className="p-3 md:p-4">
-                  <h3 className="font-bold text-gray-900 text-sm md:text-base mb-1 group-hover:text-orange-600 transition-colors line-clamp-1">
-                    {service.name}
-                  </h3>
-                  
-                  <div className="flex items-center justify-end">
-                    <FiArrowRight className="w-4 h-4 text-gray-400 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
+                    <h3 className="font-bold text-ink text-sm md:text-base mb-3 line-clamp-1 group-hover:text-amber-600 transition-colors">
+                      {service.name}
+                    </h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <MapPin className="w-3 h-3" />
+                        <span>{location}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-500 text-amber-500" />
+                        <span className="text-xs font-semibold text-ink">{pick(QUOTES, index)}</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+                      <span className="text-base font-bold text-ink">
+                        {service.price ? `LKR ${service.price.toLocaleString()}` : 'From LKR 2,000'}
+                      </span>
+                      <span className="text-xs text-muted-foreground group-hover:text-amber-600 transition-colors">
+                        {service.views} views
+                      </span>
+                    </div>
                   </div>
                 </div>
               </Link>
@@ -157,35 +140,15 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
           })}
         </div>
 
-        <div className="text-center mt-8">
-          <Link 
-            href="/services" 
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-full font-semibold hover:shadow-lg hover:scale-105 transition-all"
+        <div className="text-center mt-8 sm:hidden">
+          <Link
+            href="/services"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-amber-600 transition-colors"
           >
-            View All Services
-            <FiArrowRight className="w-5 h-5" />
+            Browse all <FiArrowRightOld className="w-4 h-4" />
           </Link>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes popIn {
-          0% {
-            opacity: 0;
-            transform: scale(0.75) translateY(24px);
-          }
-          50% {
-            transform: scale(1.04) translateY(-4px);
-          }
-          100% {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-        .animate-pop-in {
-          animation: popIn 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-        }
-      `}</style>
     </section>
   )
 }

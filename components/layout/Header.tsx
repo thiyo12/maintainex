@@ -1,9 +1,7 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { FiPhone } from 'react-icons/fi'
+import { Briefcase, ArrowRight } from 'lucide-react'
 import { useRegion } from '@/lib/region-context'
 import MobileMenu from './MobileMenu'
 import ThemeToggle from './ThemeToggle'
@@ -20,44 +18,50 @@ export default function Header() {
   const region = useRegion()
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/95 dark:bg-dark-800/95 backdrop-blur-md shadow-sm">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          <Link href="/" className="flex items-center space-x-2">
-            <Image src="/logo.JPEG" alt="Maintainex" width={40} height={40} className="object-contain" />
-            <span className="text-2xl font-bold text-dark-900 dark:text-white">
-              Main<span className="text-primary-500">tainex</span>
+    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/70 backdrop-blur-md border-b border-border">
+      <nav className="max-w-7xl mx-auto px-5 sm:px-8 h-full">
+        <div className="flex items-center justify-between h-full">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="size-9 rounded-2xl bg-amber-500 flex items-center justify-center">
+              <Briefcase className="w-4.5 h-4.5 text-ink" />
+            </div>
+            <span className="text-lg font-black tracking-[-0.02em] text-ink dark:text-white">
+              Maintain<span className="text-amber-500">ex</span>
+            </span>
+            <span className="hidden md:inline text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-medium leading-tight ml-0.5">
+              Find work · Build trust.
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-4 lg:space-x-6">
+          <div className="hidden md:flex items-center gap-1">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-gray-700 dark:text-gray-200 hover:text-primary-500 dark:hover:text-primary-400 font-medium transition-colors duration-200 text-sm lg:text-base"
+                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground font-medium rounded-full hover:bg-amber-soft/50 transition-colors"
               >
                 {item.name}
               </Link>
             ))}
           </div>
 
-          <div className="hidden md:flex items-center space-x-4">
-            <a
-              href={`tel:${region.phoneRaw}`}
-              aria-label={`Call us at ${region.phone}`}
-              className="flex items-center space-x-2 text-primary-600 dark:text-primary-400 font-semibold"
+          <div className="hidden md:flex items-center gap-3">
+            <Link
+              href="/login"
+              className="px-4 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-full border border-border hover:border-amber-300 transition-colors"
             >
-              <FiPhone className="animate-pulse" />
-              <span className="hidden lg:inline">{region.phone}</span>
-            </a>
-            <ThemeToggle />
-            <Link href="/booking" className="btn-primary">
+              Sign in
+            </Link>
+            <Link
+              href="/booking"
+              className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-1.5 rounded-full text-sm transition-all active:scale-95 shadow-sm"
+            >
               Book Now
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="md:hidden flex items-center gap-1">
+          <div className="flex md:hidden items-center gap-1">
             <ThemeToggle />
           </div>
           <MobileMenu navigation={navigation} phoneRaw={region.phoneRaw} phone={region.phone} />

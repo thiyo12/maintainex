@@ -1,7 +1,7 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { FiSun, FiMoon } from 'react-icons/fi'
+import { Sun, Moon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export default function ThemeToggle() {
@@ -10,17 +10,15 @@ export default function ThemeToggle() {
 
   useEffect(() => setMounted(true), [])
 
-  if (!mounted) {
-    return <div className="w-10 h-10" />
-  }
+  if (!mounted) return <div className="size-9" />
 
   return (
     <button
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="p-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-300 transition-colors"
+      className="size-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-amber-soft/50 transition-colors"
       aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >
-      {theme === 'dark' ? <FiSun size={22} /> : <FiMoon size={22} />}
+      {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
     </button>
   )
 }
