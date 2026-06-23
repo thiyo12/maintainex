@@ -146,7 +146,7 @@ export default function ServiceDetailClient({
             <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 lg:p-12">
               <div className="max-w-7xl mx-auto">
                 {service.category && (
-                  <Link href={`/services?category=${service.category.slug}`} className="inline-block bg-amber-500 text-ink px-4 py-1.5 rounded-full text-sm font-semibold mb-4 hover:bg-amber-400 transition-colors">
+                  <Link href={`/services?category=${service.category.slug}`} className="inline-block bg-amber-500 text-ink px-4 py-2.5 rounded-full text-sm font-semibold mb-4 hover:bg-amber-400 transition-colors">
                     {service.category.name}
                   </Link>
                 )}
@@ -167,10 +167,10 @@ export default function ServiceDetailClient({
         {/* Main Content */}
         <section className="py-12 md:py-16 bg-background">
           <div className="max-w-7xl mx-auto px-5 sm:px-8">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               
               {/* Left Column */}
-              <div className="lg:col-span-2 space-y-8">
+              <div className="md:col-span-2 lg:col-span-2 space-y-8">
                 
                 {/* Description */}
                 <div className="bg-card rounded-3xl border border-border p-6 sm:p-8">

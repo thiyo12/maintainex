@@ -688,7 +688,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 )}
                 <div className="border-t border-border pt-3">
                   <span className="text-lg font-bold text-foreground">Budget Range (optional)</span>
-                  <div className="mt-3 flex items-center gap-3">
+                  <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                     <input
                       type="number"
                       value={formData.budgetMin}

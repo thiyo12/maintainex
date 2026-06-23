@@ -20,7 +20,7 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="md:hidden p-2 text-muted-foreground hover:text-foreground hover:bg-amber-soft/50 rounded-lg transition-colors"
+        className="md:hidden p-2.5 text-muted-foreground hover:text-foreground hover:bg-amber-soft/50 rounded-lg transition-colors"
         aria-label="Toggle menu"
       >
         {open ? <X size={22} /> : <Menu size={22} />}
@@ -50,7 +50,7 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
             </div>
             <button
               onClick={() => { setShowSignIn(true); setOpen(false) }}
-              className="inline-flex items-center justify-center gap-2 text-foreground font-medium px-5 py-2.5 rounded-full border border-border hover:border-amber-300 text-sm transition-all mt-2"
+              className="inline-flex items-center justify-center gap-2 text-foreground font-medium px-5 py-3 rounded-full border border-border hover:border-amber-300 text-sm transition-all mt-2"
             >
               <LogIn className="w-4 h-4" />
               Sign in
@@ -58,7 +58,7 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
             <Link
               href="/booking"
               onClick={() => setOpen(false)}
-              className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-5 py-2.5 rounded-full text-sm transition-all mt-2"
+              className="inline-flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-5 py-3 rounded-full text-sm transition-all mt-2"
             >
               Book Now
               <ArrowRight className="w-4 h-4" />

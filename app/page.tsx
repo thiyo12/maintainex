@@ -151,8 +151,8 @@ export default async function HomePage() {
       <main className="pt-16">
         <section className="relative min-h-[70vh] flex items-center overflow-hidden bg-background">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-40 -right-40 w-[560px] h-[560px] bg-amber-500/20 rounded-full blur-3xl animate-breathe" />
-            <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] bg-indigo-400/15 rounded-full blur-3xl" />
+            <div className="absolute -top-40 -right-40 w-[300px] md:w-[560px] h-[300px] md:h-[560px] bg-amber-500/20 rounded-full blur-3xl animate-breathe" />
+            <div className="absolute -bottom-40 -left-40 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-indigo-400/15 rounded-full blur-3xl" />
           </div>
           
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 md:py-24 relative z-10 w-full">
@@ -173,10 +173,10 @@ export default async function HomePage() {
                 </div>
                 
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-6 animate-fade-up" style={{ animationDelay: '0.3s' }}>
-                  <Link href="/booking" className="glow-amber inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-6 py-2.5 rounded-full text-sm transition-all active:scale-95">
+                  <Link href="/booking" className="glow-amber inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-6 py-3 rounded-full text-sm transition-all active:scale-95">
                     Book a Service <FiArrowRight className="w-4 h-4" />
                   </Link>
-                  <Link href="/services" className="inline-flex items-center gap-2 text-foreground font-medium px-6 py-2.5 rounded-full border border-border hover:border-amber-300 text-sm transition-all">
+                  <Link href="/services" className="inline-flex items-center gap-2 text-foreground font-medium px-6 py-3 rounded-full border border-border hover:border-amber-300 text-sm transition-all">
                     View Services
                   </Link>
                 </div>

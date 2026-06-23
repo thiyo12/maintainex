@@ -46,7 +46,7 @@ export default function Header() {
               <Link
                 key={item.name}
                 href={item.href}
-                className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground font-medium rounded-full hover:bg-amber-soft/50 transition-colors"
+                className="px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground font-medium rounded-full hover:bg-amber-soft/50 transition-colors"
               >
                 {item.name}
               </Link>
@@ -57,7 +57,7 @@ export default function Header() {
             <ThemeToggle />
             <button
               onClick={() => setShowSignIn(true)}
-              className="px-4 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-full border border-border hover:border-amber-300 transition-colors"
+              className="px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-full border border-border hover:border-amber-300 transition-colors"
             >
               <span className="flex items-center gap-1.5">
                 <LogIn className="w-3.5 h-3.5" />
@@ -66,7 +66,7 @@ export default function Header() {
             </button>
             <Link
               href="/booking"
-              className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-1.5 rounded-full text-sm transition-all active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-2.5 rounded-full text-sm transition-all active:scale-95 shadow-sm"
             >
               Book Now
               <ArrowRight className="w-3.5 h-3.5" />

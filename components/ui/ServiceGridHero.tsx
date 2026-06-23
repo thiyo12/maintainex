@@ -68,7 +68,7 @@ export default function ServiceGridHero({ categories }: ServiceGridHeroProps) {
           <button
             key={cat.id}
             onClick={() => setActive(cat.slug)}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-all whitespace-nowrap ${
+            className={`text-[11px] md:text-xs font-medium px-2.5 py-2 rounded-full transition-all whitespace-nowrap ${
               active === cat.slug
                 ? 'bg-amber-500 text-ink'
                 : 'bg-muted text-muted-foreground hover:text-foreground'
@@ -108,7 +108,7 @@ export default function ServiceGridHero({ categories }: ServiceGridHeroProps) {
                   {svc.price ? `LKR ${svc.price.toLocaleString()}` : 'View pricing'}
                 </p>
               </div>
-              <button className="text-[10px] font-semibold text-ink bg-amber-500 hover:bg-amber-600 px-2.5 py-1 rounded-full transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100">
+              <button className="text-[10px] font-semibold text-ink bg-amber-500 hover:bg-amber-600 px-2.5 py-1 rounded-full transition-colors flex-shrink-0 md:opacity-0 md:group-hover:opacity-100">
                 Book
               </button>
             </div>

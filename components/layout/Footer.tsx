@@ -41,18 +41,18 @@ export default function Footer() {
           <div>
             <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Product</h4>
             <ul className="space-y-2">
-              <li><Link href="/services" className="text-sm text-foreground hover:text-amber-600 transition-colors">Services</Link></li>
-              <li><Link href="/booking" className="text-sm text-foreground hover:text-amber-600 transition-colors">Booking</Link></li>
-              <li><Link href="/about" className="text-sm text-foreground hover:text-amber-600 transition-colors">About</Link></li>
+              <li><Link href="/services" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Services</Link></li>
+              <li><Link href="/booking" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Booking</Link></li>
+              <li><Link href="/about" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">About</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Company</h4>
             <ul className="space-y-2">
-              <li><Link href="/careers" className="text-sm text-foreground hover:text-amber-600 transition-colors">Careers</Link></li>
-              <li><Link href="/contact" className="text-sm text-foreground hover:text-amber-600 transition-colors">Contact</Link></li>
-              <li><a href={`tel:${region.phoneRaw}`} className="text-sm text-foreground hover:text-amber-600 transition-colors">{region.phone}</a></li>
+              <li><Link href="/careers" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Careers</Link></li>
+              <li><Link href="/contact" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Contact</Link></li>
+              <li><a href={`tel:${region.phoneRaw}`} className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">{region.phone}</a></li>
             </ul>
           </div>
 
@@ -66,14 +66,14 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   title={s.name}
-                  className="size-9 rounded-xl bg-card border border-border flex items-center justify-center hover:border-amber-300 hover:bg-amber-soft/50 transition-all"
+                  className="size-11 rounded-xl bg-card border border-border flex items-center justify-center hover:border-amber-300 hover:bg-amber-soft/50 transition-all"
                 >
                   <Image
                     src={`/uploads/icons/${s.file}`}
                     alt={s.name}
-                    width={22}
-                    height={22}
-                    className="size-[22px]"
+                    width={26}
+                    height={26}
+                    className="size-[26px]"
                   />
                 </a>
               ))}
@@ -83,8 +83,8 @@ export default function Footer() {
           <div>
             <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Legal</h4>
             <ul className="space-y-2">
-              <li><Link href="/privacy" className="text-sm text-foreground hover:text-amber-600 transition-colors">Privacy</Link></li>
-              <li><Link href="/terms" className="text-sm text-foreground hover:text-amber-600 transition-colors">Terms</Link></li>
+              <li><Link href="/privacy" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Privacy</Link></li>
+              <li><Link href="/terms" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Terms</Link></li>
             </ul>
           </div>
         </div>

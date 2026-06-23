@@ -337,7 +337,7 @@ function ConfirmationContent() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <Link
                 href="/contact"
                 className="flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground font-semibold py-3 px-4 rounded-full transition-all text-sm"

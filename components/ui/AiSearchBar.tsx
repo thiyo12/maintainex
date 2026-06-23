@@ -80,7 +80,7 @@ export default function AiSearchBar() {
         />
         <button
           type="submit"
-          className="glow-amber inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-2 rounded-full text-xs transition-all active:scale-95 flex-shrink-0"
+          className="glow-amber inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-2.5 rounded-full text-xs transition-all active:scale-95 flex-shrink-0"
         >
           Match me
         </button>

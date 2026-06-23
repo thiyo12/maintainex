@@ -30,23 +30,23 @@ export default function AppStoreModal({ open, onClose }: AppStoreModalProps) {
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => window.location.href = '/booking'}
-            className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-1.5 rounded-full text-xs transition-all active:scale-95 whitespace-nowrap"
+            className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-5 py-2.5 rounded-full text-xs transition-all active:scale-95 whitespace-nowrap"
           >
             Book a Service
           </button>
           <Link
             href="/services"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground font-medium px-3 py-1.5 rounded-full border border-border hover:border-amber-300 text-xs transition-all whitespace-nowrap"
+            className="text-muted-foreground hover:text-foreground font-medium px-4 py-2.5 rounded-full border border-border hover:border-amber-300 text-xs transition-all whitespace-nowrap"
           >
             Browse Services
           </Link>
           <button
             onClick={onClose}
-            className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-amber-soft/50 transition-colors flex-shrink-0"
+            className="size-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-amber-soft/50 transition-colors flex-shrink-0"
             aria-label="Close"
           >
-            <X size={16} />
+            <X size={20} />
           </button>
         </div>
       </div>

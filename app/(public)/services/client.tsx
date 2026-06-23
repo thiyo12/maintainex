@@ -249,7 +249,7 @@ function ServicesContent() {
                             {service.slug && (
                               <Link
                                 href={`/services/${service.slug}`}
-                                className="flex-1 text-center bg-muted hover:bg-muted/80 text-foreground font-semibold py-2 rounded-full transition-colors text-sm"
+                                className="flex-1 text-center bg-muted hover:bg-muted/80 text-foreground font-semibold py-2.5 rounded-full transition-colors text-sm"
                               >
                                 Learn More
                               </Link>
@@ -264,7 +264,7 @@ function ServicesContent() {
                                 }))
                                 router.push(`/booking?serviceId=${service.id}&category=${category.slug}`)
                               }}
-                              className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2 rounded-full transition-colors text-sm`}
+                              className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2.5 rounded-full transition-colors text-sm`}
                             >
                               Book Now
                             </button>

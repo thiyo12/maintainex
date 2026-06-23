@@ -121,24 +121,24 @@ export default function AboutPage() {
               </div>
               <div className="bg-amber-soft rounded-3xl p-8">
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                  <div className="text-center p-3 md:p-4 bg-card rounded-3xl border border-border">
                     <Briefcase className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-amber-600 mb-2">1000+</div>
+                    <div className="text-3xl md:text-4xl font-bold text-amber-600 mb-2">1000+</div>
                     <div className="text-muted-foreground">Jobs Completed</div>
                   </div>
-                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                  <div className="text-center p-3 md:p-4 bg-card rounded-3xl border border-border">
                     <Users className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-amber-600 mb-2">500+</div>
+                    <div className="text-3xl md:text-4xl font-bold text-amber-600 mb-2">500+</div>
                     <div className="text-muted-foreground">Happy Clients</div>
                   </div>
-                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                  <div className="text-center p-3 md:p-4 bg-card rounded-3xl border border-border">
                     <UserCheck className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-amber-600 mb-2">50+</div>
+                    <div className="text-3xl md:text-4xl font-bold text-amber-600 mb-2">50+</div>
                     <div className="text-muted-foreground">Professionals</div>
                   </div>
-                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                  <div className="text-center p-3 md:p-4 bg-card rounded-3xl border border-border">
                     <Star className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-amber-600 mb-2">4.9★</div>
+                    <div className="text-3xl md:text-4xl font-bold text-amber-600 mb-2">4.9★</div>
                     <div className="text-muted-foreground">Average Rating</div>
                   </div>
                 </div>
