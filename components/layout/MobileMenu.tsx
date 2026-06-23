@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Menu, X, ArrowRight, LogIn } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
@@ -15,6 +15,11 @@ interface MobileMenuProps {
 export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuProps) {
   const [open, setOpen] = useState(false)
   const [showSignIn, setShowSignIn] = useState(false)
+
+  useEffect(() => {
+    document.body.classList.toggle('signin-open', showSignIn)
+    return () => document.body.classList.remove('signin-open')
+  }, [showSignIn])
 
   return (
     <>

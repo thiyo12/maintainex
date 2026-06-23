@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, LogIn } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import { useRegion } from '@/lib/region-context'
 import MobileMenu from './MobileMenu'
 import ThemeToggle from './ThemeToggle'
@@ -20,6 +20,11 @@ const navigation = [
 export default function Header() {
   const region = useRegion()
   const [showSignIn, setShowSignIn] = useState(false)
+
+  useEffect(() => {
+    document.body.classList.toggle('signin-open', showSignIn)
+    return () => document.body.classList.remove('signin-open')
+  }, [showSignIn])
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/70 backdrop-blur-md border-b border-border">
@@ -64,13 +69,6 @@ export default function Header() {
                 Sign in
               </span>
             </button>
-            <Link
-              href="/booking"
-              className="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-2.5 rounded-full text-sm transition-all active:scale-95 shadow-sm"
-            >
-              Book Now
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
           </div>
 
           <div className="flex md:hidden items-center gap-1">
@@ -81,12 +79,6 @@ export default function Header() {
             >
               Sign in
             </button>
-            <Link
-              href="/booking"
-              className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-3 py-1.5 rounded-full text-xs transition-all active:scale-95 whitespace-nowrap"
-            >
-              Book
-            </Link>
           </div>
           <MobileMenu navigation={navigation} phoneRaw={region.phoneRaw} phone={region.phone} />
         </div>

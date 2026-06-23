@@ -292,20 +292,20 @@ export default function ServiceDetailClient({
                       const districtParam = city ? `&district=${encodeURIComponent(city)}` : ''
                       router.push(`/booking?serviceId=${service.id}&category=${service.category?.slug}${districtParam}`)
                     }}
-                    className="w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 px-6 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-center text-lg mb-4"
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 px-6 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-center text-sm md:text-lg mb-4"
                   >
                     {city ? `Book ${service.name} in ${city}` : 'Book Now'}
                   </button>
 
                   <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-full transition-all duration-300 active:scale-[0.98] text-lg mb-6"
+                    className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-full transition-all duration-300 active:scale-[0.98] text-sm md:text-lg mb-6"
                   >
                     <FiMessageCircle className="w-6 h-6" />
                     Chat on WhatsApp
                   </a>
 
                   <a href={`tel:${region.phoneRaw}`}
-                    className="flex items-center justify-center gap-3 w-full bg-muted hover:bg-muted/80 text-foreground font-semibold py-4 px-6 rounded-full transition-all duration-300 text-lg mb-6"
+                    className="flex items-center justify-center gap-3 w-full bg-muted hover:bg-muted/80 text-foreground font-semibold py-4 px-6 rounded-full transition-all duration-300 text-sm md:text-lg mb-6"
                   >
                     <FiPhone className="w-5 h-5" />
                     Call: {region.phone}
