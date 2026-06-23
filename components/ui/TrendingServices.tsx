@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FiArrowRight, FiTrendingUp } from 'react-icons/fi'
+import { FiArrowRight, FiTrendingUp, FiEye } from 'react-icons/fi'
 import { getImageUrl } from '@/lib/images'
 
 interface Service {
@@ -24,6 +24,34 @@ interface TrendingServicesProps {
 
 export default function TrendingServices({ services }: TrendingServicesProps) {
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
+  const [visible, setVisible] = useState<Set<number>>(new Set())
+  const cardRefs = useRef<(HTMLAnchorElement | null)[]>([])
+
+  useEffect(() => {
+    if (!services?.length) return
+    cardRefs.current = cardRefs.current.slice(0, services.length)
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const index = Number(entry.target.getAttribute('data-index'))
+            if (!isNaN(index)) {
+              setVisible((prev) => new Set(prev).add(index))
+            }
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -20px 0px' }
+    )
+
+    cardRefs.current.forEach((ref) => {
+      if (ref) observer.observe(ref)
+    })
+
+    return () => observer.disconnect()
+  }, [services])
 
   if (!services || services.length === 0) {
     return null
@@ -57,12 +85,22 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
             const isUploadedImage = service.image?.startsWith('/uploads/') && !imgErrors[service.id]
             const fallbackImage = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'
             const imageSrc = isUploadedImage ? getImageUrl(service.image) : (service.image || fallbackImage)
+            const isVisible = visible.has(index)
 
             return (
               <Link
                 key={service.id}
+                data-index={index}
+                ref={(el) => { cardRefs.current[index] = el }}
                 href={`/services/${service.slug || service.id}`}
-                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-orange-200"
+                className={`group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-orange-200 ${
+                  isVisible ? 'animate-pop-in' : 'opacity-0 scale-90'
+                }`}
+                style={{
+                  animationDelay: `${index * 180}ms`,
+                  animationDuration: '900ms',
+                  animationFillMode: 'both',
+                }}
               >
                 <div className="relative h-28 sm:h-36 md:h-44 overflow-hidden">
                   {isUploadedImage ? (
@@ -99,8 +137,8 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
                     </div>
                   )}
 
-                  <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1">
-                    <span>👁️</span>
+                  <div className="absolute bottom-2 left-2 bg-gradient-to-r from-amber-500/90 to-orange-500/90 backdrop-blur-sm text-white px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 shadow-lg">
+                    <FiEye className="w-3.5 h-3.5" />
                     <span>{service.views || 0}</span>
                   </div>
                 </div>
@@ -129,6 +167,25 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
           </Link>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes popIn {
+          0% {
+            opacity: 0;
+            transform: scale(0.75) translateY(24px);
+          }
+          50% {
+            transform: scale(1.04) translateY(-4px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        .animate-pop-in {
+          animation: popIn 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+      `}</style>
     </section>
   )
 }
