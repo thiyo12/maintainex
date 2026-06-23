@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, ArrowRight } from 'lucide-react'
+import { Menu, X, ArrowRight, LogIn } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
+import AppStoreModal from './AppStoreModal'
 
 interface MobileMenuProps {
   navigation: Array<{ name: string; href: string }>
@@ -13,6 +14,7 @@ interface MobileMenuProps {
 
 export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuProps) {
   const [open, setOpen] = useState(false)
+  const [showSignIn, setShowSignIn] = useState(false)
 
   return (
     <>
@@ -46,6 +48,13 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
               </Link>
               <ThemeToggle />
             </div>
+            <button
+              onClick={() => { setShowSignIn(true); setOpen(false) }}
+              className="inline-flex items-center justify-center gap-2 text-foreground font-medium px-5 py-2.5 rounded-full border border-border hover:border-amber-300 text-sm transition-all mt-2"
+            >
+              <LogIn className="w-4 h-4" />
+              Sign in
+            </button>
             <Link
               href="/booking"
               onClick={() => setOpen(false)}
@@ -57,6 +66,8 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
           </div>
         </div>
       )}
+
+      <AppStoreModal open={showSignIn} onClose={() => setShowSignIn(false)} />
     </>
   )
 }

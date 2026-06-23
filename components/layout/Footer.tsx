@@ -1,8 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { Briefcase } from 'lucide-react'
+import Image from 'next/image'
 import { useRegion } from '@/lib/region-context'
+
+const SOCIALS = [
+  { name: 'Instagram', href: '#', icon: 'IG' },
+  { name: 'Facebook', href: '#', icon: 'FB' },
+  { name: 'LinkedIn', href: '#', icon: 'LI' },
+  { name: 'X', href: '#', icon: 'X' },
+  { name: 'YouTube', href: '#', icon: 'YT' },
+  { name: 'TikTok', href: '#', icon: 'TK' },
+]
 
 export default function Footer() {
   const region = useRegion()
@@ -10,12 +19,16 @@ export default function Footer() {
   return (
     <footer className="border-t border-border">
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-10">
           <div className="col-span-2">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
-              <div className="size-8 rounded-2xl bg-amber-500 flex items-center justify-center">
-                <Briefcase className="w-4 h-4 text-ink" />
-              </div>
+              <Image
+                src="/logo.JPEG"
+                alt="Maintainex"
+                width={32}
+                height={32}
+                className="size-8 rounded-xl object-cover"
+              />
               <span className="text-base font-black tracking-[-0.02em] text-ink dark:text-white">
                 Maintain<span className="text-amber-500">ex</span>
               </span>
@@ -44,6 +57,24 @@ export default function Footer() {
           </div>
 
           <div>
+            <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Connect</h4>
+            <div className="flex flex-wrap gap-2">
+              {SOCIALS.map((s) => (
+                <a
+                  key={s.name}
+                  href={s.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={s.name}
+                  className="size-9 rounded-xl bg-card border border-border flex items-center justify-center text-xs font-bold text-muted-foreground hover:text-amber-600 hover:border-amber-300 hover:bg-amber-soft/50 transition-all"
+                >
+                  {s.icon}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Legal</h4>
             <ul className="space-y-2">
               <li><Link href="/privacy" className="text-sm text-foreground hover:text-amber-600 transition-colors">Privacy</Link></li>
@@ -54,7 +85,7 @@ export default function Footer() {
 
         <div className="border-t border-border mt-12 pt-6 text-center">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Maintainex — Made in Colombo with care
+            &copy; {new Date().getFullYear()} Maintainex — Made in Sri Lanka with care
           </p>
         </div>
       </div>

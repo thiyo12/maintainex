@@ -7,7 +7,7 @@ import Header from '@/components/layout/Header'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
 import AiSearchBar from '@/components/ui/AiSearchBar'
-
+import FeaturedJobCard from '@/components/ui/FeaturedJobCard'
 import CategoryMarquee from '@/components/ui/CategoryMarquee'
 import HowItWorks from '@/components/ui/HowItWorks'
 
@@ -155,8 +155,8 @@ export default async function HomePage() {
           </div>
           
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 md:py-24 relative z-10 w-full">
-              <div className="max-w-3xl mx-auto">
-              <div>
+              <div className="grid lg:grid-cols-12 gap-10 items-center">
+              <div className="lg:col-span-7 order-2 lg:order-1">
                 <AnimatedHero />
                 
                 <p className="text-base md:text-lg text-muted-foreground mb-6 max-w-lg mt-6 animate-fade-up">
@@ -194,8 +194,10 @@ export default async function HomePage() {
                   </p>
                 </div>
               </div>
-              
 
+              <div className="lg:col-span-5 order-1 lg:order-2">
+                <FeaturedJobCard />
+              </div>
             </div>
           </div>
         </section>
