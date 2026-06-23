@@ -14,6 +14,11 @@ const ALL_SERVICE_SLUGS = [
   'office-cleaning', 'disinfection', 'construction',
 ]
 
+const CITY_PAGES: Record<string, string[]> = {
+  LK: ['colombo', 'kandy', 'galle', 'jaffna'],
+  CA: ['toronto', 'mississauga'],
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const headersList = headers()
   const host = headersList.get('host') || ''
@@ -46,6 +51,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
       })
     }
+  }
+
+  for (const citySlug of CITY_PAGES[region] || []) {
+    entries.push({
+      url: `${baseUrl}/services/${citySlug}`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly' as const,
+      priority: 0.7,
+    })
   }
 
   return entries

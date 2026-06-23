@@ -255,6 +255,7 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
                       src={service.image || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=600'}
                       alt={service.title}
                       fill
+                      loading="lazy"
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />

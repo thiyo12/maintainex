@@ -353,7 +353,7 @@ export default function ServiceDetailClient({
                       {isUploadedImage(related.image) ? (
                         <img src={getImageSrc(related.image)} alt={related.name} width="400" height="300" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       ) : (
-                        <Image src={getImageSrc(related.image)} alt={related.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <Image src={getImageSrc(related.image)} alt={related.name} fill loading="lazy" sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       )}
                     </div>
                     <div className="p-4">

@@ -14,6 +14,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const regionKey = host.includes('ca.') ? 'CA' : 'LK'
   const c = REGIONS[regionKey].countryName
   const isCA = regionKey === 'CA'
+  const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
   const service = await prisma.service.findFirst({
     where: { slug: params.slug, isActive: true },
@@ -21,14 +22,25 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   })
   if (!service) return { title: 'Service Not Found' }
 
-  const title = `${service.name} Services in ${c} | Maintainex ${c}`
-  const description = `${service.description?.slice(0, 155) || `Book professional ${service.name} services in ${c}. Trusted ${service.category?.name?.toLowerCase() || 'home'} service providers. Free quotes, same-day service.`}`
-  const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
+  const priceStr = service.price
+    ? isCA
+      ? `From $${Number(service.price).toLocaleString()}`
+      : `From LKR ${Number(service.price).toLocaleString()}`
+    : ''
+  const catName = service.category?.name?.toLowerCase().replace(/ & /g, ' & ') || 'home'
+
+  const title = isCA
+    ? `${service.name} in Toronto & Canada | ${catName} Service | ${priceStr} | Maintainex`
+    : `${service.name} in Sri Lanka | ${catName} Service | ${priceStr} | Maintainex`
+
+  const description = isCA
+    ? `Professional ${service.name.toLowerCase()} in Toronto & across Canada. Trusted ${catName} providers. Free quotes, vetted professionals. ${priceStr}. Book online.`
+    : `Book professional ${service.name.toLowerCase()} in Colombo, Kandy, Galle & Jaffna. Trusted ${catName} providers. Free quotes in minutes. ${priceStr}. Book on Maintainex.`
 
   return {
-    title: service.name,
+    title,
     description,
-    keywords: `${service.name}, ${service.name} services ${c}, ${service.category?.name} ${c}, professional cleaning ${c}`,
+    keywords: `${service.name}, ${service.name} ${c}, ${service.category?.name} ${c}, ${catName} ${c}, ${catName} service, book ${service.name.toLowerCase()} online`,
     alternates: {
       canonical: `${baseUrl}/services/${service.slug}`,
     },

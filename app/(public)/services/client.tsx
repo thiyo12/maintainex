@@ -75,19 +75,19 @@ function getCategoryIcon(slug: string, name: string): LucideIcon {
   return Sparkles
 }
 
-export default function ServicesPage() {
+export default function ServicesPage({ cityName }: { cityName?: string }) {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
       </div>
     }>
-      <ServicesContent />
+      <ServicesContent cityName={cityName} />
     </Suspense>
   )
 }
 
-function ServicesContent() {
+function ServicesContent({ cityName }: { cityName?: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const categoryParam = searchParams.get('category')
@@ -174,7 +174,7 @@ function ServicesContent() {
         <section className="bg-foreground py-12 md:py-16">
           <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <h1 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-background mb-3 text-center">
-              Our Services
+              {cityName ? `Services in ${cityName}` : 'Our Services'}
             </h1>
             {selectedCategory && (
               <div className="flex justify-center mb-4">
@@ -195,7 +195,9 @@ function ServicesContent() {
             )}
             {!selectedCategory && (
             <p className="text-background/80 text-center max-w-2xl mx-auto mb-6">
-              Professional home services at your fingertips. Choose a service to get started.
+              {cityName
+                ? `Professional home services in ${cityName}. Choose a service to get started.`
+                : `Professional home services at your fingertips. Choose a service to get started.`}
             </p>
             )}
           </div>

@@ -25,11 +25,17 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(process.env.NEXTAUTH_URL || baseUrl),
     title: {
-      default: `Maintainex ${c} — Your Local Service Marketplace in ${c}`,
+      default: isCA
+        ? `Home Services in Toronto & Canada | Cleaning, Plumbing, Electrical & More | Maintainex`
+        : `Home Services in Sri Lanka | Cleaning, Plumbing, Electrical & More | Maintainex`,
       template: `%s — Maintainex`,
     },
-    description: `${cp} trusted local marketplace. Post any task, get matched with vetted taskers near you — cleaning, repairs, moving, handyman & more. Free quotes, no sign-up needed.`,
-    keywords: `taskers ${c}, local services ${c}, handyman ${c}, home services, cleaning, repairs, moving, marketplace ${c}, ${c} service platform`,
+    description: isCA
+      ? `Book trusted home services in Toronto & Ontario. Cleaning, plumbing, electrical, movers & more. Free quotes. Starting from $50.`
+      : `Book trusted home services in Colombo, Kandy, Galle & Jaffna. Cleaning, plumbing, electrical, movers & more. Free quotes in minutes. Starting from LKR 1,200.`,
+    keywords: isCA
+      ? `home services Canada, cleaning service Toronto, plumber Ontario, electrician Canada, house cleaning Toronto, handyman Toronto, mover Toronto`
+      : `home services Sri Lanka, cleaning service Colombo, plumber Colombo, electrician Sri Lanka, house cleaning Sri Lanka, handyman Colombo, home repair Sri Lanka, movers Colombo`,
     robots: {
       index: true,
       follow: true,
@@ -48,8 +54,10 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     openGraph: {
-      title: `Maintainex ${c} — Your Local Service Marketplace`,
-      description: `${cp} trusted local marketplace for everyday tasks. Post a job and get matched with vetted taskers near you. Free quotes, no sign-up needed.`,
+      title: isCA ? `Book Home Services in Toronto & Canada | Maintainex` : `Book Home Services in Sri Lanka | Maintainex`,
+      description: isCA
+        ? `Canada's trusted platform for cleaning, plumbing, electrical & more. Vetted professionals. Free quotes. From $50.`
+        : `Sri Lanka's trusted platform for cleaning, plumbing, electrical & more. Vetted professionals. Free quotes. Starting LKR 1,200.`,
       url: baseUrl,
       siteName: `Maintainex ${c}`,
       locale: isCA ? 'en_CA' : 'en_LK',
@@ -58,8 +66,10 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: 'summary_large_image',
-      title: `Maintainex ${c} — Your Local Service Marketplace`,
-      description: `${cp} local marketplace for everyday tasks. Post a job and get matched with vetted taskers near you.`,
+      title: isCA ? `Book Home Services in Toronto & Canada | Maintainex` : `Book Home Services in Sri Lanka | Maintainex`,
+      description: isCA
+        ? `Canada's trusted platform for home services. Cleaning, plumbing, electrical & more. From $50.`
+        : `Sri Lanka's trusted platform for home services. Cleaning, plumbing, electrical & more. From LKR 1,200.`,
       images: [`${baseUrl}/logo.JPEG`],
     },
     other: {
@@ -100,6 +110,34 @@ export default function RootLayout({
         </Script>
         <Script id="schema-website" type="application/ld+json" strategy="afterInteractive">
           {JSON.stringify(siteJson)}
+        </Script>
+        <Script id="schema-localbusiness" type="application/ld+json" strategy="afterInteractive">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            "name": "Maintainex",
+            "url": baseUrl,
+            "logo": `${baseUrl}/logo.JPEG`,
+            "telephone": region === 'CA' ? '+14164279518' : '+94770867609',
+            "description": region === 'CA'
+              ? "Canada's trusted local marketplace for home and commercial services."
+              : "Sri Lanka's trusted local marketplace for home and commercial services.",
+            "areaServed": (region === 'CA'
+              ? ['Toronto (Downtown)', 'Scarborough', 'North York', 'Etobicoke', 'Mississauga', 'Brampton', 'Markham', 'Richmond Hill', 'Vaughan', 'Oakville', 'Burlington', 'Milton']
+              : ['Colombo', 'Kandy', 'Galle', 'Jaffna', 'Gampaha', 'Kalutara', 'Negombo', 'Kurunegala', 'Ratnapura', 'Badulla', 'Matara', 'Anuradhapura']
+            ).map((name: string) => ({ "@type": "City", "name": name })),
+            "priceRange": region === 'CA' ? 'CAD 50 - CAD 5,000' : 'LKR 1,200 - LKR 100,000',
+            "hasOfferCatalog": {
+              "@type": "OfferCatalog",
+              "name": "Home Services",
+              "itemListElement": [
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Deep House Cleaning" }, "price": region === 'CA' ? "80" : "3461", "priceCurrency": region === 'CA' ? "CAD" : "LKR" },
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Plumbing & Water Repairs" }, "price": region === 'CA' ? "120" : "1500", "priceCurrency": region === 'CA' ? "CAD" : "LKR" },
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Electrical Fixes" }, "price": region === 'CA' ? "90" : "1200", "priceCurrency": region === 'CA' ? "CAD" : "LKR" },
+                { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "House Movers" }, "price": region === 'CA' ? "350" : "5000", "priceCurrency": region === 'CA' ? "CAD" : "LKR" },
+              ]
+            }
+          })}
         </Script>
       </head>
       <body className={`${outfit.className} min-h-screen bg-background dark:text-gray-100`}>
