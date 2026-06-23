@@ -5,12 +5,12 @@ import Image from 'next/image'
 import { useRegion } from '@/lib/region-context'
 
 const SOCIALS = [
-  { name: 'Instagram', href: '#', icon: 'IG' },
-  { name: 'Facebook', href: '#', icon: 'FB' },
-  { name: 'LinkedIn', href: '#', icon: 'LI' },
-  { name: 'X', href: '#', icon: 'X' },
-  { name: 'YouTube', href: '#', icon: 'YT' },
-  { name: 'TikTok', href: '#', icon: 'TK' },
+  { name: 'Facebook', file: 'icons8-facebook-50.png' },
+  { name: 'Instagram', file: 'icons8-instagram-50.png' },
+  { name: 'LinkedIn', file: 'icons8-linkedin-circled-100.png' },
+  { name: 'X', file: 'icons8-x-100.png' },
+  { name: 'TikTok', file: 'icons8-tiktok-50.png' },
+  { name: 'WhatsApp', file: 'icons8-whatsapp-100.png' },
 ]
 
 export default function Footer() {
@@ -62,13 +62,19 @@ export default function Footer() {
               {SOCIALS.map((s) => (
                 <a
                   key={s.name}
-                  href={s.href}
+                  href="#"
                   target="_blank"
                   rel="noopener noreferrer"
                   title={s.name}
-                  className="size-9 rounded-xl bg-card border border-border flex items-center justify-center text-xs font-bold text-muted-foreground hover:text-amber-600 hover:border-amber-300 hover:bg-amber-soft/50 transition-all"
+                  className="size-9 rounded-xl bg-card border border-border flex items-center justify-center hover:border-amber-300 hover:bg-amber-soft/50 transition-all"
                 >
-                  {s.icon}
+                  <Image
+                    src={`/uploads/icons/${s.file}`}
+                    alt={s.name}
+                    width={22}
+                    height={22}
+                    className="size-[22px]"
+                  />
                 </a>
               ))}
             </div>

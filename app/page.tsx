@@ -7,7 +7,7 @@ import Header from '@/components/layout/Header'
 import AnimatedHero from '@/components/ui/AnimatedHero'
 import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
 import AiSearchBar from '@/components/ui/AiSearchBar'
-import FeaturedJobCard from '@/components/ui/FeaturedJobCard'
+import ServiceGridHero from '@/components/ui/ServiceGridHero'
 import CategoryMarquee from '@/components/ui/CategoryMarquee'
 import HowItWorks from '@/components/ui/HowItWorks'
 
@@ -196,7 +196,7 @@ export default async function HomePage() {
               </div>
 
               <div className="lg:col-span-5 order-1 lg:order-2">
-                <FeaturedJobCard />
+                <ServiceGridHero categories={categories} />
               </div>
             </div>
           </div>
