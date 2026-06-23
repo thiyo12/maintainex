@@ -167,6 +167,10 @@ export default async function HomePage() {
                 <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
                   <AiSearchBar />
                 </div>
+
+                <div className="lg:hidden mt-6 animate-fade-up" style={{ animationDelay: '0.25s' }}>
+                  <ServiceGridHero categories={categories} />
+                </div>
                 
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-6 animate-fade-up" style={{ animationDelay: '0.3s' }}>
                   <Link href="/booking" className="glow-amber inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-6 py-2.5 rounded-full text-sm transition-all active:scale-95">
@@ -190,7 +194,7 @@ export default async function HomePage() {
                 </div>
               </div>
 
-              <div className="lg:col-span-5 order-1 lg:order-2">
+              <div className="hidden lg:block lg:col-span-5 order-1 lg:order-2">
                 <ServiceGridHero categories={categories} />
               </div>
             </div>
