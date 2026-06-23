@@ -26,11 +26,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = headersList.get('host') || ''
   const c = REGIONS[host.includes('ca.') ? 'CA' : 'LK'].countryName
   return {
-    title: `Professional Cleaning & Home Services in ${c} | Maintainex ${c}`,
-    description: `${c}'s #1 professional cleaning and home maintenance services. Book online for home cleaning, office cleaning, deep cleaning and more. Free quote!`,
+    title: `Find Taskers for Any Job in ${c} | Maintainex ${c}`,
+    description: `${c}'s local marketplace for everyday tasks. Post a job, get matched with trusted taskers near you — cleaning, repairs, moving, handyman & more. Free quotes, no sign-up needed.`,
     openGraph: {
-      title: `Maintainex ${c} - Professional Cleaning & Home Services`,
-      description: `Book ${c}'s top cleaning services online. Free quotes, trusted professionals.`,
+      title: `Find Taskers for Any Job in ${c}`,
+      description: `Post any task and connect with local taskers. Free quotes, trusted professionals, no sign-up needed.`,
     },
   }
 }

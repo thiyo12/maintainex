@@ -25,11 +25,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(process.env.NEXTAUTH_URL || baseUrl),
     title: {
-      default: `Maintainex ${c} - Professional Cleaning & Home Services in ${c}`,
+      default: `Maintainex ${c} — Your Local Service Marketplace in ${c}`,
       template: `%s — Maintainex`,
     },
-    description: `${cp} #1 professional cleaning services. Home cleaning, office cleaning, deep cleaning, and maintenance services across ${c}. Book online or call us today.`,
-    keywords: `cleaning services ${c}, home cleaning ${c}, office cleaning ${c}, deep cleaning, maintenance services, ${c} cleaners, professional cleaning company ${c}`,
+    description: `${cp} trusted local marketplace. Post any task, get matched with vetted taskers near you — cleaning, repairs, moving, handyman & more. Free quotes, no sign-up needed.`,
+    keywords: `taskers ${c}, local services ${c}, handyman ${c}, home services, cleaning, repairs, moving, marketplace ${c}, ${c} service platform`,
     robots: {
       index: true,
       follow: true,
@@ -48,8 +48,8 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     openGraph: {
-      title: `Maintainex ${c} - Professional Cleaning & Home Services`,
-      description: `${cp} trusted cleaning services for homes and businesses. Book online for free!`,
+      title: `Maintainex ${c} — Your Local Service Marketplace`,
+      description: `${cp} trusted local marketplace for everyday tasks. Post a job and get matched with vetted taskers near you. Free quotes, no sign-up needed.`,
       url: baseUrl,
       siteName: `Maintainex ${c}`,
       locale: isCA ? 'en_CA' : 'en_LK',
@@ -58,8 +58,8 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: 'summary_large_image',
-      title: `Maintainex ${c} - Cleaning & Home Services`,
-      description: `${cp} #1 cleaning services. Book online!`,
+      title: `Maintainex ${c} — Your Local Service Marketplace`,
+      description: `${cp} local marketplace for everyday tasks. Post a job and get matched with vetted taskers near you.`,
       images: [`${baseUrl}/logo.JPEG`],
     },
     other: {
