@@ -54,6 +54,7 @@
 
 html {
   scroll-behavior: smooth;
+  touch-action: manipulation;
 }
 
 body {
@@ -121,7 +122,7 @@ body {
 .animate-scroll { animation: scroll 28s linear infinite; }
 .animate-scroll:hover { animation-play-state: paused; }
 
-::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar { width: 12px; }
 ::-webkit-scrollbar-track { background: #f1f1f1; }
 .dark ::-webkit-scrollbar-track { background: #1a1a2e; }
 ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }

@@ -20,14 +20,21 @@ const navigation = [
 export default function Header() {
   const region = useRegion()
   const [showSignIn, setShowSignIn] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
     document.body.classList.toggle('signin-open', showSignIn)
     return () => document.body.classList.remove('signin-open')
   }, [showSignIn])
 
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 50)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/70 backdrop-blur-md border-b border-border">
+    <header className={`fixed top-0 left-0 right-0 z-50 h-16 bg-background/70 backdrop-blur-md border-b border-border transition-shadow duration-300 ${scrolled ? 'shadow-lg' : ''}`}>
       <nav className="max-w-7xl mx-auto px-5 sm:px-8 h-full">
         <div className="flex items-center justify-between h-full">
           <Link href="/" className="flex items-center gap-2.5">

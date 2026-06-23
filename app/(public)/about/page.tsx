@@ -87,7 +87,7 @@ export default function AboutPage() {
       <Header />
       <WhatsAppButton />
 
-      <main className="pt-16">
+      <main className="pt-16 min-h-screen">
         {/* Hero Section */}
         <section className="bg-foreground py-20">
           <div className="max-w-7xl mx-auto px-5 sm:px-8 text-center">

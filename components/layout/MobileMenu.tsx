@@ -32,7 +32,7 @@ export default function MobileMenu({ navigation, phoneRaw, phone }: MobileMenuPr
       </button>
 
       {open && (
-        <div className="fixed md:hidden inset-x-0 top-16 z-50 bg-background border-t border-border shadow-lg pb-6 overflow-y-auto max-h-[calc(100vh-4rem)]">
+        <div className="fixed md:hidden inset-x-0 top-16 z-50 bg-background border-t border-border shadow-lg pb-6 overflow-y-auto max-h-[calc(100vh-4rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex flex-col px-4 pt-4">
             {navigation.map((item) => (
               <Link
