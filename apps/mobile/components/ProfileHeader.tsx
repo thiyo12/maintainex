@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../lib/ThemeContext'
 import { fonts } from '../lib/fonts'
 
@@ -21,6 +22,7 @@ export default function ProfileHeader({
 }: Props) {
   const colors = useColors()
   const styles = makeStyles(colors)
+  const { t } = useTranslation()
   const isTasker = variant === 'tasker'
   const gradientColors = isTasker
     ? (['#F59E0B', '#FBBF24'] as const)
@@ -70,7 +72,7 @@ export default function ProfileHeader({
 
       <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.white, borderColor: colors.border }]} onPress={onEdit} activeOpacity={0.7}>
         <Ionicons name="create-outline" size={14} color={colors.ink} />
-        <Text style={[styles.editBtnText, { color: colors.ink }]}>Edit Profile</Text>
+        <Text style={[styles.editBtnText, { color: colors.ink }]}>{t('profile.edit')}</Text>
       </TouchableOpacity>
     </View>
   )

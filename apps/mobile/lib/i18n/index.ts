@@ -29,4 +29,22 @@ export function getCurrentLanguage() {
   return i18next.language
 }
 
+const STATUS_KEY_MAP: Record<string, string> = {
+  open: 'jobs.status.open',
+  in_progress: 'jobs.status.inProgress',
+  completed: 'jobs.status.completed',
+  cancelled: 'jobs.status.cancelled',
+  quoted: 'jobs.status.quoted',
+  accepted: 'jobs.status.accepted',
+  pending: 'jobs.status.pending',
+  assigned: 'jobs.status.assigned',
+  in_review: 'jobs.status.inReview',
+  disputed: 'jobs.status.disputed',
+  paid: 'jobs.status.paid',
+}
+
+export function translateJobStatus(status: string): string {
+  return STATUS_KEY_MAP[status] || `jobs.status.${status}`
+}
+
 export default i18next

@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { fonts } from '../../lib/fonts'
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function EmptyState({ icon = 'search-outline', title, subtitle }: Props) {
+  const { t } = useTranslation()
   return (
     <View style={styles.container}>
       <Ionicons name={icon} size={48} color="#D1D5DB" />

@@ -5,24 +5,26 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { useAuth } from '../../../lib/auth'
 import { fonts } from '../../../lib/fonts'
-
-const settingsItems = [
-  { icon: 'person-outline', label: 'Edit Profile', route: '/settings/edit-profile' },
-  { icon: 'notifications-outline', label: 'Notifications', route: '/settings/my-profile' },
-  { icon: 'card-outline', label: 'Payment Methods', route: '/settings/payment' },
-  { icon: 'location-outline', label: 'Addresses', route: '/settings/addresses' },
-  { icon: 'help-circle-outline', label: 'Help & Support', route: '/settings/help' },
-  { icon: 'information-circle-outline', label: 'About', route: '/settings/about' },
-  { icon: 'document-text-outline', label: 'Terms & Conditions', route: '/settings/terms' },
-]
+import { useTranslation } from 'react-i18next'
 
 export default function SettingsScreen() {
+  const { t } = useTranslation()
   const router = useRouter()
   const colors = useColors()
   const styles = makeStyles(colors)
   const { user, logout } = useAuth()
 
-  const roleSettings = user?.role === 'COMPANY' ? [{ icon: 'star-outline', label: 'Subscription', route: '/(company)/settings/subscription' }] : []
+  const settingsItems = [
+    { icon: 'person-outline', label: t('profile.edit'), route: '/settings/edit-profile' },
+    { icon: 'notifications-outline', label: t('profile.notifications'), route: '/settings/my-profile' },
+    { icon: 'card-outline', label: t('profile.payment'), route: '/settings/payment' },
+    { icon: 'location-outline', label: t('profile.savedAddresses'), route: '/settings/addresses' },
+    { icon: 'help-circle-outline', label: t('profile.helpSupport'), route: '/settings/help' },
+    { icon: 'information-circle-outline', label: t('profile.aboutApp'), route: '/settings/about' },
+    { icon: 'document-text-outline', label: t('profile.termsPrivacy'), route: '/settings/terms' },
+  ]
+
+  const roleSettings = user?.role === 'COMPANY' ? [{ icon: 'star-outline', label: t('company.subscription'), route: '/(company)/settings/subscription' }] : []
 
   const allItems = [...roleSettings, ...settingsItems]
 
@@ -32,12 +34,12 @@ export default function SettingsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.ink }]}>Settings</Text>
+        <Text style={[styles.title, { color: colors.ink }]}>{t('settings.title')}</Text>
         <View style={{ width: 32 }} />
       </View>
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.muted }]}>Account</Text>
+          <Text style={[styles.sectionTitle, { color: colors.muted }]}>{t('profile.account')}</Text>
           {allItems.map((item, i) => (
             <TouchableOpacity
               key={item.label}
@@ -58,7 +60,7 @@ export default function SettingsScreen() {
           onPress={async () => { await logout(); router.replace('/(auth)/welcome') }}
         >
           <Ionicons name="log-out-outline" size={16} color="#EF4444" />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>{t('profile.logout')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />

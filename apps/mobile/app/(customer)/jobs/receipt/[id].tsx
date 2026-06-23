@@ -4,10 +4,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { bookings } from '../../../../lib/api'
 import { Booking } from '../../../../lib/types'
 
 export default function ReceiptScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -73,18 +75,18 @@ export default function ReceiptScreen() {
         <Animated.View style={[styles.receiptCard, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <View style={styles.receiptHeader}>
             <Ionicons name="receipt-outline" size={40} color={colors.dark} style={{ marginBottom: 8 }} />
-            <Text style={styles.receiptTitle}>Payment receipt</Text>
-            <Text style={styles.receiptId}>#INV-{id}-001</Text>
+            <Text style={styles.receiptTitle}>{t('receipt.title')}</Text>
+            <Text style={styles.receiptId}>{t('receipt.invoice', { id })}</Text>
             <View style={styles.paidBadge}>
               <Ionicons name="checkmark-circle" size={14} color={colors.green} />
-              <Text style={styles.paidText}> Paid</Text>
+              <Text style={styles.paidText}>{t('receipt.paid')}</Text>
             </View>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.serviceSection}>
-            <Text style={styles.serviceTitle}>{booking?.serviceName || 'Service'}</Text>
+            <Text style={styles.serviceTitle}>{booking?.serviceName || t('receipt.service')}</Text>
             <Text style={styles.serviceMeta}>
               {booking?.categoryName || ''}{locationDisplay ? ` • ${locationDisplay}` : ''}
             </Text>
@@ -94,33 +96,33 @@ export default function ReceiptScreen() {
           <View style={styles.divider} />
 
           <View style={styles.lineItem}>
-            <Text style={styles.lineLabel}>Service amount</Text>
+            <Text style={styles.lineLabel}>{t('receipt.serviceAmount')}</Text>
             <Text style={styles.lineValue}>LKR {subtotal.toLocaleString()}</Text>
           </View>
           <View style={styles.lineItem}>
-            <Text style={styles.lineLabel}>Platform fee (5%)</Text>
+            <Text style={styles.lineLabel}>{t('receipt.platformFee')}</Text>
             <Text style={styles.lineValue}>LKR {fee.toLocaleString()}</Text>
           </View>
           <View style={styles.lineItem}>
-            <Text style={styles.lineLabel}>Discount</Text>
+            <Text style={styles.lineLabel}>{t('receipt.discount')}</Text>
             <Text style={[styles.lineValue, { color: colors.green }]}>- LKR 0</Text>
           </View>
           <View style={[styles.lineItem, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total charged</Text>
+            <Text style={styles.totalLabel}>{t('receipt.totalCharged')}</Text>
             <Text style={styles.totalValue}>LKR {total.toLocaleString()}</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.paymentSection}>
-            <Text style={styles.paymentLabel}>Payment method</Text>
+            <Text style={styles.paymentLabel}>{t('receipt.paymentMethod')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="card-outline" size={14} color={colors.dark} />
-              <Text style={styles.paymentValue}> Visa ending in 4242</Text>
+              <Text style={styles.paymentValue}>{t('receipt.visa')}</Text>
             </View>
           </View>
           <View style={styles.paymentSection}>
-            <Text style={styles.paymentLabel}>Paid on</Text>
+            <Text style={styles.paymentLabel}>{t('receipt.paidOn')}</Text>
             <Text style={styles.paymentValue}>
               {booking?.createdAt
                 ? new Date(booking.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -131,7 +133,7 @@ export default function ReceiptScreen() {
           <View style={styles.escrowNote}>
             <Ionicons name="lock-closed-outline" size={16} color="#1E40AF" />
             <Text style={styles.escrowText}>
-              Payment has been released from escrow to the tasker.
+              {t('receipt.escrowInfo')}
             </Text>
           </View>
         </Animated.View>
@@ -139,14 +141,14 @@ export default function ReceiptScreen() {
         <View style={styles.actions}>
           <TouchableOpacity style={styles.shareBtn}>
             <Ionicons name="share-outline" size={16} color={colors.dark} />
-            <Text style={styles.shareBtnText}> Share receipt</Text>
+            <Text style={styles.shareBtnText}>{t('receipt.shareReceipt')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.reviewBtn}
             onPress={() => router.push('/(customer)/jobs/review/' + id as any)}
           >
             <Ionicons name="star-outline" size={16} color={colors.white} />
-            <Text style={styles.reviewBtnText}> Leave a review</Text>
+            <Text style={styles.reviewBtnText}>{t('receipt.leaveReview')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -155,7 +157,7 @@ export default function ReceiptScreen() {
         style={styles.homeBtn}
         onPress={() => router.replace('/(customer)')}
       >
-        <Text style={styles.homeBtnText}>Back to home</Text>
+        <Text style={styles.homeBtnText}>{t('receipt.backToHome')}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   )

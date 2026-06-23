@@ -64,6 +64,7 @@ export default function RootLayout() {
       if (saved && saved !== 'en') await i18next.changeLanguage(saved)
       setI18nReady(true)
       SplashScreen.hideAsync()
+      // push registration skipped — no EAS projectId configured
     })()
   }, [])
 

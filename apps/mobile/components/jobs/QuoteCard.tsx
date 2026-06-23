@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 import Avatar from '../ui/Avatar'
@@ -19,8 +20,14 @@ interface Props {
 
 export default function QuoteCard({ providerName, providerType, price, message, estimatedCompletion, rating, onAccept, onViewProfile, loading }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
     const styles = makeStyles(colors)
   const isCompany = providerType === 'COMPANY'
+
+  const providerTypeLabels: Record<string, string> = {
+    FREELANCER: t('quotes.freelancer'),
+    COMPANY: t('quotes.company'),
+  }
   const accentColor = isCompany ? colors.company : colors.amber
 
   return (
@@ -29,7 +36,7 @@ export default function QuoteCard({ providerName, providerType, price, message, 
         <Avatar name={providerName} size={42} color={accentColor} />
         <View style={styles.info}>
           <Text style={[styles.name, { color: colors.ink }]}>{providerName}</Text>
-          <Badge label={providerType} variant={isCompany ? 'purple' : 'amber'} />
+          <Badge label={providerTypeLabels[providerType] || providerType} variant={isCompany ? 'purple' : 'amber'} />
           {rating && (
             <Text style={[styles.rating, { color: colors.muted }]}><Ionicons name="star" size={14} color="#F59E0B" /> {rating.toFixed(1)}</Text>
           )}
@@ -38,15 +45,15 @@ export default function QuoteCard({ providerName, providerType, price, message, 
       </View>
       {message ? <Text style={[styles.message, { color: colors.ink, borderTopColor: colors.border }]} numberOfLines={2}>{message}</Text> : null}
       {estimatedCompletion && (
-        <Text style={[styles.eta, { color: colors.muted }]}>Est. completion: {estimatedCompletion}</Text>
+        <Text style={[styles.eta, { color: colors.muted }]}>{t('quotes.estimatedCompletion')}: {estimatedCompletion}</Text>
       )}
       <View style={styles.actions}>
         <TouchableOpacity style={[styles.acceptBtn, { backgroundColor: accentColor }]} onPress={onAccept} disabled={loading}>
-          <Text style={[styles.acceptBtnText, { color: colors.white }]}>{loading ? '...' : 'Accept Quote'}</Text>
+          <Text style={[styles.acceptBtnText, { color: colors.white }]}>{loading ? '...' : t('quotes.accept')}</Text>
         </TouchableOpacity>
         {onViewProfile && (
           <TouchableOpacity style={[styles.profileBtn, { borderColor: colors.border }]} onPress={onViewProfile}>
-            <Text style={[styles.profileBtnText, { color: accentColor }]}>View Profile</Text>
+            <Text style={[styles.profileBtnText, { color: accentColor }]}>{t('quotes.viewProfile')}</Text>
           </TouchableOpacity>
         )}
       </View>

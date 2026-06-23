@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 type Period = 'monthly' | 'quarterly' | 'yearly'
 
 export default function CompanyEarnings() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('monthly')
@@ -50,29 +52,29 @@ export default function CompanyEarnings() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Earnings</Text>
+        <Text style={styles.heading}>{t('company.earnings')}</Text>
       </View>
 
       <View style={styles.revenueCard}>
-        <Text style={styles.revenueLabel}>Total revenue</Text>
+        <Text style={styles.revenueLabel}>{t('tasker.totalEarned')}</Text>
         <Text style={styles.revenueValue}>LKR {Number(totalRevenue).toLocaleString()}</Text>
-        <Text style={styles.revenuePeriod}>This {period}</Text>
+        <Text style={styles.revenuePeriod}>{t('company.thisPeriod', { period })}</Text>
         <View style={styles.revenueChange}>
-          <Text style={styles.changeText}>↑ {revenueChange}% from last {period}</Text>
+          <Text style={styles.changeText}>↑ {revenueChange}% {t('company.fromLast', { period })}</Text>
         </View>
       </View>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Pending</Text>
+          <Text style={styles.statLabel}>{t('wallet.pending')}</Text>
           <Text style={styles.statValue}>LKR {Number(pendingAmount).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Paid out</Text>
+          <Text style={styles.statLabel}>{t('wallet.withdraw')}</Text>
           <Text style={styles.statValue}>LKR {Number(paidOut).toLocaleString()}</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Avg per job</Text>
+          <Text style={styles.statLabel}>{t('tasker.earnings')}</Text>
           <Text style={styles.statValue}>LKR {Number(avgPerJob).toLocaleString()}</Text>
         </View>
       </View>
@@ -92,13 +94,14 @@ export default function CompanyEarnings() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.payoutTitle}>Recent payouts</Text>
+        <Text style={styles.payoutTitle}>{t('wallet.transactions')}</Text>
         {payouts.length === 0 ? (
-          <Text style={styles.emptyText}>No payouts yet</Text>
+          <Text style={styles.emptyText}>{t('wallet.noTransactions')}</Text>
         ) : (
           payouts.map((p, i) => {
             const status = p.status || (p.paid ? 'Paid' : 'Pending')
             const isPaid = status === 'Paid' || status === 'paid'
+            const statusLabel = isPaid ? t('common.success') : t('common.pending')
             return (
               <View key={p.id || i} style={styles.payoutCard}>
                 <View style={styles.payoutLeft}>
@@ -112,7 +115,7 @@ export default function CompanyEarnings() {
                   <Text style={[styles.payoutAmount, { color: isPaid ? colors.success : colors.amber }]}>
                     LKR {Number(p.amount).toLocaleString()}
                   </Text>
-                  <Text style={styles.payoutStatus}>{status}</Text>
+                  <Text style={styles.payoutStatus}>{statusLabel}</Text>
                 </View>
               </View>
             )

@@ -1,5 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
+import { getCategoryI18nKey } from '../../lib/categories'
 
 interface CategoryItem {
   id: string
@@ -31,10 +33,11 @@ const FALLBACK_CATEGORIES: CategoryItem[] = [
 ]
 
 export default function CategoryPills({ items, selected, onSelect, loading }: Props) {
+  const { t } = useTranslation()
   const list = items || FALLBACK_CATEGORIES
 
   if (loading) {
-    return <Text style={styles.loadingText}>Loading categories...</Text>
+    return <Text style={styles.loadingText}>{t('common.loadingCategories')}</Text>
   }
 
   return (
@@ -57,7 +60,7 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
               color={isSelected ? '#D97706' : '#6B7280'}
             />
             <Text style={[styles.pillLabel, { color: isSelected ? '#D97706' : '#111827' }]}>
-              {cat.name}
+              {t(getCategoryI18nKey(cat))}
             </Text>
           </TouchableOpacity>
         )

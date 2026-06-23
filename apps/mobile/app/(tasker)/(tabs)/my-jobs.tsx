@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
@@ -12,6 +13,7 @@ import PressScale from '../../../components/find/PressScale'
 type Tab = 'active' | 'completed' | 'cancelled'
 
 export default function TaskerMyJobs() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -50,18 +52,18 @@ export default function TaskerMyJobs() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>My jobs</Text>
+        <Text style={styles.heading}>{t('tasker.myJobs')}</Text>
       </View>
 
       <View style={styles.tabs}>
-        {(['active', 'completed', 'cancelled'] as Tab[]).map((t) => (
+        {(['active', 'completed', 'cancelled'] as Tab[]).map((tabKey) => (
           <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
+            key={tabKey}
+            style={[styles.tab, tab === tabKey && styles.tabActive]}
+            onPress={() => setTab(tabKey)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+            <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
+              {t(`tasker.filters.${tabKey}` as any)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -78,7 +80,7 @@ export default function TaskerMyJobs() {
           {jobsList.length === 0 ? (
             <View style={styles.empty}>
               <Ionicons name="briefcase-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
-              <Text style={styles.emptyTitle}>No {tab} jobs</Text>
+              <Text style={styles.emptyTitle}>{t('tasker.noJobsFound')}</Text>
             </View>
           ) : (
             jobsList.map((job) => (
@@ -92,7 +94,7 @@ export default function TaskerMyJobs() {
                 <View style={styles.jobBottom}>
                   <View style={[styles.statusBadge, { backgroundColor: tab === 'active' ? '#CCFBF1' : tab === 'completed' ? '#D1FAE5' : '#FEE2E2' }]}>
                     <Text style={[styles.statusText, { color: tab === 'active' ? colors.amber : tab === 'completed' ? colors.success : '#EF4444' }]}>
-                      {tab === 'active' ? 'Active' : tab === 'completed' ? 'Completed' : 'Cancelled'}
+                      {t(`tasker.filters.${tab}` as any)}
                     </Text>
                   </View>
                   <Text style={styles.jobTime}>{new Date(job.createdAt).toLocaleDateString()}</Text>
@@ -103,10 +105,10 @@ export default function TaskerMyJobs() {
                       style={styles.trackBtn}
                       onPress={() => router.push('/(customer)/tracking/' + job.id as any)}
                     >
-                      <Text style={styles.trackBtnText}>Track</Text>
+                      <Text style={styles.trackBtnText}>{t('tracking.track')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.msgBtn}>
-                      <Text style={styles.msgBtnText}>Message</Text>
+                      <Text style={styles.msgBtnText}>{t('chat.message')}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : null}

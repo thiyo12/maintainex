@@ -5,9 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { bookings } from '../../../lib/api'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import type { Booking } from '../../../lib/types'
 
 export default function BookingConfirmedScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -31,12 +33,8 @@ export default function BookingConfirmedScreen() {
     }
   }, [bookingId])
 
-  const steps = [
-    { label: 'Booking confirmed', filled: true },
-    { label: 'Payment secured', filled: true },
-    { label: 'Worker on the way', filled: false },
-    { label: 'Job completed', filled: false },
-  ]
+  const stepLabels = t('booking.steps', { returnObjects: true }) as string[]
+  const steps = stepLabels.map((label, i) => ({ label, filled: i < 2 }))
 
   if (loading) {
     return (
@@ -51,15 +49,15 @@ export default function BookingConfirmedScreen() {
       <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
         <Ionicons name="checkmark" size={36} color={colors.white} />
       </Animated.View>
-      <Text style={styles.heading}>Booking confirmed</Text>
-      <Text style={styles.subheading}>Payment secured in escrow</Text>
+      <Text style={styles.heading}>{t('booking.confirmed')}</Text>
+      <Text style={styles.subheading}>{t('booking.paymentSecured')}</Text>
 
       <View style={styles.summary}>
-        <Text style={styles.sumLabel}>{booking?.serviceName || 'Service'}</Text>
+        <Text style={styles.sumLabel}>{booking?.serviceName || t('receipt.service')}</Text>
         <Text style={styles.sumValue}>{booking?.customerName || ''}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
           <Ionicons name="calendar-outline" size={16} color={colors.gray} />
-          <Text style={styles.sumValue}> {booking?.date ? new Date(booking.date).toLocaleDateString() : 'Today'} at {booking?.time || ''}</Text>
+          <Text style={styles.sumValue}> {booking?.date ? new Date(booking.date).toLocaleDateString() : t('common.today')} at {booking?.time || ''}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
           <Ionicons name="location-outline" size={16} color={colors.gray} />
@@ -83,11 +81,11 @@ export default function BookingConfirmedScreen() {
       <View style={styles.buttons}>
         <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(customer)/tracking/${bookingId || 1}`)}>
           <Ionicons name="map" size={18} color={colors.white} style={{ marginRight: 6 }} />
-          <Text style={styles.mapBtnText}>Track on map</Text>
+          <Text style={styles.mapBtnText}>{t('booking.trackOnMap')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/(chat)/${bookingId || 1}`)}>
           <Ionicons name="chatbubble-ellipses" size={18} color={colors.dark} style={{ marginRight: 6 }} />
-          <Text style={styles.chatBtnText}>Chat with worker</Text>
+          <Text style={styles.chatBtnText}>{t('booking.chatWithWorker')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -87,6 +87,10 @@ async function getServicesByCategory() {
   return { categories: categoriesWithServices, services }
 }
 
+function randomViews() {
+  return Math.floor(Math.random() * 5001) + 3000
+}
+
 async function getTrendingServices() {
   const trending = await prisma.service.findMany({
     where: { isActive: true },
@@ -105,7 +109,7 @@ async function getTrendingServices() {
     image: svc.image,
     price: svc.price ? Number(svc.price) : null,
     duration: svc.duration ? Number(svc.duration) : null,
-    views: svc.views || 0,
+    views: randomViews(),
     isTrending: svc.isTrending || false
   })) as any[]
 }

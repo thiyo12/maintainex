@@ -3,9 +3,12 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useColors } from '../../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
+import { translateJobStatus } from '../../../../lib/i18n'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 
 export default function V2MyJobsScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -39,11 +42,11 @@ export default function V2MyJobsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>My Marketplace Jobs</Text>
-          <Text style={styles.subtitle}>{jobs.length} job{jobs.length !== 1 ? 's' : ''}</Text>
+          <Text style={styles.greeting}>{t('marketplace.title')}</Text>
+          <Text style={styles.subtitle}>{t('marketplace.count', { n: jobs.length })}</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.createBtn}>
-          <Text style={styles.createBtnText}>+ New</Text>
+          <Text style={styles.createBtnText}>{t('marketplace.new')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -52,10 +55,10 @@ export default function V2MyJobsScreen() {
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="clipboard-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
-          <Text style={styles.emptyTitle}>No jobs yet</Text>
-          <Text style={styles.emptySub}>Post your first job and get quotes from top providers</Text>
+          <Text style={styles.emptyTitle}>{t('marketplace.noJobs')}</Text>
+          <Text style={styles.emptySub}>{t('marketplace.noJobsDesc')}</Text>
           <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.emptyBtn}>
-            <Text style={styles.emptyBtnText}>Post a Job</Text>
+            <Text style={styles.emptyBtnText}>{t('marketplace.postJob')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -69,7 +72,7 @@ export default function V2MyJobsScreen() {
               <View style={styles.cardTop}>
                 <View style={[styles.statusDot, { backgroundColor: statusColors[job.status] || colors.muted }]} />
                 <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
-                  <Text style={styles.statusText}>{job.status.replace(/_/g, ' ')}</Text>
+                  <Text style={styles.statusText}>{t(translateJobStatus(job.status))}</Text>
                 </View>
               </View>
               <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>

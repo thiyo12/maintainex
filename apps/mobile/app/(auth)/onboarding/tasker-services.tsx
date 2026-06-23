@@ -7,7 +7,9 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { fonts } from '../../../lib/fonts'
+import { getCategoryI18nKey } from '../../../lib/categories'
 import { getAuthToken } from '../../../lib/api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
@@ -41,6 +43,7 @@ export default function TaskerServicesOnboarding() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
+  const { t } = useTranslation()
   const { user, refreshUser } = useAuth()
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -95,7 +98,7 @@ export default function TaskerServicesOnboarding() {
 
   const handleSave = async () => {
     if (selectedIds.size === 0) {
-      Alert.alert('Selection Required', 'Please select at least one service or choose Allrounder.')
+      Alert.alert(t('errors.selectionRequired'), t('errors.selectService'))
       return
     }
     setSaving(true)
@@ -108,13 +111,13 @@ export default function TaskerServicesOnboarding() {
       })
       if (!res.ok) {
         const err = await res.json()
-        Alert.alert('Error', err.error || 'Failed to save services')
+        Alert.alert(t('common.error'), err.error || t('errors.generic'))
         return
       }
       await refreshUser()
       router.replace('/(tasker)')
     } catch {
-      Alert.alert('Error', 'Network error. Please try again.')
+      Alert.alert(t('common.error'), t('errors.network'))
     } finally {
       setSaving(false)
     }
@@ -126,9 +129,9 @@ export default function TaskerServicesOnboarding() {
         <Ionicons name="arrow-back" size={24} color={colors.ink} />
       </TouchableOpacity>
 
-      <Text style={styles.title}>Select Your Services</Text>
+      <Text style={styles.title}>{t('auth.onboarding.selectServices')}</Text>
       <Text style={styles.subtitle}>
-        Choose the services you offer so customers can find you. Pick at least one.
+        {t('auth.onboarding.selectServicesDesc')}
       </Text>
 
       <TouchableOpacity
@@ -142,8 +145,8 @@ export default function TaskerServicesOnboarding() {
           color={allrounder ? colors.amber : colors.muted}
         />
         <View style={styles.allrounderTextWrap}>
-          <Text style={styles.allrounderLabel}>Allrounder</Text>
-          <Text style={styles.allrounderDesc}>I offer all {categories.length} services</Text>
+          <Text style={styles.allrounderLabel}>{t('auth.onboarding.allrounder')}</Text>
+          <Text style={styles.allrounderDesc}>{t('auth.onboarding.allrounderDesc', { n: categories.length })}</Text>
         </View>
       </TouchableOpacity>
 
@@ -161,7 +164,7 @@ export default function TaskerServicesOnboarding() {
                 activeOpacity={0.7}
               >
                 <Ionicons name={cat.iconName as any} size={28} color={selected ? colors.amberDark : colors.ink} />
-                <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{cat.name}</Text>
+                <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{t(getCategoryI18nKey(cat))}</Text>
               </TouchableOpacity>
             )
           })}
@@ -177,7 +180,7 @@ export default function TaskerServicesOnboarding() {
           <ActivityIndicator color={colors.white} />
         ) : (
           <>
-            <Text style={styles.saveText}>Save & Continue</Text>
+            <Text style={styles.saveText}>{t('auth.onboarding.saveAndContinue')}</Text>
             <Ionicons name="arrow-forward" size={20} color={colors.white} />
           </>
         )}

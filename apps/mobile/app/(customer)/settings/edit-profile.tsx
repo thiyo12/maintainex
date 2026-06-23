@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { auth } from '../../../lib/api'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 
 export default function EditProfileScreen() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const router = useRouter()
   const { user, refreshUser } = useAuth()
@@ -30,19 +32,19 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Name is required')
+      Alert.alert(t('common.error'), t('tasker.nameRequired'))
       return
     }
     setSaving(true)
     try {
       await auth.updateProfile({ name, phone })
       await refreshUser()
-      Alert.alert('Saved', 'Profile updated successfully')
+      Alert.alert(t('common.success'), t('common.success'))
       router.back()
     } catch (e: any) {
-      let msg = 'Failed to save'
+      let msg = t('errors.generic')
       try { msg = JSON.parse(e.message).error || msg } catch {}
-      Alert.alert('Error', msg)
+      Alert.alert(t('common.error'), msg)
     } finally {
       setSaving(false)
     }
@@ -51,7 +53,7 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>Edit profile</Text>
+        <Text style={styles.heading}>{t('profile.edit')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.avatarSection}>
@@ -60,23 +62,23 @@ export default function EditProfileScreen() {
             </View>
             <TouchableOpacity style={styles.changePhotoBtn}>
               <Ionicons name="camera-outline" size={16} color={colors.customerAccent} />
-              <Text style={styles.changePhotoText}> Change photo</Text>
+              <Text style={styles.changePhotoText}> {t('common.edit')}</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Full name</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" />
+          <Text style={styles.label}>{t('profile.fullName')}</Text>
+          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('profile.fullName')} />
 
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('profile.email')}</Text>
           <View style={[styles.input, { backgroundColor: '#F3F4F6', justifyContent: 'center' }]}>
             <Text style={{ fontSize: 15, color: colors.gray }}>{email}</Text>
           </View>
 
-          <Text style={styles.label}>Phone</Text>
-          <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0712345678" />
+          <Text style={styles.label}>{t('profile.phone')}</Text>
+          <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder={t('profile.phone')} />
 
-          <Text style={styles.label}>Location</Text>
-          <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder="Colombo, Sri Lanka" />
+          <Text style={styles.label}>{t('jobDetail.location')}</Text>
+          <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder={t('jobDetail.location')} />
         </ScrollView>
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
@@ -85,7 +87,7 @@ export default function EditProfileScreen() {
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={20} color={colors.white} />
-              <Text style={styles.saveBtnText}> Save changes</Text>
+              <Text style={styles.saveBtnText}> {t('common.saveChanges')}</Text>
             </>
           )}
         </TouchableOpacity>

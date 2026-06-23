@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 type Tab = 'active' | 'completed' | 'all'
 
 export default function CompanyContracts() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [tab, setTab] = useState<Tab>('active')
@@ -47,18 +49,18 @@ export default function CompanyContracts() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Contracts</Text>
+        <Text style={styles.heading}>{t('company.contracts')}</Text>
       </View>
 
       <View style={styles.tabs}>
-        {(['active', 'completed', 'all'] as Tab[]).map((t) => (
+        {(['active', 'completed', 'all'] as Tab[]).map((tabKey) => (
           <TouchableOpacity
-            key={t}
-            style={[styles.tab, tab === t && styles.tabActive]}
-            onPress={() => setTab(t)}
+            key={tabKey}
+            style={[styles.tab, tab === tabKey && styles.tabActive]}
+            onPress={() => setTab(tabKey)}
           >
-            <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-              {t.charAt(0).toUpperCase() + t.slice(1)}
+            <Text style={[styles.tabText, tab === tabKey && styles.tabTextActive]}>
+              {tabKey === 'active' ? t('tasker.active') : tabKey === 'completed' ? t('jobs.status.completed') : t('components.viewAll')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -66,7 +68,7 @@ export default function CompanyContracts() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
-          <Text style={styles.emptyText}>No contracts found</Text>
+          <Text style={styles.emptyText}>{t('common.noResults')}</Text>
         ) : (
           filtered.map((c) => (
             <TouchableOpacity key={c.id} style={styles.contractCard} activeOpacity={0.8}>
@@ -87,7 +89,7 @@ export default function CompanyContracts() {
                     {c.status}
                   </Text>
                 </View>
-                <Text style={styles.viewDetails}>View details ›</Text>
+                <Text style={styles.viewDetails}>{t('company.viewDetails')}</Text>
               </View>
             </TouchableOpacity>
           ))

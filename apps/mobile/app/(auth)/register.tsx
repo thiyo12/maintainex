@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { useColors } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { fonts } from '../../lib/fonts'
 
 export default function RegisterScreen() {
@@ -14,6 +15,7 @@ export default function RegisterScreen() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { role: paramRole } = useLocalSearchParams<{ role: string }>()
+  const { t } = useTranslation()
   const { register, setSignupData } = useAuth()
 
   const [name, setName] = useState('')
@@ -27,27 +29,27 @@ export default function RegisterScreen() {
   const role = paramRole || 'CUSTOMER'
   const allFilled = name && phone && email && password && confirmPassword && agreeTerms
 
-  const roleLabel = role === 'TASKER' ? 'Join as a tasker' : role === 'COMPANY' ? 'Register your company' : 'Join as a customer'
+  const roleLabel = role === 'TASKER' ? t('auth.register.joinAsTasker') : role === 'COMPANY' ? t('auth.register.registerCompany') : t('auth.register.joinAsCustomer')
 
   const handleNext = async () => {
     if (!name || !phone || !email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields')
+      Alert.alert(t('common.error'), t('errors.fillAllFields'))
       return
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match')
+      Alert.alert(t('common.error'), t('errors.passwordsDoNotMatch'))
       return
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters')
+      Alert.alert(t('common.error'), t('errors.passwordMinLength'))
       return
     }
     if (phone.replace(/\D/g, '').length < 9) {
-      Alert.alert('Error', 'Please enter a valid phone number')
+      Alert.alert(t('common.error'), t('errors.invalidPhone'))
       return
     }
     if (!agreeTerms) {
-      Alert.alert('Error', 'Please agree to the terms and conditions')
+      Alert.alert(t('common.error'), t('errors.agreeTerms'))
       return
     }
 
@@ -57,12 +59,12 @@ export default function RegisterScreen() {
       setSignupData({ name, email, phone, password, role })
       router.push({ pathname: '/(auth)/otp', params: { phone, role } })
     } catch (err: any) {
-      let message = err.message || 'Something went wrong'
+      let message = err.message || t('errors.generic')
       try {
         const parsed = JSON.parse(message)
         message = parsed.error || message
       } catch {}
-      Alert.alert('Registration Failed', message)
+      Alert.alert(t('errors.registrationFailed'), message)
     } finally {
       setLoading(false)
     }
@@ -76,59 +78,59 @@ export default function RegisterScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={22} color={colors.amber} />
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('auth.register.back')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Create your account</Text>
+        <Text style={styles.title}>{t('auth.register.createYourAccount')}</Text>
         <Text style={styles.subtitle}>{roleLabel}</Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>{t('auth.register.name')}</Text>
           <TextInput
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="Your full name"
+            placeholder={t('auth.register.namePlaceholder')}
             placeholderTextColor={colors.muted}
           />
 
-          <Text style={styles.label}>Phone Number</Text>
+          <Text style={styles.label}>{t('auth.register.phone')}</Text>
           <TextInput
             style={styles.input}
             value={phone}
             onChangeText={setPhone}
-            placeholder="0712345678"
+            placeholder={t('auth.register.phonePlaceholder')}
             keyboardType="phone-pad"
             placeholderTextColor={colors.muted}
           />
 
-          <Text style={styles.label}>Email Address</Text>
+          <Text style={styles.label}>{t('auth.register.email')}</Text>
           <TextInput
             style={styles.input}
             value={email}
             onChangeText={setEmail}
-            placeholder="your@email.com"
+            placeholder={t('auth.register.emailPlaceholder')}
             keyboardType="email-address"
             autoCapitalize="none"
             placeholderTextColor={colors.muted}
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t('auth.register.password')}</Text>
           <TextInput
             style={styles.input}
             value={password}
             onChangeText={setPassword}
-            placeholder="Create a password"
+            placeholder={t('auth.register.passwordPlaceholder')}
             secureTextEntry
             placeholderTextColor={colors.muted}
           />
 
-          <Text style={styles.label}>Confirm Password</Text>
+          <Text style={styles.label}>{t('auth.register.confirmPassword')}</Text>
           <TextInput
             style={styles.input}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            placeholder="Confirm your password"
+            placeholder={t('auth.register.confirmPasswordPlaceholder')}
             secureTextEntry
             placeholderTextColor={colors.muted}
           />
@@ -141,9 +143,10 @@ export default function RegisterScreen() {
               {agreeTerms && <Ionicons name="checkmark" size={14} color={colors.white} />}
             </View>
             <Text style={styles.checkboxLabel}>
-              I agree to the{' '}
-              <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>
+              {t('auth.register.agreeTerms')}
+              <Text style={styles.termsLink}>{t('auth.register.termsOfService')}</Text>
+              {t('auth.register.and')}
+              <Text style={styles.termsLink}>{t('auth.register.privacyPolicy')}</Text>
             </Text>
           </TouchableOpacity>
 
@@ -155,7 +158,7 @@ export default function RegisterScreen() {
             {loading ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.buttonText}>Next</Text>
+              <Text style={styles.buttonText}>{t('auth.register.next')}</Text>
             )}
           </TouchableOpacity>
         </View>

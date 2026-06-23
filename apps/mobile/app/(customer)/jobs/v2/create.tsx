@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { getAuthToken } from '../../../../lib/api'
+import { v2Jobs } from '../../../../lib/api-v2'
+import { useAuth } from '../../../../lib/auth'
 import ProgressSteps from '../../../../components/ui/ProgressSteps'
 import { getCategoryIcon } from '../../../../lib/category-icons'
 
@@ -20,12 +22,6 @@ interface City { id: string; name: string; areas: Area[] }
 interface State { id: string; name: string; cities: City[] }
 interface Country { id: string; name: string; code: string; states: State[] }
 
-const budgetTiers = [
-  { key: 'SMALL', label: 'Small', range: 'LKR 1,000 – 3,000', icon: 'cash-outline' as const },
-  { key: 'MEDIUM', label: 'Medium', range: 'LKR 3,000 – 8,000', icon: 'wallet-outline' as const },
-  { key: 'LARGE', label: 'Large', range: 'LKR 8,000+', icon: 'diamond-outline' as const },
-]
-
 const providerTypes = ['FREELANCER', 'COMPANY', 'BOTH']
 
 export default function CreateJobScreen() {
@@ -33,6 +29,12 @@ export default function CreateJobScreen() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
+  const { user } = useAuth()
+  const budgetTiers = [
+    { key: 'SMALL', label: t('postJob.budgetSmall'), range: t('postJob.budgetSmallRange'), icon: 'cash-outline' as const },
+    { key: 'MEDIUM', label: t('postJob.budgetMedium'), range: t('postJob.budgetMediumRange'), icon: 'wallet-outline' as const },
+    { key: 'LARGE', label: t('postJob.budgetLarge'), range: t('postJob.budgetLargeRange'), icon: 'diamond-outline' as const },
+  ]
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -96,6 +98,15 @@ export default function CreateJobScreen() {
     }
     setSubmitting(true)
     try {
+      if (user?.id) {
+        const existing = await v2Jobs.list()
+        const activeCount = (existing.jobs || []).filter((j: any) => j.customerId === user.id && j.status !== 'COMPLETED' && j.status !== 'CANCELLED').length
+        if (activeCount >= 2) {
+          Alert.alert(t('postJob.maxActiveJobs'), t('postJob.maxActiveJobsDesc'))
+          setSubmitting(false)
+          return
+        }
+      }
       const token = await getAuthToken()
       const budget = tierToBudget(selectedTier)
       const res = await fetch(`${API_URL}/api/mobile/v2/jobs`, {
@@ -119,7 +130,7 @@ export default function CreateJobScreen() {
         return
       }
       Alert.alert(t('postJob.published'), t('postJob.publishedMsg'), [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (err) {
       Alert.alert(t('common.error'), t('postJob.networkError'))
@@ -161,7 +172,13 @@ export default function CreateJobScreen() {
                 <TouchableOpacity
                   key={cat.id}
                   style={[styles.categoryCard, selectedCategory?.id === cat.id && styles.categoryCardSelected]}
-                  onPress={() => setSelectedCategory(cat)}
+                  onPress={() => {
+                    if (cat.id === 'realestate') {
+                      router.push('/real-estate')
+                    } else {
+                      setSelectedCategory(cat)
+                    }
+                  }}
                   activeOpacity={0.7}
                 >
                   <Ionicons name={getCategoryIcon(cat.iconName) as any} size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />

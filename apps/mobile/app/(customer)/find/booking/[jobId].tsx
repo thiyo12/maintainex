@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { templateJobs, quickBookings } from '../../../../lib/api'
 import StickyBottomBar from '../../../../components/find/StickyBottomBar'
@@ -23,6 +24,7 @@ const DISTRICTS = [
 
 export default function QuickBooking() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const { jobId, taskerId, rate } = useLocalSearchParams<{ jobId: string; taskerId: string; rate: string }>()
   const [job, setJob] = useState<any>(null)
@@ -71,7 +73,7 @@ export default function QuickBooking() {
 
   const handleSubmit = async () => {
     if (!selectedDate || !selectedSlot || !address || !district) {
-      Alert.alert('Missing Info', 'Please fill in all required fields')
+      Alert.alert(t('common.error'), t('errors.fillAllFields'))
       return
     }
     setSubmitting(true)
@@ -85,18 +87,18 @@ export default function QuickBooking() {
         district,
         notes,
       })
-      Alert.alert('Booking Confirmed!', `Booking ID: ${result.id}`, [
-        { text: 'OK', onPress: () => router.push('/(customer)/(tabs)') }
+      Alert.alert(t('booking.confirmed'), t('booking.paymentSecured'), [
+        { text: t('common.ok'), onPress: () => router.push('/(customer)/(tabs)') }
       ])
     } catch (e: any) {
-      Alert.alert('Booking Failed', e.message || 'Something went wrong')
+      Alert.alert(t('common.error'), e.message || t('errors.generic'))
     } finally {
       setSubmitting(false)
     }
   }
 
   if (loading) return <View style={styles.container}><SkeletonLoader count={5} height={60} /></View>
-  if (!job) return <View style={styles.container}><Text style={{ textAlign: 'center', marginTop: 40 }}>Job not found</Text></View>
+  if (!job) return <View style={styles.container}><Text style={{ textAlign: 'center', marginTop: 40 }}>{t('errors.jobNotFound')}</Text></View>
 
   const avgPrice = Math.round((job.priceMin + job.priceMax) / 2)
 
@@ -106,10 +108,10 @@ export default function QuickBooking() {
         <View style={styles.jobHeader}>
           <Text style={styles.jobTitle}>{job.name}</Text>
           <Text style={styles.jobPrice}>Rs {avgPrice.toLocaleString()} est.</Text>
-          <Text style={styles.jobRate}>Tasker rate: Rs {rate}/hr</Text>
+          <Text style={styles.jobRate}>{t('booking.professional')}: Rs {rate}/hr</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Select Date</Text>
+        <Text style={styles.sectionTitle}>{t('components.selectDate')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
           {getNext7Days().map((dateStr) => {
             const isSelected = selectedDate === dateStr
@@ -127,7 +129,7 @@ export default function QuickBooking() {
           })}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>Select Time Slot</Text>
+        <Text style={styles.sectionTitle}>{t('components.selectTime')}</Text>
         <View style={styles.slotsGrid}>
           {TIME_SLOTS.map((slot) => {
             const isSelected = selectedSlot === slot
@@ -143,10 +145,10 @@ export default function QuickBooking() {
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>Location</Text>
+        <Text style={styles.sectionTitle}>{t('jobDetail.location')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your address"
+          placeholder={t('jobDetail.location')}
           placeholderTextColor="#9CA3AF"
           value={address}
           onChangeText={setAddress}
@@ -154,7 +156,7 @@ export default function QuickBooking() {
 
         <TouchableOpacity style={styles.pickerButton} onPress={() => setShowDistrictPicker(!showDistrictPicker)}>
           <Text style={district ? styles.pickerText : styles.pickerPlaceholder}>
-            {district || 'Select district'}
+            {district || t('booking.districtPlaceholder')}
           </Text>
           <Ionicons name={showDistrictPicker ? 'chevron-up' : 'chevron-down'} size={18} color="#9CA3AF" />
         </TouchableOpacity>
@@ -174,10 +176,10 @@ export default function QuickBooking() {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Notes (optional)</Text>
+        <Text style={styles.sectionTitle}>{t('jobDetail.description')}</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Any special instructions for the tasker"
+          placeholder={t('jobDetail.description')}
           placeholderTextColor="#9CA3AF"
           value={notes}
           onChangeText={setNotes}
@@ -188,8 +190,8 @@ export default function QuickBooking() {
 
       <StickyBottomBar
         price={`Rs ${avgPrice.toLocaleString()}`}
-        label="Estimated total"
-        buttonText={submitting ? 'Booking...' : 'Confirm Booking'}
+        label={t('booking.total')}
+        buttonText={submitting ? t('booking.processing') : t('booking.confirm')}
         icon="checkmark"
         onPress={handleSubmit}
         disabled={submitting}

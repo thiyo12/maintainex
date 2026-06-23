@@ -6,8 +6,10 @@ import { useAuth } from '../../lib/auth'
 import { fonts } from '../../lib/fonts'
 import { fontSizes } from '../../lib/tokens'
 import { spacing, borderRadius } from '../../lib/tokens'
+import { useTranslation } from 'react-i18next'
 
 export default function HomeScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
     const styles = makeStyles(colors)
   const { user } = useAuth()
@@ -16,10 +18,10 @@ export default function HomeScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
         <Text style={[styles.greeting, { color: colors.ink }]}>
-          Hello, {user?.name?.split(' ')[0] || 'there'}
+          {t('home.greeting.morning')}, {user?.name?.split(' ')[0] || t('home.user')}
         </Text>
         <Text style={[styles.subtitle, { color: colors.muted }]}>
-          What do you need done today?
+          {t('home.whatDoYouNeed')}
         </Text>
       </View>
       <View style={styles.content}>
@@ -27,9 +29,9 @@ export default function HomeScreen() {
           <View style={[styles.iconWrap, { backgroundColor: colors.primaryBg }]}>
             <Ionicons name="sparkles" size={24} color={colors.amber} />
           </View>
-          <Text style={[styles.cardTitle, { color: colors.ink }]}>Welcome to Maintainex</Text>
+          <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('welcomeOnboarding.heading')}</Text>
           <Text style={[styles.cardSub, { color: colors.muted }]}>
-            Post a job and get quotes from trusted taskers in your area.
+            {t('postJob.publishedMsg')}
           </Text>
         </View>
       </View>

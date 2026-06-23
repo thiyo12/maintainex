@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Switch, ActivityI
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as SecureStore from 'expo-secure-store'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 
 const SETTINGS_KEY = 'notification_settings'
@@ -18,6 +19,7 @@ const DEFAULTS = {
 
 export default function NotificationsScreen() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -45,40 +47,40 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Notifications</Text>
+      <Text style={styles.heading}>{t('settings.notifications')}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.customerAccent} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-          <Text style={styles.sectionTitle}>Push notifications</Text>
+          <Text style={styles.sectionTitle}>{t('settings.notifications')}</Text>
           <View style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.label}>Job updates</Text>
+              <Text style={styles.label}>{t('settings.jobUpdates')}</Text>
               <Switch value={settings.jobUpdates} onValueChange={() => toggle('jobUpdates')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
             </View>
             <View style={styles.row}>
-              <Text style={styles.label}>Messages</Text>
+              <Text style={styles.label}>{t('settings.messages')}</Text>
               <Switch value={settings.messages} onValueChange={() => toggle('messages')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
             </View>
             <View style={styles.row}>
-              <Text style={styles.label}>New quotes</Text>
+              <Text style={styles.label}>{t('settings.quotes')}</Text>
               <Switch value={settings.quotes} onValueChange={() => toggle('quotes')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
             </View>
             <View style={styles.row}>
-              <Text style={styles.label}>Promotions & offers</Text>
+              <Text style={styles.label}>{t('settings.promotions')}</Text>
               <Switch value={settings.promotions} onValueChange={() => toggle('promotions')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Notification channels</Text>
+          <Text style={styles.sectionTitle}>{t('settings.notifications')}</Text>
           <View style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.label}>Email notifications</Text>
+              <Text style={styles.label}>{t('profile.email')}</Text>
               <Switch value={settings.emailNotifications} onValueChange={() => toggle('emailNotifications')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
             </View>
             <View style={styles.row}>
-              <Text style={styles.label}>SMS notifications</Text>
+              <Text style={styles.label}>{t('profile.phone')}</Text>
               <Switch value={settings.smsNotifications} onValueChange={() => toggle('smsNotifications')} trackColor={{ false: colors.lightGray, true: colors.customerAccent }} />
             </View>
           </View>

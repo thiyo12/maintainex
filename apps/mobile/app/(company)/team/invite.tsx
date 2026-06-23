@@ -7,8 +7,10 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Team } from '../../../lib/api-v2'
+import { useTranslation } from 'react-i18next'
 
 export default function InviteTeamMember() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -20,11 +22,11 @@ export default function InviteTeamMember() {
 
   const handleSend = async () => {
     if (!name) {
-      Alert.alert('Required', 'Member name is required.')
+      Alert.alert(t('common.error'), t('errors.enterMemberName'))
       return
     }
     if (!email && !phone) {
-      Alert.alert('Required', 'Please provide an email or phone number.')
+      Alert.alert(t('common.error'), t('errors.enterEmailOrPhone'))
       return
     }
     setSending(true)
@@ -35,11 +37,11 @@ export default function InviteTeamMember() {
         phone: phone || undefined,
         role,
       })
-      Alert.alert('Invite Sent', `${name} will receive an invitation.`, [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t('common.success'), t('common.success'), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to send invite')
+      Alert.alert(t('common.error'), err.message || t('errors.generic'))
     } finally {
       setSending(false)
     }
@@ -51,24 +53,24 @@ export default function InviteTeamMember() {
         <Ionicons name="arrow-back" size={24} color={colors.ink} />
       </TouchableOpacity>
 
-      <Text style={styles.title}>Invite Team Member</Text>
+      <Text style={styles.title}>{t('company.inviteMember')}</Text>
       <Text style={styles.subtitle}>
-        Send an invite to join your company. They will need an account to accept.
+        {t('auth.onboarding.inviteTeamDesc')}
       </Text>
 
-      <Text style={styles.label}>Full Name *</Text>
+      <Text style={styles.label}>{t('profile.fullName')} *</Text>
       <TextInput
         style={styles.input}
-        placeholder="e.g. Kamal Perera"
+        placeholder={t('auth.register.namePlaceholder')}
         placeholderTextColor={colors.muted}
         value={name}
         onChangeText={setName}
       />
 
-      <Text style={styles.label}>Email Address</Text>
+      <Text style={styles.label}>{t('profile.email')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="e.g. kamal@example.com"
+        placeholder={t('auth.register.emailPlaceholder')}
         placeholderTextColor={colors.muted}
         value={email}
         onChangeText={setEmail}
@@ -76,29 +78,29 @@ export default function InviteTeamMember() {
         autoCapitalize="none"
       />
 
-      <Text style={styles.label}>Phone Number</Text>
+      <Text style={styles.label}>{t('profile.phone')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="e.g. 0771234567"
+        placeholder={t('auth.register.phonePlaceholder')}
         placeholderTextColor={colors.muted}
         value={phone}
         onChangeText={setPhone}
         keyboardType="phone-pad"
       />
 
-      <Text style={styles.label}>Role</Text>
+      <Text style={styles.label}>{t('profile.role')}</Text>
       <View style={styles.roleRow}>
         <TouchableOpacity
           style={[styles.rolePill, role === 'MEMBER' && styles.rolePillActive]}
           onPress={() => setRole('MEMBER')}
         >
-          <Text style={[styles.roleText, role === 'MEMBER' && styles.roleTextActive]}>Member</Text>
+            <Text style={[styles.roleText, role === 'MEMBER' && styles.roleTextActive]}>{t('team.memberRole')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.rolePill, role === 'ADMIN' && styles.rolePillActive]}
           onPress={() => setRole('ADMIN')}
         >
-          <Text style={[styles.roleText, role === 'ADMIN' && styles.roleTextActive]}>Admin</Text>
+          <Text style={[styles.roleText, role === 'ADMIN' && styles.roleTextActive]}>{t('team.adminRole')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -112,7 +114,7 @@ export default function InviteTeamMember() {
         ) : (
           <>
             <Ionicons name="send-outline" size={18} color={colors.white} />
-            <Text style={styles.sendText}>Send Invite</Text>
+            <Text style={styles.sendText}>{t('company.inviteMember')}</Text>
           </>
         )}
       </TouchableOpacity>

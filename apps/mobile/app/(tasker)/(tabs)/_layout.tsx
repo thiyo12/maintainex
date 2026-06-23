@@ -2,19 +2,21 @@ import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 
-const tabs = [
-  { name: 'index', title: 'Jobs', icon: 'compass-outline' as const },
-  { name: 'my-jobs', title: 'My Jobs', icon: 'briefcase-outline' as const },
-  { name: 'earnings', title: 'Earnings', icon: 'cash-outline' as const },
-  { name: 'profile', title: 'Profile', icon: 'person-outline' as const },
+const tabConfigs = [
+  { name: 'index', key: 'tasker.browse', icon: 'compass-outline' as const },
+  { name: 'my-jobs', key: 'tasker.myJobs', icon: 'briefcase-outline' as const },
+  { name: 'earnings', key: 'tasker.earnings', icon: 'cash-outline' as const },
+  { name: 'profile', key: 'tasker.profile', icon: 'person-outline' as const },
 ]
 
 export default function TaskerTabs() {
   const colors = useColors()
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
 
   return (
@@ -39,12 +41,12 @@ export default function TaskerTabs() {
         tabBarShowLabel: true,
       }}
     >
-      {tabs.map((tab) => (
+      {tabConfigs.map((tab) => (
         <Tabs.Screen
           key={tab.name}
           name={tab.name}
           options={{
-            title: tab.title,
+            title: t(tab.key),
             tabBarIcon: ({ focused }) => (
               <Ionicons name={tab.icon} size={22} color={focused ? colors.amber : colors.muted} />
             ),

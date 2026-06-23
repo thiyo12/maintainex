@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
 interface Props {
@@ -24,6 +25,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function JobCard({ title, category, budget, location, distance, urgency, status, isRemote, onPress, onApply }: Props) {
+  const { t } = useTranslation()
   const { colors } = useTheme()
   const accentColor = status ? STATUS_COLORS[status] || colors.amber : colors.amber
 
@@ -67,7 +69,7 @@ export default function JobCard({ title, category, budget, location, distance, u
           ) : null}
           {isRemote ? (
             <View style={[styles.tag, { backgroundColor: colors.purpleBg }]}>
-              <Text style={[styles.tagText, { color: colors.purple }]}>Remote</Text>
+              <Text style={[styles.tagText, { color: colors.purple }]}>{t('jobs.remote')}</Text>
             </View>
           ) : null}
         </View>
@@ -99,7 +101,7 @@ export default function JobCard({ title, category, budget, location, distance, u
             activeOpacity={0.8}
           >
             <Ionicons name="paper-plane-outline" size={12} color="#111827" />
-            <Text style={styles.applyText}>Apply Now</Text>
+            <Text style={styles.applyText}>{t('jobs.applyNow')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>

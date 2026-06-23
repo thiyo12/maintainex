@@ -3,9 +3,11 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Activi
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { v2Wallet } from '../../../lib/api-v2'
 
 export default function CustomerWalletScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [wallet, setWallet] = useState<any>({ balance: 0 })
@@ -30,7 +32,7 @@ export default function CustomerWalletScreen() {
 
   const handleTopUp = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Enter a valid amount')
+      Alert.alert(t('common.error'), t('wallet.enterValidAmount'))
       return
     }
     setSubmitting(true)
@@ -38,10 +40,10 @@ export default function CustomerWalletScreen() {
       const res = await v2Wallet.topUp(parseFloat(amount))
       setWallet({ ...wallet, balance: res.balance })
       setAmount('')
-      Alert.alert('Done!', `LKR ${amount} added to your wallet`)
+      Alert.alert(t('common.success'), t('wallet.addedToWallet', { amount }))
       loadWallet()
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setSubmitting(false)
     }
@@ -55,14 +57,14 @@ export default function CustomerWalletScreen() {
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Balance Card */}
           <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
             <Text style={styles.balanceAmount}>LKR {wallet.balance?.toLocaleString() || '0'}</Text>
-            <Text style={styles.balanceSub}>Secure funds for marketplace jobs</Text>
+            <Text style={styles.balanceSub}>{t('wallet.secureFunds')}</Text>
           </View>
 
           {/* Quick Top Up */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Top Up</Text>
+            <Text style={styles.sectionTitle}>{t('wallet.topUp')}</Text>
             <View style={styles.quickRow}>
               {[500, 1000, 2000, 5000].map((amt) => (
                 <TouchableOpacity
@@ -80,7 +82,7 @@ export default function CustomerWalletScreen() {
               style={styles.input}
               value={amount}
               onChangeText={setAmount}
-              placeholder="Custom amount"
+              placeholder={t('wallet.customAmount')}
               placeholderTextColor={colors.muted}
               keyboardType="numeric"
             />
@@ -92,18 +94,18 @@ export default function CustomerWalletScreen() {
               {submitting ? (
                 <ActivityIndicator color={colors.ink} />
               ) : (
-                <Text style={styles.topUpBtnText}>Add Funds</Text>
+                <Text style={styles.topUpBtnText}>{t('wallet.topUp')}</Text>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Transactions */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Transaction History</Text>
+            <Text style={styles.sectionTitle}>{t('wallet.transactions')}</Text>
             {transactions.length === 0 ? (
               <View style={styles.emptyTx}>
                 <Ionicons name="card-outline" size={36} color={colors.muted} />
-                <Text style={styles.emptyTxText}>No transactions yet</Text>
+                <Text style={styles.emptyTxText}>{t('wallet.noTransactions')}</Text>
               </View>
             ) : (
               transactions.map((tx) => (
@@ -113,7 +115,7 @@ export default function CustomerWalletScreen() {
                       <Text style={styles.txIconText}>{tx.type === 'CREDIT' ? '↓' : '↑'}</Text>
                     </View>
                     <View>
-                      <Text style={styles.txType}>{tx.type === 'CREDIT' ? 'Deposit' : 'Payment'}</Text>
+                      <Text style={styles.txType}>{tx.type === 'CREDIT' ? t('wallet.deposit') : t('wallet.payment')}</Text>
                       <Text style={styles.txRef}>{tx.reference}</Text>
                       <Text style={styles.txDate}>{new Date(tx.createdAt).toLocaleDateString()}</Text>
                     </View>

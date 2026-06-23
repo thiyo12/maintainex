@@ -5,9 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { conversations } from '../../../lib/api'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import PressScale from '../../../components/find/PressScale'
 
 export default function CustomerInbox() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -32,7 +34,9 @@ export default function CustomerInbox() {
     fetchData()
   }, [fetchData])
 
-  const filtered = conversationsData.filter(c =>
+  const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
+  const activeConversations = conversationsData.filter(c => !c.jobStatus || !CLOSED_STATUSES.includes(c.jobStatus))
+  const filtered = activeConversations.filter(c =>
     c.otherUser?.name?.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -44,21 +48,21 @@ export default function CustomerInbox() {
     if (diffDays === 0) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
-    if (diffDays === 1) return 'Yesterday'
+    if (diffDays === 1) return t('common.yesterday')
     return date.toLocaleDateString()
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Messages</Text>
+        <Text style={styles.heading}>{t('customer.messages')}</Text>
       </View>
 
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color={colors.muted} style={{ marginRight: 10 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search messages"
+          placeholder={t('customer.searchMessages')}
           placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
@@ -86,7 +90,7 @@ export default function CustomerInbox() {
               </View>
               <View style={styles.content}>
                 <View style={styles.topRow}>
-                  <Text style={styles.name}>{item.otherUser?.name || 'Unknown'}</Text>
+                  <Text style={styles.name}>{item.otherUser?.name || t('customer.unknown')}</Text>
                   <Text style={styles.time}>{formatTime(item.updatedAt)}</Text>
                 </View>
                 <View style={styles.bottomRow}>
@@ -106,7 +110,7 @@ export default function CustomerInbox() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
-              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptyTitle}>{t('customer.noMessages')}</Text>
             </View>
           }
         />

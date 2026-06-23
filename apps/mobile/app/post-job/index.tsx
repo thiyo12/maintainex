@@ -8,11 +8,14 @@ import { useTheme } from '../../lib/ThemeContext'
 import { useAuth } from '../../lib/auth'
 import { matchCategory } from '../../lib/aiMatch'
 import { v2Jobs } from '../../lib/api-v2'
+import { realEstate } from '../../lib/api'
 import CategoryPills from '../../components/ui/CategoryPills'
 import PhotoUploader from '../../components/ui/PhotoUploader'
 import AISearchBar from '../../components/shared/AISearchBar'
+import { useTranslation } from 'react-i18next'
 
 export default function PostJobScreen() {
+  const { t } = useTranslation()
   const router = useRouter()
   const { colors } = useTheme()
   const styles = makeStyles(colors)
@@ -54,18 +57,36 @@ export default function PostJobScreen() {
 
   const handlePost = async () => {
     try {
-      await v2Jobs.create({
-        title,
-        description,
-        categoryId: selectedCat,
-        budgetType: openToQuotes ? 'REQUEST_QUOTES' : 'FIXED',
-        budgetAmount: parseInt(budgetMax || budgetMin || '0', 10) || 0,
-      })
-      router.replace('/(customer)/(tabs)')
+      if (selectedCat !== 'realestate' && user?.id) {
+        const existing = await v2Jobs.list()
+        const activeCount = (existing.jobs || []).filter((j: any) => j.customerId === user.id && j.status !== 'COMPLETED' && j.status !== 'CANCELLED').length
+        if (activeCount >= 2) {
+          Alert.alert(t('postJob.maxActiveJobs'), t('postJob.maxActiveJobsDesc'))
+          return
+        }
+      }
+      if (selectedCat === 'realestate') {
+        await realEstate.create({
+          title,
+          description,
+          price: parseInt(budgetMax || budgetMin || '0', 10) || 0,
+          type: 'FOR_SALE',
+        })
+        router.replace('/real-estate')
+      } else {
+        const created = await v2Jobs.create({
+          title,
+          description,
+          categoryId: selectedCat,
+          budgetType: openToQuotes ? 'REQUEST_QUOTES' : 'FIXED',
+          budgetAmount: parseInt(budgetMax || budgetMin || '0', 10) || 0,
+        })
+        router.replace(`/(customer)/(tabs)?newJobId=${(created as any).id || ''}`)
+      }
     } catch (err: any) {
-      let msg = err.message || 'Failed to post job'
+      let msg = err.message || t('postJob.failedToPost')
       try { const p = JSON.parse(msg); msg = p.error || msg } catch {}
-      Alert.alert('Error', msg)
+      Alert.alert(t('common.error'), msg)
     }
   }
 
@@ -77,7 +98,7 @@ export default function PostJobScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="close-outline" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.ink }]}>Post a Job</Text>
+        <Text style={[styles.headerTitle, { color: colors.ink }]}>{t('postJob.header')}</Text>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -88,14 +109,14 @@ export default function PostJobScreen() {
             onPress={() => handleRoleChange('individual')}
           >
             <Ionicons name="person-outline" size={14} color={role === 'individual' ? colors.ink : colors.muted} />
-            <Text style={[styles.segText, { color: role === 'individual' ? colors.ink : colors.muted }]}>Individual</Text>
+            <Text style={[styles.segText, { color: role === 'individual' ? colors.ink : colors.muted }]}>{t('postJob.individual')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.segItem, role === 'company' && styles.segItemOn]}
             onPress={() => handleRoleChange('company')}
           >
             <Ionicons name="business-outline" size={14} color={role === 'company' ? colors.ink : colors.muted} />
-            <Text style={[styles.segText, { color: role === 'company' ? colors.ink : colors.muted }]}>Company</Text>
+            <Text style={[styles.segText, { color: role === 'company' ? colors.ink : colors.muted }]}>{t('profile.company')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -103,7 +124,7 @@ export default function PostJobScreen() {
         <AISearchBar
           value={aiQuery}
           onChangeText={handleAiChange}
-          placeholder="Describe what you need, e.g. 'fix leaking tap'"
+          placeholder={t('postJob.titlePlaceholder')}
         />
 
         {/* AI correction card */}
@@ -112,7 +133,7 @@ export default function PostJobScreen() {
             <Ionicons name="text-outline" size={17} color={colors.amberDark} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.correctionText, { color: colors.muted }]}>
-                Did you mean{' '}
+                {t('home.didYouMean')}{' '}
                 <Text style={{ color: colors.ink, fontFamily: 'Outfit_800ExtraBold' }}>
                   {aiMatch.categoryName}
                 </Text>
@@ -127,24 +148,24 @@ export default function PostJobScreen() {
         )}
 
         {/* Title */}
-        <Text style={[styles.fieldLabel, { color: colors.muted }]}>Title</Text>
+        <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('postJob.jobTitle')}</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-          placeholder="What needs to be done?"
+          placeholder={t('postJob.jobTitlePlaceholder')}
           placeholderTextColor={colors.muted}
           value={title}
           onChangeText={setTitle}
         />
 
         {/* Category chips */}
-        <Text style={[styles.fieldLabel, { color: colors.muted }]}>Category</Text>
+        <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('postJob.category')}</Text>
         <CategoryPills selected={selectedCat} onSelect={setSelectedCat} />
 
         {/* Description */}
-        <Text style={[styles.fieldLabel, { color: colors.muted }]}>Description</Text>
+        <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('postJob.description')}</Text>
         <TextInput
           style={[styles.input, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-          placeholder="Describe the work that needs to be done..."
+          placeholder={t('postJob.descPlaceholder')}
           placeholderTextColor={colors.muted}
           multiline
           numberOfLines={4}
@@ -155,30 +176,30 @@ export default function PostJobScreen() {
         {/* Conditional Location */}
         {!isRemoteCat ? (
           <>
-            <Text style={[styles.fieldLabel, { color: colors.muted }]}>Location</Text>
+            <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('postJob.location')}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-              placeholder="Your address or area"
+              placeholder={t('postJob.locationPlaceholder')}
               placeholderTextColor={colors.muted}
             />
             <View style={styles.infoRow}>
               <Ionicons name="map-pin-outline" size={12} color={colors.muted} />
-              <Text style={[styles.infoText, { color: colors.muted }]}>Taskers within 50km will be notified</Text>
+              <Text style={[styles.infoText, { color: colors.muted }]}>{t('postJob.postedDesc')}</Text>
             </View>
           </>
         ) : (
           <View style={styles.infoRow}>
             <Ionicons name="globe-outline" size={12} color={colors.muted} />
-            <Text style={[styles.infoText, { color: colors.muted }]}>This is remote work — freelancers anywhere can quote</Text>
+            <Text style={[styles.infoText, { color: colors.muted }]}>{t('postJob.remoteWorkInfo')}</Text>
           </View>
         )}
 
         {/* Budget */}
-        <Text style={[styles.fieldLabel, { color: colors.muted }]}>Budget Range (LKR) — optional</Text>
+        <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('postJob.budget')}</Text>
         <View style={styles.budgetRow}>
           <TextInput
             style={[styles.input, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-            placeholder="Min"
+            placeholder={t('postJob.min')}
             placeholderTextColor={colors.muted}
             keyboardType="numeric"
             value={budgetMin}
@@ -186,7 +207,7 @@ export default function PostJobScreen() {
           />
           <TextInput
             style={[styles.input, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-            placeholder="Max"
+            placeholder={t('postJob.max')}
             placeholderTextColor={colors.muted}
             keyboardType="numeric"
             value={budgetMax}
@@ -194,20 +215,22 @@ export default function PostJobScreen() {
           />
         </View>
 
-        {/* Open to quotes toggle */}
-        <TouchableOpacity
-          style={[styles.toggleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          onPress={() => setOpenToQuotes(!openToQuotes)}
-          activeOpacity={0.7}
-        >
-          <View>
-            <Text style={[styles.toggleTitle, { color: colors.ink }]}>Open to quotes</Text>
-            <Text style={[styles.toggleSub, { color: colors.muted }]}>Let taskers suggest their own price</Text>
-          </View>
-          <View style={[styles.switch, openToQuotes && { backgroundColor: colors.amber }]}>
-            <View style={[styles.switchKnob, openToQuotes && { alignSelf: 'flex-end' }]} />
-          </View>
-        </TouchableOpacity>
+        {/* Open to quotes toggle (hidden for real estate) */}
+        {selectedCat !== 'realestate' && (
+          <TouchableOpacity
+            style={[styles.toggleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setOpenToQuotes(!openToQuotes)}
+            activeOpacity={0.7}
+          >
+            <View>
+              <Text style={[styles.toggleTitle, { color: colors.ink }]}>{t('postJob.letThemQuote')}</Text>
+              <Text style={[styles.toggleSub, { color: colors.muted }]}>{t('postJob.taskersSuggestPrice')}</Text>
+            </View>
+            <View style={[styles.switch, openToQuotes && { backgroundColor: colors.amber }]}>
+              <View style={[styles.switchKnob, openToQuotes && { alignSelf: 'flex-end' }]} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Photo uploader */}
         <PhotoUploader
@@ -221,7 +244,7 @@ export default function PostJobScreen() {
           activeOpacity={0.8}
         >
           <Ionicons name="paper-plane-outline" size={16} color="#111827" />
-          <Text style={styles.postBtnText}>Post Job & Get Quotes</Text>
+          <Text style={styles.postBtnText}>{t('postJob.post')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

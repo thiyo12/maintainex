@@ -1,8 +1,8 @@
-interface Category { id: string; name: string; remote: boolean; keywords: string[] }
+interface Category { id: string; name: string; i18nKey: string; remote: boolean; keywords: string[] }
 
 const CATS: Category[] = [
   {
-    id: 'cleaning', name: 'Cleaning', remote: false,
+    id: 'cleaning', name: 'Cleaning', i18nKey: 'categories.cleaning', remote: false,
     keywords: [
       'clean','cleaning','house clean','maid','sweep','mop','wash','scrub','sanitize','disinfect','tidy',
       'சுத்தம்','துப்புரவு','சுத்திகரிப்பு','துடை','அழி','துவை','சலவை',
@@ -10,7 +10,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'electrical', name: 'Electrical', remote: false,
+    id: 'electrical', name: 'Electrical', i18nKey: 'categories.electrical', remote: false,
     keywords: [
       'electric','electrical','wiring','wire','flash','fuse','circuit','switch','socket','light','fan','power','voltage','current','electrician',
       'மின்சார','மின்','வயரிங்','கம்பி','ஃபியூஸ்','சர்க்யூட்','சுவிட்ச்','சாக்கெட்','லைட்','விசிறி',
@@ -18,7 +18,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'plumbing', name: 'Plumbing', remote: false,
+    id: 'plumbing', name: 'Plumbing', i18nKey: 'categories.plumbing', remote: false,
     keywords: [
       'plumb','plumbing','tap','pipe','leak','water','drain','sewer','faucet','toilet','sink','shower','bathroom','overflow','clog','plumber',
       'குழாய்','பிளம்பிங்','கசிவு','தண்ணீர்','வடிகால்','குளியலறை','கழிப்பறை','திறப்பு','சாக்கடை',
@@ -26,7 +26,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'painting', name: 'Painting', remote: false,
+    id: 'painting', name: 'Painting', i18nKey: 'categories.painting', remote: false,
     keywords: [
       'paint','painting','painter','wall','color','colour','coating','brush','roller','spray','primer','varnish','interior','exterior',
       'வண்ணம்','பெயிண்ட்','சாயம்','சுவர்','நிறம்','பூச்சு','தூரிகை',
@@ -34,7 +34,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'moving', name: 'Moving', remote: false,
+    id: 'moving', name: 'Moving', i18nKey: 'categories.moving', remote: false,
     keywords: [
       'move','moving','shift','relocate','transport','packing','cargo','loading','unloading','house moving','removal','shifting',
       'நகர்த்த','இடமாற்ற','நகர்வு','சுமை','ஏற்றி','இறக்கி','பார்சல்',
@@ -42,7 +42,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'gardening', name: 'Gardening', remote: false,
+    id: 'gardening', name: 'Gardening', i18nKey: 'categories.gardening', remote: false,
     keywords: [
       'garden','gardening','lawn','grass','plants','tree','flower','landscape','yard','prune','weed','mow','trim','hedge',
       'தோட்டம்','தோட்ட வேலை','புல்','செடி','மரம்','மலர்','நில அமைப்பு','வெட்டு','களை',
@@ -50,7 +50,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'repairs', name: 'Repairs', remote: false,
+    id: 'repairs', name: 'Repairs', i18nKey: 'categories.repairs', remote: false,
     keywords: [
       'repair','fix','broken','hammer','maintenance','restore','service','damage','mend','renew','renovate','handyman',
       'பழுது','சரி','உடைந்த','பராமரிப்பு','சேவை','சேதம்','புதுப்பி','ரிப்பேர்',
@@ -58,7 +58,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'assembly', name: 'Assembly', remote: false,
+    id: 'assembly', name: 'Assembly', i18nKey: 'categories.assembly', remote: false,
     keywords: [
       'assembly','assemble','furniture','build','construct','install','set up','put together','ikea','flat pack','frame',
       'சட்டசபை','கூட்டு','தளபாடங்கள்','கட்டு','நிறுவு','அமை','ஒருங்கிணை',
@@ -66,7 +66,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'webdesign', name: 'Web Design', remote: true,
+    id: 'webdesign', name: 'Web Design', i18nKey: 'categories.webdesign', remote: true,
     keywords: [
       'web','website','webdesign','wbe desing','wbe design','ui ux','wordpress','landing','frontend','backend','fullstack','html','css','javascript','react','web dev','app dev','mobile app','site',
       'இணையதள','வலைதள','வலை வடிவமைப்பு','யுஐ','யுஎக்ஸ்','வேர்ட்பிரஸ்','லேண்டிங்',
@@ -74,7 +74,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'graphics', name: 'Graphic Design', remote: true,
+    id: 'graphics', name: 'Graphic Design', i18nKey: 'categories.graphics', remote: true,
     keywords: [
       'graphic','logo','poster','design','brand','flyer','banner','illustration','photoshop','illustrator','vector','brochure','business card','typography','social media post',
       'வரைகலை','லோகோ','சுவரொட்டி','வடிவமைப்பு','பிராண்ட்','ஃபிளையர்','பேனர்','இல்லஸ்ட்ரேஷன்',
@@ -82,7 +82,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'marketing', name: 'Marketing', remote: true,
+    id: 'marketing', name: 'Marketing', i18nKey: 'categories.marketing', remote: true,
     keywords: [
       'marketing','seo','social media','ads','facebook','instagram','tiktok','linkedin','digital marketing','content','influencer','campaign','analytics','growth','promotion',
       'சந்தைப்படுத்தல்','சமூக ஊடக','விளம்பரம்','ஃபேஸ்புக்','டிஜிட்டல்','உள்ளடக்கம்','பிரச்சாரம்',
@@ -90,7 +90,7 @@ const CATS: Category[] = [
     ],
   },
   {
-    id: 'realestate', name: 'Real Estate', remote: false,
+    id: 'realestate', name: 'Real Estate', i18nKey: 'categories.realestate', remote: false,
     keywords: [
       'house','apartment','rent','sale','property','land','bedroom','villa','condo','commercial','office','buy','sell','lease','mortgage','flat','home','studio',
       'வீடு','குடியிருப்பு','வாடகை','விற்பனை','சொத்து','நிலம்','படுக்கையறை','வில்லா','அலுவலகம்','வாங்க','விற்க',

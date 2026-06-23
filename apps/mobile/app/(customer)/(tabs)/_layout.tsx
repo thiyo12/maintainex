@@ -2,19 +2,21 @@ import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 
-const tabs = [
-  { name: 'index', title: 'Home', icon: 'home-outline' as const },
-  { name: 'explore', title: 'Browse', icon: 'compass-outline' as const },
-  { name: 'inbox', title: 'Chat', icon: 'chatbubble-ellipses-outline' as const },
-  { name: 'settings', title: 'Profile', icon: 'person-outline' as const },
+const tabConfigs = [
+  { name: 'index', key: 'home.browse', icon: 'home-outline' as const },
+  { name: 'explore', key: 'customer.explore', icon: 'compass-outline' as const },
+  { name: 'inbox', key: 'customer.messages', icon: 'chatbubble-ellipses-outline' as const },
+  { name: 'settings', key: 'profile.myProfile', icon: 'person-outline' as const },
 ]
 
 export default function TabsLayout() {
   const colors = useColors()
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
 
   return (
@@ -39,12 +41,12 @@ export default function TabsLayout() {
         tabBarShowLabel: true,
       }}
     >
-      {tabs.map((tab) => (
+      {tabConfigs.map((tab) => (
         <Tabs.Screen
           key={tab.name}
           name={tab.name}
           options={{
-            title: tab.title,
+            title: t(tab.key),
             tabBarIcon: ({ focused }) => (
               <Ionicons name={tab.icon} size={22} color={focused ? colors.amber : colors.muted} />
             ),

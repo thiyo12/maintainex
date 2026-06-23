@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Switch, StyleSheet, Animated, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { offerProgram } from '../../lib/api-v2'
 
@@ -12,6 +13,7 @@ interface Props {
 
 export default function OfferProgramSection({ variant, taskerId, companyId }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const [enrolled, setEnrolled] = useState(false)
   const [offers, setOffers] = useState<any[]>([])
@@ -62,7 +64,7 @@ export default function OfferProgramSection({ variant, taskerId, companyId }: Pr
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Ionicons name="pricetag-outline" size={14} color={colors.amberDark} />
-          <Text style={[styles.title, { color: colors.ink }]}>Offer Program</Text>
+          <Text style={[styles.title, { color: colors.ink }]}>{t('components.viewOffer')}</Text>
         </View>
         {toggling ? (
           <ActivityIndicator size="small" color={colors.amber} />
@@ -77,8 +79,8 @@ export default function OfferProgramSection({ variant, taskerId, companyId }: Pr
       </View>
       <Text style={[styles.description, { color: colors.muted }]}>
         {enrolled
-          ? 'You are enrolled in the offer program. Customers can book your services at promotional rates.'
-          : 'Join the offer program to get featured promotions and attract more customers with special rates.'}
+          ? t('components.enrolledDesc')
+          : t('components.joinDesc')}
       </Text>
       {offers.length > 0 && enrolled && (
         <View style={styles.offersList}>

@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
@@ -8,16 +9,17 @@ import { spacing } from '../../../lib/tokens'
 
 export default function FindJobsScreen() {
   const colors = useColors()
+    const { t } = useTranslation()
     const styles = makeStyles(colors)
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.ink }]}>Find Jobs</Text>
+        <Text style={[styles.title, { color: colors.ink }]}>{t('find.findJobs')}</Text>
       </View>
       <View style={styles.empty}>
         <Ionicons name="search-outline" size={48} color={colors.muted} />
-        <Text style={[styles.emptyText, { color: colors.muted }]}>Search for jobs in your area</Text>
+        <Text style={[styles.emptyText, { color: colors.muted }]}>{t('find.searchInYourArea')}</Text>
       </View>
     </SafeAreaView>
   )

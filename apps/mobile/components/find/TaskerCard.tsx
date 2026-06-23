@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import PressScale from './PressScale'
 import { useColors } from '../../lib/ThemeContext'
 
@@ -16,7 +17,8 @@ interface Props {
 
 export default function TaskerCard({ name, rating, completedJobs, isVerified, isOnline, distance, hourlyRate, onPress }: Props) {
   const colors = useColors()
-    const styles = makeStyles(colors)
+  const { t } = useTranslation()
+  const styles = makeStyles(colors)
   return (
     <PressScale onPress={onPress}>
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -36,7 +38,7 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
               </View>
               <View style={styles.stat}>
                 <Ionicons name="briefcase" size={13} color={colors.muted} />
-                <Text style={[styles.statText, { color: colors.muted }]}>{completedJobs} jobs</Text>
+                <Text style={[styles.statText, { color: colors.muted }]}>{completedJobs}{t('customer.jobs')}</Text>
               </View>
               {distance !== undefined && (
                 <View style={styles.stat}>
@@ -53,7 +55,7 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
         </View>
         <View style={styles.bottom}>
           <View style={[styles.statusDot, { backgroundColor: isOnline ? '#10B981' : colors.border }]} />
-          <Text style={[styles.statusText, { color: colors.muted }]}>{isOnline ? 'Online' : 'Offline'}</Text>
+          <Text style={[styles.statusText, { color: colors.muted }]}>{isOnline ? t('common.online') : t('common.offline')}</Text>
         </View>
       </View>
     </PressScale>

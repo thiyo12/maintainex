@@ -2,21 +2,23 @@ import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 
-const tabs = [
-  { name: 'index', title: 'Dashboard', icon: 'grid-outline' as const },
-  { name: 'contracts-list', title: 'Contracts', icon: 'document-text-outline' as const },
-  { name: 'milestones-list', title: 'Milestones', icon: 'flag-outline' as const },
-  { name: 'team', title: 'Team', icon: 'people-outline' as const },
-  { name: 'earnings-list', title: 'Earnings', icon: 'cash-outline' as const },
-  { name: 'profile', title: 'Profile', icon: 'person-outline' as const },
+const tabConfigs = [
+  { name: 'index', key: 'company.dashboard', icon: 'grid-outline' as const },
+  { name: 'contracts-list', key: 'company.contracts', icon: 'document-text-outline' as const },
+  { name: 'milestones-list', key: 'company.milestones', icon: 'flag-outline' as const },
+  { name: 'team', key: 'company.team', icon: 'people-outline' as const },
+  { name: 'earnings-list', key: 'company.earnings', icon: 'cash-outline' as const },
+  { name: 'profile', key: 'company.profile', icon: 'person-outline' as const },
 ]
 
 export default function CompanyTabs() {
   const colors = useColors()
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
 
   return (
@@ -41,12 +43,12 @@ export default function CompanyTabs() {
         tabBarShowLabel: true,
       }}
     >
-      {tabs.map((tab) => (
+      {tabConfigs.map((tab) => (
         <Tabs.Screen
           key={tab.name}
           name={tab.name}
           options={{
-            title: tab.title,
+            title: t(tab.key),
             tabBarIcon: ({ focused }) => (
               <Ionicons name={tab.icon} size={20} color={focused ? colors.companyAccent : colors.muted} />
             ),

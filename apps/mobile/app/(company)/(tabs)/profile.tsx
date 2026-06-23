@@ -77,7 +77,7 @@ export default function CompanyProfile() {
       const data = await company.profile.get()
       setProfile(data)
     } catch {
-      setError('Failed to load profile. Please try again.')
+      setError(t('errors.generic'))
       setProfile(null)
     } finally {
       setLoading(false)
@@ -107,14 +107,14 @@ export default function CompanyProfile() {
           <Ionicons name="alert-circle-outline" size={48} color={colors.error} style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center', marginBottom: 20 }}>{error}</Text>
           <TouchableOpacity style={{ backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
-            <Text style={{ color: colors.ink, fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: colors.ink, fontWeight: '700' }}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
   }
 
-  const name = profile?.companyName || profile?.name || 'Company'
+  const name = profile?.companyName || profile?.name || t('profile.company')
   const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : 'CO'
   const services = profile?.services || []
   const rating = profile?.rating || 0
@@ -133,9 +133,9 @@ export default function CompanyProfile() {
   }
 
   const activeJobs = [
-    { icon: 'water-outline', title: 'Plumbing Technician Needed', sub: '5 quotes received · LKR 4,000', status: 'open' as const },
-    { icon: 'snow-outline', title: 'AC Servicing — 3 Units', sub: 'Assigned to Kamal P.', status: 'progress' as const },
-    { icon: 'flash-outline', title: 'Office Rewiring Project', sub: 'Completed · Paid LKR 18,000', status: 'done' as const },
+    { icon: 'water-outline', title: t('company.sampleJob1'), sub: t('company.sampleJobSub1'), status: 'open' as const },
+    { icon: 'snow-outline', title: t('company.sampleJob2'), sub: t('company.sampleJobSub2'), status: 'progress' as const },
+    { icon: 'flash-outline', title: t('company.sampleJob3'), sub: t('company.sampleJobSub3'), status: 'done' as const },
   ]
 
   const statusStyles: Record<string, { bg: string; text: string }> = {
@@ -145,25 +145,25 @@ export default function CompanyProfile() {
   }
 
   const statusLabels: Record<string, string> = {
-    open: 'Open',
-    progress: 'In Progress',
-    done: 'Done',
+    open: t('jobs.status.open'),
+    progress: t('jobs.status.inProgress'),
+    done: t('common.done'),
   }
 
   const reviews = [
-    { initials: 'NS', name: 'Nimal S. (Tasker)', stars: 5, text: 'Paid on time, clear instructions. Would work with them again.' },
+    { initials: t('company.sampleReviewInitials'), name: t('company.sampleReviewName'), stars: 5, text: t('company.sampleReviewText') },
   ]
 
   const verifications = [
-    { icon: 'business-outline', title: 'Business Registration', sub: 'Registrar of Companies Sri Lanka', done: true },
-    { icon: 'mail-outline', title: 'Business Email Verified', sub: 'contact@fixhub.lk', done: true },
+    { icon: 'business-outline', title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: true },
+    { icon: 'mail-outline', title: t('company.verificationTitle2'), sub: t('company.verificationSub2'), done: true },
   ] as const
 
   const jobIcons: Record<string, string> = {
-    Plumbing: 'water-outline',
-    Electrical: 'flash-outline',
-    'AC Repair': 'snow-outline',
-    'General Repairs': 'hammer-outline',
+    [t('categories.plumbing')]: 'water-outline',
+    [t('categories.electrical')]: 'flash-outline',
+    [t('categories.acRepair')]: 'snow-outline',
+    [t('categories.generalRepairs')]: 'hammer-outline',
   }
 
   return (
@@ -172,7 +172,7 @@ export default function CompanyProfile() {
         <ProfileHeader
           initials={initials}
           name={name}
-          roleLabel={`Home Services Company · Nugegoda`}
+          roleLabel={t('company.roleLabel')}
           variant="company"
           verified={identityStatus === 'APPROVED'}
           onEdit={() => router.push('/(company)/settings/edit-profile')}
@@ -181,7 +181,7 @@ export default function CompanyProfile() {
 
         <Animated.View style={[styles.card, cardAnim]}>
           <View style={styles.statsRow}>
-            {[{ val: activeContracts || 86, lbl: 'Jobs Posted' }, { val: rating || '4.7', lbl: 'Rating' }, { val: teamMembers || 24, lbl: 'Team Size' }, { val: inBusiness, lbl: 'On Platform' }].map((s) => (
+            {[{ val: activeContracts || 86, lbl: t('profile.jobsPosted') }, { val: rating || '4.7', lbl: t('profile.rating') }, { val: teamMembers || 24, lbl: t('company.teamMembers') }, { val: inBusiness, lbl: t('company.inBusiness') }].map((s) => (
               <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
                 <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
@@ -194,7 +194,7 @@ export default function CompanyProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="apps-outline" size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Service Categories</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
             <View style={styles.chipRow}>
               {services.length > 0 ? services.map((s: string) => (
@@ -204,7 +204,7 @@ export default function CompanyProfile() {
                 </Animated.View>
               )) : (
                 <>
-                  {['Plumbing', 'Electrical', 'AC Repair', 'General Repairs'].map((s) => (
+                  {[t('categories.plumbing'), t('categories.electrical'), t('categories.acRepair'), t('categories.generalRepairs')].map((s) => (
                     <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
                       <Ionicons name={jobIcons[s] as any} size={12} color={colors.amberDark} />
                       <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
@@ -220,7 +220,7 @@ export default function CompanyProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="briefcase-outline" size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Active Job Posts</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.activeJobs')}</Text>
             </View>
             {activeJobs.map((job, i) => {
               const st = statusStyles[job.status]
@@ -246,7 +246,7 @@ export default function CompanyProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Recent Reviews</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
             {reviews.map((rev, i) => (
               <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
@@ -273,7 +273,7 @@ export default function CompanyProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="shield-checkmark-outline" size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Business Verification</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('verify.title')}</Text>
             </View>
             {verifications.map((v, i) => (
               <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
@@ -285,7 +285,7 @@ export default function CompanyProfile() {
                   <Text style={[styles.verifSub, { color: colors.muted }]}>{v.sub}</Text>
                 </View>
                 <Text style={[styles.verifStatus, { color: v.done ? '#059669' : colors.amberDark }]}>
-                  {v.done ? 'Done' : 'Pending'}
+                  {v.done ? t('common.done') : t('common.pending')}
                 </Text>
               </View>
             ))}

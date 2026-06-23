@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { taskers, getAuthToken } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
@@ -36,6 +37,7 @@ function usePopIn(delay = 0) {
 }
 
 export default function TaskerProfile() {
+  const { t } = useTranslation()
   const router = useRouter()
   const colors = useColors()
   const styles = makeStyles(colors)
@@ -106,7 +108,7 @@ export default function TaskerProfile() {
     )
   }
 
-  const name = profile?.user?.name || user?.name || 'Tasker'
+  const name = profile?.user?.name || user?.name || t('customer.tasker')
   const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase() || 'T'
   const skills = profile?.skills || []
   const rating = profile?.rating || 0
@@ -138,7 +140,7 @@ export default function TaskerProfile() {
 
         <Animated.View style={[styles.card, cardAnim]}>
           <View style={styles.statsRow}>
-            {[{ val: completedJobs, lbl: 'Jobs Done' }, { val: rating.toFixed(1), lbl: 'Rating' }, { val: '98%', lbl: 'On Time' }, { val: '3yr', lbl: 'Experience' }].map((s) => (
+            {[{ val: completedJobs, lbl: t('tasker.jobsDone') }, { val: rating.toFixed(1), lbl: t('tasker.rating') }, { val: '98%', lbl: t('tasker.active') }, { val: '3yr', lbl: t('profile.experience') }].map((s) => (
               <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
                 <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
@@ -151,7 +153,7 @@ export default function TaskerProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="construct-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Skills</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
             <View style={styles.chipRow}>
               {skills.length > 0 ? skills.map((s: string) => (
@@ -177,7 +179,7 @@ export default function TaskerProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="images-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Work Portfolio</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
             <View style={styles.portGrid}>
               {[1, 2, 3].map((i) => (
@@ -193,7 +195,7 @@ export default function TaskerProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Recent Reviews</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
             {reviews.map((rev, i) => (
               <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
@@ -220,7 +222,7 @@ export default function TaskerProfile() {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="shield-checkmark-outline" size={14} color={colors.amberDark} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Verification</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.identityVerification')}</Text>
             </View>
             {verifications.map((v, i) => (
               <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
@@ -232,7 +234,7 @@ export default function TaskerProfile() {
                   <Text style={[styles.verifSub, { color: colors.muted }]}>{v.sub}</Text>
                 </View>
                 <Text style={[styles.verifStatus, { color: v.done ? '#059669' : colors.amberDark }]}>
-                  {v.done ? 'Done' : 'Pending'}
+                  {v.done ? t('common.done') : t('tasker.pending')}
                 </Text>
               </View>
             ))}

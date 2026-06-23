@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, Image, StyleSheet, Animated, Easing } from 'react-native'
+import { useTranslation } from 'react-i18next'
 
 const DARK = '#0B0C12'
 const AMBER = '#F59E0B'
@@ -8,6 +9,7 @@ const WHITE = '#FFFFFF'
 interface Props { onDone?: () => void }
 
 export function LoadingScreen({ onDone }: Props) {
+  const { t } = useTranslation()
   const iconScale   = useRef(new Animated.Value(0)).current
   const iconRotate  = useRef(new Animated.Value(-15)).current
   const titleY      = useRef(new Animated.Value(14)).current

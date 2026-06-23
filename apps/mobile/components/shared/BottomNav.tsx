@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 type Role = 'tasker' | 'company'
 
@@ -30,7 +31,24 @@ const COMPANY_TABS = [
 
 export default function BottomNav({ role, active, onPress, unreadMessages = 0 }: Props) {
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const fabGlow = useRef(new Animated.Value(0.45)).current
+
+  const TASKER_TABS = [
+    { id: 'home',    label: t('customer.browse'), icon: 'home-outline'          },
+    { id: 'explore', label: t('tasker.findWork'), icon: 'search-outline'        },
+    { id: 'fab',     label: '',                   icon: 'add'                    },
+    { id: 'chat',    label: t('home.chat'),       icon: 'chatbubble-outline'    },
+    { id: 'profile', label: t('profile.title'),   icon: 'person-circle-outline' },
+  ]
+
+  const COMPANY_TABS = [
+    { id: 'home',    label: t('company.dashboard'),  icon: 'home-outline'            },
+    { id: 'jobs',    label: t('company.contracts'),  icon: 'document-text-outline'   },
+    { id: 'fab',     label: '',                      icon: 'add'                     },
+    { id: 'chat',    label: t('home.chat'),          icon: 'chatbubble-outline'      },
+    { id: 'company', label: t('company.profile'),    icon: 'business-outline'        },
+  ]
 
   useEffect(() => {
     Animated.loop(Animated.sequence([

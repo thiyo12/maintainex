@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Animated }
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 
 export default function PaymentScreen() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const router = useRouter()
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -16,35 +18,35 @@ export default function PaymentScreen() {
   }, [])
 
   const methods = [
-    { name: 'Visa', icon: 'card-outline' as const },
-    { name: 'Mastercard', icon: 'card-outline' as const },
-    { name: 'PayHere (Sri Lanka)', icon: 'wallet-outline' as const },
-    { name: 'Stripe', icon: 'link-outline' as const },
+    { name: t('payment.methodVisa'), icon: 'card-outline' as const },
+    { name: t('payment.methodMastercard'), icon: 'card-outline' as const },
+    { name: t('payment.methodPayHere'), icon: 'wallet-outline' as const },
+    { name: t('payment.methodStripe'), icon: 'link-outline' as const },
   ]
 
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>Payment Methods</Text>
+        <Text style={styles.heading}>{t('profile.payment')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.infoCard}>
             <Ionicons name="wallet-outline" size={40} color={colors.gray} />
-            <Text style={styles.infoTitle}>No payment methods</Text>
+            <Text style={styles.infoTitle}>{t('profile.noPaymentMethods')}</Text>
             <Text style={styles.infoSub}>
-              You haven't added any payment methods yet. Add one to get started.
+              {t('profile.addPaymentMethod')}
             </Text>
           </View>
 
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => Alert.alert('Coming Soon', 'Payment method integration is on its way!')}
+            onPress={() => Alert.alert(t('payment.comingSoon'), t('payment.comingSoonDesc'))}
           >
             <Ionicons name="add-circle-outline" size={20} color={colors.white} />
-            <Text style={styles.addBtnText}>  Add Payment Method</Text>
+            <Text style={styles.addBtnText}>  {t('common.add')}</Text>
           </TouchableOpacity>
 
-          <Text style={styles.sectionTitle}>Supported Methods</Text>
+          <Text style={styles.sectionTitle}>{t('profile.payment')}</Text>
           <View style={styles.card}>
             {methods.map((m, i) => (
               <View key={m.name} style={[styles.row, i === methods.length - 1 && { borderBottomWidth: 0 }]}>

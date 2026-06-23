@@ -47,13 +47,6 @@
       "expo-router",
       "expo-location",
       "expo-secure-store",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#F59E0B"
-        }
-      ],
       "expo-font",
       "expo-localization"
     ],
@@ -63,7 +56,7 @@
     "extra": {
       "apiUrl": "https://maintainex.lk",
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "00000000-0000-0000-0000-000000000000"
       }
     }
   }

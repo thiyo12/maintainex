@@ -8,8 +8,10 @@ import { useCountry } from '../../../lib/country'
 import JobCard from '../../../components/find/JobCard'
 import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
+import { useTranslation } from 'react-i18next'
 
 export default function JobList() {
+  const { t } = useTranslation()
   const colors = useColors()
     const styles = makeStyles(colors)
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>()
@@ -74,7 +76,7 @@ export default function JobList() {
         <Ionicons name="search" size={18} color="#9CA3AF" style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search in this category..."
+          placeholder={t('find.search')}
           placeholderTextColor="#9CA3AF"
           value={search}
           onChangeText={setSearch}
@@ -87,7 +89,7 @@ export default function JobList() {
       {loading ? (
         <SkeletonLoader count={6} height={120} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="search-outline" title="No services found" subtitle="Try a different search term" />
+        <EmptyState icon="search-outline" title={t('common.noResults')} subtitle={t('components.adjustSearch')} />
       ) : (
         <FlatList
           data={[...popular, ...regular]}

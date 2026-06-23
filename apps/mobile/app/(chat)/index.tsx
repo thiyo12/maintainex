@@ -3,11 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Activity
 import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { conversations } from '../../lib/api'
 import { useColors } from '../../lib/ThemeContext'
 import PressScale from '../../components/find/PressScale'
 
 export default function ChatListScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -36,7 +38,9 @@ export default function ChatListScreen() {
     }, [fetchConversations])
   )
 
-  const filtered = conversationsData.filter(c =>
+  const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
+  const activeConversations = conversationsData.filter(c => !c.jobStatus || !CLOSED_STATUSES.includes(c.jobStatus))
+  const filtered = activeConversations.filter(c =>
     c.otherUser?.name?.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -48,21 +52,21 @@ export default function ChatListScreen() {
     if (diffDays === 0) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
-    if (diffDays === 1) return 'Yesterday'
+    if (diffDays === 1) return t('common.yesterday')
     return date.toLocaleDateString()
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Chats</Text>
+        <Text style={styles.heading}>{t('chat.title')}</Text>
       </View>
 
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color={colors.gray} style={{ marginRight: 10 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search conversations"
+          placeholder={t('customer.searchMessages')}
           placeholderTextColor={colors.gray}
           value={search}
           onChangeText={setSearch}
@@ -90,7 +94,7 @@ export default function ChatListScreen() {
               </View>
               <View style={styles.conversationContent}>
                 <View style={styles.conversationTop}>
-                  <Text style={styles.conversationName}>{item.otherUser?.name || 'Unknown'}</Text>
+                  <Text style={styles.conversationName}>{item.otherUser?.name || t('customer.unknown')}</Text>
                   <Text style={styles.conversationTime}>{formatTime(item.updatedAt)}</Text>
                 </View>
                 <View style={styles.conversationBottom}>
@@ -110,8 +114,8 @@ export default function ChatListScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
-              <Text style={styles.emptyTitle}>No conversations yet</Text>
-              <Text style={styles.emptySub}>When you book a service, chat will appear here</Text>
+              <Text style={styles.emptyTitle}>{t('chat.noConversations')}</Text>
+              <Text style={styles.emptySub}>{t('customer.noMessages')}</Text>
             </View>
           }
         />

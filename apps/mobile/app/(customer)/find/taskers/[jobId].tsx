@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { templateJobs, findTasker } from '../../../../lib/api'
 import { useCountry } from '../../../../lib/country'
@@ -11,6 +12,7 @@ import EmptyState from '../../../../components/find/EmptyState'
 
 export default function FindTaskerList() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const { jobId } = useLocalSearchParams<{ jobId: string }>()
   const [job, setJob] = useState<any>(null)
@@ -56,7 +58,7 @@ export default function FindTaskerList() {
           </View>
           <TouchableOpacity style={styles.viewToggle} onPress={() => setViewMode(v => v === 'list' ? 'map' : 'list')}>
             <Ionicons name={viewMode === 'list' ? 'map' : 'list'} size={18} color={colors.primary} />
-            <Text style={styles.viewToggleText}>{viewMode === 'list' ? 'Map' : 'List'}</Text>
+            <Text style={styles.viewToggleText}>{viewMode === 'list' ? t('tracking.title') : t('common.search')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -64,7 +66,7 @@ export default function FindTaskerList() {
       {loading ? (
         <SkeletonLoader count={5} height={110} />
       ) : taskers.length === 0 ? (
-        <EmptyState icon="shield-checkmark-outline" title="No verified taskers available" subtitle="Only taskers who have completed identity verification appear in search results. Check back later or try a different service." />
+        <EmptyState icon="shield-checkmark-outline" title={t('common.noResults')} subtitle={t('customer.noResults')} />
       ) : viewMode === 'list' ? (
         <FlatList
           data={taskers}
@@ -88,11 +90,11 @@ export default function FindTaskerList() {
       ) : (
         <View style={styles.mapPlaceholder}>
           <Ionicons name="map" size={64} color="#D1D5DB" />
-          <Text style={styles.mapText}>Map view coming soon</Text>
-          <Text style={styles.mapSubtext}>{taskers.length} taskers found in your area</Text>
-          <TouchableOpacity style={styles.switchToList} onPress={() => setViewMode('list')}>
-            <Ionicons name="list" size={16} color="#fff" />
-            <Text style={styles.switchToListText}>Show as List</Text>
+            <Text style={styles.mapText}>{t('tracking.title')}</Text>
+            <Text style={styles.mapSubtext}>{t('customer.taskersNearby', { n: taskers.length })}</Text>
+            <TouchableOpacity style={styles.switchToList} onPress={() => setViewMode('list')}>
+              <Ionicons name="list" size={16} color="#fff" />
+              <Text style={styles.switchToListText}>{t('common.search')}</Text>
           </TouchableOpacity>
         </View>
       )}

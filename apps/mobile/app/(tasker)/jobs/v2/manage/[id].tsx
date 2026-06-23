@@ -3,11 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
+import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 
 export default function V2ProviderManageJobScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const statusColors: Record<string, string> = {
@@ -28,6 +31,7 @@ export default function V2ProviderManageJobScreen() {
   const [reviews, setReviews] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
+  const [nextJob, setNextJob] = useState<V2Job | null>(null)
 
   const [reviewQuality, setReviewQuality] = useState('5')
   const [reviewComm, setReviewComm] = useState('5')
@@ -44,12 +48,28 @@ export default function V2ProviderManageJobScreen() {
       setWorkspace(res.job.workspace || null)
       setEscrow(res.job.escrow || null)
       setReviews(res.job.reviews || null)
+      loadNextJob()
     } catch (e) {
-      Alert.alert('Error', 'Failed to load job')
+      Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadNextJob = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const res = await v2Jobs.list('myQuotes=true')
+      const next = res.jobs
+        .filter((j: any) => j.status === 'QUOTE_ACCEPTED' && j.id !== id)
+        .sort((a: any, b: any) => {
+          const aDate = a.preferredDate || today
+          const bDate = b.preferredDate || today
+          return aDate.localeCompare(bDate)
+        })[0]
+      setNextJob(next || null)
+    } catch { setNextJob(null) }
   }
 
   useEffect(() => { loadJob() }, [id])
@@ -58,9 +78,9 @@ export default function V2ProviderManageJobScreen() {
     setActionLoading('complete')
     try {
       await v2JobActions.complete(id, 'MARK_COMPLETE')
-      Alert.alert('Done!', 'Marked complete. Waiting for customer approval.')
-      loadJob()
-    } catch (e: any) { Alert.alert('Error', e.message) }
+      Alert.alert(t('common.done'), t('jobDetail.confirmedStartDesc'))
+      await loadJob()
+    } catch (e: any) { Alert.alert(t('common.error'), e.message) }
     finally { setActionLoading('') }
   }
 
@@ -69,7 +89,7 @@ export default function V2ProviderManageJobScreen() {
     try {
       await v2JobActions.updateProgress(id, status)
       loadJob()
-    } catch (e: any) { Alert.alert('Error', e.message) }
+    } catch (e: any) { Alert.alert(t('common.error'), e.message) }
     finally { setActionLoading('') }
   }
 
@@ -80,7 +100,7 @@ export default function V2ProviderManageJobScreen() {
       const res = await v2JobActions.generateOtp(id)
       setGeneratedOtp(res.otp)
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to generate code')
+      Alert.alert(t('common.error'), e.message || t('common.error'))
     } finally {
       setOtpLoading(false)
     }
@@ -96,24 +116,24 @@ export default function V2ProviderManageJobScreen() {
         overallExperience: parseInt(reviewExp),
         comment: reviewComment || undefined,
       })
-      Alert.alert('Review Submitted', 'Thanks for your feedback!')
+      Alert.alert(t('receipt.reviewSubmitted'), t('receipt.reviewSubmittedDesc'))
       loadJob()
-    } catch (e: any) { Alert.alert('Error', e.message) }
+    } catch (e: any) { Alert.alert(t('common.error'), e.message) }
     finally { setActionLoading('') }
   }
 
   const [reviewCoop, setReviewCoop] = useState('5')
 
   const handleDispute = async () => {
-    Alert.alert('Raise a Dispute', 'This will pause the job and notify admin to review.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Raise Dispute', style: 'destructive', onPress: async () => {
+    Alert.alert(t('dispute.title'), t('dispute.describeIssueDesc'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('dispute.submitBtn'), style: 'destructive', onPress: async () => {
         setActionLoading('dispute')
         try {
           const res = await v2JobActions.dispute(id)
-          Alert.alert('Dispute Raised', 'Admin will review the case')
+          Alert.alert(t('jobDetail.disputeRaised'), t('jobDetail.disputeRaisedDesc'))
           loadJob()
-        } catch (e: any) { Alert.alert('Error', e.message) }
+        } catch (e: any) { Alert.alert(t('common.error'), e.message) }
         finally { setActionLoading('') }
       }},
     ])
@@ -154,9 +174,23 @@ export default function V2ProviderManageJobScreen() {
         <View style={styles.hero}>
           <Text style={styles.title}>{job.title}</Text>
           <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
-            <Text style={styles.statusText}>{job.status.replace(/_/g, ' ')}</Text>
+            <Text style={styles.statusText}>{t(translateJobStatus(job.status))}</Text>
           </View>
         </View>
+
+        {/* Scheduled Date */}
+        {job.preferredDate && (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
+              <Ionicons name="calendar-outline" size={16} color={colors.amberDark} />
+              <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
+                {job.timeSlot
+                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.timeSlot })
+                  : `${job.preferredDate}`}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Details */}
         <View style={styles.section}>
@@ -164,11 +198,11 @@ export default function V2ProviderManageJobScreen() {
             <Text style={styles.detailDesc}>{job.description}</Text>
             <View style={styles.detailRow}>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Budget</Text>
+                <Text style={styles.detailLabel}>{t('jobDetail.budget')}</Text>
                 <Text style={styles.detailValue}>LKR {job.budgetAmount}</Text>
               </View>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Type</Text>
+                <Text style={styles.detailLabel}>{t('jobs.details')}</Text>
                 <Text style={styles.detailValue}>{job.budgetType}</Text>
               </View>
             </View>
@@ -184,7 +218,7 @@ export default function V2ProviderManageJobScreen() {
         {/* Customer Address */}
         {job.addressStreet && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Customer Address</Text>
+            <Text style={styles.sectionTitle}>{t('jobDetail.shareAddress')}</Text>
             <View style={styles.addressCard}>
               <Text style={styles.addressText}>
                 {job.addressStreet}{job.addressBuilding ? `, ${job.addressBuilding}` : ''}
@@ -203,7 +237,7 @@ export default function V2ProviderManageJobScreen() {
         {/* Escrow */}
         {escrow && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Escrow</Text>
+            <Text style={styles.sectionTitle}>{t('jobDetail.escrow')}</Text>
             <View style={styles.escrowCard}>
               <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
               <View style={[styles.escrowBadge, escrow.status === 'PROTECTED' ? styles.escrowActive : styles.escrowInactive]}>
@@ -216,7 +250,7 @@ export default function V2ProviderManageJobScreen() {
         {/* Progress + Workspace */}
         {workspace && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Progress</Text>
+            <Text style={styles.sectionTitle}>{t('tracking.inProgress')}</Text>
             <View style={styles.progressCard}>
               <View style={styles.progressSteps}>
                 {['ACCEPTED', 'IN_PROGRESS', 'COMPLETION_REQUESTED', 'COMPLETED'].map((step, i) => {
@@ -229,7 +263,7 @@ export default function V2ProviderManageJobScreen() {
                         {isDone ? <Ionicons name="checkmark" size={16} color={colors.ink} /> : <Text style={styles.progressNum}>{i + 1}</Text>}
                       </View>
                       <Text style={[styles.progressLabel, isDone && styles.progressLabelDone]}>
-                        {step === 'COMPLETION_REQUESTED' ? 'REVIEW' : step === 'COMPLETED' ? 'DONE' : step.replace('_', ' ')}
+                        {step === 'COMPLETION_REQUESTED' ? t('tasker.reviews') : step === 'COMPLETED' ? t('common.done') : step.replace('_', ' ')}
                       </Text>
                     </View>
                   )
@@ -249,7 +283,7 @@ export default function V2ProviderManageJobScreen() {
                   ) : (
                     <>
                       <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
-                      <Text style={styles.otpGenText}>Generate Confirmation Code</Text>
+                      <Text style={styles.otpGenText}>{t('jobDetail.confirmArrivalDesc')}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -257,15 +291,15 @@ export default function V2ProviderManageJobScreen() {
               {workspace.progressStatus === 'ACCEPTED' && generatedOtp && (
                 <View style={styles.otpDisplay}>
                   <Ionicons name="lock-closed-outline" size={24} color={colors.amberDark} />
-                  <Text style={styles.otpDisplayLabel}>Show this code to the customer</Text>
+                  <Text style={styles.otpDisplayLabel}>{t('jobDetail.enterCode')}</Text>
                   <Text style={styles.otpCode}>{generatedOtp}</Text>
-                  <Text style={styles.otpDisplayHint}>Customer will enter this code to confirm you arrived</Text>
+                  <Text style={styles.otpDisplayHint}>{t('jobDetail.confirmStart')}</Text>
                 </View>
               )}
               {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
                 <View style={styles.waitingCard}>
                   <Ionicons name="hourglass-outline" size={20} color={colors.amberDark} />
-                  <Text style={styles.waitingText}>Waiting for customer approval</Text>
+                  <Text style={styles.waitingText}>{t('jobDetail.waitingForQuotes')}</Text>
                 </View>
               )}
             </View>
@@ -276,25 +310,25 @@ export default function V2ProviderManageJobScreen() {
         {workspace?.progressStatus === 'IN_PROGRESS' && (
           <View style={[styles.section, styles.highlightSection]}>
             <Ionicons name="flag-outline" size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>Finish Job</Text>
-            <Text style={styles.highlightDesc}>Mark as complete and request customer approval for payment release</Text>
-            {ActionBtn({ label: 'Mark Complete', loadingKey: 'complete', onPress: handleMarkComplete })}
+            <Text style={styles.highlightTitle}>{t('common.finish')}</Text>
+            <Text style={styles.highlightDesc}>{t('jobDetail.confirmStart')}</Text>
+            {ActionBtn({ label: t('common.done'), loadingKey: 'complete', onPress: handleMarkComplete })}
           </View>
         )}
 
         {/* Review Customer */}
         {job.status === 'COMPLETED' && reviews?.providerReviews?.length === 0 && (
           <View style={[styles.section, styles.reviewSection]}>
-            <Text style={styles.reviewTitle}>Review Customer</Text>
-            <Text style={styles.reviewLabel}>Cooperation (1-5)</Text>
+            <Text style={styles.reviewTitle}>{t('tasker.reviews')}</Text>
+            <Text style={styles.reviewLabel}>{t('receipt.rateQuality')} (1-5)</Text>
             <TextInput style={styles.input} value={reviewCoop} onChangeText={setReviewCoop} keyboardType="numeric" placeholderTextColor={colors.muted} />
-            <Text style={styles.reviewLabel}>Communication (1-5)</Text>
+            <Text style={styles.reviewLabel}>{t('receipt.rateCommunication')} (1-5)</Text>
             <TextInput style={styles.input} value={reviewComm} onChangeText={setReviewComm} keyboardType="numeric" placeholderTextColor={colors.muted} />
-            <Text style={styles.reviewLabel}>Overall Experience (1-5)</Text>
+            <Text style={styles.reviewLabel}>{t('receipt.rateValue')} (1-5)</Text>
             <TextInput style={styles.input} value={reviewExp} onChangeText={setReviewExp} keyboardType="numeric" placeholderTextColor={colors.muted} />
-            <Text style={styles.reviewLabel}>Comment (optional)</Text>
+            <Text style={styles.reviewLabel}>{t('receipt.writeReview')}</Text>
             <TextInput style={[styles.input, styles.textArea]} value={reviewComment} onChangeText={setReviewComment} multiline placeholderTextColor={colors.muted} />
-            {ActionBtn({ label: 'Submit Review', loadingKey: 'review', onPress: handleSubmitReview })}
+            {ActionBtn({ label: t('receipt.submitReview'), loadingKey: 'review', onPress: handleSubmitReview })}
           </View>
         )}
 
@@ -302,15 +336,37 @@ export default function V2ProviderManageJobScreen() {
           <View style={styles.section}>
             <View style={styles.reviewedCard}>
               <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={styles.reviewedText}>You reviewed this customer</Text>
+              <Text style={styles.reviewedText}>{t('receipt.reviewSubmitted')}</Text>
             </View>
+          </View>
+        )}
+
+        {/* Start Next Job */}
+        {job.status === 'COMPLETED' && nextJob && (
+          <View style={[styles.section, styles.highlightSection]}>
+            <Ionicons name="arrow-forward-circle-outline" size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
+            <Text style={styles.highlightTitle}>{t('tasker.startNextJob')}</Text>
+            <Text style={styles.highlightDesc}>{nextJob.title}</Text>
+            {nextJob.preferredDate && (
+              <Text style={[styles.scheduleText, { color: colors.amberDark, marginBottom: 12 }]}>
+                {nextJob.timeSlot
+                  ? t('booking.scheduledFor', { date: nextJob.preferredDate, timeSlot: nextJob.timeSlot })
+                  : nextJob.preferredDate}
+              </Text>
+            )}
+            <TouchableOpacity
+              style={styles.startNextBtn}
+              onPress={() => router.push(`/(tasker)/jobs/v2/manage/${nextJob.id}`)}
+            >
+              <Text style={styles.startNextBtnText}>{t('tasker.startNextJob')}</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Dispute */}
         {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
-            <Text style={styles.disputeBtnText}>Having a problem? Raise a dispute</Text>
+            <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -373,9 +429,14 @@ const makeStyles = (colors: any) => StyleSheet.create({
   otpCode: { fontSize: 40, fontFamily: fonts.headingBold, color: colors.ink, letterSpacing: 12, marginBottom: 8 },
   otpDisplayHint: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, textAlign: 'center' },
 
+  scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 1 },
+  scheduleText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1 },
+
   highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight, alignItems: 'center' },
   highlightTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
   highlightDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
+  startNextBtn: { backgroundColor: colors.amber, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  startNextBtnText: { fontSize: 15, fontWeight: '700', color: colors.ink },
 
   actionBtn: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minWidth: 120, marginTop: 4 },
   btnDisabled: { opacity: 0.5 },

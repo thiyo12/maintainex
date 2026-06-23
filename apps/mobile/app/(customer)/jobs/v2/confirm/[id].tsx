@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions } from '../../../../../lib/api-v2'
 import Avatar from '../../../../../components/ui/Avatar'
 
+const TIME_SLOTS = ['08:00-10:00','10:00-12:00','12:00-14:00','14:00-16:00','16:00-18:00']
+
 export default function V2ConfirmBookingScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -17,8 +21,16 @@ export default function V2ConfirmBookingScreen() {
   const [escrow, setEscrow] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleSlot, setScheduleSlot] = useState('')
 
   useEffect(() => { loadData() }, [id])
+
+  useEffect(() => {
+    if (!scheduleDate) {
+      setScheduleDate(new Date().toISOString().split('T')[0])
+    }
+  }, [])
 
   const loadData = async () => {
     try {
@@ -26,7 +38,7 @@ export default function V2ConfirmBookingScreen() {
       setJob(res.job)
       setEscrow(res.job.escrow || null)
     } catch (e) {
-      Alert.alert('Error', 'Failed to load booking')
+      Alert.alert(t('common.error'), t('errors.generic'))
       router.back()
     } finally {
       setLoading(false)
@@ -34,15 +46,20 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const handleDeposit = async () => {
+    if (!scheduleSlot) {
+      Alert.alert(t('booking.timeSlot'), t('components.selectTime'))
+      return
+    }
     setActionLoading('escrow')
     try {
+      await v2JobActions.update(id, { preferredDate: scheduleDate, timeSlot: scheduleSlot })
       await v2JobActions.depositEscrow(id, job?.budgetAmount || 0)
-      Alert.alert('Payment Frozen!', 'Payment is securely held. Share your address with the provider.', [
-        { text: 'OK', onPress: () => router.push(`/(customer)/jobs/v2/${id}`) },
+      Alert.alert(t('booking.paymentSecured'), t('jobDetail.escrowDepositedDesc'), [
+        { text: t('common.ok'), onPress: () => router.push(`/(customer)/jobs/v2/${id}`) },
       ])
       loadData()
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setActionLoading('')
     }
@@ -57,10 +74,10 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const steps = [
-    { label: 'Payment frozen', done: escrow !== null && escrow.status !== 'REFUNDED' },
-    { label: 'Provider completes job', done: false },
-    { label: 'You verify & confirm', done: false },
-    { label: 'Payment released to provider', done: false },
+    { label: t('booking.paymentSecured'), done: escrow !== null && escrow.status !== 'REFUNDED' },
+    { label: t('tracking.inProgress'), done: false },
+    { label: t('booking.confirmComplete'), done: false },
+    { label: t('tracking.completed'), done: false },
   ]
 
   const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
@@ -69,9 +86,9 @@ export default function V2ConfirmBookingScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>← {t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Booking</Text>
+        <Text style={styles.headerTitle}>{t('booking.confirm')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -79,15 +96,15 @@ export default function V2ConfirmBookingScreen() {
         {/* Provider Info */}
         {acceptedQuote && (
           <View style={styles.providerSection}>
-            <Text style={styles.sectionLabel}>Service Provider</Text>
+            <Text style={styles.sectionLabel}>{t('booking.professional')}</Text>
             <View style={styles.providerRow}>
               <Avatar
-                name={acceptedQuote.provider?.name || 'Provider'}
+                name={acceptedQuote.provider?.name || t('jobDetail.provider')}
                 size={52}
                 color={acceptedQuote.providerType === 'COMPANY' ? colors.company : colors.amber}
               />
               <View style={styles.providerInfo}>
-                <Text style={styles.providerName}>{acceptedQuote.provider?.name || 'Provider'}</Text>
+                <Text style={styles.providerName}>{acceptedQuote.provider?.name || t('jobDetail.provider')}</Text>
                 <Text style={styles.providerType}>{acceptedQuote.providerType}</Text>
               </View>
               <Text style={styles.providerPrice}>LKR {acceptedQuote.price.toLocaleString()}</Text>
@@ -98,9 +115,42 @@ export default function V2ConfirmBookingScreen() {
         {/* Job Summary */}
         {job && (
           <View style={styles.jobSection}>
-            <Text style={styles.sectionLabel}>Job</Text>
+            <Text style={styles.sectionLabel}>{t('dispute.job')}</Text>
             <Text style={styles.jobTitle}>{job.title}</Text>
           </View>
+        )}
+
+        {/* Schedule Selection */}
+        {!escrow && (
+        <View style={styles.scheduleSection}>
+          <Text style={styles.sectionLabel}>{t('booking.selectDate')}</Text>
+          <TextInput
+            style={styles.dateInput}
+            value={scheduleDate}
+            onChangeText={setScheduleDate}
+            placeholder={t('booking.datePlaceholder')}
+            placeholderTextColor={colors.muted}
+          />
+          <Text style={[styles.sectionLabel, { marginTop: 12 }]}>{t('booking.timeSlot')}</Text>
+          <View style={styles.timeGrid}>
+            {TIME_SLOTS.map((slot) => (
+              <TouchableOpacity
+                key={slot}
+                style={[
+                  styles.timeChip,
+                  scheduleSlot === slot && { backgroundColor: colors.amberBg, borderColor: colors.amber },
+                  { borderColor: colors.border, backgroundColor: colors.white },
+                ]}
+                onPress={() => setScheduleSlot(slot)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.timeText, scheduleSlot === slot && { color: colors.amberDark, fontFamily: fonts.bodyMedium }]}>
+                  {slot}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         )}
 
         {/* Payment Freeze Card */}
@@ -108,12 +158,12 @@ export default function V2ConfirmBookingScreen() {
           <View style={styles.freezeIconWrap}>
             <Ionicons name="lock-closed-outline" size={28} color={colors.ink} />
           </View>
-          <Text style={styles.freezeLabel}>Amount Frozen</Text>
+          <Text style={styles.freezeLabel}>{t('wallet.balance')}</Text>
           <Text style={styles.freezeAmount}>
             LKR {(acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
           </Text>
           <Text style={styles.freezeDesc}>
-            Payment is securely held by Maintainex until job completion
+            {t('booking.escrowInfo')}
           </Text>
           {!escrow && (
             <TouchableOpacity
@@ -124,21 +174,21 @@ export default function V2ConfirmBookingScreen() {
               {actionLoading === 'escrow' ? (
                 <ActivityIndicator color={colors.ink} />
               ) : (
-                <Text style={styles.depositBtnText}>Freeze Payment</Text>
+                <Text style={styles.depositBtnText}>{t('booking.paymentSecured')}</Text>
               )}
             </TouchableOpacity>
           )}
           {escrow && escrow.status === 'PROTECTED' && (
             <View style={styles.frozenBadge}>
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={styles.frozenBadgeText}>Payment Frozen</Text>
+              <Text style={styles.frozenBadgeText}>{t('booking.paymentSecured')}</Text>
             </View>
           )}
         </View>
 
         {/* 4-Step Payment Flow */}
         <View style={styles.stepsSection}>
-          <Text style={styles.sectionLabel}>Payment Flow</Text>
+          <Text style={styles.sectionLabel}>{t('booking.paymentSecured')}</Text>
           {steps.map((step, i) => (
             <View key={i} style={styles.stepRow}>
               <View style={styles.stepLeft}>
@@ -179,6 +229,12 @@ const makeStyles = (colors: any) => StyleSheet.create({
 
   jobSection: { marginTop: 16 },
   jobTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
+
+  scheduleSection: { marginTop: 20 },
+  dateInput: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 15, color: colors.ink, backgroundColor: colors.white },
+  timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
+  timeChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5 },
+  timeText: { fontSize: 13, color: colors.ink },
 
   freezeCard: { backgroundColor: colors.ink, borderRadius: 20, padding: 24, alignItems: 'center', marginTop: 20 },
   freezeIconWrap: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.amberBg, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },

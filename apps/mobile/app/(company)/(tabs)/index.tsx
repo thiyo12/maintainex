@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,6 +14,7 @@ import AISearchBar from '../../../components/shared/AISearchBar'
 import PropertyCard from '../../../components/shared/PropertyCard'
 
 export default function CompanyDashboard() {
+  const { t } = useTranslation()
   const { colors } = useTheme()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -20,9 +22,9 @@ export default function CompanyDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [stats, setStats] = useState([
-    { label: 'Active', value: '-' },
-    { label: 'Revenue', value: '-' },
-    { label: 'Team', value: '-' },
+    { label: t('company.activeContracts'), value: '-' },
+    { label: t('company.earnings'), value: '-' },
+    { label: t('company.team'), value: '-' },
   ])
   const [revenueMonth, setRevenueMonth] = useState('LKR 0')
   const [openJobs, setOpenJobs] = useState<any[]>([])
@@ -44,9 +46,9 @@ export default function CompanyDashboard() {
       const rating = earningsRes.rating || '—'
 
       setStats([
-        { label: 'Active', value: String(activeContracts) },
-        { label: 'Revenue', value: `LKR ${(monthRevenue / 1000).toFixed(1)}K` },
-        { label: 'Team', value: String(teamMembers) },
+        { label: t('company.statActive'), value: String(activeContracts) },
+        { label: t('company.statRevenue'), value: `LKR ${(monthRevenue / 1000).toFixed(1)}K` },
+        { label: t('company.statTeam'), value: String(teamMembers) },
       ])
       setRevenueMonth(`LKR ${Number(monthRevenue).toLocaleString()}`)
       setOpenJobs((contractsRes || []).slice(0, 5))
@@ -55,15 +57,15 @@ export default function CompanyDashboard() {
         setRecentActivity(earningsRes.recentActivity)
       } else {
         const activity = contractsRes.slice(-4).map((c: any) => ({
-          text: `${c.title || 'Contract'} - ${c.status}`,
-          time: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : 'Recently',
+          text: `${c.title || t('jobs.contract')} - ${c.status}`,
+          time: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : t('common.recently'),
         }))
         setRecentActivity(activity.length > 0 ? activity : [
-          { text: 'Dashboard ready — no recent activity', time: '' },
+          { text: t('company.dashboard'), time: '' },
         ])
       }
     } catch {
-      setRecentActivity([{ text: 'Could not load data. Pull to retry.', time: '' }])
+      setRecentActivity([{ text: t('errors.generic'), time: '' }])
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -82,9 +84,9 @@ export default function CompanyDashboard() {
 
   const getGreeting = () => {
     const h = new Date().getHours()
-    if (h < 12) return 'Good morning'
-    if (h < 17) return 'Good afternoon'
-    return 'Good evening'
+    if (h < 12) return t('home.greeting.morning')
+    if (h < 17) return t('home.greeting.afternoon')
+    return t('home.greeting.evening')
   }
 
   if (loading) {
@@ -112,7 +114,7 @@ export default function CompanyDashboard() {
               </View>
               <View>
                 <Text style={[styles.greeting, { color: colors.muted }]}>{getGreeting()}</Text>
-                <Text style={[styles.userName, { color: colors.ink }]}>{user?.name || 'Company'}</Text>
+                <Text style={[styles.userName, { color: colors.ink }]}>{user?.name || t('profile.company')}</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -131,7 +133,7 @@ export default function CompanyDashboard() {
           <AISearchBar
             value={aiQuery}
             onChangeText={handleAiChange}
-            placeholder="Search jobs, contracts..."
+            placeholder={t('tasker.searchJobs')}
           />
         </View>
 
@@ -150,26 +152,26 @@ export default function CompanyDashboard() {
 
         {/* Revenue */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink }]}>Revenue Overview</Text>
+          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('company.earnings')}</Text>
           <View style={[styles.revenueCard, { backgroundColor: colors.white }]}>
             <Text style={[styles.revenueAmount, { color: colors.amberDark }]}>{revenueMonth}</Text>
-            <Text style={[styles.revenueLabel, { color: colors.muted }]}>this month</Text>
+            <Text style={[styles.revenueLabel, { color: colors.muted }]}>{t('tasker.earnings')}</Text>
           </View>
         </View>
 
         {/* Active Contracts */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Active Contracts</Text>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('company.activeContracts')}</Text>
             <TouchableOpacity onPress={() => router.push('/(company)/(tabs)/contracts-list')}>
-              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>{t('common.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           {openJobs.slice(0, 4).map((job) => (
             <JobCard
               key={job.id}
-              title={job.title || 'Contract'}
-              category={job.categoryName || 'General'}
+              title={job.title || t('jobs.contract')}
+              category={job.categoryName || t('categories.general')}
               budget={job.budgetAmount}
               location={job.locationName}
               status={job.status}
@@ -181,14 +183,14 @@ export default function CompanyDashboard() {
         {/* Real Estate */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Real Estate</Text>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('realEstate.title')}</Text>
             <TouchableOpacity onPress={() => router.push('/real-estate')}>
-              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>{t('common.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 16 }}>
             <PropertyCard
-              title="Modern Apartment"
+              title={t('realEstate.sampleTitle1')}
               priceLkr={8500000}
               type="sale"
               bedrooms={3}
@@ -198,7 +200,7 @@ export default function CompanyDashboard() {
               onPress={() => router.push('/real-estate')}
             />
             <PropertyCard
-              title="Luxury Villa"
+              title={t('realEstate.sampleTitle2')}
               priceLkr={25000000}
               type="sale"
               bedrooms={5}
@@ -208,7 +210,7 @@ export default function CompanyDashboard() {
               onPress={() => router.push('/real-estate')}
             />
             <PropertyCard
-              title="Apartment for Rent"
+              title={t('realEstate.sampleTitle3')}
               priceLkr={85000}
               type="rent"
               bedrooms={2}
@@ -222,31 +224,31 @@ export default function CompanyDashboard() {
 
         {/* Quick post grid */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>What would you like to post?</Text>
+          <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>{t('home.postOptions.title')}</Text>
           <View style={styles.grid}>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/post-job')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.amberBg }]}>
                 <Ionicons name="briefcase-outline" size={22} color={colors.amberDark} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Post a Job</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('home.postJob')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/team/invite')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.blueBg }]}>
                 <Ionicons name="people-outline" size={22} color={colors.blue} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Invite Team</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('company.inviteMember')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/(tabs)/milestones-list')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.successBg }]}>
                 <Ionicons name="flag-outline" size={22} color={colors.success} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Milestones</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('company.milestones')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/settings/subscription')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.purpleBg }]}>
                 <Ionicons name="card-outline" size={22} color={colors.purple} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Subscription</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('company.subscription')}</Text>
             </TouchableOpacity>
           </View>
         </View>

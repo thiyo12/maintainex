@@ -29,6 +29,7 @@ export interface V2Job {
   areaId: string | null
   postalCode: string | null
   preferredDate: string | null
+  timeSlot: string | null
   addressStreet: string | null
   addressBuilding: string | null
   addressApartment: string | null
@@ -73,6 +74,8 @@ export const v2Jobs = {
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs${params ? `?${params}` : ''}`),
   get: (id: string) =>
     v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`),
+  pollNew: (since: string) =>
+    v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`),
 }
 
 export const v2Quotes = {
@@ -83,6 +86,9 @@ export const v2Quotes = {
 }
 
 export const v2JobActions = {
+  update: (jobId: string, data: any) =>
+    v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
   selectQuote: (jobId: string, quoteId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/select-quote`, { method: 'POST', body: JSON.stringify({ quoteId }) }),
   depositEscrow: (jobId: string, amount: number) =>
@@ -97,8 +103,8 @@ export const v2JobActions = {
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`),
   updateProgress: (jobId: string, progressStatus: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`, { method: 'PATCH', body: JSON.stringify({ progressStatus }) }),
-  complete: (jobId: string, action: string) =>
-    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action }) }),
+  complete: (jobId: string, action: string, reason?: string) =>
+    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
   confirmCashPayment: (jobId: string) =>

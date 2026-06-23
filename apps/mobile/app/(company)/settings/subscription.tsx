@@ -6,8 +6,10 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Subscription } from '../../../lib/api-v2'
+import { useTranslation } from 'react-i18next'
 
 export default function SubscriptionScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [status, setStatus] = useState<any>(null)
@@ -40,11 +42,11 @@ export default function SubscriptionScreen() {
     try {
       const res = await v2Subscription.subscribe(planId, true)
       if (res.success) {
-        Alert.alert('Subscribed', 'Your subscription is now active.')
+        Alert.alert(t('common.success'), t('company.subscription') + ' ' + t('common.success'))
         loadAll()
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to subscribe')
+      Alert.alert(t('common.error'), err.message || t('errors.generic'))
     } finally {
       setSubscribing(false)
     }
@@ -52,20 +54,20 @@ export default function SubscriptionScreen() {
 
   const handleCancel = () => {
     Alert.alert(
-      'Cancel Subscription',
-      'Are you sure? Your subscription will end at the current billing period.',
+      t('common.cancel') + ' ' + t('company.subscription'),
+      t('errors.generic'),
       [
-        { text: 'Keep Subscription', style: 'cancel' },
+        { text: t('subscription.keepSubscription'), style: 'cancel' },
         {
-          text: 'Cancel',
+          text: t('common.cancel'),
           style: 'destructive',
           onPress: async () => {
             try {
               await v2Subscription.cancel()
-              Alert.alert('Cancelled', 'Your subscription has been cancelled.')
+              Alert.alert(t('jobDetail.cancelled'), t('company.subscription') + ' ' + t('jobDetail.cancelled'))
               loadAll()
             } catch {
-              Alert.alert('Error', 'Failed to cancel subscription')
+              Alert.alert(t('common.error'), t('errors.generic'))
             }
           },
         },
@@ -85,7 +87,7 @@ export default function SubscriptionScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Subscription</Text>
+      <Text style={styles.title}>{t('company.subscription')}</Text>
 
       {/* Current Status */}
       <View style={styles.statusCard}>
@@ -96,15 +98,15 @@ export default function SubscriptionScreen() {
         />
         <View style={styles.statusInfo}>
           <Text style={styles.statusTitle}>
-            {status?.subscriptionStatus === 'TRIAL' ? 'Trial Period' :
-             isSubscribed ? 'Active' : 'No Active Subscription'}
+            {status?.subscriptionStatus === 'TRIAL' ? t('subscription.trial') :
+             isSubscribed ? t('tasker.active') : t('subscription.noActive')}
           </Text>
           <Text style={styles.statusDesc}>
-            Commission: {status?.commissionRate ?? 15}% on job payments
+            {t('subscription.commission')}: {status?.commissionRate ?? 15}%
           </Text>
           {status?.subscriptionExpiresAt && (
             <Text style={styles.expiryText}>
-              Expires: {new Date(status.subscriptionExpiresAt).toLocaleDateString()}
+              {t('receipt.paidOn')}: {new Date(status.subscriptionExpiresAt).toLocaleDateString()}
             </Text>
           )}
         </View>
@@ -114,26 +116,25 @@ export default function SubscriptionScreen() {
         <View style={styles.currentPlanCard}>
           <Text style={styles.planName}>{status.activeSubscription.planName}</Text>
           <Text style={styles.planStatus}>
-            Status: {status.activeSubscription.status}
+            {t('subscription.status')}: {status.activeSubscription.status}
           </Text>
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
-            <Text style={styles.cancelText}>Cancel Subscription</Text>
+            <Text style={styles.cancelText}>{t('common.cancel')} {t('company.subscription')}</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Available Plans */}
-      <Text style={styles.sectionTitle}>Available Plans</Text>
+      <Text style={styles.sectionTitle}>{t('subscription.availablePlans')}</Text>
       {plans.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="pricetag-outline" size={40} color={colors.muted} />
-          <Text style={styles.emptyText}>No plans available yet. Contact us for pricing.</Text>
+          <Text style={styles.emptyText}>{t('common.noResults')}</Text>
         </View>
       ) : (
         plans.map((plan) => (
           <View key={plan.id} style={styles.planCard}>
             <Text style={styles.planName}>{plan.name}</Text>
-            <Text style={styles.planPrice}>LKR {plan.price.toLocaleString()}/month</Text>
+            <Text style={styles.planPrice}>LKR {plan.price.toLocaleString()}/{t('subscription.perMonth')}</Text>
             {plan.description && (
               <Text style={styles.planDesc}>{plan.description}</Text>
             )}
@@ -156,7 +157,7 @@ export default function SubscriptionScreen() {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={styles.subscribeText}>
-                  {isSubscribed ? 'Switch to this Plan' : 'Subscribe'}
+                  {isSubscribed ? t('components.bookNow') : t('company.subscription')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -167,7 +168,7 @@ export default function SubscriptionScreen() {
       <View style={styles.infoBox}>
         <Ionicons name="information-circle-outline" size={20} color={colors.amber} />
         <Text style={styles.infoText}>
-          Subscription covers your monthly plan. The {status?.commissionRate ?? 15}% commission is deducted from job payments automatically. Companies are recommended for jobs over LKR 15,000.
+          {t('subscription.infoText', { commissionRate: status?.commissionRate ?? 15 })}
         </Text>
       </View>
     </ScrollView>

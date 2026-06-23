@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
 interface Props {
@@ -14,15 +15,15 @@ interface Props {
   onPress: () => void
 }
 
-const TYPE_BADGES: Record<string, { label: string; bg: string; text: string }> = {
-  sale: { label: 'Sale', bg: '#F59E0B', text: '#111827' },
-  rent: { label: 'Rent', bg: '#6366F1', text: '#FFFFFF' },
-  commercial: { label: 'Commercial', bg: '#10B981', text: '#FFFFFF' },
-  land: { label: 'Land', bg: '#7C3AED', text: '#FFFFFF' },
-}
-
 export default function PropertyCard({ title, priceLkr, type, bedrooms, bathrooms, areaSqft, location, onPress }: Props) {
   const { colors } = useTheme()
+  const { t } = useTranslation()
+  const TYPE_BADGES: Record<string, { label: string; bg: string; text: string }> = {
+    sale: { label: t('components.forSale'), bg: '#F59E0B', text: '#111827' },
+    rent: { label: t('components.forRent'), bg: '#6366F1', text: '#FFFFFF' },
+    commercial: { label: t('components.forLease'), bg: '#10B981', text: '#FFFFFF' },
+    land: { label: t('realEstate.land'), bg: '#7C3AED', text: '#FFFFFF' },
+  }
   const badge = TYPE_BADGES[type] || TYPE_BADGES.sale
 
   return (
@@ -52,19 +53,19 @@ export default function PropertyCard({ title, priceLkr, type, bedrooms, bathroom
           {bedrooms && (
             <View style={styles.spec}>
               <Ionicons name="bed-outline" size={10} color={colors.muted} />
-              <Text style={[styles.specText, { color: colors.muted }]}>{bedrooms} Bed</Text>
+              <Text style={[styles.specText, { color: colors.muted }]}>{t('realEstate.bedroomsFormat', { count: bedrooms })}</Text>
             </View>
           )}
           {bathrooms && (
             <View style={styles.spec}>
               <Ionicons name="water-outline" size={10} color={colors.muted} />
-              <Text style={[styles.specText, { color: colors.muted }]}>{bathrooms} Bath</Text>
+              <Text style={[styles.specText, { color: colors.muted }]}>{t('realEstate.bathroomsFormat', { count: bathrooms })}</Text>
             </View>
           )}
           {areaSqft && (
             <View style={styles.spec}>
               <Ionicons name="resize-outline" size={10} color={colors.muted} />
-              <Text style={[styles.specText, { color: colors.muted }]}>{areaSqft} sqft</Text>
+              <Text style={[styles.specText, { color: colors.muted }]}>{t('realEstate.sqftFormat', { area: areaSqft })}</Text>
             </View>
           )}
         </View>

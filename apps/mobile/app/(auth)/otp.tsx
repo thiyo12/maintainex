@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { auth } from '../../lib/api'
 import { useColors } from '../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { fonts } from '../../lib/fonts'
 import { fontSizes } from '../../lib/tokens'
 import { spacing, borderRadius } from '../../lib/tokens'
@@ -18,6 +19,7 @@ export default function OtpScreen() {
     const styles = makeStyles(colors)
   const router = useRouter()
   const { phone, role } = useLocalSearchParams<{ phone: string; role: string }>()
+  const { t } = useTranslation()
   const { register } = useAuth()
 
   const [codes, setCodes] = useState<string[]>(Array(6).fill(''))
@@ -51,7 +53,7 @@ export default function OtpScreen() {
         fillCode(res.devCode)
       }
     } catch (err: any) {
-      Alert.alert('Error', 'Failed to send verification code')
+      Alert.alert(t('common.error'), t('errors.failedToSendCode'))
     } finally {
       setSending(false)
     }
@@ -82,7 +84,7 @@ export default function OtpScreen() {
   const handleVerify = async () => {
     const code = codes.join('')
     if (code.length < 6) {
-      Alert.alert('Error', 'Please enter the complete code')
+      Alert.alert(t('common.error'), t('errors.enterCompleteCode'))
       return
     }
 
@@ -104,7 +106,7 @@ export default function OtpScreen() {
       else if (userRole === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
       else router.replace('/(customer)')
     } catch (err: any) {
-      Alert.alert('Verification Failed', 'Invalid or expired code. Please try again.')
+      Alert.alert(t('auth.otp.verificationFailed'), t('errors.invalidCode'))
     } finally {
       setLoading(false)
     }
@@ -118,16 +120,16 @@ export default function OtpScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={[styles.backText, { color: colors.primary }]}>{'\u2190'} Back</Text>
+        <Text style={[styles.backText, { color: colors.primary }]}>{'\u2190'} {t('common.back')}</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.title, { color: colors.ink }]}>Verify your phone</Text>
+      <Text style={[styles.title, { color: colors.ink }]}>{t('auth.otp.title')}</Text>
       <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        We sent a 6 digit code to {phone || 'your phone'}
+        {t('auth.otp.description')}{phone || ''}
       </Text>
 
       {devCode ? (
-        <Text style={[styles.devHint, { color: colors.success, backgroundColor: colors.successLight }]}>Dev code: {devCode} (auto-filled)</Text>
+        <Text style={[styles.devHint, { color: colors.success, backgroundColor: colors.successLight }]}>{t('auth.otp.devCode')}{devCode}{t('auth.otp.autoFilled')}</Text>
       ) : null}
 
       <View style={styles.codeRow}>
@@ -159,7 +161,7 @@ export default function OtpScreen() {
         style={styles.resendButton}
       >
         <Text style={[styles.resendText, { color: colors.primary }, (resendTimer > 0 || sending) && { color: colors.muted }]}>
-          {sending ? 'Sending...' : resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend code'}
+          {sending ? t('auth.otp.sending') : resendTimer > 0 ? `${t('auth.otp.resendIn')}${resendTimer}s` : t('auth.otp.resend')}
         </Text>
       </TouchableOpacity>
 
@@ -175,7 +177,7 @@ export default function OtpScreen() {
         {loading ? (
           <ActivityIndicator color={colors.white} />
         ) : (
-          <Text style={styles.verifyText}>Verify</Text>
+          <Text style={styles.verifyText}>{t('auth.otp.button')}</Text>
         )}
       </TouchableOpacity>
     </KeyboardAvoidingView>

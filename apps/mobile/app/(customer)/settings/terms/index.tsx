@@ -3,32 +3,34 @@ import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
-
-const sections = [
-  {
-    title: 'Terms of Service',
-    icon: 'document-text-outline' as const,
-    content:
-      'By using Maintainex, you agree to these terms. Maintainex connects customers with taskers for various services. We do not directly employ taskers and are not liable for the quality of work performed. All bookings and payments are handled through our platform. You must provide accurate information when creating an account. Any misuse of the platform may result in account termination.',
-  },
-  {
-    title: 'Privacy Policy',
-    icon: 'shield-checkmark-outline' as const,
-    content:
-      'We collect personal information such as your name, email, phone number, and location data to provide our services. Your data is stored securely and is never shared with third parties without your consent. We use encryption and industry-standard security measures to protect your information. You can request deletion of your data at any time by contacting support.',
-  },
-  {
-    title: 'Cookie Policy',
-    icon: 'cafe-outline' as const,
-    content:
-      'Maintainex uses cookies to enhance your experience. These include essential cookies for authentication, analytics cookies to help us improve the platform, and preference cookies to remember your settings. You can manage cookie preferences in your browser settings. Disabling certain cookies may affect platform functionality.',
-  },
-]
+import { useTranslation } from 'react-i18next'
 
 export default function TermsScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const fadeAnim = useRef(new Animated.Value(0)).current
+
+  const sections = [
+    {
+      title: t('profile.termsOfService'),
+      icon: 'document-text-outline' as const,
+      content:
+        'By using Maintainex, you agree to these terms. Maintainex connects customers with taskers for various services. We do not directly employ taskers and are not liable for the quality of work performed. All bookings and payments are handled through our platform. You must provide accurate information when creating an account. Any misuse of the platform may result in account termination.',
+    },
+    {
+      title: t('profile.privacyPolicy'),
+      icon: 'shield-checkmark-outline' as const,
+      content:
+        'We collect personal information such as your name, email, phone number, and location data to provide our services. Your data is stored securely and is never shared with third parties without your consent. We use encryption and industry-standard security measures to protect your information. You can request deletion of your data at any time by contacting support.',
+    },
+    {
+      title: t('profile.cookiePolicy'),
+      icon: 'cafe-outline' as const,
+      content:
+        'Maintainex uses cookies to enhance your experience. These include essential cookies for authentication, analytics cookies to help us improve the platform, and preference cookies to remember your settings. You can manage cookie preferences in your browser settings. Disabling certain cookies may affect platform functionality.',
+    },
+  ]
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
@@ -37,7 +39,7 @@ export default function TermsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>Terms & Privacy</Text>
+        <Text style={styles.heading}>{t('profile.termsPrivacy')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           {sections.map((s, i) => (
@@ -52,7 +54,7 @@ export default function TermsScreen() {
 
           <View style={styles.footer}>
             <Ionicons name="time-outline" size={16} color={colors.gray} />
-            <Text style={styles.footerText}>  Last updated: January 2026</Text>
+            <Text style={styles.footerText}>  {t('profile.lastUpdated')}</Text>
           </View>
         </ScrollView>
       </Animated.View>

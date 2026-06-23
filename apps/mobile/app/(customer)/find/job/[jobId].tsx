@@ -6,8 +6,10 @@ import { useColors } from '../../../../lib/ThemeContext'
 import { templateJobs } from '../../../../lib/api'
 import StickyBottomBar from '../../../../components/find/StickyBottomBar'
 import SkeletonLoader from '../../../../components/find/SkeletonLoader'
+import { useTranslation } from 'react-i18next'
 
 export default function JobDetail() {
+  const { t } = useTranslation()
   const colors = useColors()
     const styles = makeStyles(colors)
   const { jobId } = useLocalSearchParams<{ jobId: string }>()
@@ -29,7 +31,7 @@ export default function JobDetail() {
   }, [jobId])
 
   if (loading) return <View style={styles.container}><SkeletonLoader count={4} height={100} /></View>
-  if (!job) return <View style={styles.container}><Text style={{ textAlign: 'center', marginTop: 40 }}>Job not found</Text></View>
+  if (!job) return <View style={styles.container}><Text style={{ textAlign: 'center', marginTop: 40 }}>{t('errors.jobNotFound')}</Text></View>
 
   const avgPrice = Math.round((job.priceMin + job.priceMax) / 2)
 
@@ -47,19 +49,19 @@ export default function JobDetail() {
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={18} color={colors.primary} />
-            <Text style={styles.metaLabel}>Duration</Text>
+            <Text style={styles.metaLabel}>{t('jobDetail.duration')}</Text>
             <Text style={styles.metaValue}>{job.typicalDurationMinutes} min</Text>
           </View>
           <View style={styles.metaItem}>
             <Ionicons name="cash-outline" size={18} color={colors.primary} />
-            <Text style={styles.metaLabel}>Price Range</Text>
+            <Text style={styles.metaLabel}>{t('postJob.budget')}</Text>
             <Text style={styles.metaValue}>Rs {job.priceMin.toLocaleString()} - Rs {job.priceMax.toLocaleString()}</Text>
           </View>
         </View>
 
         {job.whatIsIncluded && job.whatIsIncluded.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>What's Included</Text>
+            <Text style={styles.sectionTitle}>{t('jobDetail.whatsIncluded')}</Text>
             {job.whatIsIncluded.map((item: string, i: number) => (
               <View key={i} style={styles.includedRow}>
                 <Ionicons name="checkmark-circle" size={18} color="#10B981" />
@@ -72,8 +74,8 @@ export default function JobDetail() {
 
       <StickyBottomBar
         price={`Rs ${avgPrice.toLocaleString()}`}
-        label="Estimated price"
-        buttonText="Find a Tasker"
+        label={t('postJob.budget')}
+        buttonText={t('customer.findTasker')}
         icon="search"
         onPress={() => router.push(`/(customer)/find/taskers/${jobId}`)}
       />

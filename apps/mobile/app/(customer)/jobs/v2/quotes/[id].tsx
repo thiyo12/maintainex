@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job, V2Quote } from '../../../../../lib/api-v2'
 import QuoteCard from '../../../../../components/jobs/QuoteCard'
 
 export default function V2QuotesScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -25,7 +28,7 @@ export default function V2QuotesScreen() {
       setJob(res.job)
       setQuotes(res.job.quotes || [])
     } catch (e) {
-      Alert.alert('Error', 'Failed to load quotes')
+      Alert.alert(t('common.error'), t('errors.generic'))
       router.back()
     } finally {
       setLoading(false)
@@ -36,11 +39,11 @@ export default function V2QuotesScreen() {
     setActionLoading(quoteId)
     try {
       await v2JobActions.selectQuote(id, quoteId)
-      Alert.alert('Quote Accepted!', 'Proceed to deposit escrow to start the job.', [
-        { text: 'OK', onPress: () => router.push(`/(customer)/jobs/v2/${id}`) },
+      Alert.alert(t('quotes.acceptSuccess'), t('quotes.acceptSuccessDesc'), [
+        { text: t('common.ok'), onPress: () => router.push(`/(customer)/jobs/v2/${id}`) },
       ])
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setActionLoading('')
     }
@@ -60,9 +63,9 @@ export default function V2QuotesScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>← {t('common.back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quotes</Text>
+        <Text style={styles.headerTitle}>{t('quotes.title')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -70,8 +73,8 @@ export default function V2QuotesScreen() {
         <View style={styles.jobSummary}>
           <Text style={styles.jobTitle}>{job.title}</Text>
           <View style={styles.jobMetaRow}>
-            <Text style={styles.jobMeta}>Budget: LKR {job.budgetAmount}</Text>
-            <Text style={styles.jobMeta}>{sorted.length} quote{sorted.length !== 1 ? 's' : ''}</Text>
+            <Text style={styles.jobMeta}>{t('quotes.budget', { amount: job.budgetAmount })}</Text>
+            <Text style={styles.jobMeta}>{t('quotes.title')} ({sorted.length})</Text>
           </View>
         </View>
       )}
@@ -80,14 +83,14 @@ export default function V2QuotesScreen() {
         {sorted.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="chatbubble-ellipses" size={48} color={colors.muted} style={{ marginBottom: 12 }} />
-            <Text style={styles.emptyText}>No quotes yet</Text>
-            <Text style={styles.emptySub}>Providers are reviewing your job</Text>
+            <Text style={styles.emptyText}>{t('quotes.noQuotes')}</Text>
+            <Text style={styles.emptySub}>{t('quotes.noQuotesMsg')}</Text>
           </View>
         ) : (
           sorted.map((q) => (
             <QuoteCard
               key={q.id}
-              providerName={q.provider?.name || 'Provider'}
+              providerName={q.provider?.name || t('quotes.provider')}
               providerType={(q.providerType || 'FREELANCER') as 'FREELANCER' | 'COMPANY'}
               price={q.price}
               message={q.message}

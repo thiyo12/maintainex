@@ -8,10 +8,12 @@ import { realEstate } from '../../lib/api'
 import PropertyCard from '../../components/shared/PropertyCard'
 import { fonts } from '../../lib/fonts'
 import { spacing, fontSizes } from '../../lib/tokens'
+import { useTranslation } from 'react-i18next'
 
 const FILTERS = ['all', 'sale', 'rent', 'commercial', 'land']
 
 export default function RealEstateList() {
+  const { t } = useTranslation()
   const { colors } = useTheme()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -49,14 +51,14 @@ export default function RealEstateList() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back-outline" size={22} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.ink }]}>Real Estate</Text>
+        <Text style={[styles.title, { color: colors.ink }]}>{t('realEstate.title')}</Text>
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: colors.white, borderColor: colors.border }]}>
         <Ionicons name="search-outline" size={16} color={colors.muted} />
         <TextInput
           style={[styles.searchInput, { color: colors.ink }]}
-          placeholder="Search properties..."
+          placeholder={t('common.search')}
           placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
@@ -91,7 +93,7 @@ export default function RealEstateList() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.amber} />}
           renderItem={({ item }) => (
             <PropertyCard
-              title={item.title || 'Property'}
+              title={item.title || t('realEstate.propertyFallback')}
               priceLkr={item.priceLkr || 0}
               type={item.type || 'sale'}
               bedrooms={item.bedrooms}
@@ -104,7 +106,7 @@ export default function RealEstateList() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Ionicons name="home-outline" size={48} color={colors.muted} />
-              <Text style={[styles.emptyText, { color: colors.muted }]}>No properties found</Text>
+              <Text style={[styles.emptyText, { color: colors.muted }]}>{t('common.noResults')}</Text>
             </View>
           }
         />

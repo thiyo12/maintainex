@@ -4,20 +4,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { jobs, disputes } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/auth'
 import { JobPosting } from '../../../../lib/types'
 
-const disputeReasons = [
-  { key: 'incomplete', label: 'Work not completed' },
-  { key: 'quality', label: 'Poor quality of work' },
-  { key: 'damage', label: 'Property damage' },
-  { key: 'price', label: 'Price disagreement' },
-  { key: 'behavior', label: 'Unprofessional behavior' },
-  { key: 'other', label: 'Other' },
-]
-
 export default function DisputeScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -45,11 +38,11 @@ export default function DisputeScreen() {
 
   const handleNext = () => {
     if (step === 0 && !reason) {
-      Alert.alert('Error', 'Please select a reason')
+      Alert.alert(t('common.error'), t('errors.selectReason'))
       return
     }
     if (step === 1 && !description.trim()) {
-      Alert.alert('Error', 'Please describe the issue')
+      Alert.alert(t('common.error'), t('errors.describeIssue'))
       return
     }
     if (step < 2) setStep(step + 1)
@@ -62,14 +55,17 @@ export default function DisputeScreen() {
       setDisputeId(res.id)
       setSubmitted(true)
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to submit dispute')
+      Alert.alert(t('common.error'), e.message || t('common.error'))
     } finally {
       setSubmitting(false)
     }
   }
 
-  const taskerName = job?.assignedTasker?.user?.name || 'Tasker'
-  const jobTitle = job?.title || 'Job'
+  const reasonLabels = t('dispute.reasons', { returnObjects: true }) as string[]
+  const disputeReasons = reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label }))
+
+  const taskerName = job?.assignedTasker?.user?.name || t('dispute.tasker')
+  const jobTitle = job?.title || t('dispute.job')
   const escrowAmount = ((job?.budget || 0) * 1.05)
 
   if (loading) {
@@ -97,23 +93,23 @@ export default function DisputeScreen() {
           <View style={styles.successCircle}>
             <Ionicons name="document-text-outline" size={36} color={colors.white} />
           </View>
-          <Text style={styles.successTitle}>Dispute filed</Text>
+          <Text style={styles.successTitle}>{t('dispute.submitted')}</Text>
           <Text style={styles.successSub}>
-            We've received your dispute. Our support team will review it within 24-48 hours and contact you via email.
+            {t('dispute.submittedDesc')}
           </Text>
           <View style={styles.ticketBox}>
-            <Text style={styles.ticketLabel}>Dispute ID</Text>
+            <Text style={styles.ticketLabel}>{t('dispute.disputeId')}</Text>
             <Text style={styles.ticketId}>#{disputeId}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 32 }}>
             <Ionicons name="lock-closed-outline" size={14} color={colors.gray} />
-            <Text style={styles.refundNote}> Funds remain in escrow until the dispute is resolved.</Text>
+            <Text style={styles.refundNote}>{t('dispute.escrowHeld')}</Text>
           </View>
           <TouchableOpacity
             style={styles.homeBtn}
             onPress={() => router.replace('/(customer)')}
           >
-            <Text style={styles.homeBtnText}>Back to home</Text>
+            <Text style={styles.homeBtnText}>{t('dispute.backToHome')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -123,19 +119,19 @@ export default function DisputeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
+        <Text style={styles.backText}>← {t('common.back')}</Text>
       </TouchableOpacity>
 
       <View style={styles.headerRow}>
-        <Text style={styles.heading}>Report an issue</Text>
-        <Text style={styles.stepIndicator}>Step {step + 1} of 3</Text>
+        <Text style={styles.heading}>{t('dispute.title')}</Text>
+        <Text style={styles.stepIndicator}>{t('dispute.step', { n: step + 1 })}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         {step === 0 ? (
           <View>
-            <Text style={styles.sectionLabel}>What went wrong?</Text>
-            <Text style={styles.sectionSub}>Select the reason for your dispute</Text>
+            <Text style={styles.sectionLabel}>{t('dispute.whatWentWrong')}</Text>
+            <Text style={styles.sectionSub}>{t('dispute.selectReason')}</Text>
             {disputeReasons.map((r) => (
               <TouchableOpacity
                 key={r.key}
@@ -153,24 +149,24 @@ export default function DisputeScreen() {
           </View>
         ) : step === 1 ? (
           <View>
-            <Text style={styles.sectionLabel}>Describe the issue</Text>
-            <Text style={styles.sectionSub}>Please provide details about what happened</Text>
-            <Text style={styles.fieldLabel}>Description</Text>
+            <Text style={styles.sectionLabel}>{t('dispute.describeIssue')}</Text>
+            <Text style={styles.sectionSub}>{t('dispute.describeIssueDesc')}</Text>
+            <Text style={styles.fieldLabel}>{t('dispute.description')}</Text>
             <TextInput
               style={styles.textArea}
               value={description}
               onChangeText={setDescription}
-              placeholder="Describe what went wrong in detail..."
+              placeholder={t('dispute.descriptionPlaceholder')}
               multiline
               numberOfLines={6}
               textAlignVertical="top"
             />
-            <Text style={styles.fieldLabel}>What would be a fair resolution?</Text>
+            <Text style={styles.fieldLabel}>{t('dispute.fairResolution')}</Text>
             <TextInput
               style={styles.textArea}
               value={expectation}
               onChangeText={setExpectation}
-              placeholder="e.g. Full refund, partial refund, redo the work..."
+              placeholder={t('dispute.resolutionPlaceholder')}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
@@ -178,41 +174,41 @@ export default function DisputeScreen() {
           </View>
         ) : (
           <View>
-            <Text style={styles.sectionLabel}>Review your dispute</Text>
+            <Text style={styles.sectionLabel}>{t('dispute.reviewDispute')}</Text>
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Job</Text>
+                <Text style={styles.summaryLabel}>{t('dispute.job')}</Text>
                 <Text style={styles.summaryValue}>{jobTitle}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Tasker</Text>
+                <Text style={styles.summaryLabel}>{t('dispute.tasker')}</Text>
                 <Text style={styles.summaryValue}>{taskerName}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Reason</Text>
+                <Text style={styles.summaryLabel}>{t('dispute.reason')}</Text>
                 <Text style={styles.summaryValue}>
                   {disputeReasons.find((r) => r.key === reason)?.label}
                 </Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Amount in escrow</Text>
+                <Text style={styles.summaryLabel}>{t('dispute.escrowAmount')}</Text>
                 <Text style={styles.summaryPrice}>LKR {escrowAmount.toLocaleString()}</Text>
               </View>
             </View>
             <View style={styles.descriptionBox}>
-              <Text style={styles.descLabel}>Description</Text>
-              <Text style={styles.descText}>{description}</Text>
-            </View>
-            {expectation ? (
-              <View style={styles.descriptionBox}>
-                <Text style={styles.descLabel}>Expected resolution</Text>
+                <Text style={styles.descLabel}>{t('dispute.description')}</Text>
+                <Text style={styles.descText}>{description}</Text>
+              </View>
+              {expectation ? (
+                <View style={styles.descriptionBox}>
+                  <Text style={styles.descLabel}>{t('dispute.expectedResolution')}</Text>
                 <Text style={styles.descText}>{expectation}</Text>
               </View>
             ) : null}
             <View style={styles.warningBox}>
               <Ionicons name="warning-outline" size={18} color="#92400E" />
               <Text style={styles.warningText}>
-                False or fraudulent disputes may result in account suspension. Please ensure your claim is accurate.
+                {t('dispute.warning')}
               </Text>
             </View>
           </View>
@@ -225,7 +221,7 @@ export default function DisputeScreen() {
         disabled={submitting}
       >
         <Text style={styles.nextBtnText}>
-          {submitting ? 'Submitting...' : step === 0 ? 'Next' : step === 1 ? 'Review dispute' : 'Submit dispute'}
+          {submitting ? t('dispute.submitting') : step === 0 ? t('dispute.next') : step === 1 ? t('dispute.reviewBtn') : t('dispute.submitBtn')}
         </Text>
       </TouchableOpacity>
     </SafeAreaView>

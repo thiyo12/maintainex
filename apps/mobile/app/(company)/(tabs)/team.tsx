@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 export default function CompanyTeam() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [loading, setLoading] = useState(true)
@@ -46,32 +48,32 @@ export default function CompanyTeam() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Team</Text>
+        <Text style={styles.heading}>{t('company.team')}</Text>
         <TouchableOpacity style={styles.addBtn}>
-          <Text style={styles.addBtnText}>+ Add</Text>
+          <Text style={styles.addBtnText}>+ {t('common.add')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryStat}>
           <Text style={styles.summaryValue}>{totalMembers}</Text>
-          <Text style={styles.summaryLabel}>Members</Text>
+          <Text style={styles.summaryLabel}>{t('company.teamMembers')}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryStat}>
           <Text style={styles.summaryValue}>{onlineCount}</Text>
-          <Text style={styles.summaryLabel}>Online</Text>
+          <Text style={styles.summaryLabel}>{t('common.online')}</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryStat}>
           <Text style={styles.summaryValue}>{avgRating}</Text>
-          <Text style={styles.summaryLabel}>Avg rating</Text>
+          <Text style={styles.summaryLabel}>{t('tasker.rating')}</Text>
         </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {members.length === 0 ? (
-          <Text style={styles.emptyText}>No team members found</Text>
+          <Text style={styles.emptyText}>{t('company.teamMembers')}</Text>
         ) : (
           members.map((m, i) => (
             <TouchableOpacity key={m.id || i} style={styles.memberCard} activeOpacity={0.8}>
@@ -94,7 +96,7 @@ export default function CompanyTeam() {
               </View>
               <View style={[styles.statusBadge, { backgroundColor: m.online ? '#D1FAE5' : '#FEE2E2' }]}>
                 <Text style={[styles.statusText, { color: m.online ? colors.success : '#EF4444' }]}>
-                  {m.online ? 'Online' : 'Offline'}
+                  {m.online ? t('common.online') : t('common.offline')}
                 </Text>
               </View>
             </TouchableOpacity>

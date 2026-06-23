@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
 interface Props {
@@ -11,6 +12,7 @@ interface Props {
 
 export default function EmptyState({ icon, title, subtitle }: Props) {
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const fadeAnim = useRef(new Animated.Value(0)).current
   const bounceAnim = useRef(new Animated.Value(0.9)).current

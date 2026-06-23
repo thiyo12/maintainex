@@ -4,18 +4,20 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
+import { useTranslation } from 'react-i18next'
 import { spacing, borderRadius } from '../../lib/tokens'
-
-const ROLE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
-  TASKER: { icon: 'construct-outline', label: 'Work as a Tasker', desc: 'Find jobs, set your rates, and get hired by customers' },
-  CUSTOMER: { icon: 'person-outline', label: 'Hire a Professional', desc: 'Post jobs and find the right expert for your needs' },
-}
 
 export default function RoleSwitchScreen() {
   const { target } = useLocalSearchParams<{ target: string }>()
   const { user, switchRole } = useAuth()
   const router = useRouter()
+  const { t } = useTranslation()
   const [switching, setSwitching] = useState(false)
+
+  const ROLE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
+    TASKER: { icon: 'construct-outline', label: t('auth.roleSwitch.workAsTasker'), desc: t('auth.roleSwitch.workAsTaskerDesc') },
+    CUSTOMER: { icon: 'person-outline', label: t('auth.roleSwitch.hireProfessional'), desc: t('auth.roleSwitch.hireProfessionalDesc') },
+  }
 
   const targetRole = target === 'TASKER' ? 'TASKER' : 'CUSTOMER'
   const info = ROLE_INFO[targetRole]
@@ -42,21 +44,21 @@ export default function RoleSwitchScreen() {
         <View style={styles.iconWrap}>
           <Ionicons name={info.icon as any} size={40} color="#F59E0B" />
         </View>
-        <Text style={styles.heading}>Switch to</Text>
+        <Text style={styles.heading}>{t('auth.roleSwitch.switchTo')}</Text>
         <Text style={styles.roleName}>{info.label}</Text>
         <Text style={styles.desc}>{info.desc}</Text>
 
         <View style={styles.oldRole}>
           <Ionicons name="swap-horizontal" size={16} color="#9CA3AF" />
           <Text style={styles.oldRoleText}>
-            Currently: <Text style={styles.bold}>{user?.role === 'TASKER' ? 'Work as a Tasker' : 'Hire a Professional'}</Text>
+            {t('auth.roleSwitch.currently')}<Text style={styles.bold}>{user?.role === 'TASKER' ? t('auth.roleSwitch.workAsTasker') : t('auth.roleSwitch.hireProfessional')}</Text>
           </Text>
         </View>
 
         <View style={styles.note}>
           <Ionicons name="information-circle-outline" size={16} color="#F59E0B" />
           <Text style={styles.noteText}>
-            Your existing profile data will be preserved. You can switch back anytime.
+            {t('auth.roleSwitch.dataPreserved')}
           </Text>
         </View>
 
@@ -69,7 +71,7 @@ export default function RoleSwitchScreen() {
           {switching ? (
             <ActivityIndicator color="#111" />
           ) : (
-            <Text style={styles.switchBtnText}>Confirm Switch</Text>
+            <Text style={styles.switchBtnText}>{t('auth.roleSwitch.confirmSwitch')}</Text>
           )}
         </TouchableOpacity>
       </View>

@@ -1,9 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import PressScale from './PressScale'
 import { useColors } from '../../lib/ThemeContext'
+import { getCategoryI18nKey } from '../../lib/categories'
 
 interface Props {
+  id?: string
   name: string
   iconName: keyof typeof Ionicons.glyphMap
   colorHex: string
@@ -11,8 +14,9 @@ interface Props {
   onPress: () => void
 }
 
-export default function CategoryCard({ name, iconName, colorHex, jobCount, onPress }: Props) {
+export default function CategoryCard({ id, name, iconName, colorHex, jobCount, onPress }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
     const styles = makeStyles(colors)
   return (
     <PressScale onPress={onPress}>
@@ -21,8 +25,8 @@ export default function CategoryCard({ name, iconName, colorHex, jobCount, onPre
           <Ionicons name={iconName as any} size={24} color={colorHex} />
         </View>
         <View style={styles.content}>
-          <Text style={[styles.name, { color: colors.ink }]}>{name}</Text>
-          <Text style={[styles.count, { color: colors.muted }]}>{jobCount} jobs available</Text>
+          <Text style={[styles.name, { color: colors.ink }]}>{t(getCategoryI18nKey({ id: id || name }))}</Text>
+          <Text style={[styles.count, { color: colors.muted }]}>{t('components.jobsAvailable', { n: jobCount })}</Text>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </View>

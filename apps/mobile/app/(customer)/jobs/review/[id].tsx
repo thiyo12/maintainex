@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import StarRating from '../../../../components/ui/StarRating'
 import { useColors } from '../../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { jobs } from '../../../../lib/api'
 import { JobPosting } from '../../../../lib/types'
 
 export default function ReviewScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -37,15 +39,15 @@ export default function ReviewScreen() {
 
   const handleSubmit = () => {
     if (rating === 0) {
-      Alert.alert('Error', 'Please select a rating')
+      Alert.alert(t('common.error'), t('errors.ratingRequired'))
       return
     }
     setSubmitted(true)
   }
 
-  const categories = ['Quality', 'Punctuality', 'Communication', 'Value']
+  const categories = [t('receipt.rateQuality'), t('receipt.ratePunctuality'), t('receipt.rateCommunication'), t('receipt.rateValue')]
 
-  const taskerName = job?.assignedTasker?.user?.name || 'Tasker'
+  const taskerName = job?.assignedTasker?.user?.name || t('customer.tasker')
   const avatarLetter = taskerName.charAt(0)
 
   if (loading) {
@@ -73,15 +75,15 @@ export default function ReviewScreen() {
           <Animated.View style={[styles.successCircle, { transform: [{ scale: slideAnim }] }]}>
             <Ionicons name="star" size={36} color={colors.white} />
           </Animated.View>
-          <Text style={styles.successTitle}>Review submitted</Text>
+          <Text style={styles.successTitle}>{t('receipt.reviewSubmitted')}</Text>
           <Text style={styles.successSub}>
-            Thanks for your feedback! It helps other customers make informed decisions.
+            {t('receipt.reviewSubmittedDesc')}
           </Text>
           <TouchableOpacity
             style={styles.homeBtn}
             onPress={() => router.replace('/(customer)')}
           >
-            <Text style={styles.homeBtnText}>Back to home</Text>
+            <Text style={styles.homeBtnText}>{t('receipt.backToHome')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -95,16 +97,16 @@ export default function ReviewScreen() {
           <View style={styles.taskerAvatar}>
             <Text style={styles.avatarText}>{avatarLetter}</Text>
           </View>
-          <Text style={styles.heading}>Review {taskerName}</Text>
-          <Text style={styles.subtitle}>Share your experience with this tasker</Text>
+          <Text style={styles.heading}>{t('receipt.reviewTitle', { name: taskerName })}</Text>
+          <Text style={styles.subtitle}>{t('receipt.reviewSubtitle')}</Text>
         </View>
 
         <View style={styles.ratingSection}>
-          <Text style={styles.ratingLabel}>Overall rating</Text>
+          <Text style={styles.ratingLabel}>{t('receipt.overallRating')}</Text>
           <StarRating stars={rating} onRate={setRating} size={40} />
           {rating > 0 ? (
             <Text style={styles.ratingText}>
-              {rating === 5 ? 'Excellent!' : rating === 4 ? 'Great' : rating === 3 ? 'Good' : rating === 2 ? 'Fair' : 'Poor'}
+              {rating === 5 ? t('receipt.ratingExcellent') : rating === 4 ? t('receipt.ratingGreat') : rating === 3 ? t('receipt.ratingGood') : rating === 2 ? t('receipt.ratingFair') : t('receipt.ratingPoor')}
             </Text>
           ) : null}
         </View>
@@ -119,21 +121,21 @@ export default function ReviewScreen() {
         </View>
 
         <View style={styles.commentSection}>
-          <Text style={styles.commentLabel}>Write a review</Text>
+          <Text style={styles.commentLabel}>{t('receipt.writeReview')}</Text>
           <TextInput
             style={styles.textArea}
             value={comment}
             onChangeText={setComment}
-            placeholder="Describe your experience... What went well? What could be improved?"
+            placeholder={t('receipt.reviewPlaceholder')}
             multiline
             numberOfLines={5}
             textAlignVertical="top"
           />
-          <Text style={styles.charCount}>{charCount} characters</Text>
+          <Text style={styles.charCount}>{t('postJob.charCount', { n: charCount })}</Text>
         </View>
 
         <View style={styles.photoSection}>
-          <Text style={styles.photoLabel}>Add photos (optional)</Text>
+          <Text style={styles.photoLabel}>{t('receipt.addPhotos')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
             <TouchableOpacity style={styles.addPhoto}>
               <Text style={styles.addPhotoIcon}>+</Text>
@@ -143,7 +145,7 @@ export default function ReviewScreen() {
       </ScrollView>
 
       <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-        <Text style={styles.submitBtnText}>Submit review</Text>
+        <Text style={styles.submitBtnText}>{t('receipt.submitReview')}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   )

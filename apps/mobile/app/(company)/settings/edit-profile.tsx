@@ -8,8 +8,10 @@ import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
 import { auth } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
+import { useTranslation } from 'react-i18next'
 
 export default function CompanyEditProfile() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -29,17 +31,17 @@ export default function CompanyEditProfile() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Name is required')
+      Alert.alert(t('common.error'), t('tasker.nameRequired'))
       return
     }
     setSaving(true)
     try {
       await auth.updateProfile({ name: name.trim(), phone: phone.trim() })
       await refreshUser()
-      Alert.alert('Saved', 'Profile updated successfully')
+      Alert.alert(t('common.success'), t('profile.editProfileHeader') + ' ' + t('common.success'))
       router.back()
     } catch {
-      Alert.alert('Error', 'Failed to update profile')
+      Alert.alert(t('common.error'), t('company.editProfile') + ' ' + t('errors.generic'))
     } finally {
       setSaving(false)
     }
@@ -48,29 +50,29 @@ export default function CompanyEditProfile() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>Edit company profile</Text>
+        <Text style={styles.heading}>{t('company.editProfile')}</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.avatarSection}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{(name || 'C')[0]}</Text>
             </View>
             <TouchableOpacity>
-              <Text style={styles.changePhoto}>Change photo</Text>
+              <Text style={styles.changePhoto}>{t('components.addPhoto')}</Text>
             </TouchableOpacity>
           </View>
-          <Text style={styles.label}>Contact name</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Your name" />
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('profile.fullName')}</Text>
+          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('auth.register.namePlaceholder')} />
+          <Text style={styles.label}>{t('profile.email')}</Text>
           <View style={[styles.input, { backgroundColor: colors.surface, justifyContent: 'center' }]}>
             <Text style={{ fontSize: fontSizes.body, color: colors.muted }}>{user?.email || ''}</Text>
           </View>
-          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.label}>{t('profile.phone')}</Text>
           <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="0712345678" />
           <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
             {saving ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
-              <Text style={styles.saveBtnText}>Save changes</Text>
+              <Text style={styles.saveBtnText}>{t('common.saveChanges')}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>

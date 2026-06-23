@@ -4,11 +4,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { jobs } from '../../../lib/api'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import type { JobPosting } from '../../../lib/types'
 
 export default function QuotesScreen() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const router = useRouter()
   const { jobId } = useLocalSearchParams()
@@ -28,18 +30,18 @@ export default function QuotesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Quotes received</Text>
+      <Text style={styles.heading}>{t('quotes.title')}</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
       ) : (
         <>
           <View style={styles.jobSummary}>
-            <Text style={styles.jobTitle}>{job?.title || 'Your job'}</Text>
+            <Text style={styles.jobTitle}>{job?.title || t('quotes.yourJob')}</Text>
             <Text style={styles.jobMeta}>{job?.category || ''} • {job?.location || ''}</Text>
           </View>
 
-          <Text style={styles.count}>{job?.bids?.length || 0} quotes received</Text>
+          <Text style={styles.count}>{job?.bids?.length || 0} {t('quotes.title').toLowerCase()}</Text>
 
           <ScrollView showsVerticalScrollIndicator={false}>
             {(job?.bids || []).map((q, i) => (
@@ -47,22 +49,22 @@ export default function QuotesScreen() {
                 <View style={styles.cardTop}>
                   <View style={styles.avatar}><Text style={styles.avatarText}>{q.tasker?.user?.name?.[0] || 'T'}</Text></View>
                   <View style={styles.cardInfo}>
-                    <Text style={styles.cardName}>{q.tasker?.user?.name || 'Tasker'}</Text>
+                    <Text style={styles.cardName}>{q.tasker?.user?.name || t('quotes.tasker')}</Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Ionicons name="star" size={13} color="#F59E0B" />
-                      <Text style={styles.cardSkill}> {q.tasker?.rating?.toFixed(1) || '5.0'}</Text>
+                      <Text style={styles.cardSkill}> {q.tasker?.rating?.toFixed(1) || t('quotes.defaultRating')}</Text>
                     </View>
                   </View>
                   <Text style={styles.price}>LKR {q.amount?.toLocaleString()}</Text>
                 </View>
                 <Text style={styles.message}>{q.message}</Text>
                 <View style={styles.cardActions}>
-                  <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>View profile</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>{t('quotes.viewProfile')}</Text></TouchableOpacity>
                   <TouchableOpacity
                     style={styles.acceptBtn}
                     onPress={() => router.push(`/(customer)/booking/confirm?jobId=${jobId || ''}&bidId=${q.id}&taskerName=${q.tasker?.user?.name || ''}&price=${q.amount}` as any)}
                   >
-                    <Text style={styles.acceptBtnText}>Accept quote</Text>
+                    <Text style={styles.acceptBtnText}>{t('quotes.accept')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
 export default function CompanyMilestones() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [filter, setFilter] = useState<string>('all')
@@ -43,18 +45,18 @@ export default function CompanyMilestones() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Milestones</Text>
+        <Text style={styles.heading}>{t('company.milestones')}</Text>
       </View>
 
       <View style={styles.tabs}>
-        {['all', 'approved', 'pending', 'in review'].map((t) => (
+        {['all', 'approved', 'pending', 'in review'].map((tabKey) => (
           <TouchableOpacity
-            key={t}
-            style={[styles.tab, filter === t && styles.tabActive]}
-            onPress={() => setFilter(t)}
+            key={tabKey}
+            style={[styles.tab, filter === tabKey && styles.tabActive]}
+            onPress={() => setFilter(tabKey)}
           >
-            <Text style={[styles.tabText, filter === t && styles.tabTextActive]}>
-              {t === 'in review' ? 'Review' : t.charAt(0).toUpperCase() + t.slice(1)}
+            <Text style={[styles.tabText, filter === tabKey && styles.tabTextActive]}>
+              {tabKey === 'all' ? t('components.viewAll') : tabKey === 'pending' ? t('common.pending') : tabKey === 'in review' ? t('verify.status.pending') : tabKey.charAt(0).toUpperCase() + tabKey.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -62,7 +64,7 @@ export default function CompanyMilestones() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {filtered.length === 0 ? (
-          <Text style={styles.emptyText}>No milestones found</Text>
+          <Text style={styles.emptyText}>{t('common.noResults')}</Text>
         ) : (
           filtered.map((m, i) => (
             <View key={m.id || i} style={styles.milestoneCard}>

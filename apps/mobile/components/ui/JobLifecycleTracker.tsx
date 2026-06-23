@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
@@ -7,13 +8,6 @@ interface Props {
   escrowStatus?: string | null
   createdAt?: string
 }
-
-const STEPS = [
-  { key: 'BOOKED', label: 'Booked', icon: 'calendar-outline' },
-  { key: 'PAYMENT', label: 'Payment', icon: 'card-outline' },
-  { key: 'IN_PROGRESS', label: 'In Progress', icon: 'construct-outline' },
-  { key: 'COMPLETE', label: 'Complete', icon: 'checkmark-circle-outline' },
-]
 
 function getStepIndex(status: string, escrowStatus?: string | null): number {
   switch (status) {
@@ -36,7 +30,16 @@ function getStepIndex(status: string, escrowStatus?: string | null): number {
 
 export default function JobLifecycleTracker({ status, escrowStatus, createdAt }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
+
+  const STEPS = [
+    { key: 'BOOKED', label: t('components.statusOpen'), icon: 'calendar-outline' },
+    { key: 'PAYMENT', label: t('components.statusInProgress'), icon: 'card-outline' },
+    { key: 'IN_PROGRESS', label: t('components.statusInProgress'), icon: 'construct-outline' },
+    { key: 'COMPLETE', label: t('components.statusCompleted'), icon: 'checkmark-circle-outline' },
+  ]
+
   const step = getStepIndex(status, escrowStatus)
   const isCancelled = status === 'CANCELLED' || status === 'DISPUTED'
 
@@ -45,7 +48,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
       <View style={[styles.container, styles.cancelledContainer]}>
         <Ionicons name="close-circle-outline" size={22} color={colors.error} />
         <Text style={[styles.cancelledText, { color: colors.error }]}>
-          {status === 'DISPUTED' ? 'Disputed' : 'Cancelled'}
+          {status === 'DISPUTED' ? t('components.statusCancelled') : t('components.statusCancelled')}
         </Text>
       </View>
     )
@@ -96,7 +99,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
       </View>
       {createdAt && step === 0 && status === 'OPEN' && (
         <Text style={[styles.cancelHint, { color: colors.muted }]}>
-          You can cancel within 30 min of posting
+          {t('jobDetail.cancelConfirm')}
         </Text>
       )}
     </View>

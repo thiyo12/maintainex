@@ -4,10 +4,12 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../../lib/auth'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 
 export default function MyProfileScreen() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const router = useRouter()
   const { user } = useAuth()
@@ -23,18 +25,23 @@ export default function MyProfileScreen() {
     ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : 'N/A'
 
+  const roleLabel =
+    user.role === 'customer' ? t('profile.customer') :
+    user.role === 'tasker' ? t('profile.tasker') :
+    t('profile.company')
+
   const fields = [
-    { label: 'Full Name', value: user.name, icon: 'person-outline' as const },
-    { label: 'Email', value: user.email, icon: 'mail-outline' as const },
-    { label: 'Phone', value: user.phone || 'Not set', icon: 'call-outline' as const },
-    { label: 'Role', value: user.role.charAt(0) + user.role.slice(1).toLowerCase(), icon: 'briefcase-outline' as const },
-    { label: 'Member Since', value: memberSince, icon: 'calendar-outline' as const },
+    { label: t('profile.fullName'), value: user.name, icon: 'person-outline' as const },
+    { label: t('profile.email'), value: user.email, icon: 'mail-outline' as const },
+    { label: t('profile.phone'), value: user.phone || 'Not set', icon: 'call-outline' as const },
+    { label: t('profile.role'), value: roleLabel, icon: 'briefcase-outline' as const },
+    { label: t('profile.memberSince'), value: memberSince, icon: 'calendar-outline' as const },
   ]
 
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>My Profile</Text>
+        <Text style={styles.heading}>{t('profile.myProfile')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.avatarSection}>
@@ -42,7 +49,7 @@ export default function MyProfileScreen() {
               <Text style={styles.avatarText}>{user.name.charAt(0).toUpperCase()}</Text>
             </View>
             <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userRole}>{user.role.charAt(0) + user.role.slice(1).toLowerCase()}</Text>
+            <Text style={styles.userRole}>{roleLabel}</Text>
           </View>
 
           <View style={styles.card}>

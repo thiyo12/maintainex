@@ -1,10 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Platform } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { translateJobStatus } from '../../../lib/i18n'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as Notifications from 'expo-notifications'
 import { useTheme } from '../../../lib/ThemeContext'
 import { v2Jobs } from '../../../lib/api-v2'
+import { taskers as api } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { matchCategory } from '../../../lib/aiMatch'
 import StatsCard from '../../../components/ui/StatsCard'
@@ -14,6 +18,7 @@ import AISearchBar from '../../../components/shared/AISearchBar'
 import PropertyCard from '../../../components/shared/PropertyCard'
 
 export default function TaskerDashboard() {
+  const { t } = useTranslation()
   const { colors, isDark } = useTheme()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -33,6 +38,9 @@ export default function TaskerDashboard() {
   const [aiQuery, setAiQuery] = useState('')
   const [aiMatchResult, setAiMatchResult] = useState<ReturnType<typeof matchCategory>>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const lastPollRef = useRef<string>(new Date().toISOString())
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval>>()
+  const alertedJobsRef = useRef<Set<string>>(new Set())
 
   const loadData = useCallback(async () => {
     try {
@@ -42,14 +50,68 @@ export default function TaskerDashboard() {
       ])
       setOpenJobs((openRes.jobs || []).slice(0, 5))
       setMyJobs(myRes.jobs || [])
-    } catch (e) {
-      console.error(e)
+    } catch {
+      // fail silently
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const toggleOnline = useCallback(async () => {
+    const next = !isOnline
+    try {
+      await api.setOnline(next)
+      setIsOnline(next)
+    } catch {
+      // fail silently
+    }
+  }, [isOnline])
+
+  useEffect(() => {
+    if (!isOnline) {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      return
+    }
+    lastPollRef.current = new Date().toISOString()
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const res = await v2Jobs.pollNew(lastPollRef.current)
+        if (res.jobs && res.jobs.length > 0) {
+          lastPollRef.current = new Date().toISOString()
+          for (const job of res.jobs) {
+            if (alertedJobsRef.current.has(job.id)) continue
+            alertedJobsRef.current.add(job.id)
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: t('tasker.newJobAlert'),
+                body: `${job.title || ''} — LKR ${(job.budgetAmount || 0).toLocaleString()}`,
+                data: { jobId: job.id, screen: '/(tasker)/jobs/v2/quote/[id]' },
+                sound: true,
+              },
+              trigger: null,
+            })
+          }
+        }
+      } catch {
+        // fail silently
+      }
+    }, 15000)
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    }
+  }, [isOnline, t])
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener(res => {
+      const data = res.notification.request.content.data
+      if (data?.jobId && data?.screen) {
+        router.push(data.screen.replace('[id]', data.jobId))
+      }
+    })
+    return () => sub.remove()
+  }, [])
 
   const handleAiChange = useCallback((text: string) => {
     setAiQuery(text)
@@ -61,9 +123,9 @@ export default function TaskerDashboard() {
 
   const getGreeting = () => {
     const h = new Date().getHours()
-    if (h < 12) return 'Good morning'
-    if (h < 17) return 'Good afternoon'
-    return 'Good evening'
+    if (h < 12) return t('home.greeting.morning')
+    if (h < 17) return t('home.greeting.afternoon')
+    return t('home.greeting.evening')
   }
 
   const profile = { rating: 4.0, completedJobs: 12, activeCount: myJobs.filter((j: any) => j.status === 'IN_PROGRESS').length }
@@ -80,17 +142,19 @@ export default function TaskerDashboard() {
               </View>
               <View>
                 <Text style={[styles.greeting, { color: colors.muted }]}>{getGreeting()}</Text>
-                <Text style={[styles.userName, { color: colors.ink }]}>{user?.name || 'Tasker'}</Text>
+                <Text style={[styles.userName, { color: colors.ink }]}>{user?.name || t('customer.tasker')}</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity style={[styles.headerIcon, { backgroundColor: colors.amberBg }]}>
-                <Ionicons name="notifications-outline" size={18} color={colors.amberDark} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.headerIcon, { backgroundColor: colors.amberBg }]}>
-                <Ionicons name="person-circle-outline" size={18} color={colors.amberDark} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={[styles.onlineToggle, { backgroundColor: isOnline ? '#059669' : colors.border }]}
+              onPress={toggleOnline}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.onlineDot, { backgroundColor: isOnline ? '#fff' : colors.muted }]} />
+              <Text style={[styles.onlineText, { color: isOnline ? '#fff' : colors.muted }]}>
+                {isOnline ? t('tasker.online') : t('tasker.offline')}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -99,7 +163,7 @@ export default function TaskerDashboard() {
           <AISearchBar
             value={aiQuery}
             onChangeText={handleAiChange}
-            placeholder="Search for jobs..."
+            placeholder={t('tasker.searchJobs')}
           />
         </View>
 
@@ -108,7 +172,7 @@ export default function TaskerDashboard() {
           <View style={[styles.correctionCard, { backgroundColor: colors.surface, borderColor: colors.amber }]}>
             <Ionicons name="text-outline" size={17} color={colors.amberDark} />
             <Text style={[styles.correctionText, { color: colors.muted }]}>
-              Did you mean{' '}
+              {t('home.didYouMean')}{' '}
               <Text style={{ color: colors.ink, fontFamily: 'Outfit_800ExtraBold' }}>
                 {aiMatchResult.categoryName}
               </Text>
@@ -118,18 +182,18 @@ export default function TaskerDashboard() {
 
         {/* Stats row */}
         <View style={styles.statsRow}>
-          <StatsCard label="Rating" value={profile.rating.toFixed(1)} iconName="⭐" color={colors.amber} />
-          <StatsCard label="Jobs Done" value={profile.completedJobs} iconName="✓" color={colors.success} />
-          <StatsCard label="Active" value={profile.activeCount} iconName="⚡" color={colors.blue} />
+          <StatsCard label={t('tasker.rating')} value={profile.rating.toFixed(1)} iconName="⭐" color={colors.amber} />
+          <StatsCard label={t('tasker.jobsDone')} value={profile.completedJobs} iconName="✓" color={colors.success} />
+          <StatsCard label={t('tasker.active')} value={profile.activeCount} iconName="⚡" color={colors.blue} />
         </View>
 
         {/* Active Jobs */}
         {myJobs.filter((j: any) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED').length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Active Jobs</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.activeJobs')}</Text>
               <TouchableOpacity onPress={() => router.push('/(tasker)/jobs/v2/my-jobs')}>
-                <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+                <Text style={[styles.seeAll, { color: colors.amberDark }]}>{t('tasker.seeAll')}</Text>
               </TouchableOpacity>
             </View>
             {myJobs.filter((j: any) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED').slice(0, 2).map((job: any) => (
@@ -142,7 +206,7 @@ export default function TaskerDashboard() {
                 <View style={styles.activeJobTop}>
                   <Text style={[styles.activeJobTitle, { color: colors.ink }]}>{job.title}</Text>
                   <View style={[styles.activeStatusPill, { backgroundColor: statusColors[job.status] || colors.muted }]}>
-                    <Text style={styles.activeStatusText}>{job.status.replace(/_/g, ' ')}</Text>
+                    <Text style={styles.activeStatusText}>{t(translateJobStatus(job.status))}</Text>
                   </View>
                 </View>
                 <JobLifecycleTracker status={job.status} createdAt={job.createdAt} />
@@ -155,9 +219,9 @@ export default function TaskerDashboard() {
         {/* Hot Offers */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Hot Offers Near You</Text>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('home.hotOffers')}</Text>
             <TouchableOpacity onPress={() => router.push('/real-estate')}>
-              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>{t('tasker.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
@@ -171,7 +235,7 @@ export default function TaskerDashboard() {
                   <Ionicons name="flame-outline" size={20} color={colors.amberDark} />
                 </View>
                 <Text style={[styles.hotCardTitle, { color: colors.ink }]} numberOfLines={1}>
-                  {job.title || 'Hot Job'}
+                  {job.title || t('home.hotOffersList.hotDeal')}
                 </Text>
                 <Text style={[styles.hotCardPrice, { color: colors.amberDark }]}>
                   LKR {job.budgetAmount?.toLocaleString() || '—'}
@@ -184,9 +248,9 @@ export default function TaskerDashboard() {
         {/* Jobs Near You */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Jobs Near You</Text>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('home.jobsNearYou')}</Text>
             <TouchableOpacity onPress={() => router.push('/(tasker)/jobs/v2/browse')}>
-              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>{t('tasker.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           {loading ? (
@@ -194,14 +258,14 @@ export default function TaskerDashboard() {
           ) : openJobs.length === 0 ? (
             <View style={[styles.emptyBox, { backgroundColor: colors.white }]}>
               <Ionicons name="search-outline" size={32} color={colors.muted} />
-              <Text style={[styles.emptyText, { color: colors.muted }]}>No jobs found</Text>
+              <Text style={[styles.emptyText, { color: colors.muted }]}>{t('tasker.noJobsFound')}</Text>
             </View>
           ) : (
             openJobs.slice(0, 4).map((job) => (
               <JobCard
                 key={job.id}
-                title={job.title || 'Untitled'}
-                category={job.categoryName || 'General'}
+                title={job.title || t('jobs.untitled')}
+                category={job.categoryName || t('categories.general')}
                 budget={job.budgetAmount}
                 location={job.locationName}
                 urgency={job.urgency}
@@ -216,14 +280,14 @@ export default function TaskerDashboard() {
         {/* Real Estate */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>Real Estate</Text>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('realEstate.title')}</Text>
             <TouchableOpacity onPress={() => router.push('/real-estate')}>
-              <Text style={[styles.seeAll, { color: colors.amberDark }]}>See all</Text>
+              <Text style={[styles.seeAll, { color: colors.amberDark }]}>{t('tasker.seeAll')}</Text>
             </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
             <PropertyCard
-              title="Modern Apartment"
+              title={t('realEstate.sampleTitle1')}
               priceLkr={8500000}
               type="sale"
               bedrooms={3}
@@ -233,7 +297,7 @@ export default function TaskerDashboard() {
               onPress={() => router.push('/real-estate')}
             />
             <PropertyCard
-              title="Luxury Villa"
+              title={t('realEstate.sampleTitle2')}
               priceLkr={25000000}
               type="sale"
               bedrooms={5}
@@ -243,7 +307,7 @@ export default function TaskerDashboard() {
               onPress={() => router.push('/real-estate')}
             />
             <PropertyCard
-              title="Apartment for Rent"
+              title={t('realEstate.sampleTitle3')}
               priceLkr={85000}
               type="rent"
               bedrooms={2}
@@ -257,31 +321,31 @@ export default function TaskerDashboard() {
 
         {/* Quick post grid */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>What would you like to post?</Text>
+          <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>{t('home.postOptions.title')}</Text>
           <View style={styles.grid}>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/post-job')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.amberBg }]}>
                 <Ionicons name="briefcase-outline" size={22} color={colors.amberDark} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Post a Job</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.postJob')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(tabs)/find/index')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.blueBg }]}>
                 <Ionicons name="search-outline" size={22} color={colors.blue} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Find Work</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.findWork')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(customer)/jobs/new')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.successBg }]}>
                 <Ionicons name="chatbubble-outline" size={22} color={colors.success} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>Quick Booking</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.quickBooking')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/settings/my-profile')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.purpleBg }]}>
                 <Ionicons name="person-outline" size={22} color={colors.purple} />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>My Profile</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.myProfile')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -310,6 +374,16 @@ const makeStyles = (colors: any) => StyleSheet.create({
   greeting: { fontSize: 11, fontFamily: 'Outfit_500Medium' },
   userName: { fontSize: 16, fontFamily: 'Outfit_800ExtraBold', marginTop: 1 },
   headerIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  onlineToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  onlineDot: { width: 8, height: 8, borderRadius: 4 },
+  onlineText: { fontSize: 12, fontFamily: 'Outfit_700Bold' },
   correctionCard: {
     flexDirection: 'row',
     alignItems: 'center',

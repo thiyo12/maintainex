@@ -7,8 +7,10 @@ import Slider from '@react-native-community/slider'
 import { bookings } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 export default function BookingConfirmScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -23,7 +25,7 @@ export default function BookingConfirmScreen() {
   const [submitting, setSubmitting] = useState(false)
 
   const handleConfirm = async () => {
-    if (!district) { Alert.alert('Error', 'Please enter your district'); return }
+    if (!district) { Alert.alert(t('common.error'), t('errors.enterDistrict')); return }
     setSubmitting(true)
     try {
       const res = await bookings.create({
@@ -41,7 +43,7 @@ export default function BookingConfirmScreen() {
       })
       router.push(`/(customer)/booking/confirmed?bookingId=${res.booking.id}`)
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to create booking')
+      Alert.alert(t('common.error'), e.message || t('postJob.failed'))
     } finally {
       setSubmitting(false)
     }
@@ -49,30 +51,30 @@ export default function BookingConfirmScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Confirm booking</Text>
+      <Text style={styles.heading}>{t('booking.confirm')}</Text>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.summary}>
-          <Text style={styles.sumTitle}>Service booking</Text>
-          <Text style={styles.sumDetail}>{taskerName || 'Tasker'} • Professional</Text>
+          <Text style={styles.sumTitle}>{t('booking.serviceBooking')}</Text>
+          <Text style={styles.sumDetail}>{taskerName || t('customer.tasker')} • {t('customer.professional')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Ionicons name="calendar-outline" size={16} color={colors.gray} />
-            <Text style={styles.sumDetail}> Today</Text>
+            <Text style={styles.sumDetail}>{t('booking.today')}</Text>
           </View>
         </View>
 
         <View style={styles.summary}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>Service location (district)</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>{t('booking.district')}</Text>
           <TextInput
             style={{ borderWidth: 1.5, borderColor: colors.lightGray, borderRadius: 12, padding: 14, fontSize: 15, color: colors.dark }}
-            placeholder="Enter your district"
+            placeholder={t('booking.districtPlaceholder')}
             value={district}
             onChangeText={setDistrict}
           />
         </View>
 
         <View style={styles.payment}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>Budget Range (optional)</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>{t('booking.budgetRange')}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <TextInput
               style={[styles.input, { flex: 1, textAlign: 'center', marginBottom: 0 }]}
@@ -81,7 +83,7 @@ export default function BookingConfirmScreen() {
                 const max = budgetMax || '100000'
                 setBudgetMin(val && Number(val) > Number(max) ? max : val)
               }}
-              placeholder="Min"
+              placeholder={t('postJob.min')}
               keyboardType="numeric"
             />
             <Text style={{ fontSize: 16, color: colors.gray }}>-</Text>
@@ -92,15 +94,15 @@ export default function BookingConfirmScreen() {
                 const min = budgetMin || '0'
                 setBudgetMax(val && Number(val) < Number(min) ? min : val)
               }}
-              placeholder="Max"
+              placeholder={t('postJob.max')}
               keyboardType="numeric"
             />
             <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark }}>LKR</Text>
           </View>
           <View style={{ marginBottom: 8 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: -4 }}>
-              <Text style={{ fontSize: 11, color: colors.gray }}>LKR 0</Text>
-              <Text style={{ fontSize: 11, color: colors.gray }}>LKR 100K</Text>
+              <Text style={{ fontSize: 11, color: colors.gray }}>{t('booking.estimateLabel')}</Text>
+              <Text style={{ fontSize: 11, color: colors.gray }}>{t('booking.estimateMax')}</Text>
             </View>
             <View style={{ height: 40, justifyContent: 'center', position: 'relative' }}>
               <View style={{ height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, marginHorizontal: 14 }} />
@@ -141,19 +143,19 @@ export default function BookingConfirmScreen() {
               />
             </View>
           </View>
-          <Text style={{ fontSize: 12, color: colors.gray, marginBottom: 8 }}>Drag thumbs or enter values above</Text>
+          <Text style={{ fontSize: 12, color: colors.gray, marginBottom: 8 }}>{t('booking.dragHint')}</Text>
           {budgetMin && budgetMax && (
             <View style={styles.payRow}>
-              <Text style={styles.payLabel}>Your range</Text>
+              <Text style={styles.payLabel}>{t('booking.yourRange')}</Text>
               <Text style={styles.payValue}>LKR {Number(budgetMin).toLocaleString()} - {Number(budgetMax).toLocaleString()}</Text>
             </View>
           )}
           <View style={styles.payRow}>
-            <Text style={styles.payLabel}>Platform fee (5%)</Text>
+            <Text style={styles.payLabel}>{t('booking.platformFee')}</Text>
             <Text style={styles.payValue}>LKR {fee.toLocaleString()}</Text>
           </View>
           <View style={[styles.payRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{t('booking.total')}</Text>
             <Text style={styles.totalValue}>LKR {(total + fee).toLocaleString()}</Text>
           </View>
         </View>
@@ -161,7 +163,7 @@ export default function BookingConfirmScreen() {
         <View style={styles.escrowBox}>
           <Ionicons name="lock-closed-outline" size={20} color="#1E40AF" />
           <Text style={styles.escrowText}>
-            Funds are held securely in escrow until the job is completed to your satisfaction.
+            {t('booking.escrowInfo')}
           </Text>
         </View>
       </ScrollView>
@@ -172,7 +174,7 @@ export default function BookingConfirmScreen() {
         disabled={submitting}
       >
         <Text style={styles.confirmBtnText}>
-          {submitting ? 'Processing...' : `Confirm and pay LKR ${(total + fee).toLocaleString()}`}
+          {submitting ? t('booking.processing') : t('booking.confirmPay', { amount: (total + fee).toLocaleString() })}
         </Text>
       </TouchableOpacity>
     </SafeAreaView>

@@ -7,8 +7,10 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Team } from '../../../lib/api-v2'
+import { useTranslation } from 'react-i18next'
 
 export default function TeamManagement() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -23,7 +25,7 @@ export default function TeamManagement() {
       setMembers(res.members || [])
       setPendingInvites(res.pendingInvites || [])
     } catch {
-      Alert.alert('Error', 'Failed to load team data')
+      Alert.alert(t('common.error'), t('errors.generic'))
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -34,19 +36,19 @@ export default function TeamManagement() {
 
   const handleRemove = (memberId: string, name: string) => {
     Alert.alert(
-      'Remove Member',
-      `Are you sure you want to remove ${name} from the team?`,
+      t('common.remove') + ' ' + t('company.team'),
+      t('errors.generic'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('common.remove'),
           style: 'destructive',
           onPress: async () => {
             try {
               await v2Team.remove(memberId)
               setMembers(members.filter(m => m.id !== memberId))
             } catch {
-              Alert.alert('Error', 'Failed to remove team member')
+              Alert.alert(t('common.error'), t('errors.generic'))
             }
           },
         },
@@ -69,20 +71,20 @@ export default function TeamManagement() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadTeam() }} />}
     >
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Team Members</Text>
+        <Text style={styles.title}>{t('company.teamMembers')}</Text>
         <TouchableOpacity style={styles.inviteBtn} onPress={() => router.push('/(company)/team/invite')}>
           <Ionicons name="person-add-outline" size={18} color={colors.white} />
-          <Text style={styles.inviteBtnText}>Invite</Text>
+          <Text style={styles.inviteBtnText}>{t('company.inviteMember')}</Text>
         </TouchableOpacity>
       </View>
 
       {members.length === 0 && pendingInvites.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="people-outline" size={48} color={colors.muted} />
-          <Text style={styles.emptyTitle}>No team members yet</Text>
-          <Text style={styles.emptyDesc}>Invite your team to get started.</Text>
+          <Text style={styles.emptyTitle}>{t('common.noResults')}</Text>
+          <Text style={styles.emptyDesc}>{t('company.inviteMember')}</Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(company)/team/invite')}>
-            <Text style={styles.emptyBtnText}>Invite Members</Text>
+            <Text style={styles.emptyBtnText}>{t('company.inviteMember')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -100,7 +102,7 @@ export default function TeamManagement() {
                   <Ionicons name="star" size={12} color={colors.amber} />
                   <Text style={styles.statText}>{m.rating.toFixed(1)}</Text>
                   <Ionicons name="checkmark-circle-outline" size={12} color={colors.muted} />
-                  <Text style={styles.statText}>{m.completedJobs} jobs</Text>
+                  <Text style={styles.statText}>{m.completedJobs} {t('customer.jobs')}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => handleRemove(m.id, m.name)} style={styles.removeBtn}>
@@ -111,7 +113,7 @@ export default function TeamManagement() {
 
           {pendingInvites.length > 0 && (
             <View style={styles.invitesSection}>
-              <Text style={styles.sectionTitle}>Pending Invites</Text>
+              <Text style={styles.sectionTitle}>{t('tasker.pending')} {t('company.inviteMember')}</Text>
               {pendingInvites.map((inv) => (
                 <View key={inv.id} style={styles.inviteCard}>
                   <Ionicons name="time-outline" size={20} color={colors.amber} />
@@ -120,7 +122,7 @@ export default function TeamManagement() {
                     <Text style={styles.inviteContact}>{inv.email || inv.phone}</Text>
                   </View>
                   <View style={styles.pendingBadge}>
-                    <Text style={styles.pendingText}>Pending</Text>
+                    <Text style={styles.pendingText}>{t('tasker.pending')}</Text>
                   </View>
                 </View>
               ))}

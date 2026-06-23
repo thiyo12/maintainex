@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
 interface PhotoItem {
@@ -17,6 +18,7 @@ interface Props {
 
 export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingPhotos = [] }: Props) {
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const [photos, setPhotos] = useState<PhotoItem[]>(existingPhotos)
 
@@ -59,7 +61,7 @@ export default function PhotoUploader({ maxPhotos = 5, onPhotosChange, existingP
           >
             <Ionicons name="camera-outline" size={26} color={colors.muted} />
             <Text style={[styles.addLabel, { color: colors.muted }]}>
-              {photos.length === 0 ? 'Tap to add' : 'Add more'}
+              {photos.length === 0 ? t('components.addPhoto') : t('components.addPhoto')}
             </Text>
           </TouchableOpacity>
         ) : null}

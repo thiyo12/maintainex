@@ -4,11 +4,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { jobs } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/auth'
 import { JobPosting } from '../../../../lib/types'
 
 export default function JobCompleteScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -59,7 +61,7 @@ export default function JobCompleteScreen() {
     )
   }
 
-  const taskerName = job?.assignedTasker?.user?.name || 'Tasker'
+  const taskerName = job?.assignedTasker?.user?.name || t('jobComplete.tasker')
   const taskerInfo = job?.assignedTasker?.skills?.length
     ? job.assignedTasker.skills.join(', ')
     : ''
@@ -78,39 +80,39 @@ export default function JobCompleteScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Ionicons name="checkmark-circle-outline" size={52} color={colors.green} style={{ marginBottom: 12 }} />
-          <Text style={styles.heading}>Job in review</Text>
+          <Text style={styles.heading}>{t('jobComplete.jobInReview')}</Text>
           <Text style={styles.subtitle}>
-            The tasker has marked this job as complete. Please confirm that everything is done to your satisfaction.
+            {t('jobComplete.jobInReviewDesc')}
           </Text>
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.sumTitle}>{job?.title || 'Job'}</Text>
+          <Text style={styles.sumTitle}>{job?.title || t('home.untitledJob')}</Text>
           <View style={styles.sumRow}>
-            <Text style={styles.sumLabel}>Tasker</Text>
+            <Text style={styles.sumLabel}>{t('jobComplete.tasker')}</Text>
             <Text style={styles.sumValue}>{taskerDisplay}</Text>
           </View>
           <View style={styles.sumRow}>
-            <Text style={styles.sumLabel}>Location</Text>
+            <Text style={styles.sumLabel}>{t('jobComplete.location')}</Text>
             <Text style={styles.sumValue}>{job?.location || ''}</Text>
           </View>
           <View style={styles.sumRow}>
-            <Text style={styles.sumLabel}>Date</Text>
+            <Text style={styles.sumLabel}>{t('jobComplete.date')}</Text>
             <Text style={styles.sumValue}>{formattedDate}</Text>
           </View>
           <View style={styles.sumRow}>
-            <Text style={styles.sumLabel}>Quoted</Text>
+            <Text style={styles.sumLabel}>{t('jobComplete.quoted')}</Text>
             <Text style={styles.sumPrice}>LKR {(job?.budget || 0).toLocaleString()}</Text>
           </View>
         </View>
 
         <View style={styles.photosSection}>
-          <Text style={styles.photoSectionTitle}>Completion photos</Text>
+          <Text style={styles.photoSectionTitle}>{t('jobComplete.completionPhotos')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
             {[1, 2, 3].map((_, i) => (
               <View key={i} style={styles.photoThumb}>
                 <Ionicons name="camera-outline" size={32} color={colors.gray} />
-                <Text style={styles.photoLabel}>Photo {i + 1}</Text>
+                <Text style={styles.photoLabel}>{t('jobComplete.photo', { n: i + 1 })}</Text>
               </View>
             ))}
           </ScrollView>
@@ -119,33 +121,33 @@ export default function JobCompleteScreen() {
         {confirmed ? (
           <View style={styles.confirmedBox}>
             <Ionicons name="sparkles-outline" size={32} color={colors.green} style={{ marginBottom: 8 }} />
-            <Text style={styles.confirmedText}>Job marked as complete!</Text>
+            <Text style={styles.confirmedText}>{t('jobComplete.completedTitle')}</Text>
             <Text style={styles.confirmedSub}>
-              Payment of LKR {((job?.budget || 0) * 1.05).toLocaleString()} will be released to the tasker.
+              {t('jobComplete.completedDesc', { amount: ((job?.budget || 0) * 1.05).toLocaleString() })}
             </Text>
           </View>
         ) : null}
 
         <View style={styles.actionSection}>
-          <Text style={styles.actionTitle}>Is everything done correctly?</Text>
+          <Text style={styles.actionTitle}>{t('jobComplete.everythingDone')}</Text>
           <TouchableOpacity
             style={[styles.confirmBtn, completing && { opacity: 0.6 }]}
             onPress={handleComplete}
             disabled={completing}
           >
             <Text style={styles.confirmBtnText}>
-              {completing ? 'Completing...' : 'Yes, complete the job'}
+              {completing ? t('jobComplete.completing') : t('jobComplete.yesComplete')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.issueBtn}
             onPress={() => router.push('/(customer)/jobs/dispute/' + id as any)}
           >
-            <Text style={styles.issueBtnText}>Report an issue</Text>
+            <Text style={styles.issueBtnText}>{t('jobComplete.reportIssue')}</Text>
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16 }}>
             <Ionicons name="lock-closed-outline" size={14} color={colors.gray} />
-            <Text style={[styles.escrowNote, { marginTop: 0 }]}> Funds are held in escrow. Payment is only released when you confirm completion.</Text>
+            <Text style={[styles.escrowNote, { marginTop: 0 }]}>{t('jobComplete.escrowHeld')}</Text>
           </View>
         </View>
       </ScrollView>
@@ -155,7 +157,7 @@ export default function JobCompleteScreen() {
           style={styles.nextBtn}
             onPress={() => router.push('/(customer)/jobs/receipt/' + id as any)}
         >
-          <Text style={styles.nextBtnText}>Continue to receipt</Text>
+          <Text style={styles.nextBtnText}>{t('jobComplete.continueReceipt')}</Text>
         </TouchableOpacity>
       ) : null}
     </SafeAreaView>

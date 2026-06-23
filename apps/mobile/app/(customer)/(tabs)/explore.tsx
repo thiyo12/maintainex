@@ -7,12 +7,14 @@ import { taskers } from '../../../lib/api'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import type { TaskerProfile } from '../../../lib/types'
+import { useTranslation } from 'react-i18next'
 import PressScale from '../../../components/find/PressScale'
 
 export default function ExploreScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [filterSkill, setFilterSkill] = useState('')
   const [taskerList, setTaskerList] = useState<TaskerProfile[]>([])
@@ -46,7 +48,7 @@ export default function ExploreScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Explore</Text>
+        <Text style={styles.heading}>{t('customer.explore')}</Text>
         <Text style={styles.count}>{filtered.length} taskers</Text>
       </View>
 
@@ -54,7 +56,7 @@ export default function ExploreScreen() {
         <Ionicons name="search" size={18} color={colors.muted} style={{ marginRight: 10 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search taskers or skills..."
+          placeholder={t('customer.searchTaskers')}
           placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
@@ -70,7 +72,7 @@ export default function ExploreScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
           <PressScale onPress={() => setFilterSkill('')}>
             <View style={[styles.filterPill, !filterSkill && styles.filterPillActive]}>
-              <Text style={[styles.filterPillText, !filterSkill && styles.filterPillTextActive]}>All</Text>
+              <Text style={[styles.filterPillText, !filterSkill && styles.filterPillTextActive]}>{t('common.all')}</Text>
             </View>
           </PressScale>
           {skills.map((f) => (
@@ -91,10 +93,10 @@ export default function ExploreScreen() {
         >
           <View style={styles.mapPlaceholder}>
             <Ionicons name="map" size={36} color="rgba(255,255,255,0.9)" />
-            <Text style={styles.mapTitle}>{filtered.length} taskers nearby</Text>
+            <Text style={styles.mapTitle}>{t('customer.taskersNearby', { n: filtered.length })}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="location-outline" size={14} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.mapSub}> Sri Lanka</Text>
+              <Text style={styles.mapSub}>{t('customer.sriLanka')}</Text>
             </View>
           </View>
 
@@ -107,24 +109,24 @@ export default function ExploreScreen() {
                     {t.isOnline ? <View style={styles.onlineDot} /> : null}
                   </View>
                   <View style={styles.taskerInfo}>
-                    <Text style={styles.taskerName}>{t.user?.name || 'Tasker'}</Text>
+                    <Text style={styles.taskerName}>{t.user?.name || t('customer.tasker')}</Text>
                     <Text style={styles.taskerSkill}>
-                      {t.skills?.slice(0, 2).join(', ') || 'Professional'}
+                      {t.skills?.slice(0, 2).join(', ') || t('customer.professional')}
                     </Text>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                       <Ionicons name="star" size={13} color="#F59E0B" />
-                      <Text style={styles.taskerRating}> {t.rating?.toFixed(1) || '5.0'} • {t.completedJobs || 0} jobs</Text>
+                      <Text style={styles.taskerRating}> {t.rating?.toFixed(1) || '5.0'} • {t.completedJobs || 0}{t('customer.jobs')}</Text>
                     </View>
                   </View>
                 </View>
                 <View style={styles.taskerRight}>
                   <Text style={styles.taskerPrice}>
-                    {t.hourlyRate ? `LKR ${t.hourlyRate}/hr` : '—'}
+                    {t.hourlyRate ? t('customer.rate', { rate: t.hourlyRate }) : '—'}
                   </Text>
                   <TouchableOpacity style={styles.hireBtn}
                     onPress={() => router.push(`/(customer)/find/tasker-profile/${t.id}`)}>
                     <Ionicons name="hand-left-outline" size={14} color={colors.white} />
-                    <Text style={styles.hireBtnText}> Hire</Text>
+                    <Text style={styles.hireBtnText}>{t('customer.hire')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

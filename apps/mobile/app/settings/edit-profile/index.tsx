@@ -7,8 +7,10 @@ import { useAuth } from '../../../lib/auth'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
 import { spacing, borderRadius } from '../../../lib/tokens'
+import { useTranslation } from 'react-i18next'
 
 export default function EditProfileScreen() {
+  const { t } = useTranslation()
   const router = useRouter()
   const colors = useColors()
     const styles = makeStyles(colors)
@@ -20,11 +22,11 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.ink }]}>Edit Profile</Text>
+        <Text style={[styles.title, { color: colors.ink }]}>{t('profile.editProfileHeader')}</Text>
         <View style={{ width: 24 }} />
       </View>
       <View style={styles.content}>
-        <Text style={[styles.fieldLabel, { color: colors.muted }]}>Coming soon</Text>
+        <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('profile.paymentComingSoon')}</Text>
       </View>
     </SafeAreaView>
   )

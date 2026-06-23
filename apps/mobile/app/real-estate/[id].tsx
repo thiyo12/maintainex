@@ -7,15 +7,16 @@ import { useTheme } from '../../lib/ThemeContext'
 import { realEstate } from '../../lib/api'
 import { fonts } from '../../lib/fonts'
 import { spacing, fontSizes } from '../../lib/tokens'
-
-const TYPE_BADGES: Record<string, { label: string; color: string }> = {
-  sale: { label: 'For Sale', color: '#F59E0B' },
-  rent: { label: 'For Rent', color: '#6366F1' },
-  commercial: { label: 'Commercial', color: '#10B981' },
-  land: { label: 'Land', color: '#7C3AED' },
-}
+import { useTranslation } from 'react-i18next'
 
 export default function PropertyDetail() {
+  const { t } = useTranslation()
+  const TYPE_BADGES: Record<string, { label: string; color: string }> = {
+    sale: { label: t('realEstate.forSale'), color: '#F59E0B' },
+    rent: { label: t('realEstate.forRent'), color: '#6366F1' },
+    commercial: { label: t('realEstate.commercial'), color: '#10B981' },
+    land: { label: t('realEstate.land'), color: '#7C3AED' },
+  }
   const { colors } = useTheme()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -44,9 +45,9 @@ export default function PropertyDetail() {
     return (
       <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', gap: spacing.sm }]}>
         <Ionicons name="alert-circle-outline" size={48} color={colors.muted} />
-        <Text style={[styles.sectionLabel, { color: colors.muted }]}>Property not found</Text>
+        <Text style={[styles.sectionLabel, { color: colors.muted }]}>{t('errors.notFound')}</Text>
         <TouchableOpacity onPress={() => router.back()} style={[styles.ctaBtn, { backgroundColor: colors.amber }]}>
-          <Text style={styles.ctaText}>Go Back</Text>
+          <Text style={styles.ctaText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     )
@@ -90,28 +91,28 @@ export default function PropertyDetail() {
               <View style={styles.specItem}>
                 <Ionicons name="bed-outline" size={18} color={colors.amber} />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.bedrooms}</Text>
-                <Text style={[styles.specLabel, { color: colors.muted }]}>Bedrooms</Text>
+                <Text style={[styles.specLabel, { color: colors.muted }]}>{t('realEstate.bedrooms')}</Text>
               </View>
             )}
             {property.bathrooms && (
               <View style={styles.specItem}>
                 <Ionicons name="water-outline" size={18} color={colors.amber} />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.bathrooms}</Text>
-                <Text style={[styles.specLabel, { color: colors.muted }]}>Bathrooms</Text>
+                <Text style={[styles.specLabel, { color: colors.muted }]}>{t('realEstate.bathrooms')}</Text>
               </View>
             )}
             {property.areaSqft && (
               <View style={styles.specItem}>
                 <Ionicons name="resize-outline" size={18} color={colors.amber} />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.areaSqft}</Text>
-                <Text style={[styles.specLabel, { color: colors.muted }]}>Sq. Ft.</Text>
+                <Text style={[styles.specLabel, { color: colors.muted }]}>{t('realEstate.sqFt')}</Text>
               </View>
             )}
             {property.isFurnished !== undefined && (
               <View style={styles.specItem}>
                 <Ionicons name={property.isFurnished ? 'checkmark-circle-outline' : 'close-circle-outline'} size={18} color={property.isFurnished ? colors.success : colors.muted} />
-                <Text style={[styles.specValue, { color: colors.ink }]}>{property.isFurnished ? 'Yes' : 'No'}</Text>
-                <Text style={[styles.specLabel, { color: colors.muted }]}>Furnished</Text>
+                <Text style={[styles.specValue, { color: colors.ink }]}>{property.isFurnished ? t('common.yes') : t('common.no')}</Text>
+                <Text style={[styles.specLabel, { color: colors.muted }]}>{t('realEstate.furnished')}</Text>
               </View>
             )}
           </View>
@@ -119,7 +120,7 @@ export default function PropertyDetail() {
           {/* Description */}
           {property.description && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Description</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('postJob.description')}</Text>
               <Text style={[styles.description, { color: colors.muted }]}>{property.description}</Text>
             </View>
           )}
@@ -127,7 +128,7 @@ export default function PropertyDetail() {
           {/* Features */}
           {property.features?.length > 0 && (
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>Features</Text>
+              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('realEstate.features')}</Text>
               <View style={styles.featureList}>
                 {property.features.map((f: string, i: number) => (
                   <View key={i} style={styles.featureRow}>
@@ -154,11 +155,11 @@ export default function PropertyDetail() {
         <View>
           <Text style={[styles.ctaPrice, { color: colors.amberDark }]}>LKR {property.priceLkr?.toLocaleString()}</Text>
           <Text style={[styles.ctaSub, { color: colors.muted }]}>
-            {property.type === 'rent' ? 'per month' : 'total price'}
+            {property.type === 'rent' ? t('realEstate.perMonth') : t('realEstate.totalPrice')}
           </Text>
         </View>
         <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: colors.amber }]}>
-          <Text style={styles.ctaText}>Contact Agent</Text>
+          <Text style={styles.ctaText}>{t('profile.contactUs')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

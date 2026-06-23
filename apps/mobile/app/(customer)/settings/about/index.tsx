@@ -4,8 +4,10 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 export default function AboutScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -18,7 +20,7 @@ export default function AboutScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>About Maintainex</Text>
+        <Text style={styles.heading}>{t('profile.aboutApp')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.brandCard}>

@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal } from 'react-native'
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
+import { translateJobStatus } from '../../../../lib/i18n'
+import { getCategoryImageUrl } from '../../../../lib/categories'
 import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { spacing } from '../../../../lib/tokens'
-import { v2Jobs, v2JobActions, V2Job, V2Quote } from '../../../../lib/api-v2'
+import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '../../../../lib/api-v2'
 import JobLifecycleTracker from '../../../../components/ui/JobLifecycleTracker'
+import { emit, removedJobs } from '../../../../lib/events'
 
 export default function V2JobDetailScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -27,6 +32,7 @@ export default function V2JobDetailScreen() {
   const [quotes, setQuotes] = useState<V2Quote[]>([])
   const [escrow, setEscrow] = useState<any>(null)
   const [workspace, setWorkspace] = useState<any>(null)
+  const [providers, setProviders] = useState<any[]>([])
   const [reviews, setReviews] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
@@ -41,6 +47,8 @@ export default function V2JobDetailScreen() {
 
   const [otpInput, setOtpInput] = useState('')
   const [otpError, setOtpError] = useState('')
+  const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
 
   const loadJob = async () => {
     try {
@@ -50,8 +58,14 @@ export default function V2JobDetailScreen() {
       setEscrow(res.job.escrow || null)
       setWorkspace(res.job.workspace || null)
       setReviews(res.job.reviews || null)
+      if (res.job.status === 'OPEN') {
+        const matchRes = await v2Match.getProviders(id).catch(() => ({ providers: [] }))
+        setProviders((matchRes.providers || []).sort((a: any, b: any) => (b.completedJobs || 0) - (a.completedJobs || 0)))
+      } else {
+        setProviders([])
+      }
     } catch (e) {
-      Alert.alert('Error', 'Failed to load job')
+      Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
     } finally {
       setLoading(false)
@@ -69,12 +83,13 @@ export default function V2JobDetailScreen() {
 
   const handleSelectQuote = async (quoteId: string) => {
     setActionLoading(quoteId)
+    removedJobs.add(id)
+    emit('jobsChanged', id)
     try {
       await v2JobActions.selectQuote(id, quoteId)
-      Alert.alert('Quote Accepted!', 'Now deposit escrow to start the job.')
-      loadJob()
-    } catch (e: any) {
-      Alert.alert('Error', e.message)
+      router.back()
+    } catch {
+      router.back()
     } finally {
       setActionLoading('')
     }
@@ -82,18 +97,18 @@ export default function V2JobDetailScreen() {
 
   const handleDeclineQuote = (quote: V2Quote) => {
     Alert.alert(
-      'Decline Quote',
-      `Decline ${quote.provider?.name || 'provider'}'s quote of LKR ${quote.price}?`,
+      t('jobDetail.declineQuote'),
+      t('jobDetail.declineConfirm', { name: quote.provider?.name || t('jobDetail.provider'), price: quote.price }),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Decline', style: 'destructive', onPress: async () => {
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('jobDetail.decline'), style: 'destructive', onPress: async () => {
           setActionLoading('decline-' + quote.id)
           try {
             await v2JobActions.complete(id, 'CANCEL')
-            Alert.alert('Declined', 'Quote declined')
+            Alert.alert(t('jobDetail.declined'), t('jobDetail.declineSuccess'))
             loadJob()
           } catch {
-            Alert.alert('Declined', 'Quote has been declined')
+            Alert.alert(t('jobDetail.declined'), t('jobDetail.declineSuccess'))
             loadJob()
           } finally {
             setActionLoading('')
@@ -107,18 +122,18 @@ export default function V2JobDetailScreen() {
     if (!bargainModal || !bargainPrice) return
     const price = parseInt(bargainPrice, 10)
     if (!price || price < 100) {
-      Alert.alert('Invalid', 'Enter a valid counter price (min LKR 100)')
+      Alert.alert(t('common.error'), t('errors.enterValidPrice'))
       return
     }
     setActionLoading('bargain')
     try {
       await v2JobActions.complete(id, 'CANCEL')
-      Alert.alert('Counter Offer Sent', `You offered LKR ${price} to ${bargainModal.provider?.name || 'provider'}. They will review and respond.`)
+      Alert.alert(t('jobDetail.counterOffer'), t('jobDetail.sendOffer'))
       setBargainModal(null)
       setBargainPrice('')
       loadJob()
     } catch {
-      Alert.alert('Sent', `Counter offer of LKR ${price} sent`)
+      Alert.alert(t('jobDetail.counterOffer'), t('jobDetail.sendOffer'))
       setBargainModal(null)
       setBargainPrice('')
     } finally {
@@ -127,29 +142,31 @@ export default function V2JobDetailScreen() {
   }
 
   const handleCancelJob = () => {
-    const within30 = canCancelWithin30()
-    Alert.alert(
-      'Cancel Job',
-      within30
-        ? 'Cancel this job? You are within the 30-min cancellation window.'
-        : 'Cancel this job? Note: More than 30 min have passed since posting.',
-      [
-        { text: 'Keep Job', style: 'cancel' },
-        { text: 'Cancel Job', style: 'destructive', onPress: async () => {
-          setActionLoading('cancel')
-          try {
-            await v2JobActions.complete(id, 'CANCEL')
-            Alert.alert('Cancelled', 'Job has been cancelled')
-            loadJob()
-          } catch {
-            Alert.alert('Cancelled', 'Job cancelled')
-            loadJob()
-          } finally {
-            setActionLoading('')
-          }
-        }},
-      ]
-    )
+    setCancelReason('')
+    setCancelReasonVisible(true)
+  }
+
+  const cancelReasons = [
+    { key: 'price', label: t('jobDetail.cancelReasonPrice') },
+    { key: 'changedMind', label: t('jobDetail.cancelReasonChangedMind') },
+    { key: 'notNeeded', label: t('jobDetail.cancelReasonNotNeeded') },
+    { key: 'foundOther', label: t('jobDetail.cancelReasonFoundOther') },
+    { key: 'other', label: t('jobDetail.cancelReasonOther') },
+  ]
+
+  const handleCancelWithReason = async () => {
+    setCancelReasonVisible(false)
+    setActionLoading('cancel')
+    removedJobs.add(id)
+    emit('jobsChanged', id)
+    try {
+      await v2JobActions.complete(id, 'CANCEL', cancelReason || t('jobDetail.cancelReasonOther'))
+      router.back()
+    } catch {
+      router.back()
+    } finally {
+      setActionLoading('')
+    }
   }
 
   const handleDepositEscrow = async () => {
@@ -157,10 +174,10 @@ export default function V2JobDetailScreen() {
     setActionLoading('escrow')
     try {
       await v2JobActions.depositEscrow(id, job.budgetAmount)
-      Alert.alert('Escrow Deposited!', 'Now share your address with the provider.')
+      Alert.alert(t('jobDetail.escrowDeposited'), t('jobDetail.escrowDepositedDesc'))
       loadJob()
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setActionLoading('')
     }
@@ -175,11 +192,11 @@ export default function V2JobDetailScreen() {
         apartment: addressApartment,
         landmark: addressLandmark,
       })
-      Alert.alert('Done!', 'Address shared with provider')
+      Alert.alert(t('common.done'), t('jobDetail.addressShared'))
       loadJob()
       setShowAddressForm(false)
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setActionLoading('')
     }
@@ -187,18 +204,18 @@ export default function V2JobDetailScreen() {
 
   const handleVerifyOtp = async () => {
     if (!otpInput || otpInput.length !== 4) {
-      setOtpError('Please enter the 4-digit code')
+      setOtpError(t('errors.enterCode'))
       return
     }
     setOtpError('')
     setActionLoading('otp')
     try {
       await v2JobActions.verifyOtp(id, otpInput)
-      Alert.alert('Confirmed!', 'Provider can now start working.')
+      Alert.alert(t('jobDetail.confirmedStart'), t('jobDetail.confirmedStartDesc'))
       setOtpInput('')
       loadJob()
     } catch (e: any) {
-      setOtpError(e.message || 'Invalid code. Ask the provider for the correct code.')
+      setOtpError(e.message || t('jobDetail.invalidConfirmCode'))
     } finally {
       setActionLoading('')
     }
@@ -206,12 +223,13 @@ export default function V2JobDetailScreen() {
 
   const handleApproveCompletion = async () => {
     setActionLoading('approve')
+    removedJobs.add(id)
+    emit('jobsChanged', id)
     try {
-      const res = await v2JobActions.complete(id, 'APPROVE_COMPLETION')
-      Alert.alert('Job Complete!', res.message || 'Payment released to provider.')
-      loadJob()
-    } catch (e: any) {
-      Alert.alert('Error', e.message)
+      await v2JobActions.complete(id, 'APPROVE_COMPLETION')
+      router.back()
+    } catch {
+      router.back()
     } finally {
       setActionLoading('')
     }
@@ -221,26 +239,26 @@ export default function V2JobDetailScreen() {
     setActionLoading('release')
     try {
       await v2JobActions.releaseEscrow(id)
-      Alert.alert('Released', 'Escrow released to provider')
+      Alert.alert(t('jobDetail.escrowReleased'), t('jobDetail.escrowReleasedDesc'))
       loadJob()
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setActionLoading('')
     }
   }
 
   const handleRefundEscrow = async () => {
-    Alert.alert('Refund Escrow?', 'This will cancel the job and refund the full amount to your wallet.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Yes, Refund', style: 'destructive', onPress: async () => {
+    Alert.alert(t('jobDetail.refundEscrow'), t('jobDetail.refundEscrowDesc'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('jobDetail.yesRefund'), style: 'destructive', onPress: async () => {
         setActionLoading('refund')
         try {
           const res = await v2JobActions.refundEscrow(id)
-          Alert.alert('Refunded', 'Escrow refunded to your wallet')
+          Alert.alert(t('jobDetail.refunded'), t('jobDetail.refundedDesc'))
           loadJob()
         } catch (e: any) {
-          Alert.alert('Error', e.message)
+          Alert.alert(t('common.error'), e.message)
         } finally {
           setActionLoading('')
         }
@@ -249,16 +267,16 @@ export default function V2JobDetailScreen() {
   }
 
   const handleDispute = async () => {
-    Alert.alert('Raise a Dispute', 'This puts escrow on hold and cancels the job. Admin will review.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Raise Dispute', style: 'destructive', onPress: async () => {
+    Alert.alert(t('jobDetail.disputeTitle'), t('jobDetail.disputeDesc'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('jobDetail.raiseDisputeBtn'), style: 'destructive', onPress: async () => {
         setActionLoading('dispute')
         try {
           const res = await v2JobActions.dispute(id)
-          Alert.alert('Dispute Raised', 'Admin will review the case')
+          Alert.alert(t('jobDetail.disputeRaised'), t('jobDetail.disputeRaisedDesc'))
           loadJob()
         } catch (e: any) {
-          Alert.alert('Error', e.message)
+          Alert.alert(t('common.error'), e.message)
         } finally {
           setActionLoading('')
         }
@@ -278,7 +296,7 @@ export default function V2JobDetailScreen() {
 
   const StatusBadge = ({ status }: { status: string }) => (
     <View style={[styles.statusBadge, { backgroundColor: statusColors[status] || colors.muted }]}>
-      <Text style={styles.statusText}>{status.replace(/_/g, ' ')}</Text>
+      <Text style={styles.statusText}>{t(translateJobStatus(status))}</Text>
     </View>
   )
 
@@ -318,7 +336,7 @@ export default function V2JobDetailScreen() {
                 <>
                   <Ionicons name="close-circle-outline" size={16} color={colors.error} />
                   <Text style={styles.cancelBtnText}>
-                    {canCancelWithin30() ? 'Cancel Job (within 30 min)' : 'Cancel Job'}
+                    {canCancelWithin30() ? t('jobDetail.statusCancelled') : t('jobDetail.statusCancelledLate')}
                   </Text>
                 </>
               )}
@@ -328,29 +346,44 @@ export default function V2JobDetailScreen() {
 
         {/* Hero Section */}
         <View style={styles.hero}>
+          <Image source={{ uri: getCategoryImageUrl(job.categoryId) }} style={styles.heroImg} resizeMode="cover" />
           <Text style={styles.title}>{job.title}</Text>
           <StatusBadge status={job.status} />
         </View>
 
+        {/* Scheduled Date */}
+        {job.preferredDate && (
+          <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+            <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
+              <Ionicons name="calendar-outline" size={16} color={colors.amberDark} />
+              <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
+                {job.timeSlot
+                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.timeSlot })
+                  : `${job.preferredDate}`}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Info Cards Row */}
         <View style={styles.infoRow}>
           <View style={styles.infoCard}>
-            <Text style={styles.infoLabel}>Budget</Text>
+            <Text style={styles.infoLabel}>{t('jobDetail.budget')}</Text>
             <Text style={styles.infoValue}>LKR {job.budgetAmount}</Text>
             <Text style={styles.infoSub}>{job.budgetType}</Text>
           </View>
           {job.locationName && (
             <View style={styles.infoCard}>
-              <Text style={styles.infoLabel}>Location</Text>
+              <Text style={styles.infoLabel}>{t('jobDetail.location')}</Text>
               <Text style={styles.infoValue} numberOfLines={1}>{job.locationName}</Text>
-              <Text style={styles.infoSub}>Service area</Text>
+              <Text style={styles.infoSub}>{t('jobDetail.serviceArea')}</Text>
             </View>
           )}
         </View>
 
         {/* Description */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.sectionTitle}>{t('jobDetail.description')}</Text>
           <View style={styles.descCard}>
             <Text style={styles.desc}>{job.description}</Text>
           </View>
@@ -360,7 +393,7 @@ export default function V2JobDetailScreen() {
         {job.status === 'OPEN' && quotes.length > 0 && (
           <View style={styles.section}>
             <View style={styles.quotesHeader}>
-              <Text style={styles.sectionTitle}>Quotes Received</Text>
+              <Text style={styles.sectionTitle}>{t('jobDetail.quotesReceived')}</Text>
               <View style={styles.quoteCountBadge}>
                 <Text style={styles.quoteCountText}>{quotes.length}</Text>
               </View>
@@ -372,7 +405,7 @@ export default function V2JobDetailScreen() {
                     <Text style={styles.quoteAvatarText}>{(q.provider?.name || 'P')[0]}</Text>
                   </View>
                   <View style={styles.quoteInfo}>
-                    <Text style={styles.quoteProvider}>{q.provider?.name || 'Provider'}</Text>
+                    <Text style={styles.quoteProvider}>{q.provider?.name || t('jobDetail.provider')}</Text>
                     <Text style={styles.quoteMeta}>{q.providerType} • {q.estimatedCompletionTime}</Text>
                   </View>
                   <Text style={styles.quotePrice}>LKR {q.price}</Text>
@@ -380,7 +413,7 @@ export default function V2JobDetailScreen() {
                 {q.message ? <Text style={styles.quoteMsg}>{q.message}</Text> : null}
                 {q.status === 'PENDING' && (
                   <View style={styles.quoteActions}>
-                    <ActionBtn label="Accept" loadingKey={q.id} onPress={() => handleSelectQuote(q.id)} />
+                    <ActionBtn label={t('jobDetail.accept')} loadingKey={q.id} onPress={() => handleSelectQuote(q.id)} />
                     <TouchableOpacity
                       style={[styles.quoteActionBtn, { borderColor: colors.error }]}
                       onPress={() => handleDeclineQuote(q)}
@@ -389,7 +422,7 @@ export default function V2JobDetailScreen() {
                       {actionLoading === 'decline-' + q.id ? (
                         <ActivityIndicator color={colors.error} size="small" />
                       ) : (
-                        <Text style={[styles.quoteActionBtnText, { color: colors.error }]}>Decline</Text>
+                        <Text style={[styles.quoteActionBtnText, { color: colors.error }]}>{t('jobDetail.decline')}</Text>
                       )}
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -397,7 +430,7 @@ export default function V2JobDetailScreen() {
                       onPress={() => { setBargainModal(q); setBargainPrice(String(q.price)) }}
                       disabled={actionLoading !== ''}
                     >
-                      <Text style={[styles.quoteActionBtnText, { color: colors.amber }]}>Bargain</Text>
+                      <Text style={[styles.quoteActionBtnText, { color: colors.amber }]}>{t('jobDetail.bargain')}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -410,8 +443,47 @@ export default function V2JobDetailScreen() {
         {job.status === 'OPEN' && quotes.length === 0 && (
           <View style={styles.noQuotesCard}>
             <Ionicons name="time-outline" size={32} color={colors.muted} />
-            <Text style={styles.noQuotesTitle}>Waiting for Quotes</Text>
-            <Text style={styles.noQuotesSub}>Providers are reviewing your job. You'll get notified when quotes arrive.</Text>
+            <Text style={styles.noQuotesTitle}>{t('jobDetail.waitingForQuotes')}</Text>
+            <Text style={styles.noQuotesSub}>{t('jobDetail.waitingDesc')}</Text>
+          </View>
+        )}
+
+        {/* Nearby Taskers */}
+        {job.status === 'OPEN' && providers.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.providersHeader}>
+              <Ionicons name="people-outline" size={18} color={colors.amber} />
+              <Text style={styles.sectionTitle}>{t('customer.taskersNearby', { n: providers.length })}</Text>
+            </View>
+            {providers.map((p: any, i: number) => (
+              <TouchableOpacity
+                key={p.id || i}
+                style={[styles.providerCard, { backgroundColor: colors.white }]}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/(customer)/find/taskers/${job.id}`)}
+              >
+                <View style={styles.providerAvatar}>
+                  <Text style={styles.providerAvatarText}>{(p.name || 'T')[0]}</Text>
+                </View>
+                <View style={styles.providerInfo}>
+                  <View style={styles.providerTop}>
+                    <Text style={[styles.providerName, { color: colors.ink }]}>{p.name || t('jobDetail.provider')}</Text>
+                    {p.isVerified && <Ionicons name="checkmark-circle" size={14} color="#3B82F6" />}
+                  </View>
+                  <View style={styles.providerMeta}>
+                    {p.rating && <Text style={[styles.providerMetaText, { color: colors.amber }]}>★ {p.rating.toFixed(1)}</Text>}
+                    {p.completedJobs > 0 && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.completedJobs} {t('customer.jobsCompleted')}</Text>}
+                    {p.distance && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.distance}</Text>}
+                  </View>
+                  {p.hourlyRate ? (
+                    <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.hourlyRate}/hr</Text>
+                  ) : p.fixedRate ? (
+                    <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.fixedRate}</Text>
+                  ) : null}
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            ))}
           </View>
         )}
 
@@ -419,9 +491,9 @@ export default function V2JobDetailScreen() {
         {job.status === 'IN_PROGRESS' && !escrow && (
           <View style={[styles.section, styles.highlightSection]}>
             <Ionicons name="lock-closed" size={32} color={colors.ink} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>Deposit Escrow</Text>
-            <Text style={styles.highlightDesc}>Secure LKR {job.budgetAmount} in escrow (includes 10% service fee). Only released when you approve.</Text>
-            <ActionBtn label={`Deposit LKR ${job.budgetAmount}`} loadingKey="escrow" onPress={handleDepositEscrow} />
+            <Text style={styles.highlightTitle}>{t('jobDetail.depositEscrow')}</Text>
+            <Text style={styles.highlightDesc}>{t('jobDetail.depositDesc', { amount: job.budgetAmount })}</Text>
+            <ActionBtn label={t('jobDetail.depositEscrow')} loadingKey="escrow" onPress={handleDepositEscrow} />
           </View>
         )}
 
@@ -429,17 +501,17 @@ export default function V2JobDetailScreen() {
         {escrow && escrow.status === 'PROTECTED' && !job.addressSharedAt && (
           <View style={[styles.section, styles.highlightSection]}>
             <Ionicons name="location-outline" size={28} color={colors.amber} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>Share Your Address</Text>
-            <Text style={styles.highlightDesc}>Let the provider know where to go</Text>
+            <Text style={styles.highlightTitle}>{t('jobDetail.shareAddress')}</Text>
+            <Text style={styles.highlightDesc}>{t('jobDetail.shareAddressDesc')}</Text>
             {!showAddressForm ? (
-              <ActionBtn label="Share Address" loadingKey="share-btn" onPress={() => setShowAddressForm(true)} outline />
+              <ActionBtn label={t('jobDetail.shareAddressBtn')} loadingKey="share-btn" onPress={() => setShowAddressForm(true)} outline />
             ) : (
               <View style={styles.addressForm}>
-                <TextInput style={styles.input} value={addressStreet} onChangeText={setAddressStreet} placeholder="Street address *" placeholderTextColor={colors.muted} />
-                <TextInput style={styles.input} value={addressBuilding} onChangeText={setAddressBuilding} placeholder="Building (optional)" placeholderTextColor={colors.muted} />
-                <TextInput style={styles.input} value={addressApartment} onChangeText={setAddressApartment} placeholder="Apartment/Unit (optional)" placeholderTextColor={colors.muted} />
-                <TextInput style={styles.input} value={addressLandmark} onChangeText={setAddressLandmark} placeholder="Landmark (optional)" placeholderTextColor={colors.muted} />
-                <ActionBtn label="Save Address" loadingKey="address" onPress={handleShareAddress} />
+                <TextInput style={styles.input} value={addressStreet} onChangeText={setAddressStreet} placeholder={t('jobDetail.streetAddress')} placeholderTextColor={colors.muted} />
+                <TextInput style={styles.input} value={addressBuilding} onChangeText={setAddressBuilding} placeholder={t('jobDetail.building')} placeholderTextColor={colors.muted} />
+                <TextInput style={styles.input} value={addressApartment} onChangeText={setAddressApartment} placeholder={t('jobDetail.apartment')} placeholderTextColor={colors.muted} />
+                <TextInput style={styles.input} value={addressLandmark} onChangeText={setAddressLandmark} placeholder={t('jobDetail.landmark')} placeholderTextColor={colors.muted} />
+                <ActionBtn label={t('jobDetail.saveAddress')} loadingKey="address" onPress={handleShareAddress} />
               </View>
             )}
           </View>
@@ -449,21 +521,21 @@ export default function V2JobDetailScreen() {
         {workspace && workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
           <View style={[styles.section, styles.otpSection]}>
             <Ionicons name="shield-checkmark-outline" size={28} color={colors.amber} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>Confirm Provider Arrival</Text>
+            <Text style={styles.highlightTitle}>{t('jobDetail.confirmArrival')}</Text>
             <Text style={styles.highlightDesc}>
-              Ask the provider for the 4-digit confirmation code and enter it below to start the job.
+              {t('jobDetail.confirmArrivalDesc')}
             </Text>
             <TextInput
               style={[styles.otpInput, otpError ? styles.otpInputError : null]}
               value={otpInput}
               onChangeText={(t) => { setOtpInput(t.replace(/\D/g, '').slice(0, 4)); setOtpError('') }}
-              placeholder="Enter 4-digit code"
+              placeholder={t('jobDetail.enterCode')}
               placeholderTextColor={colors.muted}
               keyboardType="number-pad"
               maxLength={4}
             />
             {otpError ? <Text style={styles.otpErrorText}>{otpError}</Text> : null}
-            <ActionBtn label="Confirm & Start Job" loadingKey="otp" onPress={handleVerifyOtp} />
+            <ActionBtn label={t('jobDetail.confirmStart')} loadingKey="otp" onPress={handleVerifyOtp} />
           </View>
         )}
 
@@ -471,9 +543,9 @@ export default function V2JobDetailScreen() {
         {workspace && workspace.progressStatus === 'COMPLETION_REQUESTED' && (
           <View style={[styles.section, styles.highlightSection]}>
             <Ionicons name="checkmark-circle" size={32} color={colors.success} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>Approve Completion</Text>
-            <Text style={styles.highlightDesc}>The provider marked the job complete. Review and approve to release payment.</Text>
-            <ActionBtn label="Approve & Release Payment" loadingKey="approve" onPress={handleApproveCompletion} color={colors.success} />
+            <Text style={styles.highlightTitle}>{t('jobDetail.approveCompletion')}</Text>
+            <Text style={styles.highlightDesc}>{t('jobDetail.approveDesc')}</Text>
+            <ActionBtn label={t('jobDetail.approveRelease')} loadingKey="approve" onPress={handleApproveCompletion} color={colors.success} />
           </View>
         )}
 
@@ -481,13 +553,13 @@ export default function V2JobDetailScreen() {
         {escrow && escrow.status === 'PROTECTED' && (
           <View style={[styles.section, styles.escrowCard]}>
             <View style={styles.escrowHeader}>
-              <Text style={styles.escrowTitle}>Escrow</Text>
-              <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>PROTECTED</Text></View>
+              <Text style={styles.escrowTitle}>{t('jobDetail.escrow')}</Text>
+              <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>{t('jobDetail.protected')}</Text></View>
             </View>
             <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
             <View style={styles.escrowActions}>
-              <ActionBtn label="Release to Provider" loadingKey="release" onPress={handleReleaseEscrow} color={colors.amber} />
-              <ActionBtn label="Refund & Cancel" loadingKey="refund" onPress={handleRefundEscrow} color={colors.error} />
+              <ActionBtn label={t('jobDetail.releaseToProvider')} loadingKey="release" onPress={handleReleaseEscrow} color={colors.amber} />
+              <ActionBtn label={t('jobDetail.refundCancel')} loadingKey="refund" onPress={handleRefundEscrow} color={colors.error} />
             </View>
           </View>
         )}
@@ -495,14 +567,14 @@ export default function V2JobDetailScreen() {
         {/* Dispute Link */}
         {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
-            <Text style={styles.disputeBtnText}>Having a problem? Raise a dispute</Text>
+            <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
           </TouchableOpacity>
         )}
 
         {/* Reviews */}
         {reviews && reviews.customerReviews?.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Provider Reviews</Text>
+            <Text style={styles.sectionTitle}>{t('jobDetail.providerReviews')}</Text>
             {reviews.customerReviews.map((r: any) => (
               <View key={r.id} style={styles.reviewCard}>
                 <View style={styles.reviewStars}>
@@ -513,7 +585,7 @@ export default function V2JobDetailScreen() {
                     );
                   })}
                 </View>
-                <Text style={styles.reviewScores}>Quality: {r.quality}/5 • Communication: {r.communication}/5 • Timeliness: {r.timeliness}/5</Text>
+                <Text style={styles.reviewScores}>{t('jobDetail.reviewFormat', { q: r.quality, r: r.communication, t: r.timeliness })}</Text>
                 {r.comment ? <Text style={styles.reviewComment}>{r.comment}</Text> : null}
               </View>
             ))}
@@ -525,27 +597,71 @@ export default function V2JobDetailScreen() {
       <Modal visible={!!bargainModal} transparent animationType="slide" onRequestClose={() => setBargainModal(null)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { backgroundColor: colors.white }]}>
-            <Text style={[styles.modalTitle, { color: colors.ink }]}>Counter Offer</Text>
+            <Text style={[styles.modalTitle, { color: colors.ink }]}>{t('jobDetail.counterOffer')}</Text>
             <Text style={[styles.modalSub, { color: colors.muted }]}>
-              Propose your price to {bargainModal?.provider?.name || 'provider'}
+              {t('jobDetail.counterOfferDesc', { name: bargainModal?.provider?.name || t('jobDetail.provider') })}
             </Text>
             <TextInput
               style={[styles.modalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
               value={bargainPrice}
               onChangeText={setBargainPrice}
-              placeholder="Enter your offer (LKR)"
+              placeholder={t('jobDetail.enterOffer')}
               placeholderTextColor={colors.muted}
               keyboardType="numeric"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.border }]} onPress={() => setBargainModal(null)}>
-                <Text style={[styles.modalBtnText, { color: colors.ink }]}>Cancel</Text>
+                <Text style={[styles.modalBtnText, { color: colors.ink }]}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.amber }]} onPress={handleBargain} disabled={actionLoading !== ''}>
                 {actionLoading === 'bargain' ? (
                   <ActivityIndicator color="#111827" size="small" />
                 ) : (
-                  <Text style={styles.modalBtnText}>Send Offer</Text>
+                  <Text style={styles.modalBtnText}>{t('jobDetail.sendOffer')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Cancel Reason Modal */}
+      <Modal visible={cancelReasonVisible} transparent animationType="slide" onRequestClose={() => setCancelReasonVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.white }]}>
+            <Text style={[styles.modalTitle, { color: colors.ink }]}>{t('jobDetail.cancelReasonTitle')}</Text>
+            <View style={styles.reasonList}>
+              {cancelReasons.map((r) => (
+                <TouchableOpacity
+                  key={r.key}
+                  style={[styles.reasonOption, cancelReason === r.label && styles.reasonOptionSelected]}
+                  onPress={() => setCancelReason(r.label)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.radio, cancelReason === r.label && styles.radioSelected]}>
+                    {cancelReason === r.label && <View style={styles.radioDot} />}
+                  </View>
+                  <Text style={[styles.reasonText, { color: colors.ink }]}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+              <TextInput
+                style={[styles.reasonInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
+                value={cancelReason}
+                onChangeText={(t) => setCancelReason(t)}
+                placeholder={t('jobDetail.cancelReasonPlaceholder')}
+                placeholderTextColor={colors.muted}
+                multiline
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.border }]} onPress={() => setCancelReasonVisible(false)}>
+                <Text style={[styles.modalBtnText, { color: colors.ink }]}>{t('jobDetail.keepJob')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.error }]} onPress={handleCancelWithReason} disabled={actionLoading !== ''}>
+                {actionLoading === 'cancel' ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={[styles.modalBtnText, { color: '#FFFFFF' }]}>{t('jobDetail.cancelJob')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -560,6 +676,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scroll: { flex: 1 },
   hero: { padding: 20, paddingBottom: 16, backgroundColor: colors.cream },
+  heroImg: { width: '100%', height: 180, borderRadius: 16, marginBottom: 16 },
   title: { fontSize: 24, fontWeight: '800', color: colors.ink, marginBottom: 10, lineHeight: 32 },
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   statusText: { fontSize: 12, fontWeight: '700', color: '#fff' },
@@ -582,6 +699,17 @@ const makeStyles = (colors: any) => StyleSheet.create({
   noQuotesCard: { alignItems: 'center', padding: 32, gap: 8 },
   noQuotesTitle: { fontSize: 16, fontWeight: '700', color: colors.ink },
   noQuotesSub: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 20 },
+
+  providersHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  providerCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 10, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
+  providerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.amberLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  providerAvatarText: { fontSize: 18, fontWeight: '700', color: colors.amberDark },
+  providerInfo: { flex: 1 },
+  providerTop: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  providerName: { fontSize: 15, fontWeight: '700' },
+  providerMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  providerMetaText: { fontSize: 11, fontWeight: '600' },
+  providerRate: { fontSize: 13, fontWeight: '800' },
 
   highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 20, marginBottom: 12, padding: 20, borderWidth: 1, borderColor: colors.amberLight, alignItems: 'center' },
   highlightTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
@@ -623,6 +751,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
   reviewScores: { fontSize: 13, color: colors.muted, marginBottom: 6 },
   reviewComment: { fontSize: 13, color: colors.ink, opacity: 0.7, lineHeight: 20 },
 
+  scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 1, marginBottom: 8 },
+  scheduleText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1 },
+
   otpSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 20, marginBottom: 12, padding: 20, borderWidth: 1, borderColor: colors.amber, alignItems: 'center' },
   otpInput: { width: '80%', borderWidth: 2, borderColor: colors.amber, borderRadius: 12, padding: 16, fontSize: 28, fontFamily: fonts.headingBold, color: colors.ink, backgroundColor: colors.white, textAlign: 'center', letterSpacing: 8, marginBottom: 8 },
   otpInputError: { borderColor: colors.error },
@@ -636,4 +767,12 @@ const makeStyles = (colors: any) => StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: 12 },
   modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
   modalBtnText: { fontSize: 15, fontFamily: 'Outfit_700Bold', color: '#111827' },
+  reasonList: { marginVertical: 16, gap: 4 },
+  reasonOption: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 4 },
+  reasonOptionSelected: { backgroundColor: colors.amberBg, borderRadius: 10, paddingHorizontal: 12 },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  radioSelected: { borderColor: colors.amber },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber },
+  reasonText: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', flex: 1 },
+  reasonInput: { borderWidth: 1.5, borderRadius: 12, padding: 14, fontSize: 14, fontFamily: 'Outfit_500Medium', minHeight: 60, textAlignVertical: 'top', marginTop: 8 },
 })

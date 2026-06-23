@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useCountry } from '../lib/country'
 
 export default function CountryChangeBanner() {
+  const { t } = useTranslation()
   const { countryChanged, detectedCountry, dismissCountryChange } = useCountry()
   const slideAnim = useRef(new Animated.Value(-80)).current
 

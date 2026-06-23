@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export default function OfferCard({ title, description, discountLabel, price, badgeText, onPress }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
 
   return (
@@ -22,7 +24,7 @@ export default function OfferCard({ title, description, discountLabel, price, ba
       activeOpacity={0.8}
     >
       <View style={[styles.badge, { backgroundColor: colors.amber }]}>
-        <Text style={styles.badgeText}>{badgeText || 'OFFER'}</Text>
+        <Text style={styles.badgeText}>{badgeText || t('components.viewOffer')}</Text>
       </View>
       <View style={styles.body}>
         <Text style={[styles.discount, { color: colors.amberDark }]}>{discountLabel}</Text>

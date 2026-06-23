@@ -9,9 +9,11 @@ import { jobs, jobCategories } from '../../../lib/api'
 import { useColors } from '../../../lib/ThemeContext'
 import ProgressSteps from '../../../components/ui/ProgressSteps'
 import CategoryPills from '../../../components/ui/CategoryPills'
+import { useTranslation } from 'react-i18next'
 import PhotoUploader from '../../../components/ui/PhotoUploader'
 
 export default function PostJobScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
     const styles = makeStyles(colors)
   const router = useRouter()
@@ -38,16 +40,16 @@ export default function PostJobScreen() {
     }).catch(() => setCatsLoading(false))
   }, [])
 
-  const steps = ['Job Details', 'Location & Budget', 'Review']
+  const steps = [t('postJob.steps.0'), t('postJob.steps.1'), t('postJob.steps.2')]
   const charCount = description.length
 
   const handleNext = () => {
     if (step === 0 && (!categoryId || !title || !description)) {
-      Alert.alert('Error', 'Please fill in all required fields')
+      Alert.alert(t('postJob.fillAllFields'), t('postJob.fillAllFieldsMsg'))
       return
     }
     if (step === 1 && !location) {
-      Alert.alert('Error', 'Please enter a location')
+      Alert.alert(t('postJob.fillAllFields'), t('errors.enterLocation'))
       return
     }
     if (step < 2) setStep(step + 1)
@@ -66,7 +68,7 @@ export default function PostJobScreen() {
       })
       router.push(`/(customer)/jobs/posted-confirm?jobId=${job.id}`)
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to post job')
+      Alert.alert(t('common.error'), e.message || t('postJob.failed'))
     } finally {
       setSubmitting(false)
     }
@@ -86,47 +88,47 @@ export default function PostJobScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity onPress={goBack} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
+        <Text style={styles.backText}>{t('common.back')}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.heading}>Post a job</Text>
+      <Text style={styles.heading}>{t('postJob.header')}</Text>
       <ProgressSteps current={step} total={3} labels={steps} />
 
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         {step === 0 ? (
           <View>
-            <Text style={styles.stepLabel}>Job details</Text>
-            <Text style={styles.sectionLabel}>Category</Text>
+            <Text style={styles.stepLabel}>{t('postJob.jobDetails')}</Text>
+            <Text style={styles.sectionLabel}>{t('postJob.category')}</Text>
             <CategoryPills items={cats} selected={categoryId} onSelect={handleCategorySelect} loading={catsLoading} />
-            <Text style={styles.sectionLabel}>Job title</Text>
-            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="e.g. Fix leaking pipe" />
-            <Text style={styles.sectionLabel}>Description</Text>
+            <Text style={styles.sectionLabel}>{t('postJob.jobTitle')}</Text>
+            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={t('postJob.titlePlaceholder')} />
+            <Text style={styles.sectionLabel}>{t('postJob.description')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Describe what needs to be done"
+              placeholder={t('postJob.descPlaceholder')}
               multiline
               numberOfLines={4}
             />
-            <Text style={styles.charCount}>{charCount} characters</Text>
-            <Text style={styles.sectionLabel}>Add photos</Text>
+            <Text style={styles.charCount}>{t('postJob.charCount', { n: charCount })}</Text>
+            <Text style={styles.sectionLabel}>{t('postJob.addPhotos')}</Text>
             <PhotoUploader onPhotosChange={setPhotos} />
           </View>
         ) : step === 1 ? (
           <View>
-            <Text style={styles.stepLabel}>Location and budget</Text>
+            <Text style={styles.stepLabel}>{t('postJob.jobDetails')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, marginTop: 16 }}>
               <Ionicons name="location-outline" size={16} color={colors.dark} />
-              <Text style={styles.sectionLabel}> Job location</Text>
+              <Text style={styles.sectionLabel}> {t('postJob.location')}</Text>
             </View>
             <TextInput
               style={styles.input}
               value={location}
               onChangeText={setLocation}
-              placeholder="Enter location or auto-detect"
+              placeholder={t('postJob.locationPlaceholder')}
             />
-            <Text style={styles.sectionLabel}>Budget</Text>
+            <Text style={styles.sectionLabel}>{t('postJob.budget')}</Text>
             <View style={styles.budgetRow}>
               {!letQuote ? (
                 <>
@@ -134,7 +136,7 @@ export default function PostJobScreen() {
                     style={[styles.input, styles.budgetInput]}
                     value={budgetMin}
                     onChangeText={setBudgetMin}
-                    placeholder="Min"
+                    placeholder={t('postJob.min')}
                     keyboardType="numeric"
                   />
                   <Text style={styles.budgetSep}>-</Text>
@@ -142,7 +144,7 @@ export default function PostJobScreen() {
                     style={[styles.input, styles.budgetInput]}
                     value={budgetMax}
                     onChangeText={setBudgetMax}
-                    placeholder="Max"
+                    placeholder={t('postJob.max')}
                     keyboardType="numeric"
                   />
                   <Text style={styles.currency}>LKR</Text>
@@ -153,11 +155,11 @@ export default function PostJobScreen() {
               <View style={[styles.toggle, letQuote && styles.toggleActive]}>
                 {letQuote ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
               </View>
-              <Text style={styles.toggleLabel}>Let them quote instead</Text>
+              <Text style={styles.toggleLabel}>{t('postJob.letThemQuote')}</Text>
             </TouchableOpacity>
-            <Text style={styles.sectionLabel}>Urgency</Text>
+            <Text style={styles.sectionLabel}>{t('postJob.urgency')}</Text>
             <View style={styles.pillRow}>
-              {['Today', 'This week', 'Flexible'].map((u) => (
+              {t('postJob.urgencyOptions', { returnObjects: true }).map((u: string) => (
                 <TouchableOpacity
                   key={u}
                   style={[styles.pill, urgency === u && styles.pillActive]}
@@ -167,9 +169,9 @@ export default function PostJobScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.sectionLabel}>Prefer</Text>
+            <Text style={styles.sectionLabel}>{t('postJob.prefer')}</Text>
             <View style={styles.pillRow}>
-              {['Tasker', 'Company', 'Both'].map((p) => (
+              {t('postJob.preferOptions', { returnObjects: true }).map((p: string) => (
                 <TouchableOpacity
                   key={p}
                   style={[styles.pill, prefer === p && styles.pillActive]}
@@ -182,39 +184,39 @@ export default function PostJobScreen() {
           </View>
         ) : (
           <View>
-            <Text style={styles.stepLabel}>Review your job</Text>
+            <Text style={styles.stepLabel}>{t('postJob.step4.title')}</Text>
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Category</Text>
-                <Text style={styles.summaryValue}>{categoryName || 'Not set'}</Text>
-                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <Text style={styles.summaryLabel}>{t('postJob.step4.category')}</Text>
+                <Text style={styles.summaryValue}>{categoryName || t('postJob.notSet')}</Text>
+                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>{t('postJob.edit')}</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Title</Text>
+                <Text style={styles.summaryLabel}>{t('postJob.step4.title_lbl')}</Text>
                 <Text style={styles.summaryValue} numberOfLines={1}>{title}</Text>
-                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>{t('postJob.edit')}</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Description</Text>
+                <Text style={styles.summaryLabel}>{t('postJob.step4.description')}</Text>
                 <Text style={styles.summaryValue} numberOfLines={2}>{description}</Text>
-                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(0)}><Text style={styles.editLink}>{t('postJob.edit')}</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Location</Text>
-                <Text style={styles.summaryValue}>{location || 'Not set'}</Text>
-                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <Text style={styles.summaryLabel}>{t('postJob.step4.location')}</Text>
+                <Text style={styles.summaryValue}>{location || t('postJob.notSet')}</Text>
+                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>{t('postJob.edit')}</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Budget</Text>
+                <Text style={styles.summaryLabel}>{t('postJob.step4.budget')}</Text>
                 <Text style={styles.summaryValue}>
-                  {letQuote ? 'Let them quote' : `LKR ${budgetMin || '0'} - ${budgetMax || '0'}`}
+                  {letQuote ? t('postJob.letThemQuote') : `LKR ${budgetMin || '0'} - ${budgetMax || '0'}`}
                 </Text>
-                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>{t('postJob.edit')}</Text></TouchableOpacity>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Urgency</Text>
-                <Text style={styles.summaryValue}>{urgency || 'Not set'}</Text>
-                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>Edit</Text></TouchableOpacity>
+                <Text style={styles.summaryLabel}>{t('postJob.urgency')}</Text>
+                <Text style={styles.summaryValue}>{urgency || t('postJob.notSet')}</Text>
+                <TouchableOpacity onPress={() => setStep(1)}><Text style={styles.editLink}>{t('postJob.edit')}</Text></TouchableOpacity>
               </View>
             </View>
           </View>
@@ -226,7 +228,7 @@ export default function PostJobScreen() {
         onPress={step === 2 ? handlePost : handleNext}
         disabled={submitting}
       >
-        <Text style={styles.nextText}>{submitting ? 'Posting...' : step === 2 ? 'Post job' : 'Next'}</Text>
+        <Text style={styles.nextText}>{submitting ? t('postJob.posting') : step === 2 ? t('postJob.post') : t('common.next')}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   )

@@ -3,6 +3,7 @@ import { View, Text, TextInput, FlatList, StyleSheet, RefreshControl } from 'rea
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { jobCategories } from '../../../lib/api'
 import { useCountry } from '../../../lib/country'
 import CategoryCard from '../../../components/find/CategoryCard'
@@ -10,6 +11,7 @@ import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
 
 export default function FindJobCategories() {
+  const { t } = useTranslation()
   const colors = useColors()
     const styles = makeStyles(colors)
   const [categories, setCategories] = useState<any[]>([])
@@ -56,15 +58,15 @@ export default function FindJobCategories() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Find a Tasker</Text>
-        <Text style={styles.subtitle}>{totalJobs} services across {categories.length} categories</Text>
+        <Text style={styles.title}>{t('find.title')}</Text>
+        <Text style={styles.subtitle}>{t('find.subtitle', { n: totalJobs, m: categories.length })}</Text>
       </View>
 
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={18} color="#9CA3AF" style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search services..."
+          placeholder={t('find.search')}
           placeholderTextColor="#9CA3AF"
           value={search}
           onChangeText={setSearch}
@@ -77,13 +79,14 @@ export default function FindJobCategories() {
       {loading ? (
         <SkeletonLoader count={8} height={72} />
       ) : filtered.length === 0 ? (
-        <EmptyState icon="search-outline" title="No categories found" subtitle="Try a different search term" />
+        <EmptyState icon="search-outline" title={t('find.noCategories')} subtitle={t('customer.noResults')} />
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <CategoryCard
+              id={item.id}
               name={item.name}
               iconName={item.iconName}
               colorHex={item.colorHex}

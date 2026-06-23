@@ -6,6 +6,7 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { fonts } from '../../../lib/fonts'
 import { v2Jobs, v2JobActions } from '../../../lib/api-v2'
 import Avatar from '../../../components/ui/Avatar'
@@ -27,21 +28,8 @@ const darkMapStyle = [
   { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
 ]
 
-const statusMap: Record<string, { label: string; step: number }> = {
-  ASSIGNED: { label: 'On The Way', step: 0 },
-  EN_ROUTE: { label: 'On The Way', step: 1 },
-  IN_PROGRESS: { label: 'In Progress', step: 2 },
-  COMPLETED: { label: 'Completed', step: 3 },
-}
-
-const progressSteps = [
-  { label: 'Assigned' },
-  { label: 'En route' },
-  { label: 'In progress' },
-  { label: 'Completed' },
-]
-
 export default function LiveTrackingScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -52,6 +40,20 @@ export default function LiveTrackingScreen() {
   const [workspace, setWorkspace] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
+
+  const statusMap: Record<string, { label: string; step: number }> = {
+    ASSIGNED: { label: t('booking.statusOnWay'), step: 0 },
+    EN_ROUTE: { label: t('booking.statusOnWay'), step: 1 },
+    IN_PROGRESS: { label: t('booking.statusInProgress'), step: 2 },
+    COMPLETED: { label: t('booking.statusCompleted'), step: 3 },
+  }
+
+  const progressSteps = [
+    { label: t('booking.progressAssigned') },
+    { label: t('booking.progressEnRoute') },
+    { label: t('booking.progressInProgress') },
+    { label: t('booking.progressCompleted') },
+  ]
 
   useEffect(() => {
     const pulse = Animated.loop(
@@ -78,7 +80,7 @@ export default function LiveTrackingScreen() {
   }
 
   const step = job ? (statusMap[job.status]?.step ?? 0) : 0
-  const statusLabel = job ? (statusMap[job.status]?.label ?? 'In Progress') : ''
+  const statusLabel = job ? (statusMap[job.status]?.label ?? t('booking.statusInProgress')) : ''
 
   if (loading) {
     return (
@@ -105,7 +107,7 @@ export default function LiveTrackingScreen() {
         >
           <Marker
             coordinate={{ latitude: 6.9271, longitude: 79.8612 }}
-            title={job?.title || 'Job Location'}
+            title={job?.title || t('booking.jobLocation')}
           >
             <View style={styles.customerMarker}>
               <Ionicons name="home" size={16} color={colors.white} />
@@ -116,7 +118,7 @@ export default function LiveTrackingScreen() {
         {/* ETA Pill */}
         <View style={styles.etaPill}>
           <View style={styles.etaDot} />
-          <Text style={styles.etaText}>Arriving in 12 min</Text>
+          <Text style={styles.etaText}>{t('booking.arrivingIn')}</Text>
         </View>
 
         {/* Back Button */}
@@ -155,9 +157,9 @@ export default function LiveTrackingScreen() {
 
         {/* Provider Card */}
         <View style={styles.providerCard}>
-          <Avatar name={job?.acceptedQuote?.provider?.name || 'Provider'} size={44} />
+          <Avatar name={job?.acceptedQuote?.provider?.name || t('tracking.provider')} size={44} />
           <View style={styles.providerInfo}>
-            <Text style={styles.providerName}>{job?.acceptedQuote?.provider?.name || 'Provider'}</Text>
+            <Text style={styles.providerName}>{job?.acceptedQuote?.provider?.name || t('tracking.provider')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="star" size={12} color={colors.amber} />
                   <Text style={styles.providerRating}> 4.8</Text>
@@ -179,7 +181,7 @@ export default function LiveTrackingScreen() {
             style={styles.completeBtn}
             onPress={() => router.push(`/(customer)/jobs/complete/${id}`)}
           >
-            <Text style={styles.completeBtnText}>Confirm Job Complete</Text>
+            <Text style={styles.completeBtnText}>{t('tracking.confirmComplete')}</Text>
           </TouchableOpacity>
         )}
       </View>

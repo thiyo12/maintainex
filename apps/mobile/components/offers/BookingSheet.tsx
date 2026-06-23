@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Modal, KeyboardAvoidingView, Platform, Alert, Animated, Dimensions } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
@@ -27,6 +28,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height
 
 export default function BookingSheet({ visible, onClose, onConfirm, serviceName, basePrice }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const today = new Date().toISOString().split('T')[0]
   const [date, setDate] = useState(today)
@@ -51,7 +53,7 @@ export default function BookingSheet({ visible, onClose, onConfirm, serviceName,
 
   const handleConfirm = () => {
     if (!canConfirm) {
-      Alert.alert('Missing Fields', 'Please fill in date, time, and address')
+      Alert.alert(t('errors.fillAllFields'), t('errors.fillAllFields'))
       return
     }
     onConfirm({ date, timeSlot, address: address.trim(), notes: notes.trim() })
@@ -66,23 +68,23 @@ export default function BookingSheet({ visible, onClose, onConfirm, serviceName,
             <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-            <Text style={[styles.title, { color: colors.ink }]}>Book {serviceName}</Text>
+            <Text style={[styles.title, { color: colors.ink }]}>{t('components.bookNow')} {serviceName}</Text>
             {basePrice ? (
               <Text style={[styles.price, { color: colors.amberDark }]}>
                 LKR {basePrice.toLocaleString()}
               </Text>
             ) : null}
 
-            <Text style={[styles.label, { color: colors.muted }]}>Date</Text>
+            <Text style={[styles.label, { color: colors.muted }]}>{t('components.selectDate')}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
               value={date}
               onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
+              placeholder={t('booking.datePlaceholder')}
               placeholderTextColor={colors.muted}
             />
 
-            <Text style={[styles.label, { color: colors.muted }]}>Time Slot</Text>
+            <Text style={[styles.label, { color: colors.muted }]}>{t('components.selectTime')}</Text>
             <View style={styles.timeGrid}>
               {TIME_SLOTS.map((slot) => (
                 <TouchableOpacity
@@ -102,21 +104,21 @@ export default function BookingSheet({ visible, onClose, onConfirm, serviceName,
               ))}
             </View>
 
-            <Text style={[styles.label, { color: colors.muted }]}>Address</Text>
+            <Text style={[styles.label, { color: colors.muted }]}>{t('profile.address')}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
               value={address}
               onChangeText={setAddress}
-              placeholder="Your address"
+              placeholder={t('booking.addressPlaceholder')}
               placeholderTextColor={colors.muted}
             />
 
-            <Text style={[styles.label, { color: colors.muted }]}>Notes (optional)</Text>
+            <Text style={[styles.label, { color: colors.muted }]}>{t('booking.notesOptional')}</Text>
             <TextInput
               style={[styles.input, styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
               value={notes}
               onChangeText={setNotes}
-              placeholder="Any special instructions..."
+              placeholder={t('booking.specialInstructions')}
               placeholderTextColor={colors.muted}
               multiline
               numberOfLines={3}
@@ -130,7 +132,7 @@ export default function BookingSheet({ visible, onClose, onConfirm, serviceName,
             >
               <Ionicons name="checkmark-circle-outline" size={16} color={canConfirm ? '#111827' : colors.muted} />
               <Text style={[styles.confirmText, { color: canConfirm ? '#111827' : colors.muted }]}>
-                Confirm Booking
+                {t('booking.confirm')}
               </Text>
             </TouchableOpacity>
           </ScrollView>

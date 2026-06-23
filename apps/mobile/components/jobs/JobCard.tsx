@@ -1,4 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import { translateJobStatus } from '../../lib/i18n'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 import Badge from '../ui/Badge'
@@ -27,13 +29,23 @@ interface Props {
 
 export default function JobCard({ title, description, budget, budgetType, status, locationName, createdAt, onPress }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
     const styles = makeStyles(colors)
   const variant = statusMap[status] || 'muted'
+
+  const statusLabels: Record<string, string> = {
+    OPEN: t('jobs.status.open'),
+    QUOTE_ACCEPTED: t('jobs.status.accepted'),
+    IN_PROGRESS: t('jobs.status.inProgress'),
+    COMPLETED: t('jobs.status.completed'),
+    CANCELLED: t('jobs.status.cancelled'),
+    DISPUTED: t('jobs.status.cancelled'),
+  }
 
   return (
     <TouchableOpacity style={[styles.card, { backgroundColor: colors.white, shadowColor: colors.ink }]} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.topRow}>
-        <Badge label={status.replace(/_/g, ' ')} variant={variant} dot />
+        <Badge label={statusLabels[status] || t(translateJobStatus(status))} variant={variant} dot />
         <Text style={[styles.price, { color: colors.amberDark }]}>LKR {budget.toLocaleString()}</Text>
       </View>
       <Text style={[styles.title, { color: colors.ink }]} numberOfLines={1}>{title}</Text>

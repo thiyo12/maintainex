@@ -3,9 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 
 export default function JobPostedConfirmation() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
@@ -38,17 +40,17 @@ export default function JobPostedConfirmation() {
       <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
         <Ionicons name="checkmark" size={40} color={colors.white} />
       </Animated.View>
-      <Text style={styles.heading}>Job posted successfully</Text>
-      <Text style={styles.subtitle}>Taskers and companies near you have been notified</Text>
+      <Text style={styles.heading}>{t('postJob.postedSuccess')}</Text>
+      <Text style={styles.subtitle}>{t('postJob.postedDesc')}</Text>
       <Animated.Text style={styles.counter}>{Math.round(count as any)}</Animated.Text>
-      <Text style={styles.counterLabel}>workers notified</Text>
+      <Text style={styles.counterLabel}>{t('postJob.workersNotified')}</Text>
 
       <View style={styles.buttons}>
         <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push(`/(customer)/jobs/quotes?jobId=${jobId || ''}`)}>
-          <Text style={styles.primaryBtnText}>View my job</Text>
+          <Text style={styles.primaryBtnText}>{t('postJob.viewMyJob')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(customer)')}>
-          <Text style={styles.outlineBtnText}>Go to home</Text>
+          <Text style={styles.outlineBtnText}>{t('postJob.goToHome')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

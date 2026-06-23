@@ -68,7 +68,7 @@ export default function ProfileContent() {
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(user?.name || 'U')[0]}</Text>
           </View>
-          <Text style={styles.name}>{user?.name || 'User'}</Text>
+          <Text style={styles.name}>{user?.name || t('profile.userFallback')}</Text>
           <Text style={styles.email}>{user?.email || ''}</Text>
           <Text style={styles.phone}>{user?.phone || ''}</Text>
           <TouchableOpacity
@@ -88,7 +88,7 @@ export default function ProfileContent() {
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="person-outline" label={t('profile.title')} color={colors.amber}
+          <MenuRow icon="person-outline" label={t('profile.myProfile')} color={colors.amber}
             onPress={() => router.push('/settings/my-profile')} />
           <MenuRow icon="create-outline" label={t('profile.edit')} color={colors.amber}
             onPress={() => router.push('/settings/edit-profile')} />
@@ -98,46 +98,46 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/notifications')} />
           <MenuRow icon="card-outline" label={t('profile.payment')} color="#10B981"
             onPress={() => router.push('/settings/payment')} />
-          <MenuRow icon="location-outline" label={t('profile.serviceAreas') || 'Addresses'} color="#3B82F6"
+          <MenuRow icon="location-outline" label={t('profile.savedAddresses')} color="#3B82F6"
             onPress={() => router.push('/settings/addresses')} />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Region</Text>
-          <MenuRow icon="globe-outline" label={`Country: ${selectedCountry?.name || 'Not set'}`} color="#F59E0B"
+          <Text style={styles.sectionLabel}>{t('profile.region')}</Text>
+          <MenuRow icon="globe-outline" label={t('profile.countryLabel', { name: selectedCountry?.name || t('profile.notSet') })} color="#F59E0B"
             onPress={() => {
               const labels = countries.map(c => c.name)
-              Alert.alert('Select Country', '', [
+              Alert.alert(t('profile.selectCountry'), '', [
                 ...labels.map((name, i) => ({ text: name, onPress: () => setCountry(countries[i].code) })),
-                { text: 'Cancel', style: 'cancel' as const },
+                { text: t('common.cancel'), style: 'cancel' as const },
               ])
             }} />
           <View style={styles.menuRow}>
             <View style={[styles.menuIconWrap, { backgroundColor: colors.amber + '20' }]}>
               <Ionicons name="language-outline" size={20} color={colors.amber} />
             </View>
-            <Text style={styles.menuLabel}>Language</Text>
+            <Text style={styles.menuLabel}>{t('profile.language')}</Text>
             <LanguageSelector />
           </View>
-          <MenuRow icon="swap-horizontal" label="Switch to Work as a Tasker" color="#F59E0B"
+          <MenuRow icon="swap-horizontal" label={t('profile.switchToTasker')} color="#F59E0B"
             onPress={() => router.push('/(auth)/role-switch?target=TASKER')} />
         </View>
 
         <View style={styles.section}>
-          <MenuRow icon="help-circle-outline" label={t('common.help') || 'Help & support'} color="#8B5CF6"
+          <MenuRow icon="help-circle-outline" label={t('profile.helpSupport')} color="#8B5CF6"
             onPress={() => router.push('/settings/help')} />
-          <MenuRow icon="document-text-outline" label="Terms & privacy" color="#6B7280"
+          <MenuRow icon="document-text-outline" label={t('profile.termsPrivacy')} color="#6B7280"
             onPress={() => router.push('/settings/terms')} />
-          <MenuRow icon="information-circle-outline" label="About Maintainex" color="#EC4899"
+          <MenuRow icon="information-circle-outline" label={t('profile.about')} color="#EC4899"
             onPress={() => router.push('/settings/about')} />
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <Ionicons name="log-out-outline" size={20} color={colors.red} />
-          <Text style={styles.logoutBtnText}> {t('profile.logout') || 'Log out'}</Text>
+          <Text style={styles.logoutBtnText}> {t('profile.logout')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>Version 1.0.0</Text>
+        <Text style={styles.version}>{t('profile.version', { version: '1.0.0' })}</Text>
       </ScrollView>
     </SafeAreaView>
   )

@@ -4,20 +4,22 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { spacing } from '../../../lib/tokens'
+import { useTranslation } from 'react-i18next'
 
 export default function MyJobsScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
     const styles = makeStyles(colors)
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.ink }]}>My Jobs</Text>
+        <Text style={[styles.title, { color: colors.ink }]}>{t('customer.myJobs')}</Text>
       </View>
       <View style={styles.empty}>
         <Ionicons name="briefcase-outline" size={48} color={colors.muted} />
-        <Text style={[styles.emptyText, { color: colors.muted }]}>No jobs posted yet</Text>
-        <Text style={[styles.emptySub, { color: colors.border }]}>Post your first job to get started</Text>
+        <Text style={[styles.emptyText, { color: colors.muted }]}>{t('jobs.noJobs')}</Text>
+        <Text style={[styles.emptySub, { color: colors.border }]}>{t('jobs.postFirst')}</Text>
       </View>
     </SafeAreaView>
   )

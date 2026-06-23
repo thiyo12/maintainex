@@ -9,17 +9,16 @@ import { useColors } from '../../lib/ThemeContext'
 import { v2Identity } from '../../lib/api-v2'
 import { upload } from '../../lib/api'
 
-const DOC_TYPES = [
-  { key: 'NATIONAL_ID', label: 'National ID Card', icon: 'id-card-outline' },
-  { key: 'PASSPORT', label: 'Passport', icon: 'earth-outline' },
-  { key: 'DRIVERS_LICENSE', label: "Driver's License", icon: 'car-outline' },
-]
-
 export default function IdentityVerificationScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
+  const DOC_TYPES = [
+    { key: 'NATIONAL_ID', label: t('verify.nationalIdCard'), icon: 'id-card-outline' },
+    { key: 'PASSPORT', label: t('verify.passport'), icon: 'earth-outline' },
+    { key: 'DRIVERS_LICENSE', label: t('verify.driversLicense'), icon: 'car-outline' },
+  ]
   const [loading, setLoading] = useState(true)
   const [docType, setDocType] = useState<string | null>(null)
   const [frontUri, setFrontUri] = useState<string | null>(null)
@@ -31,7 +30,7 @@ export default function IdentityVerificationScreen() {
   useEffect(() => {
     v2Identity.getStatus().then((data: any) => {
       if (data.identityStatus === 'APPROVED') {
-        Alert.alert('Already Verified', 'Your identity has already been verified.')
+        Alert.alert(t('verify.alreadyVerified'), t('verify.alreadyVerified'))
         router.back()
       }
     }).catch(() => {}).finally(() => setLoading(false))
@@ -40,7 +39,7 @@ export default function IdentityVerificationScreen() {
   const pickImage = async (side: 'FRONT' | 'BACK') => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Allow access to your photo library to upload an image.')
+      Alert.alert(t('verify.permissionRequired'), t('verify.permissionRequired'))
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -56,7 +55,7 @@ export default function IdentityVerificationScreen() {
   const takePhoto = async (side: 'FRONT' | 'BACK') => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Allow access to your camera to take a photo.')
+      Alert.alert(t('verify.permissionRequired'), t('verify.permissionRequired'))
       return
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -76,7 +75,7 @@ export default function IdentityVerificationScreen() {
       if (side === 'FRONT') setFrontUri(url)
       else setBackUri(url)
     } catch {
-      Alert.alert('Upload Failed', 'Could not upload image. Please try again.')
+      Alert.alert(t('verify.uploadFailed'), t('verify.uploadFailed'))
     } finally {
       if (side === 'FRONT') setUploadingFront(false)
       else setUploadingBack(false)
@@ -85,11 +84,11 @@ export default function IdentityVerificationScreen() {
 
   const handleSubmit = async () => {
     if (!docType) {
-      Alert.alert('Error', 'Please select a document type')
+      Alert.alert(t('common.error'), t('verify.selectDocType'))
       return
     }
     if (!frontUri) {
-      Alert.alert('Error', 'Please take or upload a photo of the front of your ID')
+      Alert.alert(t('common.error'), t('verify.uploadPhotoFront'))
       return
     }
     setSubmitting(true)
@@ -98,10 +97,10 @@ export default function IdentityVerificationScreen() {
       if (backUri) {
         await v2Identity.uploadDocument(docType, 'BACK', backUri)
       }
-      Alert.alert('Submitted', 'Your documents are under review. This usually takes 1-2 business days.')
+      Alert.alert(t('common.success'), t('verify.underReview'))
       router.back()
     } catch {
-      Alert.alert('Error', 'Failed to submit documents. Please try again.')
+      Alert.alert(t('common.error'), t('verify.submitFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -129,7 +128,7 @@ export default function IdentityVerificationScreen() {
         <Text style={styles.subtitle}>{t('verify.subtitle')}</Text>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Document Type</Text>
+          <Text style={styles.sectionTitle}>{t('verify.selectDocumentType')}</Text>
           {DOC_TYPES.map((dt) => (
             <TouchableOpacity
               key={dt.key}
@@ -145,7 +144,7 @@ export default function IdentityVerificationScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Front of ID</Text>
+          <Text style={styles.sectionTitle}>{t('verify.frontOfId')}</Text>
           {frontUri ? (
             <View style={styles.previewWrap}>
               <Image source={{ uri: frontUri }} style={styles.preview} resizeMode="cover" />
@@ -156,24 +155,24 @@ export default function IdentityVerificationScreen() {
           ) : uploadingFront ? (
             <View style={styles.uploadingBox}>
               <ActivityIndicator size="small" color={colors.amber} />
-              <Text style={styles.uploadingText}>Uploading...</Text>
+              <Text style={styles.uploadingText}>{t('verify.uploading')}</Text>
             </View>
           ) : (
             <View style={styles.imageActions}>
               <TouchableOpacity style={styles.imageBtn} onPress={() => takePhoto('FRONT')} activeOpacity={0.7}>
                 <Ionicons name="camera-outline" size={24} color={colors.amber} />
-                <Text style={styles.imageBtnText}>Camera</Text>
+                <Text style={styles.imageBtnText}>{t('verify.camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage('FRONT')} activeOpacity={0.7}>
                 <Ionicons name="image-outline" size={24} color={colors.amber} />
-                <Text style={styles.imageBtnText}>Gallery</Text>
+                <Text style={styles.imageBtnText}>{t('verify.gallery')}</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Back of ID (optional)</Text>
+          <Text style={styles.sectionTitle}>{t('verify.backOfId')}</Text>
           {backUri ? (
             <View style={styles.previewWrap}>
               <Image source={{ uri: backUri }} style={styles.preview} resizeMode="cover" />
@@ -184,23 +183,23 @@ export default function IdentityVerificationScreen() {
           ) : uploadingBack ? (
             <View style={styles.uploadingBox}>
               <ActivityIndicator size="small" color={colors.amber} />
-              <Text style={styles.uploadingText}>Uploading...</Text>
+              <Text style={styles.uploadingText}>{t('verify.uploading')}</Text>
             </View>
           ) : (
             <View style={styles.imageActions}>
               <TouchableOpacity style={styles.imageBtn} onPress={() => takePhoto('BACK')} activeOpacity={0.7}>
                 <Ionicons name="camera-outline" size={24} color={colors.amber} />
-                <Text style={styles.imageBtnText}>Camera</Text>
+                <Text style={styles.imageBtnText}>{t('verify.camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage('BACK')} activeOpacity={0.7}>
                 <Ionicons name="image-outline" size={24} color={colors.amber} />
-                <Text style={styles.imageBtnText}>Gallery</Text>
+                <Text style={styles.imageBtnText}>{t('verify.gallery')}</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        <Text style={styles.note}>Upload a clear, well-lit photo of your ID. All information must be visible and legible.</Text>
+        <Text style={styles.note}>{t('verify.uploadNote')}</Text>
 
         <TouchableOpacity
           style={[styles.submitBtn, (!docType || !frontUri || submitting) && styles.submitBtnDisabled]}

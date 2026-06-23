@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 
 const AMBER = '#F59E0B'
 const DARK_BG = '#0B0C12'
 
 export default function FindingTaskerScreen() {
+  const { t } = useTranslation()
   const pulseRing1 = useRef(new Animated.Value(0.95)).current
   const pulseRing1Op = useRef(new Animated.Value(0.5)).current
   const pulseRing2 = useRef(new Animated.Value(0.95)).current
@@ -52,8 +54,8 @@ export default function FindingTaskerScreen() {
         </Animated.View>
       </View>
       <Animated.View style={{ opacity: textFade, transform: [{ translateY: textSlide }], alignItems: 'center' }}>
-        <Text style={styles.title}>Finding the Right Tasker</Text>
-        <Text style={styles.subtitle}>Searching available professionals near you…</Text>
+        <Text style={styles.title}>{t('components.findingTasker')}</Text>
+        <Text style={styles.subtitle}>{t('components.findingTasker')}</Text>
       </Animated.View>
     </View>
   )

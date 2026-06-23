@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import PressScale from './PressScale'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
@@ -17,14 +18,15 @@ interface Props {
 
 export default function JobCard({ name, description, priceMin, priceMax, typicalDurationMinutes, isPopular, colorHex, onPress }: Props) {
   const colors = useColors()
-    const styles = makeStyles(colors)
+  const { t } = useTranslation()
+  const styles = makeStyles(colors)
   return (
     <PressScale onPress={onPress}>
       <View style={[styles.card, { backgroundColor: colors.white }, isPopular && { borderColor: colors.amber, borderWidth: 1 }]}>
         {isPopular && (
           <View style={[styles.badge, { backgroundColor: colors.amber }]}>
             <Ionicons name="flame" size={10} color="#fff" />
-            <Text style={[styles.badgeText, { color: colors.white }]}>Popular</Text>
+            <Text style={[styles.badgeText, { color: colors.white }]}>{t('home.hotOffersList.featured')}</Text>
           </View>
         )}
         <View style={styles.header}>
@@ -39,7 +41,7 @@ export default function JobCard({ name, description, priceMin, priceMax, typical
           </View>
           <View style={styles.meta}>
             <Ionicons name="cog-outline" size={14} color={colorHex} />
-            <Text style={[styles.metaText, { color: colorHex }]}>View Details</Text>
+            <Text style={[styles.metaText, { color: colorHex }]}>{t('components.viewDetails')}</Text>
           </View>
         </View>
       </View>

@@ -7,7 +7,9 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import { fonts } from '../../../lib/fonts'
+import { getCategoryI18nKey } from '../../../lib/categories'
 import { getAuthToken } from '../../../lib/api'
 import { v2Team } from '../../../lib/api-v2'
 
@@ -44,12 +46,11 @@ interface InviteEntry {
   phone: string
 }
 
-const STEPS = ['Company Info', 'Services', 'Team', 'Review']
-
 export default function CompanySetupOnboarding() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
+  const { t } = useTranslation()
   const { user, refreshUser } = useAuth()
   const [step, setStep] = useState(0)
 
@@ -64,6 +65,7 @@ export default function CompanySetupOnboarding() {
   const [invites, setInvites] = useState<InviteEntry[]>([])
   const [newInvite, setNewInvite] = useState<InviteEntry>({ name: '', email: '', phone: '' })
 
+  const STEPS = [t('auth.onboarding.steps.0'), t('auth.onboarding.steps.1'), t('auth.onboarding.steps.2'), t('auth.onboarding.steps.3')]
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -105,11 +107,11 @@ export default function CompanySetupOnboarding() {
 
   const addInvite = () => {
     if (!newInvite.name) {
-      Alert.alert('Required', 'Please enter the team member name.')
+      Alert.alert(t('common.error'), t('errors.enterMemberName'))
       return
     }
     if (!newInvite.email && !newInvite.phone) {
-      Alert.alert('Required', 'Please enter an email or phone number.')
+      Alert.alert(t('common.error'), t('errors.enterEmailOrPhone'))
       return
     }
     setInvites([...invites, { ...newInvite }])
@@ -122,11 +124,11 @@ export default function CompanySetupOnboarding() {
 
   const handleSubmit = async () => {
     if (!companyName) {
-      Alert.alert('Required', 'Company name is required.')
+      Alert.alert(t('common.error'), t('errors.companyNameRequired'))
       return
     }
     if (selectedIds.size === 0) {
-      Alert.alert('Required', 'Please select at least one service.')
+      Alert.alert(t('common.error'), t('errors.selectServiceCompany'))
       return
     }
     setSaving(true)
@@ -146,7 +148,7 @@ export default function CompanySetupOnboarding() {
       })
       if (!profileRes.ok) {
         const err = await profileRes.json()
-        Alert.alert('Error', err.error || 'Failed to create company profile')
+        Alert.alert(t('common.error'), err.error || t('errors.generic'))
         return
       }
 
@@ -161,7 +163,7 @@ export default function CompanySetupOnboarding() {
       await refreshUser()
       router.replace('/(company)')
     } catch {
-      Alert.alert('Error', 'Network error. Please try again.')
+      Alert.alert(t('common.error'), t('errors.network'))
     } finally {
       setSaving(false)
     }
@@ -189,24 +191,24 @@ export default function CompanySetupOnboarding() {
       case 0:
         return (
           <View>
-            <Text style={styles.sectionTitle}>Company Information</Text>
+            <Text style={styles.sectionTitle}>{t('auth.onboarding.companyInfo')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Company Name *"
+              placeholder={t('auth.onboarding.companyName')}
               placeholderTextColor={colors.muted}
               value={companyName}
               onChangeText={setCompanyName}
             />
             <TextInput
               style={styles.input}
-              placeholder="Registration Number (optional)"
+              placeholder={t('auth.onboarding.regNumber')}
               placeholderTextColor={colors.muted}
               value={registrationNo}
               onChangeText={setRegistrationNo}
             />
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Brief description of your company (optional)"
+              placeholder={t('auth.onboarding.description')}
               placeholderTextColor={colors.muted}
               value={description}
               onChangeText={setDescription}
@@ -218,8 +220,8 @@ export default function CompanySetupOnboarding() {
       case 1:
         return (
           <View>
-            <Text style={styles.sectionTitle}>Select Services</Text>
-            <Text style={styles.sectionSub}>Choose the services your company offers.</Text>
+            <Text style={styles.sectionTitle}>{t('auth.onboarding.selectServicesTitle')}</Text>
+            <Text style={styles.sectionSub}>{t('auth.onboarding.selectServicesDesc2')}</Text>
             {categoriesLoading ? (
               <ActivityIndicator color={colors.amber} style={{ marginTop: 24 }} />
             ) : (
@@ -234,7 +236,7 @@ export default function CompanySetupOnboarding() {
                       activeOpacity={0.7}
                     >
                       <Ionicons name={cat.iconName as any} size={28} color={selected ? colors.amberDark : colors.ink} />
-                      <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{cat.name}</Text>
+                      <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{t(getCategoryI18nKey(cat))}</Text>
                     </TouchableOpacity>
                   )
                 })}
@@ -245,20 +247,20 @@ export default function CompanySetupOnboarding() {
       case 2:
         return (
           <View>
-            <Text style={styles.sectionTitle}>Invite Team Members</Text>
-            <Text style={styles.sectionSub}>Add team members to your company. They will receive an invite. You can skip this step.</Text>
+            <Text style={styles.sectionTitle}>{t('auth.onboarding.inviteTeam')}</Text>
+            <Text style={styles.sectionSub}>{t('auth.onboarding.inviteTeamDesc')}</Text>
 
             <View style={styles.inviteForm}>
               <TextInput
                 style={styles.input}
-                placeholder="Full Name *"
+                placeholder={t('auth.onboarding.memberName')}
                 placeholderTextColor={colors.muted}
                 value={newInvite.name}
                 onChangeText={(t) => setNewInvite({ ...newInvite, name: t })}
               />
               <TextInput
                 style={styles.input}
-                placeholder="Email Address"
+                placeholder={t('auth.onboarding.memberEmail')}
                 placeholderTextColor={colors.muted}
                 value={newInvite.email}
                 onChangeText={(t) => setNewInvite({ ...newInvite, email: t })}
@@ -267,7 +269,7 @@ export default function CompanySetupOnboarding() {
               />
               <TextInput
                 style={styles.input}
-                placeholder="Phone Number"
+                placeholder={t('auth.onboarding.memberPhone')}
                 placeholderTextColor={colors.muted}
                 value={newInvite.phone}
                 onChangeText={(t) => setNewInvite({ ...newInvite, phone: t })}
@@ -275,7 +277,7 @@ export default function CompanySetupOnboarding() {
               />
               <TouchableOpacity style={styles.addInviteBtn} onPress={addInvite}>
                 <Ionicons name="person-add-outline" size={18} color={colors.white} />
-                <Text style={styles.addInviteText}>Add Member</Text>
+                <Text style={styles.addInviteText}>{t('auth.onboarding.addMember')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -293,32 +295,32 @@ export default function CompanySetupOnboarding() {
             ))}
 
             {invites.length === 0 && (
-              <Text style={styles.skipHint}>You can invite team members later from your dashboard.</Text>
+              <Text style={styles.skipHint}>{t('auth.onboarding.inviteLater')}</Text>
             )}
           </View>
         )
       case 3:
         return (
           <View>
-            <Text style={styles.sectionTitle}>Review</Text>
+            <Text style={styles.sectionTitle}>{t('auth.onboarding.review')}</Text>
             <View style={styles.reviewSection}>
-              <Text style={styles.reviewLabel}>Company Name</Text>
+              <Text style={styles.reviewLabel}>{t('auth.onboarding.companyNameLabel')}</Text>
               <Text style={styles.reviewValue}>{companyName}</Text>
             </View>
             {registrationNo ? (
               <View style={styles.reviewSection}>
-                <Text style={styles.reviewLabel}>Registration No.</Text>
+                <Text style={styles.reviewLabel}>{t('auth.onboarding.regNo')}</Text>
                 <Text style={styles.reviewValue}>{registrationNo}</Text>
               </View>
             ) : null}
             <View style={styles.reviewSection}>
-              <Text style={styles.reviewLabel}>Services ({selectedIds.size})</Text>
+              <Text style={styles.reviewLabel}>{t('auth.onboarding.servicesCount', { n: selectedIds.size })}</Text>
               <Text style={styles.reviewValue}>
-                {categories.filter(c => selectedIds.has(c.id)).map(c => c.name).join(', ')}
+                {categories.filter(c => selectedIds.has(c.id)).map(c => t(getCategoryI18nKey(c))).join(', ')}
               </Text>
             </View>
             <View style={styles.reviewSection}>
-              <Text style={styles.reviewLabel}>Team Invites</Text>
+              <Text style={styles.reviewLabel}>{t('auth.onboarding.teamInvites')}</Text>
               <Text style={styles.reviewValue}>{invites.length} member{invites.length !== 1 ? 's' : ''}</Text>
             </View>
           </View>
@@ -336,7 +338,7 @@ export default function CompanySetupOnboarding() {
           <Ionicons name="arrow-back" size={24} color={colors.ink} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Set Up Your Company</Text>
+        <Text style={styles.title}>{t('auth.onboarding.setupTitle')}</Text>
 
         {renderStepIndicator()}
         {renderStep()}
@@ -345,7 +347,7 @@ export default function CompanySetupOnboarding() {
           {step > 0 && (
             <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep(step - 1)}>
               <Ionicons name="arrow-back" size={18} color={colors.ink} />
-              <Text style={styles.secondaryBtnText}>Back</Text>
+              <Text style={styles.secondaryBtnText}>{t('common.back')}</Text>
             </TouchableOpacity>
           )}
           {step < STEPS.length - 1 ? (
@@ -354,7 +356,7 @@ export default function CompanySetupOnboarding() {
               onPress={() => setStep(step + 1)}
               disabled={step === 0 && !companyName}
             >
-              <Text style={styles.primaryBtnText}>Continue</Text>
+              <Text style={styles.primaryBtnText}>{t('common.continue')}</Text>
               <Ionicons name="arrow-forward" size={18} color={colors.white} />
             </TouchableOpacity>
           ) : (
@@ -367,7 +369,7 @@ export default function CompanySetupOnboarding() {
                 <ActivityIndicator color={colors.white} />
               ) : (
                 <>
-                  <Text style={styles.primaryBtnText}>Finish Setup</Text>
+                  <Text style={styles.primaryBtnText}>{t('common.finishSetup')}</Text>
                   <Ionicons name="checkmark-circle-outline" size={18} color={colors.white} />
                 </>
               )}

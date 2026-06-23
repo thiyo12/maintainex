@@ -7,44 +7,46 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '../../lib/colors'
 import PressScale from '../../components/find/PressScale'
-
-const roles = [
-  {
-    id: 'CUSTOMER',
-    icon: 'hand-left-outline' as const,
-    title: 'I need work done',
-    subtitle: 'Post jobs and hire taskers',
-    color: colors.customerAccent,
-  },
-  {
-    id: 'TASKER',
-    icon: 'construct-outline' as const,
-    title: 'I am a tasker',
-    subtitle: 'Find jobs near me',
-    color: colors.taskerAccent,
-  },
-  {
-    id: 'COMPANY',
-    icon: 'business-outline' as const,
-    title: 'We are a company',
-    subtitle: 'Register and get contracts',
-    color: colors.companyAccent,
-  },
-]
+import { useTranslation } from 'react-i18next'
 
 export default function RoleSelectScreen() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [selected, setSelected] = useState<string | null>(null)
+
+  const roles = [
+    {
+      id: 'CUSTOMER',
+      icon: 'hand-left-outline' as const,
+      title: t('auth.roleSelect.iNeedWork'),
+      subtitle: t('auth.roleSelect.iNeedWorkDesc'),
+      color: colors.customerAccent,
+    },
+    {
+      id: 'TASKER',
+      icon: 'construct-outline' as const,
+      title: t('auth.roleSelect.iAmTasker'),
+      subtitle: t('auth.roleSelect.iAmTaskerDesc'),
+      color: colors.taskerAccent,
+    },
+    {
+      id: 'COMPANY',
+      icon: 'business-outline' as const,
+      title: t('auth.roleSelect.weAreCompany'),
+      subtitle: t('auth.roleSelect.weAreCompanyDesc'),
+      color: colors.companyAccent,
+    },
+  ]
 
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
+        <Text style={styles.backText}>{t('auth.roleSelect.back')}</Text>
       </TouchableOpacity>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.heading}>Who are you?</Text>
-        <Text style={styles.subtitle}>Choose how you want to use Maintainex</Text>
+        <Text style={styles.heading}>{t('auth.roleSelect.title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.roleSelect.subtitle')}</Text>
 
         <View style={styles.cardList}>
           {roles.map((role) => {
@@ -84,7 +86,7 @@ export default function RoleSelectScreen() {
           activeOpacity={0.8}
         >
           <Text style={[styles.continueText, !selected && styles.continueTextDisabled]}>
-            Continue
+            {t('auth.roleSelect.continue')}
           </Text>
         </TouchableOpacity>
       </ScrollView>

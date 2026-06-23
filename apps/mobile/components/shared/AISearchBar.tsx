@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { View, TextInput, TouchableOpacity, Animated, Easing, StyleSheet, Platform } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
 interface Props {
@@ -12,6 +13,7 @@ interface Props {
 
 export default function AISearchBar({ value, onChangeText, onSearch, placeholder }: Props) {
   const { colors } = useTheme()
+  const { t } = useTranslation()
   const glowRadius = useRef(new Animated.Value(8)).current
   const glowOp     = useRef(new Animated.Value(0.2)).current
   const sparkScale = useRef(new Animated.Value(1)).current
@@ -53,7 +55,7 @@ export default function AISearchBar({ value, onChangeText, onSearch, placeholder
         style={[styles.input, { color: colors.ink, backgroundColor: colors.white, borderColor: colors.border }]}
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder || 'What do you need done?'}
+        placeholder={placeholder || t('home.searchPlaceholder')}
         placeholderTextColor={colors.muted}
         returnKeyType="search"
         onSubmitEditing={onSearch}

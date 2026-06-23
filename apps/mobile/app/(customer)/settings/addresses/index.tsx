@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Animated }
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 
 export default function AddressesScreen() {
   const colors = useColors()
+  const { t } = useTranslation()
   const styles = makeStyles(colors)
   const router = useRouter()
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -18,34 +20,34 @@ export default function AddressesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>Saved Addresses</Text>
+        <Text style={styles.heading}>{t('profile.savedAddresses')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.emptyCard}>
             <Ionicons name="location-outline" size={48} color={colors.gray} />
-            <Text style={styles.emptyTitle}>No addresses saved</Text>
+            <Text style={styles.emptyTitle}>{t('profile.noAddresses')}</Text>
             <Text style={styles.emptySub}>
-              Add your home, work, or other frequent locations for faster booking.
+              {t('profile.addAddress')}
             </Text>
           </View>
 
           <TouchableOpacity
             style={styles.addBtn}
-            onPress={() => Alert.alert('Coming Soon', 'Address management is on its way!')}
+            onPress={() => Alert.alert(t('addresses.comingSoon'), t('addresses.comingSoonDesc'))}
           >
             <Ionicons name="add-circle-outline" size={20} color={colors.white} />
-            <Text style={styles.addBtnText}>  Add Address</Text>
+            <Text style={styles.addBtnText}>  {t('profile.addAddress')}</Text>
           </TouchableOpacity>
 
           <View style={styles.demoCard}>
             <View style={styles.demoHeader}>
               <Ionicons name="home" size={20} color={colors.customerAccent} />
-              <Text style={styles.demoLabel}>  Home</Text>
+              <Text style={styles.demoLabel}>  {t('addresses.home')}</Text>
             </View>
             <Text style={styles.demoAddress}>123 Galle Road, Colombo 03</Text>
             <Text style={styles.demoSub}>Western Province, 00100, Sri Lanka</Text>
             <View style={styles.demoBadge}>
-              <Text style={styles.demoBadgeText}>Default</Text>
+              <Text style={styles.demoBadgeText}>{t('addresses.default')}</Text>
             </View>
           </View>
         </ScrollView>

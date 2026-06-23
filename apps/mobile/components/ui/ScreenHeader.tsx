@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 import { fontSizes } from '../../lib/tokens'
@@ -15,6 +16,7 @@ interface Props {
 
 export default function ScreenHeader({ title, subtitle, onBack, rightAction }: Props) {
   const colors = useColors()
+  const { t } = useTranslation()
     const styles = makeStyles(colors)
 
   return (

@@ -63,7 +63,7 @@ export default function LoginScreen() {
             style={styles.input}
             value={email}
             onChangeText={setEmail}
-            placeholder="your@email.com"
+            placeholder={t('auth.emailPlaceholder')}
             keyboardType="email-address"
             autoCapitalize="none"
             placeholderTextColor={colors.muted}

@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { v2Jobs, v2Quotes } from '../../../../../lib/api-v2'
 
 export default function V2SubmitQuoteScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -26,7 +28,7 @@ export default function V2SubmitQuoteScreen() {
       const res = await v2Jobs.get(id)
       setJob(res.job)
     } catch (e) {
-      Alert.alert('Error', 'Failed to load job')
+      Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
     } finally {
       setLoading(false)
@@ -35,7 +37,7 @@ export default function V2SubmitQuoteScreen() {
 
   const handleSubmit = async () => {
     if (!price || !estimatedCompletionTime) {
-      Alert.alert('Error', 'Price and estimated time are required')
+      Alert.alert(t('common.error'), t('errors.fillAllFields'))
       return
     }
     setSubmitting(true)
@@ -45,11 +47,11 @@ export default function V2SubmitQuoteScreen() {
         price: parseFloat(price),
         estimatedCompletionTime, message,
       })
-      Alert.alert('Quote Submitted!', 'The customer will review your offer.', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t('quotes.acceptSuccess'), t('quotes.acceptSuccessDesc'), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (e: any) {
-      Alert.alert('Error', e.message)
+      Alert.alert(t('common.error'), e.message)
     } finally {
       setSubmitting(false)
     }
@@ -70,7 +72,7 @@ export default function V2SubmitQuoteScreen() {
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Job Preview */}
         <View style={styles.jobPreview}>
-          <View style={styles.previewBadge}><Text style={styles.previewBadgeText}>Open</Text></View>
+          <View style={styles.previewBadge}><Text style={styles.previewBadgeText}>{t('jobs.status.open')}</Text></View>
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
@@ -81,25 +83,25 @@ export default function V2SubmitQuoteScreen() {
 
         {/* Quote Form */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Quote</Text>
+          <Text style={styles.sectionTitle}>{t('quotes.yourQuote')}</Text>
 
-          <Text style={styles.label}>Provider Type *</Text>
+          <Text style={styles.label}>{t('jobDetail.provider')} *</Text>
           <View style={styles.typeRow}>
             <TouchableOpacity
               style={[styles.typeBtn, providerType === 'INDIVIDUAL' && styles.typeBtnSelected]}
               onPress={() => setProviderType('INDIVIDUAL')}
             >
-              <Text style={[styles.typeBtnText, providerType === 'INDIVIDUAL' && styles.typeBtnTextSelected]}>Individual</Text>
+              <Text style={[styles.typeBtnText, providerType === 'INDIVIDUAL' && styles.typeBtnTextSelected]}>{t('postJob.step2.freelancer')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.typeBtn, providerType === 'COMPANY' && styles.typeBtnSelected]}
               onPress={() => setProviderType('COMPANY')}
             >
-              <Text style={[styles.typeBtnText, providerType === 'COMPANY' && styles.typeBtnTextSelected]}>Company</Text>
+              <Text style={[styles.typeBtnText, providerType === 'COMPANY' && styles.typeBtnTextSelected]}>{t('postJob.step2.company')}</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Your Price (LKR) *</Text>
+          <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
           <View style={styles.priceInputRow}>
             <Text style={styles.currencySign}>LKR</Text>
             <TextInput
@@ -112,21 +114,21 @@ export default function V2SubmitQuoteScreen() {
             />
           </View>
 
-          <Text style={styles.label}>Estimated Completion *</Text>
+          <Text style={styles.label}>{t('quotes.estimatedTime')} *</Text>
           <TextInput
             style={styles.input}
             value={estimatedCompletionTime}
             onChangeText={setEstimatedCompletionTime}
-            placeholder="e.g. 2 days, 3 hours"
+            placeholder={t('quotes.estimatedTime')}
             placeholderTextColor={colors.muted}
           />
 
-          <Text style={styles.label}>Message to Customer</Text>
+          <Text style={styles.label}>{t('quotes.message')}</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
             value={message}
             onChangeText={setMessage}
-            placeholder="Describe what's included in your quote..."
+            placeholder={t('quotes.message')}
             placeholderTextColor={colors.muted}
             multiline
             numberOfLines={4}
@@ -140,7 +142,7 @@ export default function V2SubmitQuoteScreen() {
             {submitting ? (
               <ActivityIndicator color={colors.ink} />
             ) : (
-              <Text style={styles.submitBtnText}>Submit Quote</Text>
+              <Text style={styles.submitBtnText}>{t('tasker.submitQuote')}</Text>
             )}
           </TouchableOpacity>
         </View>

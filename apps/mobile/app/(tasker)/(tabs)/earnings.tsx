@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { earnings } from '../../../lib/api'
@@ -17,6 +18,7 @@ interface EarningsData {
 }
 
 export default function TaskerEarnings() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const [period, setPeriod] = useState<Period>('weekly')
@@ -43,7 +45,7 @@ export default function TaskerEarnings() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>Earnings</Text>
+        <Text style={styles.heading}>{t('tasker.earnings')}</Text>
       </View>
 
       {loading ? (
@@ -53,24 +55,24 @@ export default function TaskerEarnings() {
       ) : (
         <>
           <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>Available balance</Text>
+            <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
             <Text style={styles.balanceValue}>LKR {(data?.balance || 0).toLocaleString()}</Text>
             <TouchableOpacity style={styles.withdrawBtn}>
-              <Text style={styles.withdrawBtnText}>Withdraw</Text>
+              <Text style={styles.withdrawBtnText}>{t('wallet.withdraw')}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>This {period}</Text>
+              <Text style={styles.statLabel}>{t('tasker.totalEarned')}</Text>
               <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Pending</Text>
+              <Text style={styles.statLabel}>{t('tasker.pending')}</Text>
               <Text style={styles.statValue}>LKR {(data?.pendingAmount || 0).toLocaleString()}</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Total all time</Text>
+              <Text style={styles.statLabel}>{t('tasker.totalEarned')}</Text>
               <Text style={styles.statValue}>LKR {(data?.totalEarned || 0).toLocaleString()}</Text>
             </View>
           </View>
@@ -83,7 +85,7 @@ export default function TaskerEarnings() {
                 onPress={() => setPeriod(p)}
               >
                 <Text style={[styles.periodTabText, period === p && styles.periodTabTextActive]}>
-                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                  {p === 'weekly' ? t('wallet.periodWeekly') : p === 'monthly' ? t('wallet.periodMonthly') : t('wallet.periodYearly')}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -92,24 +94,24 @@ export default function TaskerEarnings() {
           <ScrollView showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadEarnings} tintColor={colors.amber} />}
           >
-            <Text style={styles.transactionTitle}>Recent transactions</Text>
+            <Text style={styles.transactionTitle}>{t('wallet.transactions')}</Text>
             {(data?.transactions || []).length === 0 ? (
               <View style={styles.empty}>
                 <Ionicons name="cash-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
-                <Text style={styles.emptyTitle}>No transactions yet</Text>
+                <Text style={styles.emptyTitle}>{t('wallet.noTransactions')}</Text>
               </View>
             ) : (
               (data?.transactions || []).map((tx, i) => (
                 <View key={i} style={styles.txCard}>
                   <View style={styles.txLeft}>
-                    <View style={[styles.txDot, { backgroundColor: tx.status === 'Cleared' ? colors.success : colors.amber }]} />
+                    <View style={[styles.txDot, { backgroundColor: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]} />
                     <View>
                       <Text style={styles.txJob}>{tx.job}</Text>
-                      <Text style={styles.txDate}>{tx.date} • {tx.status}</Text>
+                      <Text style={styles.txDate}>{tx.date} • {tx.status === 'Cleared' ? t('wallet.statusCleared') : tx.status}</Text>
                     </View>
                   </View>
                   <View style={styles.txRight}>
-                    <Text style={[styles.txAmount, { color: tx.status === 'Cleared' ? colors.success : colors.amber }]}>
+                    <Text style={[styles.txAmount, { color: tx.status === t('wallet.statusCleared') ? colors.success : colors.amber }]}>
                       +LKR {tx.amount.toLocaleString()}
                     </Text>
                   </View>

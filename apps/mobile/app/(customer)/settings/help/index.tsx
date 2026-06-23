@@ -4,32 +4,22 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
-
-const faqs = [
-  {
-    q: 'How do I find a tasker?',
-    a: 'Browse categories on the home screen or use the search bar. Select a service, compare tasker profiles, and book the one that fits your needs.',
-  },
-  {
-    q: 'How do payments work?',
-    a: 'Payments are processed securely through our platform. You can pay via card (Visa/Mastercard), PayHere, or Stripe. Payment is held securely until the job is completed.',
-  },
-  {
-    q: 'Can I cancel a booking?',
-    a: 'Yes, you can cancel a booking from your active bookings screen. Cancellation policies may apply depending on how far in advance you cancel.',
-  },
-  {
-    q: 'How do I contact support?',
-    a: 'You can reach us via email at support@maintainex.com or call us at +94 11 234 5678. Our team is available Mon–Sat, 8 AM – 8 PM.',
-  },
-]
+import { useTranslation } from 'react-i18next'
 
 export default function HelpScreen() {
+  const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
   const fadeAnim = useRef(new Animated.Value(0)).current
   const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  const faqs = [
+    { q: t('profile.faq1Q'), a: t('profile.faq1A') },
+    { q: t('profile.faq2Q'), a: t('profile.faq2A') },
+    { q: t('profile.faq3Q'), a: t('profile.faq3A') },
+    { q: t('profile.faq4Q'), a: t('profile.faq4A') },
+  ]
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
@@ -40,10 +30,10 @@ export default function HelpScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>Help & Support</Text>
+        <Text style={styles.heading}>{t('profile.helpSupport')}</Text>
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-          <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+          <Text style={styles.sectionTitle}>{t('profile.faq')}</Text>
 
           <View style={styles.card}>
             {faqs.map((faq, i) => {
@@ -66,7 +56,7 @@ export default function HelpScreen() {
             })}
           </View>
 
-          <Text style={styles.sectionTitle}>Contact Us</Text>
+          <Text style={styles.sectionTitle}>{t('profile.contactUs')}</Text>
           <View style={styles.card}>
             <View style={styles.contactRow}>
               <Ionicons name="mail-outline" size={20} color={colors.customerAccent} />

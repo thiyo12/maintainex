@@ -1,21 +1,40 @@
 import { useState, useRef, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useTranslation } from 'react-i18next'
 import { conversations, auth } from '../../lib/api'
-import { useColors } from '../../lib/ThemeContext'
+import { useTheme } from '../../lib/ThemeContext'
+import { fonts } from '../../lib/fonts'
+
+const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
 
 export default function ChatDetailScreen() {
-  const colors = useColors()
+  const { t } = useTranslation()
+  const { colors } = useTheme()
   const styles = makeStyles(colors)
   const router = useRouter()
-  const { id } = useLocalSearchParams()
-  const [messages, setMessages] = useState<any[]>([])
+  const { id, status, testMsg, testUser } = useLocalSearchParams()
+  const isDemo = (id as string || '').startsWith('demo_')
+  const [messages, setMessages] = useState<any[]>(() => {
+    if (isDemo && testMsg) {
+      return [{
+        id: 'demo_msg',
+        text: decodeURIComponent(testMsg as string),
+        senderId: '__me__',
+        createdAt: new Date().toISOString(),
+        status: 'sent',
+      }]
+    }
+    return []
+  })
   const [inputText, setInputText] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
-  const [otherUserName, setOtherUserName] = useState('')
+  const [loading, setLoading] = useState(isDemo ? false : true)
+  const [userId, setUserId] = useState<string | null>(isDemo ? '__me__' : null)
+  const [otherUser, setOtherUser] = useState<any>(isDemo ? { id: (id as string || '').replace('demo_', ''), name: decodeURIComponent(testUser as string || '') } : null)
+  const [sending, setSending] = useState(false)
+  const [isClosed, setIsClosed] = useState(() => isDemo || CLOSED_STATUSES.includes((status as string || '').toUpperCase()))
   const flatListRef = useRef<FlatList>(null)
 
   const fetchUserId = useCallback(async () => {
@@ -32,16 +51,19 @@ export default function ChatDetailScreen() {
     try {
       const data = await conversations.get(id as string)
       setMessages(data.messages || [])
-      if (data.participants?.length > 0 && !otherUserName) {
+      if (data.participants?.length > 0 && !otherUser) {
         const other = data.participants.find((p: any) => p.id !== userId)
-        if (other) setOtherUserName(other.name || '')
+        if (other) setOtherUser(other)
+      }
+      if (data.job?.status && CLOSED_STATUSES.includes(data.job.status)) {
+        setIsClosed(true)
       }
     } catch {
       // fail silently
     } finally {
       setLoading(false)
     }
-  }, [id, userId, otherUserName])
+  }, [id, userId, otherUser])
 
   useFocusEffect(
     useCallback(() => {
@@ -59,20 +81,25 @@ export default function ChatDetailScreen() {
   )
 
   const sendMessage = async () => {
-    if (!inputText.trim()) return
+    if (!inputText.trim() || sending) return
     const text = inputText.trim()
     const optimisticMsg = {
       id: Date.now().toString(),
       text,
       senderId: userId,
       createdAt: new Date().toISOString(),
+      status: 'sending',
     }
     setMessages(prev => [...prev, optimisticMsg])
     setInputText('')
+    setSending(true)
     try {
       await conversations.sendMessage(id as string, text)
+      setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'sent' } : m))
     } catch {
-      // fail silently
+      setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m))
+    } finally {
+      setSending(false)
     }
   }
 
@@ -82,26 +109,56 @@ export default function ChatDetailScreen() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return t('common.yesterday')
+    return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })
+  }
+
+  const shouldShowDate = (index: number) => {
+    if (index === 0) return true
+    const curr = new Date(messages[index]?.createdAt || messages[index]?.updatedAt)
+    const prev = new Date(messages[index - 1]?.createdAt || messages[index - 1]?.updatedAt)
+    return curr.toDateString() !== prev.toDateString()
+  }
+
+  const retrySend = (msg: any) => {
+    Alert.alert(t('common.error'), t('chat.sendFailed'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.retry'), onPress: async () => {
+        setMessages(prev => prev.filter(m => m.id !== msg.id))
+        setInputText(msg.text)
+      }},
+    ])
+  }
+
+  const otherName = otherUser?.name || t('home.chat')
+  const otherAvatar = otherUser?.profileImage || otherUser?.avatar
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { borderBottomColor: colors.border, backgroundColor: colors.white }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <Ionicons name="chevron-back" size={22} color={colors.ink} />
         </TouchableOpacity>
         <View style={styles.topInfo}>
-          <View style={styles.avatarSmall}>
-            <Text style={styles.avatarText}>{otherUserName?.[0] || '?'}</Text>
-          </View>
-          <View>
-            <Text style={styles.chatName}>{otherUserName || 'Chat'}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green, marginRight: 4 }} />
-              <Text style={styles.chatStatus}>Online</Text>
+          {otherAvatar ? (
+            <Image source={{ uri: otherAvatar }} style={styles.avatarImg} />
+          ) : (
+            <View style={[styles.avatarSmall, { backgroundColor: colors.amber }]}>
+              <Text style={[styles.avatarText, { color: '#111827' }]}>{otherName[0]?.toUpperCase() || '?'}</Text>
             </View>
+          )}
+          <View>
+            <Text style={[styles.chatName, { color: colors.ink }]}>{otherName}</Text>
           </View>
         </View>
-        <TouchableOpacity>
-          <Text style={styles.moreIcon}>⋯</Text>
+        <TouchableOpacity onPress={() => router.push(`/(customer)/find/tasker-profile/${otherUser?.id || ''}`)}>
+          <Ionicons name="person-circle-outline" size={24} color={colors.muted} />
         </TouchableOpacity>
       </View>
 
@@ -112,7 +169,7 @@ export default function ChatDetailScreen() {
       >
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={colors.customerAccent} />
+            <ActivityIndicator size="large" color={colors.amber} />
           </View>
         ) : (
           <FlatList
@@ -121,37 +178,82 @@ export default function ChatDetailScreen() {
             keyExtractor={(item) => item.id || Math.random().toString()}
             contentContainerStyle={styles.messagesContainer}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-            renderItem={({ item }) => {
-              const isUser = userId ? item.senderId === userId : false
-              return (
-                <View style={[styles.messageWrap, isUser ? styles.messageSent : styles.messageReceived]}>
-                  <View style={[styles.messageBubble, isUser ? styles.bubbleSent : styles.bubbleReceived]}>
-                    <Text style={[styles.messageText, isUser && styles.messageTextSent]}>
-                      {item.text}
-                    </Text>
+            ListHeaderComponent={
+              <View>
+                {isClosed ? (
+                  <View style={[styles.closedBanner, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
+                    <Ionicons name="lock-closed" size={16} color="#DC2626" />
+                    <Text style={[styles.safetyText, { color: '#991B1B' }]}>{t('chat.conversationClosed')}</Text>
                   </View>
-                  <Text style={[styles.messageTime, isUser ? styles.timeSent : styles.timeReceived]}>
-                    {formatTime(item.createdAt || item.updatedAt)}
-                  </Text>
+                ) : null}
+                <View style={[styles.safetyBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
+                  <Ionicons name="shield-checkmark" size={16} color={colors.amber} />
+                  <Text style={[styles.safetyText, { color: colors.ink }]}>{t('chat.safetyMessage')}</Text>
+                </View>
+              </View>
+            }
+            renderItem={({ item, index }) => {
+              const isUser = userId ? item.senderId === userId : false
+              const showDate = shouldShowDate(index)
+              return (
+                <View>
+                  {showDate && (
+                    <View style={styles.dateSep}>
+                      <Text style={[styles.dateSepText, { color: colors.muted }]}>{formatDate(item.createdAt || item.updatedAt)}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.messageWrap, { maxWidth: '78%' }, isUser ? styles.messageSent : styles.messageReceived]}>
+                    <View style={[styles.messageBubble, isUser ? { backgroundColor: colors.amber, borderBottomRightRadius: 4 } : { backgroundColor: colors.white, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: colors.border }]}>
+                      <Text style={[styles.messageText, { color: isUser ? '#111827' : colors.ink }]}>{item.text}</Text>
+                    </View>
+                    <View style={[styles.messageFooter, isUser ? styles.footerSent : styles.footerReceived]}>
+                      <Text style={[styles.messageTime, { color: colors.muted }]}>{formatTime(item.createdAt || item.updatedAt)}</Text>
+                      {isUser && (
+                        item.status === 'sending' ? (
+                          <Ionicons name="time-outline" size={11} color={colors.muted} />
+                        ) : item.status === 'failed' ? (
+                          <TouchableOpacity onPress={() => retrySend(item)}>
+                            <Ionicons name="alert-circle" size={11} color="#EF4444" />
+                          </TouchableOpacity>
+                        ) : (
+                          <Ionicons name="checkmark" size={11} color={colors.muted} />
+                        )
+                      )}
+                    </View>
+                  </View>
                 </View>
               )
             }}
           />
         )}
 
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Type a message..."
-            placeholderTextColor={colors.gray}
-            multiline
-          />
-          <TouchableOpacity style={styles.sendBtn} onPress={sendMessage}>
-            <Text style={styles.sendBtnText}>Send</Text>
-          </TouchableOpacity>
-        </View>
+        {isClosed ? (
+          <View style={[styles.closedInputBar, { borderTopColor: colors.border, backgroundColor: '#FEF2F2' }]}>
+            <Ionicons name="lock-closed" size={14} color="#DC2626" />
+            <Text style={[styles.closedInputText, { color: '#991B1B' }]}>{t('chat.conversationClosed')}</Text>
+          </View>
+        ) : (
+          <View style={[styles.inputBar, { borderTopColor: colors.border, backgroundColor: colors.white }]}>
+            <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <TextInput
+                style={[styles.input, { color: colors.ink }]}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={t('chat.inputPlaceholder')}
+                placeholderTextColor={colors.muted}
+                multiline
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.sendBtn, { backgroundColor: inputText.trim() ? colors.amber : colors.border }]}
+              onPress={sendMessage}
+              disabled={!inputText.trim() || sending}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="send" size={16} color={inputText.trim() ? '#111827' : colors.muted} />
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
@@ -162,77 +264,84 @@ const makeStyles = (colors: any) => StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
-    backgroundColor: colors.white,
   },
-  backBtn: { marginRight: 12 },
-  backText: { fontSize: 16, color: colors.warning, fontWeight: '600' },
+  backBtn: { marginRight: 8, padding: 4 },
   topInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatarSmall: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: colors.customerAccent,
-    justifyContent: 'center',
+  avatarSmall: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  avatarImg: { width: 36, height: 36, borderRadius: 18 },
+  avatarText: { fontSize: 14, fontFamily: fonts.heading },
+  chatName: { fontSize: 15, fontFamily: fonts.bodyMedium },
+  safetyBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
   },
-  avatarText: { fontSize: 14, fontWeight: '700', color: colors.white },
-  chatName: { fontSize: 15, fontWeight: '700', color: colors.dark },
-  chatStatus: { fontSize: 11, color: colors.green },
-  moreIcon: { fontSize: 22, color: colors.gray },
+  safetyText: { fontSize: 12, fontFamily: fonts.body, flex: 1, lineHeight: 16 },
   messagesContainer: { padding: 16, paddingBottom: 8 },
-  messageWrap: { marginBottom: 16, maxWidth: '80%' },
+  dateSep: { alignItems: 'center', marginVertical: 12 },
+  dateSepText: { fontSize: 11, fontFamily: fonts.body },
+  messageWrap: { marginBottom: 12 },
   messageSent: { alignSelf: 'flex-end' },
   messageReceived: { alignSelf: 'flex-start' },
-  messageBubble: {
-    padding: 12,
-    borderRadius: 16,
-  },
-  bubbleSent: {
-    backgroundColor: colors.customerAccent,
-    borderBottomRightRadius: 4,
-  },
-  bubbleReceived: {
-    backgroundColor: colors.white,
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.lightGray,
-  },
-  messageText: { fontSize: 15, color: colors.dark, lineHeight: 20 },
-  messageTextSent: { color: colors.white },
-  messageTime: { fontSize: 11, color: colors.gray, marginTop: 4 },
-  timeSent: { textAlign: 'right' },
-  timeReceived: { textAlign: 'left' },
+  messageBubble: { padding: 12, borderRadius: 16 },
+  messageText: { fontSize: 15, fontFamily: fonts.body, lineHeight: 20 },
+  messageFooter: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  footerSent: { justifyContent: 'flex-end' },
+  footerReceived: { justifyContent: 'flex-start' },
+  messageTime: { fontSize: 10, fontFamily: fonts.body },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     padding: 12,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
-    backgroundColor: colors.white,
     gap: 8,
   },
-  input: {
+  inputWrap: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
     borderWidth: 1.5,
-    borderColor: colors.lightGray,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    borderRadius: 22,
+    paddingHorizontal: 4,
+  },
+  input: {
+    paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 15,
-    color: colors.dark,
+    fontFamily: fonts.body,
     maxHeight: 100,
   },
   sendBtn: {
-    backgroundColor: colors.customerAccent,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  sendBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  closedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  closedInputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 14,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 14,
+    borderTopWidth: 1,
+  },
+  closedInputText: { fontSize: 13, fontFamily: fonts.body },
 })
