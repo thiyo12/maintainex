@@ -89,14 +89,18 @@ async function getServicesByCategory() {
 
 const BASE_DATE = new Date('2025-01-01')
 
-function daysSince(): number {
+function fifteenMinIntervals(): number {
   const diff = Date.now() - BASE_DATE.getTime()
-  return Math.floor(diff / (1000 * 60 * 60 * 24))
+  return Math.floor(diff / (1000 * 60 * 15))
+}
+
+function twoHourIntervals(): number {
+  const diff = Date.now() - BASE_DATE.getTime()
+  return Math.floor(diff / (1000 * 60 * 120))
 }
 
 function getViewCount(seed: number = 0): number {
-  const days = daysSince()
-  return 3000 + (days * 38) + ((seed * 37) % 200)
+  return 3000 + (fifteenMinIntervals() * 38) + ((seed * 37) % 200)
 }
 
 async function getTrendingServices() {
@@ -131,7 +135,8 @@ export default async function HomePage() {
   const { categories = [], services = [] } = await getServicesByCategory()
   const trendingServices = await getTrendingServices()
 
-  const happyClients = 500 + daysSince()
+  const happyClients = 500 + twoHourIntervals() * 2
+  const transactions = 1000 + twoHourIntervals() * 2
 
   const features = [
     { icon: FiCheck, title: 'Professional Team', description: 'Trained and vetted cleaning professionals' },
@@ -212,7 +217,7 @@ export default async function HomePage() {
                   </div>
                   <div className="hidden sm:block h-8 md:h-12 w-px bg-dark-900/20" />
                   <div className="text-center sm:text-left">
-                    <AnimatedCounter end={1000} duration={4000} />
+                    <AnimatedCounter end={transactions} duration={4000} />
                     <div className="text-dark-900/70 text-xs md:text-sm">Transactions</div>
                   </div>
                   <div className="hidden sm:block h-8 md:h-12 w-px bg-dark-900/20" />
