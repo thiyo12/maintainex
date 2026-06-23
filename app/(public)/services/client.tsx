@@ -34,8 +34,8 @@ interface Category {
 export default function ServicesPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
       </div>
     }>
       <ServicesContent />
@@ -114,8 +114,8 @@ function ServicesContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
       </div>
     )
   }
@@ -125,11 +125,11 @@ function ServicesContent() {
       <Header />
       <WhatsAppButton />
       
-      <main className="pt-20 min-h-screen bg-gray-50">
+      <main className="pt-16 min-h-screen bg-background">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-yellow-400 to-yellow-500 py-12 md:py-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 text-center">
+        <section className="bg-foreground py-12 md:py-16">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
+            <h1 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-background mb-3 text-center">
               Our Services
             </h1>
             {selectedCategory && (
@@ -138,19 +138,19 @@ function ServicesContent() {
                   onClick={() => {
                     router.push('/services')
                   }}
-                  className="text-primary-600 hover:text-primary-700 font-medium flex items-center gap-2"
+                  className="text-amber-400 hover:text-amber-300 font-medium flex items-center gap-2"
                 >
                   ← View All Categories
                 </button>
               </div>
             )}
             {selectedCategory && (
-              <p className="text-gray-800 text-center max-w-2xl mx-auto mb-6">
+              <p className="text-background/80 text-center max-w-2xl mx-auto mb-6">
                 {selectedCategory.services?.length || 0} services in {selectedCategory.name}
               </p>
             )}
             {!selectedCategory && (
-            <p className="text-gray-800 text-center max-w-2xl mx-auto mb-6">
+            <p className="text-background/80 text-center max-w-2xl mx-auto mb-6">
               Professional home services at your fingertips. Choose a service to get started.
             </p>
             )}
@@ -160,13 +160,13 @@ function ServicesContent() {
         {/* ALL Services Grid - Grouped by Category */}
         {!selectedCategorySlug && (
         <section id="all-services" className="py-8 md:py-12">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             {categories.map((category) => (
               category.services && category.services.length > 0 && (
                 <div key={category.id} className="mb-12">
                   <div className="flex items-center gap-3 mb-6">
                     {category.icon && <span className="text-2xl">{category.icon}</span>}
-                    <h2 className="text-xl md:text-2xl font-bold text-gray-900">
+                    <h2 className="text-xl md:text-2xl font-bold text-foreground">
                       {category.name}
                     </h2>
                   </div>
@@ -174,9 +174,9 @@ function ServicesContent() {
                     {category.services.map((service) => (
                       <div 
                         key={service.id}
-                        className="bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
+                        className="bg-card rounded-3xl overflow-hidden border border-border hover:border-amber-300 transition-all duration-300"
                       >
-                        <div className="relative h-28 md:h-32 overflow-hidden bg-gray-100">
+                        <div className="relative h-28 md:h-32 overflow-hidden bg-muted">
                           {service.image ? (
                             <img
                               src={getImageUrl(service.image)}
@@ -184,17 +184,17 @@ function ServicesContent() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center">
+                            <div className="w-full h-full bg-amber-soft flex items-center justify-center">
                               <span className="text-4xl">🧹</span>
                             </div>
                           )}
                         </div>
 
                         <div className="p-4">
-                          <h3 className="font-bold text-gray-900 mb-1">
+                          <h3 className="font-bold text-foreground mb-1">
                             {service.title}
                           </h3>
-                          <p className="text-gray-600 text-sm mb-2 line-clamp-2">
+                          <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
                             {service.description || 'Professional service'}
                           </p>
 
@@ -202,7 +202,7 @@ function ServicesContent() {
                             {service.slug && (
                               <Link
                                 href={`/services/${service.slug}`}
-                                className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg transition-colors text-sm"
+                                className="flex-1 text-center bg-muted hover:bg-muted/80 text-foreground font-semibold py-2 rounded-full transition-colors text-sm"
                               >
                                 Learn More
                               </Link>
@@ -217,7 +217,7 @@ function ServicesContent() {
                                 }))
                                 router.push(`/booking?serviceId=${service.id}&category=${category.slug}`)
                               }}
-                              className={`${service.slug ? 'flex-1' : 'w-full'} bg-primary-500 hover:bg-primary-600 text-gray-900 font-semibold py-2 rounded-lg transition-colors text-sm`}
+                              className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2 rounded-full transition-colors text-sm`}
                             >
                               Book Now
                             </button>

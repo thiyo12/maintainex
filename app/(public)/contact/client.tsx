@@ -56,19 +56,19 @@ export default function ContactPage() {
       <>
         <Header />
         <WhatsAppButton />
-        <main className="pt-20 min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="max-w-md mx-auto px-4 text-center">
-            <div className="bg-white rounded-2xl shadow-xl p-8">
+        <main className="pt-16 min-h-screen bg-background flex items-center justify-center">
+          <div className="max-w-md mx-auto px-5 text-center">
+            <div className="bg-card rounded-3xl border border-border p-8">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <FiCheck className="text-4xl text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-dark-900 mb-4">Message Sent!</h2>
-              <p className="text-gray-600 mb-6">
+              <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-4">Message Sent!</h2>
+              <p className="text-muted-foreground mb-6">
                 Thank you for contacting us. We'll get back to you within 24 hours.
               </p>
               <button
                 onClick={() => setSuccess(false)}
-                className="bg-primary-500 hover:bg-primary-600 text-dark-900 font-semibold px-6 py-3 rounded-lg transition-all duration-300"
+                className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-6 py-3 rounded-full transition-all duration-300"
               >
                 Send Another Message
               </button>
@@ -85,67 +85,67 @@ export default function ContactPage() {
       <Header />
       <WhatsAppButton />
       
-      <main className="pt-20">
+      <main className="pt-16">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-primary-400 to-primary-600 py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-dark-900 mb-6">
+        <section className="bg-foreground py-20">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 text-center">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-[-0.02em] text-background mb-6">
               Contact Us
             </h1>
-            <p className="text-xl text-dark-900/80 max-w-3xl mx-auto">
+            <p className="text-xl text-background/80 max-w-3xl mx-auto">
               Have questions? We'd love to hear from you. Get in touch with us today.
             </p>
           </div>
         </section>
 
         {/* Contact Info Cards */}
-        <section className="py-16 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-16 bg-background">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="grid md:grid-cols-3 gap-8">
-              <div className="text-center p-8 bg-gray-50 rounded-2xl">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FiPhone className="text-3xl text-primary-600" />
+              <div className="text-center p-8 bg-card rounded-3xl border border-border">
+                <div className="w-16 h-16 bg-amber-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FiPhone className="text-3xl text-amber-600" />
                 </div>
-                <h3 className="text-xl font-bold text-dark-900 mb-2">Phone</h3>
-                <p className="text-gray-600 mb-2">Call or WhatsApp</p>
-                <a href={`tel:${region.phoneRaw}`} className="text-primary-600 font-semibold hover:text-primary-700">
+                <h3 className="text-xl font-bold text-foreground mb-2">Phone</h3>
+                <p className="text-muted-foreground mb-2">Call or WhatsApp</p>
+                <a href={`tel:${region.phoneRaw}`} className="text-amber-600 font-semibold hover:text-amber-700">
                   {region.phone}
                 </a>
               </div>
 
-              <div className="text-center p-8 bg-gray-50 rounded-2xl">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FiMail className="text-3xl text-primary-600" />
+              <div className="text-center p-8 bg-card rounded-3xl border border-border">
+                <div className="w-16 h-16 bg-amber-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FiMail className="text-3xl text-amber-600" />
                 </div>
-                <h3 className="text-xl font-bold text-dark-900 mb-2">Email</h3>
-                <p className="text-gray-600 mb-2">We reply within 24h</p>
-                <a href="mailto:maintainex.lk@gmail.com" className="text-primary-600 font-semibold hover:text-primary-700">
+                <h3 className="text-xl font-bold text-foreground mb-2">Email</h3>
+                <p className="text-muted-foreground mb-2">We reply within 24h</p>
+                <a href="mailto:maintainex.lk@gmail.com" className="text-amber-600 font-semibold hover:text-amber-700">
                   maintainex.lk@gmail.com
                 </a>
               </div>
 
-              <div className="text-center p-8 bg-gray-50 rounded-2xl">
-                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FiClock className="text-3xl text-primary-600" />
+              <div className="text-center p-8 bg-card rounded-3xl border border-border">
+                <div className="w-16 h-16 bg-amber-soft rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FiClock className="text-3xl text-amber-600" />
                 </div>
-                <h3 className="text-xl font-bold text-dark-900 mb-2">Working Hours</h3>
-                <p className="text-gray-600 mb-2">Mon - Sat</p>
-                <p className="text-primary-600 font-semibold">8:00 AM - 6:00 PM</p>
+                <h3 className="text-xl font-bold text-foreground mb-2">Working Hours</h3>
+                <p className="text-muted-foreground mb-2">Mon - Sat</p>
+                <p className="text-amber-600 font-semibold">8:00 AM - 6:00 PM</p>
               </div>
             </div>
           </div>
         </section>
 
         {/* Contact Form & Map */}
-        <section className="py-16 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-16 bg-muted">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="grid lg:grid-cols-2 gap-12">
               {/* Contact Form */}
-              <div className="bg-white rounded-2xl shadow-xl p-8">
-                <h2 className="text-2xl font-bold text-dark-900 mb-6">Send us a Message</h2>
+              <div className="bg-card rounded-3xl border border-border p-8">
+                <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-6">Send us a Message</h2>
                 
                 {error && (
-                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
+                  <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-6">
                     {error}
                   </div>
                 )}
@@ -153,7 +153,7 @@ export default function ContactPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-foreground mb-2">
                         Your Name *
                       </label>
                       <input
@@ -162,12 +162,12 @@ export default function ContactPage() {
                         value={formData.name}
                         onChange={handleChange}
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                        className="w-full px-4 py-3 border-2 border-border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-card text-foreground placeholder:text-muted-foreground"
                         placeholder="John Doe"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-foreground mb-2">
                         Phone Number *
                       </label>
                       <input
@@ -176,14 +176,14 @@ export default function ContactPage() {
                         value={formData.phone}
                         onChange={handleChange}
                         required
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                        className="w-full px-4 py-3 border-2 border-border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-card text-foreground placeholder:text-muted-foreground"
                         placeholder="0771234567"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Email Address *
                     </label>
                     <input
@@ -192,13 +192,13 @@ export default function ContactPage() {
                       value={formData.email}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                      className="w-full px-4 py-3 border-2 border-border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-card text-foreground placeholder:text-muted-foreground"
                       placeholder="your@email.com"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Subject *
                     </label>
                     <select
@@ -206,7 +206,7 @@ export default function ContactPage() {
                       value={formData.subject}
                       onChange={handleChange}
                       required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+                      className="w-full px-4 py-3 border-2 border-border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all bg-card text-foreground"
                     >
                       <option value="">Select a subject</option>
                       <option value="booking">Booking Inquiry</option>
@@ -218,7 +218,7 @@ export default function ContactPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Message *
                     </label>
                     <textarea
@@ -227,7 +227,7 @@ export default function ContactPage() {
                       onChange={handleChange}
                       required
                       rows={5}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all resize-none"
+                      className="w-full px-4 py-3 border-2 border-border rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all resize-none bg-card text-foreground placeholder:text-muted-foreground"
                       placeholder="How can we help you?"
                     />
                   </div>
@@ -235,7 +235,7 @@ export default function ContactPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 rounded-full transition-all duration-300 glow-amber disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {submitting ? 'Sending...' : (
                       <>
@@ -249,41 +249,41 @@ export default function ContactPage() {
 
               {/* Location Info */}
               <div>
-                <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-                  <h2 className="text-2xl font-bold text-dark-900 mb-6">Our Locations</h2>
+                <div className="bg-card rounded-3xl border border-border p-8 mb-8">
+                  <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-6">Our Locations</h2>
                   
                   <div className="space-y-6">
                     <div className="flex gap-4">
-                      <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <FiMapPin className="text-xl text-primary-600" />
+                      <div className="w-12 h-12 bg-amber-soft rounded-full flex items-center justify-center flex-shrink-0">
+                        <FiMapPin className="text-xl text-amber-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-dark-900">Jaffna — Headquarters</h4>
-                        <p className="text-gray-600">Jaffna, {region.countryName}</p>
-                        <p className="text-sm text-gray-500">Main operations center — serving all 25 districts</p>
+                        <h4 className="font-bold text-foreground">Jaffna — Headquarters</h4>
+                        <p className="text-muted-foreground">Jaffna, {region.countryName}</p>
+                        <p className="text-sm text-muted-foreground/70">Main operations center — serving all 25 districts</p>
                       </div>
                     </div>
 
                     <div className="flex gap-4">
-                      <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <FiMapPin className="text-xl text-primary-600" />
+                      <div className="w-12 h-12 bg-amber-soft rounded-full flex items-center justify-center flex-shrink-0">
+                        <FiMapPin className="text-xl text-amber-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-dark-900">Canada — Toronto</h4>
-                        <p className="text-gray-600">Toronto, Ontario, Canada</p>
-                        <p className="text-sm text-gray-500">Serving GTA and surrounding areas</p>
+                        <h4 className="font-bold text-foreground">Canada — Toronto</h4>
+                        <p className="text-muted-foreground">Toronto, Ontario, Canada</p>
+                        <p className="text-sm text-muted-foreground/70">Serving GTA and surrounding areas</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Quick Contact */}
-                <div className="bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl p-8 text-center">
-                  <h3 className="text-xl font-bold text-dark-900 mb-4">Need Immediate Help?</h3>
-                  <p className="text-dark-900/80 mb-6">Call us directly for instant support</p>
+                <div className="bg-foreground rounded-3xl p-8 text-center">
+                  <h3 className="text-xl font-bold text-background mb-4">Need Immediate Help?</h3>
+                  <p className="text-background/80 mb-6">Call us directly for instant support</p>
                   <a 
                     href={`tel:${region.phoneRaw}`} 
-                    className="inline-flex items-center gap-2 bg-dark-900 hover:bg-dark-800 text-white font-bold px-8 py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+                    className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber"
                   >
                     <FiPhone />
                     {region.phone}
@@ -295,36 +295,36 @@ export default function ContactPage() {
         </section>
 
         {/* FAQ Section */}
-        <section className="py-16 bg-white">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-bold text-dark-900 mb-8 text-center">Frequently Asked Questions</h2>
+        <section className="py-16 bg-background">
+          <div className="max-w-3xl mx-auto px-5 sm:px-8">
+            <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-8 text-center">Frequently Asked Questions</h2>
             
             <div className="space-y-4">
-              <div className="bg-gray-50 rounded-xl p-6">
-                <h4 className="font-bold text-dark-900 mb-2">What areas do you service?</h4>
-                <p className="text-gray-600">We service all districts across {region.countryName} from our Jaffna headquarters, plus the Greater Toronto Area in Canada.</p>
+              <div className="bg-card rounded-3xl border border-border p-6">
+                <h4 className="font-bold text-foreground mb-2">What areas do you service?</h4>
+                <p className="text-muted-foreground">We service all districts across {region.countryName} from our Jaffna headquarters, plus the Greater Toronto Area in Canada.</p>
               </div>
               
-              <div className="bg-gray-50 rounded-xl p-6">
-                <h4 className="font-bold text-dark-900 mb-2">How quickly can I get a booking?</h4>
-                <p className="text-gray-600">We typically offer same-day or next-day service. Book online or call us for urgent requests.</p>
+              <div className="bg-card rounded-3xl border border-border p-6">
+                <h4 className="font-bold text-foreground mb-2">How quickly can I get a booking?</h4>
+                <p className="text-muted-foreground">We typically offer same-day or next-day service. Book online or call us for urgent requests.</p>
               </div>
               
-              <div className="bg-gray-50 rounded-xl p-6">
-                <h4 className="font-bold text-dark-900 mb-2">Are your cleaners insured?</h4>
-                <p className="text-gray-600">Yes! All our team members are fully trained and insured for your peace of mind.</p>
+              <div className="bg-card rounded-3xl border border-border p-6">
+                <h4 className="font-bold text-foreground mb-2">Are your cleaners insured?</h4>
+                <p className="text-muted-foreground">Yes! All our team members are fully trained and insured for your peace of mind.</p>
               </div>
             </div>
           </div>
         </section>
 
         {/* Internal Links */}
-        <section className="py-12 bg-gray-50">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-gray-600">
-              <a href="/services" className="text-primary-600 hover:text-primary-700 font-semibold">Browse our services</a>
+        <section className="py-12 bg-muted">
+          <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center">
+            <p className="text-muted-foreground">
+              <a href="/services" className="text-amber-600 hover:text-amber-700 font-semibold">Browse our services</a>
               {' '}or{' '}
-              <a href="/booking" className="text-primary-600 hover:text-primary-700 font-semibold">book online</a>
+              <a href="/booking" className="text-amber-600 hover:text-amber-700 font-semibold">book online</a>
               {' '}to get started.
             </p>
           </div>

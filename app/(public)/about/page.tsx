@@ -85,61 +85,61 @@ export default function AboutPage() {
       <Header />
       <WhatsAppButton />
 
-      <main className="pt-20">
+      <main className="pt-16">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-primary-400 to-primary-600 py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-dark-900 mb-6">
+        <section className="bg-foreground py-20">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 text-center">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-[-0.02em] text-background mb-6">
               About Maintainex — All Services Under One Roof in {c}
             </h1>
-            <p className="text-xl text-dark-900/80 max-w-3xl mx-auto">
+            <p className="text-xl text-background/80 max-w-3xl mx-auto">
               From cleaning to construction, maintenance to landscaping — one trusted platform for every property service. Serving {c} with professional excellence.
             </p>
           </div>
         </section>
 
         {/* Our Story */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-background">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
-                <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-6">
+                <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-6">
                   Our Story
                 </h2>
-                <p className="text-lg text-gray-600 mb-4">
+                <p className="text-lg text-muted-foreground mb-4">
                   Maintainex was founded with a simple vision: one platform for every property service you'll ever need. No more juggling multiple providers, comparing quotes across different companies, or wondering who to call when something needs fixing.
                 </p>
-                <p className="text-lg text-gray-600 mb-4">
+                <p className="text-lg text-muted-foreground mb-4">
                   We started with professional cleaning in {c} and quickly realized our customers needed more — maintenance, repairs, landscaping, pest control, even construction and renovation support. Today, we deliver all services under one roof, backed by trained, vetted, and insured professionals.
                 </p>
-                <p className="text-lg text-gray-600 mb-4">
+                <p className="text-lg text-muted-foreground mb-4">
                   From our headquarters in Jaffna to our Canadian branch in Toronto, Maintainex brings the same commitment to quality, reliability, and customer satisfaction to every job. Whether you need a deep clean, a plumbing repair, or a full renovation, we are your all-in-one partner.
                 </p>
-                <p className="text-lg text-gray-600">
+                <p className="text-lg text-muted-foreground">
                   {cp} most trusted property services platform. One roof. One booking. Endless possibilities for your home and business.
                 </p>
               </div>
-              <div className="bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl p-8">
+              <div className="bg-amber-soft rounded-3xl p-8">
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="text-center p-4 bg-white rounded-xl shadow-lg">
-                    <Briefcase className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-primary-600 mb-2">1000+</div>
-                    <div className="text-gray-600">Jobs Completed</div>
+                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                    <Briefcase className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                    <div className="text-4xl font-bold text-amber-600 mb-2">1000+</div>
+                    <div className="text-muted-foreground">Jobs Completed</div>
                   </div>
-                  <div className="text-center p-4 bg-white rounded-xl shadow-lg">
-                    <Users className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-primary-600 mb-2">500+</div>
-                    <div className="text-gray-600">Happy Clients</div>
+                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                    <Users className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                    <div className="text-4xl font-bold text-amber-600 mb-2">500+</div>
+                    <div className="text-muted-foreground">Happy Clients</div>
                   </div>
-                  <div className="text-center p-4 bg-white rounded-xl shadow-lg">
-                    <UserCheck className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-primary-600 mb-2">50+</div>
-                    <div className="text-gray-600">Professionals</div>
+                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                    <UserCheck className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                    <div className="text-4xl font-bold text-amber-600 mb-2">50+</div>
+                    <div className="text-muted-foreground">Professionals</div>
                   </div>
-                  <div className="text-center p-4 bg-white rounded-xl shadow-lg">
-                    <Star className="w-8 h-8 text-primary-600 mx-auto mb-2" />
-                    <div className="text-4xl font-bold text-primary-600 mb-2">4.9★</div>
-                    <div className="text-gray-600">Average Rating</div>
+                  <div className="text-center p-4 bg-card rounded-3xl border border-border">
+                    <Star className="w-8 h-8 text-amber-600 mx-auto mb-2" />
+                    <div className="text-4xl font-bold text-amber-600 mb-2">4.9★</div>
+                    <div className="text-muted-foreground">Average Rating</div>
                   </div>
                 </div>
               </div>
@@ -148,47 +148,47 @@ export default function AboutPage() {
         </section>
 
         {/* Our Branches */}
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-muted">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
+              <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-4">
                 Our Branches
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
                 Two countries, one standard of excellence
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <div className="bg-white p-8 rounded-2xl shadow-lg">
-                <MapPin className="w-10 h-10 text-primary-600 mb-4" />
-                <h3 className="text-2xl font-bold text-dark-900 mb-2">Sri Lanka — Jaffna (Headquarters)</h3>
-                <p className="text-gray-600 mb-4">
+              <div className="bg-card p-8 rounded-3xl border border-border">
+                <MapPin className="w-10 h-10 text-amber-600 mb-4" />
+                <h3 className="text-2xl font-bold text-foreground mb-2">Sri Lanka — Jaffna (Headquarters)</h3>
+                <p className="text-muted-foreground mb-4">
                   Serving all 25 districts from our headquarters in Jaffna. From Colombo to Batticaloa, Kandy to Kilinochchi — we bring professional property services across the island.
                 </p>
-                <div className="space-y-2 text-sm text-gray-600">
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-primary-500" />
+                    <Phone className="w-4 h-4 text-amber-500" />
                     <span>{REGIONS.LK.phone}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-primary-500" />
+                    <Mail className="w-4 h-4 text-amber-500" />
                     <span>{REGIONS.LK.email}</span>
                   </div>
                 </div>
               </div>
-              <div className="bg-white p-8 rounded-2xl shadow-lg">
-                <MapPin className="w-10 h-10 text-primary-600 mb-4" />
-                <h3 className="text-2xl font-bold text-dark-900 mb-2">Canada — Toronto</h3>
-                <p className="text-gray-600 mb-4">
+              <div className="bg-card p-8 rounded-3xl border border-border">
+                <MapPin className="w-10 h-10 text-amber-600 mb-4" />
+                <h3 className="text-2xl font-bold text-foreground mb-2">Canada — Toronto</h3>
+                <p className="text-muted-foreground mb-4">
                   Serving the Greater Toronto Area including Toronto, Mississauga, Brampton, Scarborough, North York, Markham, Richmond Hill, and surrounding cities.
                 </p>
-                <div className="space-y-2 text-sm text-gray-600">
+                <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-primary-500" />
+                    <Phone className="w-4 h-4 text-amber-500" />
                     <span>{REGIONS.CA.phone}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-primary-500" />
+                    <Mail className="w-4 h-4 text-amber-500" />
                     <span>{REGIONS.CA.email}</span>
                   </div>
                 </div>
@@ -198,13 +198,13 @@ export default function AboutPage() {
         </section>
 
         {/* All Services Under One Roof */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-background">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
+              <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-4">
                 All Services Under One Roof
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
                 Every property service you need, from one trusted platform. Book cleaning, construction, maintenance, and more.
               </p>
             </div>
@@ -213,15 +213,15 @@ export default function AboutPage() {
                 <a
                   key={service.slug}
                   href={`/services/${service.slug}`}
-                  className="group bg-gray-50 p-8 rounded-2xl hover:shadow-lg hover:bg-white transition-all duration-300"
+                  className="group bg-card p-8 rounded-3xl border border-border hover:border-amber-300 transition-all duration-300"
                 >
-                  <div className="w-14 h-14 bg-primary-100 rounded-xl flex items-center justify-center mb-5 group-hover:bg-primary-200 transition-colors">
-                    <service.icon className="w-7 h-7 text-primary-600" />
+                  <div className="w-14 h-14 bg-amber-soft rounded-xl flex items-center justify-center mb-5 group-hover:bg-amber-200 transition-colors">
+                    <service.icon className="w-7 h-7 text-amber-600" />
                   </div>
-                  <h3 className="text-xl font-bold text-dark-900 mb-3 group-hover:text-primary-600 transition-colors">
+                  <h3 className="text-xl font-bold text-foreground mb-3 group-hover:text-amber-600 transition-colors">
                     {service.title}
                   </h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">
+                  <p className="text-muted-foreground text-sm leading-relaxed">
                     {service.desc}
                   </p>
                 </a>
@@ -231,47 +231,47 @@ export default function AboutPage() {
         </section>
 
         {/* Service Areas */}
-        <section className="py-20 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-muted">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
+              <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-4">
                 Service Areas
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
                 Wherever you are, we are just a booking away
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-12 max-w-4xl mx-auto">
               <div>
-                <h3 className="text-lg font-bold text-dark-900 mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary-500" />
+                <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-amber-500" />
                   Sri Lanka
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {REGIONS.LK.districts.map((d) => (
-                    <span key={d} className="bg-white px-3 py-1.5 rounded-lg text-sm text-gray-700 shadow-sm">
+                    <span key={d} className="bg-card px-3 py-1.5 rounded-full text-sm text-muted-foreground border border-border">
                       {d}
                     </span>
                   ))}
                 </div>
-                <p className="text-sm text-gray-500 mt-4">
-                  Headquarters in <strong>Jaffna</strong>. Active across all 25 districts.
+                <p className="text-sm text-muted-foreground/70 mt-4">
+                  Headquarters in <strong className="text-foreground">Jaffna</strong>. Active across all 25 districts.
                 </p>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-dark-900 mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-primary-500" />
+                <h3 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-amber-500" />
                   Canada
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {REGIONS.CA.districts.map((d) => (
-                    <span key={d} className="bg-white px-3 py-1.5 rounded-lg text-sm text-gray-700 shadow-sm">
+                    <span key={d} className="bg-card px-3 py-1.5 rounded-full text-sm text-muted-foreground border border-border">
                       {d}
                     </span>
                   ))}
                 </div>
-                <p className="text-sm text-gray-500 mt-4">
-                  Branch in <strong>Toronto</strong>, serving the GTA and surrounding areas.
+                <p className="text-sm text-muted-foreground/70 mt-4">
+                  Branch in <strong className="text-foreground">Toronto</strong>, serving the GTA and surrounding areas.
                 </p>
               </div>
             </div>
@@ -279,25 +279,25 @@ export default function AboutPage() {
         </section>
 
         {/* Why Choose Us */}
-        <section className="py-20 bg-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-background">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
+              <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-4">
                 Why Choose Maintainex?
               </h2>
-              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
                 The all-in-one advantage
               </p>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {whyChooseUs.map((item) => (
-                <div key={item.title} className="flex items-start gap-4 p-6 bg-gray-50 rounded-xl">
-                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <item.icon className="w-5 h-5 text-primary-600" />
+                <div key={item.title} className="flex items-start gap-4 p-6 bg-card rounded-3xl border border-border">
+                  <div className="w-10 h-10 bg-amber-soft rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <item.icon className="w-5 h-5 text-amber-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-dark-900 mb-1">{item.title}</h3>
-                    <p className="text-sm text-gray-600">{item.desc}</p>
+                    <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
+                    <p className="text-sm text-muted-foreground">{item.desc}</p>
                   </div>
                 </div>
               ))}
@@ -306,23 +306,23 @@ export default function AboutPage() {
         </section>
 
         {/* Industries We Serve */}
-        <section className="py-20 bg-gray-50 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+        <section className="py-20 bg-muted overflow-hidden">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 mb-12">
             <div className="text-center">
-              <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
+              <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-4">
                 Industries We Serve
               </h2>
-              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
                 Professional services tailored for every industry
               </p>
             </div>
           </div>
           <IndustriesCarousel />
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
+          <div className="max-w-4xl mx-auto px-5 sm:px-8 mt-16">
             <div className="text-center">
-              <p className="text-sm text-primary-600 font-medium uppercase mb-2">Our Partner</p>
-              <h3 className="text-2xl font-bold text-dark-900 mb-4">MX Cleaning Solution</h3>
-              <p className="text-gray-600 max-w-2xl mx-auto">
+              <p className="text-sm text-amber-600 font-medium uppercase tracking-wider mb-2">Our Partner</p>
+              <h3 className="text-2xl font-bold text-foreground mb-4">MX Cleaning Solution</h3>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
                 Reliable cleaning partner committed to excellence
               </p>
             </div>
@@ -330,24 +330,24 @@ export default function AboutPage() {
         </section>
 
         {/* FAQs */}
-        <section className="py-20 bg-white">
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-20 bg-background">
+          <div className="max-w-3xl mx-auto px-5 sm:px-8">
             <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-4">
+              <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-foreground mb-4">
                 Frequently Asked Questions
               </h2>
-              <p className="text-xl text-gray-600">
+              <p className="text-xl text-muted-foreground">
                 Everything you need to know about Maintainex
               </p>
             </div>
             <div className="space-y-4">
               {faqs.map((faq, i) => (
-                <details key={i} className="group bg-gray-50 rounded-xl p-6 open:shadow-lg transition-shadow">
+                <details key={i} className="group bg-card rounded-3xl border border-border p-6 transition-shadow">
                   <summary className="flex items-center justify-between cursor-pointer list-none">
-                    <h3 className="font-semibold text-dark-900 pr-4">{faq.question}</h3>
-                    <CheckCircle2 className="w-5 h-5 text-primary-500 flex-shrink-0 group-open:rotate-180 transition-transform" />
+                    <h3 className="font-semibold text-foreground pr-4">{faq.question}</h3>
+                    <CheckCircle2 className="w-5 h-5 text-amber-500 flex-shrink-0 group-open:rotate-180 transition-transform" />
                   </summary>
-                  <p className="mt-4 text-gray-600 leading-relaxed">
+                  <p className="mt-4 text-muted-foreground leading-relaxed">
                     {faq.answer}
                   </p>
                 </details>
@@ -357,15 +357,15 @@ export default function AboutPage() {
         </section>
 
         {/* CTA */}
-        <section className="py-20 bg-gradient-to-br from-primary-400 to-primary-600">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-dark-900 mb-6">
+        <section className="py-20 bg-foreground">
+          <div className="max-w-4xl mx-auto px-5 sm:px-8 text-center">
+            <h2 className="text-3xl md:text-4xl font-black tracking-[-0.02em] text-background mb-6">
               Ready to Experience the Maintainex Difference?
             </h2>
-            <p className="text-xl text-dark-900/80 mb-8">
+            <p className="text-xl text-background/80 mb-8">
               Book any service — all under one roof. From cleaning to construction, we have you covered.
             </p>
-            <a href="/booking" className="inline-block bg-dark-900 hover:bg-dark-800 text-white font-semibold px-8 py-4 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl">
+            <a href="/booking" className="inline-block bg-amber-500 hover:bg-amber-600 text-ink font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber">
               Book a Service Now
             </a>
           </div>

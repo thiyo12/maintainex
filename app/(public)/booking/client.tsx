@@ -47,10 +47,10 @@ function BookingLoading() {
     <>
       <Header />
       <WhatsAppButton />
-      <main className="pt-20 min-h-screen bg-gray-50 flex items-center justify-center">
+      <main className="pt-16 min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </main>
       <Footer />
@@ -343,20 +343,20 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
       <>
         <Header />
         <WhatsAppButton />
-        <main className="pt-20 min-h-screen bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center px-4">
-          <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 text-center">
+        <main className="pt-16 min-h-screen bg-foreground flex items-center justify-center px-4">
+          <div className="max-w-md w-full bg-card rounded-3xl border border-border p-8 text-center">
             <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-bounce">
               <FiCheck className="text-5xl text-green-600" />
             </div>
-            <h2 className="text-3xl font-bold text-dark-900 mb-4">Booking Submitted!</h2>
-            <p className="text-gray-600 mb-8">
+            <h2 className="text-3xl font-black tracking-[-0.02em] text-foreground mb-4">Booking Submitted!</h2>
+            <p className="text-muted-foreground mb-8">
               Thank you for your booking! We'll call you shortly to confirm.
             </p>
             
             <div className="space-y-4 mb-8">
               <a 
                 href={`tel:${region.phoneRaw}`}
-                className="block w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all"
+                className="block w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 rounded-full transition-all"
               >
                 📞 Call Us: {region.phone}
               </a>
@@ -364,7 +364,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 href={generateWhatsAppLink()}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all"
+                className="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-full transition-all"
               >
                 💬 Chat on WhatsApp
               </a>
@@ -372,7 +372,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             
             <button
               onClick={() => router.push('/')}
-              className="w-full text-gray-600 hover:text-dark-900 font-medium py-3"
+              className="w-full text-muted-foreground hover:text-foreground font-medium py-3"
             >
               ← Back to Home
             </button>
@@ -388,55 +388,55 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
       <Header />
       <WhatsAppButton />
       
-      <main className="pt-20 min-h-screen bg-gray-50">
+      <main className="pt-16 min-h-screen bg-background">
         {/* Hero */}
-        <section className="bg-gradient-to-br from-primary-400 to-primary-600 py-8 px-4">
+        <section className="bg-foreground py-8 px-5">
           <div className="max-w-lg mx-auto text-center">
-            <h1 className="text-3xl font-bold text-dark-900 mb-2">Book Your Service</h1>
-            <p className="text-dark-900/80">Easy booking in 4 simple steps</p>
+            <h1 className="text-3xl font-black tracking-[-0.02em] text-background mb-2">Book Your Service</h1>
+            <p className="text-background/80">Easy booking in 4 simple steps</p>
           </div>
         </section>
 
         {/* Progress Bar */}
-        <div className="bg-white shadow-sm sticky top-16 z-40">
-          <div className="max-w-lg mx-auto px-4 py-3">
+        <div className="bg-card border-b border-border sticky top-16 z-40">
+          <div className="max-w-lg mx-auto px-5 py-3">
             <div className="flex items-center justify-between">
               {[0, 1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
                     step >= s 
-                      ? 'bg-primary-500 text-dark-900' 
-                      : 'bg-gray-200 text-gray-500'
+                      ? 'bg-amber-500 text-ink' 
+                      : 'bg-muted text-muted-foreground'
                   }`}>
                     {step > s ? <FiCheck className="text-lg" /> : s + 1}
                   </div>
                   {s < 3 && (
                     <div className={`w-12 sm:w-16 h-1 mx-1 sm:mx-2 ${
-                      step > s ? 'bg-primary-500' : 'bg-gray-200'
+                      step > s ? 'bg-amber-500' : 'bg-muted'
                     }`} />
                   )}
                 </div>
               ))}
             </div>
-            <div className="flex justify-between mt-2 text-xs sm:text-sm text-gray-500">
-              <span className={step >= 0 ? 'text-dark-900 font-medium' : ''}>Select Service</span>
-              <span className={step >= 1 ? 'text-dark-900 font-medium' : ''}>Your Info</span>
-              <span className={step >= 2 ? 'text-dark-900 font-medium' : ''}>Schedule</span>
-              <span className={step >= 3 ? 'text-dark-900 font-medium' : ''}>Confirm</span>
+            <div className="flex justify-between mt-2 text-xs sm:text-sm text-muted-foreground">
+              <span className={step >= 0 ? 'text-foreground font-medium' : ''}>Select Service</span>
+              <span className={step >= 1 ? 'text-foreground font-medium' : ''}>Your Info</span>
+              <span className={step >= 2 ? 'text-foreground font-medium' : ''}>Schedule</span>
+              <span className={step >= 3 ? 'text-foreground font-medium' : ''}>Confirm</span>
             </div>
           </div>
         </div>
 
         {/* Form Content */}
-        <div className="max-w-lg mx-auto px-4 py-6">
+        <div className="max-w-lg mx-auto px-5 py-6">
           
           {/* Step 0: Service Selection */}
           {(step === 0 || showServiceSelector) && (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-4">
+            <div className="bg-card rounded-3xl border border-border p-6">
+              <h2 className="text-xl font-black tracking-[-0.02em] text-foreground mb-4">
                 {storedCategory ? `Select a ${storedCategory.charAt(0).toUpperCase() + storedCategory.slice(1).replace(/-/g, ' ')} Service` : 'Select a Service'}
               </h2>
-              <p className="text-gray-600 mb-6 text-sm">
+              <p className="text-muted-foreground mb-6 text-sm">
                 {storedCategory ? `Choose from our ${storedCategory.replace(/-/g, ' ')} services` : 'Choose from our professional services'}
               </p>
               
@@ -447,19 +447,19 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                     cat.name.toLowerCase().includes(storedCategory.toLowerCase().replace(/-/g, ' ')))
                   .map(category => (
                     <div key={category.id}>
-                      <h4 className="font-bold text-gray-700 mb-2 text-sm">{category.name}</h4>
+                      <h4 className="font-bold text-muted-foreground mb-2 text-sm">{category.name}</h4>
                       <div className="grid grid-cols-2 gap-2">
                         {category.services.map(service => (
                           <button
                             key={service.id}
                             onClick={() => handleServiceSelect(service.id)}
-                            className={`p-3 rounded-lg border-2 text-left transition-all ${
+                            className={`p-3 rounded-xl border-2 text-left transition-all ${
                               formData.serviceId === service.id
-                                ? 'border-primary-500 bg-primary-50'
-                                : 'border-gray-200 hover:border-primary-300'
+                                ? 'border-amber-500 bg-amber-soft'
+                                : 'border-border hover:border-amber-300'
                             }`}
                           >
-                            <div className="font-medium text-sm text-dark-900 truncate">{service.name}</div>
+                            <div className="font-medium text-sm text-foreground truncate">{service.name}</div>
                           </button>
                         ))}
                       </div>
@@ -469,7 +469,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                   cat.slug.toLowerCase().includes(storedCategory.toLowerCase()) || 
                   cat.name.toLowerCase().includes(storedCategory.toLowerCase().replace(/-/g, ' '))
                 ).length === 0 && (
-                  <p className="text-gray-500 text-sm">No services found for this category.</p>
+                  <p className="text-muted-foreground text-sm">No services found for this category.</p>
                 )}
               </div>
             </div>
@@ -477,25 +477,25 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
           
           {/* Step 1: Basic Info */}
           {step === 1 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-6">Your Information</h2>
+            <div className="bg-card rounded-3xl border border-border p-6">
+              <h2 className="text-xl font-black tracking-[-0.02em] text-foreground mb-6">Your Information</h2>
               
               {/* Selected Service Display - Step 1 */}
               {displayService && (
-                <div className="bg-primary-50 border-2 border-primary-500 rounded-xl p-4 mb-6">
+                <div className="bg-amber-soft border-2 border-amber-500 rounded-xl p-4 mb-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       {displayCategory && (
-                        <p className="text-sm text-primary-600 font-medium">{displayCategory}</p>
+                        <p className="text-sm text-amber-600 font-medium">{displayCategory}</p>
                       )}
-                      <p className="text-lg font-bold text-dark-900">{displayService.name}</p>
+                      <p className="text-lg font-bold text-foreground">{displayService.name}</p>
                     </div>
                     <button
                       onClick={() => {
                         setShowServiceSelector(true)
                         setStep(0)
                       }}
-                      className="text-primary-600 font-medium text-sm hover:text-primary-700"
+                      className="text-amber-600 font-medium text-sm hover:text-amber-700"
                     >
                       Change
                     </button>
@@ -505,49 +505,49 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
               
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Your Name *
                   </label>
                   <div className="relative">
-                    <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <FiUser className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg bg-card text-foreground placeholder:text-muted-foreground"
                       placeholder="Enter your name"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Phone Number *
                   </label>
                   <div className="relative">
-                    <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <FiPhone className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg bg-card text-foreground placeholder:text-muted-foreground"
                       placeholder={region.phoneExample}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{region.phoneHint}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">{region.phoneHint}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Email (Optional)
                   </label>
                   <div className="relative">
-                    <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <FiMail className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg bg-card text-foreground placeholder:text-muted-foreground"
                       placeholder="your@email.com"
                     />
                   </div>
@@ -558,20 +558,20 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
           {/* Step 2: Schedule */}
           {step === 2 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-6">Schedule</h2>
+            <div className="bg-card rounded-3xl border border-border p-6">
+              <h2 className="text-xl font-black tracking-[-0.02em] text-foreground mb-6">Schedule</h2>
               
               <div className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     District *
                   </label>
                   <div className="relative">
-                    <FiMapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <FiMapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <select
                       value={formData.district}
                       onChange={(e) => setFormData({ ...formData, district: e.target.value })}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg appearance-none bg-card text-foreground"
                     >
                       <option value="">Select {region.label === 'Canada' ? 'City' : 'District'}</option>
                       {region.districts.map(d => (
@@ -582,31 +582,31 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Preferred Date *
                   </label>
                   <div className="relative">
-                    <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <FiCalendar className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <input
                       type="date"
                       value={formData.date}
                       onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                       min={new Date().toISOString().split('T')[0]}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg bg-card text-foreground"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Preferred Time *
                   </label>
                   <div className="relative">
-                    <FiClock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <FiClock className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <select
                       value={formData.time}
                       onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                      className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg appearance-none bg-white"
+                      className="w-full pl-12 pr-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg appearance-none bg-card text-foreground"
                     >
                       <option value="">Select Time</option>
                       {TIME_SLOTS.map(t => (
@@ -617,14 +617,14 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-foreground mb-2">
                     Notes (Optional)
                   </label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     rows={3}
-                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all resize-none"
+                    className="w-full px-4 py-4 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all resize-none bg-card text-foreground placeholder:text-muted-foreground"
                     placeholder="Any special requirements..."
                   />
                 </div>
@@ -634,8 +634,8 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
 
           {/* Step 3: Confirmation */}
           {step === 3 && (
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h2 className="text-xl font-bold text-dark-900 mb-6">Booking Summary</h2>
+            <div className="bg-card rounded-3xl border border-border p-6">
+              <h2 className="text-xl font-black tracking-[-0.02em] text-foreground mb-6">Booking Summary</h2>
               
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-6">
@@ -643,51 +643,51 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                 </div>
               )}
 
-              <div className="bg-gray-50 rounded-xl p-5 space-y-3 mb-6">
+              <div className="bg-muted rounded-xl p-5 space-y-3 mb-6">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Name</span>
-                  <span className="font-medium">{formData.name}</span>
+                  <span className="text-muted-foreground">Name</span>
+                  <span className="font-medium text-foreground">{formData.name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Phone</span>
-                  <span className="font-medium">{formData.phone}</span>
+                  <span className="text-muted-foreground">Phone</span>
+                  <span className="font-medium text-foreground">{formData.phone}</span>
                 </div>
                 {formData.email && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Email</span>
-                    <span className="font-medium">{formData.email}</span>
+                    <span className="text-muted-foreground">Email</span>
+                    <span className="font-medium text-foreground">{formData.email}</span>
                   </div>
                 )}
-                <div className="border-t pt-3 flex justify-between">
-                  <span className="text-gray-600">Service</span>
-                  <span className="font-bold text-primary-600">{displayService?.name || 'Not selected'}</span>
+                <div className="border-t border-border pt-3 flex justify-between">
+                  <span className="text-muted-foreground">Service</span>
+                  <span className="font-bold text-amber-600">{displayService?.name || 'Not selected'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">District</span>
-                  <span className="font-medium">{formData.district}</span>
+                  <span className="text-muted-foreground">District</span>
+                  <span className="font-medium text-foreground">{formData.district}</span>
                 </div>
                 {formData.address && (
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Address</span>
-                    <span className="font-medium text-right max-w-[60%] text-right">{formData.address}</span>
+                    <span className="text-muted-foreground">Address</span>
+                    <span className="font-medium text-foreground text-right max-w-[60%]">{formData.address}</span>
                   </div>
                 )}
-                <div className="border-t pt-3 flex justify-between">
-                  <span className="text-gray-600">Date</span>
-                  <span className="font-medium">{formatDate(formData.date)}</span>
+                <div className="border-t border-border pt-3 flex justify-between">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-medium text-foreground">{formatDate(formData.date)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Time</span>
-                  <span className="font-medium">{formData.time}</span>
+                  <span className="text-muted-foreground">Time</span>
+                  <span className="font-medium text-foreground">{formData.time}</span>
                 </div>
                 {formData.notes && (
-                  <div className="border-t pt-3">
-                    <span className="text-gray-600 block mb-1">Notes</span>
-                    <span className="font-medium">{formData.notes}</span>
+                  <div className="border-t border-border pt-3">
+                    <span className="text-muted-foreground block mb-1">Notes</span>
+                    <span className="font-medium text-foreground">{formData.notes}</span>
                   </div>
                 )}
-                <div className="border-t pt-3">
-                  <span className="text-lg font-bold">Budget Range (optional)</span>
+                <div className="border-t border-border pt-3">
+                  <span className="text-lg font-bold text-foreground">Budget Range (optional)</span>
                   <div className="mt-3 flex items-center gap-3">
                     <input
                       type="number"
@@ -698,9 +698,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                         setFormData({ ...formData, budgetMin: val && Number(val) > Number(max) ? max : val })
                       }}
                       placeholder="Min"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      className="w-full px-4 py-3 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg bg-card text-foreground placeholder:text-muted-foreground"
                     />
-                    <span className="text-gray-400 text-xl">—</span>
+                    <span className="text-muted-foreground text-xl">—</span>
                     <input
                       type="number"
                       value={formData.budgetMax}
@@ -710,9 +710,9 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                         setFormData({ ...formData, budgetMax: val && Number(val) < Number(min) ? min : val })
                       }}
                       placeholder="Max"
-                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none transition-all text-lg"
+                      className="w-full px-4 py-3 border-2 border-border rounded-xl focus:border-amber-500 focus:outline-none transition-all text-lg bg-card text-foreground placeholder:text-muted-foreground"
                     />
-                    <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">{region.currencySymbol}</span>
+                    <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">{region.currencySymbol}</span>
                   </div>
                   <div className="mt-4 mb-2">
                     <div className="relative h-10">
@@ -728,7 +728,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                           const clamped = Number(val) > max ? String(max) : val
                           setFormData({ ...formData, budgetMin: clamped })
                         }}
-                        className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
+                        className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-amber-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
                         style={{ zIndex: 3 }}
                       />
                       <input
@@ -743,27 +743,27 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                           const clamped = Number(val) < min ? String(min) : val
                           setFormData({ ...formData, budgetMax: clamped })
                         }}
-                        className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
+                        className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-amber-500 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow-md"
                         style={{ zIndex: 2 }}
                       />
-                      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-gray-200 rounded-full" />
+                      <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1.5 bg-muted rounded-full" />
                       <div
-                        className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-primary-400 rounded-full"
+                        className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-amber-400 rounded-full"
                         style={{
                           left: `${(Number(formData.budgetMin || 0) / region.budgetMax) * 100}%`,
                           right: `${100 - (Number(formData.budgetMax || region.budgetMax) / region.budgetMax) * 100}%`,
                         }}
                       />
                     </div>
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <div className="flex justify-between text-xs text-muted-foreground/70 mt-1">
                       <span>{region.currencySymbol} 0</span>
                       <span>{region.currencySymbol} {region.budgetMax.toLocaleString()}</span>
                     </div>
                   </div>
                   {!formData.budgetMin && !formData.budgetMax ? (
-                    <p className="text-sm text-blue-600 font-medium mt-2">Our team will contact you within 2 hours to discuss pricing</p>
+                    <p className="text-sm text-amber-600 font-medium mt-2">Our team will contact you within 2 hours to discuss pricing</p>
                   ) : (
-                    <p className="text-xs text-gray-400 mt-1">Price will change based on requirements</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">Price will change based on requirements</p>
                   )}
                 </div>
               </div>
@@ -774,22 +774,22 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                   href={generateWhatsAppLink()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-all text-lg"
+                  className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-full transition-all text-lg"
                 >
                   <FiMessageCircle className="text-2xl" />
                   Complete via WhatsApp
                 </a>
-                <p className="text-center text-sm text-gray-500 mt-2">
+                <p className="text-center text-sm text-muted-foreground mt-2">
                   Quick & direct booking via chat
                 </p>
               </div>
 
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
+                  <div className="w-full border-t border-border"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-gray-50 text-gray-500">or</span>
+                  <span className="px-4 bg-card text-muted-foreground">or</span>
                 </div>
               </div>
             </div>
@@ -800,7 +800,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
             {step > 1 && (
               <button
                 onClick={() => setStep(step - 1)}
-                className="flex-1 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-4 rounded-xl transition-all"
+                className="flex-1 flex items-center justify-center gap-2 bg-muted hover:bg-muted/80 text-foreground font-semibold py-4 rounded-full transition-all"
               >
                 <FiChevronLeft />
                 Back
@@ -811,10 +811,10 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
               <button
                 onClick={handleNext}
                 disabled={!canProceed()}
-                className={`flex-1 flex items-center justify-center gap-2 font-semibold py-4 rounded-xl transition-all ${
+                className={`flex-1 flex items-center justify-center gap-2 font-semibold py-4 rounded-full transition-all ${
                   canProceed()
-                    ? 'bg-primary-500 hover:bg-primary-600 text-dark-900'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    ? 'bg-amber-500 hover:bg-amber-600 text-ink'
+                    : 'bg-muted text-muted-foreground cursor-not-allowed'
                 }`}
               >
                 Next
@@ -828,7 +828,7 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
                   handleSubmit()
                 }}
                 disabled={submitting}
-                className="flex-1 flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 rounded-xl transition-all disabled:opacity-50 active:bg-primary-700"
+                className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 rounded-full transition-all disabled:opacity-50"
                 style={{ touchAction: 'manipulation' }}
               >
                 {submitting ? '⏳ Submitting...' : '✅ Submit Booking'}
@@ -837,16 +837,16 @@ ${formData.notes ? `📝 *Notes:* ${formData.notes}` : ''}
           </div>
 
           {/* Help Text */}
-          <div className="text-center mt-6 text-gray-500 text-sm space-y-2">
-            <p>Need help? <a href={`tel:${region.phoneRaw}`} className="text-primary-600 font-medium">Call {region.phone}</a></p>
-            <p className="text-xs text-gray-400">or book via WhatsApp</p>
+          <div className="text-center mt-6 text-muted-foreground text-sm space-y-2">
+            <p>Need help? <a href={`tel:${region.phoneRaw}`} className="text-amber-600 font-medium">Call {region.phone}</a></p>
+            <p className="text-xs text-muted-foreground/70">or book via WhatsApp</p>
           </div>
 
-          <div className="text-center mt-8 pt-6 border-t border-gray-200">
-            <p className="text-gray-500 text-sm">
-              <a href="/services" className="text-primary-600 hover:text-primary-700 font-medium">Browse all services</a>
+          <div className="text-center mt-8 pt-6 border-t border-border">
+            <p className="text-muted-foreground text-sm">
+              <a href="/services" className="text-amber-600 hover:text-amber-700 font-medium">Browse all services</a>
               {' '}·{' '}
-              <a href="/about" className="text-primary-600 hover:text-primary-700 font-medium">About us</a>
+              <a href="/about" className="text-amber-600 hover:text-amber-700 font-medium">About us</a>
             </p>
           </div>
         </div>

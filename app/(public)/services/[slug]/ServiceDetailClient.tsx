@@ -89,19 +89,19 @@ export default function ServiceDetailClient({
       <>
         <Header />
         <WhatsAppButton />
-        <main className="pt-20 min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <main className="pt-16 min-h-screen bg-background flex items-center justify-center px-4">
           <div className="text-center max-w-md">
             <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <span className="text-5xl">😕</span>
             </div>
-            <h1 className="text-2xl font-bold text-dark-900 mb-4">Service Not Found</h1>
-            <p className="text-gray-600 mb-8">The service you're looking for doesn't exist or has been removed.</p>
+            <h1 className="text-2xl font-bold text-foreground mb-4">Service Not Found</h1>
+            <p className="text-muted-foreground mb-8">The service you're looking for doesn't exist or has been removed.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/services" className="btn-primary inline-flex items-center justify-center gap-2">
+              <Link href="/services" className="bg-amber-500 hover:bg-amber-600 text-ink font-bold px-6 py-3 rounded-full inline-flex items-center justify-center gap-2 transition-all">
                 <FiArrowLeft className="w-5 h-5" />
                 View All Services
               </Link>
-              <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="btn-secondary inline-flex items-center justify-center gap-2">
+              <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="border border-border hover:bg-muted text-foreground font-semibold px-6 py-3 rounded-full inline-flex items-center justify-center gap-2 transition-all">
                 <FiMessageCircle className="w-5 h-5" />
                 Contact Us
               </a>
@@ -118,43 +118,43 @@ export default function ServiceDetailClient({
       <Header />
       <WhatsAppButton />
       
-      <main className="pt-20">
+      <main className="pt-16">
         {/* Breadcrumb */}
-        <div className="bg-gray-50 border-b border-gray-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+        <div className="bg-background border-b border-border">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-3">
             <nav className="flex items-center gap-2 text-sm">
-              <Link href="/" className="text-gray-500 hover:text-primary-600 transition-colors">Home</Link>
-              <span className="text-gray-400">/</span>
-              <Link href="/services" className="text-gray-500 hover:text-primary-600 transition-colors">Services</Link>
-              <span className="text-gray-400">/</span>
-              <Link href={`/services/${service.slug}`} className="text-gray-500 hover:text-primary-600 transition-colors truncate">{service.name}</Link>
-              {city && (<><span className="text-gray-400">/</span><span className="text-gray-900 font-medium truncate">{city}</span></>)}
+              <Link href="/" className="text-muted-foreground hover:text-amber-600 transition-colors">Home</Link>
+              <span className="text-muted-foreground/40">/</span>
+              <Link href="/services" className="text-muted-foreground hover:text-amber-600 transition-colors">Services</Link>
+              <span className="text-muted-foreground/40">/</span>
+              <Link href={`/services/${service.slug}`} className="text-muted-foreground hover:text-amber-600 transition-colors truncate">{service.name}</Link>
+              {city && (<><span className="text-muted-foreground/40">/</span><span className="text-foreground font-medium truncate">{city}</span></>)}
             </nav>
           </div>
         </div>
 
         {/* Hero Section */}
         <section className="relative">
-          <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] overflow-hidden bg-gray-200">
+          <div className="relative h-64 sm:h-80 md:h-96 lg:h-[500px] overflow-hidden bg-muted">
             {isUploadedImage(service.image) ? (
               <img src={getImageSrc(service.image)} alt={service.name} width="1200" height="675" className="w-full h-full object-cover" />
             ) : (
               <Image src={getImageSrc(service.image)} alt={service.name} fill priority sizes="100vw" className="w-full h-full object-cover" />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/30 to-transparent" />
             
             <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8 lg:p-12">
               <div className="max-w-7xl mx-auto">
                 {service.category && (
-                  <Link href={`/services?category=${service.category.slug}`} className="inline-block bg-primary-500 text-dark-900 px-4 py-1.5 rounded-full text-sm font-semibold mb-4 hover:bg-primary-400 transition-colors">
+                  <Link href={`/services?category=${service.category.slug}`} className="inline-block bg-amber-500 text-ink px-4 py-1.5 rounded-full text-sm font-semibold mb-4 hover:bg-amber-400 transition-colors">
                     {service.category.name}
                   </Link>
                 )}
-                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4">{service.name}{city ? <span className="block text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-primary-300 mt-2">in {city}</span> : ''}</h1>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-[-0.02em] text-white mb-4">{service.name}{city ? <span className="block text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-amber-300 mt-2">in {city}</span> : ''}</h1>
                 <div className="flex flex-wrap items-center gap-4 text-white/90">
                   {service.reviews && service.reviews.length > 0 && (
                     <span className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full">
-                      <FiStar className="w-5 h-5 text-yellow-400 fill-yellow-400" />
+                      <FiStar className="w-5 h-5 text-amber-400 fill-amber-400" />
                       {getAverageRating(service.reviews)} ({service.reviews.length} reviews)
                     </span>
                   )}
@@ -165,22 +165,22 @@ export default function ServiceDetailClient({
         </section>
 
         {/* Main Content */}
-        <section className="py-12 md:py-16 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="py-12 md:py-16 bg-background">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               
               {/* Left Column */}
               <div className="lg:col-span-2 space-y-8">
                 
                 {/* Description */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                  <h2 className="text-2xl font-bold text-dark-900 mb-4">About {service?.name}{city ? ` in ${city}` : ''}</h2>
-                  <div className="prose prose-gray max-w-none">
-                    <p className="text-gray-600 text-lg leading-relaxed whitespace-pre-line">
+                <div className="bg-card rounded-3xl border border-border p-6 sm:p-8">
+                  <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-4">About {service?.name}{city ? ` in ${city}` : ''}</h2>
+                  <div className="max-w-none">
+                    <p className="text-muted-foreground text-lg leading-relaxed whitespace-pre-line">
                       {service.description || `Professional ${service.name.toLowerCase()} service tailored to your needs. Our experienced team ensures a thorough and efficient clean every time.`}
                     </p>
                     {city && (
-                      <p className="text-gray-600 text-lg leading-relaxed mt-4">
+                      <p className="text-muted-foreground text-lg leading-relaxed mt-4">
                         We proudly serve {city} and surrounding areas with reliable, professional {service.name.toLowerCase()} services. Our local team is ready to help you.
                       </p>
                     )}
@@ -188,8 +188,8 @@ export default function ServiceDetailClient({
                 </div>
 
                 {/* Features */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                  <h2 className="text-2xl font-bold text-dark-900 mb-6">What's Included in {service?.name}</h2>
+                <div className="bg-card rounded-3xl border border-border p-6 sm:p-8">
+                  <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-6">What's Included in {service?.name}</h2>
                   <div className="grid sm:grid-cols-2 gap-4">
                     {[
                       'Professional equipment', 'Trained & verified staff',
@@ -197,10 +197,10 @@ export default function ServiceDetailClient({
                       'Customer satisfaction', 'Post-service inspection'
                     ].map((feature, index) => (
                       <div key={index} className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                          <FiCheck className="w-5 h-5 text-primary-600" />
+                        <div className="w-8 h-8 bg-amber-soft rounded-full flex items-center justify-center flex-shrink-0">
+                          <FiCheck className="w-5 h-5 text-amber-600" />
                         </div>
-                        <span className="text-gray-700 font-medium">{feature}</span>
+                        <span className="text-foreground font-medium">{feature}</span>
                       </div>
                     ))}
                   </div>
@@ -208,9 +208,9 @@ export default function ServiceDetailClient({
 
                 {/* Available Cities */}
                 {!city && (
-                  <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
-                    <h2 className="text-2xl font-bold text-dark-900 mb-4">Areas Where {service?.name} Is Available</h2>
-                    <p className="text-gray-600 mb-4">
+                  <div className="bg-card rounded-3xl border border-border p-6 sm:p-8">
+                    <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-4">Areas Where {service?.name} Is Available</h2>
+                    <p className="text-muted-foreground mb-4">
                       We serve the following areas in {region.countryName}. Select your city to book {service.name.toLowerCase()} locally.
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -220,7 +220,7 @@ export default function ServiceDetailClient({
                           <Link
                             key={d}
                             href={`/services/${service.slug}/${slug}`}
-                            className="inline-flex items-center gap-1.5 bg-gray-50 hover:bg-primary-50 border border-gray-200 hover:border-primary-300 text-gray-700 hover:text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
+                            className="inline-flex items-center gap-1.5 bg-muted hover:bg-amber-soft border border-border hover:border-amber-300 text-muted-foreground hover:text-amber-700 px-3 py-1.5 rounded-full text-sm font-medium transition-all"
                           >
                             <FiMapPin className="w-3.5 h-3.5" />
                             {d}
@@ -238,34 +238,34 @@ export default function ServiceDetailClient({
 
                 {/* Reviews */}
                 {service.reviews && service.reviews.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+                  <div className="bg-card rounded-3xl border border-border p-6 sm:p-8">
                     <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-2xl font-bold text-dark-900">Customer Reviews for {service?.name}</h2>
-                      <div className="flex items-center gap-2 bg-primary-50 px-4 py-2 rounded-full">
-                        <FiStar className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                        <span className="font-bold text-dark-900">{getAverageRating(service.reviews)}</span>
-                        <span className="text-gray-500">({service.reviews.length})</span>
+                      <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground">Customer Reviews for {service?.name}</h2>
+                      <div className="flex items-center gap-2 bg-amber-soft px-4 py-2 rounded-full">
+                        <FiStar className="w-5 h-5 text-amber-500 fill-amber-500" />
+                        <span className="font-bold text-foreground">{getAverageRating(service.reviews)}</span>
+                        <span className="text-muted-foreground">({service.reviews.length})</span>
                       </div>
                     </div>
                     <div className="space-y-6">
                       {service.reviews.slice(0, 5).map((review) => (
-                        <div key={review.id} className="border-b border-gray-100 pb-6 last:border-0 last:pb-0">
+                        <div key={review.id} className="border-b border-border pb-6 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                              <span className="text-lg font-bold text-primary-600">
+                            <div className="w-12 h-12 bg-amber-soft rounded-full flex items-center justify-center">
+                              <span className="text-lg font-bold text-amber-600">
                                 {review.customerName?.[0]?.toUpperCase() || 'C'}
                               </span>
                             </div>
                             <div>
-                              <p className="font-semibold text-dark-900">{review.customerName || 'Customer'}</p>
+                              <p className="font-semibold text-foreground">{review.customerName || 'Customer'}</p>
                               <div className="flex items-center gap-1">
                                 {[...Array(5)].map((_, i) => (
-                                  <FiStar key={i} className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+                                  <FiStar key={i} className={`w-4 h-4 ${i < review.rating ? 'text-amber-400 fill-amber-400' : 'text-muted'}`} />
                                 ))}
                               </div>
                             </div>
                           </div>
-                          {review.comment && <p className="text-gray-600">{review.comment}</p>}
+                          {review.comment && <p className="text-muted-foreground">{review.comment}</p>}
                         </div>
                       ))}
                     </div>
@@ -275,14 +275,14 @@ export default function ServiceDetailClient({
 
               {/* Right Column - Booking Card */}
               <div className="lg:col-span-1">
-                <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 sticky top-28">
+                <div className="bg-card rounded-3xl border border-border p-6 sm:p-8 sticky top-28">
                   {city && (
-                    <div className="flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 mb-6">
-                      <FiMapPin className="w-5 h-5 text-primary-600 flex-shrink-0" />
-                      <span className="text-primary-800 font-medium">Serving <strong>{city}</strong></span>
+                    <div className="flex items-center gap-2 bg-amber-soft border border-amber-200 rounded-xl px-4 py-3 mb-6">
+                      <FiMapPin className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                      <span className="text-amber-800 font-medium">Serving <strong>{city}</strong></span>
                     </div>
                   )}
-                  <h3 className="text-2xl font-bold text-dark-900 mb-6">Book This Service</h3>
+                  <h3 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-6">Book This Service</h3>
                   
                   <button
                     onClick={() => {
@@ -292,35 +292,35 @@ export default function ServiceDetailClient({
                       const districtParam = city ? `&district=${encodeURIComponent(city)}` : ''
                       router.push(`/booking?serviceId=${service.id}&category=${service.category?.slug}${districtParam}`)
                     }}
-                    className="w-full bg-primary-500 hover:bg-primary-600 text-dark-900 font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-center text-lg mb-4"
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 px-6 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-center text-lg mb-4"
                   >
                     {city ? `Book ${service.name} in ${city}` : 'Book Now'}
                   </button>
 
                   <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-lg mb-6"
+                    className="flex items-center justify-center gap-3 w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-full transition-all duration-300 active:scale-[0.98] text-lg mb-6"
                   >
                     <FiMessageCircle className="w-6 h-6" />
                     Chat on WhatsApp
                   </a>
 
                   <a href={`tel:${region.phoneRaw}`}
-                    className="flex items-center justify-center gap-3 w-full bg-gray-100 hover:bg-gray-200 text-dark-900 font-semibold py-4 px-6 rounded-xl transition-all duration-300 text-lg mb-6"
+                    className="flex items-center justify-center gap-3 w-full bg-muted hover:bg-muted/80 text-foreground font-semibold py-4 px-6 rounded-full transition-all duration-300 text-lg mb-6"
                   >
                     <FiPhone className="w-5 h-5" />
                     Call: {region.phone}
                   </a>
 
-                  <div className="border-t border-gray-200 pt-6 space-y-4">
-                    <div className="flex items-center gap-3 text-gray-600">
+                  <div className="border-t border-border pt-6 space-y-4">
+                    <div className="flex items-center gap-3 text-muted-foreground">
                       <FiCheck className="w-5 h-5 text-green-500" />
                       <span>Free cancellation</span>
                     </div>
-                    <div className="flex items-center gap-3 text-gray-600">
+                    <div className="flex items-center gap-3 text-muted-foreground">
                       <FiCheck className="w-5 h-5 text-green-500" />
                       <span>Satisfaction guaranteed</span>
                     </div>
-                    <div className="flex items-center gap-3 text-gray-600">
+                    <div className="flex items-center gap-3 text-muted-foreground">
                       <FiCheck className="w-5 h-5 text-green-500" />
                       <span>24/7 customer support</span>
                     </div>
@@ -333,23 +333,23 @@ export default function ServiceDetailClient({
 
         {/* Related Services */}
         {relatedServices.length > 0 && (
-          <section className="py-12 md:py-16 bg-white">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <section className="py-12 md:py-16 bg-muted">
+            <div className="max-w-7xl mx-auto px-5 sm:px-8">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-2xl sm:text-3xl font-bold text-dark-900">More {service?.category?.name || 'Services'} You Might Like</h2>
-                  <p className="text-gray-600 mt-2">More services in {service.category?.name}{city ? ` in ${city}` : ''}</p>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-[-0.02em] text-foreground">More {service?.category?.name || 'Services'} You Might Like</h2>
+                  <p className="text-muted-foreground mt-2">More services in {service.category?.name}{city ? ` in ${city}` : ''}</p>
                 </div>
-                <Link href="/services" className="hidden sm:flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-700 transition-colors">
+                <Link href="/services" className="hidden sm:flex items-center gap-2 text-amber-600 font-semibold hover:text-amber-700 transition-colors">
                   View All <FiArrowRight className="w-5 h-5" />
                 </Link>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                 {relatedServices.map((related) => (
                   <Link key={related.id} href={`/services/${related.slug || related.id}${citySlug ? `/${citySlug}` : ''}`}
-                    className="group bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300"
+                    className="group bg-card border border-border rounded-3xl overflow-hidden transition-all duration-300"
                   >
-                    <div className="relative h-40 overflow-hidden bg-gray-200">
+                    <div className="relative h-40 overflow-hidden bg-muted">
                       {isUploadedImage(related.image) ? (
                         <img src={getImageSrc(related.image)} alt={related.name} width="400" height="300" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       ) : (
@@ -357,10 +357,10 @@ export default function ServiceDetailClient({
                       )}
                     </div>
                     <div className="p-4">
-                      <h3 className="font-bold text-dark-900 mb-2 group-hover:text-primary-600 transition-colors line-clamp-1">{related.name}</h3>
-                      <p className="text-gray-500 text-sm line-clamp-2 mb-3">{related.description}</p>
+                      <h3 className="font-bold text-foreground mb-2 group-hover:text-amber-600 transition-colors line-clamp-1">{related.name}</h3>
+                      <p className="text-muted-foreground text-sm line-clamp-2 mb-3">{related.description}</p>
                       <div className="flex items-center justify-end">
-                        <span className="text-sm font-medium text-gray-500 group-hover:text-primary-600 transition-colors flex items-center gap-1">
+                        <span className="text-sm font-medium text-muted-foreground group-hover:text-amber-600 transition-colors flex items-center gap-1">
                           View <FiArrowRight className="w-4 h-4" />
                         </span>
                       </div>
@@ -369,7 +369,7 @@ export default function ServiceDetailClient({
                 ))}
               </div>
               <div className="mt-8 text-center sm:hidden">
-                <Link href="/services" className="btn-primary inline-flex items-center gap-2">
+                <Link href="/services" className="bg-amber-500 hover:bg-amber-600 text-ink font-bold px-6 py-3 rounded-full inline-flex items-center gap-2 transition-all">
                   View All Services <FiArrowRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -378,20 +378,20 @@ export default function ServiceDetailClient({
         )}
 
         {/* CTA */}
-        <section className="py-16 md:py-20 bg-gradient-to-br from-primary-400 to-primary-600">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-4xl font-bold text-dark-900 mb-4">Ready to Book {service?.name}?</h2>
-            <p className="text-xl text-dark-900/80 mb-8 max-w-2xl mx-auto">
+        <section className="py-16 md:py-20 bg-foreground">
+          <div className="max-w-4xl mx-auto px-5 sm:px-8 text-center">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-[-0.02em] text-background mb-4">Ready to Book {service?.name}?</h2>
+            <p className="text-xl text-background/80 mb-8 max-w-2xl mx-auto">
               Book now and let our professional team handle the cleaning. Easy scheduling, instant confirmation.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href={`/booking?serviceId=${service.id}&category=${service.category?.slug}${city ? `&district=${encodeURIComponent(city)}` : ''}`}
-                className="bg-dark-900 hover:bg-dark-800 text-white font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-lg"
+                className="bg-amber-500 hover:bg-amber-600 text-ink font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-lg"
               >
                 {city ? `Book ${service.name} in ${city}` : 'Book Now'}
               </Link>
               <a href={generateWhatsAppLink()} target="_blank" rel="noopener noreferrer"
-                className="bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl active:scale-[0.98] text-lg inline-flex items-center justify-center gap-2"
+                className="bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-4 rounded-full transition-all duration-300 active:scale-[0.98] text-lg inline-flex items-center justify-center gap-2"
               >
                 <FiMessageCircle className="w-6 h-6" />
                 Chat Now

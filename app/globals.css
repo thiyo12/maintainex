@@ -116,9 +116,9 @@ body {
 
 .animate-breathe { animation: breathe 3.2s ease-in-out infinite; }
 .animate-float-y { animation: float-y 4s ease-in-out infinite; }
-.animate-marquee { animation: marquee 38s linear infinite; }
+.animate-marquee { animation: marquee 28s linear infinite; }
 .animate-fade-up { animation: fade-up 0.7s cubic-bezier(.2,.7,.2,1) both; }
-.animate-scroll { animation: scroll 30s linear infinite; }
+.animate-scroll { animation: scroll 28s linear infinite; }
 .animate-scroll:hover { animation-play-state: paused; }
 
 ::-webkit-scrollbar { width: 8px; }

@@ -69,7 +69,7 @@ export default function TrendingServices({ services }: TrendingServicesProps) {
           <div>
             <span className="text-[10px] uppercase tracking-[0.15em] text-amber-600 font-semibold">Live now</span>
             <h2 className="text-3xl md:text-4xl font-black tracking-[-0.03em] text-ink mt-1">
-              Jobs posted today
+              Trending jobs near you
             </h2>
           </div>
           <Link

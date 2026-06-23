@@ -21,8 +21,8 @@ const config: Config = {
         border: 'var(--border)',
         input: 'var(--input)',
         ring: 'var(--ring)',
-        ink: '#2C2416',
-        cream: '#FDF8F0',
+        ink: 'var(--ink)',
+        cream: 'var(--cream)',
         'amber-soft': '#FEF3E2',
         primary: {
           50: '#FFFBEB',
