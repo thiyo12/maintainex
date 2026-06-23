@@ -1,9 +1,14 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { Sparkles, CheckCircle2, Lightbulb } from 'lucide-react'
+import { Sparkles, Lightbulb } from 'lucide-react'
 import Fuse from 'fuse.js'
 import { CATEGORY_KEYWORDS, CATEGORY_SLUGS, DEFAULT_CATEGORY } from '@/lib/category-keywords'
+
+interface ServiceEntry {
+  title: string
+  slug: string
+}
 
 function buildEntries(): { keyword: string; category: string }[] {
   const entries: { keyword: string; category: string }[] = []
@@ -15,7 +20,7 @@ function buildEntries(): { keyword: string; category: string }[] {
   return entries
 }
 
-function createFuse(): Fuse<{ keyword: string; category: string }> {
+function createKeywordFuse(): Fuse<{ keyword: string; category: string }> {
   return new Fuse(buildEntries(), {
     keys: ['keyword'],
     threshold: 0.4,
@@ -28,7 +33,7 @@ function createFuse(): Fuse<{ keyword: string; category: string }> {
 function matchCategory(input: string): string {
   const lower = input.toLowerCase().trim()
   if (lower.length < 2) return DEFAULT_CATEGORY
-  const fuse = createFuse()
+  const fuse = createKeywordFuse()
   const results = fuse.search(lower)
   if (results.length > 0 && results[0].score !== undefined && results[0].score < 0.6) {
     return results[0].item.category
@@ -41,9 +46,20 @@ function matchCategory(input: string): string {
   return DEFAULT_CATEGORY
 }
 
-export default function AiSearchBar() {
+export default function AiSearchBar({ services = [] }: { services?: ServiceEntry[] }) {
   const [value, setValue] = useState('')
   const [matched, setMatched] = useState<string | null>(null)
+
+  const serviceFuse = useMemo(() => {
+    if (services.length === 0) return null
+    return new Fuse(services, {
+      keys: ['title'],
+      threshold: 0.4,
+      distance: 100,
+      minMatchCharLength: 2,
+      includeScore: true,
+    })
+  }, [services])
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
@@ -57,12 +73,33 @@ export default function AiSearchBar() {
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    if (value.trim().length > 1) {
-      const cat = matchCategory(value) || DEFAULT_CATEGORY
+    const query = value.trim()
+    if (query.length < 2) return
+
+    const keywordFuse = createKeywordFuse()
+    const keywordResults = keywordFuse.search(query).slice(0, 3)
+
+    const titleResults = serviceFuse ? serviceFuse.search(query).slice(0, 3) : []
+
+    if (titleResults.length > 0 && titleResults[0].score !== undefined && titleResults[0].score < 0.25) {
+      const topTitle = titleResults[0]
+      const titleCategory = matchCategory(topTitle.item.title)
+      const topKeywordCat = keywordResults.length > 0 ? keywordResults[0].item.category : null
+      if (!topKeywordCat || titleCategory === topKeywordCat) {
+        window.location.href = `/services/${topTitle.item.slug}`
+        return
+      }
+    }
+
+    if (keywordResults.length > 0 && keywordResults[0].score !== undefined && keywordResults[0].score < 0.35) {
+      const cat = keywordResults[0].item.category
       const slug = CATEGORY_SLUGS[cat] || cat.toLowerCase().replace(/\s+/g, '-')
       window.location.href = `/services#${slug}`
+      return
     }
-  }, [value])
+
+    window.location.href = '/services'
+  }, [value, serviceFuse])
 
   return (
     <form onSubmit={handleSubmit} className="relative w-full max-w-[540px]">

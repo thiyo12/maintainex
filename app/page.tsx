@@ -165,7 +165,7 @@ export default async function HomePage() {
                 </p>
 
                 <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                  <AiSearchBar />
+                  <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
                 </div>
 
                 <div className="lg:hidden mt-6 animate-fade-up" style={{ animationDelay: '0.25s' }}>
