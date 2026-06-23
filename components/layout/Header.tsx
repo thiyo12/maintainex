@@ -73,6 +73,21 @@ export default function Header() {
             </Link>
           </div>
 
+          <div className="flex md:hidden items-center gap-1">
+            <ThemeToggle />
+            <button
+              onClick={() => setShowSignIn(true)}
+              className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground rounded-lg hover:bg-amber-soft/50 transition-colors"
+            >
+              Sign in
+            </button>
+            <Link
+              href="/booking"
+              className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-3 py-1.5 rounded-full text-xs transition-all active:scale-95 whitespace-nowrap"
+            >
+              Book
+            </Link>
+          </div>
           <MobileMenu navigation={navigation} phoneRaw={region.phoneRaw} phone={region.phone} />
         </div>
       </nav>
