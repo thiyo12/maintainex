@@ -1,12 +1,19 @@
+import { headers } from 'next/headers'
 import type { Metadata } from 'next'
+import { getRegionFromHost } from '@/lib/regions'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { Shield } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy — Maintainex',
-  description: 'Maintainex privacy policy. Learn how we collect, use, and protect your personal information.',
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get('host') || ''
+  const baseUrl = getRegionFromHost(host) === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
+  return {
+    title: 'Privacy Policy — Maintainex',
+    description: 'Maintainex privacy policy. Learn how we collect, use, and protect your personal information.',
+    alternates: { canonical: `${baseUrl}/privacy` },
+  }
 }
 
 export default function PrivacyPage() {

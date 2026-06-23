@@ -14,10 +14,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = headersList.get('host') || ''
   const regionKey = getRegionFromHost(host)
   const c = REGIONS[regionKey].countryName
-
+  const cp = REGIONS[regionKey].countryNamePossessive
+  const baseUrl = regionKey === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
   return {
     title: `About Maintainex — All Services Under One Roof in ${c}`,
-    description: `Maintainex ${c} — your all-in-one property services partner under one roof. Cleaning, construction, maintenance, pest control & landscaping by insured professionals. Serving Jaffna, Colombo, Toronto & more. Book online.`,
+    description: `${cp} trusted platform for cleaning, construction, maintenance, pest control & landscaping by insured professionals. Serving Jaffna, Colombo, Toronto & more.`,
+    alternates: { canonical: `${baseUrl}/about` },
     openGraph: {
       title: `About Maintainex — All Services Under One Roof in ${c}`,
       description: `All property services under one roof. ${c}'s trusted platform for cleaning, construction, maintenance & more.`,

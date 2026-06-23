@@ -46,7 +46,6 @@ export async function generateMetadata(): Promise<Metadata> {
       shortcut: '/favicon.svg',
     },
     alternates: {
-      canonical: baseUrl,
       languages: {
         'x-default': baseUrl,
         'en-LK': 'https://maintainex.lk',

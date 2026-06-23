@@ -1,12 +1,19 @@
+import { headers } from 'next/headers'
 import type { Metadata } from 'next'
+import { getRegionFromHost } from '@/lib/regions'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { FileText } from 'lucide-react'
 
-export const metadata: Metadata = {
-  title: 'Terms of Service — Maintainex',
-  description: 'Maintainex terms of service. Terms governing the use of the Maintainex platform.',
+export async function generateMetadata(): Promise<Metadata> {
+  const host = (await headers()).get('host') || ''
+  const baseUrl = getRegionFromHost(host) === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
+  return {
+    title: 'Terms of Service — Maintainex',
+    description: 'Maintainex terms of service. Terms governing the use of the Maintainex platform.',
+    alternates: { canonical: `${baseUrl}/terms` },
+  }
 }
 
 export default function TermsPage() {
