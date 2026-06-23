@@ -87,8 +87,16 @@ async function getServicesByCategory() {
   return { categories: categoriesWithServices, services }
 }
 
-function randomViews() {
-  return Math.floor(Math.random() * 5001) + 3000
+const BASE_DATE = new Date('2025-01-01')
+
+function daysSince(): number {
+  const diff = Date.now() - BASE_DATE.getTime()
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
+
+function getViewCount(seed: number = 0): number {
+  const days = daysSince()
+  return 3000 + (days * 38) + ((seed * 37) % 200)
 }
 
 async function getTrendingServices() {
@@ -101,7 +109,7 @@ async function getTrendingServices() {
     take: 5
   })
   
-  return trending.map(svc => ({
+  return trending.map((svc, index) => ({
     id: svc.id,
     name: svc.name,
     slug: svc.slug,
@@ -109,7 +117,7 @@ async function getTrendingServices() {
     image: svc.image,
     price: svc.price ? Number(svc.price) : null,
     duration: svc.duration ? Number(svc.duration) : null,
-    views: randomViews(),
+    views: getViewCount(index),
     isTrending: svc.isTrending || false
   })) as any[]
 }
@@ -122,6 +130,8 @@ export default async function HomePage() {
 
   const { categories = [], services = [] } = await getServicesByCategory()
   const trendingServices = await getTrendingServices()
+
+  const happyClients = 500 + daysSince()
 
   const features = [
     { icon: FiCheck, title: 'Professional Team', description: 'Trained and vetted cleaning professionals' },
@@ -197,7 +207,7 @@ export default async function HomePage() {
                 
                 <div className="mt-8 md:mt-12 flex flex-wrap items-center justify-center sm:justify-start gap-4 md:gap-8">
                   <div className="text-center sm:text-left">
-                    <AnimatedCounter end={500} duration={3000} />
+                    <AnimatedCounter end={happyClients} duration={3000} />
                     <div className="text-dark-900/70 text-xs md:text-sm">Happy Clients</div>
                   </div>
                   <div className="hidden sm:block h-8 md:h-12 w-px bg-dark-900/20" />
