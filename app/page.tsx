@@ -5,7 +5,7 @@ import { REGIONS, getRegionFromHost } from '@/lib/regions'
 import dynamicImport from 'next/dynamic'
 import Header from '@/components/layout/Header'
 import AnimatedHero from '@/components/ui/AnimatedHero'
-import ServiceCategorySlider from '@/components/ui/ServiceCategorySlider'
+
 import AiSearchBar from '@/components/ui/AiSearchBar'
 import ServiceGridHero from '@/components/ui/ServiceGridHero'
 import CategoryMarquee from '@/components/ui/CategoryMarquee'
@@ -17,6 +17,7 @@ const WhatsAppButton = dynamicImport(() => import('@/components/layout/WhatsAppB
 const HomeServices = dynamicImport(() => import('@/components/ui/HomeServices'))
 const TrendingServices = dynamicImport(() => import('@/components/ui/TrendingServices'))
 const CTASection = dynamicImport(() => import('@/components/ui/CTASection'))
+const HomeFaqSection = dynamicImport(() => import('@/components/ui/HomeFaqSection'))
 const Footer = dynamicImport(() => import('@/components/layout/Footer'))
 import Link from 'next/link'
 
@@ -167,12 +168,6 @@ export default async function HomePage() {
                   <AiSearchBar />
                 </div>
                 
-                {/* Mobile: Services Slider */}
-                <div className="lg:hidden mb-6 mt-8">
-                  <h2 className="text-lg font-bold text-ink mb-3">Our Services</h2>
-                  <ServiceCategorySlider categories={categories} />
-                </div>
-                
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-6 animate-fade-up" style={{ animationDelay: '0.3s' }}>
                   <Link href="/booking" className="glow-amber inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-6 py-2.5 rounded-full text-sm transition-all active:scale-95">
                     Book a Service <FiArrowRight className="w-4 h-4" />
@@ -232,7 +227,7 @@ export default async function HomePage() {
                 </div>
                 <div className="flex flex-wrap gap-6 mt-10">
                   <div>
-                    <div className="text-2xl font-black text-amber-400">LKR 38k</div>
+                    <div className="text-2xl font-black text-amber-400">LKR 120k</div>
                     <div className="text-xs text-background/60">Avg. monthly</div>
                   </div>
                   <div>
@@ -274,6 +269,8 @@ export default async function HomePage() {
             <CTASection />
           </div>
         </section>
+
+        <HomeFaqSection />
       </main>
 
       <Footer />

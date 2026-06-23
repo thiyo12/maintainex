@@ -12,38 +12,42 @@ export default function AppStoreModal({ open, onClose }: AppStoreModalProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-card rounded-3xl p-8 max-w-md w-full text-center relative border border-border shadow-xl animate-fade-up">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Close"
-        >
-          <X size={20} />
-        </button>
-        <div className="size-16 rounded-2xl bg-amber-soft flex items-center justify-center mx-auto mb-5">
-          <Smartphone className="w-8 h-8 text-amber-600" />
+    <div className="fixed top-16 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border shadow-lg animate-fade-up">
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="size-10 rounded-2xl bg-amber-soft flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-5 h-5 text-amber-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-ink truncate">
+              We&apos;re still working
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              The full account system is coming soon. Book any service directly — no sign-up needed.
+            </p>
+          </div>
         </div>
-        <h3 className="text-2xl font-black tracking-[-0.03em] text-ink mb-3">
-          We&apos;re still working
-        </h3>
-        <p className="text-muted-foreground mb-2 leading-relaxed">
-          The full account system is coming soon. In the meantime, you can book any service directly — no sign-up needed.
-        </p>
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={onClose}
-            className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-6 py-2.5 rounded-full text-sm transition-all active:scale-95"
+            onClick={() => window.location.href = '/booking'}
+            className="bg-amber-500 hover:bg-amber-600 text-ink font-semibold px-4 py-1.5 rounded-full text-xs transition-all active:scale-95 whitespace-nowrap"
           >
             Book a Service
           </button>
           <Link
             href="/services"
             onClick={onClose}
-            className="text-foreground font-medium px-6 py-2.5 rounded-full border border-border hover:border-amber-300 text-sm transition-all"
+            className="text-muted-foreground hover:text-foreground font-medium px-3 py-1.5 rounded-full border border-border hover:border-amber-300 text-xs transition-all whitespace-nowrap"
           >
             Browse Services
           </Link>
+          <button
+            onClick={onClose}
+            className="size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-amber-soft/50 transition-colors flex-shrink-0"
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
         </div>
       </div>
     </div>

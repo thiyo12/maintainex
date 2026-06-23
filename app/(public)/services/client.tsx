@@ -7,6 +7,10 @@ import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
 import { getImageUrl } from '@/lib/images'
+import {
+  Sparkles, Zap, Droplet, Paintbrush, Wrench, Leaf, Monitor, Hammer,
+  Bug, Snowflake, Droplets, Shield, Truck, Home, type LucideIcon,
+} from 'lucide-react'
 
 interface Service {
   id: string
@@ -29,6 +33,46 @@ interface Category {
   displayOrder: number
   serviceCount: number
   services: Service[]
+}
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  cleaning: Sparkles,
+  electrical: Zap,
+  plumbing: Droplet,
+  painting: Paintbrush,
+  repairs: Wrench,
+  gardening: Leaf,
+  'web-design': Monitor,
+  assembly: Hammer,
+  mounting: Hammer,
+  'pest-control': Bug,
+  'ac-service': Snowflake,
+  'water-tank-cleaning': Droplets,
+  'water-tank': Droplets,
+  disinfection: Shield,
+  moving: Truck,
+  homecare: Home,
+}
+
+function getCategoryIcon(slug: string, name: string): LucideIcon {
+  const lower = slug.toLowerCase()
+  if (CATEGORY_ICONS[lower]) return CATEGORY_ICONS[lower]
+  const byName = name.toLowerCase()
+  if (byName.includes('clean')) return Sparkles
+  if (byName.includes('electr')) return Zap
+  if (byName.includes('plumb')) return Droplet
+  if (byName.includes('paint')) return Paintbrush
+  if (byName.includes('repair') || byName.includes('mainten')) return Wrench
+  if (byName.includes('garden') || byName.includes('lawn')) return Leaf
+  if (byName.includes('web') || byName.includes('design')) return Monitor
+  if (byName.includes('assemb') || byName.includes('mount')) return Hammer
+  if (byName.includes('pest')) return Bug
+  if (byName.includes('ac') || byName.includes('air')) return Snowflake
+  if (byName.includes('tank') || byName.includes('water')) return Droplets
+  if (byName.includes('disinf') || byName.includes('sanit')) return Shield
+  if (byName.includes('move') || byName.includes('shift')) return Truck
+  if (byName.includes('home') || byName.includes('house')) return Home
+  return Sparkles
 }
 
 export default function ServicesPage() {
@@ -165,7 +209,10 @@ function ServicesContent() {
               category.services && category.services.length > 0 && (
                 <div key={category.id} className="mb-12">
                   <div className="flex items-center gap-3 mb-6">
-                    {category.icon && <span className="text-2xl">{category.icon}</span>}
+                    {(() => {
+                      const Icon = getCategoryIcon(category.slug, category.name)
+                      return <Icon className="w-6 h-6 text-amber-500" />
+                    })()}
                     <h2 className="text-xl md:text-2xl font-bold text-foreground">
                       {category.name}
                     </h2>

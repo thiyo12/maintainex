@@ -5,12 +5,12 @@ import Image from 'next/image'
 import { useRegion } from '@/lib/region-context'
 
 const SOCIALS = [
-  { name: 'Facebook', file: 'icons8-facebook-50.png' },
-  { name: 'Instagram', file: 'icons8-instagram-50.png' },
-  { name: 'LinkedIn', file: 'icons8-linkedin-circled-100.png' },
-  { name: 'X', file: 'icons8-x-100.png' },
-  { name: 'TikTok', file: 'icons8-tiktok-50.png' },
-  { name: 'WhatsApp', file: 'icons8-whatsapp-100.png' },
+  { name: 'Facebook', file: 'icons8-facebook-50.png', url: 'https://facebook.com/maintainex' },
+  { name: 'Instagram', file: 'icons8-instagram-50.png', url: 'https://instagram.com/maintainex' },
+  { name: 'LinkedIn', file: 'icons8-linkedin-circled-100.png', url: 'https://linkedin.com/company/maintainex' },
+  { name: 'X', file: 'icons8-x-100.png', url: 'https://x.com/maintainex' },
+  { name: 'TikTok', file: 'icons8-tiktok-50.png', url: 'https://tiktok.com/@maintainex' },
+  { name: 'WhatsApp', file: 'icons8-whatsapp-100.png', url: 'https://wa.me/94770867609' },
 ]
 
 export default function Footer() {
@@ -62,7 +62,7 @@ export default function Footer() {
               {SOCIALS.map((s) => (
                 <a
                   key={s.name}
-                  href="#"
+                  href={s.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   title={s.name}
