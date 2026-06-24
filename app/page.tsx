@@ -154,6 +154,27 @@ export default async function HomePage() {
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute -top-40 -right-40 w-[300px] md:w-[560px] h-[300px] md:h-[560px] bg-amber-500/20 rounded-full blur-3xl animate-breathe" />
             <div className="absolute -bottom-40 -left-40 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-indigo-400/15 rounded-full blur-3xl" />
+            <Strands
+              colors={["#F97316","#7C3AED","#06B6D4"]}
+              count={3}
+              speed={0.4}
+              amplitude={0.6}
+              waviness={0.8}
+              thickness={0.5}
+              glow={1.2}
+              taper={3}
+              spread={0.8}
+              intensity={0.4}
+              saturation={1.5}
+              opacity={0.35}
+              scale={0.7}
+              glass={false}
+              refraction={1}
+              dispersion={1}
+              glassSize={1}
+              hueShift={0}
+              className="absolute inset-0"
+            />
           </div>
           
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 md:py-24 relative z-10 w-full">
@@ -161,34 +182,12 @@ export default async function HomePage() {
               <div className="lg:col-span-7 order-2 lg:order-1">
                 <AnimatedHero />
                 
-                <p className="text-base md:text-lg text-muted-foreground mb-6 max-w-lg mt-6 animate-fade-up">
+                <p className="text-base md:text-lg text-muted-foreground mb-4 max-w-lg mt-6 animate-fade-up">
                   Sri Lanka&apos;s trusted local marketplace. Post a job, get matched with vetted taskers within 50 km, and receive quotes in minutes.
                 </p>
 
-                <div className="relative overflow-hidden rounded-2xl animate-fade-up" style={{ animationDelay: '0.2s', height: '400px' }}>
-                  <Strands
-                    colors={["#F97316","#7C3AED","#06B6D4"]}
-                    count={3}
-                    speed={0.4}
-                    amplitude={0.6}
-                    waviness={0.8}
-                    thickness={0.5}
-                    glow={1.2}
-                    taper={3}
-                    spread={0.8}
-                    intensity={0.4}
-                    saturation={1.5}
-                    opacity={0.9}
-                    scale={0.7}
-                    glass={false}
-                    refraction={1}
-                    dispersion={1}
-                    glassSize={1}
-                    hueShift={0}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
-                  </div>
+                <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
+                  <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
                 </div>
 
                 <div className="lg:hidden mt-6 animate-fade-up" style={{ animationDelay: '0.25s' }}>
