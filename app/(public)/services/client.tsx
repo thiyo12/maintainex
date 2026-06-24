@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import WhatsAppButton from '@/components/layout/WhatsAppButton'
+import GradualBlur from '@/components/ui/GradualBlur'
 import { getImageUrl } from '@/lib/images'
 import {
   Sparkles, Zap, Droplet, Paintbrush, Wrench, Leaf, Monitor, Hammer,
@@ -206,78 +207,93 @@ function ServicesContent({ cityName }: { cityName?: string }) {
         {/* ALL Services Grid - Grouped by Category */}
         {!selectedCategorySlug && (
         <section id="all-services" className="py-8 md:py-12">
-          <div className="max-w-7xl mx-auto px-5 sm:px-8">
-            {categories.map((category) => (
-              category.services && category.services.length > 0 && (
-                <div key={category.id} className="mb-12">
-                  <div className="flex items-center gap-3 mb-6">
-                    {(() => {
-                      const Icon = getCategoryIcon(category.slug, category.name)
-                      return <Icon className="w-6 h-6 text-amber-500" />
-                    })()}
-                    <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                      {category.name}
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                    {category.services.map((service) => (
-                      <div 
-                        key={service.id}
-                        className="bg-card rounded-3xl overflow-hidden border border-border hover:border-amber-300 transition-all duration-300"
-                      >
-                        <div className="relative h-28 md:h-32 overflow-hidden bg-muted">
-                          {service.image ? (
-                            <img
-                              src={getImageUrl(service.image)}
-                              alt={service.title}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-amber-soft flex items-center justify-center">
-                              <span className="text-4xl">🧹</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="p-4">
-                          <h3 className="font-bold text-foreground mb-1">
-                            {service.title}
-                          </h3>
-                          <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
-                            {service.description || 'Professional service'}
-                          </p>
-
-                          <div className="flex gap-2">
-                            {service.slug && (
-                              <Link
-                                href={`/services/${service.slug}`}
-                                className="flex-1 text-center bg-muted hover:bg-muted/80 text-foreground font-semibold py-2.5 rounded-full transition-colors text-sm"
-                              >
-                                Learn More
-                              </Link>
+          <div
+            className="max-w-7xl mx-auto px-5 sm:px-8 relative"
+            style={{ height: '520px', overflow: 'hidden' }}
+          >
+            <div className="h-full overflow-y-auto pb-16">
+              {categories.map((category) => (
+                category.services && category.services.length > 0 && (
+                  <div key={category.id} className="mb-12">
+                    <div className="flex items-center gap-3 mb-6">
+                      {(() => {
+                        const Icon = getCategoryIcon(category.slug, category.name)
+                        return <Icon className="w-6 h-6 text-amber-500" />
+                      })()}
+                      <h2 className="text-xl md:text-2xl font-bold text-foreground">
+                        {category.name}
+                      </h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                      {category.services.map((service) => (
+                        <div 
+                          key={service.id}
+                          className="bg-card rounded-3xl overflow-hidden border border-border hover:border-amber-300 transition-all duration-300"
+                        >
+                          <div className="relative h-28 md:h-32 overflow-hidden bg-muted">
+                            {service.image ? (
+                              <img
+                                src={getImageUrl(service.image)}
+                                alt={service.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-amber-soft flex items-center justify-center">
+                                <span className="text-4xl">🧹</span>
+                              </div>
                             )}
-                            <button 
-                              onClick={() => {
-                                localStorage.setItem('selectedService', JSON.stringify({
-                                  id: service.id,
-                                  name: service.title,
-                                  price: service.price,
-                                  category: category.name
-                                }))
-                                router.push(`/booking?serviceId=${service.id}&category=${category.slug}`)
-                              }}
-                              className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2.5 rounded-full transition-colors text-sm`}
-                            >
-                              Book Now
-                            </button>
+                          </div>
+
+                          <div className="p-4">
+                            <h3 className="font-bold text-foreground mb-1">
+                              {service.title}
+                            </h3>
+                            <p className="text-muted-foreground text-sm mb-2 line-clamp-2">
+                              {service.description || 'Professional service'}
+                            </p>
+
+                            <div className="flex gap-2">
+                              {service.slug && (
+                                <Link
+                                  href={`/services/${service.slug}`}
+                                  className="flex-1 text-center bg-muted hover:bg-muted/80 text-foreground font-semibold py-2.5 rounded-full transition-colors text-sm"
+                                >
+                                  Learn More
+                                </Link>
+                              )}
+                              <button 
+                                onClick={() => {
+                                  localStorage.setItem('selectedService', JSON.stringify({
+                                    id: service.id,
+                                    name: service.title,
+                                    price: service.price,
+                                    category: category.name
+                                  }))
+                                  router.push(`/booking?serviceId=${service.id}&category=${category.slug}`)
+                                }}
+                                className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2.5 rounded-full transition-colors text-sm`}
+                              >
+                                Book Now
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )
-            ))}
+                )
+              ))}
+            </div>
+            <GradualBlur
+              target="parent"
+              position="bottom"
+              height="7rem"
+              strength={2}
+              divCount={5}
+              curve="bezier"
+              exponential
+              opacity={1}
+            />
           </div>
         </section>
         )}

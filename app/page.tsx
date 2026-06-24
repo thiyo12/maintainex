@@ -11,6 +11,7 @@ import ServiceGridHero from '@/components/ui/ServiceGridHero'
 import CategoryMarquee from '@/components/ui/CategoryMarquee'
 import HowItWorks from '@/components/ui/HowItWorks'
 
+const Strands = dynamicImport(() => import('@/components/ui/Strands'), { ssr: false })
 const FlashOfferSplash = dynamicImport(() => import('@/components/ui/FlashOfferSplash'), { ssr: false })
 const WelcomeBanner = dynamicImport(() => import('@/components/ui/WelcomeBanner'), { ssr: false })
 const WhatsAppButton = dynamicImport(() => import('@/components/layout/WhatsAppButton'), { ssr: false })
@@ -164,8 +165,30 @@ export default async function HomePage() {
                   Sri Lanka&apos;s trusted local marketplace. Post a job, get matched with vetted taskers within 50 km, and receive quotes in minutes.
                 </p>
 
-                <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                  <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
+                <div className="relative overflow-hidden rounded-2xl animate-fade-up" style={{ animationDelay: '0.2s', height: '400px' }}>
+                  <Strands
+                    colors={["#F97316","#7C3AED","#06B6D4"]}
+                    count={3}
+                    speed={0.5}
+                    amplitude={1}
+                    waviness={1}
+                    thickness={0.7}
+                    glow={2.6}
+                    taper={3}
+                    spread={1}
+                    intensity={0.6}
+                    saturation={2}
+                    opacity={1}
+                    scale={1.5}
+                    glass={false}
+                    refraction={1}
+                    dispersion={1}
+                    glassSize={1}
+                    hueShift={0}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
+                  </div>
                 </div>
 
                 <div className="lg:hidden mt-6 animate-fade-up" style={{ animationDelay: '0.25s' }}>
