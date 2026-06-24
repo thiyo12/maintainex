@@ -173,7 +173,7 @@ export default async function HomePage() {
               dispersion={1}
               glassSize={1}
               hueShift={0}
-              className="absolute inset-0"
+              style={{ position: 'absolute', inset: 0 }}
             />
           </div>
           
