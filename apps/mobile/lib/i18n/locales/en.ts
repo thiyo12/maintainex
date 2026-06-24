@@ -1090,6 +1090,8 @@ const en = {
     confirmComplete: 'Confirm Job Complete',
     track: 'Track',
     defaultRating: '4.8',
+    startNavigation: 'Start Navigation',
+    sharingLocation: 'Sharing live location',
   },
 }
 

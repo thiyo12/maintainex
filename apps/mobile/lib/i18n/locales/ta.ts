@@ -1089,6 +1089,8 @@ const ta: Record<string, any> = {
     confirmComplete: 'வேலை முடிந்ததாக உறுதிப்படுத்து',
     track: 'கண்காணி',
     defaultRating: '4.8',
+    startNavigation: 'வழிசெலுத்தலைத் தொடங்கு',
+    sharingLocation: 'நேரடி இருப்பிடத்தைப் பகிர்கிறது',
   },
 }
 

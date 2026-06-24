@@ -1089,6 +1089,8 @@ const si: Record<string, any> = {
     confirmComplete: 'රැකියාව සම්පූර්ණ කළ බව තහවුරු කරන්න',
     track: 'ලුහුබඳින්න',
     defaultRating: '4.8',
+    startNavigation: 'සංචාලනය ආරම්භ කරන්න',
+    sharingLocation: 'සජීවී ස්ථානය බෙදාගනිමින්',
   },
 }
 

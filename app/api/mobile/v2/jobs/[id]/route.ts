@@ -27,6 +27,20 @@ export async function GET(
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
     const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
 
+    const acceptedQuote = quotes.find((q) => q.status === 'ACCEPTED')
+    let acceptedProvider = null
+    if (acceptedQuote) {
+      const providerUser = await prisma.user.findUnique({
+        where: { id: acceptedQuote.providerId },
+        select: { id: true, name: true, phone: true },
+      })
+      const providerProfile = await prisma.taskerProfile.findUnique({
+        where: { userId: acceptedQuote.providerId },
+        select: { latitude: true, longitude: true, rating: true },
+      })
+      if (providerUser) acceptedProvider = { ...providerUser, ...providerProfile }
+    }
+
     const [customerReviews, providerReviews] = await Promise.all([
       prisma.jobReview.findMany({ where: { jobId: job.id } }),
       prisma.providerReview.findMany({ where: { jobId: job.id } }),
@@ -59,7 +73,7 @@ export async function GET(
     )
 
     return NextResponse.json({
-      job: { ...job, budgetAmount: Number(job.budgetAmount), customer, locationName, quotes: enrichedQuotes, escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null, workspace: workspace || null, reviews: { customerReviews, providerReviews } },
+      job: { ...job, budgetAmount: Number(job.budgetAmount), customer, locationName, quotes: enrichedQuotes, escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null, workspace: workspace || null, reviews: { customerReviews, providerReviews }, acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: Number(acceptedQuote.price), provider: acceptedProvider } : null },
     })
   } catch (error) {
     console.error('Get job error:', error)

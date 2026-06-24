@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'
+import MapView, { Marker } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
@@ -14,19 +14,7 @@ import Avatar from '../../../components/ui/Avatar'
 const { height } = Dimensions.get('window')
 const MAP_HEIGHT = height * 0.45
 
-const darkMapStyle = [
-  { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9ca5b3' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
-  { featureType: 'water', elementType: 'labels.text.stroke', stylers: [{ color: '#17263c' }] },
-]
+const COLOMBO_COORDS = { latitude: 6.9271, longitude: 79.8612 }
 
 export default function LiveTrackingScreen() {
   const { t } = useTranslation()
@@ -38,6 +26,7 @@ export default function LiveTrackingScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current
   const [job, setJob] = useState<any>(null)
   const [workspace, setWorkspace] = useState<any>(null)
+  const [providerCoord, setProviderCoord] = useState<{ latitude: number; longitude: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
 
@@ -66,6 +55,24 @@ export default function LiveTrackingScreen() {
     if (id) loadData()
     return () => pulse.stop()
   }, [id])
+
+  // Poll provider location every 10s
+  useEffect(() => {
+    if (!id || job?.status === 'COMPLETED' || job?.status === 'CANCELLED') return
+    const interval = setInterval(async () => {
+      try {
+        const res = await v2Jobs.get(id)
+        setJob(res.job)
+        if (res.job.acceptedQuote?.provider?.latitude) {
+          setProviderCoord({
+            latitude: res.job.acceptedQuote.provider.latitude,
+            longitude: res.job.acceptedQuote.provider.longitude,
+          })
+        }
+      } catch {}
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [id, job?.status])
 
   const loadData = async () => {
     try {
@@ -96,23 +103,31 @@ export default function LiveTrackingScreen() {
       <View style={styles.mapContainer}>
         <MapView
           style={styles.map}
-          provider={PROVIDER_GOOGLE}
-          customMapStyle={darkMapStyle}
           initialRegion={{
-            latitude: 6.9271,
-            longitude: 79.8612,
+            latitude: COLOMBO_COORDS.latitude,
+            longitude: COLOMBO_COORDS.longitude,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
         >
           <Marker
-            coordinate={{ latitude: 6.9271, longitude: 79.8612 }}
+            coordinate={COLOMBO_COORDS}
             title={job?.title || t('booking.jobLocation')}
           >
             <View style={styles.customerMarker}>
               <Ionicons name="home" size={16} color={colors.white} />
             </View>
           </Marker>
+          {providerCoord && (
+            <Marker
+              coordinate={providerCoord}
+              title={t('tracking.provider')}
+            >
+              <View style={styles.taskerMarker}>
+                <Ionicons name="construct" size={16} color={colors.white} />
+              </View>
+            </Marker>
+          )}
         </MapView>
 
         {/* ETA Pill */}
@@ -198,6 +213,16 @@ const makeStyles = (colors: any) => StyleSheet.create({
     height: 32,
     borderRadius: 16,
     backgroundColor: colors.info,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.white,
+  },
+  taskerMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.amber,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,

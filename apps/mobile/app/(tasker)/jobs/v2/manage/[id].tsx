@@ -8,6 +8,7 @@ import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
+import * as Location from 'expo-location'
 
 export default function V2ProviderManageJobScreen() {
   const { t } = useTranslation()
@@ -40,6 +41,7 @@ export default function V2ProviderManageJobScreen() {
 
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
+  const [locationSharing, setLocationSharing] = useState(false)
 
   const loadJob = async () => {
     try {
@@ -73,6 +75,37 @@ export default function V2ProviderManageJobScreen() {
   }
 
   useEffect(() => { loadJob() }, [id])
+
+  // Send tasker location every 10s when navigation started
+  useEffect(() => {
+    if (!locationSharing || !id) return
+    const interval = setInterval(async () => {
+      try {
+        const loc = await Location.getCurrentPositionAsync({})
+        const token = await (await import('../../../../../lib/api')).getAuthToken()
+        await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/taskers/location`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
+        })
+      } catch {}
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [locationSharing, id])
+
+  const startLocationSharing = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert(t('common.error'), t('errors.locationPermission'))
+        return
+      }
+      setLocationSharing(true)
+      await handleUpdateProgress('IN_PROGRESS')
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e.message)
+    }
+  }
 
   const handleMarkComplete = async () => {
     setActionLoading('complete')
@@ -272,6 +305,21 @@ export default function V2ProviderManageJobScreen() {
             </View>
 
             <View style={styles.progressActions}>
+              {workspace.progressStatus === 'ACCEPTED' && !locationSharing && (
+                <TouchableOpacity
+                  style={styles.navBtn}
+                  onPress={startLocationSharing}
+                >
+                  <Ionicons name="navigate-outline" size={20} color={colors.ink} />
+                  <Text style={styles.navBtnText}>{t('tracking.startNavigation')}</Text>
+                </TouchableOpacity>
+              )}
+              {locationSharing && (
+                <View style={styles.sharingActive}>
+                  <Ionicons name="radio-outline" size={18} color={colors.success} />
+                  <Text style={styles.sharingActiveText}>{t('tracking.sharingLocation')}</Text>
+                </View>
+              )}
               {workspace.progressStatus === 'ACCEPTED' && !generatedOtp && (
                 <TouchableOpacity
                   style={[styles.otpGenBtn, otpLoading && styles.btnDisabled]}
@@ -414,6 +462,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   progressLabel: { fontSize: 10, color: colors.muted, fontWeight: '600', textAlign: 'center' },
   progressLabelDone: { color: colors.amberDark },
   progressActions: { gap: 8 },
+  navBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
+  },
+  navBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
   progressBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
@@ -456,4 +509,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
 
   waitingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amberBg, borderRadius: 12, padding: 16 },
   waitingText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amberDark },
+  sharingActive: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12 },
+  sharingActiveText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.success },
 })
