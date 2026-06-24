@@ -11,7 +11,7 @@ import ServiceGridHero from '@/components/ui/ServiceGridHero'
 import CategoryMarquee from '@/components/ui/CategoryMarquee'
 import HowItWorks from '@/components/ui/HowItWorks'
 
-const Strands = dynamicImport(() => import('@/components/ui/Strands'), { ssr: false })
+const LaserFlow = dynamicImport(() => import('@/components/ui/LaserFlow'), { ssr: false })
 const FlashOfferSplash = dynamicImport(() => import('@/components/ui/FlashOfferSplash'), { ssr: false })
 const WelcomeBanner = dynamicImport(() => import('@/components/ui/WelcomeBanner'), { ssr: false })
 const WhatsAppButton = dynamicImport(() => import('@/components/layout/WhatsAppButton'), { ssr: false })
@@ -166,30 +166,7 @@ export default async function HomePage() {
                 </p>
 
                 <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                  <div className="relative mx-auto flex items-center justify-center" style={{ maxWidth: '580px', minHeight: '180px', padding: '16px' }}>
-                    <Strands
-                      colors={["#F97316","#7C3AED","#06B6D4"]}
-                      count={4}
-                      speed={0.3}
-                      amplitude={0.8}
-                      waviness={1}
-                      thickness={0.6}
-                      glow={2}
-                      taper={4}
-                      spread={1.2}
-                      intensity={0.5}
-                      saturation={2}
-                      opacity={0.6}
-                      scale={0.9}
-                      glass={false}
-                      refraction={1}
-                      dispersion={1}
-                      glassSize={1}
-                      hueShift={0}
-                      style={{ position: 'absolute', inset: 0, borderRadius: '24px' }}
-                    />
-                    <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
-                  </div>
+                  <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
                 </div>
 
                 <div className="lg:hidden mt-6 animate-fade-up" style={{ animationDelay: '0.25s' }}>
@@ -298,10 +275,33 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <HomeFaqSection />
       </main>
 
-      <Footer />
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0" style={{ mixBlendMode: 'screen' as any, pointerEvents: 'none' }}>
+          <LaserFlow
+            horizontalBeamOffset={0.1}
+            verticalBeamOffset={0.0}
+            color="#F97316"
+            horizontalSizing={0.1}
+            verticalSizing={4.3}
+            wispDensity={1}
+            wispSpeed={50}
+            wispIntensity={14.1}
+            flowSpeed={1.94}
+            flowStrength={0.07}
+            fogIntensity={0}
+            fogScale={0.1}
+            fogFallSpeed={1.85}
+            decay={2.61}
+            falloffStart={0.5}
+          />
+        </div>
+        <div className="relative z-10">
+          <HomeFaqSection />
+          <Footer />
+        </div>
+      </section>
     </>
   )
 }
