@@ -12,6 +12,7 @@ import CategoryMarquee from '@/components/ui/CategoryMarquee'
 import HowItWorks from '@/components/ui/HowItWorks'
 
 const LaserFlow = dynamicImport(() => import('@/components/ui/LaserFlow'), { ssr: false })
+const Galaxy = dynamicImport(() => import('@/components/ui/Galaxy'), { ssr: false })
 const FlashOfferSplash = dynamicImport(() => import('@/components/ui/FlashOfferSplash'), { ssr: false })
 const WelcomeBanner = dynamicImport(() => import('@/components/ui/WelcomeBanner'), { ssr: false })
 const WhatsAppButton = dynamicImport(() => import('@/components/layout/WhatsAppButton'), { ssr: false })
@@ -216,6 +217,23 @@ export default async function HomePage() {
           <div className="max-w-7xl mx-auto px-5 sm:px-8">
             <div className="grid lg:grid-cols-5 gap-6">
               <div className="lg:col-span-3 rounded-[32px] bg-foreground text-background p-10 md:p-14 relative overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none">
+                  <Galaxy
+                    density={1}
+                    glowIntensity={0.3}
+                    saturation={0}
+                    hueShift={140}
+                    twinkleIntensity={0.3}
+                    rotationSpeed={0.1}
+                    repulsionStrength={2}
+                    autoCenterRepulsion={0}
+                    starSpeed={0.5}
+                    speed={1}
+                    mouseRepulsion
+                    mouseInteraction
+                    transparent
+                  />
+                </div>
                 <div className="absolute top-10 right-10 w-64 h-64 bg-amber-500/20 rounded-full blur-3xl animate-breathe" />
                 <span className="text-[10px] uppercase tracking-[0.15em] text-amber-400 font-semibold">For taskers</span>
                 <h2 className="text-3xl md:text-4xl font-black tracking-[-0.03em] mt-4 max-w-md">
@@ -257,9 +275,9 @@ export default async function HomePage() {
                     <p className="text-sm font-bold text-ink">Sivapragasam R.</p>
                     <p className="text-xs text-muted-foreground">Business Owner, {c}</p>
                   </div>
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
         </section>
 
@@ -278,7 +296,7 @@ export default async function HomePage() {
       </main>
 
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0" style={{ mixBlendMode: 'screen' as any, pointerEvents: 'none' }}>
+        <div className="absolute inset-0" style={{ mixBlendMode: 'screen' as any, pointerEvents: 'none', left: '1cm' }}>
           <LaserFlow
             horizontalBeamOffset={0.1}
             verticalBeamOffset={0.0}
