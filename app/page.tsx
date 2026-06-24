@@ -296,8 +296,9 @@ export default async function HomePage() {
       </main>
 
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0" style={{ mixBlendMode: 'screen' as any, pointerEvents: 'none', left: '1cm' }}>
+        <div className="absolute inset-0" style={{ pointerEvents: 'none', left: '1cm' }}>
           <LaserFlow
+            transparent
             horizontalBeamOffset={0.1}
             verticalBeamOffset={0.0}
             color="#F97316"
