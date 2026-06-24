@@ -294,6 +294,37 @@ export default function ContactPage() {
           </div>
         </section>
 
+        {/* Social Media */}
+        <section className="py-16 bg-background border-t border-border">
+          <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center">
+            <h2 className="text-2xl font-black tracking-[-0.02em] text-foreground mb-4">Follow Us</h2>
+            <p className="text-muted-foreground mb-8">Stay connected on social media for updates, tips, and offers</p>
+            <div className="flex flex-wrap justify-center gap-4">
+              {[
+                { name: 'Facebook', url: 'https://facebook.com/maintainex.lk', icon: 'M' },
+                { name: 'Instagram', url: 'https://instagram.com/maintainex.lk', icon: 'I' },
+                { name: 'LinkedIn', url: 'https://linkedin.com/company/maintainex-lk', icon: 'L' },
+                { name: 'TikTok', url: 'https://tiktok.com/@maintainex.lk', icon: 'T' },
+                { name: 'X', url: 'https://x.com/maintainexlk', icon: 'X' },
+                { name: 'WhatsApp', url: 'https://wa.me/94770867609', icon: 'W' },
+              ].map((s) => (
+                <a
+                  key={s.name}
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-3 px-6 py-3 bg-card border border-border rounded-full hover:border-amber-300 hover:bg-amber-soft/50 transition-all text-foreground font-medium"
+                >
+                  <span className="w-8 h-8 rounded-full bg-amber-soft flex items-center justify-center text-amber-600 font-bold text-sm">
+                    {s.icon}
+                  </span>
+                  {s.name}
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* FAQ Section */}
         <section className="py-16 bg-background">
           <div className="max-w-3xl mx-auto px-5 sm:px-8">

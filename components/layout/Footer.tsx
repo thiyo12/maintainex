@@ -5,11 +5,11 @@ import Image from 'next/image'
 import { useRegion } from '@/lib/region-context'
 
 const SOCIALS = [
-  { name: 'Facebook', file: 'icons8-facebook-50.png', url: 'https://facebook.com/maintainex' },
-  { name: 'Instagram', file: 'icons8-instagram-50.png', url: 'https://instagram.com/maintainex' },
-  { name: 'LinkedIn', file: 'icons8-linkedin-circled-100.png', url: 'https://linkedin.com/company/maintainex' },
-  { name: 'X', file: 'icons8-x-100.png', url: 'https://x.com/maintainex' },
-  { name: 'TikTok', file: 'icons8-tiktok-50.png', url: 'https://tiktok.com/@maintainex' },
+  { name: 'Facebook', file: 'icons8-facebook-50.png', url: 'https://facebook.com/maintainex.lk' },
+  { name: 'Instagram', file: 'icons8-instagram-50.png', url: 'https://instagram.com/maintainex.lk' },
+  { name: 'LinkedIn', file: 'icons8-linkedin-circled-100.png', url: 'https://linkedin.com/company/maintainex-lk' },
+  { name: 'X', file: 'icons8-x-100.png', url: 'https://x.com/maintainexlk' },
+  { name: 'TikTok', file: 'icons8-tiktok-50.png', url: 'https://tiktok.com/@maintainex.lk' },
   { name: 'WhatsApp', file: 'icons8-whatsapp-100.png', url: 'https://wa.me/94770867609' },
 ]
 
