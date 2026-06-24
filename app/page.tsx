@@ -154,27 +154,6 @@ export default async function HomePage() {
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute -top-40 -right-40 w-[300px] md:w-[560px] h-[300px] md:h-[560px] bg-amber-500/20 rounded-full blur-3xl animate-breathe" />
             <div className="absolute -bottom-40 -left-40 w-[250px] md:w-[400px] h-[250px] md:h-[400px] bg-indigo-400/15 rounded-full blur-3xl" />
-            <Strands
-              colors={["#F97316","#7C3AED","#06B6D4"]}
-              count={4}
-              speed={0.3}
-              amplitude={0.8}
-              waviness={1}
-              thickness={0.6}
-              glow={2}
-              taper={4}
-              spread={1.2}
-              intensity={0.5}
-              saturation={2}
-              opacity={0.5}
-              scale={1}
-              glass={false}
-              refraction={1}
-              dispersion={1}
-              glassSize={1}
-              hueShift={0}
-              style={{ position: 'absolute', inset: 0 }}
-            />
           </div>
           
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-16 md:py-24 relative z-10 w-full">
@@ -186,8 +165,31 @@ export default async function HomePage() {
                   Sri Lanka&apos;s trusted local marketplace. Post a job, get matched with vetted taskers within 50 km, and receive quotes in minutes.
                 </p>
 
-                <div className="animate-fade-up" style={{ animationDelay: '0.2s' }}>
-                  <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
+                <div className="relative animate-fade-up" style={{ animationDelay: '0.2s', minHeight: '200px' }}>
+                  <Strands
+                    colors={["#F97316","#7C3AED","#06B6D4"]}
+                    count={4}
+                    speed={0.3}
+                    amplitude={0.8}
+                    waviness={1}
+                    thickness={0.6}
+                    glow={2}
+                    taper={4}
+                    spread={1.2}
+                    intensity={0.5}
+                    saturation={2}
+                    opacity={0.5}
+                    scale={1}
+                    glass={false}
+                    refraction={1}
+                    dispersion={1}
+                    glassSize={1}
+                    hueShift={0}
+                    style={{ position: 'absolute', inset: 0 }}
+                  />
+                  <div className="relative z-10 pt-8">
+                    <AiSearchBar services={services.map(s => ({ title: s.title, slug: s.slug }))} />
+                  </div>
                 </div>
 
                 <div className="lg:hidden mt-6 animate-fade-up" style={{ animationDelay: '0.25s' }}>
