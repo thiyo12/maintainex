@@ -81,18 +81,19 @@ export default function V2JobDetailScreen() {
     return (now - created) < 30 * 60 * 1000
   }
 
-  const handleSelectQuote = async (quoteId: string) => {
-    setActionLoading(quoteId)
-    removedJobs.add(id)
-    emit('jobsChanged', id)
-    try {
-      await v2JobActions.selectQuote(id, quoteId)
-      router.back()
-    } catch {
-      router.back()
-    } finally {
-      setActionLoading('')
-    }
+  const handleSelectQuote = (quoteId: string) => {
+    const quote = quotes.find(q => q.id === quoteId)
+    if (!quote || !job) return
+    router.push({
+      pathname: '/(customer)/payment/escrow-confirm',
+      params: {
+        bookingId: id,
+        jobTitle: job.title,
+        taskerName: quote.provider?.name || t('jobDetail.provider'),
+        quotedAmount: String(quote.price),
+        quoteId,
+      },
+    })
   }
 
   const handleDeclineQuote = (quote: V2Quote) => {
@@ -221,18 +222,19 @@ export default function V2JobDetailScreen() {
     }
   }
 
-  const handleApproveCompletion = async () => {
-    setActionLoading('approve')
-    removedJobs.add(id)
-    emit('jobsChanged', id)
-    try {
-      await v2JobActions.complete(id, 'APPROVE_COMPLETION')
-      router.back()
-    } catch {
-      router.back()
-    } finally {
-      setActionLoading('')
-    }
+  const handleApproveCompletion = () => {
+    if (!job || !escrow) return
+    const acceptedQuote = quotes.find(q => q.status === 'ACCEPTED')
+    router.push({
+      pathname: '/(customer)/payment/confirm-complete',
+      params: {
+        bookingId: id,
+        jobTitle: job.title,
+        taskerName: acceptedQuote?.provider?.name || t('jobDetail.provider'),
+        taskerPayout: String(Number(escrow.amount) - Number(escrow.serviceFee || 0)),
+        platformFee: String(Number(escrow.serviceFee || 0)),
+      },
+    })
   }
 
   const handleReleaseEscrow = async () => {
@@ -266,22 +268,16 @@ export default function V2JobDetailScreen() {
     ])
   }
 
-  const handleDispute = async () => {
-    Alert.alert(t('jobDetail.disputeTitle'), t('jobDetail.disputeDesc'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('jobDetail.raiseDisputeBtn'), style: 'destructive', onPress: async () => {
-        setActionLoading('dispute')
-        try {
-          const res = await v2JobActions.dispute(id)
-          Alert.alert(t('jobDetail.disputeRaised'), t('jobDetail.disputeRaisedDesc'))
-          loadJob()
-        } catch (e: any) {
-          Alert.alert(t('common.error'), e.message)
-        } finally {
-          setActionLoading('')
-        }
-      }},
-    ])
+  const handleDispute = () => {
+    const acceptedQuote = quotes.find(q => q.status === 'ACCEPTED')
+    router.push({
+      pathname: '/(customer)/payment/dispute',
+      params: {
+        bookingId: id,
+        jobTitle: job?.title || '',
+        taskerName: acceptedQuote?.provider?.name || t('jobDetail.provider'),
+      },
+    })
   }
 
   if (loading) {

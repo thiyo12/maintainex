@@ -1,174 +1,193 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { useRouter } from 'expo-router'
+import { fonts } from '../../../lib/fonts'
 import { v2Wallet } from '../../../lib/api-v2'
+
+const TX_ICONS: Record<string, { name: string; bg: string }> = {
+  ESCROW_RELEASE:  { name: 'lock-closed-outline', bg: '#FEF3C7' },
+  ESCROW_REFUND:   { name: 'return-down-back-outline', bg: '#DBEAFE' },
+  WITHDRAWAL:      { name: 'arrow-up-circle-outline', bg: '#DBEAFE' },
+  SERVICE_FEE:     { name: 'trending-down-outline', bg: '#FEE2E2' },
+}
+
+const TX_LABELS: Record<string, string> = {
+  ESCROW_RELEASE: 'Payment Released from Escrow',
+  ESCROW_REFUND: 'Refund',
+  WITHDRAWAL: 'Withdrawal',
+  SERVICE_FEE: 'Service Fee',
+}
 
 export default function CustomerWalletScreen() {
   const { t } = useTranslation()
   const colors = useColors()
-  const styles = makeStyles(colors)
-  const [wallet, setWallet] = useState<any>({ balance: 0 })
+  const router = useRouter()
+  const [wallet, setWallet] = useState<any>(null)
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [amount, setAmount] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const fadeAnim = useState(new Animated.Value(0))[0]
 
-  useEffect(() => { loadWallet() }, [])
-
-  const loadWallet = async () => {
+  const fetchWallet = useCallback(async () => {
     try {
       const res = await v2Wallet.get('customer')
       setWallet(res.wallet)
       setTransactions(res.transactions)
+      Animated.timing(fadeAnim, {
+        toValue: 1, duration: 500, useNativeDriver: true,
+      }).start()
     } catch (e) {
       console.error('Load wallet error:', e)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }
+  }, [])
 
-  const handleTopUp = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert(t('common.error'), t('wallet.enterValidAmount'))
-      return
-    }
-    setSubmitting(true)
-    try {
-      const res = await v2Wallet.topUp(parseFloat(amount))
-      setWallet({ ...wallet, balance: res.balance })
-      setAmount('')
-      Alert.alert(t('common.success'), t('wallet.addedToWallet', { amount }))
-      loadWallet()
-    } catch (e: any) {
-      Alert.alert(t('common.error'), e.message)
-    } finally {
-      setSubmitting(false)
-    }
+  useEffect(() => { fetchWallet() }, [])
+
+  const styles = makeStyles(colors)
+
+  if (loading || !wallet) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: colors.muted, fontFamily: fonts.body }}>{t('common.loading')}</Text>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
-      ) : (
-        <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-          {/* Balance Card */}
-          <View style={styles.balanceCard}>
-            <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
-            <Text style={styles.balanceAmount}>LKR {wallet.balance?.toLocaleString() || '0'}</Text>
-            <Text style={styles.balanceSub}>{t('wallet.secureFunds')}</Text>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchWallet() }} tintColor={colors.amber} />
+        }
+      >
+        <Animated.View style={[styles.balanceCard, { opacity: fadeAnim }]}>
+          <View style={styles.balanceBg}>
+            <Text style={styles.balanceLabel}>Available Balance</Text>
+            <Text style={styles.balanceAmt}>
+              {(wallet.balance ?? 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+            </Text>
+            <Text style={styles.balanceCurr}>{wallet.currency || 'LKR'}</Text>
           </View>
-
-          {/* Quick Top Up */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('wallet.topUp')}</Text>
-            <View style={styles.quickRow}>
-              {[500, 1000, 2000, 5000].map((amt) => (
-                <TouchableOpacity
-                  key={amt}
-                  style={[styles.quickBtn, parseFloat(amount) === amt && styles.quickBtnSelected]}
-                  onPress={() => setAmount(amt.toString())}
-                >
-                  <Text style={[styles.quickBtnText, parseFloat(amount) === amt && styles.quickBtnTextSelected]}>
-                    LKR {amt}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TextInput
-              style={styles.input}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder={t('wallet.customAmount')}
-              placeholderTextColor={colors.muted}
-              keyboardType="numeric"
-            />
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={[styles.actionBtn, styles.addBtn]} onPress={() => router.push('/(customer)/wallet/topup')} activeOpacity={0.8}>
+              <Ionicons name="add-circle-outline" size={16} color="#111827" />
+              <Text style={styles.addTxt}>Add Money</Text>
+            </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.topUpBtn, submitting && styles.btnDisabled]}
-              onPress={handleTopUp}
-              disabled={submitting}
+              style={[styles.actionBtn, styles.withdrawBtn]}
+              onPress={() => router.push('/(tasker)/wallet/withdraw' as any)}
+              activeOpacity={0.8}
             >
-              {submitting ? (
-                <ActivityIndicator color={colors.ink} />
-              ) : (
-                <Text style={styles.topUpBtnText}>{t('wallet.topUp')}</Text>
-              )}
+              <Ionicons name="arrow-up-circle-outline" size={16} color="#FFFFFF" />
+              <Text style={styles.withdrawTxt}>Withdraw</Text>
             </TouchableOpacity>
           </View>
+        </Animated.View>
 
-          {/* Transactions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('wallet.transactions')}</Text>
-            {transactions.length === 0 ? (
-              <View style={styles.emptyTx}>
-                <Ionicons name="card-outline" size={36} color={colors.muted} />
-                <Text style={styles.emptyTxText}>{t('wallet.noTransactions')}</Text>
-              </View>
-            ) : (
-              transactions.map((tx) => (
-                <View key={tx.id} style={styles.txCard}>
-                  <View style={styles.txLeft}>
-                    <View style={[styles.txIcon, tx.type === 'CREDIT' ? styles.txIconCredit : styles.txIconDebit]}>
-                      <Text style={styles.txIconText}>{tx.type === 'CREDIT' ? '↓' : '↑'}</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.txType}>{tx.type === 'CREDIT' ? t('wallet.deposit') : t('wallet.payment')}</Text>
-                      <Text style={styles.txRef}>{tx.reference}</Text>
-                      <Text style={styles.txDate}>{new Date(tx.createdAt).toLocaleDateString()}</Text>
-                    </View>
-                  </View>
-                  <Text style={[styles.txAmount, tx.type === 'CREDIT' ? styles.credit : styles.debit]}>
-                    {tx.type === 'CREDIT' ? '+' : '-'} LKR {tx.amount}
-                  </Text>
-                </View>
-              ))
-            )}
+        <Text style={styles.sectionTitle}>Transaction History</Text>
+
+        {transactions.length === 0 && (
+          <View style={styles.emptyTx}>
+            <Ionicons name="receipt-outline" size={40} color={colors.muted} />
+            <Text style={{ color: colors.muted, fontFamily: fonts.body, marginTop: 12 }}>
+              No transactions yet
+            </Text>
           </View>
-        </ScrollView>
-      )}
+        )}
+
+        {transactions.map((tx: any) => {
+          const icon = TX_ICONS[tx.referenceType as string] || { name: 'swap-horizontal-outline', bg: colors.surface || colors.amberBg }
+          return (
+            <View key={tx.id} style={styles.txCard}>
+              <View style={[styles.txIcon, { backgroundColor: icon.bg }]}>
+                <Ionicons name={icon.name as any} size={18} color={colors.ink} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.txTitle}>{TX_LABELS[tx.referenceType as string] || tx.referenceType}</Text>
+                <Text style={styles.txSub}>
+                  {new Date(tx.createdAt).toLocaleDateString('en-LK', {
+                    day: 'numeric', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+              <Text style={[styles.txAmt, { color: tx.type === 'CREDIT' ? '#10B981' : colors.ink }]}>
+                {tx.type === 'CREDIT' ? '+' : '-'}LKR {tx.amount.toLocaleString()}
+              </Text>
+            </View>
+          )
+        })}
+        <View style={{ height: 32 }} />
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
-  scroll: { flex: 1 },
-  balanceCard: { backgroundColor: colors.amber, marginHorizontal: 20, marginTop: 20, borderRadius: 20, padding: 28, alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 16, elevation: 6 },
-  balanceLabel: { fontSize: 13, color: colors.ink, opacity: 0.7, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1 },
-  balanceAmount: { fontSize: 40, fontWeight: '800', color: colors.ink, marginTop: 8, marginBottom: 4 },
-  balanceSub: { fontSize: 12, color: colors.ink, opacity: 0.6 },
-
-  section: { padding: 20, paddingBottom: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 14 },
-
-  quickRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  quickBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
-  quickBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  quickBtnText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  quickBtnTextSelected: { color: colors.amberDark },
-
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 15, color: colors.ink, backgroundColor: colors.white, marginBottom: 12 },
-  topUpBtn: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
-  btnDisabled: { opacity: 0.5 },
-  topUpBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
-
-  emptyTx: { alignItems: 'center', paddingVertical: 30 },
-  emptyTxIcon: { fontSize: 36, marginBottom: 8 },
-  emptyTxText: { fontSize: 14, color: colors.muted },
-
-  txCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 10, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  txLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  txIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  txIconCredit: { backgroundColor: '#D1FAE5' },
-  txIconDebit: { backgroundColor: '#FEE2E2' },
-  txIconText: { fontSize: 16, fontWeight: '800' },
-  txType: { fontSize: 14, fontWeight: '600', color: colors.ink },
-  txRef: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  txDate: { fontSize: 11, color: colors.muted, marginTop: 1 },
-  txAmount: { fontSize: 16, fontWeight: '700' },
-  credit: { color: colors.success },
-  debit: { color: colors.error },
+  balanceCard: {
+    margin: 16, borderRadius: 22, overflow: 'hidden',
+    backgroundColor: '#0B0C12',
+    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
+  },
+  balanceBg: { padding: 24 },
+  balanceLabel: {
+    fontSize: 11, fontFamily: fonts.bodyMedium,
+    color: 'rgba(255,255,255,0.45)',
+    textTransform: 'uppercase', letterSpacing: 1,
+  },
+  balanceAmt: {
+    fontSize: 38, fontFamily: fonts.heading,
+    color: '#FFFFFF', letterSpacing: -1, marginVertical: 4,
+  },
+  balanceCurr: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
+  escrowRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    marginTop: 4, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+  },
+  escrowTxt: { fontSize: 12, fontFamily: fonts.body, color: 'rgba(255,255,255,0.4)' },
+  actionRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 24, paddingBottom: 20 },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 6,
+    paddingVertical: 11, borderRadius: 12,
+  },
+  addBtn: { backgroundColor: colors.amber },
+  withdrawBtn: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  addTxt: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#111827' },
+  withdrawTxt: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  sectionTitle: {
+    fontSize: 14, fontFamily: fonts.headingBold,
+    color: colors.ink, paddingHorizontal: 16,
+    paddingTop: 8, paddingBottom: 10,
+  },
+  txCard: {
+    backgroundColor: colors.white, marginHorizontal: 16,
+    marginBottom: 8, borderRadius: 14, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
+  },
+  txIcon: {
+    width: 38, height: 38, borderRadius: 11,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  txTitle: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
+  txSub: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 1 },
+  txAmt: { fontSize: 15, fontFamily: fonts.heading, letterSpacing: -0.3 },
+  emptyTx: { alignItems: 'center', paddingVertical: 40 },
 })

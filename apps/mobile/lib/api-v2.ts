@@ -135,6 +135,8 @@ export const v2Wallet = {
     v2Request<{ success: boolean; balance: number }>('/api/mobile/v2/wallet', { method: 'POST', body: JSON.stringify({ amount, action: 'TOP_UP' }) }),
   withdraw: (amount: number) =>
     v2Request<{ success: boolean; balance: number }>('/api/mobile/v2/wallet', { method: 'POST', body: JSON.stringify({ amount, action: 'WITHDRAW' }) }),
+  withdrawPayout: (amount: number) =>
+    v2Request<{ id: string; amount: number; status: string; createdAt: string }>('/api/mobile/withdraw', { method: 'POST', body: JSON.stringify({ amount }) }),
 }
 
 export const v2Team = {

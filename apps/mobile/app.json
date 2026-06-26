@@ -40,7 +40,9 @@
         "ACCESS_BACKGROUND_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "plugins": [
@@ -48,7 +50,9 @@
       "expo-location",
       "expo-secure-store",
       "expo-font",
-      "expo-localization"
+      "expo-localization",
+      "expo-splash-screen",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true
@@ -56,8 +60,10 @@
     "extra": {
       "apiUrl": "https://maintainex.lk",
       "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
-      }
-    }
+        "projectId": "7affb9b0-172e-4a54-a95d-46107c4a4f83"
+      },
+      "router": {}
+    },
+    "owner": "thiyothman"
   }
 }
