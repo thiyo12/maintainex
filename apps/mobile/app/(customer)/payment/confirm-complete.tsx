@@ -8,7 +8,7 @@ import { fonts } from '../../../lib/fonts'
 import { v2JobActions } from '../../../lib/api-v2'
 
 export default function ConfirmCompleteScreen() {
-  const { colors } = useColors()
+  const colors = useColors()
   const router = useRouter()
   const params = useLocalSearchParams<{
     bookingId: string; jobTitle: string; taskerName: string;

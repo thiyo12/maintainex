@@ -17,7 +17,7 @@ const REASONS = [
 ]
 
 export default function DisputeScreen() {
-  const { colors } = useColors()
+  const colors = useColors()
   const router = useRouter()
   const { bookingId, jobTitle, taskerName } = useLocalSearchParams<{ bookingId: string; jobTitle: string; taskerName: string }>()
   const [reason, setReason] = useState('')
