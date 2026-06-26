@@ -62,6 +62,14 @@ export default function TaskerEditProfile() {
           </View>
           <Text style={styles.label}>{t('profile.fullName')}</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('auth.register.namePlaceholder')} />
+          {user?.lastNameChangedAt && (() => {
+            const d = Math.floor((Date.now() - new Date(user.lastNameChangedAt).getTime()) / (1000 * 60 * 60 * 24))
+            if (d < 30) {
+              const a = new Date(user.lastNameChangedAt); a.setDate(a.getDate() + 30)
+              return <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 4, fontFamily: fonts.body }}>Name can be changed again on {a.toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+            }
+            return null
+          })()}
           <Text style={styles.label}>{t('profile.email')}</Text>
           <View style={[styles.input, { backgroundColor: colors.surface, justifyContent: 'center' }]}>
             <Text style={{ fontSize: fontSizes.body, color: colors.muted }}>{user?.email || ''}</Text>

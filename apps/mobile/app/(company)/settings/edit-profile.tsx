@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
-import { auth } from '../../../lib/api'
+import { auth, company as companyApi } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { useTranslation } from 'react-i18next'
 
@@ -18,6 +18,7 @@ export default function CompanyEditProfile() {
   const { user, refreshUser } = useAuth()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [saving, setSaving] = useState(false)
   const fadeAnim = useRef(new Animated.Value(0)).current
 
@@ -27,6 +28,12 @@ export default function CompanyEditProfile() {
       setName(user.name || '')
       setPhone(user.phone || '')
     }
+    ;(async () => {
+      try {
+        const res = await companyApi.profile.get()
+        if (res?.companyName) setCompanyName(res.companyName)
+      } catch {}
+    })()
   }, [user])
 
   const handleSave = async () => {
@@ -37,6 +44,9 @@ export default function CompanyEditProfile() {
     setSaving(true)
     try {
       await auth.updateProfile({ name: name.trim(), phone: phone.trim() })
+      if (companyName.trim()) {
+        await companyApi.profile.update({ companyName: companyName.trim() })
+      }
       await refreshUser()
       Alert.alert(t('common.success'), t('profile.editProfileHeader') + ' ' + t('common.success'))
       router.back()
@@ -60,8 +70,18 @@ export default function CompanyEditProfile() {
               <Text style={styles.changePhoto}>{t('components.addPhoto')}</Text>
             </TouchableOpacity>
           </View>
+          <Text style={styles.label}>{t('company.companyName') || 'Company Name'}</Text>
+          <TextInput style={styles.input} value={companyName} onChangeText={setCompanyName} placeholder='My Company' />
           <Text style={styles.label}>{t('profile.fullName')}</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('auth.register.namePlaceholder')} />
+          {user?.lastNameChangedAt && (() => {
+            const d = Math.floor((Date.now() - new Date(user.lastNameChangedAt).getTime()) / (1000 * 60 * 60 * 24))
+            if (d < 30) {
+              const a = new Date(user.lastNameChangedAt); a.setDate(a.getDate() + 30)
+              return <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 4, fontFamily: fonts.body }}>Name can be changed again on {a.toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+            }
+            return null
+          })()}
           <Text style={styles.label}>{t('profile.email')}</Text>
           <View style={[styles.input, { backgroundColor: colors.surface, justifyContent: 'center' }]}>
             <Text style={{ fontSize: fontSizes.body, color: colors.muted }}>{user?.email || ''}</Text>

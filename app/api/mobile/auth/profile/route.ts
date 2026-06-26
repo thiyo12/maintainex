@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 
+const NAME_CHANGE_DAYS = 30
+
 export async function PUT(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -11,15 +13,33 @@ export async function PUT(request: NextRequest) {
 
     const { name, phone } = await request.json()
 
+    if (name !== undefined && name !== user.name) {
+      if (user.lastNameChangedAt) {
+        const daysSinceChange = Math.floor(
+          (Date.now() - new Date(user.lastNameChangedAt).getTime()) / (1000 * 60 * 60 * 24)
+        )
+        if (daysSinceChange < NAME_CHANGE_DAYS) {
+          const availableAt = new Date(user.lastNameChangedAt)
+          availableAt.setDate(availableAt.getDate() + NAME_CHANGE_DAYS)
+          return NextResponse.json({
+            error: `Name can only be changed every ${NAME_CHANGE_DAYS} days. Available on ${availableAt.toISOString().split('T')[0]}.`,
+            availableAt: availableAt.toISOString(),
+          }, { status: 429 })
+        }
+      }
+    }
+
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (phone !== undefined) updateData.phone = phone
+    if (name !== undefined && name !== user.name) updateData.lastNameChangedAt = new Date()
+
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: {
-        ...(name !== undefined && { name }),
-        ...(phone !== undefined && { phone }),
-      },
+      data: updateData,
       select: {
         id: true, email: true, name: true, phone: true,
-        role: true, isActive: true, createdAt: true,
+        role: true, isActive: true, createdAt: true, lastNameChangedAt: true,
       },
     })
 
@@ -27,6 +47,7 @@ export async function PUT(request: NextRequest) {
       user: {
         ...updated,
         createdAt: updated.createdAt.toISOString(),
+        lastNameChangedAt: updated.lastNameChangedAt?.toISOString() || null,
       },
     })
   } catch (error) {

@@ -48,7 +48,7 @@ export async function authenticateRequest(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.id },
-    select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, identityStatus: true },
+    select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, identityStatus: true, lastNameChangedAt: true },
   })
 
   if (!user || !user.isActive) return null

@@ -21,7 +21,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: disputes.map((d) => ({
-        ...d,
+        id: d.id,
+        job: d.job,
+        raisedBy: d.raisedBy,
+        reason: d.reason,
+        description: d.description,
+        resolution: d.resolution,
+        status: d.status,
         createdAt: d.createdAt.toISOString(),
         updatedAt: d.updatedAt.toISOString(),
       })),

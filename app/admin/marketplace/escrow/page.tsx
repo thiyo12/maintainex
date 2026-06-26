@@ -40,6 +40,8 @@ interface Dispute {
   job: { id: string; title: string }
   raisedBy: { id: string; name: string | null; email: string }
   reason: string
+  description: string
+  resolution: string | null
   status: string
   createdAt: string
 }
@@ -65,6 +67,8 @@ export default function MarketplaceEscrow() {
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [confirmAction, setConfirmAction] = useState<{ escrowId: string; action: 'release' | 'refund' } | null>(null)
+  const [disputeAction, setDisputeAction] = useState<{ disputeId: string; action: 'resolve' | 'dismiss' } | null>(null)
+  const [resolutionText, setResolutionText] = useState('')
 
   const canAct = adminUser ? can(adminUser.role, PERMISSION.manageEscrow) : false
 
@@ -102,6 +106,22 @@ export default function MarketplaceEscrow() {
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Failed to process action')
+    },
+  })
+
+  const disputeMutation = useMutation({
+    mutationFn: async ({ id, action, resolution }: { id: string; action: 'resolve' | 'dismiss'; resolution?: string }) => {
+      const res = await api.patch(`/api/admin/marketplace/escrow/disputes/${id}`, { action, resolution })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-marketplace-disputes'] })
+      toast.success('Dispute updated successfully')
+      setDisputeAction(null)
+      setResolutionText('')
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to update dispute')
     },
   })
 
@@ -263,6 +283,9 @@ export default function MarketplaceEscrow() {
                       <TableHead>Reason</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
+                      <PermissionGate roles={PERMISSION.manageEscrow}>
+                        <TableHead className="w-48" />
+                      </PermissionGate>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -275,10 +298,25 @@ export default function MarketplaceEscrow() {
                           <Badge className={
                             d.status === 'OPEN' ? 'bg-yellow-100 text-yellow-800' :
                             d.status === 'RESOLVED' ? 'bg-green-100 text-green-800' :
+                            d.status === 'DISMISSED' ? 'bg-gray-100 text-gray-800' :
                             'bg-red-100 text-red-800'
                           }>{d.status}</Badge>
                         </TableCell>
                         <TableCell className="text-gray-500">{new Date(d.createdAt).toLocaleDateString()}</TableCell>
+                        <PermissionGate roles={PERMISSION.manageEscrow}>
+                          <TableCell>
+                            {(d.status === 'OPEN' || d.status === 'UNDER_REVIEW') && (
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => { setDisputeAction({ disputeId: d.id, action: 'resolve' }); setResolutionText('') }}>
+                                  Resolve
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => { setDisputeAction({ disputeId: d.id, action: 'dismiss' }); setResolutionText('') }}>
+                                  Dismiss
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </PermissionGate>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -309,6 +347,42 @@ export default function MarketplaceEscrow() {
             >
               {actionMutation.isPending ? 'Processing...' : `Confirm ${confirmAction?.action === 'release' ? 'Release' : 'Refund'}`}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!disputeAction} onOpenChange={(o) => { if (!o) { setDisputeAction(null); setResolutionText('') }}}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{disputeAction?.action === 'resolve' ? 'Resolve Dispute' : 'Dismiss Dispute'}</DialogTitle>
+            <DialogDescription>
+              {disputeAction?.action === 'resolve'
+                ? 'Mark this dispute as resolved. You may add a resolution note.'
+                : 'Dismiss this dispute without resolution. The dispute will be closed.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Resolution Note (optional)</label>
+              <textarea
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[80px]"
+                placeholder="Add notes about this resolution..."
+                value={resolutionText}
+                onChange={(e) => setResolutionText(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => { setDisputeAction(null); setResolutionText('') }}>Cancel</Button>
+              <Button
+                variant={disputeAction?.action === 'dismiss' ? 'destructive' : 'default'}
+                onClick={() => {
+                  if (disputeAction) disputeMutation.mutate({ id: disputeAction.disputeId, action: disputeAction.action, resolution: resolutionText.trim() || undefined })
+                }}
+                disabled={disputeMutation.isPending}
+              >
+                {disputeMutation.isPending ? 'Processing...' : disputeAction?.action === 'resolve' ? 'Resolve' : 'Dismiss'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

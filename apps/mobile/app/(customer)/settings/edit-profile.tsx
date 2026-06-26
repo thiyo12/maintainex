@@ -17,7 +17,6 @@ export default function EditProfileScreen() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
   const fadeAnim = useRef(new Animated.Value(0)).current
 
@@ -68,6 +67,19 @@ export default function EditProfileScreen() {
 
           <Text style={styles.label}>{t('profile.fullName')}</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('profile.fullName')} />
+          {user?.lastNameChangedAt && (() => {
+            const daysSinceChange = Math.floor((Date.now() - new Date(user.lastNameChangedAt).getTime()) / (1000 * 60 * 60 * 24))
+            if (daysSinceChange < 30) {
+              const availableAt = new Date(user.lastNameChangedAt)
+              availableAt.setDate(availableAt.getDate() + 30)
+              return (
+                <Text style={{ fontSize: 11, color: '#EF4444', marginTop: 4 }}>
+                  Name can be changed again on {availableAt.toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              )
+            }
+            return null
+          })()}
 
           <Text style={styles.label}>{t('profile.email')}</Text>
           <View style={[styles.input, { backgroundColor: '#F3F4F6', justifyContent: 'center' }]}>
@@ -76,9 +88,6 @@ export default function EditProfileScreen() {
 
           <Text style={styles.label}>{t('profile.phone')}</Text>
           <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder={t('profile.phone')} />
-
-          <Text style={styles.label}>{t('jobDetail.location')}</Text>
-          <TextInput style={styles.input} value={location} onChangeText={setLocation} placeholder={t('jobDetail.location')} />
         </ScrollView>
 
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
