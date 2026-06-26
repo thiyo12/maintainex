@@ -6,9 +6,11 @@ import Link from 'next/link'
 import {
   FiHome, FiUsers, FiFileText, FiClock, FiShield, FiGrid,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX, FiUserCheck,
-  FiAlertCircle, FiList,
+  FiAlertCircle, FiList, FiBell, FiStar,
 } from 'react-icons/fi'
 import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/lib/api'
 
 const navigation = [
   { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome },
@@ -16,10 +18,12 @@ const navigation = [
   { name: 'KYC Reviews', href: '/admin/marketplace/kyc', icon: FiShield },
   { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText },
   { name: 'Escrows & Disputes', href: '/admin/marketplace/escrow', icon: FiClock },
+  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar },
   { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid },
   { name: 'Reports', href: '/admin/marketplace/reports', icon: FiBarChart2 },
   { name: 'Admin Users', href: '/admin/marketplace/admin-users', icon: FiUserCheck },
   { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList },
+  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell },
   { name: 'Settings', href: '/admin/marketplace/settings', icon: FiSettings },
 ]
 
@@ -77,6 +81,18 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
         </div>
       </div>
     )
+  }
+
+  function NotifBadge() {
+    const { data } = useQuery({
+      queryKey: ['admin-notifications-count'],
+      queryFn: async () => {
+        const res = await api.get('/api/admin/marketplace/notifications')
+        return res.data.unreadCount as number
+      },
+      refetchInterval: 30000,
+    })
+    return data ? <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{data > 9 ? '9+' : data}</span> : null
   }
 
   return (
@@ -138,6 +154,10 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
               {navigation.find(n => pathname.startsWith(n.href))?.name || 'Marketplace'}
             </h2>
             <div className="flex items-center gap-4">
+              <Link href="/admin/marketplace/notifications" className="relative p-1">
+                <FiBell className="text-gray-500 hover:text-gray-700" size={20} />
+                <NotifBadge />
+              </Link>
               <span className="text-gray-600 text-sm">{user.email}</span>
               <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center">
                 <span className="text-dark-900 font-bold">

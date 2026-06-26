@@ -1583,6 +1583,20 @@ model AdminUser {
   @@index([parentId])
 }
 
+model AdminNotification {
+  id            String   @id @default(cuid())
+  adminUserId   String
+  type          String
+  title         String
+  message       String
+  link          String?
+  read          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@index([adminUserId, read])
+  @@index([createdAt])
+}
+
 model AdminRefreshToken {
   id                String    @id @default(cuid())
   adminUserId       String
@@ -1625,6 +1639,10 @@ model PlatformSettings {
   minJobAmountCents BigInt   @default(500)
   maxJobAmountCents BigInt   @default(1000000)
   escrowReleaseDays Int      @default(3)
+  maxActiveJobsPerUser Int   @default(10)
+  maxQuotesPerJob   Int      @default(10)
+  maxDisputesPerJob Int      @default(1)
+  autoReleaseAfterDays Int   @default(14)
   supportEmail      String?
   updatedBy         String?
   updatedAt         DateTime @updatedAt

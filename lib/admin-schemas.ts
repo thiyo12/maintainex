@@ -102,6 +102,10 @@ export const updateSettingsSchema = z.object({
   minJobAmountCents: z.coerce.number().int().min(0).optional(),
   maxJobAmountCents: z.coerce.number().int().min(0).optional(),
   escrowReleaseDays: z.coerce.number().int().min(1).max(90).optional(),
+  maxActiveJobsPerUser: z.coerce.number().int().min(1).max(100).optional(),
+  maxQuotesPerJob: z.coerce.number().int().min(1).max(100).optional(),
+  maxDisputesPerJob: z.coerce.number().int().min(0).max(10).optional(),
+  autoReleaseAfterDays: z.coerce.number().int().min(1).max(90).optional(),
   supportEmail: z.string().email().optional(),
 })
 

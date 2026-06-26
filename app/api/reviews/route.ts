@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { notifyAllAdmins } from '@/lib/admin-notifications'
 
 function sanitizeString(str: string): string {
   return str.replace(/<[^>]*>/g, '').trim()
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
         status: 'PENDING'
       }
     })
+
+    await notifyAllAdmins('review_pending', 'New Review Pending', `A ${parsedRating}-star review was submitted for service "${serviceId}"`, '/admin/marketplace/reviews')
 
     return NextResponse.json(review, { status: 201 })
   } catch {

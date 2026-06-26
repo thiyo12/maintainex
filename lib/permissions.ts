@@ -32,4 +32,6 @@ export const PERMISSION = {
   platformSettings: ['SUPER_ADMIN'] as AdminRole[],
   viewAuditLogs: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] as AdminRole[],
   viewAllAuditLogs: ['SUPER_ADMIN'] as AdminRole[],
+  moderateReviews: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] as AdminRole[],
+  viewNotifications: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] as AdminRole[],
 } as const

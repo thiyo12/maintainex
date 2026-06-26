@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { notifyAllAdmins } from '@/lib/admin-notifications'
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +28,8 @@ export async function POST(request: NextRequest) {
         description,
       },
     })
+
+    await notifyAllAdmins('dispute_raised', `New Dispute: ${reason}`, `Dispute raised by ${user.name || user.email} on job "${job.title}"`, `/admin/marketplace/escrow`)
 
     return NextResponse.json({
       id: dispute.id,

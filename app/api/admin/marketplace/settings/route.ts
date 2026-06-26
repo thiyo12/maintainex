@@ -47,6 +47,10 @@ export async function PATCH(request: NextRequest) {
     if (data.minJobAmountCents !== undefined) updates.minJobAmountCents = BigInt(data.minJobAmountCents)
     if (data.maxJobAmountCents !== undefined) updates.maxJobAmountCents = BigInt(data.maxJobAmountCents)
     if (data.escrowReleaseDays !== undefined) updates.escrowReleaseDays = data.escrowReleaseDays
+    if (data.maxActiveJobsPerUser !== undefined) updates.maxActiveJobsPerUser = data.maxActiveJobsPerUser
+    if (data.maxQuotesPerJob !== undefined) updates.maxQuotesPerJob = data.maxQuotesPerJob
+    if (data.maxDisputesPerJob !== undefined) updates.maxDisputesPerJob = data.maxDisputesPerJob
+    if (data.autoReleaseAfterDays !== undefined) updates.autoReleaseAfterDays = data.autoReleaseAfterDays
     if (data.supportEmail !== undefined) updates.supportEmail = data.supportEmail
     updates.updatedBy = session.id
 

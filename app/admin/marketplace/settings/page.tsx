@@ -21,6 +21,10 @@ interface PlatformSettings {
   minJobAmountCents: number
   maxJobAmountCents: number
   escrowReleaseDays: number
+  maxActiveJobsPerUser: number
+  maxQuotesPerJob: number
+  maxDisputesPerJob: number
+  autoReleaseAfterDays: number
   supportEmail: string
   updatedAt: string
 }
@@ -30,6 +34,10 @@ const settingsSchema = z.object({
   minJobAmount: z.string().min(1, 'Min amount is required'),
   maxJobAmount: z.string().min(1, 'Max amount is required'),
   escrowReleaseDays: z.string().min(1, 'Release days is required'),
+  maxActiveJobsPerUser: z.string().min(1, 'Required'),
+  maxQuotesPerJob: z.string().min(1, 'Required'),
+  maxDisputesPerJob: z.string().min(1, 'Required'),
+  autoReleaseAfterDays: z.string().min(1, 'Required'),
   supportEmail: z.string().email('Valid email is required'),
 })
 
@@ -70,6 +78,10 @@ export default function MarketplaceSettings() {
         minJobAmount: (Number(settings.minJobAmountCents) / 100).toFixed(2),
         maxJobAmount: (Number(settings.maxJobAmountCents) / 100).toFixed(2),
         escrowReleaseDays: String(settings.escrowReleaseDays || 14),
+        maxActiveJobsPerUser: String(settings.maxActiveJobsPerUser || 10),
+        maxQuotesPerJob: String(settings.maxQuotesPerJob || 10),
+        maxDisputesPerJob: String(settings.maxDisputesPerJob || 1),
+        autoReleaseAfterDays: String(settings.autoReleaseAfterDays || 14),
         supportEmail: settings.supportEmail || '',
       })
     }
@@ -82,6 +94,10 @@ export default function MarketplaceSettings() {
         minJobAmountCents: dollarsToCents(data.minJobAmount),
         maxJobAmountCents: dollarsToCents(data.maxJobAmount),
         escrowReleaseDays: parseInt(data.escrowReleaseDays) || 14,
+        maxActiveJobsPerUser: parseInt(data.maxActiveJobsPerUser) || 10,
+        maxQuotesPerJob: parseInt(data.maxQuotesPerJob) || 10,
+        maxDisputesPerJob: parseInt(data.maxDisputesPerJob) || 1,
+        autoReleaseAfterDays: parseInt(data.autoReleaseAfterDays) || 14,
         supportEmail: data.supportEmail,
       }
       const res = await api.patch('/api/admin/marketplace/settings', payload)
@@ -202,6 +218,34 @@ export default function MarketplaceSettings() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader><CardTitle>Platform Limits</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-500">Max Active Jobs / User</label>
+                <Input type="number" {...form.register('maxActiveJobsPerUser')} />
+                {form.formState.errors.maxActiveJobsPerUser && <p className="text-xs text-red-500">{form.formState.errors.maxActiveJobsPerUser.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-500">Max Quotes / Job</label>
+                <Input type="number" {...form.register('maxQuotesPerJob')} />
+                {form.formState.errors.maxQuotesPerJob && <p className="text-xs text-red-500">{form.formState.errors.maxQuotesPerJob.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-500">Max Disputes / Job</label>
+                <Input type="number" {...form.register('maxDisputesPerJob')} />
+                {form.formState.errors.maxDisputesPerJob && <p className="text-xs text-red-500">{form.formState.errors.maxDisputesPerJob.message}</p>}
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-500">Auto-Release After (days)</label>
+                <Input type="number" {...form.register('autoReleaseAfterDays')} />
+                {form.formState.errors.autoReleaseAfterDays && <p className="text-xs text-red-500">{form.formState.errors.autoReleaseAfterDays.message}</p>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {settings && (
           <Card>
             <CardHeader><CardTitle>Current Values</CardTitle></CardHeader>
@@ -211,6 +255,10 @@ export default function MarketplaceSettings() {
                 <div><span className="text-gray-500">Release Days:</span> <span className="font-medium">{settings.escrowReleaseDays}</span></div>
                 <div><span className="text-gray-500">Min Amount:</span> <span className="font-medium">{formatMoney(Number(settings.minJobAmountCents))}</span></div>
                 <div><span className="text-gray-500">Max Amount:</span> <span className="font-medium">{formatMoney(Number(settings.maxJobAmountCents))}</span></div>
+                <div><span className="text-gray-500">Max Active Jobs:</span> <span className="font-medium">{settings.maxActiveJobsPerUser}</span></div>
+                <div><span className="text-gray-500">Max Quotes/Job:</span> <span className="font-medium">{settings.maxQuotesPerJob}</span></div>
+                <div><span className="text-gray-500">Max Disputes/Job:</span> <span className="font-medium">{settings.maxDisputesPerJob}</span></div>
+                <div><span className="text-gray-500">Auto-Release:</span> <span className="font-medium">{settings.autoReleaseAfterDays}d</span></div>
               </div>
               <p className="mt-3 text-xs text-gray-400">
                 Last updated: {settings.updatedAt ? new Date(settings.updatedAt).toLocaleString() : 'Never'}
