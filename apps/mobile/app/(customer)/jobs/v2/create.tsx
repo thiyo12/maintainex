@@ -1,65 +1,140 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Animated,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { MapPin, Clipboard, Wallet, Question, CheckCircle, ArrowRight, MapPinArea, Buildings, House, Users, User, Building, Briefcase, Camera, CaretLeft, X, Coin, CoinVertical, Diamond, Package, Lightning, Key, PawPrint, Chisel, Drop, Leaf, Desktop, Bug, Truck, Car, Wrench, PaintBrush, Snowflake, Sparkle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { getAuthToken } from '../../../../lib/api'
-import { v2Jobs } from '../../../../lib/api-v2'
-import { useAuth } from '../../../../lib/auth'
-import ProgressSteps from '../../../../components/ui/ProgressSteps'
-import { getCategoryIcon } from '../../../../lib/category-icons'
+import { matchCategory } from '../../../../lib/aiMatch'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
 interface Category { id: string; name: string; iconName: string }
 interface Area { id: string; name: string }
+
+const FALLBACK_CATEGORIES: Category[] = [
+  { id: 'cleaning', name: 'Cleaning', iconName: 'Drop' },
+  { id: 'electrical', name: 'Electrical', iconName: 'Lightning' },
+  { id: 'plumbing', name: 'Plumbing', iconName: 'Wrench' },
+  { id: 'painting', name: 'Painting', iconName: 'PaintBrush' },
+  { id: 'ac', name: 'AC Service', iconName: 'Snowflake' },
+  { id: 'moving', name: 'Moving', iconName: 'Truck' },
+  { id: 'gardening', name: 'Gardening', iconName: 'Leaf' },
+  { id: 'carpentry', name: 'Carpentry', iconName: 'Chisel' },
+  { id: 'digital', name: 'Digital Services', iconName: 'Desktop' },
+  { id: 'pest', name: 'Pest Control', iconName: 'Bug' },
+  { id: 'renovation', name: 'Renovation', iconName: 'Buildings' },
+  { id: 'automotive', name: 'Automotive', iconName: 'Car' },
+  { id: 'repairs', name: 'Repairs', iconName: 'Wrench' },
+  { id: 'other', name: 'Other', iconName: 'Briefcase' },
+]
 interface City { id: string; name: string; areas: Area[] }
 interface State { id: string; name: string; cities: City[] }
 interface Country { id: string; name: string; code: string; states: State[] }
 
 const providerTypes = ['FREELANCER', 'COMPANY', 'BOTH']
 
+const taskQuestions = [
+  { key: 'rooms', icon: Buildings, label: 'How many rooms?', visible: ['cleaning', 'painting', 'ac'] },
+  { key: 'materials', icon: Package, label: 'Do you have materials?', visible: ['plumbing', 'electrical', 'painting'] },
+  { key: 'urgency', icon: Lightning, label: 'How urgent is this?', visible: ['plumbing', 'electrical', 'ac'] },
+  { key: 'access', icon: Key, label: 'Access instructions', visible: ['cleaning', 'plumbing', 'electrical', 'ac', 'painting'] },
+  { key: 'floor', icon: Buildings, label: 'Which floor?', visible: ['moving', 'cleaning'] },
+  { key: 'pets', icon: PawPrint, label: 'Any pets at home?', visible: ['cleaning', 'painting', 'plumbing'] },
+]
+
+function useSlideIn(delay = 0) {
+  const anim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    Animated.spring(anim, { toValue: 1, friction: 6, tension: 80, delay, useNativeDriver: true }).start()
+  }, [])
+  return anim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] })
+}
+
+function getCatIcon(name: string) {
+  const map: Record<string, any> = {
+    cleaning: Drop, electrical: Lightning, plumbing: Wrench, painting: PaintBrush,
+    ac: Snowflake, moving: Truck, gardening: Leaf, carpentry: Chisel,
+    digital: Desktop, pest: Bug, renovation: Buildings, automotive: Car,
+  }
+  for (const [k, v] of Object.entries(map)) {
+    if (name.toLowerCase().includes(k)) return v
+  }
+  return Wrench
+}
+
 export default function CreateJobScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
-  const { user } = useAuth()
-  const budgetTiers = [
-    { key: 'SMALL', label: t('postJob.budgetSmall'), range: t('postJob.budgetSmallRange'), icon: 'cash-outline' as const },
-    { key: 'MEDIUM', label: t('postJob.budgetMedium'), range: t('postJob.budgetMediumRange'), icon: 'wallet-outline' as const },
-    { key: 'LARGE', label: t('postJob.budgetLarge'), range: t('postJob.budgetLargeRange'), icon: 'diamond-outline' as const },
-  ]
+
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [photos, setPhotos] = useState<string[]>([])
 
-  // Step 1
-  const [categories, setCategories] = useState<Category[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-
-  // Step 2
-  const [selectedTier, setSelectedTier] = useState('')
-  const [providerType, setProviderType] = useState('')
-
-  // Step 3
   const [countries, setCountries] = useState<Country[]>([])
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null)
   const [selectedState, setSelectedState] = useState<State | null>(null)
   const [selectedCity, setSelectedCity] = useState<City | null>(null)
   const [selectedArea, setSelectedArea] = useState<Area | null>(null)
-  const [addressText, setAddressText] = useState('')
 
-  useEffect(() => { loadInitialData() }, [])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
 
-  const loadInitialData = async () => {
+  const [selectedTier, setSelectedTier] = useState('')
+  const [providerType, setProviderType] = useState('')
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+
+  const [aiQuery, setAiQuery] = useState('')
+  const [aiMatchResult, setAiMatchResult] = useState<ReturnType<typeof matchCategory>>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const catsRef = useRef(categories)
+  catsRef.current = categories
+
+  const handleAiChange = useCallback((text: string) => {
+    setAiQuery(text)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      const result = matchCategory(text)
+      setAiMatchResult(result)
+      if (result && result.confidence > 90) {
+        const match = catsRef.current.find(c => c.name === result.categoryName)
+        if (match) setSelectedCategory(match)
+      }
+    }, 300)
+  }, [])
+
+  const filteredCategories = aiQuery.trim()
+    ? categories.filter(c => c.name.toLowerCase().includes(aiQuery.toLowerCase()))
+    : categories
+
+  const slideAnim = useSlideIn()
+
+  const budgetTiers = [
+    { key: 'SMALL', icon: Coin, label: 'Small Job', range: '~ LKR 3,000', amount: 3000 },
+    { key: 'MEDIUM', icon: CoinVertical, label: 'Medium Job', range: '~ LKR 8,000', amount: 8000 },
+    { key: 'LARGE', icon: Diamond, label: 'Large Job', range: '~ LKR 15,000+', amount: 15000 },
+  ]
+
+  const stepMeta = [
+    { icon: MapPin, title: 'Where do you need help?', sub: 'Set your location so we can find nearby providers' },
+    { icon: Clipboard, title: 'What needs to be done?', sub: 'Choose a category and describe your task' },
+    { icon: Wallet, title: 'What\'s your budget?', sub: 'Pick a range that works for you' },
+    { icon: Question, title: 'A few details', sub: 'Help providers understand your needs' },
+    { icon: CheckCircle, title: 'Review & Post', sub: 'Everything look good?' },
+  ]
+
+  useEffect(() => { loadData() }, [])
+
+  const loadData = async () => {
     setLoading(true)
     try {
       const token = await getAuthToken()
@@ -71,405 +146,363 @@ export default function CreateJobScreen() {
       ])
       if (catRes.ok) {
         const data = await catRes.json()
-        setCategories(data.filter((c: any) => c.isActive !== false))
+        const list = Array.isArray(data) ? data : data.categories || data.data || []
+        setCategories(list.length > 0 ? list : FALLBACK_CATEGORIES)
+      } else {
+        setCategories(FALLBACK_CATEGORIES)
       }
-      if (locRes.ok) {
-        const data = await locRes.json()
-        setCountries(data.countries || [])
-      }
-    } catch (err) {
-      Alert.alert(t('common.error'), t('errors.network'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const tierToBudget = (tier: string): { type: string; amount: number } => {
-    if (tier === 'SMALL') return { type: 'FIXED', amount: 3000 }
-    if (tier === 'MEDIUM') return { type: 'FIXED', amount: 8000 }
-    if (tier === 'LARGE') return { type: 'FIXED', amount: 15000 }
-    return { type: 'REQUEST_QUOTES', amount: 0 }
+      if (locRes.ok) { const data = await locRes.json(); setCountries(data.countries || []) }
+    } catch {
+      setCategories(FALLBACK_CATEGORIES)
+    } finally { setLoading(false) }
   }
 
   const handleSubmit = async () => {
-    if (!selectedCategory || !title || !description || !selectedTier) {
-      Alert.alert(t('postJob.noCategory'), t('postJob.noCategoryMsg'))
-      return
+    if (!selectedCategory || !title || !description || !selectedTier || !selectedCountry || !selectedState || !selectedCity) {
+      Alert.alert('Missing fields', 'Please complete all required fields.'); return
     }
     setSubmitting(true)
     try {
-      if (user?.id) {
-        const existing = await v2Jobs.list()
-        const activeCount = (existing.jobs || []).filter((j: any) => j.customerId === user.id && j.status !== 'COMPLETED' && j.status !== 'CANCELLED').length
-        if (activeCount >= 2) {
-          Alert.alert(t('postJob.maxActiveJobs'), t('postJob.maxActiveJobsDesc'))
-          setSubmitting(false)
-          return
-        }
-      }
+      const budget = budgetTiers.find(t => t.key === selectedTier)!
       const token = await getAuthToken()
-      const budget = tierToBudget(selectedTier)
       const res = await fetch(`${API_URL}/api/mobile/v2/jobs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          title,
-          description,
-          categoryId: selectedCategory.id,
-          budgetType: budget.type,
-          budgetAmount: budget.amount,
-          providerType: providerType || null,
-          areaId: selectedArea?.id || null,
-          postalCode: null,
-          preferredDate: null,
+          title, description: description + (Object.keys(answers).length ? `\n\n---\n${Object.entries(answers).map(([k, v]) => `${k}: ${v}`).join('\n')}` : ''),
+          categoryId: selectedCategory.id, budgetType: 'FIXED', budgetAmount: budget.amount,
+          providerType: providerType || null, areaId: selectedArea?.id || null, postalCode: null, preferredDate: null,
         }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        Alert.alert(t('common.error'), data.error || t('postJob.failed'))
-        return
-      }
-      Alert.alert(t('postJob.published'), t('postJob.publishedMsg'), [
-        { text: t('common.ok'), onPress: () => router.back() },
-      ])
-    } catch (err) {
-      Alert.alert(t('common.error'), t('postJob.networkError'))
-    } finally {
-      setSubmitting(false)
-    }
+      if (!res.ok) { Alert.alert(t('common.error'), data.error || t('postJob.failed')); return }
+      Alert.alert('Job Posted!', 'We\'ll notify you when providers start quoting.', [{ text: 'Great!', onPress: () => router.back() }])
+    } catch { Alert.alert(t('common.error'), t('postJob.networkError'))
+    } finally { setSubmitting(false) }
   }
 
   if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
-      </SafeAreaView>
-    )
+    return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
   }
+
+  const StepIcon = stepMeta[step].icon
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.amber} />
+          {step > 0 ? <CaretLeft size={20} color={colors.ink} weight="bold" /> : <X size={20} color={colors.ink} weight="regular" />}
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('postJob.header')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.ink }]}>Post a Job</Text>
         <View style={styles.backBtn} />
       </View>
 
-      <ProgressSteps current={step} total={4} labels={[t('common.next'), t('postJob.step2.title'), t('postJob.step3.title'), t('postJob.step4.title')]} />
+      <View style={styles.progressRow}>
+        {stepMeta.map((_, i) => (
+          <View key={i} style={styles.progressWrap}>
+            <View style={[styles.progressDot, i === step && styles.progressDotActive, i < step && styles.progressDotDone]}>
+              <Text style={styles.progressDotText}>{i < step ? '✓' : i === step ? '●' : '○'}</Text>
+            </View>
+            {i < stepMeta.length - 1 && <View style={[styles.progressLine, i < step && styles.progressLineDone]} />}
+          </View>
+        ))}
+      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* STEP 1: Job Details */}
+      <Animated.ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}
+        style={{ transform: [{ translateY: slideAnim }] }}>
+        <StepIcon size={32} color={colors.amber} weight="fill" style={{ marginBottom: 12 }} />
+        <Text style={[styles.sectionTitle, { color: colors.ink }]}>{stepMeta[step].title}</Text>
+        <Text style={[styles.sectionSub, { color: colors.muted }]}>{stepMeta[step].sub}</Text>
+
         {step === 0 && (
-          <View>
-            <Text style={styles.sectionTitle}>{t('postJob.step1.title')}</Text>
-            <Text style={styles.sectionSub}>{t('postJob.step1.subtitle')}</Text>
-
-            <Text style={styles.label}>{t('postJob.step1.category')}</Text>
-            <View style={styles.categoryGrid}>
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryCard, selectedCategory?.id === cat.id && styles.categoryCardSelected]}
-                  onPress={() => {
-                    if (cat.id === 'realestate') {
-                      router.push('/real-estate')
-                    } else {
-                      setSelectedCategory(cat)
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={getCategoryIcon(cat.iconName) as any} size={28} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.ink} />
-                  <Text style={[styles.catName, selectedCategory?.id === cat.id && styles.catNameSelected]}>{cat.name}</Text>
+          <View style={styles.stepContent}>
+            <Text style={styles.label}>Country</Text>
+            <View style={styles.pillsWrap}>
+              {countries.map((c) => (
+                <TouchableOpacity key={c.id} style={[styles.pill, selectedCountry?.id === c.id && styles.pillActive]}
+                  onPress={() => { setSelectedCountry(c); setSelectedState(null); setSelectedCity(null); setSelectedArea(null) }}>
+                  <Text style={[styles.pillText, selectedCountry?.id === c.id && styles.pillTextActive]}>{c.name}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-
-            <Text style={styles.label}>{t('postJob.step1.jobTitle')}</Text>
-            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder={t('postJob.step1.jobTitlePlaceholder')} placeholderTextColor={colors.muted} />
-
-            <Text style={styles.label}>{t('postJob.step1.description')}</Text>
-            <View style={styles.charCountRow}>
-              <Text style={styles.charCountHint}>{t('postJob.step1.descHint')}</Text>
-              <Text style={[styles.charCount, description.length > 1000 && styles.charCountWarn]}>{description.length}/2000</Text>
-            </View>
-            <TextInput
-              style={[styles.input, styles.textArea, description.length > 1000 && { borderColor: description.length > 1500 ? '#EF4444' : '#F59E0B' }]}
-              value={description}
-              onChangeText={(t) => setDescription(t.slice(0, 2000))}
-              placeholder={t('postJob.step1.descriptionPlaceholder')}
-              placeholderTextColor={colors.muted}
-              multiline
-              numberOfLines={5}
-            />
-
-            <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]} onPress={() => { if (selectedCategory && title && description) setStep(1); else Alert.alert(t('postJob.noCategory'), t('postJob.noCategoryMsg')) }}>
-              <Text style={styles.btnText}>{t('common.next')}</Text>
-              <Ionicons name="arrow-forward" size={18} color={colors.ink} />
+            {selectedCountry && <> 
+              <Text style={styles.label}>State / Province</Text>
+              <View style={styles.pillsWrap}>{selectedCountry.states.map((s) => (
+                <TouchableOpacity key={s.id} style={[styles.pill, selectedState?.id === s.id && styles.pillActive]}
+                  onPress={() => { setSelectedState(s); setSelectedCity(null); setSelectedArea(null) }}>
+                  <Text style={[styles.pillText, selectedState?.id === s.id && styles.pillTextActive]}>{s.name}</Text>
+                </TouchableOpacity>
+              ))}</View>
+            </>}
+            {selectedState && <>
+              <Text style={styles.label}>City</Text>
+              <View style={styles.pillsWrap}>{selectedState.cities.map((c) => (
+                <TouchableOpacity key={c.id} style={[styles.pill, selectedCity?.id === c.id && styles.pillActive]}
+                  onPress={() => { setSelectedCity(c); setSelectedArea(null) }}>
+                  <Text style={[styles.pillText, selectedCity?.id === c.id && styles.pillTextActive]}>{c.name}</Text>
+                </TouchableOpacity>
+              ))}</View>
+            </>}
+            {selectedCity?.areas.length > 0 && <>
+              <Text style={styles.label}>Area</Text>
+              <View style={styles.pillsWrap}>{selectedCity.areas.map((a) => (
+                <TouchableOpacity key={a.id} style={[styles.pill, selectedArea?.id === a.id && styles.pillActive]}
+                  onPress={() => setSelectedArea(a)}>
+                  <Text style={[styles.pillText, selectedArea?.id === a.id && styles.pillTextActive]}>{a.name}</Text>
+                </TouchableOpacity>
+              ))}</View>
+            </>}
+            <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]}
+              onPress={() => { if (selectedCountry && selectedState && selectedCity) setStep(1) }}>
+              <ArrowRight size={18} color="#111827" weight="bold" />
+              <Text style={styles.btnText}>Next</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* STEP 2: Budget & Type */}
         {step === 1 && (
-          <View>
-            <Text style={styles.sectionTitle}>{t('postJob.step2.title')}</Text>
-            <Text style={styles.sectionSub}>{t('postJob.step2.subtitle')}</Text>
-
-            <View style={styles.tierRow}>
-              {budgetTiers.map((tier) => (
-                <TouchableOpacity
-                  key={tier.key}
-                  style={[styles.tierCard, selectedTier === tier.key && styles.tierCardSelected]}
-                  onPress={() => setSelectedTier(tier.key)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={tier.icon} size={24} color={selectedTier === tier.key ? colors.amberDark : colors.muted} />
-                  <Text style={styles.tierLabel}>{tier.label}</Text>
-                  <Text style={[styles.tierRange, selectedTier === tier.key && styles.tierRangeSelected]}>{tier.range}</Text>
+          <View style={styles.stepContent}>
+            {/* AI Search */}
+            <View style={[styles.aiSearchWrap, { backgroundColor: colors.white, borderColor: colors.border }]}>
+              <Sparkle size={18} color={colors.amber} weight="fill" style={{ marginLeft: 14 }} />
+              <TextInput
+                style={[styles.aiSearchInput, { color: colors.ink }]}
+                value={aiQuery}
+                onChangeText={handleAiChange}
+                placeholder="What do you need? e.g. fix my sink..."
+                placeholderTextColor={colors.muted}
+              />
+              {aiQuery.length > 0 && (
+                <TouchableOpacity onPress={() => { setAiQuery(''); setAiMatchResult(null) }} style={{ paddingRight: 14 }}>
+                  <X size={16} color={colors.muted} weight="bold" />
                 </TouchableOpacity>
-              ))}
+              )}
             </View>
-
-            {selectedTier && (
-              <View style={styles.recommendBox}>
-                <Ionicons name="bulb-outline" size={18} color={colors.amber} />
-                <Text style={styles.recommendText}>
-                  {selectedTier === 'LARGE'
-                    ? t('postJob.step2.recommendCompany')
-                    : t('postJob.step2.recommendTasker')}
+            {aiMatchResult && (
+              <TouchableOpacity style={[styles.aiSuggestion, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}
+                onPress={() => {
+                  const match = categories.find(c => c.name === aiMatchResult.categoryName)
+                  if (match) setSelectedCategory(match)
+                }}>
+                <Sparkle size={16} color={colors.amberDark} weight="fill" />
+                <Text style={[styles.aiSuggestionText, { color: colors.amberDark }]}>
+                  Did you mean <Text style={{ fontFamily: fonts.headingBold }}>{aiMatchResult.categoryName}</Text>? ({(aiMatchResult.confidence)}% match)
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
+            <Text style={styles.label}>Category {aiQuery.trim() ? `(${filteredCategories.length})` : ''}</Text>
+            {filteredCategories.length === 0 ? (
+              <View style={[styles.emptyCats, { backgroundColor: colors.white, borderColor: colors.border }]}>
+                <Text style={[styles.emptyCatsText, { color: colors.muted }]}>No categories match "{aiQuery}"</Text>
+              </View>
+            ) : (
+            <View style={styles.catGrid}>
+              {filteredCategories.map((cat) => {
+                const CatIcon = getCatIcon(cat.name)
+                return (
+                <TouchableOpacity key={cat.id} style={[styles.catCard, { backgroundColor: colors.white, borderColor: colors.border }, selectedCategory?.id === cat.id && styles.catCardActive]}
+                  onPress={() => setSelectedCategory(cat)}>
+                  <CatIcon size={32} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.muted} weight="fill" style={{ marginBottom: 8 }} />
+                  <Text style={[styles.catName, { color: colors.ink }, selectedCategory?.id === cat.id && { color: colors.amberDark }]}>{cat.name}</Text>
+                </TouchableOpacity>
+                )
+              })}
+            </View>
+            )}
+            <Text style={styles.label}>Title</Text>
+            <View style={[styles.inputWrap, { backgroundColor: colors.white, borderColor: colors.border }]}>
+              <TextInput style={[styles.input, { color: colors.ink }]} value={title} onChangeText={setTitle}
+                placeholder="e.g. Fix leaking kitchen pipe" placeholderTextColor={colors.muted} />
+            </View>
+            <Text style={styles.label}>Description</Text>
+            <View style={[styles.inputWrap, { backgroundColor: colors.white, borderColor: colors.border }]}>
+              <TextInput style={[styles.input, styles.textArea, { color: colors.ink }]}
+                value={description} onChangeText={(t) => setDescription(t.slice(0, 2000))}
+                placeholder="Describe your task..." placeholderTextColor={colors.muted} multiline numberOfLines={4} />
+            </View>
+            <Text style={[styles.charHint, { color: colors.muted }]}>{description.length}/2000</Text>
+            <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]}
+              onPress={() => { if (selectedCategory && title && description) setStep(2) }}>
+              <ArrowRight size={18} color="#111827" weight="bold" />
+              <Text style={styles.btnText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
-            <Text style={styles.label}>{t('postJob.step2.providerType')}</Text>
+        {step === 2 && (
+          <View style={styles.stepContent}>
+            {budgetTiers.map((tier) => (
+              <TouchableOpacity key={tier.key} style={[styles.budgetCard, { backgroundColor: colors.white, borderColor: colors.border }, selectedTier === tier.key && styles.budgetCardActive]}
+                onPress={() => setSelectedTier(tier.key)}>
+                <tier.icon size={24} color={colors.amberDark} weight="fill" style={{ marginRight: 14 }} />
+                <View style={styles.budgetInfo}>
+                  <Text style={[styles.budgetLabel, { color: colors.ink }]}>{tier.label}</Text>
+                  <Text style={[styles.budgetRange, { color: colors.muted }]}>{tier.range}</Text>
+                </View>
+                <View style={[styles.budgetCheck, selectedTier === tier.key && { backgroundColor: colors.amber }]}>
+                  {selectedTier === tier.key && <CheckCircle size={16} color="#111827" weight="fill" />}
+                </View>
+              </TouchableOpacity>
+            ))}
+            <Text style={styles.label}>Provider preference</Text>
             <View style={styles.providerRow}>
               {providerTypes.map((p) => (
-                <TouchableOpacity
-                  key={p}
-                  style={[styles.providerChip, providerType === p && styles.providerChipSelected]}
-                  onPress={() => setProviderType(p)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.providerText, providerType === p && styles.providerTextSelected]}>
-                    {p === 'FREELANCER' ? t('postJob.step2.freelancer') : p === 'COMPANY' ? t('postJob.step2.company') : t('postJob.step2.both')}
+                <TouchableOpacity key={p} style={[styles.providerChip, { backgroundColor: colors.white, borderColor: colors.border }, providerType === p && styles.providerChipActive]}
+                  onPress={() => setProviderType(p)}>
+                  {p === 'FREELANCER' ? <User size={16} color={providerType === p ? colors.amberDark : colors.muted} weight="fill" /> :
+                   p === 'COMPANY' ? <Buildings size={16} color={providerType === p ? colors.amberDark : colors.muted} weight="fill" /> :
+                   <Users size={16} color={providerType === p ? colors.amberDark : colors.muted} weight="fill" />}
+                  <Text style={[styles.providerText, { color: providerType === p ? colors.amberDark : colors.muted }]}>
+                    {p === 'FREELANCER' ? 'Freelancer' : p === 'COMPANY' ? 'Company' : 'Both'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-
-            <TouchableOpacity style={[styles.nextBtn, !selectedTier && styles.btnDisabled]} onPress={() => { if (selectedTier) setStep(2); else Alert.alert(t('postJob.selectBudget'), t('postJob.selectBudgetMsg')) }}>
-              <Text style={styles.btnText}>{t('common.next')}</Text>
-              <Ionicons name="arrow-forward" size={18} color={colors.ink} />
+            <TouchableOpacity style={[styles.nextBtn, !selectedTier && styles.btnDisabled]}
+              onPress={() => { if (selectedTier) setStep(3) }}>
+              <ArrowRight size={18} color="#111827" weight="bold" />
+              <Text style={styles.btnText}>Next</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* STEP 3: Location */}
-        {step === 2 && (
-          <View>
-            <Text style={styles.sectionTitle}>{t('postJob.step3.title')}</Text>
-            <Text style={styles.sectionSub}>{t('postJob.step3.subtitle')}</Text>
-
-            <Text style={styles.label}>{t('postJob.step3.country')}</Text>
-            <View style={styles.pickerRow}>
-              {countries.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[styles.pill, selectedCountry?.id === c.id && styles.pillSelected]}
-                  onPress={() => { setSelectedCountry(c); setSelectedState(null); setSelectedCity(null); setSelectedArea(null) }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pillText, selectedCountry?.id === c.id && styles.pillTextSelected]}>{c.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {selectedCountry && (
-              <>
-                <Text style={styles.label}>{t('postJob.step3.state')}</Text>
-                <View style={styles.pickerRow}>
-                  {selectedCountry.states.map((s) => (
-                    <TouchableOpacity
-                      key={s.id}
-                      style={[styles.pill, selectedState?.id === s.id && styles.pillSelected]}
-                      onPress={() => { setSelectedState(s); setSelectedCity(null); setSelectedArea(null) }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.pillText, selectedState?.id === s.id && styles.pillTextSelected]}>{s.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {selectedState && (
-              <>
-                <Text style={styles.label}>{t('postJob.step3.city')}</Text>
-                <View style={styles.pickerRow}>
-                  {selectedState.cities.map((c) => (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[styles.pill, selectedCity?.id === c.id && styles.pillSelected]}
-                      onPress={() => { setSelectedCity(c); setSelectedArea(null) }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.pillText, selectedCity?.id === c.id && styles.pillTextSelected]}>{c.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {selectedCity && selectedCity.areas.length > 0 && (
-              <>
-                <Text style={styles.label}>{t('postJob.step3.area')}</Text>
-                <View style={styles.pickerRow}>
-                  {selectedCity.areas.map((a) => (
-                    <TouchableOpacity
-                      key={a.id}
-                      style={[styles.pill, selectedArea?.id === a.id && styles.pillSelected]}
-                      onPress={() => setSelectedArea(a)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.pillText, selectedArea?.id === a.id && styles.pillTextSelected]}>{a.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-
-            <Text style={styles.label}>{t('postJob.step3.address')}</Text>
-            <TextInput
-              style={styles.input}
-              value={addressText}
-              onChangeText={setAddressText}
-              placeholder={t('postJob.step3.addressPlaceholder')}
-              placeholderTextColor={colors.muted}
-            />
-
-            <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]} onPress={() => { if (selectedCountry && selectedState && selectedCity) setStep(3); else Alert.alert(t('postJob.selectLocation'), t('postJob.selectLocationMsg')) }}>
-              <Text style={styles.btnText}>{t('postJob.step4.title')}</Text>
-              <Ionicons name="arrow-forward" size={18} color={colors.ink} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* STEP 4: Review & Post */}
         {step === 3 && (
-          <View>
-            <Text style={styles.sectionTitle}>{t('postJob.step4.title')}</Text>
-            <Text style={styles.sectionSub}>{t('postJob.step4.subtitle')}</Text>
-
-            <View style={styles.reviewCard}>
-              <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{t('postJob.step4.category')}</Text>
-                <Text style={styles.reviewValue}>{selectedCategory?.name}</Text>
+          <View style={styles.stepContent}>
+            <TouchableOpacity style={[styles.photoCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+              onPress={() => { if (photos.length > 0) setPhotos([]); else setPhotos(['dummy']) }}>
+              <Camera size={22} color={colors.muted} weight="regular" />
+              <Text style={[styles.photoText, { color: colors.muted }]}>
+                {photos.length > 0 ? `${photos.length} photo(s) added` : 'Add photos (optional)'}
+              </Text>
+            </TouchableOpacity>
+            {taskQuestions.filter(q => !selectedCategory || q.visible.some(v => selectedCategory.name.toLowerCase().includes(v))).map((q) => {
+              const QIcon = q.icon
+              return (
+              <View key={q.key} style={[styles.questionCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+                <QIcon size={20} color={colors.amberDark} weight="fill" style={{ marginRight: 12 }} />
+                <View style={styles.questionInputWrap}>
+                  <Text style={[styles.questionLabel, { color: colors.ink }]}>{q.label}</Text>
+                  <TextInput style={[styles.questionInput, { color: colors.ink }]} value={answers[q.key] || ''}
+                    onChangeText={(t) => setAnswers(prev => ({ ...prev, [q.key]: t }))}
+                    placeholder="Type your answer..." placeholderTextColor={colors.muted} />
+                </View>
               </View>
-              <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{t('postJob.step4.title_lbl')}</Text>
-                <Text style={styles.reviewValue}>{title}</Text>
-              </View>
-              <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{t('postJob.step4.description')}</Text>
-                <Text style={styles.reviewValue} numberOfLines={3}>{description}</Text>
-              </View>
-              <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{t('postJob.step4.budget')}</Text>
-                <Text style={styles.reviewValue}>{budgetTiers.find(tier => tier.key === selectedTier)?.label} — {budgetTiers.find(tier => tier.key === selectedTier)?.range}</Text>
-              </View>
-              <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{t('postJob.step4.provider')}</Text>
-                <Text style={styles.reviewValue}>{providerType || t('postJob.step4.any')}</Text>
-              </View>
-              <View style={styles.reviewRow}>
-                <Text style={styles.reviewLabel}>{t('postJob.step4.location')}</Text>
-                <Text style={styles.reviewValue}>{selectedArea?.name || selectedCity?.name}, {selectedState?.name}</Text>
-              </View>
-            </View>
-
-            <View style={styles.reviewFooter}>
-              <TouchableOpacity onPress={() => setStep(0)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="arrow-back" size={18} color={colors.amber} />
-                <Text style={styles.editLink}> {t('postJob.step4.editDetails')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.submitBtn, submitting && styles.btnDisabled]}
-                onPress={handleSubmit}
-                disabled={submitting}
-              >
-                {submitting ? <ActivityIndicator color={colors.ink} /> : <><Ionicons name="checkmark-circle-outline" size={18} color={colors.ink} /><Text style={styles.submitBtnText}> {t('postJob.step4.post')}</Text></>}
-              </TouchableOpacity>
-            </View>
+              )
+            })}
+            <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(4)}>
+              <ArrowRight size={18} color="#111827" weight="bold" />
+              <Text style={styles.btnText}>Review</Text>
+            </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
+
+        {step === 4 && (
+          <View style={styles.stepContent}>
+            <View style={[styles.reviewCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+              {[
+                { icon: MapPin, label: 'Location', value: selectedArea?.name || selectedCity?.name + ', ' + selectedState?.name },
+                { icon: Clipboard, label: 'Category', value: selectedCategory?.name },
+                { icon: Clipboard, label: 'Title', value: title },
+                { icon: Wallet, label: 'Budget', value: budgetTiers.find(t => t.key === selectedTier)?.label + ' ' + budgetTiers.find(t => t.key === selectedTier)?.range },
+                { icon: Users, label: 'Provider', value: providerType || 'Any' },
+              ].map((item, i) => {
+                const RIcon = item.icon
+                return (
+                <View key={i} style={[styles.reviewItem, i < 4 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                  <RIcon size={18} color={colors.amberDark} weight="fill" />
+                  <View style={{ marginLeft: 10 }}>
+                    <Text style={[styles.reviewItemLabel, { color: colors.muted }]}>{item.label}</Text>
+                    <Text style={[styles.reviewItemValue, { color: colors.ink }]}>{item.value}</Text>
+                  </View>
+                </View>
+                )
+              })}
+            </View>
+            <TouchableOpacity style={[styles.submitBtn, submitting && styles.btnDisabled]}
+              onPress={handleSubmit} disabled={submitting}>
+              {submitting ? <ActivityIndicator color="#111827" /> : <>
+                <CheckCircle size={20} color="#111827" weight="fill" />
+                <Text style={styles.submitText}>Post Job</Text>
+              </>}
+            </TouchableOpacity>
+          </View>
+        )}
+      </Animated.ScrollView>
     </SafeAreaView>
   )
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  backBtn: { width: 60 },
-  headerTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
-  content: { flex: 1, padding: 20 },
-  sectionTitle: { fontSize: 22, fontFamily: fonts.heading, color: colors.ink, marginBottom: 4 },
-  sectionSub: { fontSize: 14, fontFamily: fonts.body, color: colors.muted, marginBottom: 20 },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
+  backBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontFamily: fonts.headingBold },
+  scroll: { padding: 20, paddingBottom: 40 },
+  sectionTitle: { fontSize: 24, fontFamily: fonts.heading, marginBottom: 4 },
+  sectionSub: { fontSize: 14, fontFamily: fonts.body, marginBottom: 24, lineHeight: 20 },
+  label: { fontSize: 14, fontFamily: fonts.bodyMedium, marginBottom: 8, marginTop: 16, color: colors.ink },
+  stepContent: {},
 
-  // Step 1 — Category grid
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  categoryCard: { width: '47%', padding: 16, borderRadius: 16, backgroundColor: colors.white, alignItems: 'center', marginBottom: 8, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  categoryCardSelected: { backgroundColor: colors.amberBg, borderWidth: 2, borderColor: colors.amber },
-  catName: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink, textAlign: 'center' },
-  catNameSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
+  progressRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 20 },
+  progressWrap: { flexDirection: 'row', alignItems: 'center' },
+  progressDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  progressDotActive: { borderColor: colors.amber, backgroundColor: colors.amber },
+  progressDotDone: { borderColor: colors.success, backgroundColor: colors.success },
+  progressDotText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#fff' },
+  progressLine: { width: 32, height: 2, backgroundColor: colors.border, marginHorizontal: 4 },
+  progressLineDone: { backgroundColor: colors.success },
 
-  // Fields
-  label: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 6, marginTop: 16 },
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 15, fontFamily: fonts.body, color: colors.ink, backgroundColor: colors.white },
-  textArea: { height: 140, textAlignVertical: 'top' },
-  charCountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, marginTop: -2 },
-  charCountHint: { fontSize: 12, color: colors.muted, flex: 1, fontFamily: fonts.bodyLight },
-  charCount: { fontSize: 12, color: colors.muted, fontFamily: fonts.bodyMedium },
-  charCountWarn: { color: '#F59E0B' },
-
-  // Step 2 — Budget tiers
-  tierRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  tierCard: { flex: 1, backgroundColor: colors.white, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
-  tierCardSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  tierLabel: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 4 },
-  tierRange: { fontSize: 11, fontFamily: fonts.bodyLight, color: colors.muted },
-  tierRangeSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
-  recommendBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, backgroundColor: colors.amberBg, borderRadius: 12, marginBottom: 12 },
-  recommendText: { flex: 1, fontSize: 13, fontFamily: fonts.body, color: colors.muted, lineHeight: 18 },
-
-  providerRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  providerChip: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.white, alignItems: 'center', borderWidth: 1.5, borderColor: colors.border },
-  providerChipSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  providerText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
-  providerTextSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
-
-  // Step 3 — Location
-  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border },
-  pillSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pill: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 100, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border },
+  pillActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
   pillText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
-  pillTextSelected: { color: colors.amberDark, fontFamily: fonts.bodyMedium },
+  pillTextActive: { color: colors.amberDark },
 
-  // Buttons
-  nextBtn: { flexDirection: 'row', backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 24, gap: 8 },
-  btnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
-  btnDisabled: { opacity: 0.5 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  catCard: { width: '47%', padding: 18, borderRadius: 20, alignItems: 'center', marginBottom: 8, borderWidth: 1.5 },
+  catCardActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  catName: { fontSize: 13, fontFamily: fonts.bodyMedium, textAlign: 'center' },
+  emptyCats: { borderRadius: 20, padding: 24, alignItems: 'center', borderWidth: 1.5, borderStyle: 'dashed' },
+  emptyCatsText: { fontSize: 13, fontFamily: fonts.body, textAlign: 'center' },
 
-  // Step 4 — Review
-  reviewCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  reviewRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  reviewLabel: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.5 },
-  reviewValue: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
-  reviewFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, marginBottom: 24 },
-  editLink: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
-  submitBtn: { flexDirection: 'row', backgroundColor: colors.amber, paddingVertical: 16, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  submitBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
+  aiSearchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 18, borderWidth: 1.5, marginBottom: 4 },
+  aiSearchInput: { flex: 1, padding: 14, fontSize: 14, fontFamily: fonts.body },
+  aiSuggestion: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 14, borderWidth: 1.5, marginBottom: 8 },
+  aiSuggestionText: { fontSize: 12, fontFamily: fonts.bodyMedium, flex: 1 },
+
+  inputWrap: { borderRadius: 18, borderWidth: 1.5, overflow: 'hidden' },
+  input: { padding: 16, fontSize: 15, fontFamily: fonts.body },
+  textArea: { height: 120, textAlignVertical: 'top' },
+  charHint: { textAlign: 'right', fontSize: 12, fontFamily: fonts.body, marginTop: 4 },
+
+  budgetCard: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 20, borderWidth: 1.5, marginBottom: 10 },
+  budgetCardActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  budgetInfo: { flex: 1 },
+  budgetLabel: { fontSize: 16, fontFamily: fonts.bodyMedium, marginBottom: 2 },
+  budgetRange: { fontSize: 13, fontFamily: fonts.body },
+  budgetCheck: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: colors.amber, justifyContent: 'center', alignItems: 'center' },
+
+  providerRow: { flexDirection: 'row', gap: 8 },
+  providerChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 100, borderWidth: 1.5 },
+  providerChipActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  providerText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+
+  photoCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, borderRadius: 20, borderWidth: 1.5, borderStyle: 'dashed', marginBottom: 16 },
+  photoText: { fontSize: 14, fontFamily: fonts.bodyMedium },
+  questionCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 18, borderWidth: 1.5, marginBottom: 10 },
+  questionInputWrap: { flex: 1 },
+  questionLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, marginBottom: 2 },
+  questionInput: { fontSize: 14, fontFamily: fonts.body, padding: 0 },
+
+  nextBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 100, marginTop: 28 },
+  btnText: { fontSize: 17, fontFamily: fonts.bodySemiBold, color: '#111827' },
+  btnDisabled: { opacity: 0.4 },
+
+  reviewCard: { borderRadius: 20, padding: 4, borderWidth: 1.5, overflow: 'hidden' },
+  reviewItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14 },
+  reviewItemLabel: { fontSize: 11, fontFamily: fonts.body, textTransform: 'uppercase', letterSpacing: 0.5 },
+  reviewItemValue: { fontSize: 15, fontFamily: fonts.bodyMedium, marginTop: 1 },
+
+  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amber, paddingVertical: 18, borderRadius: 100, marginTop: 20 },
+  submitText: { fontSize: 17, fontFamily: fonts.bodySemiBold, color: '#111827' },
 })

@@ -272,6 +272,16 @@ export const upload = {
   },
 }
 
+export const seasonalOffers = {
+  list: (country: string, season?: string) =>
+    request<import('./seasonal').SeasonalOffer[]>(`/api/mobile/seasonal-offers?country=${country}${season ? `&season=${season}` : ''}`),
+}
+
+export const serviceCategories = {
+  list: (country?: string) =>
+    request<{ id: string; name: string; jobs: { id: string; name: string }[] }[]>(`/api/mobile/service-categories${country ? `?country=${country}` : ''}`),
+}
+
 export const realEstate = {
   list: (params?: { type?: string; status?: string }) =>
     request<any[]>(`${API_URL}/api/real-estate?${new URLSearchParams(params || {}).toString()}`),

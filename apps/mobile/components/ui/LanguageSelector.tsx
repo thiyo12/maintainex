@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Check } from 'phosphor-react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useTranslation } from 'react-i18next'
 import i18next, { changeLanguage } from '../../lib/i18n'
-import { useTheme } from '../../lib/ThemeContext'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts } from '../../lib/fonts'
 
 const languages = [
   { code: 'en', name: 'English', flag: 'GB' },
@@ -14,7 +15,7 @@ const languages = [
 
 export default function LanguageSelector({ style }: { style?: any }) {
   const { t } = useTranslation()
-  const { colors } = useTheme()
+  const colors = useColors()
   const styles = makeStyles(colors)
   const [visible, setVisible] = useState(false)
 
@@ -54,7 +55,7 @@ export default function LanguageSelector({ style }: { style?: any }) {
                     {l.name}
                   </Text>
                   {isSelected ? (
-                    <Ionicons name="checkmark" size={16} color={colors.amberDark} />
+                    <Check size={16} color={colors.amberDark} weight="bold" />
                   ) : null}
                 </TouchableOpacity>
               )
@@ -67,17 +68,12 @@ export default function LanguageSelector({ style }: { style?: any }) {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  trigger: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 8, paddingHorizontal: 14,
-    borderRadius: 12, backgroundColor: colors.white,
-    borderWidth: 1.5, borderColor: colors.border, gap: 6,
-  },
-  triggerText:        { fontSize: 14, fontFamily: 'Outfit_700Bold', color: colors.ink },
-  overlay:            { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet:              { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44 },
-  sheetTitle:         { fontSize: 18, fontFamily: 'Outfit_900Black', marginBottom: 20, textAlign: 'center', letterSpacing: -0.3 },
-  option:             { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6 },
-  optionName:         { fontSize: 16, fontFamily: 'Outfit_500Medium', flex: 1 },
-  optionNameSelected: { fontFamily: 'Outfit_700Bold', color: colors.amberDark },
+  trigger: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1.5, gap: 6 },
+  triggerText: { fontSize: 14, fontFamily: fonts.bodySemiBold },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44 },
+  sheetTitle: { fontSize: 18, fontFamily: fonts.heading, marginBottom: 20, textAlign: 'center', letterSpacing: -0.3 },
+  option: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 6 },
+  optionName: { fontSize: 16, fontFamily: fonts.body, flex: 1 },
+  optionNameSelected: { fontFamily: fonts.bodySemiBold, color: colors.amberDark },
 })

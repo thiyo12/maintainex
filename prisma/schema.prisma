@@ -869,8 +869,9 @@ model TemplateJob {
   isActive               Boolean     @default(true)
   createdAt              DateTime    @default(now())
 
-  taskerSkills TaskerSkill[]
-  bookings     Booking[]
+  taskerSkills      TaskerSkill[]
+  bookings          Booking[]
+  seasonalOfferJobs SeasonalOfferJob[]
 
   @@index([categoryId])
   @@index([isPopular])
@@ -1308,6 +1309,45 @@ model FlashOffer {
 
   @@index([isActive])
   @@index([expiresAt])
+}
+
+// ============================================
+// SEASONAL OFFERS — Country + season-based promotions
+// ============================================
+
+model SeasonalOffer {
+  id            String  @id @default(cuid())
+  title         String
+  description   String?
+  slug          String  @unique
+  season        String  // "winter" | "spring" | "summer" | "fall" | "general"
+  country       String  // "LK" | "CA"
+  image         String?
+  badgeText     String?
+  bgColor       String?
+  textColor     String?
+  displayOrder  Int     @default(0)
+  isActive      Boolean @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  jobs SeasonalOfferJob[]
+
+  @@index([season, country])
+  @@index([isActive])
+}
+
+model SeasonalOfferJob {
+  id              String        @id @default(cuid())
+  seasonalOfferId String
+  seasonalOffer   SeasonalOffer @relation(fields: [seasonalOfferId], references: [id], onDelete: Cascade)
+  templateJobId   String
+  templateJob     TemplateJob   @relation(fields: [templateJobId], references: [id])
+  price           Float?
+  currency        String        @default("LKR")
+
+  @@unique([seasonalOfferId, templateJobId])
+  @@index([templateJobId])
 }
 
 // ============================================

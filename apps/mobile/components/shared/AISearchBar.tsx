@@ -1,8 +1,9 @@
 import { useRef, useEffect } from 'react'
 import { View, TextInput, TouchableOpacity, Animated, Easing, StyleSheet, Platform } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Sparkle, ArrowRight } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useTheme } from '../../lib/ThemeContext'
+import { useColors } from '../../lib/ThemeContext'
+import { fonts } from '../../lib/fonts'
 
 interface Props {
   value: string
@@ -12,7 +13,7 @@ interface Props {
 }
 
 export default function AISearchBar({ value, onChangeText, onSearch, placeholder }: Props) {
-  const { colors } = useTheme()
+  const colors = useColors()
   const { t } = useTranslation()
   const glowRadius = useRef(new Animated.Value(8)).current
   const glowOp     = useRef(new Animated.Value(0.2)).current
@@ -37,7 +38,7 @@ export default function AISearchBar({ value, onChangeText, onSearch, placeholder
     <View style={styles.wrap}>
       {Platform.OS === 'ios' ? (
         <Animated.View style={[styles.glowLayer, {
-          shadowColor: '#F59E0B',
+          shadowColor: colors.amber,
           shadowOpacity: glowOp,
           shadowRadius: glowRadius,
           shadowOffset: { width: 0, height: 0 },
@@ -49,7 +50,7 @@ export default function AISearchBar({ value, onChangeText, onSearch, placeholder
         }]} />
       )}
       <Animated.View style={[styles.leftIcon, { transform: [{ scale: sparkScale }] }]}>
-        <Ionicons name="sparkles-outline" size={16} color={colors.amberDark} />
+        <Sparkle size={16} color={colors.amberDark} weight="fill" />
       </Animated.View>
       <TextInput
         style={[styles.input, { color: colors.ink, backgroundColor: colors.white, borderColor: colors.border }]}
@@ -62,13 +63,14 @@ export default function AISearchBar({ value, onChangeText, onSearch, placeholder
       />
       <TouchableOpacity
         style={[styles.sendBtn, {
-          shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 2 },
+          backgroundColor: colors.amber,
+          shadowColor: colors.amber, shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
         }]}
         onPress={onSearch}
         activeOpacity={0.8}
       >
-        <Ionicons name="arrow-forward" size={14} color="#111827" />
+        <ArrowRight size={14} color="#111827" weight="bold" />
       </TouchableOpacity>
     </View>
   )
@@ -82,12 +84,11 @@ const styles = StyleSheet.create({
   input: {
     height: 52, borderRadius: 18, borderWidth: 1.5,
     paddingLeft: 42, paddingRight: 48,
-    fontSize: 13, fontFamily: 'Outfit_700Bold',
+    fontSize: 15, fontFamily: fonts.bodyMedium,
   },
   sendBtn: {
     position: 'absolute', right: 8, top: '50%', marginTop: -15,
     width: 30, height: 30, borderRadius: 15,
-    backgroundColor: '#F59E0B',
     justifyContent: 'center', alignItems: 'center',
   },
 })

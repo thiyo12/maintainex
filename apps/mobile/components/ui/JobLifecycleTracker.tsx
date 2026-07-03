@@ -1,7 +1,8 @@
 import { View, Text, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { CalendarBlank, Cardholder, Wrench, CheckCircle, XCircle, Circle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
+import { fonts } from '../../lib/fonts'
 
 interface Props {
   status: string
@@ -34,10 +35,10 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
   const styles = makeStyles(colors)
 
   const STEPS = [
-    { key: 'BOOKED', label: t('components.statusOpen'), icon: 'calendar-outline' },
-    { key: 'PAYMENT', label: t('components.statusInProgress'), icon: 'card-outline' },
-    { key: 'IN_PROGRESS', label: t('components.statusInProgress'), icon: 'construct-outline' },
-    { key: 'COMPLETE', label: t('components.statusCompleted'), icon: 'checkmark-circle-outline' },
+    { key: 'BOOKED', label: t('components.statusOpen'), icon: CalendarBlank },
+    { key: 'PAYMENT', label: t('components.statusInProgress'), icon: Cardholder },
+    { key: 'IN_PROGRESS', label: t('components.statusInProgress'), icon: Wrench },
+    { key: 'COMPLETE', label: t('components.statusCompleted'), icon: CheckCircle },
   ]
 
   const step = getStepIndex(status, escrowStatus)
@@ -46,7 +47,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
   if (isCancelled) {
     return (
       <View style={[styles.container, styles.cancelledContainer]}>
-        <Ionicons name="close-circle-outline" size={22} color={colors.error} />
+        <XCircle size={22} color={colors.error} weight="fill" />
         <Text style={[styles.cancelledText, { color: colors.error }]}>
           {status === 'DISPUTED' ? t('components.statusCancelled') : t('components.statusCancelled')}
         </Text>
@@ -60,6 +61,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
         {STEPS.map((s, i) => {
           const isDone = i < step
           const isCurrent = i === step
+          const StepIcon = s.icon
           return (
             <View key={s.key} style={styles.stepWrap}>
               <View style={[
@@ -68,11 +70,13 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
                 isCurrent && { backgroundColor: colors.amber, shadowColor: colors.amber, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
                 !isDone && !isCurrent && { backgroundColor: colors.border },
               ]}>
-                <Ionicons
-                  name={isDone ? 'checkmark' : isCurrent ? 'ellipse' : s.icon as any}
-                  size={isCurrent ? 10 : 14}
-                  color={isDone || isCurrent ? '#FFFFFF' : colors.muted}
-                />
+                {isDone ? (
+                  <CheckCircle size={14} color="#FFFFFF" weight="fill" />
+                ) : isCurrent ? (
+                  <Circle size={10} color="#FFFFFF" weight="fill" />
+                ) : (
+                  <StepIcon size={14} color={colors.muted} weight="regular" />
+                )}
               </View>
               {i < STEPS.length - 1 ? (
                 <View style={[styles.line, { backgroundColor: isDone ? colors.success : colors.border }]} />
@@ -89,7 +93,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
             <Text key={s.key} style={[
               styles.label,
               isDone && { color: colors.success },
-              isCurrent && { color: colors.amberDark, fontFamily: 'Outfit_800ExtraBold' },
+              isCurrent && { color: colors.amberDark, fontFamily: fonts.headingBold },
               !isDone && !isCurrent && { color: colors.muted },
             ]}>
               {s.label}
@@ -113,8 +117,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   dot: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   line: { width: 36, height: 2, marginHorizontal: 4, borderRadius: 2 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
-  label: { fontSize: 9, fontFamily: 'Outfit_500Medium', textTransform: 'uppercase', letterSpacing: 0.3, flex: 1, textAlign: 'center' },
+  label: { fontSize: 9, fontFamily: fonts.body, textTransform: 'uppercase', letterSpacing: 0.3, flex: 1, textAlign: 'center' },
   cancelledContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.errorBg, borderWidth: 1, borderColor: colors.error, paddingVertical: 12 },
-  cancelledText: { fontSize: 15, fontFamily: 'Outfit_800ExtraBold' },
-  cancelHint: { fontSize: 10, fontFamily: 'Outfit_500Medium', textAlign: 'center', marginTop: 8 },
+  cancelledText: { fontSize: 15, fontFamily: fonts.headingBold },
+  cancelHint: { fontSize: 10, fontFamily: fonts.body, textAlign: 'center', marginTop: 8 },
 })
