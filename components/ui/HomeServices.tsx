@@ -235,8 +235,9 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
           <>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
               {filteredServices.slice(0, 8).map((service) => (
-                <div
+                <Link
                   key={service.id}
+                  href={`/services/${service.slug || service.id}`}
                   className="group bg-card rounded-2xl overflow-hidden border border-border hover:border-amber-300 transition-all duration-300"
                 >
                   <div className="relative h-28 md:h-32 overflow-hidden">
@@ -273,14 +274,14 @@ export default function HomeServices({ initialCategories, initialServices }: Hom
 
                   <div className="flex items-center justify-end">
                     <button
-                      onClick={() => handleBookNow(service)}
+                      onClick={(e) => { e.preventDefault(); handleBookNow(service); }}
                       className="text-xs font-semibold text-ink bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-full transition-colors"
                     >
                       Book
                     </button>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
             </div>
           </>
