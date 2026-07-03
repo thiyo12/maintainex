@@ -11,18 +11,23 @@ import ServiceDetailClient from '../ServiceDetailClient'
 export const revalidate = 3600
 
 export async function generateStaticParams() {
-  const services = await prisma.service.findMany({
-    where: { isActive: true },
-    select: { slug: true },
-  })
-  const allCitySlugs = [
-    ...REGIONS.LK.districts.map(slugifyCity),
-    ...REGIONS.CA.districts.map(slugifyCity),
-  ]
-  const allServiceSlugs = services.filter(s => s.slug).map(s => s.slug!)
-  return allServiceSlugs.flatMap(slug =>
-    allCitySlugs.map(city => ({ slug, city }))
-  )
+  try {
+    const services = await prisma.service.findMany({
+      where: { isActive: true },
+      select: { slug: true },
+    })
+    const allCitySlugs = [
+      ...REGIONS.LK.districts.map(slugifyCity),
+      ...REGIONS.CA.districts.map(slugifyCity),
+    ]
+    const allServiceSlugs = services.filter(s => s.slug).map(s => s.slug!)
+    return allServiceSlugs.flatMap(slug =>
+      allCitySlugs.map(city => ({ slug, city }))
+    )
+  } catch (error) {
+    console.error('Error in generateStaticParams for services/[slug]/[city]:', error)
+    return []
+  }
 }
 
 function getRegionFromRequest(): 'LK' | 'CA' {

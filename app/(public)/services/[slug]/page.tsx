@@ -9,11 +9,16 @@ import ServiceDetailClient from './ServiceDetailClient'
 export const revalidate = 3600
 
 export async function generateStaticParams() {
-  const services = await prisma.service.findMany({
-    where: { isActive: true },
-    select: { slug: true },
-  })
-  return services.filter(s => s.slug).map(s => ({ slug: s.slug! }))
+  try {
+    const services = await prisma.service.findMany({
+      where: { isActive: true },
+      select: { slug: true },
+    })
+    return services.filter(s => s.slug).map(s => ({ slug: s.slug! }))
+  } catch (error) {
+    console.error('Error in generateStaticParams for services/[slug]:', error)
+    return []
+  }
 }
 
 function getRegionFromRequest(): 'LK' | 'CA' {
