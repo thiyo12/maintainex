@@ -276,7 +276,7 @@ model Settings {
   description String @default("")
   groupName String   @default("general")
   updatedBy String?
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime?
 }
 
 model AppSetting {
