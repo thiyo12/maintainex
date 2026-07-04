@@ -255,8 +255,8 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  // Allow auto-seed API without auth
-  if (pathname === '/api/seed/auto' || pathname === '/api/seed/admin') {
+  // Allow seed APIs without auth
+  if (pathname === '/api/seed/auto' || pathname === '/api/seed/admin' || pathname === '/api/seed/test-data') {
     response = NextResponse.next()
     return applySecurityHeaders(
       applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
@@ -349,6 +349,7 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/api/admin/auth/') &&
     pathname !== '/api/seed/auto' &&
     pathname !== '/api/seed/admin' &&
+    pathname !== '/api/seed/test-data' &&
     pathname !== '/api/seed/real-estate' &&
     pathname !== '/api/real-estate' &&
     !pathname.startsWith('/api/real-estate/') &&
