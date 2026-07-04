@@ -210,13 +210,13 @@ export default function V2JobDetailScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* ─── Lifecycle ─── */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
           <JobLifecycleTracker status={job.status} escrowStatus={escrow?.status} createdAt={job.createdAt} />
         </View>
 
         {/* ─── Cancel Button ─── */}
         {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED') && (
-          <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+          <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
               <Text style={styles.cancelBtnText}>{canCancelWithin30() ? 'Cancel this mission' : 'Request cancellation'}</Text>
@@ -226,7 +226,6 @@ export default function V2JobDetailScreen() {
 
         {/* ─── Hero ─── */}
         <View style={styles.hero}>
-          <Image source={{ uri: getCategoryImageUrl(job.categoryId) }} style={styles.heroImg} resizeMode="cover" />
           <Animated.View style={[styles.statusPill, { backgroundColor: statusColor(job.status), transform: [{ translateY: bounceY }] }]}>
             {(() => { const SI = statusMeta[job.status]?.icon || Clipboard; return <SI size={14} color="#fff" weight="fill" />; })()}
             <Text style={styles.statusPillText}>{statusMeta[job.status]?.label || t(translateJobStatus(job.status))}</Text>
@@ -501,8 +500,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
 
-  hero: { padding: 16, paddingBottom: 12 },
-  heroImg: { width: '100%', height: 180, borderRadius: 24, marginBottom: 12 },
+  hero: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
+  heroImg: { width: '100%', height: 120, borderRadius: 18, marginBottom: 6 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 100, marginBottom: 8 },
   statusPillText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#fff' },
   title: { fontSize: 26, fontFamily: fonts.heading, lineHeight: 34, letterSpacing: -0.5 },

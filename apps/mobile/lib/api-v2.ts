@@ -128,6 +128,24 @@ export const v2Match = {
     v2Request<{ providers: any[] }>(`/api/mobile/v2/match/${jobId}`),
 }
 
+export interface SubTask {
+  id: string
+  name: string
+  description: string
+  priceRangeLKR: { min: number; max: number }
+  priceRangeCAD: { min: number; max: number }
+  estimatedTime: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  tips: string[]
+}
+
+export const v2SubTasks = {
+  getByCategory: (categoryId: string, categoryName?: string) =>
+    v2Request<{ categoryId: string; subTasks: SubTask[] }>(
+      `/api/mobile/v2/subtasks?categoryId=${encodeURIComponent(categoryId)}${categoryName ? `&categoryName=${encodeURIComponent(categoryName)}` : ''}`
+    ),
+}
+
 export const v2Wallet = {
   get: (role: string) =>
     v2Request<{ wallet: any; transactions: any[] }>(`/api/mobile/v2/wallet?role=${role}`),
@@ -205,4 +223,141 @@ export const offerProgram = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+}
+
+export interface PriceBreakdownItem {
+  label: string
+  amount: number
+  amountRange?: { min: number; max: number }
+}
+
+export interface MarketInsight {
+  comparison: 'below_average' | 'average' | 'slightly_above' | 'premium'
+  percentage: number
+  label: string
+}
+
+export interface PriceEstimate {
+  currency: string
+  symbol: string
+  priceRange: { min: number; max: number; base: number }
+  breakdown: PriceBreakdownItem[]
+  marketInsight: MarketInsight
+  timeEstimate: string
+  confidence: 'high' | 'medium' | 'low'
+  warning: string | null
+  suggestion: string | null
+}
+
+export const v2Pricing = {
+  getEstimate: (data: {
+    categoryId: string
+    categoryName?: string
+    description: string
+    title?: string
+    areaId?: string
+    cityId?: string
+    countryCode?: string
+    urgency?: string
+    preferredDate?: string
+    preferredTime?: string
+    estimatedDuration?: number
+    workersCount?: number
+  }) => v2Request<PriceEstimate>('/api/mobile/v2/pricing/estimate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+}
+
+export interface SearchResult {
+  id: string
+  name: string
+  slug: string
+  score: number
+  matchType: string
+  subcategories: string[]
+}
+
+export const v2Search = {
+  categories: (q: string, lang?: string) =>
+    v2Request<{ query: string; lang: string; results: SearchResult[] }>(
+      `/api/mobile/v2/search?q=${encodeURIComponent(q)}${lang ? `&lang=${lang}` : ''}`
+    ),
+  popular: () =>
+    v2Request<{ results: any[] }>('/api/mobile/v2/search?popular=true'),
+}
+
+export interface AvailabilityResult {
+  isAvailable: boolean
+  reason: string
+  workHours: { start: string; end: string }
+  workDays: string[]
+  nextAvailable?: string
+}
+
+export const v2Availability = {
+  get: (providerId?: string) =>
+    v2Request<AvailabilityResult>(
+      `/api/mobile/v2/availability${providerId ? `?providerId=${providerId}` : ''}`
+    ),
+  update: (data: {
+    monday?: boolean; tuesday?: boolean; wednesday?: boolean;
+    thursday?: boolean; friday?: boolean; saturday?: boolean; sunday?: boolean;
+    startTime?: string; endTime?: string; isAvailable?: boolean;
+  }) => v2Request<{ success: boolean }>('/api/mobile/v2/availability', {
+    method: 'PUT', body: JSON.stringify(data),
+  }),
+}
+
+export interface QualityResult {
+  providerId: string
+  qualityScore: number
+  avgReviewRating: number
+  jobCompletionRate: number
+  onTimeRate: number
+  disputeRate: number
+  totalJobs: number
+  completedJobs: number
+  isFlagged: boolean
+  warnings: string[]
+}
+
+export const v2Quality = {
+  get: (providerId?: string) =>
+    v2Request<QualityResult>(
+      `/api/mobile/v2/quality${providerId ? `?providerId=${providerId}` : ''}`
+    ),
+}
+
+export interface TrustResult {
+  customerId: string
+  trustScore: number
+  level: 'untrusted' | 'low' | 'normal' | 'high' | 'trusted'
+  totalJobsPosted: number
+  completedJobs: number
+  cancelledJobs: number
+  warnings: string[]
+}
+
+export const v2Trust = {
+  get: (customerId?: string) =>
+    v2Request<TrustResult>(
+      `/api/mobile/v2/trust${customerId ? `?customerId=${customerId}` : ''}`
+    ),
+}
+
+export interface ScheduleRecommendation {
+  jobId: string
+  title: string
+  distance: number
+  estimatedEarning: number
+}
+
+export const v2Schedule = {
+  recommend: () =>
+    v2Request<{ suggestedJobs: ScheduleRecommendation[]; totalEstimatedEarning: number; totalTravelKm: number }>(
+      '/api/mobile/v2/schedule?action=recommend'
+    ),
+  cluster: () =>
+    v2Request<{ clusters: any[] }>('/api/mobile/v2/schedule?action=cluster'),
 }

@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native'
-import { CalendarBlank, Cardholder, Wrench, CheckCircle, XCircle, Circle } from 'phosphor-react-native'
+import { CalendarBlank, Wallet, Wrench, CheckCircle, XCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
@@ -36,7 +36,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
 
   const STEPS = [
     { key: 'BOOKED', label: t('components.statusOpen'), icon: CalendarBlank },
-    { key: 'PAYMENT', label: t('components.statusInProgress'), icon: Cardholder },
+    { key: 'PAYMENT', label: t('components.statusInProgress'), icon: Wallet },
     { key: 'IN_PROGRESS', label: t('components.statusInProgress'), icon: Wrench },
     { key: 'COMPLETE', label: t('components.statusCompleted'), icon: CheckCircle },
   ]
@@ -73,7 +73,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
                 {isDone ? (
                   <CheckCircle size={14} color="#FFFFFF" weight="fill" />
                 ) : isCurrent ? (
-                  <Circle size={10} color="#FFFFFF" weight="fill" />
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' }} />
                 ) : (
                   <StepIcon size={14} color={colors.muted} weight="regular" />
                 )}
@@ -111,7 +111,7 @@ export default function JobLifecycleTracker({ status, escrowStatus, createdAt }:
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { marginVertical: 12, borderRadius: 16, padding: 16 },
+  container: { marginVertical: 4, borderRadius: 16, padding: 16 },
   barRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   stepWrap: { flexDirection: 'row', alignItems: 'center' },
   dot: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },

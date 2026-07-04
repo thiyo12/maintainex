@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get('country') || 'LK'
     const season = searchParams.get('season') || 'general'
 
-    const offers = await prisma.seasonalOffer.findMany({
+    let offers = await prisma.seasonalOffer.findMany({
       where: { isActive: true, country, season },
       include: {
         jobs: {
@@ -21,6 +21,14 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { displayOrder: 'asc' },
     })
+
+    if (offers.length === 0) {
+      offers = await prisma.seasonalOffer.findMany({
+        where: { isActive: true, country, season: 'general' },
+        include: { jobs: { include: { templateJob: { select: { id: true, name: true, description: true, priceMin: true, priceMax: true, currency: true } } }, orderBy: { templateJob: { name: 'asc' } } } },
+        orderBy: { displayOrder: 'asc' },
+      })
+    }
 
     return NextResponse.json(offers, {
       headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' },

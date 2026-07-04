@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { FiBell, FiCheck, FiCheckCircle, FiAlertCircle, FiRefreshCw, FiShield, FiFileText, FiDollarSign, FiStar, FiUser } from 'react-icons/fi'
 import api from '@/lib/api'
+import { PERMISSION } from '@/lib/permissions'
+import { PermissionGate } from '@/components/admin/PermissionGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +43,6 @@ const typeColors: Record<string, string> = {
 
 export default function AdminNotifications() {
   const queryClient = useQueryClient()
-  const [markingAll, setMarkingAll] = useState(false)
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-notifications'],
@@ -72,6 +73,7 @@ export default function AdminNotifications() {
   const notifications = data?.notifications || []
 
   return (
+    <PermissionGate roles={PERMISSION.viewNotifications}>
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
@@ -144,6 +146,7 @@ export default function AdminNotifications() {
         </CardContent>
       </Card>
     </div>
+    </PermissionGate>
   )
 }
 

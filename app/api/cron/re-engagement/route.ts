@@ -1,0 +1,50 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { getSetting } from '@/lib/settings'
+import { createNotification } from '@/lib/notifications'
+
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET || 'maintainex-cron-secret'}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const hoursThreshold = await getSetting('notify.reengagement_hours', 24)
+    const cutoff = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000)
+
+    const oldJobs = await prisma.marketplaceJob.findMany({
+      where: {
+        status: 'OPEN',
+        createdAt: { lte: cutoff },
+      },
+    })
+
+    const jobIds = oldJobs.map(j => j.id)
+    const quoteCounts = await prisma.jobQuote.groupBy({
+      by: ['jobId'],
+      where: { jobId: { in: jobIds } },
+      _count: true,
+    })
+    const quoteCountMap = new Map(quoteCounts.map(q => [q.jobId, q._count]))
+
+    let notified = 0
+    for (const job of oldJobs) {
+      if ((quoteCountMap.get(job.id) || 0) === 0) {
+        await createNotification({
+          userId: job.customerId,
+          title: 'No quotes yet on your job',
+          body: `"${job.title}" has no quotes. Try our Offer Program for instant booking.`,
+          referenceType: 'RE_ENGAGEMENT',
+          referenceId: job.id,
+        })
+        notified++
+      }
+    }
+
+    return NextResponse.json({ success: true, notified })
+  } catch (error) {
+    console.error('[CRON] Re-engagement error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}

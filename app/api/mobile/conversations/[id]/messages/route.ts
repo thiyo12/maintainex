@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { scanChatMessage } from '@/lib/fraud-detection'
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -23,6 +24,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    // Fraud detection: scan for contact sharing
+    const scanResult = await scanChatMessage(text.trim(), user.id, params.id)
+    if (!scanResult.allowed) {
+      return NextResponse.json({
+        error: 'Message blocked',
+        reason: scanResult.reason,
+        note: 'Sharing contact details before a booking is confirmed is against Maintainex policy.',
+      }, { status: 403 })
     }
 
     const message = await prisma.message.create({

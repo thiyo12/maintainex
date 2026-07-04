@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
-import { FiShield, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
+import { FiShield, FiAlertCircle, FiRefreshCw, FiChevronDown, FiChevronRight, FiEdit2, FiLock, FiSave, FiX } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
 import { can, PERMISSION } from '@/lib/permissions'
@@ -29,6 +29,29 @@ interface PlatformSettings {
   updatedAt: string
 }
 
+interface AppSettingItem {
+  id: string
+  key: string
+  value: string
+  type: string
+  label: string
+  description: string
+  groupName: string
+  updatedBy: string | null
+  updatedAt: string
+}
+
+const GROUP_LABELS: Record<string, string> = {
+  matching: 'Matching Algorithm',
+  scoring: 'Scoring Weights',
+  offer: 'Offer Settings',
+  escrow: 'Escrow Configuration',
+  reputation: 'Reputation System',
+  fraud: 'Fraud Detection',
+  notifications: 'Notifications',
+  general: 'General',
+}
+
 const settingsSchema = z.object({
   platformFeePercent: z.string().min(1, 'Fee is required'),
   minJobAmount: z.string().min(1, 'Min amount is required'),
@@ -42,6 +65,152 @@ const settingsSchema = z.object({
 })
 
 type SettingsForm = z.infer<typeof settingsSchema>
+
+function AppSettingRow({
+  setting,
+  isSuperAdmin,
+  onSave,
+  isSaving,
+}: {
+  setting: AppSettingItem
+  isSuperAdmin: boolean
+  onSave: (key: string, value: string) => void
+  isSaving: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState(setting.value)
+
+  const handleSave = () => {
+    onSave(setting.key, editValue)
+    setEditing(false)
+  }
+
+  const handleCancel = () => {
+    setEditValue(setting.value)
+    setEditing(false)
+  }
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-4 py-3 px-4 rounded-lg border transition-colors ${
+        isSuperAdmin
+          ? 'border-gray-200 hover:border-amber-300 hover:bg-amber-50/30'
+          : 'border-gray-100 bg-gray-50 opacity-60'
+      }`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900 truncate">{setting.label || setting.key}</span>
+          {!isSuperAdmin && <FiLock className="w-3 h-3 text-gray-400 flex-shrink-0" />}
+        </div>
+        {setting.description && (
+          <p className="text-xs text-gray-500 mt-0.5 truncate">{setting.description}</p>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="h-8 w-48 text-sm border-amber-300 focus:ring-amber-500"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave()
+              if (e.key === 'Escape') handleCancel()
+            }}
+          />
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="h-8 px-2 bg-amber-500 hover:bg-amber-600 text-white"
+          >
+            <FiSave className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleCancel}
+            className="h-8 px-2"
+          >
+            <FiX className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded">
+            {setting.value}
+          </span>
+          {isSuperAdmin && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEditing(true)}
+              className="h-8 px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+            >
+              <FiEdit2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AppSettingGroup({
+  groupName,
+  settings,
+  isSuperAdmin,
+  onSave,
+  isSaving,
+  defaultOpen,
+}: {
+  groupName: string
+  settings: AppSettingItem[]
+  isSuperAdmin: boolean
+  onSave: (key: string, value: string) => void
+  isSaving: boolean
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? true)
+
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-amber-50 to-white hover:from-amber-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-gray-900">
+            {GROUP_LABELS[groupName] || groupName}
+          </span>
+          <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
+            {settings.length}
+          </span>
+        </div>
+        {open ? (
+          <FiChevronDown className="w-4 h-4 text-amber-600" />
+        ) : (
+          <FiChevronRight className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+      {open && (
+        <div className="divide-y divide-gray-100">
+          {settings.map((s) => (
+            <AppSettingRow
+              key={s.key}
+              setting={s}
+              isSuperAdmin={isSuperAdmin}
+              onSave={onSave}
+              isSaving={isSaving}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function MarketplaceSettings() {
   const adminUser = useAuthStore((s) => s.adminUser)
@@ -69,6 +238,30 @@ export default function MarketplaceSettings() {
       return body.data
     },
     enabled: isSuperAdmin,
+  })
+
+  const { data: appSettings, isLoading: isLoadingAppSettings } = useQuery<Record<string, AppSettingItem[]>>({
+    queryKey: ['admin-app-settings'],
+    queryFn: async () => {
+      const res = await api.get('/api/admin/marketplace/app-settings')
+      const body = res.data
+      if (body.error) throw new Error(body.error)
+      return body.data
+    },
+  })
+
+  const updateAppSettingMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      const res = await api.patch('/api/admin/marketplace/app-settings', { key, value })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-app-settings'] })
+      toast.success('Setting updated. Takes effect within 60 seconds.')
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to update setting')
+    },
   })
 
   useEffect(() => {
@@ -159,13 +352,67 @@ export default function MarketplaceSettings() {
   const feeValue = parseFloat(form.watch('platformFeePercent') || '0')
   const displayBps = formatBps(Math.round(feeValue * 100))
 
+  const appSettingGroups = appSettings ? Object.entries(appSettings) : []
+  const sortedGroups = appSettingGroups.sort(([a], [b]) => {
+    const order = ['matching', 'scoring', 'offer', 'escrow', 'reputation', 'fraud', 'notifications', 'general']
+    return order.indexOf(a) - order.indexOf(b)
+  })
+
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-end flex-wrap gap-2">
         <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
 
+      {/* Algorithm Settings Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="h-1 w-1 rounded-full bg-amber-500" />
+          <h2 className="text-lg font-semibold text-gray-900">Algorithm Settings</h2>
+          <span className="text-xs text-gray-400">AppSetting</span>
+        </div>
+        <p className="text-sm text-gray-500">
+          Fine-tune matching, scoring, and platform behavior. Changes take effect within 60 seconds.
+        </p>
+
+        {isLoadingAppSettings ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : sortedGroups.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-gray-400">
+              No algorithm settings configured yet.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {sortedGroups.map(([groupName, items], idx) => (
+              <AppSettingGroup
+                key={groupName}
+                groupName={groupName}
+                settings={items}
+                isSuperAdmin={isSuperAdmin}
+                onSave={(key, value) => updateAppSettingMutation.mutate({ key, value })}
+                isSaving={updateAppSettingMutation.isPending}
+                defaultOpen={idx < 3}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Platform Settings Section (existing) */}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-1 rounded-full bg-blue-500" />
+            <h2 className="text-lg font-semibold text-gray-900">Platform Settings</h2>
+          </div>
+        </div>
+
         <Card>
           <CardHeader><CardTitle>Fee Configuration</CardTitle></CardHeader>
           <CardContent className="space-y-4">

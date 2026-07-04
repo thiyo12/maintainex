@@ -49,10 +49,32 @@ function verifySimpleToken(token: string): any {
 
 async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
-  
+
   if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7)
+
+    // Try new JWT access token first
     try {
-      const token = authHeader.substring(7)
+      const { verifyAccessToken } = await import('@/lib/admin-jwt')
+      const jwtPayload = verifyAccessToken(token)
+      if (jwtPayload) {
+        return {
+          id: jwtPayload.sub,
+          email: jwtPayload.email,
+          role: jwtPayload.role,
+          branchId: null,
+          province: null,
+          region: null,
+          name: `${jwtPayload.firstName} ${jwtPayload.lastName}`.trim(),
+          canEditServices: false,
+          authType: 'adminUser',
+          assignedCountries: jwtPayload.assignedCountries,
+        }
+      }
+    } catch {}
+
+    // Fallback: try old base64+HMAC token (website admin uses this)
+    try {
       const payload = token.split('.')[0]
       const decoded = JSON.parse(atob(payload))
       if (decoded.id && decoded.email && decoded.role) {
@@ -256,7 +278,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Allow auto-seed API without auth
-  if (pathname === '/api/seed/auto') {
+  if (pathname === '/api/seed/auto' || pathname === '/api/seed/admin') {
     response = NextResponse.next()
     return applySecurityHeaders(
       applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
@@ -346,12 +368,20 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/') &&
     pathname !== '/api/auth/login' &&
     pathname !== '/api/auth/logout' &&
+    !pathname.startsWith('/api/admin/auth/') &&
     pathname !== '/api/seed/auto' &&
+    pathname !== '/api/seed/admin' &&
+    pathname !== '/api/seed/real-estate' &&
+    pathname !== '/api/real-estate' &&
+    !pathname.startsWith('/api/real-estate/') &&
+    pathname !== '/api/properties' &&
+    !pathname.startsWith('/api/properties/') &&
     !pathname.startsWith('/api/services') &&
     !pathname.startsWith('/api/categories') &&
     !pathname.startsWith('/api/industries') &&
     !pathname.startsWith('/api/testimonials') &&
-    !pathname.startsWith('/api/booking')
+    !pathname.startsWith('/api/booking') &&
+    !pathname.startsWith('/api/cron/')
   ) {
     const session = await getSession(request)
     

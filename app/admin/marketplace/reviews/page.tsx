@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { FiChevronLeft, FiChevronRight, FiStar, FiCheckCircle, FiXCircle, FiAlertCircle, FiRefreshCw, FiMessageSquare } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
-import { can, PERMISSION } from '@/lib/permissions'
+import { PERMISSION } from '@/lib/permissions'
 import { PermissionGate } from '@/components/admin/PermissionGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -47,8 +47,6 @@ export default function MarketplaceReviews() {
   const [page, setPage] = useState(1)
   const [selectedReview, setSelectedReview] = useState<Review | null>(null)
   const [confirmAction, setConfirmAction] = useState<{ reviewId: string; action: 'approve' | 'reject' } | null>(null)
-
-  const canModerate = adminUser ? can(adminUser.role, PERMISSION.moderateReviews) : false
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin-marketplace-reviews', statusFilter, page],

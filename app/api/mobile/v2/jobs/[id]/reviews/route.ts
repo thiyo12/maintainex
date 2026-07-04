@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { recalculateReputation } from '@/lib/reputation-engine'
+import { recoverPenaltyPoints } from '@/lib/reputation-engine'
 
 export async function POST(
   request: NextRequest,
@@ -57,6 +59,8 @@ export async function POST(
           where: { userId: quote.providerId },
           data: { rating: Math.round(avgRating * 10) / 10, completedJobs: completedCount },
         })
+        // Trigger reputation recalculation (fire-and-forget)
+        recalculateReputation(quote.providerId).catch(err => console.error('Reputation recalc error:', err))
       } else {
         await prisma.companyProfile.updateMany({
           where: { userId: quote.providerId },

@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore
 import { View, Text, TextInput, Image, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, RefreshControl, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { MagnifyingGlass, Sparkle, Lightning, Drop, Snowflake, Palette, Laptop, Bell, Fire, Users, MapPin, Briefcase, CaretRight, PaperPlaneRight, Bookmark, Buildings, Heart, PlusCircle, CheckCircle, ChatCircle, List, ArrowRight, TextT, Tag, Globe, Star, Trophy, Clock, Wallet, Rocket } from 'phosphor-react-native'
+import { MagnifyingGlass, Sparkle, Lightning, Drop, Snowflake, Palette, Laptop, Bell, Fire, Users, MapPin, Briefcase, CaretRight, PaperPlaneRight, Bookmark, Buildings, Heart, PlusCircle, CheckCircle, ChatCircle, List, ArrowRight, TextT, Tag, Globe, Star, Trophy, Clock, Wallet, Rocket, ShieldCheck } from 'phosphor-react-native'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
 import { v2Jobs, v2Quotes, v2Match } from '../../../lib/api-v2'
-import { taskers, conversations } from '../../../lib/api'
+import { taskers, conversations, templateJobs } from '../../../lib/api'
 import { matchCategory } from '../../../lib/aiMatch'
 import { getCategoryImageUrl } from '../../../lib/categories'
 import { useTranslation } from 'react-i18next'
@@ -19,8 +19,7 @@ import BookingSheet from '../../../components/offers/BookingSheet'
 import type { BookingFormData } from '../../../components/offers/BookingSheet'
 import SeasonalOffersComponent from '../../../components/offers/SeasonalOffers'
 import CategoryGrid from '../../../components/offers/CategoryGrid'
-import SearchSuggestions from '../../../components/offers/SearchSuggestions'
-import type { SeasonalOffer } from '../../../lib/seasonal'
+
 
 function usePulse() {
   const anim = useRef(new Animated.Value(1)).current
@@ -84,13 +83,14 @@ export default function CustomerHome() {
   const [selectedCat, setSelectedCat] = useState('all')
   const [aiQuery, setAiQuery] = useState('')
   const [aiMatchResult, setAiMatchResult] = useState<ReturnType<typeof matchCategory>>(null)
+  const [suggestions, setSuggestions] = useState<{ id: string; name: string }[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const glowAnim = useRef(new Animated.Value(0)).current
   const [staggerKey, setStaggerKey] = useState(0)
   const [selectedOffer, setSelectedOffer] = useState<typeof hotOffers[0] | null>(null)
   const [bookingVisible, setBookingVisible] = useState(false)
-  const [selectedSeasonalOffer, setSelectedSeasonalOffer] = useState<SeasonalOffer | null>(null)
-  const [seasonalBookingVisible, setSeasonalBookingVisible] = useState(false)
+
   const { newJobId } = useLocalSearchParams<{ newJobId?: string }>()
 
   const userId = user?.id
@@ -172,6 +172,17 @@ export default function CustomerHome() {
   const handleAiChange = useCallback((text: string) => {
     setAiQuery(text)
     if (debounceRef.current) clearTimeout(debounceRef.current)
+
+    if (text.length >= 2) {
+      templateJobs.search(text).then(results => {
+        setSuggestions(results.map((r: any) => ({ id: r.id, name: r.name })))
+        setShowSuggestions(true)
+      }).catch(() => setSuggestions([]))
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+
     debounceRef.current = setTimeout(() => {
       const result = matchCategory(text)
       setAiMatchResult(result)
@@ -364,13 +375,24 @@ export default function CustomerHome() {
               </Text>
             </View>
           )}
+          {showSuggestions && suggestions.length > 0 && (
+            <View style={[styles.suggestionsDropdown, { backgroundColor: colors.white, borderColor: colors.border }]}>
+              {suggestions.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.suggestionItem, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    setShowSuggestions(false)
+                    setAiQuery(item.name)
+                    router.push(`/(customer)/jobs/v2/create?templateJobId=${item.id}&title=${encodeURIComponent(item.name)}`)
+                  }}
+                >
+                  <Text style={[styles.suggestionText, { color: colors.ink }]}>{item.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
-
-        <SearchSuggestions
-          onSelect={(jobId, jobName) => {
-            router.push(`/(customer)/jobs/v2/create?templateJobId=${jobId}&title=${encodeURIComponent(jobName)}`)
-          }}
-        />
 
         {/* ─── Category Grid ─── */}
         <CategoryGrid
@@ -413,13 +435,7 @@ export default function CustomerHome() {
         )}
 
         {/* ─── Seasonal Offers ─── */}
-        <SeasonalOffersComponent
-          onOfferPress={(offer) => {
-            setSelectedSeasonalOffer(offer)
-            setSeasonalBookingVisible(true)
-          }}
-          onServicePress={handleSeasonalServicePress}
-        />
+        <SeasonalOffersComponent onServicePress={handleSeasonalServicePress} />
 
         {/* ─── Hot Offers ─── */}
         <View style={styles.secRow}>
@@ -563,16 +579,16 @@ export default function CustomerHome() {
               <Buildings size={22} color={colors.amberDark} weight="fill" />
               <Text style={[styles.actionBtnLabel, { color: colors.ink }]}>List Property</Text>
               <Text style={[styles.actionBtnSub, { color: colors.muted }]}>Sell or rent</Text>
-              <View style={styles.actionNewBadge}><Text style={styles.actionNewText}>New</Text></View>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtnCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(customer)/jobs/v2/create')}>
-              <Laptop size={22} color={colors.amberDark} weight="fill" />
-              <Text style={[styles.actionBtnLabel, { color: colors.ink }]}>Digital Service</Text>
-              <Text style={[styles.actionBtnSub, { color: colors.muted }]}>Web, design, photo</Text>
+            <TouchableOpacity style={[styles.actionBtnCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.5 }]} activeOpacity={1}>
+              <ShieldCheck size={22} color={colors.muted} weight="fill" />
+              <Text style={[styles.actionBtnLabel, { color: colors.muted }]}>Helmet Sanitising</Text>
+              <Text style={[styles.actionBtnSub, { color: colors.muted }]}>Clean & protect</Text>
+              <View style={[styles.actionNewBadge, { backgroundColor: colors.muted }]}><Text style={styles.actionNewText}>Soon</Text></View>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtnCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Tag size={22} color={colors.amberDark} weight="fill" />
-              <Text style={[styles.actionBtnLabel, { color: colors.ink }]}>Sell an Item</Text>
+            <TouchableOpacity style={[styles.actionBtnCard, { backgroundColor: colors.surface, borderColor: colors.border, opacity: 0.5 }]} activeOpacity={1}>
+              <Tag size={22} color={colors.muted} weight="fill" />
+              <Text style={[styles.actionBtnLabel, { color: colors.muted }]}>Sell an Item</Text>
               <Text style={[styles.actionBtnSub, { color: colors.muted }]}>Marketplace</Text>
               <View style={[styles.actionNewBadge, { backgroundColor: colors.muted }]}><Text style={styles.actionNewText}>Soon</Text></View>
             </TouchableOpacity>
@@ -599,7 +615,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   hdrLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   hdrAvatarWrap: { position: 'relative' },
   hdrAvatar: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  hdrAvatarText: { fontSize: 16, fontFamily: fonts.heading, color: '#111827' },
+  hdrAvatarText: { fontSize: 16, fontFamily: fonts.heading, color: colors.ink },
   hdrGreet: { fontSize: 11, fontFamily: fonts.bodyMedium },
   hdrName: { fontSize: 19, fontFamily: fonts.heading, letterSpacing: -0.4 },
   hdrRight: { flexDirection: 'row', alignItems: 'center', gap: 9 },
@@ -631,6 +647,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
   aiBtn: { position: 'absolute', right: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: colors.amber, justifyContent: 'center', alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
   correctionCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, borderRadius: 14, padding: 12 },
   correctionText: { fontSize: 13, fontFamily: fonts.body, flex: 1 },
+  suggestionsDropdown: { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, borderRadius: 14, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8, zIndex: 200, overflow: 'hidden' },
+  suggestionItem: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 0.5 },
+  suggestionText: { fontSize: 14, fontFamily: fonts.body },
 
   pillsScroll: { gap: 8, paddingHorizontal: 8, paddingVertical: 8 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 100, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.white },
@@ -678,7 +697,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   jcLocText: { fontSize: 11, fontFamily: fonts.bodyMedium },
   jcActs: { flexDirection: 'row', gap: 7 },
   applyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.amber, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 12, shadowColor: colors.amber, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 8, elevation: 4 },
-  applyText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#111827' },
+  applyText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.ink },
   saveBtn: { paddingVertical: 8, paddingHorizontal: 11, borderRadius: 12, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
 
   emptyFeed: { alignItems: 'center', padding: 40, gap: 10 },
@@ -702,8 +721,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actionBtnMain: { width: '48%', borderRadius: 20, padding: 16, alignItems: 'center', borderWidth: 1.5, borderColor: '#F59E0B' },
   actionBtnCard: { width: '48%', borderRadius: 20, padding: 16, alignItems: 'center', borderWidth: 1.5, position: 'relative', overflow: 'hidden' },
-  actionBtnLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#111827', textAlign: 'center', marginTop: 6 },
-  actionBtnSub: { fontSize: 10, fontFamily: fonts.body, textAlign: 'center', marginTop: 2, color: '#111827', opacity: 0.7 },
+  actionBtnLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink, textAlign: 'center', marginTop: 6 },
+  actionBtnSub: { fontSize: 10, fontFamily: fonts.body, textAlign: 'center', marginTop: 2, color: colors.ink, opacity: 0.7 },
   actionNewBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: colors.red, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 100 },
   actionNewText: { fontSize: 9, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
 

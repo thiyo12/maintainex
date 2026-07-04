@@ -9,8 +9,9 @@ import toast from 'react-hot-toast'
 import { FiPlus, FiEdit2, FiTrash2, FiGrid, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
-import { can, PERMISSION } from '@/lib/permissions'
+import { PERMISSION } from '@/lib/permissions'
 import { PermissionGate } from '@/components/admin/PermissionGate'
+import { ConfirmDialog } from '@/components/admin/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -48,8 +49,7 @@ export default function MarketplaceCategories() {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Category | null>(null)
-
-  const canEdit = adminUser ? can(adminUser.role, PERMISSION.manageCategories) : false
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const form = useForm<CategoryForm>({
     resolver: zodResolver(categorySchema),
@@ -221,9 +221,7 @@ export default function MarketplaceCategories() {
                             <FiEdit2 className="w-4 h-4" />
                           </Button>
                           {cat.isActive && (
-                            <Button variant="ghost" size="icon" onClick={() => {
-                              if (confirm(`Delete "${cat.name}"?`)) deleteMutation.mutate(cat.id)
-                            }}>
+                            <Button variant="ghost" size="icon" onClick={() => setConfirmDeleteId(cat.id)}>
                               <FiTrash2 className="w-4 h-4 text-red-500" />
                             </Button>
                           )}
@@ -284,6 +282,16 @@ export default function MarketplaceCategories() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => { if (!open) setConfirmDeleteId(null) }}
+        title="Delete Category"
+        description={`Are you sure you want to delete "${confirmDeleteId ? (categories || []).find(c => c.id === confirmDeleteId)?.name || '' : ''}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => { if (confirmDeleteId) { deleteMutation.mutate(confirmDeleteId); setConfirmDeleteId(null) } }}
+        loading={deleteMutation.isPending}
+      />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { getLocationName } from './locations'
 import { jsonArrayContains, safeParseJsonArr } from './db-utils'
+import { calculateAcceptanceProbability } from './availability-engine'
 
 export interface MatchedProvider {
   id: string
@@ -9,6 +10,7 @@ export interface MatchedProvider {
   rating: number
   completedJobs: number
   responseSpeed: number
+  acceptanceProbability: number
   areaMatch: boolean
   overallScore: number
   profile: {
@@ -61,7 +63,7 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
 
     const areaMatch = areaId ? matchesArea(areaId, ind.serviceAreas) : true
 
-    const responseSpeed = 0.5
+    const acceptanceProbability = await calculateAcceptanceProbability(ind.userId, job.categoryId, areaId || undefined)
 
     const ratingScore = ind.rating / 5.0
     const completedScore = Math.min(completedJobs / maxCompleted, 1.0)
@@ -70,7 +72,7 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     const overallScore =
       ratingScore * 0.40 +
       completedScore * 0.30 +
-      responseSpeed * 0.20 +
+      acceptanceProbability * 0.20 +
       areaScore * 0.10
 
     providers.push({
@@ -79,7 +81,8 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
       type: 'INDIVIDUAL',
       rating: ind.rating,
       completedJobs,
-      responseSpeed,
+      responseSpeed: acceptanceProbability,
+      acceptanceProbability,
       areaMatch,
       overallScore: Math.round(overallScore * 100) / 100,
       profile: {
@@ -97,7 +100,7 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
 
     const areaMatch = areaId ? matchesArea(areaId, comp.serviceAreas) : true
 
-    const responseSpeed = 0.5
+    const acceptanceProbability = await calculateAcceptanceProbability(comp.userId, job.categoryId, areaId || undefined)
 
     const ratingScore = comp.rating / 5.0
     const completedScore = Math.min(completedJobs / maxCompleted, 1.0)
@@ -106,7 +109,7 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     const overallScore =
       ratingScore * 0.40 +
       completedScore * 0.30 +
-      responseSpeed * 0.20 +
+      acceptanceProbability * 0.20 +
       areaScore * 0.10
 
     providers.push({
@@ -115,7 +118,8 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
       type: 'COMPANY',
       rating: comp.rating,
       completedJobs,
-      responseSpeed,
+      responseSpeed: acceptanceProbability,
+      acceptanceProbability,
       areaMatch,
       overallScore: Math.round(overallScore * 100) / 100,
       profile: {

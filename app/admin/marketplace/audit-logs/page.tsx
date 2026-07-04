@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query'
 import { FiChevronLeft, FiChevronRight, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
-import { can, PERMISSION } from '@/lib/permissions'
+import { PERMISSION } from '@/lib/permissions'
+import { PermissionGate } from '@/components/admin/PermissionGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -117,6 +118,7 @@ export default function MarketplaceAuditLogs() {
   }
 
   return (
+    <PermissionGate roles={PERMISSION.viewAuditLogs}>
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-end">
         <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
@@ -262,5 +264,6 @@ export default function MarketplaceAuditLogs() {
         </DialogContent>
       </Dialog>
     </div>
+    </PermissionGate>
   )
 }

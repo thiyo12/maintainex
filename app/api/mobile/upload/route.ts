@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { writeFile, mkdir } from 'fs/promises'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import path from 'path'
 
 const ALLOWED_MIMES = new Set([
@@ -42,6 +43,12 @@ export async function POST(request: NextRequest) {
     const filepath = path.join(uploadDir, filename)
 
     await writeFile(filepath, buffer)
+
+    const indexFile = path.join(process.cwd(), 'public', 'uploads', 'mobile', '.photo-index.json')
+    let index: Record<string, string> = {}
+    try { if (existsSync(indexFile)) index = JSON.parse(readFileSync(indexFile, 'utf-8')) } catch {}
+    index[filename] = new Date().toISOString()
+    try { writeFileSync(indexFile, JSON.stringify(index)) } catch {}
 
     const url = `/uploads/mobile/${user.id}/${filename}`
 

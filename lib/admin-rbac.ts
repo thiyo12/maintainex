@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from './prisma'
+import { verifyAccessToken } from './admin-jwt'
 import { verifySimpleToken } from './admin-auth'
 import type { AdminRole, AuditAction, AdminSession } from './admin-types'
 
@@ -17,6 +18,21 @@ export function getSessionFromCookie(request: NextRequest): AdminSession | null 
 
   if (!rawToken) return null
 
+  // Try new JWT access token first
+  const jwtPayload = verifyAccessToken(rawToken)
+  if (jwtPayload) {
+    return {
+      id: jwtPayload.sub,
+      email: jwtPayload.email,
+      role: jwtPayload.role,
+      firstName: jwtPayload.firstName,
+      lastName: jwtPayload.lastName,
+      assignedCountries: jwtPayload.assignedCountries || [],
+      authType: 'adminUser',
+    }
+  }
+
+  // Fallback to old base64+HMAC custom token
   const payload = verifySimpleToken(rawToken)
   if (!payload || payload.authType !== 'adminUser') return null
   return {

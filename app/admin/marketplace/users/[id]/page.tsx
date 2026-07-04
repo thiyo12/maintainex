@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { FiArrowLeft, FiSlash, FiCheckCircle, FiXCircle, FiFileText, FiAlertCircle, FiRefreshCw, FiLogIn, FiUserCheck, FiBriefcase, FiDollarSign } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
-import { can, PERMISSION } from '@/lib/permissions'
+import { PERMISSION } from '@/lib/permissions'
 import { PermissionGate } from '@/components/admin/PermissionGate'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -49,8 +49,6 @@ export default function MarketplaceUserDetail() {
   const router = useRouter()
   const adminUser = useAuthStore((s) => s.adminUser)
   const queryClient = useQueryClient()
-
-  const canAct = adminUser ? can(adminUser.role, PERMISSION.manageUsers) : false
 
   const { data: user, isLoading, error, refetch } = useQuery<UserDetail>({
     queryKey: ['admin-marketplace-user', params.id],

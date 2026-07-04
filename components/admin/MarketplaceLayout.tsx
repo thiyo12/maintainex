@@ -4,35 +4,33 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  FiHome, FiUsers, FiFileText, FiClock, FiShield, FiGrid,
+  FiHome, FiUsers, FiFileText, FiShield, FiGrid,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX, FiUserCheck,
-  FiAlertCircle, FiList, FiBell, FiStar,
+  FiAlertCircle, FiList, FiBell, FiStar, FiFlag, FiZap, FiDollarSign,
+  FiMessageSquare, FiAlertTriangle,
 } from 'react-icons/fi'
 import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome },
-  { name: 'Users', href: '/admin/marketplace/users', icon: FiUsers },
-  { name: 'KYC Reviews', href: '/admin/marketplace/kyc', icon: FiShield },
-  { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText },
-  { name: 'Escrows & Disputes', href: '/admin/marketplace/escrow', icon: FiClock },
-  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar },
-  { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid },
-  { name: 'Reports', href: '/admin/marketplace/reports', icon: FiBarChart2 },
-  { name: 'Admin Users', href: '/admin/marketplace/admin-users', icon: FiUserCheck },
-  { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList },
-  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell },
-  { name: 'Settings', href: '/admin/marketplace/settings', icon: FiSettings },
+  { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Users', href: '/admin/marketplace/users', icon: FiUsers, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Disputes', href: '/admin/marketplace/disputes', icon: FiMessageSquare, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { name: 'Escrow', href: '/admin/marketplace/escrow', icon: FiShield, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { name: 'Revenue', href: '/admin/marketplace/revenue', icon: FiDollarSign, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { name: 'Fraud Centre', href: '/admin/marketplace/fraud', icon: FiAlertTriangle, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+  { name: 'Offers', href: '/admin/marketplace/offers', icon: FiZap, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+  { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+  { name: 'Staff', href: '/admin/marketplace/staff', icon: FiUserCheck, roles: ['SUPER_ADMIN'] },
+  { name: 'Settings', href: '/admin/marketplace/settings', icon: FiSettings, roles: ['SUPER_ADMIN'] },
+  { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+  { name: 'Properties', href: '/admin/marketplace/properties', icon: FiHome, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+  { name: 'Alert Centre', href: '/admin/marketplace/alerts', icon: FiAlertCircle, roles: ['SUPER_ADMIN', 'ADMIN'] },
 ]
-
-const roleAccess: Record<string, string[]> = {
-  SUPER_ADMIN: navigation.map(n => n.href),
-  ADMIN: navigation.map(n => n.href).filter(h => !h.includes('/settings') && !h.includes('/admin-users') && !h.includes('/audit-logs')),
-  MODERATOR: navigation.map(n => n.href).filter(h => !h.includes('/escrow') && !h.includes('/settings') && !h.includes('/admin-users') && !h.includes('/audit-logs')),
-  SUPPORT: ['/admin/marketplace/dashboard', '/admin/marketplace/users', '/admin/marketplace/jobs', '/admin/marketplace/reports'],
-}
 
 export default function MarketplaceLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -55,74 +53,74 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
     clearStoredUser()
     localStorage.removeItem('admin_user')
     localStorage.removeItem('admin_token')
+    try { await fetch('/api/admin/auth/logout', { method: 'POST', credentials: 'include' }) } catch {}
     try { await fetch('/api/auth/logout') } catch {}
     window.location.href = '/admin/login'
   }
 
-  const allowedPaths = roleAccess[user?.role || ''] || roleAccess.SUPPORT
+  const visibleNav = navigation.filter(
+    (item) => user && item.roles.includes(user.role as any)
+  )
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0B0C12' }}>
+        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center p-8 bg-white rounded-xl shadow-lg">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0B0C12' }}>
+        <div className="text-center p-8 rounded-xl shadow-lg" style={{ backgroundColor: '#1B1D27' }}>
           <FiAlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Session Expired</h2>
-          <p className="text-gray-500 mb-4">Please login again.</p>
+          <h2 className="text-xl font-bold mb-2" style={{ color: '#F59E0B' }}>Session Expired</h2>
+          <p className="text-gray-400 mb-4">Please login again.</p>
           <button onClick={() => window.location.href = '/admin/login'}
-            className="px-6 py-2 bg-primary-500 text-dark-900 rounded-lg font-medium">Go to Login</button>
+            className="px-6 py-2 rounded-lg font-medium" style={{ backgroundColor: '#F59E0B', color: '#0B0C12' }}>Go to Login</button>
         </div>
       </div>
     )
   }
 
-  function NotifBadge() {
-    const { data } = useQuery({
-      queryKey: ['admin-notifications-count'],
-      queryFn: async () => {
-        const res = await api.get('/api/admin/marketplace/notifications')
-        return res.data.unreadCount as number
-      },
-      refetchInterval: 30000,
-    })
-    return data ? <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">{data > 9 ? '9+' : data}</span> : null
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen" style={{ backgroundColor: '#0B0C12' }}>
       <button onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-dark-900 text-white rounded-lg shadow-lg">
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg shadow-lg"
+        style={{ backgroundColor: '#F59E0B', color: '#0B0C12' }}>
         {sidebarOpen ? <FiX size={24} /> : <FiMenu size={24} />}
       </button>
 
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-900 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 transform transition-transform lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ backgroundColor: '#1B1D27' }}>
         <div className="p-6 flex flex-col h-full">
           <Link href="/admin/marketplace/dashboard" className="flex items-center space-x-2 mb-6">
-            <span className="text-xl font-bold text-white">
-              Market<span className="text-primary-500">place</span>
+            <span className="text-xl font-bold" style={{ color: '#F59E0B' }}>
+              Market<span style={{ color: '#FFFFFF' }}>place</span>
             </span>
           </Link>
 
-          <div className="mb-4 px-3 py-2 bg-blue-500/20 rounded-lg border border-blue-500/30 flex items-center gap-2">
-            <FiShield className="text-blue-400" size={16} />
-            <span className="text-blue-400 text-xs font-medium">{user.role.replace('_', ' ')}</span>
+          <div className="mb-4 px-3 py-2 rounded-lg flex items-center gap-2"
+            style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+            <FiShield size={16} style={{ color: '#F59E0B' }} />
+            <span className="text-xs font-medium" style={{ color: '#F59E0B' }}>{user.role?.replace('_', ' ') || 'USER'}</span>
           </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto">
-            {navigation.filter(n => allowedPaths.includes(n.href)).map((item) => {
+            {visibleNav.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
               return (
                 <Link key={item.name} href={item.href}
                   className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-colors ${
-                    isActive ? 'bg-primary-500/20 text-primary-400' : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                    isActive
+                      ? 'text-amber-400'
+                      : 'text-gray-400 hover:text-white'
                   }`}
+                  style={{
+                    backgroundColor: isActive ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                    color: isActive ? '#F59E0B' : undefined,
+                  }}
                   onClick={() => setSidebarOpen(false)}>
                   <item.icon className="text-lg" />
                   <span className="font-medium">{item.name}</span>
@@ -131,15 +129,18 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
             })}
           </nav>
 
-          <div className="pt-4 border-t border-white/10 space-y-2">
+          <div className="pt-4 border-t border-gray-700/50 space-y-2">
             <Link href="/admin/dashboard"
-              className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-colors text-sm"
+              className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white transition-colors text-sm"
               onClick={() => setSidebarOpen(false)}>
               <FiHome className="text-lg" />
               <span>Back to Website Admin</span>
             </Link>
             <button onClick={handleLogout}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors">
+              className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors"
+              style={{ color: '#EF4444' }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
               <FiLogOut className="text-lg" />
               <span>Sign Out</span>
             </button>
@@ -148,19 +149,17 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
       </aside>
 
       <div className="lg:pl-64">
-        <header className="hidden lg:block bg-white shadow-sm sticky top-0 z-30">
+        <header className="sticky top-0 z-30 shadow-sm"
+          style={{ backgroundColor: '#15161E', borderBottom: '1px solid #23252F' }}>
           <div className="px-6 lg:px-8 py-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">
-              {navigation.find(n => pathname.startsWith(n.href))?.name || 'Marketplace'}
+            <h2 className="text-xl font-semibold" style={{ color: '#F59E0B' }}>
+              {visibleNav.find(n => pathname.startsWith(n.href))?.name || 'Dashboard'}
             </h2>
             <div className="flex items-center gap-4">
-              <Link href="/admin/marketplace/notifications" className="relative p-1">
-                <FiBell className="text-gray-500 hover:text-gray-700" size={20} />
-                <NotifBadge />
-              </Link>
-              <span className="text-gray-600 text-sm">{user.email}</span>
-              <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center">
-                <span className="text-dark-900 font-bold">
+              <span className="text-sm text-gray-400">{user.email}</span>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: '#F59E0B' }}>
+                <span className="font-bold" style={{ color: '#0B0C12' }}>
                   {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'M'}
                 </span>
               </div>

@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 import { FiChevronLeft, FiChevronRight, FiDollarSign, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
-import { can, PERMISSION } from '@/lib/permissions'
+import { PERMISSION } from '@/lib/permissions'
 import { PermissionGate } from '@/components/admin/PermissionGate'
 import { formatMoney } from '@/lib/money'
 import { Button } from '@/components/ui/button'
@@ -69,8 +69,6 @@ export default function MarketplaceEscrow() {
   const [confirmAction, setConfirmAction] = useState<{ escrowId: string; action: 'release' | 'refund' } | null>(null)
   const [disputeAction, setDisputeAction] = useState<{ disputeId: string; action: 'resolve' | 'dismiss' } | null>(null)
   const [resolutionText, setResolutionText] = useState('')
-
-  const canAct = adminUser ? can(adminUser.role, PERMISSION.manageEscrow) : false
 
   const escrowQuery = useQuery({
     queryKey: ['admin-marketplace-escrows', statusFilter, page],

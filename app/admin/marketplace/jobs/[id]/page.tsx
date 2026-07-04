@@ -1,15 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { FiArrowLeft, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
 import api from '@/lib/api'
 import { useAuthStore } from '@/lib/auth-store'
-import { can, PERMISSION } from '@/lib/permissions'
+import { PERMISSION } from '@/lib/permissions'
 import { PermissionGate } from '@/components/admin/PermissionGate'
 import { formatMoney } from '@/lib/money'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/admin/ConfirmDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -41,8 +43,7 @@ export default function MarketplaceJobDetail() {
   const router = useRouter()
   const adminUser = useAuthStore((s) => s.adminUser)
   const queryClient = useQueryClient()
-
-  const canCancel = adminUser ? can(adminUser.role, PERMISSION.forceCancelJob) : false
+  const [confirmCancel, setConfirmCancel] = useState(false)
 
   const { data: job, isLoading, error, refetch } = useQuery<JobDetail>({
     queryKey: ['admin-marketplace-job', params.id],
@@ -107,6 +108,7 @@ export default function MarketplaceJobDetail() {
   }
 
   return (
+    <>
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-4">
@@ -160,11 +162,7 @@ export default function MarketplaceJobDetail() {
                 <Button
                   variant="destructive"
                   className="w-full"
-                  onClick={() => {
-                    if (confirm('Are you sure you want to force cancel this job?')) {
-                      cancelMutation.mutate()
-                    }
-                  }}
+                  onClick={() => setConfirmCancel(true)}
                   disabled={cancelMutation.isPending}
                 >
                   {cancelMutation.isPending ? 'Cancelling...' : 'Force Cancel Job'}
@@ -197,5 +195,16 @@ export default function MarketplaceJobDetail() {
         </Card>
       )}
     </div>
+
+      <ConfirmDialog
+        open={confirmCancel}
+        onOpenChange={setConfirmCancel}
+        title="Force Cancel Job"
+        description="Are you sure you want to force cancel this job? This action cannot be undone."
+        confirmLabel="Cancel Job"
+        onConfirm={() => { cancelMutation.mutate(); setConfirmCancel(false) }}
+        loading={cancelMutation.isPending}
+      />
+    </>
   )
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { matchJobToTaskers } from '@/lib/job-matcher'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -47,6 +48,9 @@ export async function POST(request: NextRequest) {
         status: 'OPEN',
       },
     })
+
+    // Auto-trigger matching engine (fire-and-forget)
+    matchJobToTaskers(job.id).catch(err => console.error('Match job error:', err))
 
     return NextResponse.json({ job: { ...job, budgetAmount: Number(job.budgetAmount) } }, { status: 201 })
   } catch (error) {
