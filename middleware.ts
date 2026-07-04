@@ -51,30 +51,8 @@ async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7)
-
-    // Try new JWT access token first
     try {
-      const { verifyAccessToken } = await import('@/lib/admin-jwt')
-      const jwtPayload = verifyAccessToken(token)
-      if (jwtPayload) {
-        return {
-          id: jwtPayload.sub,
-          email: jwtPayload.email,
-          role: jwtPayload.role,
-          branchId: null,
-          province: null,
-          region: null,
-          name: `${jwtPayload.firstName} ${jwtPayload.lastName}`.trim(),
-          canEditServices: false,
-          authType: 'adminUser',
-          assignedCountries: jwtPayload.assignedCountries,
-        }
-      }
-    } catch {}
-
-    // Fallback: try old base64+HMAC token (website admin uses this)
-    try {
+      const token = authHeader.substring(7)
       const payload = token.split('.')[0]
       const decoded = JSON.parse(atob(payload))
       if (decoded.id && decoded.email && decoded.role) {
