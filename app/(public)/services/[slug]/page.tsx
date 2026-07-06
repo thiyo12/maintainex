@@ -19,7 +19,7 @@ function getHostname(): string {
 
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_REGION = 'LK' as const
+const DEFAULT_REGION: 'LK' | 'CA' = 'LK'
 const DEFAULT_HOST = 'maintainex.lk'
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
