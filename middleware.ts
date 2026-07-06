@@ -148,6 +148,7 @@ async function checkRateLimit(
     return {
       remaining: 0,
       resetAt: new Date(Date.now() + 5000),
+      limited: true,
     }
   }
 }
@@ -253,8 +254,14 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  // Allow seed APIs without auth
-  if (pathname === '/api/seed/auto' || pathname === '/api/seed/admin' || pathname === '/api/seed/test-data') {
+  // Block seed APIs in production
+  if (pathname.startsWith('/api/seed/')) {
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse(
+        JSON.stringify({ error: 'Not available in production' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
     response = NextResponse.next()
     return applySecurityHeaders(
       applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
@@ -334,10 +341,26 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
+  // Allow health check without auth
+  if (pathname === '/api/health') {
+    response = NextResponse.next()
+    applySecurityHeaders(response)
+    response.headers.set('Access-Control-Allow-Origin', '*')
+    return response
+  }
+
   // Allow all mobile API paths (they handle auth via Bearer token)
   if (pathname.startsWith('/api/mobile/')) {
     response = NextResponse.next()
-    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+    applySecurityHeaders(response)
+    applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
+    response.headers.set('Access-Control-Allow-Origin', '*')
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    if (request.method === 'OPTIONS') {
+      return new NextResponse(null, { status: 204, headers: response.headers })
+    }
+    return response
   }
 
   if (

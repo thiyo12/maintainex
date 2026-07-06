@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y openssl build-essential python3 && rm -
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --ignore-scripts
+RUN npm install
 
 COPY prisma ./prisma/
 RUN npx prisma generate
@@ -24,4 +24,7 @@ RUN npm run build
 
 EXPOSE 3000
 
-CMD npx prisma db push --accept-data-loss && npm start
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"
+
+CMD npx prisma db push && npm start
