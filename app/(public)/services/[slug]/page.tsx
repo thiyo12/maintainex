@@ -6,44 +6,26 @@ import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import ServiceDetailClient from './ServiceDetailClient'
 
-export const revalidate = 3600
-
-export async function generateStaticParams() {
-  try {
-    const services = await prisma.service.findMany({
-      where: { isActive: true },
-      select: { slug: true },
-    })
-    return services.filter(s => s.slug).map(s => ({ slug: s.slug! }))
-  } catch (error) {
-    console.error('Error in generateStaticParams for services/[slug]:', error)
-    return []
-  }
-}
-
 function getRegionFromRequest(): 'LK' | 'CA' {
-  try {
-    const headersList = headers()
-    const host = headersList.get('host') || ''
-    return host.includes('ca.') ? 'CA' : 'LK'
-  } catch {
-    return 'LK'
-  }
+  const headersList = headers()
+  const host = headersList.get('host') || ''
+  return host.includes('ca.') ? 'CA' : 'LK'
 }
 
 function getHostname(): string {
-  try {
-    const headersList = headers()
-    return headersList.get('host') || 'maintainex.lk'
-  } catch {
-    return 'maintainex.lk'
-  }
+  const headersList = headers()
+  return headersList.get('host') || 'maintainex.lk'
 }
+
+export const dynamic = 'force-dynamic'
+
+const DEFAULT_REGION = 'LK' as const
+const DEFAULT_HOST = 'maintainex.lk'
 
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   try {
-    const regionKey = getRegionFromRequest()
-    const host = getHostname()
+    const regionKey = DEFAULT_REGION
+    const host = DEFAULT_HOST
     const c = REGIONS[regionKey].countryName
     const isCA = regionKey === 'CA'
     const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
