@@ -12,7 +12,7 @@ const securityHeaders = {
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
 
@@ -51,24 +51,21 @@ async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const token = authHeader.substring(7)
-      const payload = token.split('.')[0]
-      const decoded = JSON.parse(atob(payload))
-      if (decoded.id && decoded.email && decoded.role) {
-        return {
-          id: decoded.id,
-          email: decoded.email,
-          role: decoded.role,
-          branchId: decoded.branchId || null,
-          province: decoded.province || null,
-          region: decoded.region || null,
-          name: decoded.name || null,
-          canEditServices: decoded.canEditServices || false,
-          authType: decoded.authType || 'admin',
-        }
+    const token = authHeader.substring(7)
+    const payload = verifySimpleToken(token)
+    if (payload && payload.id && payload.email && payload.role) {
+      return {
+        id: payload.id,
+        email: payload.email,
+        role: payload.role,
+        branchId: payload.branchId || null,
+        province: payload.province || null,
+        region: payload.region || null,
+        name: payload.name || null,
+        canEditServices: payload.canEditServices || false,
+        authType: payload.authType || 'admin',
       }
-    } catch {}
+    }
   }
 
   const token = request.cookies.get('admin_token')?.value
@@ -149,8 +146,8 @@ async function checkRateLimit(
     }
   } catch {
     return {
-      remaining: config.maxRequests,
-      resetAt: new Date(now.getTime() + config.windowSeconds * 1000),
+      remaining: 0,
+      resetAt: new Date(Date.now() + 5000),
     }
   }
 }
@@ -243,7 +240,8 @@ export async function middleware(request: NextRequest) {
              request.headers.get('x-real-ip') || 
              'unknown'
   
-  const rateLimitType = pathname.startsWith('/api/auth') ? 'auth' : 'admin'
+  const isLoginRoute = pathname.startsWith('/api/auth') || pathname.startsWith('/api/admin/auth')
+  const rateLimitType = isLoginRoute ? 'auth' : 'admin'
   const rateLimit = await checkRateLimit(ip, 'IP', rateLimitType)
   
   let response: NextResponse
@@ -346,7 +344,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/') &&
     pathname !== '/api/auth/login' &&
     pathname !== '/api/auth/logout' &&
-    !pathname.startsWith('/api/admin/auth/') &&
+    !pathname.startsWith('/api/admin/') &&
     pathname !== '/api/seed/auto' &&
     pathname !== '/api/seed/admin' &&
     pathname !== '/api/seed/test-data' &&

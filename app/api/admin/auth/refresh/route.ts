@@ -4,6 +4,11 @@ import { verifyRefreshToken, signAccessToken, signRefreshToken, generateRefreshT
 import { getIp } from '@/lib/admin-rbac'
 import type { AdminRole } from '@/lib/admin-types'
 
+function parseCountries(val: string): string[] {
+  if (!val) return []
+  try { const p = JSON.parse(val); return Array.isArray(p) ? p : [] } catch { return val.split(',').map(c => c.trim()).filter(Boolean) }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const refreshToken = request.cookies.get('refresh_token')?.value
@@ -34,7 +39,7 @@ export async function POST(request: NextRequest) {
       role: adminUser.role as AdminRole,
       firstName: adminUser.firstName,
       lastName: adminUser.lastName,
-      assignedCountries: adminUser.assignedCountries ? JSON.parse(adminUser.assignedCountries) : [],
+      assignedCountries: parseCountries(adminUser.assignedCountries),
     })
 
     await prisma.adminSession.update({

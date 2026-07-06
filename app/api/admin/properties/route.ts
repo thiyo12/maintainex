@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth-utils'
+import { getSessionFromCookie, adminAuthorize } from '@/lib/admin-rbac'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rawSession = getSessionFromCookie(request)
+    const auth = adminAuthorize(['SUPER_ADMIN', 'ADMIN'])(rawSession)
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
 
     const { searchParams } = new URL(request.url)

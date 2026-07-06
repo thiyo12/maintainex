@@ -10,6 +10,11 @@ const TEMP_TOKEN_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-pr
 const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 30
 
+function parseCountries(val: string): string[] {
+  if (!val) return []
+  try { const p = JSON.parse(val); return Array.isArray(p) ? p : [] } catch { return val.split(',').map(c => c.trim()).filter(Boolean) }
+}
+
 async function recordLoginAttempt(params: {
   adminUserId?: string
   email: string
@@ -89,7 +94,7 @@ export async function POST(request: NextRequest) {
       role: adminUser.role as AdminRole,
       firstName: adminUser.firstName,
       lastName: adminUser.lastName,
-      assignedCountries: adminUser.assignedCountries ? JSON.parse(adminUser.assignedCountries) : [],
+      assignedCountries: parseCountries(adminUser.assignedCountries),
     })
 
     const session = await prisma.adminSession.create({
@@ -112,7 +117,7 @@ export async function POST(request: NextRequest) {
         role: adminUser.role,
         firstName: adminUser.firstName,
         lastName: adminUser.lastName,
-        assignedCountries: adminUser.assignedCountries ? JSON.parse(adminUser.assignedCountries) : [],
+        assignedCountries: parseCountries(adminUser.assignedCountries),
       },
     })
 

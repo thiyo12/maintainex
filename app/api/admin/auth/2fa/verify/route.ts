@@ -8,6 +8,11 @@ import type { AdminRole } from '@/lib/admin-types'
 
 const TEMP_TOKEN_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production'
 
+function parseCountries(val: string): string[] {
+  if (!val) return []
+  try { const p = JSON.parse(val); return Array.isArray(p) ? p : [] } catch { return val.split(',').map(c => c.trim()).filter(Boolean) }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -52,7 +57,7 @@ export async function POST(request: NextRequest) {
       role: adminUser.role as AdminRole,
       firstName: adminUser.firstName,
       lastName: adminUser.lastName,
-      assignedCountries: adminUser.assignedCountries ? JSON.parse(adminUser.assignedCountries) : [],
+      assignedCountries: parseCountries(adminUser.assignedCountries),
     })
 
     const session = await prisma.adminSession.create({
@@ -75,7 +80,7 @@ export async function POST(request: NextRequest) {
         role: adminUser.role,
         firstName: adminUser.firstName,
         lastName: adminUser.lastName,
-        assignedCountries: adminUser.assignedCountries ? JSON.parse(adminUser.assignedCountries) : [],
+        assignedCountries: parseCountries(adminUser.assignedCountries),
       },
     })
 

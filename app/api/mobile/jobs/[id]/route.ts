@@ -9,8 +9,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const job = await prisma.jobPosting.findUnique({
-      where: { id: params.id },
+    const where: Record<string, unknown> = { id: params.id }
+    if (user.role === 'CUSTOMER') {
+      where.customerId = user.id
+    }
+
+    const job = await prisma.jobPosting.findFirst({
+      where: where as any,
       include: {
         customer: { select: { id: true, name: true, phone: true } },
         bids: {
