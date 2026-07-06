@@ -92,7 +92,7 @@ async function checkRateLimit(
   identifier: string,
   type: 'IP' | 'USER',
   limitType = 'default'
-): Promise<{ remaining: number; resetAt: Date }> {
+): Promise<{ remaining: number; resetAt: Date; limited?: boolean }> {
   const config = RATE_LIMITS[limitType as keyof typeof RATE_LIMITS] || RATE_LIMITS.default
   const now = new Date()
   const windowStart = new Date(now.getTime() - config.windowSeconds * 1000)
