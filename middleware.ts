@@ -367,6 +367,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/') &&
     pathname !== '/api/auth/login' &&
     pathname !== '/api/auth/logout' &&
+    pathname !== '/api/health' &&
     !pathname.startsWith('/api/admin/') &&
     pathname !== '/api/seed/auto' &&
     pathname !== '/api/seed/admin' &&
