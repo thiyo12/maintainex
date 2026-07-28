@@ -8,10 +8,8 @@ RUN apt-get update && apt-get install -y openssl build-essential python3 && rm -
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
-
 COPY prisma ./prisma/
-RUN npx prisma generate
+RUN npm install
 
 COPY . .
 
