@@ -185,9 +185,9 @@ export default function HomeClient() {
       {/* FIXED NAVBAR */}
       <nav className="fixed top-0 left-0 w-full h-20 bg-[#0B0C12]/80 backdrop-blur-md border-b border-white/10 z-50">
         <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center justify-between">
-          <a href="#hero" className="flex items-center gap-2">
-            <span className="font-extrabold text-xl text-white tracking-tight">Maintain</span>
-            <span className="font-extrabold text-xl text-brand tracking-tight">EX</span>
+          <a href="#hero" className="flex items-center gap-2.5">
+            <img src="/logo.JPEG" alt="MaintainEX" className="w-8 h-8 rounded-full object-cover" />
+            <span className="font-extrabold text-xl tracking-tight"><span className="text-white">Maintain</span><span className="text-brand">EX</span></span>
           </a>
           <ul className="hidden md:flex items-center gap-8">
             <li><a href="#hero" className="text-white hover:text-brand transition font-medium">Home</a></li>
@@ -870,9 +870,9 @@ export default function HomeClient() {
         <div className="max-w-7xl mx-auto px-6 py-16">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6 md:gap-8">
             <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="font-extrabold text-xl text-white">Maintain</span>
-                <span className="font-extrabold text-xl text-brand">EX</span>
+              <div className="flex items-center gap-2.5 mb-4">
+                <img src="/logo.JPEG" alt="MaintainEX" className="w-8 h-8 rounded-full object-cover" />
+                <span className="font-extrabold text-xl tracking-tight"><span className="text-white">Maintain</span><span className="text-brand">EX</span></span>
               </div>
               <p className="text-gray-400 text-sm max-w-xs mb-4">Your trusted task marketplace. Verified professionals, transparent pricing, 100% satisfaction guaranteed.</p>
               <div className="flex items-center gap-2 text-sm text-gray-400">
