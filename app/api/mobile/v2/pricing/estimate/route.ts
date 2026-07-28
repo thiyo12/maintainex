@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       categoryId, categoryName, description, title,
       areaId, cityId, stateId, countryCode,
       urgency, preferredDate, preferredTime,
-      estimatedDuration, workersCount,
+      estimatedDuration, workersCount, materialHandling,
     } = body
 
     if (!categoryId) {
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       preferredTime,
       estimatedDuration: estimatedDuration ? Number(estimatedDuration) : undefined,
       workersCount: workersCount ? Number(workersCount) : undefined,
+      materialHandling: materialHandling || 'tasker_brings',
     })
 
     return NextResponse.json(estimate)

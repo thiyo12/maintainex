@@ -1,17 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Platform } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Platform } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../lib/i18n'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bell, Briefcase, MagnifyingGlass, ChatCircle, User, Flame, Star, CheckCircle, Lightning, ArrowRight, MapPin, Clock, Wallet, House, Buildings, Note, CaretRight, Users, Trophy, Wrench, Sun } from 'phosphor-react-native'
+import { Bell, Briefcase, MagnifyingGlass, ChatCircle, User, Flame, Star, CheckCircle, Lightning, ArrowRight, MapPin, Clock, Wallet, House, Buildings, CaretRight, Users, Trophy, Wrench, Sun } from 'phosphor-react-native'
 import * as Notifications from 'expo-notifications'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Jobs } from '../../../lib/api-v2'
 import { taskers as api } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
-import { matchCategory } from '../../../lib/aiMatch'
 import StatsCard from '../../../components/ui/StatsCard'
 import JobCard from '../../../components/ui/JobCard'
 import JobLifecycleTracker from '../../../components/ui/JobLifecycleTracker'
@@ -36,9 +35,6 @@ export default function TaskerDashboard() {
   const [openJobs, setOpenJobs] = useState<any[]>([])
   const [myJobs, setMyJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [aiQuery, setAiQuery] = useState('')
-  const [aiMatchResult, setAiMatchResult] = useState<ReturnType<typeof matchCategory>>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const lastPollRef = useRef<string>(new Date().toISOString())
   const pollIntervalRef = useRef<ReturnType<typeof setInterval>>()
   const alertedJobsRef = useRef<Set<string>>(new Set())
@@ -109,14 +105,6 @@ export default function TaskerDashboard() {
     return () => sub.remove()
   }, [])
 
-  const handleAiChange = useCallback((text: string) => {
-    setAiQuery(text)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      setAiMatchResult(matchCategory(text))
-    }, 400)
-  }, [])
-
   const getGreeting = () => {
     const h = new Date().getHours()
     if (h < 12) return t('home.greeting.morning')
@@ -157,24 +145,18 @@ export default function TaskerDashboard() {
         {/* AI Search */}
         <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
           <AISearchBar
-            value={aiQuery}
-            onChangeText={handleAiChange}
             placeholder={t('tasker.searchJobs')}
+            onCategorySelect={(catId, catName) => {
+              router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+            }}
+            onJobSelect={(jobId, jobName) => {
+              router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+            }}
+            onPostJob={(query) => {
+              router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+            }}
           />
         </View>
-
-        {/* AI correction */}
-        {aiMatchResult && aiMatchResult.correctedText && aiQuery.length > 0 && (
-          <View style={[styles.correctionCard, { backgroundColor: colors.surface, borderColor: colors.amber }]}>
-            <Note size={17} color={colors.amberDark} weight="fill" />
-            <Text style={[styles.correctionText, { color: colors.muted }]}>
-              {t('home.didYouMean')}{' '}
-              <Text style={{ color: colors.ink, fontFamily: fonts.headingBold }}>
-                {aiMatchResult.categoryName}
-              </Text>
-            </Text>
-          </View>
-        )}
 
         {/* Stats row */}
         <View style={styles.statsRow}>
@@ -378,8 +360,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
   onlineToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   onlineDot: { width: 8, height: 8, borderRadius: 4 },
   onlineText: { fontSize: 12, fontFamily: fonts.bodySemiBold },
-  correctionCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 8, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', padding: 12 },
-  correctionText: { fontSize: 11, fontFamily: fonts.body, flex: 1 },
   statsRow: { flexDirection: 'row', gap: 10, marginHorizontal: 16, marginTop: 16 },
   statCard: { flex: 1, borderRadius: 20, padding: 16, alignItems: 'center', gap: 4, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
   statValue: { fontSize: 22, fontFamily: fonts.headingBold, letterSpacing: -0.5 },

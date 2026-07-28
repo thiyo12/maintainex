@@ -7,7 +7,6 @@ ARCHIVE_NAME="maintainex-full-backup-${DATE}.tar.gz"
 WORK_DIR=$(mktemp -d)
 PROJECT_DIR="/Users/thiyoth/Documents/NEWM/maintainex"
 SERVER="root@147.93.106.54"
-SERVER_PASS="iloveBEAT21@"
 
 echo "=== Maintainex Full Backup ==="
 echo "Date: $DATE"
@@ -30,8 +29,6 @@ mkdir -p "$WORK_DIR/database"
 expect << EXPBACKUP > /dev/null 2>&1
 set timeout 60
 spawn ssh -o StrictHostKeyChecking=no $SERVER
-expect "password:"
-send "$SERVER_PASS\r"
 expect "#"
 send "docker exec \$(docker ps --format '{{.Names}}' | grep maintainex-db | head -1) pg_dump -U postgres -d postgres --clean --if-exists -f /tmp/maintainex-live-dump.sql 2>&1\r"
 expect "#"

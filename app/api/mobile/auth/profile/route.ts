@@ -11,7 +11,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { name, phone } = await request.json()
+    const { name, phone, profileImage } = await request.json()
 
     if (name !== undefined && name !== user.name) {
       if (user.lastNameChangedAt) {
@@ -32,6 +32,7 @@ export async function PUT(request: NextRequest) {
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
     if (phone !== undefined) updateData.phone = phone
+    if (profileImage !== undefined) updateData.profileImage = profileImage
     if (name !== undefined && name !== user.name) updateData.lastNameChangedAt = new Date()
 
     const updated = await prisma.user.update({

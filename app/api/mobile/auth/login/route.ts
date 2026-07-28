@@ -4,8 +4,6 @@ import bcrypt from 'bcryptjs'
 import { createToken } from '@/lib/mobile-auth'
 import { checkRateLimit } from '@/lib/rate-limit'
 
-const TEST_CODE = process.env.TEST_LOGIN_CODE
-
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
@@ -33,8 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
     }
 
-    const isTestCode = TEST_CODE && password === TEST_CODE
-    const valid = isTestCode || await bcrypt.compare(password, user.passwordHash)
+    const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }

@@ -35,8 +35,7 @@ export default function CustomerInbox() {
   }, [fetchData])
 
   const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
-  const activeConversations = conversationsData.filter(c => !c.jobStatus || !CLOSED_STATUSES.includes(c.jobStatus))
-  const filtered = activeConversations.filter(c =>
+  const filtered = conversationsData.filter(c =>
     c.otherUser?.name?.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -97,11 +96,18 @@ export default function CustomerInbox() {
                   <Text style={[styles.lastMsg, item.unreadCount > 0 && styles.lastMsgUnread]} numberOfLines={1}>
                     {item.lastMessage?.text || ''}
                   </Text>
-                  {item.unreadCount > 0 ? (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{item.unreadCount}</Text>
-                    </View>
-                  ) : null}
+                  <View style={styles.badgesRow}>
+                    {item.jobStatus && CLOSED_STATUSES.includes(item.jobStatus) && (
+                      <View style={styles.closedBadge}>
+                        <Text style={styles.closedBadgeText}>Closed</Text>
+                      </View>
+                    )}
+                    {item.unreadCount > 0 ? (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadText}>{item.unreadCount}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
               </View>
             </View>
@@ -167,6 +173,12 @@ const makeStyles = (colors: any) => StyleSheet.create({
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   lastMsg: { fontSize: 13, color: colors.muted, flex: 1, marginRight: 8 },
   lastMsgUnread: { fontWeight: '600', color: colors.ink },
+  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  closedBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+  },
+  closedBadgeText: { fontSize: 10, fontWeight: '600', color: '#DC2626' },
   unreadBadge: {
     backgroundColor: colors.warning,
     minWidth: 20, height: 20, borderRadius: 10,

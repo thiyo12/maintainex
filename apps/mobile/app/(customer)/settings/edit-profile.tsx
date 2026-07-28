@@ -3,8 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert,
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { useAuth } from '../../../lib/auth'
-import { auth } from '../../../lib/api'
+import { auth, upload } from '../../../lib/api'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 
@@ -17,7 +18,9 @@ export default function EditProfileScreen() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [profileImage, setProfileImage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const fadeAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -26,8 +29,32 @@ export default function EditProfileScreen() {
       setName(user.name || '')
       setEmail(user.email || '')
       setPhone(user.phone || '')
+      setProfileImage(user.profileImage || '')
     }
   }, [user])
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert(t('common.error'), 'Camera roll permission is required')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    })
+    if (!result.canceled && result.assets[0]) {
+      setUploading(true)
+      try {
+        const { url } = await upload.file(result.assets[0].uri)
+        setProfileImage(url)
+      } catch {
+        Alert.alert(t('common.error'), 'Failed to upload image')
+      } finally {
+        setUploading(false)
+      }
+    }
+  }
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -36,7 +63,7 @@ export default function EditProfileScreen() {
     }
     setSaving(true)
     try {
-      await auth.updateProfile({ name, phone })
+      await auth.updateProfile({ name, phone, profileImage: profileImage || undefined })
       await refreshUser()
       Alert.alert(t('common.success'), t('common.success'))
       router.back()
@@ -56,12 +83,24 @@ export default function EditProfileScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.avatarSection}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{name.charAt(0) || 'U'}</Text>
-            </View>
-            <TouchableOpacity style={styles.changePhotoBtn}>
-              <Ionicons name="camera-outline" size={16} color={colors.customerAccent} />
-              <Text style={styles.changePhotoText}> {t('common.edit')}</Text>
+            {profileImage ? (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{name.charAt(0) || 'U'}</Text>
+              </View>
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{name.charAt(0) || 'U'}</Text>
+              </View>
+            )}
+            <TouchableOpacity style={styles.changePhotoBtn} onPress={pickImage} disabled={uploading}>
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.customerAccent} />
+              ) : (
+                <>
+                  <Ionicons name="camera-outline" size={16} color={colors.customerAccent} />
+                  <Text style={styles.changePhotoText}> {t('common.edit')}</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
 

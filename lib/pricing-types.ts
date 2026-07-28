@@ -6,6 +6,7 @@ export type TimeOfDay = 'day' | 'night'
 export type DemandLevel = 'low' | 'normal' | 'high' | 'surge'
 export type MarketComparison = 'below_average' | 'average' | 'slightly_above' | 'premium'
 export type Confidence = 'high' | 'medium' | 'low'
+export type MaterialHandling = 'tasker_brings' | 'customer_provides' | 'quote_both'
 
 export interface PriceEstimateRequest {
   categoryId: string
@@ -21,6 +22,7 @@ export interface PriceEstimateRequest {
   preferredTime?: TimeOfDay
   estimatedDuration?: number
   workersCount?: number
+  materialHandling?: MaterialHandling
 }
 
 export interface PriceBreakdownItem {
@@ -35,6 +37,15 @@ export interface MarketInsight {
   label: string
 }
 
+export interface DetectedMaterial {
+  name: string
+  quantity: number
+  unit: string
+  unitPrice: number
+  totalPrice: number
+  source: string
+}
+
 export interface PriceEstimate {
   currency: CurrencyCode
   symbol: string
@@ -45,6 +56,11 @@ export interface PriceEstimate {
   confidence: Confidence
   warning: string | null
   suggestion: string | null
+  materialHandling?: MaterialHandling
+  materials?: DetectedMaterial[]
+  totalMaterialCost?: number
+  labourOnlyRange?: { min: number; max: number }
+  withMaterialsRange?: { min: number; max: number }
 }
 
 export interface PricingModelWeights {

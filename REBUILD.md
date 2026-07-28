@@ -89,11 +89,11 @@ curl http://localhost:3000
 | Setting | Value |
 |---------|-------|
 | Database User | postgres |
-| Database Password | rdxddze9prbobul5 |
+| Database Password | *** (stored in VPS environment variables) |
 | Database Name | postgres |
 | Server IP | 147.93.106.54 |
 | Dokploy URL | http://147.93.106.54:3000 |
-| Dokploy Login | thiyothman7@gmail.com |
+| Dokploy Login | *** (stored in VPS environment variables) |
 | Domain | maintainex.lk |
 | Cloudflare SSL | Full (not Full Strict) |
 

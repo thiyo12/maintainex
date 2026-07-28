@@ -12,9 +12,9 @@ import AppStoreModal from './AppStoreModal'
 const navigation = [
   { name: 'Home', href: '/' },
   { name: 'Services', href: '/services' },
+  { name: 'How It Works', href: '/#how-it-works' },
   { name: 'About', href: '/about' },
-  { name: 'Careers', href: '/careers' },
-  { name: 'Contact', href: '/contact' },
+  { name: 'Vision', href: '/vision' },
 ]
 
 export default function Header() {
@@ -67,15 +67,12 @@ export default function Header() {
 
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            <button
-              onClick={() => setShowSignIn(true)}
-              className="px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground rounded-full border border-border hover:border-amber-300 transition-colors"
+            <Link
+              href="/vision"
+              className="px-4 py-2.5 text-sm font-semibold bg-amber-500 hover:bg-amber-600 text-black rounded-full transition-colors"
             >
-              <span className="flex items-center gap-1.5">
-                <LogIn className="w-3.5 h-3.5" />
-                Sign in
-              </span>
-            </button>
+              Join Waitlist
+            </Link>
           </div>
 
           <div className="flex items-center gap-1">

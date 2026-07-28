@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useTheme } from '../../lib/ThemeContext'
 import { useAuth } from '../../lib/auth'
-import { matchCategory } from '../../lib/aiMatch'
 import { v2Jobs } from '../../lib/api-v2'
 import { realEstate } from '../../lib/api'
 import CategoryPills from '../../components/ui/CategoryPills'
@@ -27,28 +26,12 @@ export default function PostJobScreen() {
   const [budgetMin, setBudgetMin] = useState('')
   const [budgetMax, setBudgetMax] = useState('')
   const [openToQuotes, setOpenToQuotes] = useState(true)
-  const [aiQuery, setAiQuery] = useState('')
-  const [aiMatch, setAiMatch] = useState<ReturnType<typeof matchCategory>>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
     AsyncStorage.getItem('active-role').then(v => {
       if (v === 'individual' || v === 'company') setRole(v)
     })
   }, [])
-
-  const handleAiChange = useCallback((text: string) => {
-    setAiQuery(text)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      const result = matchCategory(text)
-      setAiMatch(result)
-      if (result) {
-        setSelectedCat(result.categoryId)
-        if (title === '') setTitle(result.categoryName)
-      }
-    }, 400)
-  }, [title])
 
   const handleRoleChange = (r: 'individual' | 'company') => {
     setRole(r)
@@ -122,30 +105,18 @@ export default function PostJobScreen() {
 
         {/* AI Search Bar */}
         <AISearchBar
-          value={aiQuery}
-          onChangeText={handleAiChange}
           placeholder={t('postJob.titlePlaceholder')}
+          onCategorySelect={(catId, catName) => {
+            setSelectedCat(catId)
+            if (title === '') setTitle(catName)
+          }}
+          onJobSelect={(jobId, jobName) => {
+            router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+          }}
+          onPostJob={(query) => {
+            router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+          }}
         />
-
-        {/* AI correction card */}
-        {aiMatch?.correctedText && aiQuery.length > 0 && (
-          <View style={[styles.correctionCard, { backgroundColor: colors.surface, borderColor: colors.amber }]}>
-            <Ionicons name="text-outline" size={17} color={colors.amberDark} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.correctionText, { color: colors.muted }]}>
-                {t('home.didYouMean')}{' '}
-                <Text style={{ color: colors.ink, fontFamily: 'Outfit_800ExtraBold' }}>
-                  {aiMatch.categoryName}
-                </Text>
-                ?{' '}
-                <Text style={{ textDecorationLine: 'line-through', opacity: 0.5 }}>
-                  {aiQuery}
-                </Text>
-                {' → '}matched
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* Title */}
         <Text style={[styles.fieldLabel, { color: colors.muted }]}>{t('postJob.jobTitle')}</Text>
@@ -288,17 +259,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
     elevation: 3,
   },
   segText: { fontSize: 12, fontFamily: 'Outfit_700Bold' },
-  correctionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    padding: 12,
-    marginBottom: 12,
-  },
-  correctionText: { fontSize: 11, fontFamily: 'Outfit_700Bold' },
   fieldLabel: {
     fontSize: 11,
     fontFamily: 'Outfit_700Bold',

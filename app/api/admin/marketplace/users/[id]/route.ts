@@ -27,6 +27,9 @@ export async function GET(
         phone: true,
         role: true,
         isActive: true,
+        isSuspended: true,
+        suspendedUntil: true,
+        suspensionReason: true,
         identityStatus: true,
         createdAt: true,
         updatedAt: true,
@@ -66,7 +69,9 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, data: user })
+    const isBanned = !user.isActive && !user.isSuspended
+
+    return NextResponse.json({ success: true, data: { ...user, isBanned } })
   } catch (e) {
     console.error('User detail error:', e)
     return NextResponse.json({ success: false, error: 'Failed to fetch user' }, { status: 500 })
@@ -97,19 +102,19 @@ export async function PATCH(
 
     switch (action) {
       case 'suspend':
-        updateData = { isActive: false }
+        updateData = { isActive: false, isSuspended: true }
         auditAction = 'SUSPEND'
         break
       case 'unsuspend':
-        updateData = { isActive: true }
+        updateData = { isActive: true, isSuspended: false, suspendedUntil: null, suspensionReason: null }
         auditAction = 'UNSUSPEND'
         break
       case 'ban':
-        updateData = { isActive: false }
+        updateData = { isActive: false, isSuspended: false }
         auditAction = 'BAN'
         break
       case 'unban':
-        updateData = { isActive: true }
+        updateData = { isActive: true, isSuspended: false }
         auditAction = 'UNBAN'
         break
     }

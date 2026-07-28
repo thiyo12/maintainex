@@ -1634,6 +1634,8 @@ model MarketplaceJob {
   workersCount     Int       @default(1)
   status           String    @default("OPEN") // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
   isActive         Boolean   @default(true)
+  aiEstimateJson   String?   // JSON-encoded AI price estimate
+  materialHandling String?   // tasker_brings, customer_provides, quote_both
   currentWave      Int       @default(0)
   waveSentAt       DateTime?
   createdAt        DateTime  @default(now())
@@ -2365,4 +2367,18 @@ model ProviderJobResponse {
 
   @@index([providerId])
   @@index([jobId])
+}
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  role      String
+  location  String?
+  createdAt DateTime @default(now())
+
+  @@unique([email])
+  @@index([role])
+  @@index([createdAt])
 }

@@ -73,7 +73,18 @@ export async function GET(
     )
 
     return NextResponse.json({
-      job: { ...job, budgetAmount: Number(job.budgetAmount), customer, locationName, quotes: enrichedQuotes, escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null, workspace: workspace || null, reviews: { customerReviews, providerReviews }, acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: Number(acceptedQuote.price), provider: acceptedProvider } : null },
+      job: {
+        ...job,
+        budgetAmount: Number(job.budgetAmount),
+        aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
+        customer,
+        locationName,
+        quotes: enrichedQuotes,
+        escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null,
+        workspace: workspace || null,
+        reviews: { customerReviews, providerReviews },
+        acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: Number(acceptedQuote.price), provider: acceptedProvider } : null,
+      },
     })
   } catch (error) {
     console.error('Get job error:', error)

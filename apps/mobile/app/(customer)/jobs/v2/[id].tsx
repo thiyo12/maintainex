@@ -274,11 +274,31 @@ export default function V2JobDetailScreen() {
         {/* ─── Quotes ─── */}
         {job.status === 'OPEN' && quotes.length > 0 && (
           <View style={styles.section}>
+            {(job as any).aiEstimate && (
+              <View style={[styles.aiEstimateBanner, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
+                <Warning size={16} color="#D97706" weight="fill" />
+                <Text style={[styles.aiEstimateBannerText, { color: '#92400E' }]}>
+                  AI estimate was {((job as any).aiEstimate.symbol || 'LKR')} {((job as any).aiEstimate.priceRange?.min || 0).toLocaleString()}–{((job as any).aiEstimate.priceRange?.max || 0).toLocaleString()}
+                  {((job as any).aiEstimate.materialHandling === 'tasker_brings') ? ' with materials' : ''}. Quotes below show how taskers compare.
+                </Text>
+              </View>
+            )}
             <View style={styles.quotesHeader}>
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>Quotes Received</Text>
               <View style={styles.quoteCountBadge}><Text style={styles.quoteCountText}>{quotes.length}</Text></View>
             </View>
-            {quotes.map((q) => (
+            {quotes.map((q) => {
+              const aiEst = (job as any).aiEstimate
+              let quoteTag: { label: string; color: string; bg: string } | null = null
+              if (aiEst?.priceRange) {
+                const price = Number(q.price)
+                if (price < aiEst.priceRange.min) {
+                  quoteTag = { label: 'Below AI estimate', color: '#065F46', bg: '#DCFCE7' }
+                } else if (price > aiEst.priceRange.max) {
+                  quoteTag = { label: 'Above AI estimate', color: '#92400E', bg: '#FEF3C7' }
+                }
+              }
+              return (
               <View key={q.id} style={[styles.quoteCard, { backgroundColor: colors.white }]}>
                 <View style={styles.quoteTop}>
                   <View style={[styles.quoteAvatar, { backgroundColor: colors.amberLight }]}>
@@ -288,7 +308,14 @@ export default function V2JobDetailScreen() {
                     <Text style={[styles.quoteProvider, { color: colors.ink }]}>{q.provider?.name || 'Provider'}</Text>
                     <Text style={[styles.quoteMeta, { color: colors.muted }]}>{q.providerType} • {q.estimatedCompletionTime}</Text>
                   </View>
-                  <Text style={styles.quotePrice}>LKR {q.price}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.quotePrice}>LKR {q.price}</Text>
+                    {quoteTag && (
+                      <View style={[styles.quoteTag, { backgroundColor: quoteTag.bg }]}>
+                        <Text style={[styles.quoteTagText, { color: quoteTag.color }]}>{quoteTag.label}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
                 {q.message ? <Text style={[styles.quoteMsg, { color: colors.ink }]}>{q.message}</Text> : null}
                 {q.status === 'PENDING' && (
@@ -302,7 +329,8 @@ export default function V2JobDetailScreen() {
                   </View>
                 )}
               </View>
-            ))}
+              )
+            })}
           </View>
         )}
 
@@ -552,10 +580,15 @@ const makeStyles = (colors: any) => StyleSheet.create({
   quoteProvider: { fontSize: 15, fontFamily: fonts.bodyMedium },
   quoteMeta: { fontSize: 12, fontFamily: fonts.body, marginTop: 2 },
   quotePrice: { fontSize: 18, fontFamily: fonts.heading, letterSpacing: -0.3, color: colors.amberDark },
+  quoteTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 },
+  quoteTagText: { fontSize: 10, fontFamily: fonts.bodySemiBold },
   quoteMsg: { fontSize: 13, fontFamily: fonts.body, opacity: 0.7, lineHeight: 20, marginBottom: 12, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
   quoteActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   quoteActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   quoteActionBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+
+  aiEstimateBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 12 },
+  aiEstimateBannerText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1, lineHeight: 18 },
 
   addressForm: { width: '100%', marginTop: 8 },
   input: { borderWidth: 1.5, borderRadius: 16, padding: 14, fontSize: 14, fontFamily: fonts.body, marginBottom: 10 },

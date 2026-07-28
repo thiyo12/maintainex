@@ -1,8 +1,5 @@
 import { NextRequest } from 'next/server'
-
-if (!process.env.NEXTAUTH_SECRET) {
-  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
-}
+import { verifySimpleToken } from './admin-auth'
 
 export interface SessionUser {
   id: string
@@ -16,23 +13,6 @@ export interface SessionUser {
 }
 
 export async function getSession(request: NextRequest): Promise<SessionUser | null> {
-  const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
-
-  function verifySimpleToken(token: string): any {
-    try {
-      const [encoded, signature] = token.split('.')
-      if (!encoded || !signature) return null
-      const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-      if (signature !== expectedSig) return null
-      const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
-      const maxAge = 30 * 24 * 60 * 60 * 1000
-      if (Date.now() - payload.created > maxAge) return null
-      return payload
-    } catch {
-      return null
-    }
-  }
-
   // Try Bearer token header first
   const authHeader = request.headers.get('Authorization')
   if (authHeader && authHeader.startsWith('Bearer ')) {

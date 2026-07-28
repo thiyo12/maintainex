@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, FlatList, StyleSheet, RefreshControl } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
@@ -9,6 +8,7 @@ import { useCountry } from '../../../lib/country'
 import CategoryCard from '../../../components/find/CategoryCard'
 import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
+import AISearchBar from '../../../components/shared/AISearchBar'
 
 export default function FindJobCategories() {
   const { t } = useTranslation()
@@ -16,7 +16,6 @@ export default function FindJobCategories() {
     const styles = makeStyles(colors)
   const [categories, setCategories] = useState<any[]>([])
   const [filtered, setFiltered] = useState<any[]>([])
-  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const { selectedCountry } = useCountry()
@@ -37,16 +36,7 @@ export default function FindJobCategories() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  useEffect(() => { fetch() }, [fetch])
-
-  useEffect(() => {
-    if (!search.trim()) {
-      setFiltered(categories)
-    } else {
-      const q = search.toLowerCase()
-      setFiltered(categories.filter(c => c.name.toLowerCase().includes(q)))
-    }
-  }, [search, categories])
+  useEffect(() => { fetch()   }, [fetch])
 
   const onRefresh = () => {
     setRefreshing(true)
@@ -62,19 +52,18 @@ export default function FindJobCategories() {
         <Text style={styles.subtitle}>{t('find.subtitle', { n: totalJobs, m: categories.length })}</Text>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color="#9CA3AF" style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={t('find.search')}
-          placeholderTextColor="#9CA3AF"
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search ? (
-          <Ionicons name="close-circle" size={18} color="#9CA3AF" onPress={() => setSearch('')} />
-        ) : null}
-      </View>
+      <AISearchBar
+        placeholder={t('find.search')}
+        onCategorySelect={(catId, catName) => {
+          router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+        }}
+        onJobSelect={(jobId, jobName) => {
+          router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+        }}
+        onPostJob={(query) => {
+          router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+        }}
+      />
 
       {loading ? (
         <SkeletonLoader count={8} height={72} />
@@ -108,18 +97,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 22, fontWeight: '700', color: '#1F2937' },
   subtitle: { fontSize: 13, color: '#9CA3AF', marginTop: 4 },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    paddingHorizontal: 12,
-    height: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  searchInput: { flex: 1, fontSize: 14, color: '#1F2937' },
   list: { paddingHorizontal: 16, paddingBottom: 32 },
 })

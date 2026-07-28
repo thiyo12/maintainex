@@ -237,6 +237,15 @@ export interface MarketInsight {
   label: string
 }
 
+export interface DetectedMaterial {
+  name: string
+  quantity: number
+  unit: string
+  unitPrice: number
+  totalPrice: number
+  source: string
+}
+
 export interface PriceEstimate {
   currency: string
   symbol: string
@@ -247,6 +256,11 @@ export interface PriceEstimate {
   confidence: 'high' | 'medium' | 'low'
   warning: string | null
   suggestion: string | null
+  materialHandling?: 'tasker_brings' | 'customer_provides' | 'quote_both'
+  materials?: DetectedMaterial[]
+  totalMaterialCost?: number
+  labourOnlyRange?: { min: number; max: number }
+  withMaterialsRange?: { min: number; max: number }
 }
 
 export const v2Pricing = {
@@ -263,7 +277,26 @@ export const v2Pricing = {
     preferredTime?: string
     estimatedDuration?: number
     workersCount?: number
+    materialHandling?: 'tasker_brings' | 'customer_provides' | 'quote_both'
   }) => v2Request<PriceEstimate>('/api/mobile/v2/pricing/estimate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  getMaterials: (data: {
+    categoryId: string
+    description: string
+    title?: string
+    countryCode?: string
+  }) => v2Request<{
+    materials: { name: string; quantity: number; unit: string; unitPrice: number; totalPrice: number; source: string }[]
+    totalMaterialCost: number
+    labourRange: { min: number; max: number }
+    currency: string
+    symbol: string
+    confidence: string
+    hasMaterials: boolean
+  }>('/api/mobile/v2/pricing/materials', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
@@ -280,7 +313,12 @@ export interface SearchResult {
 
 export const v2Search = {
   categories: (q: string, lang?: string) =>
-    v2Request<{ query: string; lang: string; results: SearchResult[] }>(
+    v2Request<{
+      query: string; lang: string; correctedQuery?: string;
+      categories: { id: string; name: string; icon: string; colorHex: string; score: number; correctedQuery?: string }[];
+      subServices: { id: string; name: string; categoryId: string; categoryName: string; categoryIcon: string; categoryColor: string; score: number }[];
+      totalResults: number;
+    }>(
       `/api/mobile/v2/search?q=${encodeURIComponent(q)}${lang ? `&lang=${lang}` : ''}`
     ),
   popular: () =>

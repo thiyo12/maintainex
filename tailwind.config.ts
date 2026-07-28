@@ -24,6 +24,8 @@ const config: Config = {
         ink: 'var(--ink)',
         cream: 'var(--cream)',
         'amber-soft': '#FEF3E2',
+        brand: { DEFAULT: '#F59E0B', light: '#FBBF24', dark: '#D97706' },
+        surface: { DEFAULT: '#15161E', deep: '#0B0C12' },
         primary: {
           50: '#FFFBEB',
           100: '#FEF3C7',

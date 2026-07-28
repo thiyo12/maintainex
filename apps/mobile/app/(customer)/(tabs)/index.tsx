@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react'
-import { View, Text, TextInput, Image, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, RefreshControl, Alert } from 'react-native'
+import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, Animated, ActivityIndicator, RefreshControl, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { MagnifyingGlass, Sparkle, Lightning, Drop, Snowflake, Palette, Laptop, Bell, Fire, Users, MapPin, Briefcase, CaretRight, PaperPlaneRight, Bookmark, Buildings, Heart, PlusCircle, CheckCircle, ChatCircle, List, ArrowRight, TextT, Tag, Globe, Star, Trophy, Clock, Wallet, Rocket, ShieldCheck } from 'phosphor-react-native'
+import { MagnifyingGlass, Sparkle, Lightning, Drop, Snowflake, Palette, Laptop, Bell, Fire, Users, MapPin, Briefcase, CaretRight, PaperPlaneRight, Bookmark, Buildings, Heart, PlusCircle, CheckCircle, ChatCircle, List, Tag, Globe, Star, Trophy, Clock, Wallet, Rocket, ShieldCheck } from 'phosphor-react-native'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
 import { v2Jobs, v2Quotes, v2Match } from '../../../lib/api-v2'
-import { taskers, conversations, templateJobs } from '../../../lib/api'
-import { matchCategory } from '../../../lib/aiMatch'
+import { taskers, conversations } from '../../../lib/api'
 import { getCategoryImageUrl } from '../../../lib/categories'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../lib/i18n'
@@ -19,6 +18,7 @@ import BookingSheet from '../../../components/offers/BookingSheet'
 import type { BookingFormData } from '../../../components/offers/BookingSheet'
 import SeasonalOffersComponent from '../../../components/offers/SeasonalOffers'
 import CategoryGrid from '../../../components/offers/CategoryGrid'
+import AISearchBar from '../../../components/shared/AISearchBar'
 
 
 function usePulse() {
@@ -56,7 +56,6 @@ export default function CustomerHome() {
   const { t } = useTranslation()
 
   const pulseScale = usePulse()
-  const floatY = useFloat(600)
 
   const categories = useMemo(() => [
     { id: 'all', icon: Sparkle, label: t('home.categories.all') },
@@ -81,15 +80,10 @@ export default function CustomerHome() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [selectedCat, setSelectedCat] = useState('all')
-  const [aiQuery, setAiQuery] = useState('')
-  const [aiMatchResult, setAiMatchResult] = useState<ReturnType<typeof matchCategory>>(null)
-  const [suggestions, setSuggestions] = useState<{ id: string; name: string }[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
-  const glowAnim = useRef(new Animated.Value(0)).current
   const [staggerKey, setStaggerKey] = useState(0)
   const [selectedOffer, setSelectedOffer] = useState<typeof hotOffers[0] | null>(null)
   const [bookingVisible, setBookingVisible] = useState(false)
+  const [recentConversations, setRecentConversations] = useState<any[]>([])
 
   const { newJobId } = useLocalSearchParams<{ newJobId?: string }>()
 
@@ -112,12 +106,6 @@ export default function CustomerHome() {
   const cardStagger = useStagger(totalCards, 100, 60, staggerKey)
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 1500, useNativeDriver: false }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 1500, useNativeDriver: false }),
-      ])
-    ).start()
     const unsub = on('jobsChanged', (jobId?: string) => {
       if (jobId) setMyJobs(prev => prev.filter(j => j.id !== jobId))
       setRefreshKey(k => k + 1)
@@ -165,33 +153,12 @@ export default function CustomerHome() {
         const allTaskers = await taskers.list().catch(() => null)
         setRelatedProviders((allTaskers || MOCK_PROVIDERS).slice(0, 10))
       }
+      conversations.list().then((data: any[]) => {
+        setRecentConversations(data.slice(0, 3))
+      }).catch(() => {})
     } catch (e) { console.error('Load jobs error:', e)
     } finally { setLoading(false); setRefreshing(false); setStaggerKey(k => k + 1) }
   }, [selectedCat])
-
-  const handleAiChange = useCallback((text: string) => {
-    setAiQuery(text)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-
-    if (text.length >= 2) {
-      templateJobs.search(text).then(results => {
-        setSuggestions(results.map((r: any) => ({ id: r.id, name: r.name })))
-        setShowSuggestions(true)
-      }).catch(() => setSuggestions([]))
-    } else {
-      setSuggestions([])
-      setShowSuggestions(false)
-    }
-
-    debounceRef.current = setTimeout(() => {
-      const result = matchCategory(text)
-      setAiMatchResult(result)
-      if (result) {
-        const cat = categories.find(c => result.categoryName.toLowerCase().includes(c.id) || c.id === result.categoryName.toLowerCase())
-        if (cat) setSelectedCat(cat.id)
-      }
-    }, 400)
-  }, [])
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -200,14 +167,11 @@ export default function CustomerHome() {
     return t('home.greeting.evening')
   }
 
-  const glowOpacity = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.5] })
-  const glowScale = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.05] })
-
   const handleOfferPress = (offer: typeof hotOffers[0]) => { setSelectedOffer(offer); setBookingVisible(true) }
   const handleBookingConfirm = (data: BookingFormData) => { setBookingVisible(false); setSelectedOffer(null); Alert.alert(t('home.bookingConfirmedTitle'), t('home.bookingConfirmedMessage', { date: data.date, timeSlot: data.timeSlot })) }
   const handleBookingClose = () => { setBookingVisible(false); setSelectedOffer(null) }
   const handleSeasonalServicePress = (jobId: string, jobName: string) => {
-    router.push(`/(customer)/jobs/v2/create?templateJobId=${jobId}&title=${encodeURIComponent(jobName)}`)
+    router.push(`/(customer)/find/job/${jobId}`)
   }
   const parseOfferPrice = (price: string): number | undefined => { const m = price.replace(/,/g, '').match(/(\d+)/); return m ? parseInt(m[1], 10) : undefined }
   const startChat = async (p: any) => {
@@ -352,54 +316,23 @@ export default function CustomerHome() {
         </View>
 
         {/* ─── Search ─── */}
-        <View style={styles.aiWrap}>
-          <Animated.View style={[styles.glowRing, { opacity: glowOpacity, transform: [{ scale: glowScale }] }]} />
-          <Animated.View style={[styles.aiBar, { backgroundColor: colors.white, borderColor: aiMatchResult ? colors.amber : colors.border + '60' }]}>
-            <Sparkle size={16} color={colors.amberDark} weight="fill" style={styles.aiSpark} />
-            <TextInput
-              style={[styles.aiInput, { color: colors.ink }]}
-              placeholder={t('home.searchPlaceholder')}
-              placeholderTextColor={colors.muted}
-              value={aiQuery}
-              onChangeText={handleAiChange}
-            />
-            <TouchableOpacity style={styles.aiBtn} onPress={() => { if (aiMatchResult && aiMatchResult.categoryName) loadJobs() }}>
-              <ArrowRight size={13} color="#111827" weight="bold" />
-            </TouchableOpacity>
-          </Animated.View>
-          {aiMatchResult && aiMatchResult.correctedText && aiQuery.length > 0 && (
-            <View style={[styles.correctionCard, { backgroundColor: colors.amberBg }]}>
-              <TextT size={14} color={colors.amberDark} weight="regular" />
-              <Text style={[styles.correctionText, { color: colors.ink }]}>
-                {t('home.didYouMean')}<Text style={{ fontFamily: fonts.heading }}>{aiMatchResult.categoryName}</Text>?
-              </Text>
-            </View>
-          )}
-          {showSuggestions && suggestions.length > 0 && (
-            <View style={[styles.suggestionsDropdown, { backgroundColor: colors.white, borderColor: colors.border }]}>
-              {suggestions.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.suggestionItem, { borderBottomColor: colors.border }]}
-                  onPress={() => {
-                    setShowSuggestions(false)
-                    setAiQuery(item.name)
-                    router.push(`/(customer)/jobs/v2/create?templateJobId=${item.id}&title=${encodeURIComponent(item.name)}`)
-                  }}
-                >
-                  <Text style={[styles.suggestionText, { color: colors.ink }]}>{item.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
+        <AISearchBar
+          placeholder={t('home.searchPlaceholder')}
+          onCategorySelect={(catId, catName) => {
+            router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+          }}
+          onJobSelect={(jobId, jobName) => {
+            router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+          }}
+          onPostJob={(query) => {
+            router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+          }}
+        />
 
         {/* ─── Category Grid ─── */}
         <CategoryGrid
-          onCategoryPress={(id, name) => {
+          onCategoryPress={(id) => {
             setSelectedCat(id === selectedCat ? 'all' : id)
-            setAiMatchResult(null)
-            setAiQuery('')
           }}
           onServicePress={handleSeasonalServicePress}
         />
@@ -481,6 +414,15 @@ export default function CustomerHome() {
                     {p.rating ? <Text style={[styles.providerMetaText, { color: colors.amber }]}><Star size={10} color={colors.amber} weight="fill" /> {p.rating.toFixed(1)}</Text> : null}
                     {p.badge ? <View style={[styles.providerBadge, { backgroundColor: p.badgeColor || '#6366F1' }]}><Text style={styles.providerBadgeText}>{p.badge}</Text></View> : null}
                   </View>
+                  {(p.skills || p.categories) && (
+                    <View style={styles.providerSkillsRow}>
+                      {(p.skills || p.categories || []).slice(0, 3).map((s: string, i: number) => (
+                        <View key={i} style={[styles.providerSkillChip, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
+                          <Text style={[styles.providerSkillText, { color: colors.amberDark }]} numberOfLines={1}>{s}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                   {p.completedJobs > 0 && <Text style={[styles.providerExp, { color: colors.muted }]}>{p.completedJobs} jobs</Text>}
                   {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.fixedRate}</Text> : null}
                 </TouchableOpacity>
@@ -595,6 +537,54 @@ export default function CustomerHome() {
           </View>
         </View>
 
+        {recentConversations.length > 0 && (
+          <View>
+            <View style={styles.secRow}>
+              <View style={styles.secTitleRow}>
+                <ChatCircle size={16} color={colors.amberDark} weight="regular" />
+                <Text style={[styles.secTitle, { color: colors.ink }]}>{t('customer.messages')}</Text>
+              </View>
+              <TouchableOpacity style={styles.secMore} onPress={() => router.push('/(tabs)/inbox')}>
+                <Text style={[styles.secMoreText, { color: colors.amberDark }]}>{t('common.viewAll')}</Text>
+                <CaretRight size={12} color={colors.amberDark} weight="bold" />
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.feedSection]}>
+              {recentConversations.map((conv: any) => (
+                <TouchableOpacity
+                  key={conv.id}
+                  style={[styles.convCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+                  onPress={() => router.push(`/(chat)/${conv.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.convAvatar, { backgroundColor: colors.customerAccent }]}>
+                    <Text style={styles.convAvatarText}>{conv.otherUser?.name?.[0] || '?'}</Text>
+                  </View>
+                  <View style={styles.convContent}>
+                    <View style={styles.convTopRow}>
+                      <Text style={[styles.convName, { color: colors.ink }]} numberOfLines={1}>{conv.otherUser?.name || 'Unknown'}</Text>
+                      {conv.lastMessage?.createdAt && (
+                        <Text style={[styles.convTime, { color: colors.muted }]}>
+                          {(() => {
+                            const d = new Date(conv.lastMessage.createdAt)
+                            const diff = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24))
+                            if (diff === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            if (diff === 1) return t('common.yesterday')
+                            return d.toLocaleDateString()
+                          })()}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={[styles.convLastMsg, { color: colors.muted }]} numberOfLines={1}>
+                      {conv.lastMessage?.text || t('customer.noMessages')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={{ height: 80 }} />
       </ScrollView>
 
@@ -638,18 +628,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
   tierStat: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   tierStatText: { fontSize: 12, fontFamily: fonts.bodyMedium },
   tierStatDiv: { width: 1, height: 14, backgroundColor: colors.border },
-
-  aiWrap: { marginHorizontal: 8, marginTop: 8, position: 'relative' },
-  glowRing: { position: 'absolute', inset: -8, borderRadius: 26, backgroundColor: colors.amber, opacity: 0.2, shadowColor: colors.amber, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 8 },
-  aiBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 20, borderWidth: 1.5, paddingVertical: 13, paddingLeft: 44, paddingRight: 48 },
-  aiSpark: { position: 'absolute', left: 16 },
-  aiInput: { flex: 1, fontSize: 14, fontFamily: fonts.bodyMedium },
-  aiBtn: { position: 'absolute', right: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: colors.amber, justifyContent: 'center', alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
-  correctionCard: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, borderRadius: 14, padding: 12 },
-  correctionText: { fontSize: 13, fontFamily: fonts.body, flex: 1 },
-  suggestionsDropdown: { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, borderRadius: 14, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8, zIndex: 200, overflow: 'hidden' },
-  suggestionItem: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 0.5 },
-  suggestionText: { fontSize: 14, fontFamily: fonts.body },
 
   pillsScroll: { gap: 8, paddingHorizontal: 8, paddingVertical: 8 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 100, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.white },
@@ -739,6 +717,17 @@ const makeStyles = (colors: any) => StyleSheet.create({
   providerMetaText: { fontSize: 11, fontFamily: fonts.bodyMedium },
   providerBadge: { paddingHorizontal: 5, paddingVertical: 2, borderRadius: 4 },
   providerBadgeText: { fontSize: 8, fontFamily: fonts.bodySemiBold, color: '#fff' },
+  providerSkillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  providerSkillChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 0.5 },
+  providerSkillText: { fontSize: 9, fontFamily: fonts.bodyMedium },
   providerExp: { fontSize: 10, fontFamily: fonts.body, color: colors.muted },
   providerRate: { fontSize: 13, fontFamily: fonts.heading, marginTop: 2 },
+  convCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 14, marginBottom: 6, borderWidth: 1 },
+  convAvatar: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  convAvatarText: { fontSize: 16, fontFamily: fonts.heading, color: '#fff' },
+  convContent: { flex: 1 },
+  convTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  convName: { fontSize: 14, fontFamily: fonts.bodyMedium, flex: 1, marginRight: 8 },
+  convTime: { fontSize: 11, fontFamily: fonts.body },
+  convLastMsg: { fontSize: 13, fontFamily: fonts.body },
 })

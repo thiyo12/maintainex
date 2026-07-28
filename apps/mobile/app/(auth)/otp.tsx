@@ -12,8 +12,6 @@ import { fonts } from '../../lib/fonts'
 import { fontSizes } from '../../lib/tokens'
 import { spacing, borderRadius } from '../../lib/tokens'
 
-const TEST_OTP_BYPASS = process.env.EXPO_PUBLIC_TEST_OTP_CODE || '000000'
-
 export default function OtpScreen() {
   const colors = useColors()
     const styles = makeStyles(colors)
@@ -26,7 +24,6 @@ export default function OtpScreen() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(true)
   const [resendTimer, setResendTimer] = useState(60)
-  const [devCode, setDevCode] = useState('')
   const inputRefs = useRef<(TextInput | null)[]>([])
 
   useEffect(() => {
@@ -47,11 +44,7 @@ export default function OtpScreen() {
   const sendOtp = async () => {
     setSending(true)
     try {
-      const res = await auth.sendOtp({ phone: phone || '' })
-      if (res.devCode) {
-        setDevCode(res.devCode)
-        fillCode(res.devCode)
-      }
+      await auth.sendOtp({ phone: phone || '' })
     } catch (err: any) {
       Alert.alert(t('common.error'), t('errors.failedToSendCode'))
     } finally {
@@ -88,15 +81,6 @@ export default function OtpScreen() {
       return
     }
 
-    // Dev bypass: accept test code without server call
-    if (code === TEST_OTP_BYPASS) {
-      const userRole = role || 'CUSTOMER'
-      if (userRole === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
-      else if (userRole === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
-      else router.replace('/(customer)')
-      return
-    }
-
     setLoading(true)
     try {
       await auth.verifyOtp({ phone: phone || '', code })
@@ -127,10 +111,6 @@ export default function OtpScreen() {
       <Text style={[styles.subtitle, { color: colors.inkLight }]}>
         {t('auth.otp.description')}{phone || ''}
       </Text>
-
-      {devCode ? (
-        <Text style={[styles.devHint, { color: colors.success, backgroundColor: colors.successLight }]}>{t('auth.otp.devCode')}{devCode}{t('auth.otp.autoFilled')}</Text>
-      ) : null}
 
       <View style={styles.codeRow}>
         {codes.map((digit, i) => (
@@ -194,16 +174,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
   backText: { fontSize: fontSizes.body, fontFamily: fonts.label },
   title: { fontSize: fontSizes.h1, fontFamily: fonts.headingBold, marginBottom: spacing.sm },
   subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, marginBottom: spacing.sm, lineHeight: 24 },
-  devHint: {
-    fontSize: fontSizes.caption,
-    fontFamily: fonts.label,
-    textAlign: 'center',
-    marginBottom: spacing.xxl,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
-  },
   codeRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

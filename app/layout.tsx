@@ -92,7 +92,7 @@ export default function RootLayout({
   const siteJson = websiteSchema(region)
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={region === 'CA' ? 'en-CA' : 'en-LK'} className="dark" suppressHydrationWarning>
       <head>
         <link rel="llms-txt" href={`${baseUrl}/llms.txt`} />
         <meta name="llms" content={`${baseUrl}/llms.txt`} />

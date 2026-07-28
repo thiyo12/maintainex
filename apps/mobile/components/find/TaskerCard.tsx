@@ -12,10 +12,11 @@ interface Props {
   isOnline: boolean
   distance?: number
   hourlyRate: number
+  skills?: string[]
   onPress: () => void
 }
 
-export default function TaskerCard({ name, rating, completedJobs, isVerified, isOnline, distance, hourlyRate, onPress }: Props) {
+export default function TaskerCard({ name, rating, completedJobs, isVerified, isOnline, distance, hourlyRate, skills, onPress }: Props) {
   const colors = useColors()
   const { t } = useTranslation()
   const styles = makeStyles(colors)
@@ -54,8 +55,19 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
           </View>
         </View>
         <View style={styles.bottom}>
-          <View style={[styles.statusDot, { backgroundColor: isOnline ? '#10B981' : colors.border }]} />
-          <Text style={[styles.statusText, { color: colors.muted }]}>{isOnline ? t('common.online') : t('common.offline')}</Text>
+          {skills && skills.length > 0 && (
+            <View style={styles.skillsRow}>
+              {skills.slice(0, 3).map((s, i) => (
+                <View key={i} style={[styles.skillChip, { backgroundColor: colors.border }]}>
+                  <Text style={[styles.skillText, { color: colors.muted }]} numberOfLines={1}>{s}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, { backgroundColor: isOnline ? '#10B981' : colors.border }]} />
+            <Text style={[styles.statusText, { color: colors.muted }]}>{isOnline ? t('common.online') : t('common.offline')}</Text>
+          </View>
         </View>
       </View>
     </PressScale>
@@ -91,7 +103,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   rateCol: { alignItems: 'flex-end' },
   rate: { fontSize: 15, fontWeight: '700' },
   rateLabel: { fontSize: 10 },
-  bottom: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 6 },
+  bottom: { marginTop: 8, gap: 6 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 12 },
+  skillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  skillChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  skillText: { fontSize: 11, fontFamily: 'Outfit_500Medium' },
 })

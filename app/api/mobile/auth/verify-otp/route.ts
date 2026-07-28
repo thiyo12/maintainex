@@ -2,19 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-const TEST_OTP = process.env.TEST_OTP_CODE
-
 export async function POST(request: NextRequest) {
   try {
     const { phone, code } = await request.json()
 
     if (!phone || !code) {
       return NextResponse.json({ error: 'Phone and code required' }, { status: 400 })
-    }
-
-    // Test OTP bypass
-    if (TEST_OTP && code === TEST_OTP) {
-      return NextResponse.json({ success: true })
     }
 
     const user = await prisma.user.findFirst({ where: { phone } })

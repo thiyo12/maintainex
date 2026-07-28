@@ -8,7 +8,9 @@ import {
   PriceEstimateRequest, PriceEstimate, PriceBreakdownItem,
   MarketInsight, MarketComparison, Confidence, PricingModelWeights,
   COMPLEXITY_KEYWORDS, URGENCY_MULTIPLIERS, TIME_MULTIPLIERS,
+  MaterialHandling, DetectedMaterial,
 } from './pricing-types'
+import { detectMaterials } from './materials-detect'
 
 const BASE_RATES_CAD: Record<string, { base: number; min: number; max: number }> = {
   cleaning: { base: 70, min: 50, max: 120 },
@@ -189,7 +191,7 @@ function estimateTimeText(estimatedDuration: number, complexity: ComplexityLevel
 }
 
 function cacheKey(req: PriceEstimateRequest): string {
-  return `${req.categoryId}|${req.countryCode || 'LK'}|${req.areaId || ''}|${req.cityId || ''}|${req.urgency || 'normal'}|${req.estimatedDuration || 0}|${req.workersCount || 1}`
+  return `${req.categoryId}|${req.countryCode || 'LK'}|${req.areaId || ''}|${req.cityId || ''}|${req.urgency || 'normal'}|${req.estimatedDuration || 0}|${req.workersCount || 1}|${req.materialHandling || 'none'}`
 }
 
 async function getCached(cacheKeyStr: string): Promise<PriceEstimate | null> {
@@ -221,6 +223,7 @@ export async function getPriceEstimate(req: PriceEstimateRequest): Promise<Price
   const urgency: UrgencyLevel = req.urgency || 'normal'
   const workersCount = Math.max(1, req.workersCount || 1)
   const config = getCountryConfig(countryCode)
+  const materialHandling: MaterialHandling = req.materialHandling || 'tasker_brings'
 
   const cacheKeyStr = cacheKey(req)
   const cached = await getCached(cacheKeyStr)
@@ -231,7 +234,11 @@ export async function getPriceEstimate(req: PriceEstimateRequest): Promise<Price
   const duration = req.estimatedDuration || estimateDuration(req.description, req.title, complexity.level)
   const timing = analyzeTiming(req.preferredDate, req.preferredTime)
   const urgencyMultiplier = URGENCY_MULTIPLIERS[urgency]
-  const materialCost = estimateMaterialCost(req.description, req.title)
+
+  const materialDetection = detectMaterials(req.categoryId, [req.title, req.description].filter(Boolean).join(' '), countryCode)
+  const materialCost = materialDetection.hasMaterials && materialHandling !== 'customer_provides'
+    ? materialDetection.totalMaterialCost
+    : 0
 
   const isHourly = baseRateData.isHourly
   const basePrice = isHourly
@@ -245,10 +252,29 @@ export async function getPriceEstimate(req: PriceEstimateRequest): Promise<Price
   const modelWeights = await getModelWeights(req.categoryId, countryCode)
   const modelMultiplier = modelWeights ? modelWeights.demandMultiplier : 1.0
 
-  const subTotal = (basePrice + complexityAdj + urgencyAdj + timingAdj + distanceCost + materialCost) * modelMultiplier
-  const finalBase = Math.round(subTotal / (isHourly ? 1 : 100)) * (isHourly ? 1 : 100)
-  const finalMin = Math.round(finalBase * 0.85)
-  const finalMax = Math.round(finalBase * 1.25)
+  const labourOnlyBase = basePrice + complexityAdj + urgencyAdj + timingAdj + distanceCost
+  const labourOnlyTotal = Math.round((labourOnlyBase * modelMultiplier) / (isHourly ? 1 : 100)) * (isHourly ? 1 : 100)
+  const labourOnlyMin = Math.round(labourOnlyTotal * 0.85)
+  const labourOnlyMax = Math.round(labourOnlyTotal * 1.25)
+
+  const withMaterialsTotal = labourOnlyTotal + materialCost
+  const withMaterialsMin = labourOnlyMin + materialCost
+  const withMaterialsMax = labourOnlyMax + materialCost
+
+  let finalBase: number, finalMin: number, finalMax: number
+  if (materialHandling === 'customer_provides') {
+    finalBase = labourOnlyTotal
+    finalMin = labourOnlyMin
+    finalMax = labourOnlyMax
+  } else if (materialHandling === 'quote_both') {
+    finalBase = labourOnlyTotal
+    finalMin = labourOnlyMin
+    finalMax = labourOnlyMax
+  } else {
+    finalBase = withMaterialsTotal
+    finalMin = withMaterialsMin
+    finalMax = withMaterialsMax
+  }
 
   const regionalData = await getRegionalPriceIndex(req.categoryId, countryCode, req.areaId, req.cityId)
   const marketInsight = getMarketComparison(finalBase, regionalData)
@@ -272,9 +298,8 @@ export async function getPriceEstimate(req: PriceEstimateRequest): Promise<Price
     breakdown.push({ label: 'Distance surcharge', amount: distanceCost })
   }
   if (materialCost > 0) {
-    breakdown.push({ label: 'Materials estimate', amount: materialCost })
+    breakdown.push({ label: 'Materials cost', amount: materialCost })
   }
-
   if (modelMultiplier > 1.0) {
     breakdown.push({ label: 'Market demand adjustment', amount: Math.round((finalBase - (finalBase / modelMultiplier))) })
   }
@@ -289,6 +314,11 @@ export async function getPriceEstimate(req: PriceEstimateRequest): Promise<Price
     confidence,
     warning,
     suggestion,
+    materialHandling,
+    materials: materialDetection.hasMaterials ? materialDetection.materials : undefined,
+    totalMaterialCost: materialDetection.hasMaterials ? materialDetection.totalMaterialCost : undefined,
+    labourOnlyRange: materialDetection.hasMaterials ? { min: labourOnlyMin, max: labourOnlyMax } : undefined,
+    withMaterialsRange: materialDetection.hasMaterials ? { min: withMaterialsMin, max: withMaterialsMax } : undefined,
   }
 
   await setCached(cacheKeyStr, estimate)

@@ -87,9 +87,7 @@ export default function QuickBooking() {
         district,
         notes,
       })
-      Alert.alert(t('booking.confirmed'), t('booking.paymentSecured'), [
-        { text: t('common.ok'), onPress: () => router.push('/(customer)/(tabs)') }
-      ])
+      router.push(`/(customer)/booking/confirmed?bookingId=${result.booking?.id || jobId}`)
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message || t('errors.generic'))
     } finally {

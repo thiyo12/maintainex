@@ -1,14 +1,20 @@
-if (!process.env.NEXTAUTH_SECRET && process.env.NODE_ENV === 'production') {
-  throw new Error('NEXTAUTH_SECRET environment variable is required in production')
+import crypto from 'crypto'
+
+const JWT_SECRET: string = process.env.NEXTAUTH_SECRET!
+if (!JWT_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is required')
 }
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
+
+function hmacSign(data: string): string {
+  return crypto.createHmac('sha256', JWT_SECRET).update(data).digest('hex')
+}
 
 export function verifySimpleToken(token: string): any {
   try {
     const [encoded, signature] = token.split('.')
     if (!encoded || !signature) return null
-    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-    if (signature !== expectedSig) return null
+    const expectedSig = hmacSign(encoded)
+    if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSig, 'hex'))) return null
     const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
     const maxAge = 30 * 24 * 60 * 60 * 1000
     if (Date.now() - payload.created > maxAge) return null
@@ -21,7 +27,7 @@ export function verifySimpleToken(token: string): any {
 export function createSimpleToken(data: any): string {
   const payload = { ...data, created: Date.now() }
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64')
-  const signature = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+  const signature = hmacSign(encoded)
   return `${encoded}.${signature}`
 }
 

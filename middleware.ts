@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-if (!process.env.NEXTAUTH_SECRET) {
-  console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+const JWT_SECRET = process.env.NEXTAUTH_SECRET
+if (!JWT_SECRET) {
+  throw new Error('NEXTAUTH_SECRET environment variable is required')
 }
 
 const securityHeaders = {
@@ -30,15 +31,27 @@ const RATE_LIMITS = {
   admin: { maxRequests: 200, windowSeconds: 60 },
 }
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
-
-function verifySimpleToken(token: string): any {
+async function verifySimpleToken(token: string): Promise<any> {
   try {
     const [encoded, signature] = token.split('.')
     if (!encoded || !signature) return null
-    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
-    if (signature !== expectedSig) return null
-    const payload = JSON.parse(Buffer.from(encoded, 'base64').toString())
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(JWT_SECRET),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    )
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      Uint8Array.from(atob(signature), c => c.charCodeAt(0)),
+      new TextEncoder().encode(encoded)
+    )
+    if (!valid) return null
+
+    const payload = JSON.parse(atob(encoded))
     const maxAge = 30 * 24 * 60 * 60 * 1000
     if (Date.now() - payload.created > maxAge) return null
     return payload
@@ -52,7 +65,7 @@ async function getSession(request: NextRequest) {
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7)
-    const payload = verifySimpleToken(token)
+    const payload = await verifySimpleToken(token)
     if (payload && payload.id && payload.email && payload.role) {
       return {
         id: payload.id,
@@ -72,7 +85,7 @@ async function getSession(request: NextRequest) {
   
   if (!token) return null
   
-  const payload = verifySimpleToken(token)
+  const payload = await verifySimpleToken(token)
   if (!payload) return null
   
   return {
@@ -226,15 +239,12 @@ function isAiCrawler(request: NextRequest): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Bypass all middleware checks for known AI crawlers
+  // Allow AI crawlers to index content with standard security headers
   if (isAiCrawler(request)) {
     const response = NextResponse.next()
-    // Allow AI crawlers to index and read content
     response.headers.set('X-Robots-Tag', 'all')
     response.headers.set('Cache-Control', 'public, max-age=3600')
-    // Remove restrictive CSP for AI crawlers that blocks their fetch
-    response.headers.set('Content-Security-Policy', "default-src 'self'; img-src 'self' data: https:;")
-    return response
+    return applySecurityHeaders(response)
   }
   
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
@@ -370,7 +380,6 @@ export async function middleware(request: NextRequest) {
     pathname !== '/api/health' &&
     !pathname.startsWith('/api/admin/') &&
     pathname !== '/api/seed/auto' &&
-    pathname !== '/api/seed/admin' &&
     pathname !== '/api/seed/test-data' &&
     pathname !== '/api/seed/real-estate' &&
     pathname !== '/api/real-estate' &&

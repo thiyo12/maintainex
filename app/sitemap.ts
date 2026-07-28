@@ -5,7 +5,7 @@ import type { MetadataRoute } from 'next'
 
 export const dynamic = 'force-dynamic'
 
-const STATIC_PATHS = ['/', '/services', '/about', '/contact', '/booking', '/careers']
+const STATIC_PATHS = ['/', '/services', '/about', '/contact', '/booking', '/careers', '/vision', '/waitlist']
 
 const ALL_SERVICE_SLUGS = [
   'cleaning', 'plumbing', 'electrical', 'painting', 'roofing', 'hvac',

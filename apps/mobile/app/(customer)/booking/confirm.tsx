@@ -9,6 +9,27 @@ import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 
+const TIME_SLOTS = [
+  '08:00 - 09:00', '09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00',
+  '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '15:00 - 16:00',
+  '16:00 - 17:00', '17:00 - 18:00',
+]
+
+const getNext7Days = () => {
+  const days = []
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date()
+    d.setDate(d.getDate() + i)
+    days.push(d.toISOString().split('T')[0])
+  }
+  return days
+}
+
+const formatDate = (dateStr: string) => {
+  const d = new Date(dateStr + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
 export default function BookingConfirmScreen() {
   const { t } = useTranslation()
   const colors = useColors()
@@ -22,10 +43,17 @@ export default function BookingConfirmScreen() {
   const total = baseAmount
   const fee = Math.round(total * 0.05)
   const [district, setDistrict] = useState('')
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    return tomorrow.toISOString().split('T')[0]
+  })
+  const [selectedSlot, setSelectedSlot] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const handleConfirm = async () => {
     if (!district) { Alert.alert(t('common.error'), t('errors.enterDistrict')); return }
+    if (!selectedDate || !selectedSlot) { Alert.alert(t('common.error'), t('errors.fillAllFields')); return }
     setSubmitting(true)
     try {
       const res = await bookings.create({
@@ -35,8 +63,8 @@ export default function BookingConfirmScreen() {
         serviceId: jobId || '',
         district,
         address: '',
-        date: new Date().toISOString().split('T')[0],
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: selectedDate,
+        time: selectedSlot,
         notes: bidId ? `Bid: ${bidId}` : '',
         budgetMin: budgetMin || undefined,
         budgetMax: budgetMax || undefined,
@@ -57,9 +85,38 @@ export default function BookingConfirmScreen() {
         <View style={styles.summary}>
           <Text style={styles.sumTitle}>{t('booking.serviceBooking')}</Text>
           <Text style={styles.sumDetail}>{taskerName || t('customer.tasker')} • {t('customer.professional')}</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Ionicons name="calendar-outline" size={16} color={colors.gray} />
-            <Text style={styles.sumDetail}>{t('booking.today')}</Text>
+        </View>
+
+        <View style={styles.summary}>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>{t('components.selectDate')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            {getNext7Days().map((dateStr) => {
+              const isSelected = selectedDate === dateStr
+              return (
+                <TouchableOpacity
+                  key={dateStr}
+                  style={[styles.dateChip, isSelected && { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                  onPress={() => setSelectedDate(dateStr)}
+                >
+                  <Text style={[styles.dateChipText, isSelected && { color: colors.primary, fontWeight: '600' }]}>{formatDate(dateStr)}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </ScrollView>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.dark, marginBottom: 8 }}>{t('components.selectTime')}</Text>
+          <View style={styles.timeSlotsWrap}>
+            {TIME_SLOTS.map((slot) => {
+              const isSelected = selectedSlot === slot
+              return (
+                <TouchableOpacity
+                  key={slot}
+                  style={[styles.timeSlot, isSelected && { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                  onPress={() => setSelectedSlot(slot)}
+                >
+                  <Text style={[styles.timeSlotText, isSelected && { color: colors.primary, fontWeight: '600' }]}>{slot}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
         </View>
 
@@ -193,6 +250,17 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   sumTitle: { fontSize: 17, fontWeight: '700', color: colors.dark, marginBottom: 8 },
   sumDetail: { fontSize: 14, color: colors.gray, marginBottom: 4 },
+  dateChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+    backgroundColor: '#fff', marginRight: 8, borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  dateChipText: { fontSize: 13, color: '#374151' },
+  timeSlotsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  timeSlot: {
+    width: '48%', paddingVertical: 10, borderRadius: 10,
+    backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center',
+  },
+  timeSlotText: { fontSize: 13, color: '#374151' },
   payment: {
     backgroundColor: colors.white,
     marginHorizontal: 24,

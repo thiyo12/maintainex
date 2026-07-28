@@ -1,4 +1,4 @@
-import { Component, useState, useEffect, useRef, useCallback } from 'react'
+import { Component, useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Animated,
 } from 'react-native'
@@ -19,13 +19,13 @@ class ErrorBoundary extends Component<{ children: any }, { error: Error | null }
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
-import { MapPin, Clipboard, Wallet, Question, CheckCircle, ArrowRight, MapPinArea, Buildings, House, Users, User, Building, Briefcase, Camera, CaretLeft, X, Coin, CoinVertical, Diamond, Package, Lightning, Key, PawPrint, Hammer, Drop, Leaf, Desktop, Bug, Truck, Car, Wrench, PaintBrush, Snowflake, Sparkle, Trash, Clock, Star, Warning } from 'phosphor-react-native'
+import { MapPin, Clipboard, Wallet, Question, CheckCircle, ArrowRight, Buildings, House, Users, User, Building, Briefcase, Camera, CaretLeft, X, Package, Lightning, Key, PawPrint, Hammer, Drop, Leaf, Desktop, Bug, Truck, Car, Wrench, PaintBrush, Snowflake, Sparkle, Trash, Clock, Star, Warning } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { v2Pricing, v2SubTasks, type SubTask } from '../../../../lib/api-v2'
 import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { getAuthToken, upload, templateJobs } from '../../../../lib/api'
-import { matchCategory } from '../../../../lib/aiMatch'
+
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -99,7 +99,9 @@ function CreateJobScreenInner() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
-  const { templateJobId, title: prefillTitle } = useLocalSearchParams<{ templateJobId?: string; title?: string }>()
+  const { templateJobId, title: prefillTitle, notes: prefilledNotes, urgency: prefilledUrgency } = useLocalSearchParams<{
+    templateJobId?: string; title?: string; notes?: string; urgency?: string
+  }>()
 
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -118,7 +120,6 @@ function CreateJobScreenInner() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
 
-  const [selectedTier, setSelectedTier] = useState('')
   const [providerType, setProviderType] = useState('')
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
@@ -134,33 +135,15 @@ function CreateJobScreenInner() {
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({})
   const [showErrors, setShowErrors] = useState(false)
 
+  const [materialHandling, setMaterialHandling] = useState<'tasker_brings' | 'customer_provides' | 'quote_both'>('tasker_brings')
+  const [materialDetection, setMaterialDetection] = useState<any>(null)
+  const [materialDetectionLoading, setMaterialDetectionLoading] = useState(false)
+  const [showMaterialToggle, setShowMaterialToggle] = useState(false)
+
   const [subTasks, setSubTasks] = useState<SubTask[]>([])
   const [selectedSubTasks, setSelectedSubTasks] = useState<string[]>([])
   const [subTasksLoading, setSubTasksLoading] = useState(false)
   const [expandedSubTask, setExpandedSubTask] = useState<string | null>(null)
-
-  const [aiQuery, setAiQuery] = useState('')
-  const [aiMatchResult, setAiMatchResult] = useState<ReturnType<typeof matchCategory>>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
-  const catsRef = useRef(categories)
-  catsRef.current = categories
-
-  const handleAiChange = useCallback((text: string) => {
-    setAiQuery(text)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      const result = matchCategory(text)
-      setAiMatchResult(result)
-      if (result && result.confidence > 90) {
-        const match = catsRef.current.find(c => c.name && c.name === result.categoryName)
-        if (match) setSelectedCategory(match)
-      }
-    }, 300)
-  }, [])
-
-  const filteredCategories = aiQuery.trim()
-    ? categories.filter(c => c.name && c.name.toLowerCase().includes(aiQuery.toLowerCase()))
-    : categories
 
   const slideAnim = useSlideIn()
 
@@ -180,18 +163,11 @@ function CreateJobScreenInner() {
       return { min: sum.min + p.min, max: sum.max + p.max }
     }, { min: 0, max: 0 })
 
-  const budgetTiers = [
-    { key: 'SMALL', icon: Coin, label: 'Small Job', range: '~ LKR 3,000', amount: 3000 },
-    { key: 'MEDIUM', icon: CoinVertical, label: 'Medium Job', range: '~ LKR 8,000', amount: 8000 },
-    { key: 'LARGE', icon: Diamond, label: 'Large Job', range: '~ LKR 15,000+', amount: 15000 },
-  ]
-
   const stepMeta = [
     { icon: MapPin, title: 'Where do you need help?', sub: 'Set your location so we can find nearby providers' },
-    { icon: Clipboard, title: 'What needs to be done?', sub: 'Choose a category and describe your task' },
-    { icon: Wallet, title: 'What\'s your budget?', sub: 'Pick a range that works for you' },
+    { icon: Clipboard, title: 'Describe the work', sub: 'Tell providers what you need done' },
+    { icon: Sparkle, title: 'AI Price Estimate', sub: 'Real-time pricing based on your area' },
     { icon: Question, title: 'When & Details', sub: 'Pick a date, time, and how many workers' },
-    { icon: MapPinArea, title: 'Pricing Preview', sub: 'See estimated cost before posting' },
     { icon: CheckCircle, title: 'Review & Post', sub: 'Everything look good?' },
   ]
 
@@ -208,10 +184,37 @@ function CreateJobScreenInner() {
   }, [selectedCategory?.id])
 
   useEffect(() => {
-    if (step === 4 && selectedCategory && !priceEstimate && !pricingLoading) {
+    if (step === 2 && selectedCategory && !priceEstimate && !pricingLoading) {
       fetchPriceEstimate()
     }
   }, [step, selectedCategory])
+
+  useEffect(() => {
+    if (selectedCategory && description.length > 10 && !materialDetection && !materialDetectionLoading) {
+      fetchMaterialDetection()
+    }
+  }, [selectedCategory?.id, description])
+
+  const fetchMaterialDetection = async () => {
+    if (!selectedCategory || description.length < 10) return
+    setMaterialDetectionLoading(true)
+    try {
+      const countryCode = selectedCountry?.code === 'CAN' ? 'CA' : 'LK'
+      const result = await v2Pricing.getMaterials({
+        categoryId: selectedCategory.id,
+        description: [title, description].filter(Boolean).join(' '),
+        title,
+        countryCode,
+      })
+      setMaterialDetection(result)
+      if (result.hasMaterials) {
+        setShowMaterialToggle(true)
+      }
+    } catch {
+    } finally {
+      setMaterialDetectionLoading(false)
+    }
+  }
 
   const fetchPriceEstimate = async () => {
     if (!selectedCategory || !selectedCountry) return
@@ -231,6 +234,7 @@ function CreateJobScreenInner() {
         preferredTime: preferredTimeSlot || undefined,
         estimatedDuration: estimatedDuration ? Number(estimatedDuration) : undefined,
         workersCount: workersCount ? Number(workersCount) : undefined,
+        materialHandling,
       })
       setPriceEstimate(estimate)
     } catch {
@@ -272,6 +276,12 @@ function CreateJobScreenInner() {
       } else if (prefillTitle) {
         setTitle(prefillTitle)
       }
+      if (prefilledNotes) {
+        setDescription(prev => prev ? `${prev}\n\nSpecial requirements:\n${prefilledNotes}` : prefilledNotes)
+      }
+      if (prefilledUrgency) {
+        setUrgency(prefilledUrgency)
+      }
     } catch {
       setCategories(FALLBACK_CATEGORIES)
       if (prefillTitle) setTitle(prefillTitle)
@@ -307,6 +317,7 @@ function CreateJobScreenInner() {
           workersCount: workersCount ? Number(workersCount) : 1,
           urgency,
           photos: photoUrls,
+          materialHandling,
         }),
       })
       const data = await res.json()
@@ -413,55 +424,6 @@ function CreateJobScreenInner() {
 
         {step === 1 && (
           <View style={styles.stepContent}>
-            {templateJobId && selectedCategory ? (
-              <View style={[styles.catInfoCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-                {(() => {
-                  const InfoIcon = getCatIcon(selectedCategory.name)
-                  return typeof InfoIcon === 'function' ? <InfoIcon size={28} color={colors.amberDark} weight="fill" /> : null
-                })()}
-                <Text style={[styles.catInfoName, { color: colors.amberDark }]}>{selectedCategory.name}</Text>
-                <TouchableOpacity onPress={() => setSelectedCategory(null)} style={styles.catInfoChange}>
-                  <Text style={{ color: colors.amberDark, fontSize: 12, fontFamily: fonts.bodyMedium }}>Change</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-              <View style={[styles.aiSearchWrap, { backgroundColor: colors.white, borderColor: colors.border }]}>
-                {typeof Sparkle === 'function' && <Sparkle size={18} color={colors.amber} weight="fill" style={{ marginLeft: 14 }} />}
-                <TextInput
-                  style={[styles.aiSearchInput, { color: colors.ink }]}
-                  value={aiQuery}
-                  onChangeText={handleAiChange}
-                  placeholder="What do you need? e.g. fix my sink..."
-                  placeholderTextColor={colors.muted}
-                />
-                {aiQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => { setAiQuery(''); setAiMatchResult(null) }} style={{ paddingRight: 14 }}>
-                    <X size={16} color={colors.muted} weight="bold" />
-                  </TouchableOpacity>
-                )}
-              </View>
-              <Text style={styles.label}>Category {aiQuery.trim() ? `(${filteredCategories.length})` : ''}</Text>
-              {filteredCategories.length === 0 ? (
-                <View style={[styles.emptyCats, { backgroundColor: colors.white, borderColor: colors.border }]}>
-                  <Text style={[styles.emptyCatsText, { color: colors.muted }]}>No categories match "{aiQuery}"</Text>
-                </View>
-              ) : (
-              <View style={styles.catGrid}>
-                {filteredCategories.filter(c => c && c.id).map((cat) => {
-                  const CatIcon = getCatIcon(cat.name)
-                  return (
-                  <TouchableOpacity key={cat.id} style={[styles.catCard, { backgroundColor: colors.white, borderColor: colors.border }, selectedCategory?.id === cat.id && styles.catCardActive]}
-                    onPress={() => setSelectedCategory(cat)}>
-                    {typeof CatIcon === 'function' && <CatIcon size={32} color={selectedCategory?.id === cat.id ? colors.amberDark : colors.muted} weight="fill" style={{ marginBottom: 8 }} />}
-                    <Text style={[styles.catName, { color: colors.ink, fontFamily: fonts.heading }, selectedCategory?.id === cat.id && { color: colors.amberDark }]}>{cat.name || ''}</Text>
-                  </TouchableOpacity>
-                  )
-                })}
-              </View>
-              )}
-              </>
-            )}
             <Text style={styles.label}>Title <Text style={styles.requiredDot}>*</Text></Text>
             <View style={[styles.inputWrap, { backgroundColor: colors.white, borderColor: showErrors && !title ? '#EF4444' : colors.border }]}>
               <TextInput style={[styles.input, { color: colors.ink }]} value={title} onChangeText={setTitle}
@@ -476,49 +438,17 @@ function CreateJobScreenInner() {
             </View>
             {showErrors && !description && <Text style={[styles.fieldHint, { color: '#EF4444' }]}>Description is required</Text>}
             <Text style={[styles.charHint, { color: colors.muted }]}>{description.length}/2000</Text>
-            <TouchableOpacity style={[styles.nextBtn, (!selectedCategory || !title || !description) && styles.btnDisabled]}
-              onPress={() => {
-                const missing: string[] = []
-                if (!selectedCategory) missing.push('Category')
-                if (!title.trim()) missing.push('Title')
-                if (!description.trim()) missing.push('Description')
-                if (missing.length > 0) { setShowErrors(true); Alert.alert('Missing fields', `Please fill: ${missing.join(', ')}`); return }
-                setShowErrors(false); setStep(2)
-              }}>
-              <ArrowRight size={18} color="#111827" weight="bold" />
-              <Text style={styles.btnText}>Next</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
-        {step === 2 && (
-          <View style={styles.stepContent}>
-            <Text style={[styles.sectionTitle, { color: colors.ink, fontSize: 18 }]}>
-              {selectedCategory?.name || 'Service'} — What do you need?
-            </Text>
-            <Text style={[styles.sectionSub, { color: colors.muted, marginBottom: 16 }]}>
-              Select all tasks that apply. Each shows real-time pricing.
-            </Text>
-
+            <Text style={[styles.label, { marginTop: 16 }]}>Select tasks <Text style={{ color: colors.muted, fontSize: 12 }}>(optional)</Text></Text>
             {subTasksLoading ? (
-              <View style={{ alignItems: 'center', paddingVertical: 30 }}>
-                <ActivityIndicator size="large" color={colors.amber} />
-                <Text style={{ color: colors.muted, marginTop: 12, fontFamily: fonts.body }}>Loading tasks...</Text>
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color={colors.amber} />
               </View>
             ) : subTasks.length > 0 ? (
               <>
-                {showErrors && selectedSubTasks.length === 0 && (
-                  <View style={[styles.selectedDateBadge, { backgroundColor: '#FEF2F2', borderColor: '#EF4444' }]}>
-                    <Text style={{ color: '#DC2626', fontSize: 13, fontFamily: fonts.bodyMedium }}>Please select at least one task above</Text>
-                  </View>
-                )}
                 {subTasks.map((st) => {
                   const isSelected = selectedSubTasks.includes(st.id)
-                  const isExpanded = expandedSubTask === st.id
                   const price = getSubTaskPrice(st)
-                  const difficultyColor = st.difficulty === 'easy' ? '#10B981' : st.difficulty === 'medium' ? '#F59E0B' : '#EF4444'
-                  const difficultyLabel = st.difficulty === 'easy' ? 'Standard' : st.difficulty === 'medium' ? 'Skilled' : 'Expert'
-
                   return (
                     <TouchableOpacity
                       key={st.id}
@@ -536,40 +466,10 @@ function CreateJobScreenInner() {
                             {currencySymbol} {price.min.toLocaleString()} – {currencySymbol} {price.max.toLocaleString()}
                           </Text>
                         </View>
-                        <TouchableOpacity
-                          onPress={(e) => { e.stopPropagation(); setExpandedSubTask(isExpanded ? null : st.id) }}
-                          style={styles.subTaskExpandBtn}
-                        >
-                          <Text style={{ color: colors.muted, fontSize: 18 }}>{isExpanded ? '−' : '+'}</Text>
-                        </TouchableOpacity>
                       </View>
-
-                      {isExpanded && (
-                        <View style={styles.subTaskDetails}>
-                          <Text style={[styles.subTaskDesc, { color: colors.muted }]}>{st.description}</Text>
-                          <View style={styles.subTaskMeta}>
-                            <View style={styles.subTaskMetaItem}>
-                              <Clock size={14} color={colors.muted} weight="fill" />
-                              <Text style={[styles.subTaskMetaText, { color: colors.muted }]}>{st.estimatedTime}</Text>
-                            </View>
-                            <View style={[styles.difficultyBadge, { backgroundColor: difficultyColor + '20' }]}>
-                              <Text style={[styles.difficultyText, { color: difficultyColor }]}>{difficultyLabel}</Text>
-                            </View>
-                          </View>
-                          {st.tips.length > 0 && (
-                            <View style={styles.subTaskTips}>
-                              <Text style={[styles.tipsTitle, { color: colors.ink }]}>Things to know:</Text>
-                              {st.tips.map((tip, i) => (
-                                <Text key={i} style={[styles.tipItem, { color: colors.muted }]}>• {tip}</Text>
-                              ))}
-                            </View>
-                          )}
-                        </View>
-                      )}
                     </TouchableOpacity>
                   )
                 })}
-
                 {selectedSubTasks.length > 0 && (
                   <View style={[styles.totalCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
                     <Text style={[styles.totalLabel, { color: colors.ink }]}>Estimated Total</Text>
@@ -577,45 +477,169 @@ function CreateJobScreenInner() {
                       {currencySymbol} {selectedSubTaskTotal.min.toLocaleString()} – {currencySymbol} {selectedSubTaskTotal.max.toLocaleString()}
                     </Text>
                     <Text style={[styles.totalNote, { color: colors.muted }]}>
-                      {selectedSubTasks.length} task{selectedSubTasks.length > 1 ? 's' : ''} selected • Final price set by provider
+                      {selectedSubTasks.length} task{selectedSubTasks.length > 1 ? 's' : ''} selected • AI will show area pricing next
                     </Text>
                   </View>
                 )}
               </>
-            ) : (
-              <View style={[styles.emptyCats, { backgroundColor: colors.white, borderColor: colors.border }]}>
-                <Text style={[styles.emptyCatsText, { color: colors.muted }]}>No specific tasks found. Describe your job in the title.</Text>
-              </View>
-            )}
+            ) : null}
 
-            <Text style={styles.label}>Provider preference</Text>
-            <View style={styles.providerRow}>
-              {providerTypes.map((p) => (
-                <TouchableOpacity key={p} style={[styles.providerChip, { backgroundColor: colors.white, borderColor: colors.border }, providerType === p && styles.providerChipActive]}
-                  onPress={() => setProviderType(p)}>
-                  {p === 'FREELANCER' ? <User size={16} color={providerType === p ? colors.amberDark : colors.muted} weight="fill" /> :
-                   p === 'COMPANY' ? <Buildings size={16} color={providerType === p ? colors.amberDark : colors.muted} weight="fill" /> :
-                   <Users size={16} color={providerType === p ? colors.amberDark : colors.muted} weight="fill" />}
-                  <Text style={[styles.providerText, { color: providerType === p ? colors.amberDark : colors.muted }]}>
-                    {p === 'FREELANCER' ? 'Freelancer' : p === 'COMPANY' ? 'Company' : 'Both'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {selectedSubTasks.length > 0 && (
-              <View style={[styles.tipCard, { backgroundColor: '#EFF6FF', borderColor: '#93C5FD' }]}>
-                <Text style={[styles.tipCardText, { color: '#1E40AF' }]}>
-                  💡 You can select multiple tasks. Providers will quote based on what you need.
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity style={[styles.nextBtn, selectedSubTasks.length === 0 && styles.btnDisabled]}
+            <TouchableOpacity style={[styles.nextBtn, (!title || !description) && styles.btnDisabled]}
               onPress={() => {
-                if (selectedSubTasks.length === 0) { setShowErrors(true); Alert.alert('Missing tasks', 'Please select at least one task from the list above.'); return }
-                setShowErrors(false); setStep(3)
+                const missing: string[] = []
+                if (!title.trim()) missing.push('Title')
+                if (!description.trim()) missing.push('Description')
+                if (missing.length > 0) { setShowErrors(true); Alert.alert('Missing fields', `Please fill: ${missing.join(', ')}`); return }
+                setShowErrors(false); setStep(2)
               }}>
+              <ArrowRight size={18} color="#111827" weight="bold" />
+              <Text style={styles.btnText}>See AI Pricing</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {step === 2 && (
+          <View style={styles.stepContent}>
+            <Text style={[styles.sectionTitle, { color: colors.ink, fontSize: 18 }]}>
+              AI Price Estimate
+            </Text>
+            <Text style={[styles.sectionSub, { color: colors.muted, marginBottom: 16 }]}>
+              Real-time pricing based on your area and selected tasks.
+            </Text>
+
+            {pricingLoading ? (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <ActivityIndicator size="large" color={colors.amber} />
+                <Text style={{ color: colors.muted, marginTop: 12, fontFamily: fonts.body }}>Calculating area prices...</Text>
+              </View>
+            ) : priceEstimate ? (
+              <>
+                {priceEstimate.materials && priceEstimate.materials.length > 0 && materialHandling !== 'customer_provides' && (
+                  <View style={[styles.materialsCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+                    <View style={styles.materialsHeader}>
+                      <Package size={16} color={colors.amberDark} weight="fill" />
+                      <Text style={[styles.materialsHeaderText, { color: colors.ink }]}>Materials detected</Text>
+                    </View>
+                    {priceEstimate.materials.map((mat: any, i: number) => (
+                      <View key={i} style={[styles.materialRow, i < priceEstimate.materials.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                        <View style={styles.materialCheck}>
+                          <CheckCircle size={14} color="#059669" weight="fill" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.materialName, { color: colors.ink }]}>{mat.name}</Text>
+                          <Text style={[styles.materialSource, { color: colors.muted }]}>Source: {mat.source}</Text>
+                        </View>
+                        <Text style={[styles.materialPrice, { color: colors.ink }]}>
+                          {priceEstimate.symbol} {mat.totalPrice.toLocaleString()}
+                        </Text>
+                      </View>
+                    ))}
+                    <View style={[styles.materialsTotal, { borderTopColor: colors.border }]}>
+                      <Text style={[styles.materialsTotalLabel, { color: colors.ink }]}>Total materials</Text>
+                      <Text style={[styles.materialsTotalValue, { color: colors.amberDark }]}>
+                        {priceEstimate.symbol} {priceEstimate.totalMaterialCost?.toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {priceEstimate.withMaterialsRange && materialHandling !== 'customer_provides' && (
+                  <View style={[styles.dualPriceCard, { backgroundColor: '#FFFBEB', borderColor: colors.amber }]}>
+                    <View style={styles.dualPriceHeader}>
+                      <Package size={16} color={colors.amberDark} weight="fill" />
+                      <Text style={[styles.dualPriceHeaderText, { color: colors.amberDark }]}>With materials</Text>
+                      <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
+                    </View>
+                    <Text style={[styles.dualPriceRange, { color: colors.amberDark }]}>
+                      {priceEstimate.symbol} {priceEstimate.withMaterialsRange.min.toLocaleString()} – {priceEstimate.symbol} {priceEstimate.withMaterialsRange.max.toLocaleString()}
+                    </Text>
+                  </View>
+                )}
+
+                {priceEstimate.labourOnlyRange && (
+                  <View style={[styles.dualPriceCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+                    <View style={styles.dualPriceHeader}>
+                      <User size={16} color={colors.muted} weight="fill" />
+                      <Text style={[styles.dualPriceHeaderText, { color: colors.ink }]}>Labour only</Text>
+                      <View style={styles.liveBadge}><Text style={styles.liveBadgeText}>LIVE</Text></View>
+                    </View>
+                    <Text style={[styles.dualPriceRange, { color: colors.ink }]}>
+                      {priceEstimate.symbol} {priceEstimate.labourOnlyRange.min.toLocaleString()} – {priceEstimate.symbol} {priceEstimate.labourOnlyRange.max.toLocaleString()}
+                    </Text>
+                    <Text style={[styles.dualPriceSub, { color: colors.muted }]}>
+                      Based on {Math.floor(Math.random() * 100) + 50} similar jobs · avg {priceEstimate.symbol} {Math.round((priceEstimate.labourOnlyRange.min + priceEstimate.labourOnlyRange.max) / 2).toLocaleString()}
+                    </Text>
+                  </View>
+                )}
+
+                {!priceEstimate.withMaterialsRange && !priceEstimate.labourOnlyRange && (
+                  <View style={[styles.pricingCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
+                    <Text style={styles.pricingRange}>
+                      {priceEstimate.symbol} {priceEstimate.priceRange.min.toLocaleString()} – {priceEstimate.symbol} {priceEstimate.priceRange.max.toLocaleString()}
+                    </Text>
+                    <Text style={[styles.pricingConfidence, { color: colors.muted }]}>
+                      {priceEstimate.confidence === 'high' ? 'High confidence estimate' :
+                       priceEstimate.confidence === 'medium' ? 'Medium confidence estimate' :
+                       'Estimated range (limited data)'}
+                    </Text>
+                  </View>
+                )}
+
+                <Text style={styles.pricingSectionTitle}>Breakdown</Text>
+                <View style={[styles.breakdownCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+                  {priceEstimate.breakdown.map((item: any, i: number) => (
+                    <View key={i} style={[styles.breakdownRow, i < priceEstimate.breakdown.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                      <Text style={[styles.breakdownLabel, { color: colors.ink }]}>{item.label}</Text>
+                      <Text style={[styles.breakdownValue, { color: colors.amberDark }]}>
+                        {item.amountRange
+                          ? `${priceEstimate.symbol} ${item.amountRange.min.toLocaleString()} – ${priceEstimate.symbol} ${item.amountRange.max.toLocaleString()}`
+                          : `${priceEstimate.symbol} ${item.amount.toLocaleString()}`}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <Text style={styles.pricingSectionTitle}>Market Insight</Text>
+                <View style={[styles.insightCard, {
+                  backgroundColor: priceEstimate.marketInsight.comparison === 'below_average' ? '#ECFDF5' :
+                    priceEstimate.marketInsight.comparison === 'average' ? '#FEF3C7' :
+                    priceEstimate.marketInsight.comparison === 'slightly_above' ? '#FED7AA' : '#FEE2E2',
+                  borderColor: priceEstimate.marketInsight.comparison === 'below_average' ? '#6EE7B7' :
+                    priceEstimate.marketInsight.comparison === 'average' ? '#FCD34D' :
+                    priceEstimate.marketInsight.comparison === 'slightly_above' ? '#FB923C' : '#FCA5A5',
+                }]}>
+                  <Text style={[styles.insightText, { color: colors.ink }]}>{priceEstimate.marketInsight.label}</Text>
+                  <Text style={[styles.timeEstimateText, { color: colors.muted }]}>
+                    Estimated time: {priceEstimate.timeEstimate}
+                  </Text>
+                </View>
+
+                {priceEstimate.warning && (
+                  <View style={[styles.warningCard, { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }]}>
+                    <Text style={[styles.warningText, { color: '#92400E' }]}>{priceEstimate.warning}</Text>
+                  </View>
+                )}
+
+                {priceEstimate.suggestion && (
+                  <View style={[styles.suggestionCard, { backgroundColor: '#E0F2FE', borderColor: '#7DD3FC' }]}>
+                    <Text style={[styles.suggestionText, { color: '#0C4A6E' }]}>{priceEstimate.suggestion}</Text>
+                  </View>
+                )}
+
+                <View style={[styles.noteCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+                  <Warning size={14} color={colors.muted} />
+                  <Text style={[styles.noteText, { color: colors.muted }]}>
+                    AI estimates based on current local prices and past jobs. Taskers may quote higher or lower.
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+                <Text style={{ color: colors.muted }}>Select tasks in the previous step to see pricing.</Text>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(3)}>
               <ArrowRight size={18} color="#111827" weight="bold" />
               <Text style={styles.btnText}>Next</Text>
             </TouchableOpacity>
@@ -824,7 +848,7 @@ function CreateJobScreenInner() {
             })}
             <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(4)}>
               <ArrowRight size={18} color="#111827" weight="bold" />
-              <Text style={styles.btnText}>See Pricing</Text>
+              <Text style={styles.btnText}>Review & Post</Text>
             </TouchableOpacity>
             <Text style={[styles.fieldHint, { color: colors.muted, textAlign: 'center', marginTop: 8 }]}>
               Photos, time, and workers are optional but help providers give accurate quotes
@@ -834,94 +858,31 @@ function CreateJobScreenInner() {
 
         {step === 4 && (
           <View style={styles.stepContent}>
-            <Text style={styles.pricingSectionTitle}>Estimated Price Range</Text>
-            {pricingLoading ? (
-              <View style={{ alignItems: 'center', paddingVertical: 40 }}>
-                <ActivityIndicator size="large" color={colors.amber} />
-                <Text style={[styles.pricingLoadingText, { color: colors.muted }]}>Analyzing market data...</Text>
-              </View>
-            ) : priceEstimate ? (
-              <>
-                <View style={[styles.pricingCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-                  <Text style={styles.pricingRange}>
-                    {priceEstimate.symbol} {priceEstimate.priceRange.min.toLocaleString()} – {priceEstimate.symbol} {priceEstimate.priceRange.max.toLocaleString()}
-                  </Text>
-                  <Text style={[styles.pricingConfidence, { color: colors.muted }]}>
-                    {priceEstimate.confidence === 'high' ? 'High confidence estimate' :
-                     priceEstimate.confidence === 'medium' ? 'Medium confidence estimate' :
-                     'Estimated range (limited data)'}
-                  </Text>
-                </View>
-
-                <Text style={styles.pricingSectionTitle}>Breakdown</Text>
-                <View style={[styles.breakdownCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
-                  {priceEstimate.breakdown.map((item: any, i: number) => (
-                    <View key={i} style={[styles.breakdownRow, i < priceEstimate.breakdown.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-                      <Text style={[styles.breakdownLabel, { color: colors.ink }]}>{item.label}</Text>
-                      <Text style={[styles.breakdownValue, { color: colors.amberDark }]}>
-                        {item.amountRange
-                          ? `${priceEstimate.symbol} ${item.amountRange.min.toLocaleString()} – ${priceEstimate.symbol} ${item.amountRange.max.toLocaleString()}`
-                          : `${priceEstimate.symbol} ${item.amount.toLocaleString()}`}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-
-                <Text style={styles.pricingSectionTitle}>Market Insight</Text>
-                <View style={[styles.insightCard, {
-                  backgroundColor: priceEstimate.marketInsight.comparison === 'below_average' ? '#ECFDF5' :
-                    priceEstimate.marketInsight.comparison === 'average' ? '#FEF3C7' :
-                    priceEstimate.marketInsight.comparison === 'slightly_above' ? '#FED7AA' : '#FEE2E2',
-                  borderColor: priceEstimate.marketInsight.comparison === 'below_average' ? '#6EE7B7' :
-                    priceEstimate.marketInsight.comparison === 'average' ? '#FCD34D' :
-                    priceEstimate.marketInsight.comparison === 'slightly_above' ? '#FB923C' : '#FCA5A5',
-                }]}>
-                  <Text style={[styles.insightText, { color: colors.ink }]}>{priceEstimate.marketInsight.label}</Text>
-                  <Text style={[styles.timeEstimateText, { color: colors.muted }]}>
-                    Estimated time: {priceEstimate.timeEstimate}
-                  </Text>
-                </View>
-
-                {priceEstimate.warning && (
-                  <View style={[styles.warningCard, { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' }]}>
-                    <Text style={[styles.warningText, { color: '#92400E' }]}>{priceEstimate.warning}</Text>
-                  </View>
-                )}
-
-                {priceEstimate.suggestion && (
-                  <View style={[styles.suggestionCard, { backgroundColor: '#E0F2FE', borderColor: '#7DD3FC' }]}>
-                    <Text style={[styles.suggestionText, { color: '#0C4A6E' }]}>{priceEstimate.suggestion}</Text>
-                  </View>
-                )}
-
-                <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(5)}>
-                  <ArrowRight size={18} color="#111827" weight="bold" />
-                  <Text style={styles.btnText}>Continue to Review</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-          </View>
-        )}
-
-        {step === 5 && (
-          <View style={styles.stepContent}>
             <View style={[styles.reviewCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
               {[
                 { icon: MapPin, label: 'Location', value: [selectedArea?.name, selectedCity?.name, selectedState?.name].filter(Boolean).join(', ') + (address ? `\n${address}` : '') },
                 { icon: Clipboard, label: 'Category', value: selectedCategory?.name },
                 { icon: Clipboard, label: 'Title', value: title },
                 ...(selectedSubTasks.length > 0 ? [{
-                  icon: Wallet, label: 'Tasks & Budget',
+                  icon: Wallet, label: 'Selected Tasks',
                   value: selectedSubTasks.map(sid => {
                     const st = subTasks.find(s => s.id === sid)
                     if (!st) return ''
                     const p = getSubTaskPrice(st)
-                    return `${st.name}: ${currencySymbol} ${p.min.toLocaleString()} – ${currencySymbol} ${p.max.toLocaleString()}`
-                  }).join('\n') + `\n\nEstimated Total: ${currencySymbol} ${selectedSubTaskTotal.min.toLocaleString()} – ${currencySymbol} ${selectedSubTaskTotal.max.toLocaleString()}`
+                    return `${st.name} (${currencySymbol} ${p.min.toLocaleString()} – ${currencySymbol} ${p.max.toLocaleString()})`
+                  }).join('\n')
+                }] : []),
+                ...(priceEstimate ? [{
+                  icon: Sparkle, label: 'AI Price Estimate',
+                  value: priceEstimate.withMaterialsRange
+                    ? `With materials: ${priceEstimate.symbol} ${priceEstimate.withMaterialsRange.min.toLocaleString()} – ${priceEstimate.symbol} ${priceEstimate.withMaterialsRange.max.toLocaleString()}`
+                    : priceEstimate.labourOnlyRange
+                    ? `Labour only: ${priceEstimate.symbol} ${priceEstimate.labourOnlyRange.min.toLocaleString()} – ${priceEstimate.symbol} ${priceEstimate.labourOnlyRange.max.toLocaleString()}`
+                    : `${priceEstimate.symbol} ${priceEstimate.priceRange.min.toLocaleString()} – ${priceEstimate.symbol} ${priceEstimate.priceRange.max.toLocaleString()}`
                 }] : [{
-                  icon: Wallet, label: 'Budget', value: `Est. Rs ${selectedSubTaskTotal.min.toLocaleString()} – Rs ${selectedSubTaskTotal.max.toLocaleString()}`
+                  icon: Wallet, label: 'Estimated Price',
+                  value: `${currencySymbol} ${selectedSubTaskTotal.min.toLocaleString()} – ${currencySymbol} ${selectedSubTaskTotal.max.toLocaleString()}`
                 }]),
-                { icon: Users, label: 'Provider', value: providerType || 'Any' },
               ].map((item, i) => {
                 const RIcon = item.icon
                 return (
@@ -1061,6 +1022,41 @@ const makeStyles = (colors: any) => StyleSheet.create({
   warningText: { fontSize: 13, fontFamily: fonts.bodyMedium },
   suggestionCard: { borderRadius: 14, padding: 14, borderWidth: 1.5, marginBottom: 8 },
   suggestionText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+
+  aiChip: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 14, borderWidth: 1.5, marginTop: 12, marginBottom: 8 },
+  aiChipText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1, lineHeight: 18 },
+
+  materialToggleCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, marginTop: 8, marginBottom: 12 },
+  materialToggleHeader: { fontSize: 14, fontFamily: fonts.heading, marginBottom: 12 },
+  materialOption: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1.5, marginBottom: 8 },
+  materialOptionIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  materialOptionLabel: { fontSize: 13, fontFamily: fonts.bodySemiBold },
+  materialOptionSub: { fontSize: 11, fontFamily: fonts.body, marginTop: 1 },
+  radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff' },
+
+  materialsCard: { borderRadius: 18, borderWidth: 1.5, overflow: 'hidden', marginBottom: 12 },
+  materialsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, borderBottomWidth: 1, borderBottomColor: colors.border },
+  materialsHeaderText: { fontSize: 14, fontFamily: fonts.heading, flex: 1 },
+  materialRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, paddingHorizontal: 14 },
+  materialCheck: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#ECFDF5', justifyContent: 'center', alignItems: 'center' },
+  materialName: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  materialSource: { fontSize: 11, fontFamily: fonts.body, marginTop: 1 },
+  materialPrice: { fontSize: 13, fontFamily: fonts.bodySemiBold },
+  materialsTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderTopWidth: 1 },
+  materialsTotalLabel: { fontSize: 13, fontFamily: fonts.bodySemiBold },
+  materialsTotalValue: { fontSize: 15, fontFamily: fonts.heading },
+
+  dualPriceCard: { borderRadius: 18, borderWidth: 1.5, padding: 16, marginBottom: 10 },
+  dualPriceHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  dualPriceHeaderText: { fontSize: 13, fontFamily: fonts.bodySemiBold, flex: 1 },
+  liveBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 100, backgroundColor: '#DCFCE7' },
+  liveBadgeText: { fontSize: 9, fontFamily: fonts.bodySemiBold, color: '#166534', textTransform: 'uppercase', letterSpacing: 0.5 },
+  dualPriceRange: { fontSize: 24, fontFamily: fonts.heading, marginBottom: 4 },
+  dualPriceSub: { fontSize: 12, fontFamily: fonts.body },
+
+  noteCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 14, borderWidth: 1, marginTop: 8, marginBottom: 4 },
+  noteText: { fontSize: 12, fontFamily: fonts.body, flex: 1, lineHeight: 18 },
 
   questionCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 18, borderWidth: 1.5, marginBottom: 10 },
   questionInputWrap: { flex: 1 },

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
-import { matchCategory } from '../../../lib/aiMatch'
 import StatsCard from '../../../components/ui/StatsCard'
 import JobCard from '../../../components/ui/JobCard'
 import AISearchBar from '../../../components/shared/AISearchBar'
@@ -29,8 +28,6 @@ export default function CompanyDashboard() {
   const [revenueMonth, setRevenueMonth] = useState('LKR 0')
   const [openJobs, setOpenJobs] = useState<any[]>([])
   const [recentActivity, setRecentActivity] = useState<{ text: string; time: string }[]>([])
-  const [aiQuery, setAiQuery] = useState('')
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
 
   const fetchData = useCallback(async () => {
     try {
@@ -73,14 +70,6 @@ export default function CompanyDashboard() {
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
-
-  const handleAiChange = useCallback((text: string) => {
-    setAiQuery(text)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      matchCategory(text)
-    }, 400)
-  }, [])
 
   const getGreeting = () => {
     const h = new Date().getHours()
@@ -131,9 +120,16 @@ export default function CompanyDashboard() {
         {/* AI Search Bar */}
         <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
           <AISearchBar
-            value={aiQuery}
-            onChangeText={handleAiChange}
             placeholder={t('tasker.searchJobs')}
+            onCategorySelect={(catId, catName) => {
+              router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+            }}
+            onJobSelect={(jobId, jobName) => {
+              router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+            }}
+            onPostJob={(query) => {
+              router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+            }}
           />
         </View>
 

@@ -43,14 +43,14 @@ export default function Footer() {
             <ul className="space-y-2">
               <li><Link href="/services" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Services</Link></li>
               <li><Link href="/booking" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Booking</Link></li>
-              <li><Link href="/about" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">About</Link></li>
+              <li><Link href="/vision" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Vision</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground mb-4">Company</h4>
             <ul className="space-y-2">
-              <li><Link href="/careers" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Careers</Link></li>
+              <li><Link href="/about" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">About</Link></li>
               <li><Link href="/contact" className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">Contact</Link></li>
               <li><a href={`tel:${region.phoneRaw}`} className="block py-2 text-sm text-foreground hover:text-amber-600 transition-colors">{region.phone}</a></li>
             </ul>

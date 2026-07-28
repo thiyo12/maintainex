@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
-import { auth, company as companyApi } from '../../../lib/api'
+import { auth, upload, company as companyApi } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import { useTranslation } from 'react-i18next'
 
@@ -19,7 +20,9 @@ export default function CompanyEditProfile() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [profileImage, setProfileImage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const fadeAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
@@ -27,6 +30,7 @@ export default function CompanyEditProfile() {
     if (user) {
       setName(user.name || '')
       setPhone(user.phone || '')
+      setProfileImage(user.profileImage || '')
     }
     ;(async () => {
       try {
@@ -36,6 +40,29 @@ export default function CompanyEditProfile() {
     })()
   }, [user])
 
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert(t('common.error'), 'Camera roll permission is required')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    })
+    if (!result.canceled && result.assets[0]) {
+      setUploading(true)
+      try {
+        const { url } = await upload.file(result.assets[0].uri)
+        setProfileImage(url)
+      } catch {
+        Alert.alert(t('common.error'), 'Failed to upload image')
+      } finally {
+        setUploading(false)
+      }
+    }
+  }
+
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert(t('common.error'), t('tasker.nameRequired'))
@@ -43,7 +70,7 @@ export default function CompanyEditProfile() {
     }
     setSaving(true)
     try {
-      await auth.updateProfile({ name: name.trim(), phone: phone.trim() })
+      await auth.updateProfile({ name: name.trim(), phone: phone.trim(), profileImage: profileImage || undefined })
       if (companyName.trim()) {
         await companyApi.profile.update({ companyName: companyName.trim() })
       }
@@ -64,10 +91,18 @@ export default function CompanyEditProfile() {
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.avatarSection}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(name || 'C')[0]}</Text>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={{ width: 80, height: 80, borderRadius: 22 }} />
+              ) : (
+                <Text style={styles.avatarText}>{(name || 'C')[0]}</Text>
+              )}
             </View>
-            <TouchableOpacity>
-              <Text style={styles.changePhoto}>{t('components.addPhoto')}</Text>
+            <TouchableOpacity onPress={pickImage} disabled={uploading}>
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.muted} />
+              ) : (
+                <Text style={styles.changePhoto}>{t('components.addPhoto')}</Text>
+              )}
             </TouchableOpacity>
           </View>
           <Text style={styles.label}>{t('company.companyName') || 'Company Name'}</Text>

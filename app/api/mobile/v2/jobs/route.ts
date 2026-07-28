@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { matchJobToTaskers } from '@/lib/job-matcher'
+import { getPriceEstimate } from '@/lib/pricing-engine'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
     let {
       title, description, categoryId, photos,
       budgetType, budgetAmount, areaId, postalCode, preferredDate,
+      materialHandling, urgency, estimatedDuration, workersCount,
     } = body
 
     title = sanitize(title, 200)
@@ -33,6 +35,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid budgetType. Must be FIXED, HOURLY, NEGOTIABLE, or REQUEST_QUOTES' }, { status: 400 })
     }
 
+    let aiEstimateJson: string | null = null
+    const validMaterialHandling = ['tasker_brings', 'customer_provides', 'quote_both']
+    const finalMaterialHandling = validMaterialHandling.includes(materialHandling) ? materialHandling : 'tasker_brings'
+
+    try {
+      const estimate = await getPriceEstimate({
+        categoryId,
+        categoryName: title,
+        description,
+        title,
+        areaId: areaId || undefined,
+        countryCode: 'LK',
+        urgency: urgency || 'normal',
+        estimatedDuration: estimatedDuration ? Number(estimatedDuration) : undefined,
+        workersCount: workersCount ? Number(workersCount) : undefined,
+        materialHandling: finalMaterialHandling,
+      })
+      aiEstimateJson = JSON.stringify(estimate)
+    } catch (e) {
+      console.error('AI estimate generation failed:', e)
+    }
+
     const job = await prisma.marketplaceJob.create({
       data: {
         customerId: user.id,
@@ -45,11 +69,15 @@ export async function POST(request: NextRequest) {
         areaId: areaId || null,
         postalCode: postalCode || null,
         preferredDate: preferredDate ? new Date(preferredDate) : null,
+        urgency: urgency || 'normal',
+        estimatedDuration: estimatedDuration ? Number(estimatedDuration) : null,
+        workersCount: workersCount ? Number(workersCount) : 1,
         status: 'OPEN',
+        aiEstimateJson,
+        materialHandling: finalMaterialHandling,
       },
     })
 
-    // Auto-trigger matching engine (fire-and-forget)
     matchJobToTaskers(job.id).catch(err => console.error('Match job error:', err))
 
     return NextResponse.json({ job: { ...job, budgetAmount: Number(job.budgetAmount) } }, { status: 201 })
@@ -96,7 +124,11 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    return NextResponse.json({ jobs: jobs.map((j) => ({ ...j, budgetAmount: Number(j.budgetAmount) })) })
+    return NextResponse.json({ jobs: jobs.map((j) => ({
+      ...j,
+      budgetAmount: Number(j.budgetAmount),
+      aiEstimate: j.aiEstimateJson ? JSON.parse(j.aiEstimateJson) : null,
+    })) })
   } catch (error) {
     console.error('List jobs error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

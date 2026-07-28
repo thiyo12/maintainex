@@ -4,12 +4,10 @@ import { prisma } from './prisma'
 
 const TOKEN_MAX_AGE = '30d'
 
-const FALLBACK_SECRET = 'fallback-secret-key-change-in-production'
-
 function getJwtSecret(): string {
-  const secret = process.env.NEXTAUTH_SECRET || FALLBACK_SECRET
-  if (secret === FALLBACK_SECRET) {
-    console.warn('⚠️ SECURITY: NEXTAUTH_SECRET not set - using fallback. Set in production!')
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET environment variable is required')
   }
   return secret
 }
@@ -17,7 +15,6 @@ function getJwtSecret(): string {
 export function createToken(data: object): string | null {
   try {
     const secret = getJwtSecret()
-    if (!secret) return null
     return jwt.sign(data, secret, { expiresIn: TOKEN_MAX_AGE })
   } catch {
     return null
@@ -27,7 +24,6 @@ export function createToken(data: object): string | null {
 export function verifyToken(token: string): any {
   try {
     const secret = getJwtSecret()
-    if (!secret) return null
     return jwt.verify(token, secret)
   } catch {
     return null
