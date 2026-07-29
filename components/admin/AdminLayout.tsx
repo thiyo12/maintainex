@@ -37,12 +37,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
   // Security: Logout with proper cleanup
   const handleLogout = () => {
-    // Clear all stored data
     clearStoredUser()
-    // Clear any other localStorage items
     localStorage.removeItem('admin_user')
     localStorage.removeItem('admin_token')
-    // Redirect to login
+    // Clear admin_token cookie
+    document.cookie = 'admin_token=; path=/; max-age=0'
     window.location.href = '/admin/login'
   }
 
