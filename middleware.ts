@@ -33,7 +33,46 @@ const RATE_LIMITS = {
 
 async function verifySimpleToken(token: string): Promise<any> {
   try {
-    const [encoded, signature] = token.split('.')
+    const parts = token.split('.')
+    
+    // Standard JWT (3 parts: header.payload.signature)
+    if (parts.length === 3) {
+      const [headerB64, payloadB64, signatureB64] = parts
+      const signingInput = `${headerB64}.${payloadB64}`
+      
+      const key = await crypto.subtle.importKey(
+        'raw',
+        new TextEncoder().encode(JWT_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['verify']
+      )
+      const valid = await crypto.subtle.verify(
+        'HMAC',
+        key,
+        Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0)),
+        new TextEncoder().encode(signingInput)
+      )
+      if (!valid) return null
+
+      const payload = JSON.parse(atob(payloadB64))
+      // Check expiry if present
+      if (payload.exp && Date.now() / 1000 > payload.exp) return null
+      return {
+        id: payload.sub || payload.id,
+        email: payload.email,
+        role: payload.role,
+        name: [payload.firstName, payload.lastName].filter(Boolean).join(' ') || payload.name || null,
+        branchId: payload.branchId || null,
+        province: payload.province || null,
+        region: payload.region || null,
+        canEditServices: payload.canEditServices || false,
+        authType: payload.authType || 'admin',
+      }
+    }
+
+    // Legacy 2-part token
+    const [encoded, signature] = parts
     if (!encoded || !signature) return null
 
     const key = await crypto.subtle.importKey(
