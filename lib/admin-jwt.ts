@@ -45,7 +45,7 @@ export function signAccessToken(user: {
       type: 'access',
     } satisfies AccessTokenPayload,
     getJwtSecret(),
-    { expiresIn: '15m' }
+    { expiresIn: '24h' }
   )
 }
 
