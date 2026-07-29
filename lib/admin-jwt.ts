@@ -3,7 +3,7 @@ import crypto from 'crypto'
 import type { AdminRole } from './admin-types'
 
 function getJwtSecret(): string {
-  return process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production'
+  return process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-jwt-secret-change-in-production'
 }
 
 function getJwtRefreshSecret(): string {

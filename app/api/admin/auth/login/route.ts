@@ -121,6 +121,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    response.cookies.set('admin_token', accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60,
+    })
+
     response.cookies.set('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

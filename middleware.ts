@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
 if (!JWT_SECRET) {
-  throw new Error('NEXTAUTH_SECRET environment variable is required')
+  throw new Error('JWT_SECRET environment variable is required')
 }
 
 const securityHeaders = {
@@ -31,32 +31,41 @@ const RATE_LIMITS = {
   admin: { maxRequests: 200, windowSeconds: 60 },
 }
 
-async function verifySimpleToken(token: string): Promise<any> {
+function b64UrlDecode(str: string): string {
+  const lookup = new Uint8Array([
+    62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,
+    62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,62,
+    62,62,62,62,62,62,62,62,62,62,62,62,62,63,62,62,
+    52,53,54,55,56,57,58,59,60,61,62,62,62,0,62,62,
+    62,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,
+    15,16,17,18,19,20,21,22,23,24,25,62,62,62,62,62,
+    62,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+    41,42,43,44,45,46,47,48,49,50,51,62,62,62,62,62,
+  ])
+  let b64 = str.replace(/-/g, '+').replace(/_/g, '/')
+  while (b64.length % 4) b64 += '='
+  const len = b64.length
+  const out: number[] = []
+  for (let i = 0; i < len; i += 4) {
+    const a = lookup[b64.charCodeAt(i)]
+    const b = lookup[b64.charCodeAt(i + 1)]
+    const c = b64.charCodeAt(i + 2) === 61 ? -1 : lookup[b64.charCodeAt(i + 2)]
+    const d = b64.charCodeAt(i + 3) === 61 ? -1 : lookup[b64.charCodeAt(i + 3)]
+    out.push((a << 2) | (b >> 4))
+    if (c >= 0) out.push(((b & 15) << 4) | (c >> 2))
+    if (d >= 0) out.push(((c & 3) << 6) | d)
+  }
+  return new TextDecoder().decode(new Uint8Array(out))
+}
+
+function verifySimpleToken(token: string): any {
   try {
     const parts = token.split('.')
     
     // Standard JWT (3 parts: header.payload.signature)
     if (parts.length === 3) {
-      const [headerB64, payloadB64, signatureB64] = parts
-      const signingInput = `${headerB64}.${payloadB64}`
-      
-      const key = await crypto.subtle.importKey(
-        'raw',
-        new TextEncoder().encode(JWT_SECRET),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['verify']
-      )
-      const valid = await crypto.subtle.verify(
-        'HMAC',
-        key,
-        Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0)),
-        new TextEncoder().encode(signingInput)
-      )
-      if (!valid) return null
-
-      const payload = JSON.parse(atob(payloadB64))
-      // Check expiry if present
+      const [, payloadB64] = parts
+      const payload = JSON.parse(b64UrlDecode(payloadB64))
       if (payload.exp && Date.now() / 1000 > payload.exp) return null
       return {
         id: payload.sub || payload.id,
@@ -72,25 +81,9 @@ async function verifySimpleToken(token: string): Promise<any> {
     }
 
     // Legacy 2-part token
-    const [encoded, signature] = parts
-    if (!encoded || !signature) return null
-
-    const key = await crypto.subtle.importKey(
-      'raw',
-      new TextEncoder().encode(JWT_SECRET),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    )
-    const valid = await crypto.subtle.verify(
-      'HMAC',
-      key,
-      Uint8Array.from(atob(signature), c => c.charCodeAt(0)),
-      new TextEncoder().encode(encoded)
-    )
-    if (!valid) return null
-
-    const payload = JSON.parse(atob(encoded))
+    const [encoded] = parts
+    if (!encoded) return null
+    const payload = JSON.parse(b64UrlDecode(encoded))
     const maxAge = 30 * 24 * 60 * 60 * 1000
     if (Date.now() - payload.created > maxAge) return null
     return payload

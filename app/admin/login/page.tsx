@@ -49,8 +49,6 @@ export default function AdminLogin() {
           authType: 'adminUser',
         })
         setStoredUser(mpData.user)
-        // Set admin_token cookie so middleware can read it during page navigation
-        document.cookie = `admin_token=${mpData.accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Strict`
         toast.success('Login successful!')
         window.location.href = '/admin/dashboard'
         return
@@ -121,7 +119,6 @@ export default function AdminLogin() {
         authType: 'adminUser',
       })
       setStoredUser(data.user)
-      document.cookie = `admin_token=${data.accessToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Strict`
       toast.success('Login successful!')
       window.location.href = '/admin/dashboard'
     } catch {
