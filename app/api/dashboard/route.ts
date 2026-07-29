@@ -8,73 +8,93 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
-    console.log('Dashboard API called by:', session.email, 'role:', session.role)
 
-    const userBranchId = session.branchId || null
     const isSuper = session.role === 'SUPER_ADMIN'
 
-    const branchFilter = !isSuper && userBranchId ? { branchId: userBranchId } : {}
-    const serviceFilter = {}
-
     const [
-      totalBookings,
-      pendingBookings,
-      totalApplications,
-      newApplications,
-      totalServices
+      totalUsers,
+      totalTaskers,
+      totalCompanies,
+      pendingKYC,
+      verifiedKYC,
+      rejectedKYC,
+      bannedUsers,
+      pendingSettlements,
+      overdueSettlements,
+      totalCommissionOwed,
+      totalCommissionPaid,
+      pendingCheatingReports,
+      totalJobPostings,
+      openJobs,
+      completedJobs,
+      totalWalletBalance,
+      weeklySettlementsPending,
+      weeklySettlementsOverdue,
     ] = await Promise.all([
-      prisma.booking.count({ where: branchFilter }),
-      prisma.booking.count({ where: { ...branchFilter, status: 'PENDING' } }),
-      prisma.application.count({ where: branchFilter }),
-      prisma.application.count({ where: { ...branchFilter, status: 'NEW' } }),
-      prisma.service.count({ where: serviceFilter })
+      prisma.user.count({ where: { isBanned: false } }),
+      prisma.taskerProfile.count(),
+      prisma.companyProfile.count(),
+      prisma.identityDocument.count({ where: { status: 'PENDING' } }),
+      prisma.identityDocument.count({ where: { status: 'APPROVED' } }),
+      prisma.identityDocument.count({ where: { status: 'REJECTED' } }),
+      prisma.user.count({ where: { isBanned: true } }),
+      prisma.weeklySettlement.count({ where: { status: 'PENDING' } }),
+      prisma.weeklySettlement.count({ where: { status: 'OVERDUE' } }),
+      prisma.weeklySettlement.aggregate({
+        where: { status: { in: ['PENDING', 'OVERDUE'] } },
+        _sum: { commissionOwed: true }
+      }),
+      prisma.weeklySettlement.aggregate({
+        where: { status: 'PAID' },
+        _sum: { commissionOwed: true }
+      }),
+      prisma.offPlatformDeal.count({ where: { status: 'PENDING' } }),
+      prisma.jobPosting.count(),
+      prisma.jobPosting.count({ where: { status: 'OPEN' } }),
+      prisma.jobPosting.count({ where: { status: 'COMPLETED' } }),
+      prisma.providerWallet.aggregate({ _sum: { availableBalance: true } }),
+      prisma.weeklySettlement.aggregate({
+        where: { status: 'PENDING' },
+        _sum: { commissionOwed: true },
+        _count: true
+      }),
+      prisma.weeklySettlement.aggregate({
+        where: { status: 'OVERDUE' },
+        _sum: { commissionOwed: true },
+        _count: true
+      }),
     ])
-
-    const recentBookingsRaw = await prisma.booking.findMany({
-      where: branchFilter,
-      take: 10,
-      orderBy: { createdAt: 'desc' }
-    })
-    
-    const recentBookings = await Promise.all(recentBookingsRaw.map(async (booking: any) => {
-      let service = null
-      if (booking.serviceId) {
-        service = await prisma.service.findUnique({
-          where: { id: booking.serviceId },
-          select: { id: true, name: true, price: true }
-        })
-      }
-      return { ...booking, service }
-    }))
-
-    const recentApplications = await prisma.application.findMany({
-      where: branchFilter,
-      take: 5,
-      orderBy: { createdAt: 'desc' }
-    })
-
-    const branches = isSuper ? await prisma.branch.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, location: true }
-    }) : []
 
     return NextResponse.json({
       stats: {
-        totalBookings,
-        pendingBookings,
-        totalApplications,
-        newApplications,
-        totalServices
+        totalUsers,
+        totalTaskers,
+        totalCompanies,
+        pendingKYC,
+        verifiedKYC,
+        rejectedKYC,
+        bannedUsers,
+        pendingSettlements,
+        overdueSettlements,
+        totalCommissionOwed: totalCommissionOwed._sum.commissionOwed || 0,
+        totalCommissionPaid: totalCommissionPaid._sum.commissionOwed || 0,
+        pendingCheatingReports,
+        totalJobPostings,
+        openJobs,
+        completedJobs,
+        totalWalletBalance: totalWalletBalance._sum.availableBalance || 0,
+        commissionRate: 10,
       },
-      recentBookings,
-      recentApplications,
-      branches,
-      currentBranch: userBranchId,
+      weeklySummary: {
+        pendingCommission: weeklySettlementsPending._sum.commissionOwed || 0,
+        pendingCount: weeklySettlementsPending._count,
+        overdueCommission: weeklySettlementsOverdue._sum.commissionOwed || 0,
+        overdueCount: weeklySettlementsOverdue._count,
+      },
       isSuperAdmin: isSuper
     })
   } catch (error) {
     console.error('Dashboard API error:', error)
-    return NextResponse.json({ error: 'Failed to fetch dashboard data', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
   }
 }

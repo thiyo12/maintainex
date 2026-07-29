@@ -335,7 +335,7 @@ export default function HomeClient() {
       </section>
 
       {/* PROBLEM */}
-      <section id="problem" className="min-h-screen flex flex-col justify-center items-center px-4 py-16">
+      <section id="problem" className="min-h-screen flex flex-col justify-center items-center px-4 py-16 bg-[#0B0C12]">
         <div className="flex items-center justify-center w-full my-8">
           <span className="flex items-center px-7 py-2 rounded-full bg-[#1a1b24] border border-white/10 text-sm font-semibold text-white">
             <svg className="w-5 h-5 mr-2 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>

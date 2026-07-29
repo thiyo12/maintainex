@@ -76,40 +76,24 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Full Super Admin navigation with all sections
+  // New Unified Admin navigation — manages both App and Website
   const superAdminNavigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: FiHome },
-    { name: 'Customers', href: '/admin/customers', icon: FiUsers },
-    { name: 'Bookings', href: '/admin/bookings', icon: FiCalendar },
-    { name: 'Invoices', href: '/admin/invoices', icon: FiFileText },
-    { name: 'Quotations', href: '/admin/quotations', icon: FiFile },
-    { name: 'Applications', href: '/admin/applications', icon: FiUsers },
-    { name: 'Services', href: '/admin/services', icon: FiSettings },
-    { name: 'Categories', href: '/admin/categories', icon: FiGrid },
-    { name: 'Flash Offers', href: '/admin/flash-offers', icon: FiZap },
-    { name: 'Industries', href: '/admin/industries', icon: FiGrid },
-    { name: 'Branches', href: '/admin/branches', icon: FiMapPin },
-    { name: 'Districts', href: '/admin/districts', icon: FiMap },
-    { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
-    { name: 'Careers', href: '/admin/careers', icon: FiShield },
-    { name: 'Admins', href: '/admin/admins', icon: FiUserCheck },
-    { name: 'App Super Admins', href: '/admin/app-admins', icon: FiShield },
-    { name: 'App Management', href: '/admin/marketplace/dashboard', icon: FiGrid },
-    { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
+    { name: 'KYC Verification', href: '/admin/kyc', icon: FiShield },
+    { name: 'Commission', href: '/admin/commission', icon: FiFileText },
+    { name: 'Cheating Reports', href: '/admin/cheating', icon: FiShield },
+    { name: 'Wishlist', href: '/admin/wishlist', icon: FiGrid },
     { name: 'Settings', href: '/admin/settings', icon: FiSettings },
   ]
 
-  // Regular Admin navigation
+  // Regular Admin navigation — same new pages
   const adminNavigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: FiHome },
-    { name: 'Bookings', href: '/admin/bookings', icon: FiCalendar },
-    { name: 'Invoices', href: '/admin/invoices', icon: FiFileText },
-    { name: 'Quotations', href: '/admin/quotations', icon: FiFile },
-    { name: 'Applications', href: '/admin/applications', icon: FiUsers },
-    { name: 'Staff', href: '/admin/staff', icon: FiUserCheck },
-    { name: 'Careers', href: '/admin/careers', icon: FiShield },
-    { name: 'Reports', href: '/admin/reports', icon: FiBarChart2 },
-    { name: 'Services', href: '/admin/services', icon: FiSettings },
+    { name: 'KYC Verification', href: '/admin/kyc', icon: FiShield },
+    { name: 'Commission', href: '/admin/commission', icon: FiFileText },
+    { name: 'Cheating Reports', href: '/admin/cheating', icon: FiShield },
+    { name: 'Wishlist', href: '/admin/wishlist', icon: FiGrid },
+    { name: 'Settings', href: '/admin/settings', icon: FiSettings },
   ]
 
   const navigation = isSuperAdmin ? superAdminNavigation : adminNavigation

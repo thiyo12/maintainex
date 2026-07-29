@@ -9,6 +9,7 @@ datasource db {
 
 model User {
   id               String   @id @default(cuid())
+  mxId             String?  @unique // MXU-XXXXX unique user ID
   email            String   @unique
   passwordHash     String
   name             String
@@ -16,6 +17,8 @@ model User {
   role             String   @default("CUSTOMER")
   isActive         Boolean  @default(true)
   isSuspended      Boolean  @default(false)
+  isBanned         Boolean  @default(false) // Banned for off-platform deals
+  banReason        String?
   suspendedUntil   DateTime?
   suspensionReason String?
   pushToken        String?
@@ -1116,6 +1119,12 @@ model TaskerProfile {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  mxId              String?  @unique // MXT-XXXXX unique tasker ID
+  verificationStatus String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationNote  String?  // Admin rejection reason
+  verifiedBy        String?  // Admin ID who verified
+  verifiedAt        DateTime?
+
   bio           String?
   hourlyRate    Float    @default(0)
   skills        String? // Category slugs
@@ -1125,6 +1134,11 @@ model TaskerProfile {
   isVerified    Boolean  @default(false)
   isOnline      Boolean  @default(false)
   profileImage  String?
+
+  // Experience proof
+  experienceProofUrl String? // Certificate or portfolio URL
+  hasDrivingLicense  Boolean @default(false)
+  drivingLicenseUrl  String?
 
   // Reputation & scoring
   compositeScore  Int     @default(50)
@@ -1328,8 +1342,10 @@ model CompanyProfile {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  mxId              String?  @unique // MXC-XXXXX unique company ID
   companyName       String
   registrationNo    String?
+  taxId             String?  // Tax identification number
   description       String?
   services          String
   serviceAreas      String
@@ -1338,12 +1354,24 @@ model CompanyProfile {
   isVerified        Boolean  @default(false)
   logo              String?
 
+  // Verification
+  verificationStatus String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationNote   String? // Admin rejection reason
+  verifiedBy         String? // Admin ID who verified
+  verifiedAt         DateTime?
+  businessRegDocUrl  String? // Business registration document URL
+
+  // Staff requirements
+  minStaffCount  Int     @default(3) // Minimum staff required
+  staffCount     Int     @default(0) // Actual staff count
+  staffProofUrl  String? // Proof of staff (document URL)
+
   // Location
   latitude          Float?
   longitude         Float?
   serviceRadius     Float?
 
-  commissionRate        Float     @default(15.0)
+  commissionRate        Float     @default(10.0) // Changed from 15 to 10
   subscriptionStatus    String    @default("TRIAL") // TRIAL, ACTIVE, PAST_DUE, CANCELLED
   subscriptionExpiresAt DateTime?
 
@@ -1700,7 +1728,7 @@ model CommissionSettlement {
   providerId       String
   customerId       String
   jobAmount        BigInt // total job amount in cents (excl. fees)
-  commissionRate   Float    @default(15.0)
+  commissionRate   Float    @default(10.0) // Changed from 15 to 10
   commissionAmount BigInt // jobAmount * commissionRate / 10000 (bps calc)
   status           String   @default("PENDING") // PENDING, SETTLED
   settledAt        DateTime?
@@ -1956,7 +1984,7 @@ model AdminAlert {
 
 model PlatformSettings {
   id                String   @id @default(cuid())
-  platformFeeBps    Int      @default(1000)
+  platformFeeBps    Int      @default(1000) // 10% = 1000 basis points
   minJobAmountCents BigInt   @default(500)
   maxJobAmountCents BigInt   @default(1000000)
   escrowReleaseDays Int      @default(3)
@@ -1964,6 +1992,9 @@ model PlatformSettings {
   maxQuotesPerJob   Int      @default(10)
   maxDisputesPerJob Int      @default(1)
   autoReleaseAfterDays Int   @default(14)
+  commissionRate    Float    @default(10.0) // Platform commission percentage
+  weeklySettlementDay String @default("MONDAY") // Day commission is due
+  suspensionGracePeriodDays Int @default(7) // Days after due before suspension
   supportEmail      String?
   updatedBy         String?
   updatedAt         DateTime @updatedAt
@@ -2380,5 +2411,79 @@ model WaitlistEntry {
 
   @@unique([email])
   @@index([role])
+  @@index([createdAt])
+}
+
+// ============================================
+// PHASE 1: COMMISSION & SETTLEMENT MODELS
+// ============================================
+
+/// Weekly commission settlement for providers
+model WeeklySettlement {
+  id              String    @id @default(cuid())
+  providerId      String    // userId of the provider
+  providerType    String    // TASKER, COMPANY
+  weekStart       DateTime  // Monday of the week
+  weekEnd         DateTime  // Sunday of the week
+  totalEarnings   Float     @default(0) // Total earned this week
+  commissionRate  Float     @default(10.0) // Commission percentage
+  commissionOwed  Float     @default(0) // totalEarnings * commissionRate / 100
+  commissionPaid  Boolean   @default(false)
+  paidAt          DateTime?
+  dueAt           DateTime  // 7 days after weekEnd (next Monday)
+  status          String    @default("PENDING") // PENDING, PAID, OVERDUE, SUSPENDED
+  suspendedAt     DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([providerId, weekStart])
+  @@index([providerId])
+  @@index([status])
+  @@index([weekStart])
+  @@index([dueAt])
+}
+
+/// Off-platform deal reports (cheating)
+model OffPlatformDeal {
+  id              String   @id @default(cuid())
+  reporterId      String   // userId of reporter
+  againstUserId   String   // userId of person being reported
+  againstUserType String   // TASKER, CUSTOMER, COMPANY
+  jobId           String?  // Related job if any
+  evidence        String   // Description of evidence
+  evidenceUrls    String?  // JSON array of evidence photo URLs
+  status          String   @default("PENDING") // PENDING, CONFIRMED, DISMISSED
+  action          String?  // BAN, WARNING, NO_ACTION
+  actionNote      String?  // Admin note on action taken
+  reviewedBy      String?  // Admin ID who reviewed
+  reviewedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([reporterId])
+  @@index([againstUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// Website feature requests / wishlist
+model WishlistItem {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String   @default("GENERAL") // GENERAL, APP, WEBSITE, ADMIN, API
+  status      String   @default("NEW") // NEW, PLANNED, IN_PROGRESS, COMPLETED, REJECTED
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  assignedTo  String?  // Admin user ID
+  notes       String?  // Internal admin notes
+  requestedBy String?  // User who requested (email or userId)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([category])
   @@index([createdAt])
 }

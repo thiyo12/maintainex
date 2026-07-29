@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiSave, FiMail, FiPhone, FiMapPin, FiMessageCircle } from 'react-icons/fi'
 import { getAuthHeader } from '@/lib/auth-client'
+import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Settings {
   companyName: string
@@ -101,6 +102,7 @@ export default function AdminSettings() {
   }
 
   return (
+    <AdminLayout>
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
@@ -252,5 +254,6 @@ export default function AdminSettings() {
         </div>
       </form>
     </div>
+    </AdminLayout>
   )
 }
