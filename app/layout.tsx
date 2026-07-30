@@ -139,7 +139,7 @@ export default function RootLayout({
           })}
         </Script>
       </head>
-      <body className={`${outfit.className} min-h-screen bg-background dark:text-gray-100`}>
+      <body className={`${outfit.className} min-h-screen bg-[#0B0C12] dark:text-gray-100`}>
         <Script id="region-cookie" strategy="afterInteractive">
           {`document.cookie="region=${region};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax"`}
         </Script>
