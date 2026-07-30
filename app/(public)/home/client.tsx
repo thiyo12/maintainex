@@ -243,19 +243,16 @@ export default function HomeClient() {
           </div>
         </div>
         <div className="relative w-full max-w-[1400px] flex justify-center items-end mt-4">
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between w-full px-[6vw] z-0 pointer-events-none select-none">
-            <div className="relative hidden md:block w-[16vw] min-w-[150px] max-w-[200px] -rotate-[8deg] slow-float">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between w-full px-[3vw] z-0 pointer-events-none select-none">
+            <div className="relative hidden md:block w-[20vw] min-w-[180px] max-w-[260px] -rotate-[6deg] slow-float">
               <img src="/app-splash.png" className="w-full rounded-2xl shadow-xl block" alt="MaintainEX App" />
-              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
-            <div className="relative hidden md:block w-[16vw] min-w-[150px] max-w-[200px] rotate-[8deg] slow-float" style={{ animationDelay: '1s' }}>
+            <div className="relative hidden md:block w-[20vw] min-w-[180px] max-w-[260px] rotate-[6deg] slow-float" style={{ animationDelay: '1s' }}>
               <img src="/app-splash.png" className="w-full rounded-2xl shadow-xl block" alt="MaintainEX App" />
-              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
           </div>
-          <div className="relative z-10 w-[200px] md:w-[240px] slow-float" style={{ animationDelay: '0.5s' }}>
+          <div className="relative z-10 w-[260px] md:w-[320px] slow-float" style={{ animationDelay: '0.5s' }}>
             <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" alt="MaintainEX App" />
-            <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 50%,rgba(11,12,18,1) 100%)' }}></div>
           </div>
         </div>
         <div className="w-full bg-[#0B0C12] py-6 overflow-hidden relative">
@@ -458,12 +455,12 @@ export default function HomeClient() {
           </div>
         </div>
         <div className="w-full md:w-1/2 flex items-center justify-center">
-          <img src="https://placehold.co/400x400/15161E/F59E0B?text=MaintainEX" className="w-[220px] sm:w-[280px] md:w-[380px] rounded-3xl" alt="" />
+          <img src="/app-splash.png" className="w-[220px] sm:w-[280px] md:w-[380px] rounded-3xl" alt="MaintainEX App" />
         </div>
       </section>
 
       {/* SEEKER */}
-      <section id="client" className="min-h-screen flex flex-col items-center justify-center px-6 py-20 md:py-32">
+      <section id="client" className="min-h-screen flex flex-col items-center justify-center px-6 py-20 md:py-32 bg-[#0B0C12]">
         <div className="flex items-center justify-center w-full my-8">
           <span className="flex items-center px-7 py-2 rounded-full bg-[#1a1b24] border border-white/10 text-sm font-semibold text-white">
             <svg className="w-5 h-5 mr-2 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -489,7 +486,7 @@ export default function HomeClient() {
           </div>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <a href="#waitlist" className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Seeker</a>
-            <a href="#" className="bg-white text-black font-semibold px-10 py-3 rounded-full shadow hover:bg-brand transition">Learn More &rarr;</a>
+            <a href="#" className="bg-white/10 text-white font-semibold px-10 py-3 rounded-full shadow hover:bg-brand hover:text-black transition">Learn More &rarr;</a>
           </div>
         </div>
       </section>
@@ -528,7 +525,7 @@ export default function HomeClient() {
         </div>
         <div className="mt-12 flex flex-col sm:flex-row gap-6 justify-center">
           <a href="#waitlist" onClick={() => launchConfetti()} className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Tasker</a>
-          <a href="#" className="bg-white text-black font-semibold px-10 py-3 rounded-full shadow hover:bg-brand transition">Learn More &rarr;</a>
+          <a href="#" className="bg-white/10 text-white font-semibold px-10 py-3 rounded-full shadow hover:bg-brand hover:text-black transition">Learn More &rarr;</a>
         </div>
       </section>
 
@@ -750,7 +747,7 @@ export default function HomeClient() {
       </section>
 
       {/* ABOUT PAGE */}
-      <section id="about-page" className="py-20 px-6">
+      <section id="about-page" className="py-20 px-6 bg-[#0B0C12]">
         <div className="max-w-6xl mx-auto">
           <span className="text-brand text-sm uppercase tracking-widest font-bold">About MaintainEX</span>
           <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">Built for the people who build the world.</h2>
@@ -897,7 +894,7 @@ export default function HomeClient() {
       </section>
 
       {/* PRIVACY POLICY */}
-      <section id="privacy-page" className="py-20 px-6">
+      <section id="privacy-page" className="py-20 px-6 bg-[#0B0C12]">
         <div className="max-w-4xl mx-auto">
           <span className="inline-block px-5 py-2 rounded-full bg-[#1a1b24] border border-white/10 text-sm font-semibold text-brand mb-6">Legal</span>
           <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mb-4">Privacy Policy</h2>
