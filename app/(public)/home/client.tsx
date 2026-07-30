@@ -213,7 +213,7 @@ export default function HomeClient() {
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-black leading-tight text-white mb-4 sm:mb-6 tracking-tight max-w-4xl fade-in-up">
             Hire someone who<br /><span className="text-brand">actually shows up.</span>
           </h1>
-          <p className="text-base sm:text-lg md:text-xl text-gray-400 max-w-xl mb-5 sm:mb-6 fade-in-up px-2">
+          <p className="text-base sm:text-lg md:text-xl text-gray-300 max-w-xl mb-5 sm:mb-6 fade-in-up px-2">
             Connect with verified professionals for any task — home, business, or local.
             <span className="relative inline-block font-bold bg-animate px-1">Fast &amp; reliable.</span>
           </p>
@@ -231,7 +231,7 @@ export default function HomeClient() {
             Join Waitlist
           </a>
           <div className="flex items-center gap-4 mb-10">
-            <span className="flex items-center gap-2 text-gray-400 text-sm font-medium">
+            <span className="flex items-center gap-2 text-gray-300 text-sm font-medium">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="1"/></svg>
               App Available For
             </span>
@@ -293,7 +293,7 @@ export default function HomeClient() {
         <div className="w-full max-w-3xl grid grid-cols-1 md:grid-row-3 gap-10 md:gap-0" data-aos="flip-right">
           <div className="flex flex-col items-center px-6">
             <span className="text-4xl md:text-5xl font-black text-white">10%</span>
-            <span className="mt-2 text-gray-400 text-lg font-medium text-center">
+            <span className="mt-2 text-gray-300 text-lg font-medium text-center">
               <span className="block text-brand font-bold">Platform Fee — That&apos;s It</span>
               Industry charges 15-25%. We charge 10%, deducted only when you pay.
             </span>
@@ -301,7 +301,7 @@ export default function HomeClient() {
           <div className="flex justify-center items-center"><div className="w-px h-16 bg-brand/40"></div></div>
           <div className="flex flex-col items-center px-6">
             <span className="text-4xl md:text-5xl font-black text-white">200+</span>
-            <span className="mt-2 text-gray-400 text-lg font-medium text-center">
+            <span className="mt-2 text-gray-300 text-lg font-medium text-center">
               <span className="block text-brand font-bold">Services Available</span>
               From cleaning to event planning, IT support to logistics — and more every week.
             </span>
@@ -309,7 +309,7 @@ export default function HomeClient() {
           <div className="flex justify-center items-center"><div className="w-px h-16 bg-brand/40"></div></div>
           <div className="flex flex-col items-center px-6">
             <span className="text-4xl md:text-5xl font-black text-white">&lt;100 min</span>
-            <span className="mt-2 text-gray-400 text-lg font-medium text-center">
+            <span className="mt-2 text-gray-300 text-lg font-medium text-center">
               <span className="block text-brand font-bold">Average Match Time</span>
               Post a job, get matched with a verified pro, and book — fast.
             </span>
@@ -386,19 +386,19 @@ export default function HomeClient() {
         <div className="w-full max-w-6xl mx-auto relative hidden md:block">
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-gray-700"></div>
           <div className="flex justify-between relative z-10">
-            <div className="flex flex-col items-center w-1/5" data-aos="fade-up"><span className="text-4xl font-black text-white/10 mb-4">01</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Search service</div><div className="text-xs text-gray-500">Tell us what you need.</div></div></div>
-            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="100"><span className="text-4xl font-black text-white/10 mb-4">02</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Choose a pro</div><div className="text-xs text-gray-500">Browse verified experts.</div></div></div>
-            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="200"><span className="text-4xl font-black text-white/10 mb-4">03</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Book &amp; pay</div><div className="text-xs text-gray-500">Secure in-app payment.</div></div></div>
-            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="300"><span className="text-4xl font-black text-white/10 mb-4">04</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Job gets done</div><div className="text-xs text-gray-500">Track in real-time.</div></div></div>
-            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="400"><span className="text-4xl font-black text-white/10 mb-4">05</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Rate &amp; review</div><div className="text-xs text-gray-500">Share your experience.</div></div></div>
+            <div className="flex flex-col items-center w-1/5" data-aos="fade-up"><span className="text-4xl font-black text-white/10 mb-4">01</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Search service</div><div className="text-xs text-gray-400">Tell us what you need.</div></div></div>
+            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="100"><span className="text-4xl font-black text-white/10 mb-4">02</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Choose a pro</div><div className="text-xs text-gray-400">Browse verified experts.</div></div></div>
+            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="200"><span className="text-4xl font-black text-white/10 mb-4">03</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Book &amp; pay</div><div className="text-xs text-gray-400">Secure in-app payment.</div></div></div>
+            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="300"><span className="text-4xl font-black text-white/10 mb-4">04</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Job gets done</div><div className="text-xs text-gray-400">Track in real-time.</div></div></div>
+            <div className="flex flex-col items-center w-1/5" data-aos="fade-up" data-aos-delay="400"><span className="text-4xl font-black text-white/10 mb-4">05</span><div className="w-3 h-3 bg-brand rounded-full mb-4"></div><div className="text-center"><div className="font-semibold text-sm mb-1">Rate &amp; review</div><div className="text-xs text-gray-400">Share your experience.</div></div></div>
           </div>
         </div>
         <div className="w-full max-w-md mx-auto md:hidden mt-8 space-y-4">
-          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up"><span className="text-2xl font-black text-brand/40">01</span><div><div className="font-semibold text-white">Search service</div><div className="text-sm text-gray-400">Tell us what you need.</div></div></div>
-          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="100"><span className="text-2xl font-black text-brand/40">02</span><div><div className="font-semibold text-white">Choose a pro</div><div className="text-sm text-gray-400">Browse verified experts.</div></div></div>
-          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="200"><span className="text-2xl font-black text-brand/40">03</span><div><div className="font-semibold text-white">Book &amp; pay</div><div className="text-sm text-gray-400">Secure in-app payment.</div></div></div>
-          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="300"><span className="text-2xl font-black text-brand/40">04</span><div><div className="font-semibold text-white">Job gets done</div><div className="text-sm text-gray-400">Track in real-time.</div></div></div>
-          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="400"><span className="text-2xl font-black text-brand/40">05</span><div><div className="font-semibold text-white">Rate &amp; review</div><div className="text-sm text-gray-400">Share your experience.</div></div></div>
+          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up"><span className="text-2xl font-black text-brand/40">01</span><div><div className="font-semibold text-white">Search service</div><div className="text-sm text-gray-300">Tell us what you need.</div></div></div>
+          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="100"><span className="text-2xl font-black text-brand/40">02</span><div><div className="font-semibold text-white">Choose a pro</div><div className="text-sm text-gray-300">Browse verified experts.</div></div></div>
+          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="200"><span className="text-2xl font-black text-brand/40">03</span><div><div className="font-semibold text-white">Book &amp; pay</div><div className="text-sm text-gray-300">Secure in-app payment.</div></div></div>
+          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="300"><span className="text-2xl font-black text-brand/40">04</span><div><div className="font-semibold text-white">Job gets done</div><div className="text-sm text-gray-300">Track in real-time.</div></div></div>
+          <div className="flex items-start gap-4 bg-white/5 rounded-xl p-4 border border-white/10" data-aos="fade-up" data-aos-delay="400"><span className="text-2xl font-black text-brand/40">05</span><div><div className="font-semibold text-white">Rate &amp; review</div><div className="text-sm text-gray-300">Share your experience.</div></div></div>
         </div>
         <div className="w-fit mx-auto px-6 py-8 mt-10">
           <div className="text-white py-10 text-2xl sm:text-3xl font-black tracking-tight text-center">
@@ -471,18 +471,18 @@ export default function HomeClient() {
           <h1 className="text-4xl md:text-6xl font-black mb-4 leading-tight">Get tasks done in <span className="text-brand">minutes</span>, not days.</h1>
           <p className="text-gray-300 text-lg md:text-xl mb-10">Need help with any task — personal, business, or local? MaintainEX connects you with verified professionals who get it done — <span className="relative inline-block font-bold bg-animate px-1">instantly</span>.</p>
           <div className="grid md:grid-cols-2 gap-8 text-left max-w-3xl mx-auto mb-12">
-            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Describe your task</h3><p className="text-gray-400">Tell us what you need done — personal, business, or local.</p></div>
-            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Choose a pro</h3><p className="text-gray-400">Browse verified experts with real reviews.</p></div>
-            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Book &amp; pay</h3><p className="text-gray-400">Secure payment, transparent pricing.</p></div>
-            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Task completed</h3><p className="text-gray-400">Track in real-time, satisfaction guaranteed.</p></div>
+            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Describe your task</h3><p className="text-gray-300">Tell us what you need done — personal, business, or local.</p></div>
+            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Choose a pro</h3><p className="text-gray-300">Browse verified experts with real reviews.</p></div>
+            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Book &amp; pay</h3><p className="text-gray-300">Secure payment, transparent pricing.</p></div>
+            <div className="pl-8 border-l border-gray-700"><h3 className="font-bold text-lg mb-1 flex items-center gap-2"><svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Task completed</h3><p className="text-gray-300">Track in real-time, satisfaction guaranteed.</p></div>
           </div>
           <div className="w-24 h-[1px] bg-gray-700 mx-auto mb-12"></div>
           <h2 className="text-2xl font-semibold mb-6 text-brand">Key Benefits</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto text-center mb-10 md:mb-12">
-            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p className="font-bold text-lg">Verified Pros</p><p className="text-sm text-gray-400 mt-1">Background-checked &amp; insured</p></div>
-            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><p className="font-bold text-lg">Transparent Pricing</p><p className="text-sm text-gray-400 mt-1">No hidden fees ever</p></div>
-            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg><p className="font-bold text-lg">Real-Time Tracking</p><p className="text-sm text-gray-400 mt-1">Watch your pro on the way</p></div>
-            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><p className="font-bold text-lg">100% Guaranteed</p><p className="text-sm text-gray-400 mt-1">Or your money back</p></div>
+            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><p className="font-bold text-lg">Verified Pros</p><p className="text-sm text-gray-300 mt-1">Background-checked &amp; insured</p></div>
+            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><p className="font-bold text-lg">Transparent Pricing</p><p className="text-sm text-gray-300 mt-1">No hidden fees ever</p></div>
+            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg><p className="font-bold text-lg">Real-Time Tracking</p><p className="text-sm text-gray-300 mt-1">Watch your pro on the way</p></div>
+            <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><p className="font-bold text-lg">100% Guaranteed</p><p className="text-sm text-gray-300 mt-1">Or your money back</p></div>
           </div>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <a href="#waitlist" className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Seeker</a>
@@ -610,14 +610,14 @@ export default function HomeClient() {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">Built for speed, trust, and control.</h2>
-            <p className="text-lg text-gray-400 max-w-2xl mx-auto">MaintainEX empowers both seekers and professionals through instant matching, transparent pricing, and total control.</p>
+            <p className="text-lg text-gray-300 max-w-2xl mx-auto">MaintainEX empowers both seekers and professionals through instant matching, transparent pricing, and total control.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
-            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h4 className="font-bold text-lg mb-1">AI Search</h4><p className="text-sm text-gray-400">Describe your issue, our AI finds the right pro.</p></div>
-            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="100"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h4 className="font-bold text-lg mb-1">Smart Scheduling</h4><p className="text-sm text-gray-400">Book instantly or schedule for later.</p></div>
-            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="200"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><h4 className="font-bold text-lg mb-1">Secure Payments</h4><p className="text-sm text-gray-400">Pay through the app, funds held in escrow.</p></div>
-            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="300"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><h4 className="font-bold text-lg mb-1">Verified Pros</h4><p className="text-sm text-gray-400">Background-checked &amp; insured professionals.</p></div>
-            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="400"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div><h4 className="font-bold text-lg mb-1">Real-Time Tracking</h4><p className="text-sm text-gray-400">Watch your pro on the way to your door.</p></div>
+            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div><h4 className="font-bold text-lg mb-1">AI Search</h4><p className="text-sm text-gray-300">Describe your issue, our AI finds the right pro.</p></div>
+            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="100"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><h4 className="font-bold text-lg mb-1">Smart Scheduling</h4><p className="text-sm text-gray-300">Book instantly or schedule for later.</p></div>
+            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="200"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><h4 className="font-bold text-lg mb-1">Secure Payments</h4><p className="text-sm text-gray-300">Pay through the app, funds held in escrow.</p></div>
+            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="300"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><h4 className="font-bold text-lg mb-1">Verified Pros</h4><p className="text-sm text-gray-300">Background-checked &amp; insured professionals.</p></div>
+            <div className="glass-card p-6 text-center hover:scale-105 transition-transform duration-300" data-aos="zoom-in" data-aos-delay="400"><div className="w-12 h-12 rounded-xl bg-brand/10 flex items-center justify-center mx-auto mb-3"><svg className="w-6 h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></div><h4 className="font-bold text-lg mb-1">Real-Time Tracking</h4><p className="text-sm text-gray-300">Watch your pro on the way to your door.</p></div>
           </div>
         </div>
       </section>
@@ -626,7 +626,7 @@ export default function HomeClient() {
       <section id="waitlist" className="py-20 px-4 bg-[#0B0C12]">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">Join the Waitlist</h2>
-          <p className="text-lg text-gray-400 mb-10">Secure your spot for the MaintainEX launch. Early members get priority access.</p>
+          <p className="text-lg text-gray-300 mb-10">Secure your spot for the MaintainEX launch. Early members get priority access.</p>
           <form className="space-y-5 max-w-xl mx-auto text-left" onSubmit={async (e) => {
             e.preventDefault()
             const phone = waitlistCountry + waitlistPhone.replace(/\s/g, '')
@@ -659,7 +659,7 @@ export default function HomeClient() {
             }
           }}>
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">I am a</label>
+              <label className="block text-xs font-semibold text-gray-300 mb-2 uppercase tracking-wider">I am a</label>
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { value: 'SEEKER', label: 'Seeker', desc: 'Need help', detail: 'I need home services & tasks done' },
@@ -673,7 +673,7 @@ export default function HomeClient() {
                     className={`p-4 rounded-xl border text-center transition-all ${
                       waitlistRole === opt.value
                         ? 'border-brand bg-brand/10 text-white'
-                        : 'border-white/10 bg-[#1a1b24] text-gray-400 hover:border-white/20'
+                        : 'border-white/10 bg-[#1a1b24] text-gray-300 hover:border-white/20'
                     }`}
                   >
                     <div className="text-sm font-bold">{opt.label}</div>
@@ -681,7 +681,7 @@ export default function HomeClient() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-2 pl-1">
+              <p className="text-xs text-gray-400 mt-2 pl-1">
                 {waitlistRole === 'SEEKER' && 'I need home services & tasks done'}
                 {waitlistRole === 'TASKER' && 'I fix, clean & maintain things'}
                 {waitlistRole === 'AGENCY' && 'I manage a team of professionals'}
@@ -703,7 +703,7 @@ export default function HomeClient() {
               className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
             />
             <div>
-              <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Phone</label>
+              <label className="block text-xs font-semibold text-gray-300 mb-2 uppercase tracking-wider">Phone</label>
               <div className="flex gap-2">
                 <select value={waitlistCountry} onChange={(e) => setWaitlistCountry(e.target.value)} className="bg-[#1a1b24] border border-white/10 rounded-xl px-3 py-4 text-white focus:border-brand focus:outline-none transition text-sm min-w-[110px]">
                   <option value="+94">🇱🇰 +94</option>
@@ -721,7 +721,7 @@ export default function HomeClient() {
               </div>
             </div>
             <button type="submit" className="w-full bg-brand text-black font-bold py-4 rounded-xl hover:bg-brand-light transition text-lg mt-4">Join the Waitlist</button>
-            <p className="text-xs text-gray-500 text-center mt-3">No spam. Unsubscribe anytime. Join 500+ others already on the list.</p>
+            <p className="text-xs text-gray-400 text-center mt-3">No spam. Unsubscribe anytime. Join 500+ others already on the list.</p>
           </form>
         </div>
       </section>
@@ -738,7 +738,7 @@ export default function HomeClient() {
                   <span className="text-brand text-2xl font-bold">{faqOpen === i ? '\u2212' : '+'}</span>
                 </button>
                 <div className="faq-a px-6" style={{ maxHeight: faqOpen === i ? '200px' : '0', overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
-                  <p className="py-4 text-gray-400">{item.a}</p>
+                  <p className="py-4 text-gray-300">{item.a}</p>
                 </div>
               </div>
             ))}
@@ -751,20 +751,20 @@ export default function HomeClient() {
         <div className="max-w-6xl mx-auto">
           <span className="text-brand text-sm uppercase tracking-widest font-bold">About MaintainEX</span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">Built for the people who build the world.</h2>
-          <p className="text-base md:text-xl text-gray-400 max-w-2xl mb-12 md:mb-16">We connect skilled professionals with people and businesses who need help getting things done — fast, fair, and transparently.</p>
+          <p className="text-base md:text-xl text-gray-300 max-w-2xl mb-12 md:mb-16">We connect skilled professionals with people and businesses who need help getting things done — fast, fair, and transparently.</p>
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center mb-16 md:mb-20">
             <div>
               <h3 className="text-2xl md:text-3xl font-black text-white mb-4 md:mb-6">It started with a simple problem.</h3>
-              <p className="text-base md:text-lg text-gray-400 leading-relaxed mb-3 md:mb-4">We watched people struggle to find reliable help — for their homes, their businesses, and their daily lives. The existing solutions were slow, overpriced, and untrustworthy.</p>
-              <p className="text-base md:text-lg text-gray-400 leading-relaxed mb-3 md:mb-4">Meanwhile, thousands of skilled professionals were looking for work but had no way to connect with the people who needed them.</p>
-              <p className="text-base md:text-lg text-gray-400 leading-relaxed">MaintainEX was built to solve both sides of this problem. A marketplace that&apos;s fair for professionals and reliable for seekers.</p>
+              <p className="text-base md:text-lg text-gray-300 leading-relaxed mb-3 md:mb-4">We watched people struggle to find reliable help — for their homes, their businesses, and their daily lives. The existing solutions were slow, overpriced, and untrustworthy.</p>
+              <p className="text-base md:text-lg text-gray-300 leading-relaxed mb-3 md:mb-4">Meanwhile, thousands of skilled professionals were looking for work but had no way to connect with the people who needed them.</p>
+              <p className="text-base md:text-lg text-gray-300 leading-relaxed">MaintainEX was built to solve both sides of this problem. A marketplace that&apos;s fair for professionals and reliable for seekers.</p>
             </div>
             <div className="bg-[#15161E] border border-white/10 rounded-3xl p-6 md:p-10">
               <div className="space-y-4 md:space-y-6">
-                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Trust by Default</h4><p className="text-xs md:text-sm text-gray-400">Every professional verified. Every review real.</p></div></div>
-                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Fair Economics</h4><p className="text-xs md:text-sm text-gray-400">10% platform fee. Professionals keep 90%.</p></div></div>
-                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Instant Matching</h4><p className="text-xs md:text-sm text-gray-400">AI-powered. Under 100 minutes average.</p></div></div>
-                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Global Local</h4><p className="text-xs md:text-sm text-gray-400">Starting in Sri Lanka &amp; Canada. Scaling worldwide.</p></div></div>
+                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Trust by Default</h4><p className="text-xs md:text-sm text-gray-300">Every professional verified. Every review real.</p></div></div>
+                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Fair Economics</h4><p className="text-xs md:text-sm text-gray-300">10% platform fee. Professionals keep 90%.</p></div></div>
+                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Instant Matching</h4><p className="text-xs md:text-sm text-gray-300">AI-powered. Under 100 minutes average.</p></div></div>
+                <div className="flex items-center gap-3 md:gap-4"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center flex-shrink-0"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><div><h4 className="font-bold text-white text-sm md:text-base">Global Local</h4><p className="text-xs md:text-sm text-gray-300">Starting in Sri Lanka &amp; Canada. Scaling worldwide.</p></div></div>
               </div>
             </div>
           </div>
@@ -778,17 +778,17 @@ export default function HomeClient() {
             <div>
               <span className="text-brand text-sm uppercase tracking-widest font-bold">Our Vision</span>
               <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">The world&apos;s most trusted task marketplace.</h2>
-              <p className="text-lg text-gray-400 leading-relaxed mb-4">We envision a world where anyone can get any task done — from home repairs to business operations — by connecting with verified, trusted professionals in their area.</p>
-              <p className="text-lg text-gray-400 leading-relaxed">No more guesswork. No more no-shows. No more hidden fees. Just reliable professionals, transparent pricing, and guaranteed satisfaction.</p>
+              <p className="text-lg text-gray-300 leading-relaxed mb-4">We envision a world where anyone can get any task done — from home repairs to business operations — by connecting with verified, trusted professionals in their area.</p>
+              <p className="text-lg text-gray-300 leading-relaxed">No more guesswork. No more no-shows. No more hidden fees. Just reliable professionals, transparent pricing, and guaranteed satisfaction.</p>
             </div>
             <div className="relative">
               <div className="absolute inset-0 bg-brand/10 rounded-3xl blur-3xl"></div>
               <div className="relative bg-[#0B0C12] border border-white/10 rounded-3xl p-10">
                 <div className="grid grid-cols-2 gap-3 md:gap-6">
-                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">2027</div><div className="text-xs md:text-sm text-gray-400 mt-1">Target Year</div></div>
-                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">10M+</div><div className="text-xs md:text-sm text-gray-400 mt-1">Tasks Completed</div></div>
-                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">50+</div><div className="text-xs md:text-sm text-gray-400 mt-1">Countries</div></div>
-                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">1M+</div><div className="text-xs md:text-sm text-gray-400 mt-1">Professionals</div></div>
+                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">2027</div><div className="text-xs md:text-sm text-gray-300 mt-1">Target Year</div></div>
+                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">10M+</div><div className="text-xs md:text-sm text-gray-300 mt-1">Tasks Completed</div></div>
+                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">50+</div><div className="text-xs md:text-sm text-gray-300 mt-1">Countries</div></div>
+                  <div className="text-center p-3 md:p-6 bg-[#1a1b24] rounded-2xl border border-white/5"><div className="text-2xl md:text-3xl font-black text-brand">1M+</div><div className="text-xs md:text-sm text-gray-300 mt-1">Professionals</div></div>
                 </div>
               </div>
             </div>
@@ -796,17 +796,17 @@ export default function HomeClient() {
           <span className="text-brand text-sm uppercase tracking-widest font-bold">Our Mission</span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-8 md:mb-12">Empowering every connection.</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 mb-16 md:mb-20">
-            <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Trust First</h3><p className="text-gray-400 text-sm md:text-base">Every professional is background-checked, ID-verified, and skill-assessed. We never compromise on trust.</p></div>
-            <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Fair Pricing</h3><p className="text-gray-400 text-sm md:text-base">Transparent upfront pricing. No hidden fees. Professionals keep 90% of what they earn.</p></div>
-            <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Instant Access</h3><p className="text-gray-400 text-sm md:text-base">AI-powered matching connects you with the right professional in under 100 minutes.</p></div>
+            <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Trust First</h3><p className="text-gray-300 text-sm md:text-base">Every professional is background-checked, ID-verified, and skill-assessed. We never compromise on trust.</p></div>
+            <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Fair Pricing</h3><p className="text-gray-300 text-sm md:text-base">Transparent upfront pricing. No hidden fees. Professionals keep 90% of what they earn.</p></div>
+            <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Instant Access</h3><p className="text-gray-300 text-sm md:text-base">AI-powered matching connects you with the right professional in under 100 minutes.</p></div>
           </div>
           <span className="text-brand text-sm uppercase tracking-widest font-bold">Core Values</span>
           <h2 className="text-2xl md:text-4xl font-black text-white mt-4 mb-8 md:mb-12">What drives us every day.</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">01</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">Radical Transparency</h3><p className="text-gray-400 text-sm md:text-base">Every price, every review, every professional — visible and verified. No black boxes.</p></div></div>
-            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">02</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">People Over Profit</h3><p className="text-gray-400 text-sm md:text-base">We take 10% so professionals keep 90%. Fair fees build sustainable businesses.</p></div></div>
-            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">03</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">Speed Matters</h3><p className="text-gray-400 text-sm md:text-base">From search to booking in minutes. AI-powered matching eliminates wait times.</p></div></div>
-            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">04</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">Global Local</h3><p className="text-gray-400 text-sm md:text-base">Built for local communities, scaled globally. Starting in Sri Lanka &amp; Canada.</p></div></div>
+            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">01</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">Radical Transparency</h3><p className="text-gray-300 text-sm md:text-base">Every price, every review, every professional — visible and verified. No black boxes.</p></div></div>
+            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">02</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">People Over Profit</h3><p className="text-gray-300 text-sm md:text-base">We take 10% so professionals keep 90%. Fair fees build sustainable businesses.</p></div></div>
+            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">03</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">Speed Matters</h3><p className="text-gray-300 text-sm md:text-base">From search to booking in minutes. AI-powered matching eliminates wait times.</p></div></div>
+            <div className="flex gap-4 md:gap-6 p-4 md:p-6 bg-[#0B0C12] border border-white/10 rounded-2xl hover:border-brand/30 transition-all"><div className="text-3xl md:text-4xl font-black text-brand/20">04</div><div><h3 className="text-lg md:text-xl font-bold text-white mb-2">Global Local</h3><p className="text-gray-300 text-sm md:text-base">Built for local communities, scaled globally. Starting in Sri Lanka &amp; Canada.</p></div></div>
           </div>
         </div>
 
@@ -815,50 +815,50 @@ export default function HomeClient() {
           <div className="max-w-6xl mx-auto">
             <span className="text-brand text-sm uppercase tracking-widest font-bold">Investor Relations</span>
             <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">The future of work is on-demand.</h2>
-            <p className="text-base md:text-xl text-gray-400 max-w-2xl mb-8 md:mb-12">MaintainEX is building the infrastructure that connects every task to the right professional — instantly, transparently, and fairly.</p>
+            <p className="text-base md:text-xl text-gray-300 max-w-2xl mb-8 md:mb-12">MaintainEX is building the infrastructure that connects every task to the right professional — instantly, transparently, and fairly.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 mb-16 md:mb-20 bg-[#15161E] rounded-3xl p-6 md:p-10">
-              <div className="text-center"><div className="text-4xl font-black text-brand">$400B+</div><p className="text-gray-400 mt-2 text-sm">Total Addressable Market</p></div>
-              <div className="text-center"><div className="text-4xl font-black text-brand">$87B</div><p className="text-gray-400 mt-2 text-sm">Serviceable Market (2026)</p></div>
-              <div className="text-center"><div className="text-4xl font-black text-brand">10%</div><p className="text-gray-400 mt-2 text-sm">Platform Fee</p></div>
-              <div className="text-center"><div className="text-4xl font-black text-brand">90%</div><p className="text-gray-400 mt-2 text-sm">Professional Retention</p></div>
+              <div className="text-center"><div className="text-4xl font-black text-brand">$400B+</div><p className="text-gray-300 mt-2 text-sm">Total Addressable Market</p></div>
+              <div className="text-center"><div className="text-4xl font-black text-brand">$87B</div><p className="text-gray-300 mt-2 text-sm">Serviceable Market (2026)</p></div>
+              <div className="text-center"><div className="text-4xl font-black text-brand">10%</div><p className="text-gray-300 mt-2 text-sm">Platform Fee</p></div>
+              <div className="text-center"><div className="text-4xl font-black text-brand">90%</div><p className="text-gray-300 mt-2 text-sm">Professional Retention</p></div>
             </div>
             <div className="grid md:grid-cols-2 gap-8 md:gap-12 mb-16 md:mb-20">
               <div>
                 <h3 className="text-2xl font-bold text-white mb-6">The Problem</h3>
                 <div className="space-y-4">
-                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div><h4 className="font-bold text-white">Fragmented Market</h4><p className="text-gray-400 text-sm">Millions of informal workers with no digital presence.</p></div></div>
-                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div><h4 className="font-bold text-white">Trust Deficit</h4><p className="text-gray-400 text-sm">No verification, no reviews, no accountability.</p></div></div>
-                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div><h4 className="font-bold text-white">Exploitative Fees</h4><p className="text-gray-400 text-sm">Existing platforms charge 15-25%, leaving professionals underpaid.</p></div></div>
+                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div><h4 className="font-bold text-white">Fragmented Market</h4><p className="text-gray-300 text-sm">Millions of informal workers with no digital presence.</p></div></div>
+                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div><h4 className="font-bold text-white">Trust Deficit</h4><p className="text-gray-300 text-sm">No verification, no reviews, no accountability.</p></div></div>
+                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div><div><h4 className="font-bold text-white">Exploitative Fees</h4><p className="text-gray-300 text-sm">Existing platforms charge 15-25%, leaving professionals underpaid.</p></div></div>
                 </div>
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-white mb-6">Our Solution</h3>
                 <div className="space-y-4">
-                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div><h4 className="font-bold text-white">AI-Powered Matching</h4><p className="text-gray-400 text-sm">Match seekers with the right professional in under 100 minutes.</p></div></div>
-                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div><h4 className="font-bold text-white">Verified Trust Layer</h4><p className="text-gray-400 text-sm">Background checks, ID verification, real reviews.</p></div></div>
-                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div><h4 className="font-bold text-white">Fair Economics</h4><p className="text-gray-400 text-sm">10% fee. Professionals keep 90%. Sustainable and scalable.</p></div></div>
+                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div><h4 className="font-bold text-white">AI-Powered Matching</h4><p className="text-gray-300 text-sm">Match seekers with the right professional in under 100 minutes.</p></div></div>
+                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div><h4 className="font-bold text-white">Verified Trust Layer</h4><p className="text-gray-300 text-sm">Background checks, ID verification, real reviews.</p></div></div>
+                  <div className="flex gap-4 items-start"><div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0 mt-1"><svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div><h4 className="font-bold text-white">Fair Economics</h4><p className="text-gray-300 text-sm">10% fee. Professionals keep 90%. Sustainable and scalable.</p></div></div>
                 </div>
               </div>
             </div>
             <h3 className="text-xl md:text-3xl font-black text-white mb-6 md:mb-8">How we make money.</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 mb-16 md:mb-20">
-              <div className="bg-[#15161E] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="text-2xl md:text-3xl font-black text-brand mb-2">10%</div><h4 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Platform Fee</h4><p className="text-gray-400 text-sm">Charged on every completed transaction. Professionals receive 90%.</p></div>
-              <div className="bg-[#15161E] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="text-2xl md:text-3xl font-black text-brand mb-2">Weekly</div><h4 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Payouts</h4><p className="text-gray-400 text-sm">Professionals get paid weekly via bank transfer or mobile payment.</p></div>
-              <div className="bg-[#15161E] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="text-2xl md:text-3xl font-black text-brand mb-2">2x</div><h4 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Network Effects</h4><p className="text-gray-400 text-sm">More professionals attract more seekers. Classic marketplace flywheel.</p></div>
+              <div className="bg-[#15161E] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="text-2xl md:text-3xl font-black text-brand mb-2">10%</div><h4 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Platform Fee</h4><p className="text-gray-300 text-sm">Charged on every completed transaction. Professionals receive 90%.</p></div>
+              <div className="bg-[#15161E] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="text-2xl md:text-3xl font-black text-brand mb-2">Weekly</div><h4 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Payouts</h4><p className="text-gray-300 text-sm">Professionals get paid weekly via bank transfer or mobile payment.</p></div>
+              <div className="bg-[#15161E] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="text-2xl md:text-3xl font-black text-brand mb-2">2x</div><h4 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Network Effects</h4><p className="text-gray-300 text-sm">More professionals attract more seekers. Classic marketplace flywheel.</p></div>
             </div>
             <h3 className="text-xl md:text-3xl font-black text-white mb-6 md:mb-8">Traction &amp; Roadmap.</h3>
             <div className="space-y-8 mb-20">
-              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-black font-bold text-sm">Q1</div><div className="w-px h-16 bg-brand/30"></div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-brand text-sm font-bold">Completed</span><h4 className="text-lg font-bold text-white mt-1">MVP Launch &amp; Waitlist</h4><p className="text-gray-400 text-sm mt-1">Platform built, 500+ waitlist signups, initial professional onboarding in Sri Lanka.</p></div></div>
-              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-black font-bold text-sm">Q2</div><div className="w-px h-16 bg-brand/30"></div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-brand text-sm font-bold">In Progress</span><h4 className="text-lg font-bold text-white mt-1">Sri Lanka Beta Launch</h4><p className="text-gray-400 text-sm mt-1">Mobile app launch, 100+ professionals onboarded, first paying transactions.</p></div></div>
-              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand/30 flex items-center justify-center text-brand font-bold text-sm">Q3</div><div className="w-px h-16 bg-brand/10"></div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-gray-400 text-sm font-bold">Planned</span><h4 className="text-lg font-bold text-white mt-1">Canada Expansion</h4><p className="text-gray-400 text-sm mt-1">Launch in Toronto &amp; Vancouver. Partnership with local service companies.</p></div></div>
-              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand/30 flex items-center justify-center text-brand font-bold text-sm">Q4</div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-gray-400 text-sm font-bold">Planned</span><h4 className="text-lg font-bold text-white mt-1">Series A &amp; Regional Scale</h4><p className="text-gray-400 text-sm mt-1">Expand to 5+ countries. AI matching 2.0. Agency management platform.</p></div></div>
+              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-black font-bold text-sm">Q1</div><div className="w-px h-16 bg-brand/30"></div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-brand text-sm font-bold">Completed</span><h4 className="text-lg font-bold text-white mt-1">MVP Launch &amp; Waitlist</h4><p className="text-gray-300 text-sm mt-1">Platform built, 500+ waitlist signups, initial professional onboarding in Sri Lanka.</p></div></div>
+              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-black font-bold text-sm">Q2</div><div className="w-px h-16 bg-brand/30"></div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-brand text-sm font-bold">In Progress</span><h4 className="text-lg font-bold text-white mt-1">Sri Lanka Beta Launch</h4><p className="text-gray-300 text-sm mt-1">Mobile app launch, 100+ professionals onboarded, first paying transactions.</p></div></div>
+              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand/30 flex items-center justify-center text-brand font-bold text-sm">Q3</div><div className="w-px h-16 bg-brand/10"></div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-gray-300 text-sm font-bold">Planned</span><h4 className="text-lg font-bold text-white mt-1">Canada Expansion</h4><p className="text-gray-300 text-sm mt-1">Launch in Toronto &amp; Vancouver. Partnership with local service companies.</p></div></div>
+              <div className="flex gap-6 items-start"><div className="flex flex-col items-center"><div className="w-10 h-10 rounded-full bg-brand/30 flex items-center justify-center text-brand font-bold text-sm">Q4</div></div><div className="bg-[#15161E] border border-white/10 rounded-xl p-6 flex-1"><span className="text-gray-300 text-sm font-bold">Planned</span><h4 className="text-lg font-bold text-white mt-1">Series A &amp; Regional Scale</h4><p className="text-gray-300 text-sm mt-1">Expand to 5+ countries. AI matching 2.0. Agency management platform.</p></div></div>
             </div>
             <div className="bg-[#15161E] border border-brand/20 rounded-3xl p-6 md:p-10">
               <h3 className="text-2xl md:text-3xl font-black text-white mb-4 md:mb-6">Invest in the future of work.</h3>
               <div className="grid grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-8">
-                <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-4 md:p-6 text-center"><div className="text-lg md:text-2xl font-black text-brand mb-1 md:mb-2">Pre-Seed</div><p className="text-gray-400 text-xs md:text-sm">Current Round</p></div>
-                <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-4 md:p-6 text-center"><div className="text-lg md:text-2xl font-black text-brand mb-1 md:mb-2">$500K</div><p className="text-gray-400 text-xs md:text-sm">Raising Amount</p></div>
-                <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-4 md:p-6 text-center"><div className="text-lg md:text-2xl font-black text-brand mb-1 md:mb-2">18 months</div><p className="text-gray-400 text-xs md:text-sm">Runway Target</p></div>
+                <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-4 md:p-6 text-center"><div className="text-lg md:text-2xl font-black text-brand mb-1 md:mb-2">Pre-Seed</div><p className="text-gray-300 text-xs md:text-sm">Current Round</p></div>
+                <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-4 md:p-6 text-center"><div className="text-lg md:text-2xl font-black text-brand mb-1 md:mb-2">$500K</div><p className="text-gray-300 text-xs md:text-sm">Raising Amount</p></div>
+                <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-4 md:p-6 text-center"><div className="text-lg md:text-2xl font-black text-brand mb-1 md:mb-2">18 months</div><p className="text-gray-300 text-xs md:text-sm">Runway Target</p></div>
               </div>
               <h4 className="text-lg md:text-xl font-bold text-white mb-3 md:mb-4">Use of Funds</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
@@ -879,7 +879,7 @@ export default function HomeClient() {
         <div className="max-w-4xl mx-auto">
           <span className="inline-block px-5 py-2 rounded-full bg-[#0B0C12] border border-white/10 text-sm font-semibold text-brand mb-6">Legal</span>
           <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mb-4">Terms &amp; Conditions</h2>
-          <p className="text-gray-400 mb-12">Last updated: January 2026</p>
+          <p className="text-gray-300 mb-12">Last updated: January 2026</p>
           <div className="space-y-10 text-gray-300 leading-relaxed">
             <div><h3 className="text-xl font-bold text-white mb-3">1. Acceptance of Terms</h3><p>By accessing or using the MaintainEX platform, you agree to be bound by these Terms. MaintainEX is a marketplace connecting seekers with professionals. We are not a party to any agreement between parties.</p></div>
             <div><h3 className="text-xl font-bold text-white mb-3">2. Eligibility</h3><p>You must be at least 18 years old. Professionals must complete identity verification. Agencies must provide valid business registration documents.</p></div>
@@ -898,7 +898,7 @@ export default function HomeClient() {
         <div className="max-w-4xl mx-auto">
           <span className="inline-block px-5 py-2 rounded-full bg-[#1a1b24] border border-white/10 text-sm font-semibold text-brand mb-6">Legal</span>
           <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mb-4">Privacy Policy</h2>
-          <p className="text-gray-400 mb-12">Last updated: January 2026</p>
+          <p className="text-gray-300 mb-12">Last updated: January 2026</p>
           <div className="space-y-10 text-gray-300 leading-relaxed">
             <div><h3 className="text-xl font-bold text-white mb-3">1. Information We Collect</h3><p className="mb-2"><strong className="text-brand">Personal:</strong> Name, email, mobile number, government ID (for verification), payment info, location data.</p><p><strong className="text-brand">Usage:</strong> Device info, pages viewed, IP address, task history, reviews.</p></div>
             <div><h3 className="text-xl font-bold text-white mb-3">2. How We Use Your Information</h3><p>To provide services, match seekers with professionals, process payments, verify identities, communicate updates, improve AI matching, prevent fraud, and comply with legal obligations.</p></div>
@@ -920,26 +920,26 @@ export default function HomeClient() {
                 <img src="/logo.JPEG" alt="MaintainEX" className="w-8 h-8 rounded-full object-cover" />
                 <span className="font-extrabold text-xl tracking-tight"><span className="text-white">Maintain</span><span className="text-brand">EX</span></span>
               </div>
-              <p className="text-gray-400 text-sm max-w-xs mb-4">Your trusted task marketplace. Verified professionals, transparent pricing, 100% satisfaction guaranteed.</p>
-              <div className="flex items-center gap-2 text-sm text-gray-400">
+              <p className="text-gray-300 text-sm max-w-xs mb-4">Your trusted task marketplace. Verified professionals, transparent pricing, 100% satisfaction guaranteed.</p>
+              <div className="flex items-center gap-2 text-sm text-gray-300">
                 <svg className="w-4 h-4 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 Sri Lanka &bull; Canada
               </div>
             </div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-4">Product</h4><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Features</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Pricing</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Mobile App</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Updates</a></div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-4">Platform</h4><a href="#client" className="block text-gray-300 text-sm hover:text-brand transition py-1">For Seekers</a><a href="#tasker" className="block text-gray-300 text-sm hover:text-brand transition py-1">For Professionals</a><a href="#features" className="block text-gray-300 text-sm hover:text-brand transition py-1">Services</a><a href="#working" className="block text-gray-300 text-sm hover:text-brand transition py-1">How It Works</a></div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-4">Company</h4><a href="#about-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">About Us</a><a href="#vision-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Vision &amp; Mission</a><a href="#investors-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Investors</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Careers</a></div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-500 mb-4">Legal</h4><a href="#terms-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Terms of Service</a><a href="#privacy-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Privacy Policy</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Cookie Policy</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Security</a></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-400 mb-4">Product</h4><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Features</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Pricing</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Mobile App</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Updates</a></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-400 mb-4">Platform</h4><a href="#client" className="block text-gray-300 text-sm hover:text-brand transition py-1">For Seekers</a><a href="#tasker" className="block text-gray-300 text-sm hover:text-brand transition py-1">For Professionals</a><a href="#features" className="block text-gray-300 text-sm hover:text-brand transition py-1">Services</a><a href="#working" className="block text-gray-300 text-sm hover:text-brand transition py-1">How It Works</a></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-400 mb-4">Company</h4><a href="#about-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">About Us</a><a href="#vision-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Vision &amp; Mission</a><a href="#investors-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Investors</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Careers</a></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-gray-400 mb-4">Legal</h4><a href="#terms-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Terms of Service</a><a href="#privacy-page" className="block text-gray-300 text-sm hover:text-brand transition py-1">Privacy Policy</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Cookie Policy</a><a href="#" className="block text-gray-300 text-sm hover:text-brand transition py-1">Security</a></div>
           </div>
         </div>
         <div className="border-t border-white/10 py-6 px-6">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-            <span className="text-sm text-gray-500">&copy; 2026 MaintainEX. All rights reserved.</span>
+            <span className="text-sm text-gray-400">&copy; 2026 MaintainEX. All rights reserved.</span>
             <div className="flex gap-4">
-              <a href="#" className="text-gray-400 hover:text-brand transition">Twitter</a>
-              <a href="#" className="text-gray-400 hover:text-brand transition">Instagram</a>
-              <a href="#" className="text-gray-400 hover:text-brand transition">LinkedIn</a>
-              <a href="#" className="text-gray-400 hover:text-brand transition">WhatsApp</a>
+              <a href="#" className="text-gray-300 hover:text-brand transition">Twitter</a>
+              <a href="#" className="text-gray-300 hover:text-brand transition">Instagram</a>
+              <a href="#" className="text-gray-300 hover:text-brand transition">LinkedIn</a>
+              <a href="#" className="text-gray-300 hover:text-brand transition">WhatsApp</a>
             </div>
           </div>
         </div>
@@ -967,11 +967,11 @@ export default function HomeClient() {
             <svg className="w-8 h-8 text-brand animate-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 13l4 4L19 7"/></svg>
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">You&apos;re on the Waitlist!</h3>
-          <p className="text-gray-400 mb-4">We&apos;ll notify you when we launch. Welcome aboard!</p>
+          <p className="text-gray-300 mb-4">We&apos;ll notify you when we launch. Welcome aboard!</p>
           <div className="bg-[#0B0C12] rounded-xl p-4 mb-6">
-            <p className="text-gray-400 text-sm">You&apos;re one of</p>
+            <p className="text-gray-300 text-sm">You&apos;re one of</p>
             <p className="text-3xl font-black text-brand">500+</p>
-            <p className="text-gray-400 text-sm">early adopters shaping the future of work</p>
+            <p className="text-gray-300 text-sm">early adopters shaping the future of work</p>
           </div>
           <button onClick={() => setModalVisible(false)} className="bg-brand text-black font-bold py-3 px-8 rounded-full w-full hover:bg-brand-light transition">Got it!</button>
         </div>
