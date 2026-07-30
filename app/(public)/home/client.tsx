@@ -239,16 +239,37 @@ export default function HomeClient() {
         <div className="relative w-full max-w-[1400px] flex justify-center items-end mt-4">
           <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between w-full px-[8vw] z-0 pointer-events-none select-none">
             <div className="relative hidden md:block w-[20vw] min-w-[200px] max-w-[280px] -rotate-[10deg] slow-float">
-              <img src="https://placehold.co/280x560/15161E/F59E0B?text=MaintainEX" className="w-full rounded-[32px] shadow-2xl border-2 border-white/10" alt="" />
+              <div className="w-full rounded-[32px] shadow-2xl border-2 border-white/10 overflow-hidden" style={{ background: 'linear-gradient(180deg, #F59E0B 0%, #D97706 40%, #92400E 100%)', aspectRatio: '9/19.5' }}>
+                <div className="w-full h-full flex flex-col items-center justify-center relative">
+                  <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.4) 0%, transparent 60%)' }}></div>
+                  <div className="relative flex items-center justify-center w-28 h-28 rounded-full border-[2px] border-amber-400/60" style={{ boxShadow: '0 0 40px rgba(245,158,11,0.4)' }}>
+                    <img src="/logo.JPEG" alt="" className="w-16 h-16 object-cover rounded-full" />
+                  </div>
+                </div>
+              </div>
               <div className="absolute inset-0 rounded-[32px]" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
             <div className="relative hidden md:block w-[20vw] min-w-[200px] max-w-[280px] rotate-[10deg] slow-float" style={{ animationDelay: '1s' }}>
-              <img src="https://placehold.co/280x560/15161E/F59E0B?text=MaintainEX" className="w-full rounded-[32px] shadow-2xl border-2 border-white/10" alt="" />
+              <div className="w-full rounded-[32px] shadow-2xl border-2 border-white/10 overflow-hidden" style={{ background: 'linear-gradient(180deg, #F59E0B 0%, #D97706 40%, #92400E 100%)', aspectRatio: '9/19.5' }}>
+                <div className="w-full h-full flex flex-col items-center justify-center relative">
+                  <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.4) 0%, transparent 60%)' }}></div>
+                  <div className="relative flex items-center justify-center w-28 h-28 rounded-full border-[2px] border-amber-400/60" style={{ boxShadow: '0 0 40px rgba(245,158,11,0.4)' }}>
+                    <img src="/logo.JPEG" alt="" className="w-16 h-16 object-cover rounded-full" />
+                  </div>
+                </div>
+              </div>
               <div className="absolute inset-0 rounded-[32px]" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
           </div>
           <div className="relative z-10 w-[280px] md:w-[320px] slow-float" style={{ animationDelay: '0.5s' }}>
-            <img src="https://placehold.co/320x640/15161E/F59E0B?text=MaintainEX+App" className="w-full rounded-[32px] shadow-2xl border-2 border-white/10" alt="" />
+            <div className="w-full rounded-[32px] shadow-2xl border-2 border-white/10 overflow-hidden" style={{ background: 'linear-gradient(180deg, #F59E0B 0%, #D97706 40%, #92400E 100%)', aspectRatio: '9/19.5' }}>
+              <div className="w-full h-full flex flex-col items-center justify-center relative">
+                <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 50% 40%, rgba(251,191,36,0.4) 0%, transparent 60%)' }}></div>
+                <div className="relative flex items-center justify-center w-36 h-36 md:w-44 md:h-44 rounded-full border-[3px] border-amber-400/60" style={{ boxShadow: '0 0 60px rgba(245,158,11,0.5), 0 0 120px rgba(245,158,11,0.2)' }}>
+                  <img src="/logo.JPEG" alt="MaintainEX" className="w-20 h-20 md:w-24 md:h-24 object-cover rounded-full" />
+                </div>
+              </div>
+            </div>
             <div className="absolute inset-0 rounded-[32px]" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 50%,rgba(11,12,18,1) 100%)' }}></div>
           </div>
         </div>
