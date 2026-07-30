@@ -227,7 +227,7 @@ export default function HomeClient() {
               <span className="text-xs sm:text-sm text-gray-300">Canada</span>
             </div>
           </div>
-          <a href="#waitlist" onClick={() => launchConfetti()} className="bg-white text-black py-3 sm:py-4 px-8 sm:px-12 rounded-full font-bold text-base sm:text-lg glow-amber hover:-translate-y-1 transition mb-5 sm:mb-6">
+          <a href="#waitlist" className="bg-white text-black py-3 sm:py-4 px-8 sm:px-12 rounded-full font-bold text-base sm:text-lg glow-amber hover:-translate-y-1 transition mb-5 sm:mb-6">
             Join Waitlist
           </a>
           <div className="flex items-center gap-4 mb-10">
@@ -524,7 +524,7 @@ export default function HomeClient() {
           </ul>
         </div>
         <div className="mt-12 flex flex-col sm:flex-row gap-6 justify-center">
-          <a href="#waitlist" onClick={() => launchConfetti()} className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Tasker</a>
+          <a href="#waitlist" className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Tasker</a>
           <a href="#" className="bg-white/10 text-white font-semibold px-10 py-3 rounded-full shadow hover:bg-brand hover:text-black transition">Learn More &rarr;</a>
         </div>
       </section>
@@ -750,7 +750,7 @@ export default function HomeClient() {
       <section id="about-page" className="py-20 px-6 bg-[#0B0C12]">
         <div className="max-w-6xl mx-auto">
           <span className="text-brand text-sm uppercase tracking-widest font-bold">About MaintainEX</span>
-          <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">Built for the people who build the world.</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">Built for the people who build the world.</h2>
           <p className="text-base md:text-xl text-gray-400 max-w-2xl mb-12 md:mb-16">We connect skilled professionals with people and businesses who need help getting things done — fast, fair, and transparently.</p>
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center mb-16 md:mb-20">
             <div>
@@ -772,12 +772,12 @@ export default function HomeClient() {
       </section>
 
       {/* VISION & MISSION */}
-      <section id="vision-page" className="py-20 px-6 bg-[#15161E]">
+      <section id="vision-page" className="py-20 px-6 bg-[#0B0C12]">
         <div className="max-w-6xl mx-auto">
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center mb-16 md:mb-20">
             <div>
               <span className="text-brand text-sm uppercase tracking-widest font-bold">Our Vision</span>
-              <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">The world&apos;s most trusted task marketplace.</h2>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">The world&apos;s most trusted task marketplace.</h2>
               <p className="text-lg text-gray-400 leading-relaxed mb-4">We envision a world where anyone can get any task done — from home repairs to business operations — by connecting with verified, trusted professionals in their area.</p>
               <p className="text-lg text-gray-400 leading-relaxed">No more guesswork. No more no-shows. No more hidden fees. Just reliable professionals, transparent pricing, and guaranteed satisfaction.</p>
             </div>
@@ -794,7 +794,7 @@ export default function HomeClient() {
             </div>
           </div>
           <span className="text-brand text-sm uppercase tracking-widest font-bold">Our Mission</span>
-          <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-8 md:mb-12">Empowering every connection.</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-8 md:mb-12">Empowering every connection.</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8 mb-16 md:mb-20">
             <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Trust First</h3><p className="text-gray-400 text-sm md:text-base">Every professional is background-checked, ID-verified, and skill-assessed. We never compromise on trust.</p></div>
             <div className="bg-[#0B0C12] border border-white/10 rounded-2xl p-5 md:p-8 hover:border-brand/30 transition-all"><div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-brand/10 flex items-center justify-center mb-3 md:mb-4"><svg className="w-5 h-5 md:w-6 md:h-6 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><h3 className="text-base md:text-xl font-bold text-white mb-2 md:mb-3">Fair Pricing</h3><p className="text-gray-400 text-sm md:text-base">Transparent upfront pricing. No hidden fees. Professionals keep 90% of what they earn.</p></div>
@@ -814,7 +814,7 @@ export default function HomeClient() {
         <div id="investors-page" className="py-20 px-6">
           <div className="max-w-6xl mx-auto">
             <span className="text-brand text-sm uppercase tracking-widest font-bold">Investor Relations</span>
-            <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">The future of work is on-demand.</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl md:text-5xl font-black text-white mt-4 mb-4 md:mb-6">The future of work is on-demand.</h2>
             <p className="text-base md:text-xl text-gray-400 max-w-2xl mb-8 md:mb-12">MaintainEX is building the infrastructure that connects every task to the right professional — instantly, transparently, and fairly.</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 mb-16 md:mb-20 bg-[#15161E] rounded-3xl p-6 md:p-10">
               <div className="text-center"><div className="text-4xl font-black text-brand">$400B+</div><p className="text-gray-400 mt-2 text-sm">Total Addressable Market</p></div>
@@ -875,7 +875,7 @@ export default function HomeClient() {
       </section>
 
       {/* TERMS & CONDITIONS */}
-      <section id="terms-page" className="py-20 px-6 bg-[#15161E]">
+      <section id="terms-page" className="py-20 px-6 bg-[#0B0C12]">
         <div className="max-w-4xl mx-auto">
           <span className="inline-block px-5 py-2 rounded-full bg-[#0B0C12] border border-white/10 text-sm font-semibold text-brand mb-6">Legal</span>
           <h2 className="text-3xl md:text-4xl md:text-5xl font-black text-white mb-4">Terms &amp; Conditions</h2>
