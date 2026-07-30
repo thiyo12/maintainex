@@ -238,17 +238,23 @@ export default function HomeClient() {
         </div>
         <div className="relative w-full max-w-[1400px] flex justify-center items-end mt-4">
           <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between w-full px-[5vw] z-0 pointer-events-none select-none">
-            <div className="relative hidden md:block w-[30vw] min-w-[260px] max-w-[420px] -rotate-[8deg] slow-float">
-              <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" style={{ transform: 'rotate(90deg)', transformOrigin: 'center center', aspectRatio: '16/9', objectFit: 'cover' }} alt="MaintainEX App" />
+            <div className="relative hidden md:block w-[32vw] min-w-[280px] max-w-[440px] -rotate-[6deg] slow-float">
+              <div className="relative overflow-hidden rounded-2xl shadow-2xl" style={{ aspectRatio: '16/9', boxShadow: '0 0 40px rgba(245,158,11,0.12), 0 20px 40px rgba(0,0,0,0.5)' }}>
+                <img src="/app-splash.png" className="w-full h-full object-cover block" alt="MaintainEX App" />
+              </div>
               <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 30%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
-            <div className="relative hidden md:block w-[30vw] min-w-[260px] max-w-[420px] rotate-[8deg] slow-float" style={{ animationDelay: '1s' }}>
-              <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" style={{ transform: 'rotate(90deg)', transformOrigin: 'center center', aspectRatio: '16/9', objectFit: 'cover' }} alt="MaintainEX App" />
+            <div className="relative hidden md:block w-[32vw] min-w-[280px] max-w-[440px] rotate-[6deg] slow-float" style={{ animationDelay: '1s' }}>
+              <div className="relative overflow-hidden rounded-2xl shadow-2xl" style={{ aspectRatio: '16/9', boxShadow: '0 0 40px rgba(245,158,11,0.12), 0 20px 40px rgba(0,0,0,0.5)' }}>
+                <img src="/app-splash.png" className="w-full h-full object-cover block" alt="MaintainEX App" />
+              </div>
               <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 30%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
           </div>
-          <div className="relative z-10 w-[380px] md:w-[500px] slow-float" style={{ animationDelay: '0.5s' }}>
-            <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" style={{ transform: 'rotate(90deg)', transformOrigin: 'center center', aspectRatio: '16/9', objectFit: 'cover' }} alt="MaintainEX App" />
+          <div className="relative z-10 w-[420px] md:w-[560px] slow-float" style={{ animationDelay: '0.5s' }}>
+            <div className="relative overflow-hidden rounded-2xl shadow-2xl" style={{ aspectRatio: '16/9', boxShadow: '0 0 80px rgba(245,158,11,0.2), 0 30px 60px rgba(0,0,0,0.6)' }}>
+              <img src="/app-splash.png" className="w-full h-full object-cover block" alt="MaintainEX App" />
+            </div>
             <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
           </div>
         </div>
