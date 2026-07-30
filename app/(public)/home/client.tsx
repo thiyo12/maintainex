@@ -237,28 +237,19 @@ export default function HomeClient() {
           </div>
         </div>
         <div className="relative w-full max-w-[1400px] flex justify-center items-end mt-4">
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between w-full px-[8vw] z-0 pointer-events-none select-none">
-            <div className="relative hidden md:block w-[20vw] min-w-[200px] max-w-[280px] -rotate-[10deg] slow-float">
-              <div className="relative bg-black rounded-[36px] p-[3px] shadow-2xl" style={{ boxShadow: '0 0 40px rgba(245,158,11,0.15), 0 25px 50px rgba(0,0,0,0.5)' }}>
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[40%] h-[22px] bg-black rounded-b-2xl z-10"></div>
-                <img src="/app-splash.png" className="w-full rounded-[33px] block" alt="MaintainEX App" />
-              </div>
-              <div className="absolute inset-0 rounded-[36px]" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between w-full px-[5vw] z-0 pointer-events-none select-none">
+            <div className="relative hidden md:block w-[30vw] min-w-[260px] max-w-[420px] -rotate-[8deg] slow-float">
+              <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" style={{ transform: 'rotate(90deg)', transformOrigin: 'center center', aspectRatio: '16/9', objectFit: 'cover' }} alt="MaintainEX App" />
+              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 30%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
-            <div className="relative hidden md:block w-[20vw] min-w-[200px] max-w-[280px] rotate-[10deg] slow-float" style={{ animationDelay: '1s' }}>
-              <div className="relative bg-black rounded-[36px] p-[3px] shadow-2xl" style={{ boxShadow: '0 0 40px rgba(245,158,11,0.15), 0 25px 50px rgba(0,0,0,0.5)' }}>
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[40%] h-[22px] bg-black rounded-b-2xl z-10"></div>
-                <img src="/app-splash.png" className="w-full rounded-[33px] block" alt="MaintainEX App" />
-              </div>
-              <div className="absolute inset-0 rounded-[36px]" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
+            <div className="relative hidden md:block w-[30vw] min-w-[260px] max-w-[420px] rotate-[8deg] slow-float" style={{ animationDelay: '1s' }}>
+              <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" style={{ transform: 'rotate(90deg)', transformOrigin: 'center center', aspectRatio: '16/9', objectFit: 'cover' }} alt="MaintainEX App" />
+              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 30%,rgba(11,12,18,1) 100%)' }}></div>
             </div>
           </div>
-          <div className="relative z-10 w-[280px] md:w-[320px] slow-float" style={{ animationDelay: '0.5s' }}>
-            <div className="relative bg-black rounded-[44px] p-[4px] shadow-2xl" style={{ boxShadow: '0 0 80px rgba(245,158,11,0.2), 0 30px 60px rgba(0,0,0,0.6)' }}>
-              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-[35%] h-[26px] bg-black rounded-b-2xl z-10"></div>
-              <img src="/app-splash.png" className="w-full rounded-[40px] block" alt="MaintainEX App" />
-            </div>
-            <div className="absolute inset-0 rounded-[44px]" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 50%,rgba(11,12,18,1) 100%)' }}></div>
+          <div className="relative z-10 w-[380px] md:w-[500px] slow-float" style={{ animationDelay: '0.5s' }}>
+            <img src="/app-splash.png" className="w-full rounded-2xl shadow-2xl block" style={{ transform: 'rotate(90deg)', transformOrigin: 'center center', aspectRatio: '16/9', objectFit: 'cover' }} alt="MaintainEX App" />
+            <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(to bottom,rgba(11,12,18,0) 40%,rgba(11,12,18,1) 100%)' }}></div>
           </div>
         </div>
         <div className="w-full bg-[#0B0C12] py-6 overflow-hidden relative">
@@ -636,12 +627,22 @@ export default function HomeClient() {
           <form className="space-y-4 max-w-xl mx-auto text-left" onSubmit={async (e) => {
             e.preventDefault()
             const form = e.target as HTMLFormElement
-            const phone = (form.elements.namedItem('phone') as HTMLInputElement).value
+            const name = (form.elements.namedItem('name') as HTMLInputElement).value
+            const role = (form.elements.namedItem('role') as HTMLSelectElement).value
+            const countryCode = (form.elements.namedItem('countryCode') as HTMLSelectElement).value
+            const phoneRaw = (form.elements.namedItem('phone') as HTMLInputElement).value.replace(/\s/g, '')
             const emailInput = form.elements.namedItem('email') as HTMLInputElement
             const email = emailInput.value || undefined
 
-            if (!/^\d{10}$/.test(phone)) {
-              toast.error('Please enter a valid 10-digit phone number')
+            const phone = countryCode + phoneRaw
+
+            if (phoneRaw.length < 7 || phoneRaw.length > 11) {
+              toast.error('Enter a valid phone number (7-11 digits)')
+              return
+            }
+
+            if (!name.trim()) {
+              toast.error('Please enter your name')
               return
             }
 
@@ -649,7 +650,7 @@ export default function HomeClient() {
               const res = await fetch('/api/waitlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, email })
+                body: JSON.stringify({ name: name.trim(), phone, email, role })
               })
               const data = await res.json()
               if (!res.ok) {
@@ -663,14 +664,25 @@ export default function HomeClient() {
               toast.error('Something went wrong. Please try again.')
             }
           }}>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'SEEKER', label: 'Seeker' },
+                { value: 'TASKER', label: 'Tasker' },
+                { value: 'AGENCY', label: 'Agency' },
+              ].map((opt) => (
+                <label key={opt.value} className="relative cursor-pointer">
+                  <input type="radio" name="role" value={opt.value} defaultChecked={opt.value === 'SEEKER'} className="peer sr-only" />
+                  <div className="bg-[#1a1b24] border border-white/10 peer-checked:border-brand peer-checked:bg-brand/10 rounded-xl px-4 py-3 text-center transition-all">
+                    <span className="text-sm font-semibold text-white peer-checked:text-brand">{opt.label}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
             <input
-              type="tel"
-              name="phone"
-              placeholder="Phone Number"
+              type="text"
+              name="name"
+              placeholder="Your name"
               required
-              pattern="[0-9]{10}"
-              maxLength={10}
-              inputMode="numeric"
               className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
             />
             <input
@@ -679,6 +691,20 @@ export default function HomeClient() {
               placeholder="Email (optional)"
               className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
             />
+            <div className="flex gap-2">
+              <select name="countryCode" className="bg-[#1a1b24] border border-white/10 rounded-xl px-3 py-4 text-white focus:border-brand focus:outline-none transition text-sm min-w-[110px]">
+                <option value="+94">🇱🇰 +94</option>
+                <option value="+1">🇨🇦 +1</option>
+              </select>
+              <input
+                type="tel"
+                name="phone"
+                placeholder="7X XXX XXXX"
+                required
+                inputMode="numeric"
+                className="flex-1 bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
+              />
+            </div>
             <button type="submit" className="w-full bg-brand text-black font-bold py-4 rounded-xl hover:bg-brand-light transition text-lg mt-4">Join the Waitlist</button>
             <p className="text-xs text-gray-500 text-center mt-3">No spam. Unsubscribe anytime. Join 500+ others already on the list.</p>
           </form>

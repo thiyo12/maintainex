@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { FiArrowRight, FiCheck } from 'react-icons/fi'
 
 export default function WaitlistPage() {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'SEEKER', location: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', role: 'SEEKER', location: '', countryCode: '+94' })
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -15,10 +15,11 @@ export default function WaitlistPage() {
     setError('')
     setLoading(true)
     try {
+      const phone = form.countryCode + form.phone.replace(/\s/g, '')
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ name: form.name, email: form.email, phone, role: form.role, location: form.location }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to join')
@@ -108,14 +109,24 @@ export default function WaitlistPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Phone (optional)</label>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-[#15161E] border border-gray-800 text-white text-sm focus:border-amber-500 focus:outline-none transition-colors"
-              placeholder="+94 77 123 4567"
-            />
+            <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Phone</label>
+            <div className="flex gap-2">
+              <select
+                value={form.countryCode}
+                onChange={(e) => setForm({ ...form, countryCode: e.target.value })}
+                className="bg-[#15161E] border border-gray-800 text-white text-sm rounded-xl px-3 py-3 focus:border-amber-500 focus:outline-none transition-colors min-w-[100px]"
+              >
+                <option value="+94">🇱🇰 +94</option>
+                <option value="+1">🇨🇦 +1</option>
+              </select>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="flex-1 px-4 py-3 rounded-xl bg-[#15161E] border border-gray-800 text-white text-sm focus:border-amber-500 focus:outline-none transition-colors"
+                placeholder="7X XXX XXXX"
+              />
+            </div>
           </div>
 
           <div>

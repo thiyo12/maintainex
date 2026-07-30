@@ -10,14 +10,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
     }
 
-    const { phone, email } = await request.json()
+    const { name, phone, email, role } = await request.json()
+
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: 'Name is required.' }, { status: 400 })
+    }
 
     if (!phone) {
       return NextResponse.json({ error: 'Phone number is required.' }, { status: 400 })
     }
 
-    if (!/^\d{10}$/.test(phone)) {
-      return NextResponse.json({ error: 'Please enter a valid 10-digit phone number.' }, { status: 400 })
+    const digitsOnly = phone.replace(/\D/g, '')
+    if (digitsOnly.length < 10 || digitsOnly.length > 12) {
+      return NextResponse.json({ error: 'Please enter a valid phone number with country code.' }, { status: 400 })
     }
 
     if (email) {
@@ -37,12 +42,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This phone number is already registered.' }, { status: 409 })
     }
 
+    const validRoles = ['SEEKER', 'TASKER', 'AGENCY']
+    const entryRole = validRoles.includes(role) ? role : 'SEEKER'
+
     await prisma.waitlistEntry.create({
       data: {
-        name: phone,
+        name: name.trim(),
         phone,
         email: email || null,
-        role: 'SEEKER',
+        role: entryRole,
       },
     })
 
