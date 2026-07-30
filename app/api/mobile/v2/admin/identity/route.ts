@@ -5,7 +5,7 @@ import { authenticateRequest } from '@/lib/mobile-auth'
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user || user.role !== 'ADMIN') {
+    if (!user || !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

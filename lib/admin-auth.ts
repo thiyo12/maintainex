@@ -1,17 +1,43 @@
 import crypto from 'crypto'
+import jwt from 'jsonwebtoken'
 
-const JWT_SECRET: string = process.env.NEXTAUTH_SECRET!
-if (!JWT_SECRET) {
-  throw new Error('NEXTAUTH_SECRET environment variable is required')
-}
+const JWT_SECRET: string = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-jwt-secret-change-in-production'
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || 'dev-jwt-refresh-secret-change-in-production'
 
 function hmacSign(data: string): string {
   return crypto.createHmac('sha256', JWT_SECRET).update(data).digest('hex')
 }
 
+function b64UrlDecode(str: string): string {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/')
+  while (base64.length % 4) base64 += '='
+  return Buffer.from(base64, 'base64').toString('utf-8')
+}
+
 export function verifySimpleToken(token: string): any {
   try {
-    const [encoded, signature] = token.split('.')
+    const parts = token.split('.')
+
+    if (parts.length === 3) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any
+        return {
+          id: decoded.sub || decoded.id,
+          email: decoded.email,
+          role: decoded.role,
+          name: [decoded.firstName, decoded.lastName].filter(Boolean).join(' ') || decoded.name || null,
+          branchId: decoded.branchId || null,
+          province: decoded.province || null,
+          region: decoded.region || null,
+          canEditServices: decoded.canEditServices || false,
+          authType: decoded.authType || 'admin',
+        }
+      } catch {
+        return null
+      }
+    }
+
+    const [encoded, signature] = parts
     if (!encoded || !signature) return null
     const expectedSig = hmacSign(encoded)
     if (!crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expectedSig, 'hex'))) return null

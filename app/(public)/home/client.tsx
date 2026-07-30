@@ -1,15 +1,14 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import toast from 'react-hot-toast'
 
 export default function HomeClient() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [activeDot, setActiveDot] = useState('hero')
   const [bannerVisible, setBannerVisible] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
-  const [selectedRole, setSelectedRole] = useState('seeker')
   const [faqOpen, setFaqOpen] = useState<number | null>(null)
-  const taskerFired = useRef(false)
   const confettiBoxRef = useRef<HTMLDivElement>(null)
 
   const launchConfetti = useCallback(() => {
@@ -102,24 +101,11 @@ export default function HomeClient() {
     }, { threshold: 0.3 })
     sections.forEach(s => sectionObserver.observe(s))
 
-    const taskerSection = document.getElementById('tasker')
-    const taskerObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && !taskerFired.current) {
-          taskerFired.current = true
-          launchConfetti()
-          launchConfetti()
-        }
-      })
-    }, { threshold: 0.4 })
-    if (taskerSection) taskerObserver.observe(taskerSection)
-
     return () => {
       window.removeEventListener('scroll', handleScroll)
       sectionObserver.disconnect()
-      taskerObserver.disconnect()
     }
-  }, [launchConfetti])
+  }, [])
 
   useEffect(() => {
     import('aos').then(AOS => {
@@ -129,12 +115,6 @@ export default function HomeClient() {
 
   const toggleFaq = (index: number) => {
     setFaqOpen(prev => prev === index ? null : index)
-  }
-
-  const roleExplanations: Record<string, { title: string; desc: string }> = {
-    seeker: { title: 'Seeker', desc: 'You need tasks done — cleaning, moving, repairs, event setup, business help, or anything else. Post your task and get matched with verified professionals instantly.' },
-    individual: { title: 'Individual Professional', desc: 'You work independently and want to earn by completing tasks. Register as an individual pro, get verified, and start accepting tasks that match your skills and schedule.' },
-    agency: { title: 'Registered Agency', desc: 'You run a company or team of professionals. Register your agency, manage multiple workers, and take on bigger tasks and contracts through the platform.' },
   }
 
   const faqData = [
@@ -644,36 +624,52 @@ export default function HomeClient() {
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">Join the Waitlist</h2>
           <p className="text-lg text-gray-400 mb-10">Secure your spot for the MaintainEX launch. Early members get priority access.</p>
-          <form className="space-y-4 max-w-xl mx-auto text-left" onSubmit={e => { e.preventDefault(); setModalVisible(true); launchConfetti() }}>
-            <div className="grid grid-cols-2 gap-4">
-              <input type="text" placeholder="First Name" required className="bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition" />
-              <input type="text" placeholder="Last Name" required className="bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition" />
-            </div>
-            <input type="email" placeholder="Email Address" required className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition" />
-            <input type="tel" placeholder="Mobile Number" required className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-              {(['seeker', 'individual', 'agency'] as const).map(role => (
-                <label key={role} className={`role-card cursor-pointer bg-[#1a1b24] border-2 rounded-xl p-5 text-center hover:border-brand/50 transition-all ${selectedRole === role ? 'border-brand' : 'border-white/10'}`} onClick={() => setSelectedRole(role)}>
-                  <input type="radio" name="role" value={role} checked={selectedRole === role} readOnly className="hidden" />
-                  <div className="w-10 h-10 mx-auto mb-2 flex items-center justify-center rounded-full bg-brand/10">
-                    {role === 'seeker' && <svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
-                    {role === 'individual' && <svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>}
-                    {role === 'agency' && <svg className="w-5 h-5 text-brand" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7M5 21V10.5M19 21V10.5M12 21V10.5"/></svg>}
-                  </div>
-                  <div className="font-bold text-white text-sm">{role === 'seeker' ? 'Seeker' : role === 'individual' ? 'Individual Pro' : 'Agency'}</div>
-                  <div className="text-xs text-gray-400 mt-1">{role === 'seeker' ? 'Need help with tasks' : role === 'individual' ? 'Work independently' : 'Registered company'}</div>
-                </label>
-              ))}
-            </div>
-            <div className="bg-[#0B0C12] border border-white/10 rounded-xl p-5 text-left mt-2">
-              <div className="font-bold text-brand mb-1 flex items-center gap-2">
-                {selectedRole === 'seeker' && <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>}
-                {selectedRole === 'individual' && <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>}
-                {selectedRole === 'agency' && <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 21h18M3 7v1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7m0 1a3 3 0 0 0 6 0V7M5 21V10.5M19 21V10.5M12 21V10.5"/></svg>}
-                {roleExplanations[selectedRole].title}
-              </div>
-              <p className="text-sm text-gray-400">{roleExplanations[selectedRole].desc}</p>
-            </div>
+          <form className="space-y-4 max-w-xl mx-auto text-left" onSubmit={async (e) => {
+            e.preventDefault()
+            const form = e.target as HTMLFormElement
+            const phone = (form.elements.namedItem('phone') as HTMLInputElement).value
+            const emailInput = form.elements.namedItem('email') as HTMLInputElement
+            const email = emailInput.value || undefined
+
+            if (!/^\d{10}$/.test(phone)) {
+              toast.error('Please enter a valid 10-digit phone number')
+              return
+            }
+
+            try {
+              const res = await fetch('/api/waitlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, email })
+              })
+              const data = await res.json()
+              if (!res.ok) {
+                toast.error(data.error || 'Failed to join waitlist')
+                return
+              }
+              launchConfetti()
+              setModalVisible(true)
+              form.reset()
+            } catch {
+              toast.error('Something went wrong. Please try again.')
+            }
+          }}>
+            <input
+              type="tel"
+              name="phone"
+              placeholder="Phone Number"
+              required
+              pattern="[0-9]{10}"
+              maxLength={10}
+              inputMode="numeric"
+              className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
+            />
+            <input
+              type="email"
+              name="email"
+              placeholder="Email (optional)"
+              className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
+            />
             <button type="submit" className="w-full bg-brand text-black font-bold py-4 rounded-xl hover:bg-brand-light transition text-lg mt-4">Join the Waitlist</button>
             <p className="text-xs text-gray-500 text-center mt-3">No spam. Unsubscribe anytime. Join 500+ others already on the list.</p>
           </form>
@@ -921,7 +917,7 @@ export default function HomeClient() {
             <svg className="w-8 h-8 text-brand animate-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M5 13l4 4L19 7"/></svg>
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">You&apos;re on the Waitlist!</h3>
-          <p className="text-gray-400 mb-4">Welcome aboard! We&apos;ll notify you when we launch.</p>
+          <p className="text-gray-400 mb-4">We&apos;ll notify you when we launch. Welcome aboard!</p>
           <div className="bg-[#0B0C12] rounded-xl p-4 mb-6">
             <p className="text-gray-400 text-sm">You&apos;re one of</p>
             <p className="text-3xl font-black text-brand">500+</p>

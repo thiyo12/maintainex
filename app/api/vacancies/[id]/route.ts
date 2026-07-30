@@ -13,7 +13,7 @@ export async function DELETE(
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = session.role === 'SUPER_ADMIN' || session.role === 'ADMIN'
+    const canManage = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(session.role)
 
     if (!canManage) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
@@ -41,7 +41,7 @@ export async function PATCH(
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = session.role === 'SUPER_ADMIN' || session.role === 'ADMIN'
+    const canManage = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(session.role)
 
     if (!canManage) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 })

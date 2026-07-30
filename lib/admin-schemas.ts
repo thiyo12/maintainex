@@ -86,12 +86,12 @@ export const createAdminSchema = z.object({
   email: z.string().email(),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT']),
+  role: z.enum(['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT']),
   assignedCountries: z.array(z.string()).default([]),
 })
 
 export const updateAdminSchema = z.object({
-  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT']).optional(),
+  role: z.enum(['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT']).optional(),
   assignedCountries: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
 })

@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from './prisma'
 import bcrypt from 'bcryptjs'
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN'
+export type UserRole = 'SUPER_ADMIN' | 'OPERATIONS' | 'FINANCE' | 'MODERATOR' | 'SUPPORT'
 
 export interface ExtendedUser {
   id: string

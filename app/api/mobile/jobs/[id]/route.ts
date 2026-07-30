@@ -147,7 +147,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    if (job.customerId !== user.id && user.role !== 'ADMIN') {
+    if (job.customerId !== user.id && !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Not your job' }, { status: 403 })
     }
 

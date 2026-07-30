@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET: List all KYC submissions with optional status filter
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') // PENDING, VERIFIED, REJECTED
-    const type = searchParams.get('type') // TASKER, COMPANY
+    const status = searchParams.get('status')
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
     const where: any = {}
-    if (status) where.status = status
+    if (status && status !== 'ALL') where.status = status
 
-    // Get identity documents
     const documents = await prisma.identityDocument.findMany({
       where,
       include: {
@@ -37,8 +34,8 @@ export async function GET(request: NextRequest) {
                 hasDrivingLicense: true,
                 drivingLicenseUrl: true,
                 completedJobs: true,
-                rating: true
-              }
+                rating: true,
+              },
             },
             companyProfile: {
               select: {
@@ -53,15 +50,15 @@ export async function GET(request: NextRequest) {
                 staffProofUrl: true,
                 businessRegDocUrl: true,
                 completedProjects: true,
-                rating: true
-              }
-            }
-          }
-        }
+                rating: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
       skip,
-      take: limit
+      take: limit,
     })
 
     const total = await prisma.identityDocument.count({ where })
@@ -69,7 +66,7 @@ export async function GET(request: NextRequest) {
     const summary = {
       pending: await prisma.identityDocument.count({ where: { status: 'PENDING' } }),
       verified: await prisma.identityDocument.count({ where: { status: 'APPROVED' } }),
-      rejected: await prisma.identityDocument.count({ where: { status: 'REJECTED' } })
+      rejected: await prisma.identityDocument.count({ where: { status: 'REJECTED' } }),
     }
 
     return NextResponse.json({
@@ -79,8 +76,8 @@ export async function GET(request: NextRequest) {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     })
   } catch (error) {
     console.error('KYC GET error:', error)
@@ -88,46 +85,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Submit new KYC document
-export async function POST(request: NextRequest) {
+export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, docType, side, imageUrl } = body
+    const { documentId, status, reviewNote } = body
 
-    if (!userId || !docType || !imageUrl) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
-
-    // Validate doc type
-    const validDocTypes = ['PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE', 'EXPERIENCE_CERT', 'BUSINESS_REG', 'STAFF_PROOF']
-    if (!validDocTypes.includes(docType)) {
-      return NextResponse.json({ error: 'Invalid document type' }, { status: 400 })
-    }
-
-    const document = await prisma.identityDocument.create({
-      data: {
-        userId,
-        docType,
-        side: side || 'FRONT',
-        imageUrl,
-        status: 'PENDING'
-      }
-    })
-
-    return NextResponse.json({ document }, { status: 201 })
-  } catch (error) {
-    console.error('KYC POST error:', error)
-    return NextResponse.json({ error: 'Failed to submit KYC document' }, { status: 500 })
-  }
-}
-
-// PUT: Review KYC document (approve/reject)
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { documentId, status, reviewNote, reviewedBy } = body
-
-    if (!documentId || !status || !reviewedBy) {
+    if (!documentId || !status) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -135,21 +98,32 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
 
-    const document = await prisma.identityDocument.update({
+    if (status === 'REJECTED' && !reviewNote?.trim()) {
+      return NextResponse.json({ error: 'Rejection reason is required' }, { status: 400 })
+    }
+
+    const document = await prisma.identityDocument.findUnique({
+      where: { id: documentId },
+      select: { userId: true },
+    })
+
+    if (!document) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
+
+    const updated = await prisma.identityDocument.update({
       where: { id: documentId },
       data: {
         status,
-        reviewNote,
-        reviewedBy,
-        reviewedAt: new Date()
-      }
+        reviewNote: reviewNote || null,
+        reviewedAt: new Date(),
+      },
     })
 
-    // If approved, update user's verification status
     if (status === 'APPROVED') {
       const user = await prisma.user.findUnique({
         where: { id: document.userId },
-        include: { taskerProfile: true, companyProfile: true }
+        include: { taskerProfile: true, companyProfile: true },
       })
 
       if (user?.taskerProfile) {
@@ -157,11 +131,10 @@ export async function PUT(request: NextRequest) {
           where: { id: user.taskerProfile.id },
           data: {
             verificationStatus: 'VERIFIED',
-            verificationNote: reviewNote || 'All documents verified',
-            verifiedBy: reviewedBy,
+            verificationNote: 'Documents verified',
             verifiedAt: new Date(),
-            isVerified: true
-          }
+            isVerified: true,
+          },
         })
       }
 
@@ -170,20 +143,18 @@ export async function PUT(request: NextRequest) {
           where: { id: user.companyProfile.id },
           data: {
             verificationStatus: 'VERIFIED',
-            verificationNote: reviewNote || 'All documents verified',
-            verifiedBy: reviewedBy,
+            verificationNote: 'Documents verified',
             verifiedAt: new Date(),
-            isVerified: true
-          }
+            isVerified: true,
+          },
         })
       }
     }
 
-    // If rejected, update user's verification status
     if (status === 'REJECTED') {
       const user = await prisma.user.findUnique({
         where: { id: document.userId },
-        include: { taskerProfile: true, companyProfile: true }
+        include: { taskerProfile: true, companyProfile: true },
       })
 
       if (user?.taskerProfile) {
@@ -191,8 +162,8 @@ export async function PUT(request: NextRequest) {
           where: { id: user.taskerProfile.id },
           data: {
             verificationStatus: 'REJECTED',
-            verificationNote: reviewNote || 'Document rejected'
-          }
+            verificationNote: reviewNote || 'Document rejected',
+          },
         })
       }
 
@@ -201,15 +172,15 @@ export async function PUT(request: NextRequest) {
           where: { id: user.companyProfile.id },
           data: {
             verificationStatus: 'REJECTED',
-            verificationNote: reviewNote || 'Document rejected'
-          }
+            verificationNote: reviewNote || 'Document rejected',
+          },
         })
       }
     }
 
-    return NextResponse.json({ document })
+    return NextResponse.json({ document: updated })
   } catch (error) {
-    console.error('KYC PUT error:', error)
-    return NextResponse.json({ error: 'Failed to review KYC document' }, { status: 500 })
+    console.error('KYC PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update KYC document' }, { status: 500 })
   }
 }

@@ -5,7 +5,7 @@ import { authenticateRequest } from '@/lib/mobile-auth'
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
 
     const { searchParams } = new URL(request.url)

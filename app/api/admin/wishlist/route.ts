@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET: List all wishlist items
+// GET: List all wishlist items or waitlist signups
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const view = searchParams.get('view')
+
+    if (view === 'waitlist') {
+      const page = parseInt(searchParams.get('page') || '1')
+      const limit = parseInt(searchParams.get('limit') || '20')
+      const skip = (page - 1) * limit
+
+      const entries = await prisma.waitlistEntry.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      })
+
+      const total = await prisma.waitlistEntry.count()
+
+      return NextResponse.json({
+        entries,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      })
+    }
+
     const status = searchParams.get('status') // NEW, PLANNED, IN_PROGRESS, COMPLETED, REJECTED
     const category = searchParams.get('category') // GENERAL, APP, WEBSITE, ADMIN, API
     const priority = searchParams.get('priority') // LOW, MEDIUM, HIGH, CRITICAL
@@ -29,7 +55,6 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.wishlistItem.count({ where })
 
-    // Get summary stats
     const summary = {
       new: await prisma.wishlistItem.count({ where: { status: 'NEW' } }),
       planned: await prisma.wishlistItem.count({ where: { status: 'PLANNED' } }),

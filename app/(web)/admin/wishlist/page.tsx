@@ -17,8 +17,20 @@ interface WishlistItem {
   createdAt: string
 }
 
+interface WaitlistEntry {
+  id: string
+  name: string
+  email: string | null
+  phone: string
+  role: string
+  location: string | null
+  createdAt: string
+}
+
 export default function WishlistPage() {
+  const [activeTab, setActiveTab] = useState<'wishlist' | 'waitlist'>('wishlist')
   const [items, setItems] = useState<WishlistItem[]>([])
+  const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('NEW')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -38,10 +50,16 @@ export default function WishlistPage() {
     priority: 'MEDIUM'
   })
   const [actionLoading, setActionLoading] = useState(false)
+  const [waitlistPage, setWaitlistPage] = useState(1)
+  const [waitlistPagination, setWaitlistPagination] = useState({ page: 1, limit: 20, total: 0, pages: 0 })
 
   useEffect(() => {
-    fetchItems()
-  }, [filter, categoryFilter])
+    if (activeTab === 'wishlist') {
+      fetchItems()
+    } else {
+      fetchWaitlist()
+    }
+  }, [filter, categoryFilter, activeTab, waitlistPage])
 
   const fetchItems = async () => {
     setLoading(true)
@@ -62,6 +80,21 @@ export default function WishlistPage() {
       })
     } catch (error) {
       console.error('Failed to fetch wishlist items:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchWaitlist = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ view: 'waitlist', page: String(waitlistPage), limit: '20' })
+      const res = await fetch(`/api/admin/wishlist?${params}`)
+      const data = await res.json()
+      setWaitlistEntries(data.entries || [])
+      setWaitlistPagination(data.pagination || { page: 1, limit: 20, total: 0, pages: 0 })
+    } catch (error) {
+      console.error('Failed to fetch waitlist entries:', error)
     } finally {
       setLoading(false)
     }
@@ -169,121 +202,212 @@ export default function WishlistPage() {
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Website & App Wishlist</h1>
+          {activeTab === 'wishlist' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+            >
+              + Add Item
+            </button>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
           <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600"
+            onClick={() => setActiveTab('wishlist')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              activeTab === 'wishlist'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            + Add Item
+            Wishlist Items
+          </button>
+          <button
+            onClick={() => setActiveTab('waitlist')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+              activeTab === 'waitlist'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Waitlist Signups
           </button>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="text-blue-600 text-sm font-medium">New</div>
-            <div className="text-2xl font-bold text-blue-700">{summary.new}</div>
-          </div>
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-            <div className="text-purple-600 text-sm font-medium">Planned</div>
-            <div className="text-2xl font-bold text-purple-700">{summary.planned}</div>
-          </div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="text-yellow-600 text-sm font-medium">In Progress</div>
-            <div className="text-2xl font-bold text-yellow-700">{summary.inProgress}</div>
-          </div>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-green-600 text-sm font-medium">Completed</div>
-            <div className="text-2xl font-bold text-green-700">{summary.completed}</div>
-          </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="text-red-600 text-sm font-medium">Rejected</div>
-            <div className="text-2xl font-bold text-red-700">{summary.rejected}</div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        <div className="flex gap-4 mb-6">
-          <div className="flex gap-2">
-            {['NEW', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'].map((status) => (
-              <button
-                key={status}
-                onClick={() => setFilter(status)}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
-                  filter === status
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {status.replace('_', ' ')}
-              </button>
-            ))}
-          </div>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">All Categories</option>
-            <option value="GENERAL">General</option>
-            <option value="APP">Mobile App</option>
-            <option value="WEBSITE">Website</option>
-            <option value="ADMIN">Admin Panel</option>
-            <option value="API">API</option>
-          </select>
-        </div>
-
-        {/* Items List */}
-        {loading ? (
-          <div className="text-center py-8">Loading...</div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">No items found</div>
-        ) : (
-          <div className="space-y-4">
-            {items.map((item) => (
-              <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
-                        {item.status.replace('_', ' ')}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(item.priority)}`}>
-                        {item.priority}
-                      </span>
-                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                        {getCategoryLabel(item.category)}
-                      </span>
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
-                    <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                    <div className="text-xs text-gray-400">
-                      Created: {formatDate(item.createdAt)}
-                      {item.requestedBy && ` | Requested by: ${item.requestedBy}`}
-                    </div>
-                    {item.notes && (
-                      <div className="text-sm text-gray-500 mt-2">
-                        <span className="font-medium">Notes:</span> {item.notes}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setSelectedItem(item)}
-                      className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
+        {activeTab === 'wishlist' ? (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="text-blue-600 text-sm font-medium">New</div>
+                <div className="text-2xl font-bold text-blue-700">{summary.new}</div>
               </div>
-            ))}
-          </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="text-purple-600 text-sm font-medium">Planned</div>
+                <div className="text-2xl font-bold text-purple-700">{summary.planned}</div>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="text-yellow-600 text-sm font-medium">In Progress</div>
+                <div className="text-2xl font-bold text-yellow-700">{summary.inProgress}</div>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="text-green-600 text-sm font-medium">Completed</div>
+                <div className="text-2xl font-bold text-green-700">{summary.completed}</div>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="text-red-600 text-sm font-medium">Rejected</div>
+                <div className="text-2xl font-bold text-red-700">{summary.rejected}</div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex gap-4 mb-6">
+              <div className="flex gap-2">
+                {['NEW', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setFilter(status)}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
+                      filter === status
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {status.replace('_', ' ')}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm"
+              >
+                <option value="">All Categories</option>
+                <option value="GENERAL">General</option>
+                <option value="APP">Mobile App</option>
+                <option value="WEBSITE">Website</option>
+                <option value="ADMIN">Admin Panel</option>
+                <option value="API">API</option>
+              </select>
+            </div>
+
+            {/* Items List */}
+            {loading ? (
+              <div className="text-center py-8">Loading...</div>
+            ) : items.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No items found</div>
+            ) : (
+              <div className="space-y-4">
+                {items.map((item) => (
+                  <div key={item.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                            {item.status.replace('_', ' ')}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(item.priority)}`}>
+                            {item.priority}
+                          </span>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                            {getCategoryLabel(item.category)}
+                          </span>
+                        </div>
+                        <h3 className="font-semibold text-gray-900 mb-1">{item.title}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                        <div className="text-xs text-gray-400">
+                          Created: {formatDate(item.createdAt)}
+                          {item.requestedBy && ` | Requested by: ${item.requestedBy}`}
+                        </div>
+                        {item.notes && (
+                          <div className="text-sm text-gray-500 mt-2">
+                            <span className="font-medium">Notes:</span> {item.notes}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSelectedItem(item)}
+                          className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Waitlist Signups Table */}
+            {loading ? (
+              <div className="text-center py-8">Loading...</div>
+            ) : waitlistEntries.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">No waitlist signups yet</div>
+            ) : (
+              <>
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Phone</th>
+                        <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Email</th>
+                        <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Role</th>
+                        <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Date Registered</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {waitlistEntries.map((entry) => (
+                        <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">{entry.phone}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{entry.email || '—'}</td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                              {entry.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{formatDate(entry.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {waitlistPagination.pages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button
+                      onClick={() => setWaitlistPage(p => Math.max(1, p - 1))}
+                      disabled={waitlistPage === 1}
+                      className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      Page {waitlistPage} of {waitlistPagination.pages} ({waitlistPagination.total} total)
+                    </span>
+                    <button
+                      onClick={() => setWaitlistPage(p => Math.min(waitlistPagination.pages, p + 1))}
+                      disabled={waitlistPage === waitlistPagination.pages}
+                      className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
 
         {/* Create Modal */}

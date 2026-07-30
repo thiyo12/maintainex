@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = session.role === 'SUPER_ADMIN' || session.role === 'ADMIN'
+    const canManage = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(session.role)
 
     if (!canManage) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 })

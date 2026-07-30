@@ -16,6 +16,7 @@ model User {
   phone            String?
   role             String   @default("CUSTOMER")
   isActive         Boolean  @default(true)
+  emailVerified    Boolean  @default(false)
   isSuspended      Boolean  @default(false)
   isBanned         Boolean  @default(false) // Banned for off-platform deals
   banReason        String?
@@ -376,17 +377,21 @@ model AdminFlag {
 }
 
 model UserDevice {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceId  String
-  platform  String   // ios, android
-  pushToken String?
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId   String
+  platform   String    // ios, android
+  pushToken  String?
+  userAgent  String?
+  ipAddress  String?
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
 
   @@unique([userId, deviceId])
   @@index([deviceId])
   @@index([userId])
+  @@index([userId, userAgent])
 }
 
 model OfferTemplate {
@@ -770,7 +775,8 @@ model SecurityAudit {
   entityName String?
 
   // Details
-  description String
+  description String @default("")
+  details     String? // JSON of additional context
   oldValue    String? // JSON of previous state
   newValue    String? // JSON of new state
 
@@ -843,18 +849,18 @@ model RateLimitLog {
 
   // What was rate limited
   identifier String // IP address, API key, or user ID
-  type       String // IP, API_KEY, USER
+  type       String // IP, API_KEY, USER, login, api, upload, password-reset, login-failed
 
   // Endpoint
-  endpoint String
-  method   String
+  endpoint String @default("")
+  method   String @default("")
 
   // Request details
   requestCount Int @default(1)
 
   // Window
-  windowStart DateTime
-  windowEnd   DateTime
+  windowStart DateTime @default(now())
+  windowEnd   DateTime @default(now())
 
   // Result
   limited    Boolean   @default(false)
@@ -863,7 +869,31 @@ model RateLimitLog {
   createdAt DateTime @default(now())
 
   @@index([identifier, windowStart])
+  @@index([identifier, type, createdAt])
   @@index([limited])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+model IpBlock {
+  id        String    @id @default(cuid())
+  ip        String    @unique
+  reason    String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([ip])
+  @@index([expiresAt])
 }
 
 model FailedLogin {
@@ -888,7 +918,7 @@ model FailedLogin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([email, ipAddress])
+  @@unique([email, ipAddress])
   @@index([blocked])
   @@index([createdAt])
 }
@@ -2403,13 +2433,14 @@ model ProviderJobResponse {
 model WaitlistEntry {
   id        String   @id @default(cuid())
   name      String
-  email     String
-  phone     String?
+  email     String?
+  phone     String
   role      String
   location  String?
   createdAt DateTime @default(now())
 
   @@unique([email])
+  @@unique([phone])
   @@index([role])
   @@index([createdAt])
 }
@@ -2486,4 +2517,16 @@ model WishlistItem {
   @@index([priority])
   @@index([category])
   @@index([createdAt])
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([userId])
 }

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (session.role !== 'ADMIN' && session.role !== 'PROVINCE_ADMIN' && session.role !== 'SUPER_ADMIN') {
+    if (!['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'PROVINCE_ADMIN'].includes(session.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
+import { verifyPasswordWithMigration } from '@/lib/security/password'
 
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-change-in-production'
 
@@ -96,9 +96,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
       }
 
-      const isValid = await bcrypt.compare(password, webAdmin.password)
-      if (!isValid) {
+      const passwordCheck = await verifyPasswordWithMigration(password, webAdmin.password)
+      if (!passwordCheck.valid) {
         recordFailedAttempt(ip)
+        try {
+          await prisma.rateLimitLog.create({
+            data: {
+              identifier: ip,
+              type: 'login-failed',
+              endpoint: '/api/auth/login',
+              method: 'POST',
+              requestCount: 1,
+              windowStart: new Date(),
+              windowEnd: new Date(Date.now() + 60 * 60 * 1000),
+              limited: false,
+            }
+          })
+        } catch {}
         return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
       }
 
@@ -136,6 +150,14 @@ export async function POST(request: NextRequest) {
         sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60
       })
 
+      if (passwordCheck.needsMigration) {
+        try {
+          const { hashPassword } = await import('@/lib/security/password')
+          const newHash = await hashPassword(password)
+          await prisma.admin.update({ where: { id: webAdmin.id }, data: { password: newHash } })
+        } catch {}
+      }
+
       return response
     }
 
@@ -155,9 +177,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account locked. Try again later.' }, { status: 423 })
     }
 
-    const isValid = await bcrypt.compare(password, appAdmin.passwordHash)
-    if (!isValid) {
+    const passwordCheck2 = await verifyPasswordWithMigration(password, appAdmin.passwordHash)
+    if (!passwordCheck2.valid) {
       recordFailedAttempt(ip)
+      try {
+        await prisma.rateLimitLog.create({
+          data: {
+            identifier: ip,
+            type: 'login-failed',
+            endpoint: '/api/auth/login',
+            method: 'POST',
+            requestCount: 1,
+            windowStart: new Date(),
+            windowEnd: new Date(Date.now() + 60 * 60 * 1000),
+            limited: false,
+          }
+        })
+      } catch {}
       const newAttempts = (appAdmin.failedLoginAttempts || 0) + 1
       const updateData: any = { failedLoginAttempts: newAttempts }
       if (newAttempts >= 10) {
@@ -202,6 +238,14 @@ export async function POST(request: NextRequest) {
       httpOnly: true, secure: isProduction && !isHttpUrl,
       sameSite: 'lax', path: '/', maxAge: 30 * 24 * 60 * 60
     })
+
+    if (passwordCheck2.needsMigration) {
+      try {
+        const { hashPassword } = await import('@/lib/security/password')
+        const newHash = await hashPassword(password)
+        await prisma.adminUser.update({ where: { id: appAdmin.id }, data: { passwordHash: newHash } })
+      } catch {}
+    }
 
     return response
   } catch (error) {

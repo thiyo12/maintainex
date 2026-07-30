@@ -52,14 +52,16 @@ type AdminForm = z.infer<typeof adminSchema>
 
 const ROLE_HIERARCHY: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
-  ADMIN: 'Admin',
+  OPERATIONS: 'Operations',
+  FINANCE: 'Finance',
   MODERATOR: 'Moderator',
   SUPPORT: 'Support',
 }
 
 const roleBadgeClass: Record<string, string> = {
   SUPER_ADMIN: 'bg-red-100 text-red-800',
-  ADMIN: 'bg-blue-100 text-blue-800',
+  OPERATIONS: 'bg-blue-100 text-blue-800',
+  FINANCE: 'bg-indigo-100 text-indigo-800',
   MODERATOR: 'bg-yellow-100 text-yellow-800',
   SUPPORT: 'bg-gray-100 text-gray-800',
 }
@@ -314,7 +316,8 @@ export default function MarketplaceAdminUsers() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
+                    <SelectItem value="OPERATIONS">Operations</SelectItem>
+                    <SelectItem value="FINANCE">Finance</SelectItem>
                     <SelectItem value="MODERATOR">Moderator</SelectItem>
                     <SelectItem value="SUPPORT">Support</SelectItem>
                   </SelectContent>

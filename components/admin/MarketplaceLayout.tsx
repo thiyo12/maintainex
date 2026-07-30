@@ -14,22 +14,22 @@ import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Users', href: '/admin/marketplace/users', icon: FiUsers, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Disputes', href: '/admin/marketplace/disputes', icon: FiMessageSquare, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { name: 'Escrow', href: '/admin/marketplace/escrow', icon: FiShield, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { name: 'Revenue', href: '/admin/marketplace/revenue', icon: FiDollarSign, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { name: 'Fraud Centre', href: '/admin/marketplace/fraud', icon: FiAlertTriangle, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
-  { name: 'Offers', href: '/admin/marketplace/offers', icon: FiZap, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
-  { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
+  { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome, roles: ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Users', href: '/admin/marketplace/users', icon: FiUsers, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Disputes', href: '/admin/marketplace/disputes', icon: FiMessageSquare, roles: ['SUPER_ADMIN', 'OPERATIONS', 'SUPPORT'] },
+  { name: 'Escrow', href: '/admin/marketplace/escrow', icon: FiShield, roles: ['SUPER_ADMIN', 'FINANCE'] },
+  { name: 'Revenue', href: '/admin/marketplace/revenue', icon: FiDollarSign, roles: ['SUPER_ADMIN', 'FINANCE'] },
+  { name: 'Fraud Centre', href: '/admin/marketplace/fraud', icon: FiAlertTriangle, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Offers', href: '/admin/marketplace/offers', icon: FiZap, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
+  { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
   { name: 'Staff', href: '/admin/marketplace/staff', icon: FiUserCheck, roles: ['SUPER_ADMIN'] },
   { name: 'Settings', href: '/admin/marketplace/settings', icon: FiSettings, roles: ['SUPER_ADMIN'] },
-  { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList, roles: ['SUPER_ADMIN', 'ADMIN'] },
-  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
-  { name: 'Properties', href: '/admin/marketplace/properties', icon: FiHome, roles: ['SUPER_ADMIN', 'ADMIN', 'MODERATOR'] },
-  { name: 'Alert Centre', href: '/admin/marketplace/alerts', icon: FiAlertCircle, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList, roles: ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell, roles: ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT'] },
+  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
+  { name: 'Properties', href: '/admin/marketplace/properties', icon: FiHome, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
+  { name: 'Alert Centre', href: '/admin/marketplace/alerts', icon: FiAlertCircle, roles: ['SUPER_ADMIN', 'OPERATIONS', 'SUPPORT'] },
 ]
 
 export default function MarketplaceLayout({ children }: { children: React.ReactNode }) {

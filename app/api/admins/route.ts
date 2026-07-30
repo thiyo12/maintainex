@@ -52,11 +52,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
-    if (!['SUPER_ADMIN', 'ADMIN'].includes(role)) {
+    if (!['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
 
-    if (role === 'ADMIN' && !branchId && !region) {
+    if (['OPERATIONS', 'FINANCE'].includes(role) && !branchId && !region) {
       return NextResponse.json({ error: 'Branch or region is required for admin users' }, { status: 400 })
     }
 
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         name: name || null,
         role,
-        branchId: role === 'ADMIN' ? branchId : null,
+        branchId: ['OPERATIONS', 'FINANCE'].includes(role) ? branchId : null,
         region: region || 'LK',
       },
       include: {

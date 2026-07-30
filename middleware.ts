@@ -6,7 +6,7 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required')
 }
 
-const securityHeaders = {
+const securityHeaders: Record<string, string> = {
   'X-DNS-Prefetch-Control': 'on',
   'X-Frame-Options': 'SAMEORIGIN',
   'X-Content-Type-Options': 'nosniff',
@@ -17,7 +17,7 @@ const securityHeaders = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
 
-const coconutSecurityHeaders = {
+const coconutSecurityHeaders: Record<string, string> = {
   ...securityHeaders,
   'X-Robots-Tag': 'noindex, nofollow',
   'X-Frame-Options': 'DENY',
@@ -25,7 +25,7 @@ const coconutSecurityHeaders = {
   'Pragma': 'no-cache',
 }
 
-const RATE_LIMITS = {
+const RATE_LIMITS: Record<string, { maxRequests: number; windowSeconds: number }> = {
   default: { maxRequests: 100, windowSeconds: 60 },
   auth: { maxRequests: 5, windowSeconds: 60 },
   admin: { maxRequests: 200, windowSeconds: 60 },
@@ -58,13 +58,30 @@ function b64UrlDecode(str: string): string {
   return new TextDecoder().decode(new Uint8Array(out))
 }
 
-function verifySimpleToken(token: string): any {
+async function verifyJwtSignature(headerB64: string, payloadB64: string, signatureB64: string): Promise<boolean> {
+  try {
+    const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`)
+    const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(JWT_SECRET!),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    )
+    return await crypto.subtle.verify('HMAC', key, signature, data)
+  } catch {
+    return false
+  }
+}
+
+async function verifySimpleToken(token: string): Promise<any> {
   try {
     const parts = token.split('.')
-    
-    // Standard JWT (3 parts: header.payload.signature)
     if (parts.length === 3) {
-      const [, payloadB64] = parts
+      const [headerB64, payloadB64, signatureB64] = parts
+      const signatureValid = await verifyJwtSignature(headerB64, payloadB64, signatureB64)
+      if (!signatureValid) return null
       const payload = JSON.parse(b64UrlDecode(payloadB64))
       if (payload.exp && Date.now() / 1000 > payload.exp) return null
       return {
@@ -79,10 +96,10 @@ function verifySimpleToken(token: string): any {
         authType: payload.authType || 'admin',
       }
     }
-
-    // Legacy 2-part token
-    const [encoded] = parts
+    const [encoded, legacySig] = parts
     if (!encoded) return null
+    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+    if (legacySig !== expectedSig) return null
     const payload = JSON.parse(b64UrlDecode(encoded))
     const maxAge = 30 * 24 * 60 * 60 * 1000
     if (Date.now() - payload.created > maxAge) return null
@@ -94,7 +111,6 @@ function verifySimpleToken(token: string): any {
 
 async function getSession(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
-
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7)
     const payload = await verifySimpleToken(token)
@@ -112,14 +128,10 @@ async function getSession(request: NextRequest) {
       }
     }
   }
-
   const token = request.cookies.get('admin_token')?.value
-  
   if (!token) return null
-  
   const payload = await verifySimpleToken(token)
   if (!payload) return null
-  
   return {
     id: payload.id,
     email: payload.email,
@@ -133,101 +145,62 @@ async function getSession(request: NextRequest) {
   }
 }
 
-async function checkRateLimit(
-  identifier: string,
-  type: 'IP' | 'USER',
-  limitType = 'default'
-): Promise<{ remaining: number; resetAt: Date; limited?: boolean }> {
-  const config = RATE_LIMITS[limitType as keyof typeof RATE_LIMITS] || RATE_LIMITS.default
-  const now = new Date()
-  const windowStart = new Date(now.getTime() - config.windowSeconds * 1000)
+const IP_BLOCKLIST = new Set<string>()
+const ipBlocklistExpiry = new Map<string, number>()
+let lastBlocklistSync = 0
+const BLOCKLIST_SYNC_INTERVAL = 60000
 
+const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET || 'maintainex-internal-sync-2024'
+
+async function syncIPBlocklist(request: NextRequest) {
+  const now = Date.now()
+  if (now - lastBlocklistSync < BLOCKLIST_SYNC_INTERVAL) return
+  lastBlocklistSync = now
   try {
-    const { prisma } = await import('@/lib/prisma')
-    const existing = await prisma.rateLimitLog.findFirst({
-      where: {
-        identifier,
-        type,
-        windowStart: { gte: windowStart },
-      },
-      orderBy: { windowStart: 'desc' },
+    const url = new URL('/api/internal/security/ip-blocklist', request.url)
+    const resp = await fetch(url.toString(), {
+      headers: { 'x-internal-sync': INTERNAL_SYNC_SECRET },
+      cache: 'no-store',
     })
-
-    if (!existing || existing.windowStart < windowStart) {
-      await prisma.rateLimitLog.create({
-        data: {
-          identifier,
-          type,
-          endpoint: 'middleware',
-          method: 'ALL',
-          requestCount: 1,
-          windowStart: now,
-          windowEnd: new Date(now.getTime() + config.windowSeconds * 1000),
-          limited: false,
-        },
-      })
-      
-      return {
-        remaining: config.maxRequests - 1,
-        resetAt: new Date(now.getTime() + config.windowSeconds * 1000),
+    if (resp.ok) {
+      const data = await resp.json()
+      IP_BLOCKLIST.clear()
+      ipBlocklistExpiry.clear()
+      if (data.blockedIPs) {
+        for (const entry of data.blockedIPs) {
+          IP_BLOCKLIST.add(entry.ip)
+          if (entry.expiresAt) {
+            ipBlocklistExpiry.set(entry.ip, new Date(entry.expiresAt).getTime())
+          }
+        }
       }
     }
-
-    const newCount = existing.requestCount + 1
-    const limited = newCount > config.maxRequests
-
-    await prisma.rateLimitLog.update({
-      where: { id: existing.id },
-      data: { 
-        requestCount: newCount,
-        limited,
-        blockUntil: limited ? new Date(now.getTime() + config.windowSeconds * 1000) : null,
-      },
-    })
-
-    return {
-      remaining: Math.max(0, config.maxRequests - newCount),
-      resetAt: existing.windowStart,
-    }
-  } catch {
-    return {
-      remaining: 0,
-      resetAt: new Date(Date.now() + 5000),
-      limited: true,
-    }
-  }
+  } catch {}
 }
 
-async function logAccessAttempt(
-  action: string,
-  category: string,
-  request: NextRequest,
-  session: any,
-  success: boolean,
-  errorMessage?: string,
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW'
-) {
-  try {
-    const { prisma } = await import('@/lib/prisma')
-    await prisma.securityAudit.create({
-      data: {
-        action,
-        category,
-        userId: session?.id || null,
-        userEmail: session?.email || null,
-        userRole: session?.role || null,
-        description: errorMessage || `${action} ${category}`,
-        ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown',
-        userAgent: request.headers.get('user-agent') || null,
-        success,
-        errorMessage,
-        riskLevel,
-        isSuspicious: riskLevel === 'HIGH' || riskLevel === 'CRITICAL',
-      },
-    })
-  } catch (error) {
-    console.error('Failed to log access attempt:', error)
+function isIpBlocked(ip: string): boolean {
+  const expiry = ipBlocklistExpiry.get(ip)
+  if (expiry !== undefined) {
+    if (Date.now() > expiry) {
+      IP_BLOCKLIST.delete(ip)
+      ipBlocklistExpiry.delete(ip)
+      return false
+    }
   }
+  return IP_BLOCKLIST.has(ip)
+}
+
+const AI_CRAWLER_AGENTS = [
+  'GPTBot', 'Google-Extended', 'CCBot', 'PerplexityBot',
+  'Claude-Web', 'ClaudeBot', 'anthropic-ai', 'cohere-ai',
+  'Bytespider', 'Applebot-Extended', 'FacebookBot',
+  'Amazonbot', 'YouBot', 'Meltwater', 'omgili',
+  'ChatGPT-User', 'OAI-SearchBot',
+]
+
+function isAiCrawler(request: NextRequest): boolean {
+  const ua = request.headers.get('user-agent') || ''
+  return AI_CRAWLER_AGENTS.some(agent => ua.includes(agent))
 }
 
 function applySecurityHeaders(response: NextResponse): NextResponse {
@@ -244,9 +217,6 @@ function applyRateLimitHeaders(response: NextResponse, remaining: number, resetA
 }
 
 function applyCoconutHeaders(response: NextResponse, remaining: number, resetAt: Date): NextResponse {
-  Object.entries(securityHeaders).forEach(([key, value]) => {
-    response.headers.set(key, value)
-  })
   Object.entries(coconutSecurityHeaders).forEach(([key, value]) => {
     response.headers.set(key, value)
   })
@@ -255,48 +225,88 @@ function applyCoconutHeaders(response: NextResponse, remaining: number, resetAt:
   return response
 }
 
-const AI_CRAWLER_AGENTS = [
-  'GPTBot', 'Google-Extended', 'CCBot', 'PerplexityBot',
-  'Claude-Web', 'ClaudeBot', 'anthropic-ai', 'cohere-ai',
-  'Bytespider', 'Applebot-Extended', 'FacebookBot',
-  'Amazonbot', 'YouBot', 'Meltwater', 'omgili',
-  'ChatGPT-User', 'OAI-SearchBot',
-]
+const inMemoryRateLimit = new Map<string, { count: number; windowStart: number }>()
 
-function isAiCrawler(request: NextRequest): boolean {
-  const ua = request.headers.get('user-agent') || ''
-  return AI_CRAWLER_AGENTS.some(agent => ua.includes(agent))
+function getInMemoryRateLimit(ip: string, limitType: string): { remaining: number; resetAt: Date; limited: boolean } {
+  const config = RATE_LIMITS[limitType] || RATE_LIMITS.default
+  const now = Date.now()
+  const windowMs = config.windowSeconds * 1000
+  const windowStart = now - (now % windowMs)
+  const key = `${ip}:${limitType}:${windowStart}`
+  const entry = inMemoryRateLimit.get(key)
+  if (!entry || entry.windowStart !== windowStart) {
+    inMemoryRateLimit.set(key, { count: 1, windowStart })
+    return { remaining: config.maxRequests - 1, resetAt: new Date(windowStart + windowMs), limited: false }
+  }
+  entry.count++
+  const remaining = Math.max(0, config.maxRequests - entry.count)
+  return { remaining, resetAt: new Date(windowStart + windowMs), limited: remaining <= 0 }
+}
+
+if (typeof globalThis.__rateLimitCleanup === 'undefined') {
+  globalThis.__rateLimitCleanup = setInterval(() => {
+    const now = Date.now()
+    for (const [key, entry] of inMemoryRateLimit.entries()) {
+      if (now - entry.windowStart > 120000) {
+        inMemoryRateLimit.delete(key)
+      }
+    }
+  }, 60000)
+}
+
+declare global {
+  var __rateLimitCleanup: ReturnType<typeof setInterval> | undefined
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow AI crawlers to index content with standard security headers
   if (isAiCrawler(request)) {
     const response = NextResponse.next()
     response.headers.set('X-Robots-Tag', 'all')
     response.headers.set('Cache-Control', 'public, max-age=3600')
     return applySecurityHeaders(response)
   }
-  
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
-             request.headers.get('x-real-ip') || 
+
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+             request.headers.get('x-real-ip') ||
              'unknown'
-  
+
+  await syncIPBlocklist(request)
+
+  if (isIpBlocked(ip)) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Access denied', code: 'IP_BLOCKED' }),
+      { status: 403, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
   const isLoginRoute = pathname.startsWith('/api/auth') || pathname.startsWith('/api/admin/auth')
   const rateLimitType = isLoginRoute ? 'auth' : 'admin'
-  const rateLimit = await checkRateLimit(ip, 'IP', rateLimitType)
-  
+  const rateLimit = getInMemoryRateLimit(ip, rateLimitType)
+
+  if (rateLimit.limited) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
+        },
+      }
+    )
+  }
+
   let response: NextResponse
 
   if (pathname.startsWith('/admin/login') || pathname.startsWith('/admin/api/auth')) {
     response = NextResponse.next()
-    return applySecurityHeaders(
-      applyCoconutHeaders(response, rateLimit.remaining, rateLimit.resetAt)
-    )
+    return applyCoconutHeaders(response, rateLimit.remaining, rateLimit.resetAt)
   }
 
-  // Block seed APIs in production
   if (pathname.startsWith('/api/seed/')) {
     if (process.env.NODE_ENV === 'production') {
       return new NextResponse(
@@ -305,45 +315,21 @@ export async function middleware(request: NextRequest) {
       )
     }
     response = NextResponse.next()
-    return applySecurityHeaders(
-      applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
-    )
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const session = await getSession(request)
-    
     if (!session) {
-      await logAccessAttempt(
-        'ACCESS_DENIED',
-        'AUTH',
-        request,
-        null,
-        false,
-        'No session - redirect to login',
-        'MEDIUM'
-      )
-      
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
-      
       response = NextResponse.redirect(loginUrl)
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    const isMarketplaceRoute = pathname.startsWith('/admin/marketplace/')
-    const isWebAdmin = session.authType === 'admin'
-    const validWebRoles = ['SUPER_ADMIN', 'ADMIN']
-    const validMarketplaceRoles = ['SUPER_ADMIN', 'ADMIN', 'MODERATOR', 'SUPPORT']
+    const validWebRoles = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT']
 
-    if (isMarketplaceRoute) {
-      if (!validMarketplaceRoles.includes(session.role)) {
-        await logAccessAttempt('ACCESS_DENIED', 'AUTH', request, session, false, 'Invalid marketplace role', 'HIGH')
-        response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
-        return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-      }
-    } else if (!validWebRoles.includes(session.role)) {
-      await logAccessAttempt('ACCESS_DENIED', 'AUTH', request, session, false, 'Invalid role', 'HIGH')
+    if (!validWebRoles.includes(session.role)) {
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
@@ -351,39 +337,19 @@ export async function middleware(request: NextRequest) {
     response = NextResponse.next()
     response.headers.set('X-Admin-Id', session.id)
     response.headers.set('X-Admin-Role', session.role)
-    
+
     if (pathname.startsWith('/admin/api/') || pathname.startsWith('/api/')) {
       response.headers.set('Cache-Control', 'no-store, must-revalidate')
     }
-    
-    await logAccessAttempt(
-      'ACCESS',
-      'ADMIN',
-      request,
-      session,
-      true,
-      undefined,
-      'LOW'
-    )
-    
+
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
-  if (
-    pathname.startsWith('/api/bookings') &&
-    !pathname.includes('admin')
-  ) {
+  if (pathname === '/api/auth/forgot-password' || pathname === '/api/auth/reset-password') {
     response = NextResponse.next()
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
-  // Allow public access to vacancies API for careers page
-  if (pathname.startsWith('/api/vacancies')) {
-    response = NextResponse.next()
-    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-  }
-
-  // Allow health check without auth
   if (pathname === '/api/health') {
     response = NextResponse.next()
     applySecurityHeaders(response)
@@ -391,8 +357,36 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // Allow all mobile API paths (they handle auth via Bearer token)
+  if (pathname === '/api/waitlist') {
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
+  if (pathname.startsWith('/api/bookings') && !pathname.includes('admin')) {
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
+  if (pathname.startsWith('/api/vacancies')) {
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
   if (pathname.startsWith('/api/mobile/')) {
+    if (rateLimit.limited) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
+        {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000).toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
+          },
+        }
+      )
+    }
     response = NextResponse.next()
     applySecurityHeaders(response)
     applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
@@ -410,7 +404,11 @@ export async function middleware(request: NextRequest) {
     pathname !== '/api/auth/login' &&
     pathname !== '/api/auth/logout' &&
     pathname !== '/api/health' &&
+    pathname !== '/api/waitlist' &&
+    pathname !== '/api/auth/forgot-password' &&
+    pathname !== '/api/auth/reset-password' &&
     !pathname.startsWith('/api/admin/') &&
+    !pathname.startsWith('/api/internal/') &&
     pathname !== '/api/seed/auto' &&
     pathname !== '/api/seed/test-data' &&
     pathname !== '/api/seed/real-estate' &&
@@ -426,59 +424,22 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/api/cron/')
   ) {
     const session = await getSession(request)
-    
     if (!session) {
-      await logAccessAttempt(
-        'API_ACCESS_DENIED',
-        'AUTH',
-        request,
-        null,
-        false,
-        'API access without session',
-        'MEDIUM'
-      )
-      
       response = NextResponse.json(
         { error: 'Unauthorized', code: 'NO_SESSION' },
         { status: 401 }
       )
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
-    
     response = NextResponse.next()
     response.headers.set('X-User-Id', session.id)
     response.headers.set('X-User-Role', session.role)
-    
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname === '/maintenance' || pathname.startsWith('/api/settings/maintenance')) {
     response = NextResponse.next()
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-  }
-
-  try {
-    const baseUrl = request.url.split('/')[0] + '//' + request.url.split('/')[2]
-    const apiUrl = `${baseUrl}/api/settings/maintenance?_=${Date.now()}`
-    
-    const maintenanceResponse = await fetch(apiUrl, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
-      }
-    })
-    
-    if (maintenanceResponse.ok) {
-      const data = await maintenanceResponse.json()
-      
-      if (data.maintenanceMode === true) {
-        const maintenanceUrl = new URL('/maintenance', request.url)
-        response = NextResponse.redirect(maintenanceUrl)
-        return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
-      }
-    }
-  } catch (error) {
-    console.error('Maintenance check failed:', error)
   }
 
   response = NextResponse.next()

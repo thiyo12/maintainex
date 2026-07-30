@@ -3,18 +3,31 @@ import { authenticateRequest } from '@/lib/mobile-auth'
 import { writeFile, mkdir } from 'fs/promises'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import path from 'path'
-
+import { validateFileUpload, generateSecureFilename } from '@/lib/security/file-upload'
 const ALLOWED_MIMES = new Set([
   'image/jpeg', 'image/png', 'image/webp', 'image/gif',
   'application/pdf',
 ])
 const MAX_SIZE = 10 * 1024 * 1024 // 10MB
+const uploadRateMap = new Map<string, { count: number; resetAt: number }>()
 
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const uploadIp = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || user.id
+    const now = Date.now()
+    const entry = uploadRateMap.get(uploadIp)
+    if (entry && now < entry.resetAt && entry.count >= 10) {
+      return NextResponse.json({ error: 'Too many uploads. Try again later.' }, { status: 429 })
+    }
+    if (!entry || now > entry.resetAt) {
+      uploadRateMap.set(uploadIp, { count: 1, resetAt: now + 60000 })
+    } else {
+      entry.count++
     }
 
     const formData = await request.formData()
@@ -34,12 +47,17 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
+    const validation = validateFileUpload(buffer, file.type, file.name)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+
+    const secureFilename = generateSecureFilename(file.name)
+
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'mobile', user.id)
     await mkdir(uploadDir, { recursive: true })
 
-    const timestamp = Date.now()
-    const safeExt = (file.name.split('.').pop() || 'jpg').replace(/[^a-zA-Z0-9]/g, '')
-    const filename = `${timestamp}.${safeExt}`
+    const filename = secureFilename
     const filepath = path.join(uploadDir, filename)
 
     await writeFile(filepath, buffer)

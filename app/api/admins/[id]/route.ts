@@ -69,11 +69,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (role && !['SUPER_ADMIN', 'ADMIN'].includes(role)) {
+    if (role && !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
 
-    if (role === 'ADMIN' && !branchId && !isSuper) {
+    if (['OPERATIONS', 'FINANCE'].includes(role) && !branchId && !isSuper) {
       return NextResponse.json({ error: 'Branch is required for admin users' }, { status: 400 })
     }
 

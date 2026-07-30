@@ -1,259 +1,378 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { FiSave, FiMail, FiPhone, FiMapPin, FiMessageCircle } from 'react-icons/fi'
+import {
+  FiSave, FiSettings, FiDollarSign, FiShield, FiBell,
+  FiGlobe, FiMail, FiClock, FiUsers, FiLock, FiAlertTriangle,
+  FiToggleLeft, FiToggleRight
+} from 'react-icons/fi'
 import { getAuthHeader } from '@/lib/auth-client'
 import AdminLayout from '@/components/admin/AdminLayout'
 
-interface Settings {
-  companyName: string
-  email: string
-  phone: string
-  address: string
-  mapEmbedUrl: string | null
-  whatsappNumber: string | null
-  facebookUrl: string | null
-  instagramUrl: string | null
-  workingHours: string | null
+interface PlatformSettings {
+  platformName: string
+  supportEmail: string
+  maintenanceMode: boolean
+  commissionRate: number
+  weeklySettlementDay: string
+  suspensionGracePeriodDays: number
+  maxActiveJobsPerUser: number
+  sessionTimeoutMinutes: number
+  maxLoginAttempts: number
+  ipAllowlist: string
+  emailNotificationsEnabled: boolean
+  pushNotificationsEnabled: boolean
 }
 
+const TABS = [
+  { id: 'platform', label: 'Platform', icon: FiGlobe },
+  { id: 'commission', label: 'Commission', icon: FiDollarSign },
+  { id: 'security', label: 'Security', icon: FiShield },
+  { id: 'notifications', label: 'Notifications', icon: FiBell },
+]
+
+const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
+
 export default function AdminSettings() {
-  const [settings, setSettings] = useState<Settings>({
-    companyName: 'Maintainex',
-    email: 'maintainex.lk@gmail.com',
-    phone: '+94 XX XXX XXXX',
-    address: 'Jaffna, Sri Lanka',
-    mapEmbedUrl: '',
-    whatsappNumber: '',
-    facebookUrl: '',
-    instagramUrl: '',
-    workingHours: ''
+  const [activeTab, setActiveTab] = useState('platform')
+  const [settings, setSettings] = useState<PlatformSettings>({
+    platformName: 'MaintainEX',
+    supportEmail: 'support@maintainex.lk',
+    maintenanceMode: false,
+    commissionRate: 10,
+    weeklySettlementDay: 'MONDAY',
+    suspensionGracePeriodDays: 7,
+    maxActiveJobsPerUser: 10,
+    sessionTimeoutMinutes: 60,
+    maxLoginAttempts: 5,
+    ipAllowlist: '',
+    emailNotificationsEnabled: true,
+    pushNotificationsEnabled: true,
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    fetchSettings()
-  }, [])
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const authHeaders = getAuthHeader()
-      const res = await fetch('/api/settings', { headers: { ...authHeaders } })
-      
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
+      const res = await fetch('/api/admin/settings', { headers: { ...authHeaders } })
+      if (res.status === 401) { window.location.href = '/admin/login'; return }
+      if (res.ok) {
+        const data = await res.json()
+        setSettings((prev) => ({ ...prev, ...data }))
       }
-      
-      const data = await res.json()
-      setSettings({
-        companyName: data.companyName || 'Maintainex',
-        email: data.email || 'maintainex.lk@gmail.com',
-        phone: data.phone || '+94 XX XXX XXXX',
-        address: data.address || 'Jaffna, Sri Lanka',
-        mapEmbedUrl: data.mapEmbedUrl || '',
-        whatsappNumber: data.whatsappNumber || '',
-        facebookUrl: data.facebookUrl || '',
-        instagramUrl: data.instagramUrl || '',
-        workingHours: data.workingHours || ''
-      })
-    } catch (error) {
+    } catch {
       toast.error('Failed to load settings')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => { fetchSettings() }, [fetchSettings])
+
+  const handleSave = async () => {
     setSaving(true)
-
     try {
       const authHeaders = getAuthHeader()
-      const res = await fetch('/api/settings', {
+      const res = await fetch('/api/admin/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify(settings)
+        body: JSON.stringify(settings),
       })
-
-      if (res.status === 401) {
-        window.location.href = '/admin/login'
-        return
-      }
-
       if (!res.ok) throw new Error()
-
-      toast.success('Settings saved successfully!')
-    } catch (error) {
+      toast.success('Settings saved successfully')
+    } catch {
       toast.error('Failed to save settings')
     } finally {
       setSaving(false)
     }
   }
 
+  const updateSetting = <K extends keyof PlatformSettings>(key: K, value: PlatformSettings[K]) => {
+    setSettings((prev) => ({ ...prev, [key]: value }))
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </AdminLayout>
     )
   }
 
   return (
     <AdminLayout>
-    <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600">Manage your company information</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Company Information</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-              <input
-                type="text"
-                value={settings.companyName}
-                onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
-                className="input-field"
-              />
-            </div>
-
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <FiMail className="inline mr-2" />
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={settings.email}
-                  onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                  className="input-field"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <FiPhone className="inline mr-2" />
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  value={settings.phone}
-                  onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                  className="input-field"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <FiMapPin className="inline mr-2" />
-                Address
-              </label>
-              <input
-                type="text"
-                value={settings.address}
-                onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-                className="input-field"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Working Hours</label>
-              <input
-                type="text"
-                value={settings.workingHours || ''}
-                onChange={(e) => setSettings({ ...settings, workingHours: e.target.value })}
-                className="input-field"
-                placeholder="Monday - Saturday: 8:00 AM - 6:00 PM"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Social & Contact</h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <FiMessageCircle className="inline mr-2" />
-                WhatsApp Number
-              </label>
-              <input
-                type="text"
-                value={settings.whatsappNumber || ''}
-                onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
-                className="input-field"
-                placeholder="94XXXXXXXXX"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Facebook URL</label>
-              <input
-                type="url"
-                value={settings.facebookUrl || ''}
-                onChange={(e) => setSettings({ ...settings, facebookUrl: e.target.value })}
-                className="input-field"
-                placeholder="https://facebook.com/..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Instagram URL</label>
-              <input
-                type="url"
-                value={settings.instagramUrl || ''}
-                onChange={(e) => setSettings({ ...settings, instagramUrl: e.target.value })}
-                className="input-field"
-                placeholder="https://instagram.com/..."
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Map Settings</h2>
-          
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Google Maps Embed URL</label>
-            <textarea
-              value={settings.mapEmbedUrl || ''}
-              onChange={(e) => setSettings({ ...settings, mapEmbedUrl: e.target.value })}
-              rows={3}
-              className="input-field resize-none"
-              placeholder="Paste your Google Maps embed iframe URL here"
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Get this from Google Maps → Share → Embed a map
-            </p>
+            <h1 className="text-2xl font-bold text-white">Settings</h1>
+            <p className="text-gray-400 text-sm mt-1">Configure platform, commission, security, and notifications</p>
           </div>
-        </div>
-
-        <div className="flex justify-end">
           <button
-            type="submit"
+            onClick={handleSave}
             disabled={saving}
-            className="btn-primary flex items-center"
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 text-[#0B0C12] rounded-lg font-medium text-sm hover:bg-amber-400 transition-colors disabled:opacity-50"
           >
             {saving ? (
-              <div className="w-5 h-5 border-2 border-dark-900 border-t-transparent rounded-full animate-spin mr-2" />
+              <div className="w-4 h-4 border-2 border-[#0B0C12] border-t-transparent rounded-full animate-spin" />
             ) : (
-              <FiSave className="mr-2" />
+              <FiSave size={16} />
             )}
-            Save Settings
+            Save Changes
           </button>
         </div>
-      </form>
-    </div>
+
+        <div className="flex gap-1 bg-[#15161E] border border-white/5 rounded-xl p-1 overflow-x-auto">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <tab.icon size={16} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-[#15161E] border border-white/5 rounded-xl p-6">
+          {activeTab === 'platform' && (
+            <div className="space-y-6">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <FiGlobe className="text-amber-400" />
+                Platform Configuration
+              </h3>
+              <div className="grid gap-5">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Platform Name</label>
+                  <input
+                    type="text"
+                    value={settings.platformName}
+                    onChange={(e) => updateSetting('platformName', e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    <FiMail className="inline mr-1" />
+                    Support Email
+                  </label>
+                  <input
+                    type="email"
+                    value={settings.supportEmail}
+                    onChange={(e) => updateSetting('supportEmail', e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 bg-[#0B0C12] border border-white/10 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FiAlertTriangle className="text-amber-400" size={18} />
+                    <div>
+                      <div className="text-white text-sm font-medium">Maintenance Mode</div>
+                      <div className="text-gray-500 text-xs">Temporarily disable public access</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('maintenanceMode', !settings.maintenanceMode)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      settings.maintenanceMode ? 'bg-amber-500' : 'bg-white/10'
+                    }`}
+                  >
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      settings.maintenanceMode ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'commission' && (
+            <div className="space-y-6">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <FiDollarSign className="text-amber-400" />
+                Commission Settings
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Commission Rate (%)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={settings.commissionRate}
+                      onChange={(e) => updateSetting('commissionRate', parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
+                  </div>
+                  <p className="text-gray-500 text-xs mt-1">Platform fee deducted from provider earnings</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    <FiClock className="inline mr-1" />
+                    Weekly Settlement Day
+                  </label>
+                  <select
+                    value={settings.weeklySettlementDay}
+                    onChange={(e) => updateSetting('weeklySettlementDay', e.target.value)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  >
+                    {DAYS.map((d) => (
+                      <option key={d} value={d}>{d.charAt(0) + d.slice(1).toLowerCase()}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Suspension Grace Period (days)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={settings.suspensionGracePeriodDays}
+                    onChange={(e) => updateSetting('suspensionGracePeriodDays', parseInt(e.target.value) || 7)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">Days after missed payment before suspension</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    <FiUsers className="inline mr-1" />
+                    Max Active Jobs Per User
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={settings.maxActiveJobsPerUser}
+                    onChange={(e) => updateSetting('maxActiveJobsPerUser', parseInt(e.target.value) || 10)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <FiShield className="text-amber-400" />
+                Security Settings
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    <FiClock className="inline mr-1" />
+                    Session Timeout (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={480}
+                    value={settings.sessionTimeoutMinutes}
+                    onChange={(e) => updateSetting('sessionTimeoutMinutes', parseInt(e.target.value) || 60)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">Auto-logout after inactivity</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    <FiLock className="inline mr-1" />
+                    Max Login Attempts
+                  </label>
+                  <input
+                    type="number"
+                    min={3}
+                    max={20}
+                    value={settings.maxLoginAttempts}
+                    onChange={(e) => updateSetting('maxLoginAttempts', parseInt(e.target.value) || 5)}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">Account lockout after failed attempts</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    <FiGlobe className="inline mr-1" />
+                    IP Allowlist
+                  </label>
+                  <textarea
+                    value={settings.ipAllowlist}
+                    onChange={(e) => updateSetting('ipAllowlist', e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2.5 bg-[#0B0C12] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50 resize-none"
+                    placeholder="One IP per line. Leave empty to allow all."
+                  />
+                  <p className="text-gray-500 text-xs mt-1">Restrict admin access to specific IPs</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-6">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <FiBell className="text-amber-400" />
+                Notification Settings
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 bg-[#0B0C12] border border-white/10 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FiMail className="text-amber-400" size={18} />
+                    <div>
+                      <div className="text-white text-sm font-medium">Email Notifications</div>
+                      <div className="text-gray-500 text-xs">Send email alerts for critical events</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('emailNotificationsEnabled', !settings.emailNotificationsEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      settings.emailNotificationsEnabled ? 'bg-amber-500' : 'bg-white/10'
+                    }`}
+                  >
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      settings.emailNotificationsEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-4 bg-[#0B0C12] border border-white/10 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FiBell className="text-amber-400" size={18} />
+                    <div>
+                      <div className="text-white text-sm font-medium">Push Notifications</div>
+                      <div className="text-gray-500 text-xs">Send push notifications to mobile users</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateSetting('pushNotificationsEnabled', !settings.pushNotificationsEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      settings.pushNotificationsEnabled ? 'bg-amber-500' : 'bg-white/10'
+                    }`}
+                  >
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      settings.pushNotificationsEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+              <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                <p className="text-amber-400/80 text-xs">
+                  Email templates and notification preferences can be configured in the database directly.
+                  Changes here take effect immediately.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </AdminLayout>
   )
 }

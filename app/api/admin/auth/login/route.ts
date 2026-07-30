@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefreshToken } from '@/lib/admin-jwt'
 import { createAuditLog, getIp } from '@/lib/admin-rbac'
+import { verifyPasswordWithMigration } from '@/lib/security/password'
 import type { AdminRole } from '@/lib/admin-types'
 
 const TEMP_TOKEN_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production'
@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Account locked. Try again in ${remainingMin} minutes.` }, { status: 423 })
     }
 
-    const isValidPassword = await bcrypt.compare(password, adminUser.passwordHash)
-    if (!isValidPassword) {
+    const passwordCheck = await verifyPasswordWithMigration(password, adminUser.passwordHash)
+    if (!passwordCheck.valid) {
       const newAttempts = (adminUser.failedLoginAttempts || 0) + 1
       const updateData: Record<string, unknown> = { failedLoginAttempts: newAttempts }
       if (newAttempts >= MAX_ATTEMPTS) {
@@ -68,6 +68,47 @@ export async function POST(request: NextRequest) {
       }
       await prisma.adminUser.update({ where: { id: adminUser.id }, data: updateData as any })
       await recordLoginAttempt({ adminUserId: adminUser.id, email, ipAddress: ip, userAgent, success: false, failureReason: 'INVALID_PASSWORD' })
+
+      try {
+        await prisma.rateLimitLog.create({
+          data: {
+            identifier: ip,
+            type: 'login-failed',
+            endpoint: '/api/admin/auth/login',
+            method: 'POST',
+            requestCount: 1,
+            windowStart: new Date(),
+            windowEnd: new Date(Date.now() + 60 * 60 * 1000),
+            limited: false,
+          }
+        })
+      } catch {}
+
+      try {
+        const { assessLoginRisk } = await import('@/lib/security/risk-score')
+        const risk = await assessLoginRisk(null, email, ip, userAgent || 'unknown')
+
+        if (risk.level === 'HIGH' || risk.level === 'CRITICAL') {
+          await prisma.securityAudit.create({
+            data: {
+              action: 'LOGIN_FAILED_HIGH_RISK',
+              category: 'AUTH',
+              entityType: 'AdminUser',
+              entityId: email,
+              riskLevel: risk.level,
+              ipAddress: ip,
+              userAgent: userAgent || 'unknown',
+              details: JSON.stringify({ reasons: risk.reasons, score: risk.score })
+            }
+          })
+
+          if (risk.level === 'CRITICAL') {
+            const { blockIP } = await import('@/lib/security/rate-limiter')
+            await blockIP(ip, `Auto-blocked: CRITICAL risk score ${risk.score}`, 60)
+          }
+        }
+      } catch (e) {}
+
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
@@ -75,6 +116,14 @@ export async function POST(request: NextRequest) {
       where: { id: adminUser.id },
       data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date(), lastLoginIp: ip },
     })
+
+    if (passwordCheck.needsMigration) {
+      try {
+        const { hashPassword } = await import('@/lib/security/password')
+        const newHash = await hashPassword(password)
+        await prisma.adminUser.update({ where: { id: adminUser.id }, data: { passwordHash: newHash } })
+      } catch {}
+    }
 
     if (adminUser.totpEnabled && adminUser.totpSecret) {
       const tempToken = jwt.sign(
@@ -146,6 +195,32 @@ export async function POST(request: NextRequest) {
     })
 
     await recordLoginAttempt({ adminUserId: adminUser.id, email, ipAddress: ip, userAgent, success: true })
+
+    // Record device
+    try {
+      const ua = userAgent || 'unknown'
+      await prisma.userDevice.upsert({
+        where: { userId_deviceId: { userId: adminUser.id, deviceId: ua } },
+        update: { pushToken: null },
+        create: { userId: adminUser.id, deviceId: ua, platform: 'web' }
+      })
+    } catch (e) {}
+
+    // Record successful login event
+    try {
+      await prisma.securityAudit.create({
+        data: {
+          action: 'LOGIN_SUCCESS',
+          category: 'AUTH',
+          userId: adminUser.id,
+          entityType: 'AdminUser',
+          entityId: adminUser.id,
+          riskLevel: 'LOW',
+          ipAddress: ip,
+          userAgent: userAgent || 'unknown'
+        }
+      })
+    } catch (e) {}
 
     return response
   } catch (error) {

@@ -113,7 +113,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (session.role !== 'SUPER_ADMIN' && session.role !== 'ADMIN') {
+    if (!['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(session.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

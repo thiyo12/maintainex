@@ -27,7 +27,7 @@ const categories = [
 export async function POST(_request: NextRequest) {
   try {
     const user = await authenticateRequest(_request)
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     let totalJobs = 0
     const results: string[] = []
