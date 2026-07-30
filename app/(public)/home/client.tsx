@@ -9,6 +9,12 @@ export default function HomeClient() {
   const [bannerVisible, setBannerVisible] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [faqOpen, setFaqOpen] = useState<number | null>(null)
+  const [waitlistRole, setWaitlistRole] = useState('SEEKER')
+  const [waitlistName, setWaitlistName] = useState('')
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistPhone, setWaitlistPhone] = useState('')
+  const [waitlistCountry, setWaitlistCountry] = useState('+94')
+
   const confettiBoxRef = useRef<HTMLDivElement>(null)
 
   const launchConfetti = useCallback(() => {
@@ -630,33 +636,22 @@ export default function HomeClient() {
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-4xl sm:text-5xl font-black text-white mb-4">Join the Waitlist</h2>
           <p className="text-lg text-gray-400 mb-10">Secure your spot for the MaintainEX launch. Early members get priority access.</p>
-          <form className="space-y-4 max-w-xl mx-auto text-left" onSubmit={async (e) => {
+          <form className="space-y-5 max-w-xl mx-auto text-left" onSubmit={async (e) => {
             e.preventDefault()
-            const form = e.target as HTMLFormElement
-            const name = (form.elements.namedItem('name') as HTMLInputElement).value
-            const role = (form.elements.namedItem('role') as HTMLSelectElement).value
-            const countryCode = (form.elements.namedItem('countryCode') as HTMLSelectElement).value
-            const phoneRaw = (form.elements.namedItem('phone') as HTMLInputElement).value.replace(/\s/g, '')
-            const emailInput = form.elements.namedItem('email') as HTMLInputElement
-            const email = emailInput.value || undefined
-
-            const phone = countryCode + phoneRaw
-
-            if (phoneRaw.length < 7 || phoneRaw.length > 11) {
-              toast.error('Enter a valid phone number (7-11 digits)')
+            const phone = waitlistCountry + waitlistPhone.replace(/\s/g, '')
+            if (waitlistPhone.length < 7) {
+              toast.error('Enter a valid phone number')
               return
             }
-
-            if (!name.trim()) {
+            if (!waitlistName.trim()) {
               toast.error('Please enter your name')
               return
             }
-
             try {
               const res = await fetch('/api/waitlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name.trim(), phone, email, role })
+                body: JSON.stringify({ name: waitlistName.trim(), phone, email: waitlistEmail || undefined, role: waitlistRole })
               })
               const data = await res.json()
               if (!res.ok) {
@@ -665,51 +660,74 @@ export default function HomeClient() {
               }
               launchConfetti()
               setModalVisible(true)
-              form.reset()
+              setWaitlistName('')
+              setWaitlistEmail('')
+              setWaitlistPhone('')
             } catch {
               toast.error('Something went wrong. Please try again.')
             }
           }}>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { value: 'SEEKER', label: 'Seeker' },
-                { value: 'TASKER', label: 'Tasker' },
-                { value: 'AGENCY', label: 'Agency' },
-              ].map((opt) => (
-                <label key={opt.value} className="relative cursor-pointer">
-                  <input type="radio" name="role" value={opt.value} defaultChecked={opt.value === 'SEEKER'} className="peer sr-only" />
-                  <div className="bg-[#1a1b24] border border-white/10 peer-checked:border-brand peer-checked:bg-brand/10 rounded-xl px-4 py-3 text-center transition-all">
-                    <span className="text-sm font-semibold text-white peer-checked:text-brand">{opt.label}</span>
-                  </div>
-                </label>
-              ))}
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">I am a</label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'SEEKER', label: 'Seeker', desc: 'Need help', detail: 'I need home services & tasks done' },
+                  { value: 'TASKER', label: 'Tasker', desc: 'Offer help', detail: 'I fix, clean & maintain things' },
+                  { value: 'AGENCY', label: 'Agency', desc: 'Team of pros', detail: 'I manage a team of professionals' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setWaitlistRole(opt.value)}
+                    className={`p-4 rounded-xl border text-center transition-all ${
+                      waitlistRole === opt.value
+                        ? 'border-brand bg-brand/10 text-white'
+                        : 'border-white/10 bg-[#1a1b24] text-gray-400 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="text-sm font-bold">{opt.label}</div>
+                    <div className="text-xs mt-1 opacity-60">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2 pl-1">
+                {waitlistRole === 'SEEKER' && 'I need home services & tasks done'}
+                {waitlistRole === 'TASKER' && 'I fix, clean & maintain things'}
+                {waitlistRole === 'AGENCY' && 'I manage a team of professionals'}
+              </p>
             </div>
             <input
               type="text"
-              name="name"
+              value={waitlistName}
+              onChange={(e) => setWaitlistName(e.target.value)}
               placeholder="Your name"
               required
               className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
             />
             <input
               type="email"
-              name="email"
+              value={waitlistEmail}
+              onChange={(e) => setWaitlistEmail(e.target.value)}
               placeholder="Email (optional)"
               className="w-full bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
             />
-            <div className="flex gap-2">
-              <select name="countryCode" className="bg-[#1a1b24] border border-white/10 rounded-xl px-3 py-4 text-white focus:border-brand focus:outline-none transition text-sm min-w-[110px]">
-                <option value="+94">🇱🇰 +94</option>
-                <option value="+1">🇨🇦 +1</option>
-              </select>
-              <input
-                type="tel"
-                name="phone"
-                placeholder="7X XXX XXXX"
-                required
-                inputMode="numeric"
-                className="flex-1 bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
-              />
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Phone</label>
+              <div className="flex gap-2">
+                <select value={waitlistCountry} onChange={(e) => setWaitlistCountry(e.target.value)} className="bg-[#1a1b24] border border-white/10 rounded-xl px-3 py-4 text-white focus:border-brand focus:outline-none transition text-sm min-w-[110px]">
+                  <option value="+94">🇱🇰 +94</option>
+                  <option value="+1">🇨🇦 +1</option>
+                </select>
+                <input
+                  type="tel"
+                  value={waitlistPhone}
+                  onChange={(e) => setWaitlistPhone(e.target.value)}
+                  placeholder="7X XXX XXXX"
+                  required
+                  inputMode="numeric"
+                  className="flex-1 bg-[#1a1b24] border border-white/10 rounded-xl px-5 py-4 text-white placeholder-gray-500 focus:border-brand focus:outline-none transition"
+                />
+              </div>
             </div>
             <button type="submit" className="w-full bg-brand text-black font-bold py-4 rounded-xl hover:bg-brand-light transition text-lg mt-4">Join the Waitlist</button>
             <p className="text-xs text-gray-500 text-center mt-3">No spam. Unsubscribe anytime. Join 500+ others already on the list.</p>
