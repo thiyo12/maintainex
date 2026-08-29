@@ -1,64 +1,85 @@
-import { useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Animated } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
-import { useTranslation } from 'react-i18next'
-import { useTheme } from '../../lib/ThemeContext'
+import React, { useEffect, useState } from 'react'
+import { View, Text, StyleSheet } from 'react-native'
+import LottieView from 'lottie-react-native'
+import { Icon } from 'phosphor-react-native'
+import PressableScale from './PressableScale'
+import { colors, radius, spacing, typography } from '../../lib/theme'
 
 interface Props {
-  icon?: string
+  lottieUrl?: string | null
   title: string
   subtitle?: string
+  ctaText?: string
+  onCta?: () => void
+  FallbackIcon?: Icon
+  iconSize?: number
 }
 
-export default function EmptyState({ icon, title, subtitle }: Props) {
-  const { colors } = useTheme()
-  const { t } = useTranslation()
-  const styles = makeStyles(colors)
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const bounceAnim = useRef(new Animated.Value(0.9)).current
-  const floatAnim = useRef(new Animated.Value(0)).current
+export default function EmptyState({
+  lottieUrl,
+  title,
+  subtitle,
+  ctaText,
+  onCta,
+  FallbackIcon,
+  iconSize = 64,
+}: Props) {
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(bounceAnim, { toValue: 1, friction: 5, tension: 60, useNativeDriver: true }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(floatAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-          Animated.timing(floatAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
-        ])
-      ),
-    ]).start()
-  }, [])
-
-  const floatY = floatAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -8],
-  })
+    if (!lottieUrl) return
+    setFailed(false)
+    setLoaded(false)
+    const timeout = setTimeout(() => setFailed(true), 4000)
+    return () => clearTimeout(timeout)
+  }, [lottieUrl])
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.iconBox, {
-        opacity: fadeAnim,
-        transform: [{ scale: bounceAnim }, { translateY: floatY }],
-      }]}>
-        <Ionicons name={(icon as any) || 'mail-unread-outline'} size={32} color={colors.muted} />
-      </Animated.View>
-      <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
-      {subtitle ? <Text style={[styles.subtitle, { color: colors.muted }]}>{subtitle}</Text> : null}
+    <View style={styles.wrap}>
+      <View style={styles.animBox}>
+        {!loaded || failed ? (
+          <View style={styles.fallback}>
+            {FallbackIcon ? <FallbackIcon size={iconSize} color={colors.textMuted} weight="duotone" /> : null}
+          </View>
+        ) : null}
+        {lottieUrl && !failed ? (
+          <LottieView
+            source={{ uri: lottieUrl }}
+            style={styles.lottie}
+            autoPlay
+            loop
+            speed={1}
+            onLoad={() => setLoaded(true)}
+          />
+        ) : null}
+      </View>
+      <Text style={styles.title}>{title}</Text>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      {ctaText && onCta ? (
+        <PressableScale onPress={onCta} scaleTo={0.96} style={styles.ctaWrap}>
+          <View style={styles.cta}>
+            <Text style={styles.ctaText}>{ctaText}</Text>
+          </View>
+        </PressableScale>
+      ) : null}
     </View>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 60 },
-  iconBox: {
-    width: 80, height: 80, borderRadius: 24,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5, borderColor: colors.border,
-    justifyContent: 'center', alignItems: 'center',
-    marginBottom: 20,
+const styles = StyleSheet.create({
+  wrap: { alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.sm },
+  animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  fallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  lottie: { width: 140, height: 140 },
+  title: { ...typography.h3, textAlign: 'center' },
+  subtitle: { ...typography.bodyMuted, textAlign: 'center' },
+  ctaWrap: { marginTop: spacing.md, alignSelf: 'stretch', alignItems: 'center' },
+  cta: {
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.full,
   },
-  title:    { fontSize: 18, fontFamily: 'Outfit_800ExtraBold', textAlign: 'center', marginBottom: 8, letterSpacing: -0.3 },
-  subtitle: { fontSize: 14, fontFamily: 'Outfit_500Medium', textAlign: 'center', lineHeight: 22 },
+  ctaText: { ...typography.body, fontFamily: 'Outfit_700Bold', color: colors.background },
 })

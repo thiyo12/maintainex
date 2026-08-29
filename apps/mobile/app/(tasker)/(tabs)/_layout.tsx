@@ -1,10 +1,9 @@
 import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
+import TabIcon from '../../../components/ui/TabIcon'
+import { colors } from '../../../lib/theme'
 
 const tabConfigs = [
   { name: 'index', key: 'tasker.browse', icon: 'compass-outline' as const },
@@ -13,7 +12,6 @@ const tabConfigs = [
 ]
 
 export default function TaskerTabs() {
-  const colors = useColors()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
@@ -23,7 +21,7 @@ export default function TaskerTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.cream,
+          backgroundColor: colors.background,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           height: 56 + bottomPad,
@@ -34,9 +32,9 @@ export default function TaskerTabs() {
             default: { elevation: 8 },
           }),
         },
-        tabBarActiveTintColor: colors.amber,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
         tabBarShowLabel: true,
       }}
     >
@@ -47,7 +45,7 @@ export default function TaskerTabs() {
           options={{
             title: t(tab.key),
             tabBarIcon: ({ focused }) => (
-              <Ionicons name={tab.icon} size={22} color={focused ? colors.amber : colors.muted} />
+              <TabIcon name={tab.icon} focused={focused} />
             ),
           }}
         />

@@ -1,10 +1,9 @@
 import { Tabs } from 'expo-router'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
+import TabIcon from '../../../components/ui/TabIcon'
+import { colors } from '../../../lib/theme'
 
 const tabConfigs = [
   { name: 'index', key: 'company.dashboard', icon: 'grid-outline' as const },
@@ -17,7 +16,6 @@ const tabConfigs = [
 ]
 
 export default function CompanyTabs() {
-  const colors = useColors()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
@@ -27,10 +25,10 @@ export default function CompanyTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.cream,
+          backgroundColor: colors.background,
           borderTopWidth: 1,
           borderTopColor: colors.border,
-          height: 56 + bottomPad,
+          height: 52 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 6,
           ...Platform.select({
@@ -38,9 +36,9 @@ export default function CompanyTabs() {
             default: { elevation: 8 },
           }),
         },
-        tabBarActiveTintColor: colors.companyAccent,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontSize: 10, fontFamily: fonts.bodyMedium, color: colors.ink },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textMuted,
+        tabBarLabelStyle: { fontSize: 9, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
         tabBarShowLabel: true,
       }}
     >
@@ -51,7 +49,7 @@ export default function CompanyTabs() {
           options={{
             title: t(tab.key),
             tabBarIcon: ({ focused }) => (
-              <Ionicons name={tab.icon} size={20} color={focused ? colors.companyAccent : colors.muted} />
+              <TabIcon name={tab.icon} focused={focused} activeColor={colors.accent} />
             ),
           }}
         />

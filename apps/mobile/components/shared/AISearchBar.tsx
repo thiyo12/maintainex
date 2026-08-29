@@ -55,6 +55,8 @@ export default function AISearchBar({
   const value = isControlled ? controlledValue! : internalValue
   const onChangeText = isControlled ? controlledOnChangeText! : setInternalValue
 
+  const [focused, setFocused] = useState(false)
+
   const [categories, setCategories] = useState<CategoryResult[]>([])
   const [subServices, setSubServices] = useState<SubServiceResult[]>([])
   const [correctedQuery, setCorrectedQuery] = useState<string | undefined>()
@@ -133,21 +135,21 @@ export default function AISearchBar({
       {Platform.OS === 'ios' ? (
         <Animated.View style={[styles.glowLayer, {
           shadowColor: colors.amber,
-          shadowOpacity: glowOp,
-          shadowRadius: glowRadius,
+          shadowOpacity: focused ? 0.45 : glowOp,
+          shadowRadius: focused ? 22 : glowRadius,
           shadowOffset: { width: 0, height: 0 },
         }]} />
       ) : (
         <Animated.View style={[styles.androidGlow, {
-          opacity: glowOp,
+          opacity: focused ? 0.3 : glowOp,
           transform: [{ scale: sparkScale }],
         }]} />
       )}
-      <Animated.View style={[styles.leftIcon, { transform: [{ scale: sparkScale }] }]}>
-        <Sparkle size={16} color={colors.amberDark} weight="fill" />
+      <Animated.View style={[styles.leftIcon, { transform: [{ scale: focused ? 1 : sparkScale }] }]}>
+        <MagnifyingGlass size={18} color={colors.amber} weight="fill" />
       </Animated.View>
       <TextInput
-        style={[styles.input, { color: colors.ink, backgroundColor: colors.white, borderColor: colors.border }]}
+        style={[styles.input, { color: colors.ink, backgroundColor: colors.surface, borderColor: focused ? colors.amber : colors.border }]}
         value={value}
         onChangeText={handleChange}
         placeholder={placeholder || t('home.searchPlaceholder')}
@@ -155,7 +157,8 @@ export default function AISearchBar({
         returnKeyType="search"
         onSubmitEditing={handleSubmit}
         autoFocus={autoFocus}
-        onFocus={() => { if (hasResults) setShowDropdown(true) }}
+        onFocus={() => { setFocused(true); if (hasResults) setShowDropdown(true) }}
+        onBlur={() => setFocused(false)}
       />
       {value.length > 0 ? (
         <TouchableOpacity style={[styles.clearBtn]} onPress={handleClear}>
@@ -179,7 +182,7 @@ export default function AISearchBar({
       </TouchableOpacity>
 
       {showDropdown && showSuggestions && (
-        <View style={[styles.dropdown, { backgroundColor: colors.white, borderColor: colors.border }]}>
+        <View style={[styles.dropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled style={{ maxHeight: 360 }}>
             {correctedQuery && (
               <TouchableOpacity style={[styles.correctedRow, { borderBottomColor: colors.border }]} onPress={handleCorrectedTap}>
@@ -270,8 +273,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   androidGlow: { position: 'absolute', inset: -4, borderRadius: 22, backgroundColor: 'rgba(245,158,11,0.12)', zIndex: 0 },
   leftIcon: { position: 'absolute', left: 16, top: '50%', marginTop: -8, zIndex: 2 },
   input: {
-    height: 52, borderRadius: 18, borderWidth: 1.5,
-    paddingLeft: 42, paddingRight: 72,
+    height: 54, borderRadius: 18, borderWidth: 1.5,
+    paddingLeft: 44, paddingRight: 72,
     fontSize: 15, fontFamily: fonts.bodyMedium, zIndex: 1,
   },
   clearBtn: {

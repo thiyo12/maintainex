@@ -1,13 +1,16 @@
 import { useEffect, useState, Component, ReactNode } from 'react'
+import { View } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { I18nextProvider } from 'react-i18next'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
-  useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_700Bold,
+  useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold,
   Outfit_800ExtraBold, Outfit_900Black,
 } from '@expo-google-fonts/outfit'
+import { colors as themeColors } from '../lib/theme'
 
 import { AuthProvider } from '../lib/auth'
 import i18next, { initI18n } from '../lib/i18n'
@@ -81,7 +84,7 @@ const ebStyles = {
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    Outfit_400Regular, Outfit_500Medium, Outfit_700Bold,
+    Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold,
     Outfit_800ExtraBold, Outfit_900Black,
   })
   const [i18nReady, setI18nReady] = useState(false)
@@ -99,15 +102,18 @@ export default function RootLayout() {
     })()
   }, [])
 
-  if (!fontsLoaded || !i18nReady) return null
+  if (!fontsLoaded || !i18nReady) {
+    return <View style={{ flex: 1, backgroundColor: themeColors.background }} />
+  }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: themeColors.background }}>
     <ErrorBoundary>
     <ThemeProvider>
       <AuthProvider>
         <CountryProvider>
         <I18nextProvider i18n={i18next}>
-          <StatusBar style="dark" />
+          <StatusBar style="light" />
           <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
@@ -121,5 +127,6 @@ export default function RootLayout() {
     </AuthProvider>
     </ThemeProvider>
     </ErrorBoundary>
+    </GestureHandlerRootView>
   )
 }
