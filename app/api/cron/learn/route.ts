@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runLearningCycle } from '@/lib/learning-engine'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

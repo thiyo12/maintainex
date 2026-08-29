@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notifyNextOfferCandidate } from '@/lib/offer-matcher'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
   const authHeader = request.headers.get('authorization')

@@ -4,6 +4,8 @@ import { getSetting } from '@/lib/settings'
 import { sendMatchWave } from '@/lib/job-matcher'
 import { createNotification } from '@/lib/notifications'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   // Verify cron secret
   if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
