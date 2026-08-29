@@ -869,6 +869,7 @@ const si: Record<string, any> = {
   profile: {
     title: 'පැතිකඩ',
     myProfile: 'මගේ පැතිකඩ',
+    messages: 'පණිවිඩ',
     edit: 'පැතිකඩ සංස්කරණය කරන්න',
     language: 'භාෂාව',
     notifications: 'දැනුම්දීම්',
@@ -1021,6 +1022,7 @@ const si: Record<string, any> = {
     chooseFromLibrary: 'පුස්තකාලයෙන් තෝරන්න',
     back: 'ආපසු',
     loading: 'පූරණය වෙමින්...',
+    markAllRead: 'සියල්ල කියවූ ලෙස සලකන්න',
     noResults: 'ප්‍රතිඵල නැත',
     adjustSearch: 'ඔබගේ සෙවීම සකස් කිරීමට උත්සාහ කරන්න',
     statusOpen: 'විවෘත',

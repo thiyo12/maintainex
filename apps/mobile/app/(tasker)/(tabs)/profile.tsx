@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
-import { taskers, getAuthToken } from '../../../lib/api'
+import { taskers, getAuthToken, conversations, notifications } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import type { TaskerProfile } from '../../../lib/types'
 import ProfileHeader from '../../../components/ProfileHeader'
@@ -45,6 +45,8 @@ export default function TaskerProfile() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<TaskerProfile | null>(null)
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
+  const [unreadMsgs, setUnreadMsgs] = useState(0)
+  const [unreadNotifs, setUnreadNotifs] = useState(0)
 
   const cardAnim = useSlideUp(0)
   const sectionAnim2 = useSlideUp(80)
@@ -69,6 +71,24 @@ export default function TaskerProfile() {
   useEffect(() => {
     loadProfile()
     loadIdentity()
+  }, [])
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    const loadCounts = async () => {
+      try {
+        const [convos, notifs] = await Promise.all([
+          conversations.list(),
+          notifications.list(),
+        ])
+        const msgs = (convos || []).reduce((n: number, c: any) => n + (c.unreadCount || 0), 0)
+        setUnreadMsgs(msgs)
+        setUnreadNotifs((notifs || []).filter((n: any) => !n.read).length)
+      } catch {}
+    }
+    loadCounts()
+    interval = setInterval(loadCounts, 30000)
+    return () => { if (interval) clearInterval(interval) }
   }, [])
 
   async function loadProfile() {
@@ -135,7 +155,7 @@ export default function TaskerProfile() {
           variant="tasker"
           verified={identityStatus === 'APPROVED'}
           onEdit={() => router.push('/(tasker)/settings/edit-profile')}
-          onSettings={() => router.push('/settings/notifications')}
+          onSettings={() => router.push('/notifications')}
         />
 
         <Animated.View style={[styles.card, cardAnim]}>
@@ -265,6 +285,36 @@ export default function TaskerProfile() {
               <Text style={[styles.menuTitle, { color: colors.ink }]}>Your Services</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+              onPress={() => router.push('/(chat)' as any)}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#2563EB" />
+              </View>
+              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.messages')}</Text>
+              {unreadMsgs > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.amberDark }]}>
+                  <Text style={styles.badgeText}>{unreadMsgs > 99 ? '99+' : unreadMsgs}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+              onPress={() => router.push('/notifications' as any)}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="notifications-outline" size={16} color="#D97706" />
+              </View>
+              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.notifications')}</Text>
+              {unreadNotifs > 0 && (
+                <View style={[styles.badge, { backgroundColor: colors.amberDark }]}>
+                  <Text style={styles.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/settings/my-profile')}>
               <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
                 <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
@@ -309,6 +359,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
   menuIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuTitle: { flex: 1, fontSize: 14, fontFamily: fonts.bodyMedium },
+  badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  badgeText: { color: '#fff', fontSize: 11, fontFamily: fonts.bodyMedium },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   sectionTitle: { fontSize: 12, fontFamily: fonts.headingBold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

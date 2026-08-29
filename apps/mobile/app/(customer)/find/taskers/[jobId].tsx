@@ -9,6 +9,7 @@ import { useCountry } from '../../../../lib/country'
 import TaskerCard from '../../../../components/find/TaskerCard'
 import SkeletonLoader from '../../../../components/find/SkeletonLoader'
 import EmptyState from '../../../../components/find/EmptyState'
+import NewChatModal from '@/components/chat/NewChatModal'
 
 export default function FindTaskerList() {
   const colors = useColors()
@@ -20,6 +21,7 @@ export default function FindTaskerList() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
+  const [chatRecipient, setChatRecipient] = useState<any>(null)
   const { selectedCountry } = useCountry()
   const router = useRouter()
 
@@ -82,6 +84,7 @@ export default function FindTaskerList() {
               hourlyRate={item.hourlyRate}
               skills={item.skills}
               onPress={() => router.push(`/(customer)/find/tasker-profile/${item.id}?jobId=${jobId}` as any)}
+              onMessage={() => setChatRecipient({ id: item.userId, name: item.name })}
             />
           )}
           contentContainerStyle={styles.list}
@@ -99,6 +102,11 @@ export default function FindTaskerList() {
           </TouchableOpacity>
         </View>
       )}
+      <NewChatModal
+        visible={!!chatRecipient}
+        onClose={() => setChatRecipient(null)}
+        recipient={chatRecipient}
+      />
     </View>
   )
 }

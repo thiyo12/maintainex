@@ -16,7 +16,7 @@ export default function SettingsScreen() {
 
   const settingsItems = [
     { icon: 'person-outline', label: t('profile.edit'), route: '/settings/edit-profile' },
-    { icon: 'notifications-outline', label: t('profile.notifications'), route: '/settings/my-profile' },
+    { icon: 'notifications-outline', label: t('profile.notifications'), route: '/notifications' },
     { icon: 'card-outline', label: t('profile.payment'), route: '/settings/payment' },
     { icon: 'location-outline', label: t('profile.savedAddresses'), route: '/settings/addresses' },
     { icon: 'help-circle-outline', label: t('profile.helpSupport'), route: '/settings/help' },

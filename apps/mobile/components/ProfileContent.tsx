@@ -2,7 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, Alert, Switch } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { User, PencilSimple, ShieldCheck, Bell, CreditCard, MapPin, Globe, Translate, ArrowsLeftRight, Question, FileText, Info, SignOut, CaretRight, Clock, Shield, Sun, Moon } from 'phosphor-react-native'
+import { User, PencilSimple, ShieldCheck, Bell, CreditCard, MapPin, Globe, Translate, ArrowsLeftRight, Question, FileText, Info, SignOut, CaretRight, Clock, Shield, Sun, Moon, ChatText } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../lib/auth'
 import { useCountry } from '../lib/country'
@@ -94,6 +94,8 @@ export default function ProfileContent() {
         </View>
 
         <View style={styles.section}>
+          <MenuRow icon={ChatText} label={t('profile.messages')} color="#2563EB"
+            onPress={() => router.push('/(chat)' as any)} />
           <MenuRow icon={User} label={t('profile.myProfile')} color={colors.amber}
             onPress={() => router.push('/settings/my-profile')} />
           <MenuRow icon={PencilSimple} label={t('profile.edit')} color={colors.amber}
@@ -101,7 +103,7 @@ export default function ProfileContent() {
           <MenuRow icon={ShieldCheck} label={t('verify.title')} color="#8B5CF6"
             onPress={() => router.push('/(tasker)/identity')} />
           <MenuRow icon={Bell} label={t('profile.notifications')} color="#F59E0B"
-            onPress={() => router.push('/settings/notifications')} />
+            onPress={() => router.push('/notifications')} />
           <MenuRow icon={CreditCard} label={t('profile.payment')} color="#10B981"
             onPress={() => router.push('/settings/payment')} />
           <MenuRow icon={MapPin} label={t('profile.savedAddresses')} color="#3B82F6"

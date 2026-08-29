@@ -869,6 +869,7 @@ const ta: Record<string, any> = {
   profile: {
     title: 'சுயவிவரம்',
     myProfile: 'என் சுயவிவரம்',
+    messages: 'செய்திகள்',
     edit: 'சுயவிவரத்தை திருத்து',
     language: 'மொழி',
     notifications: 'அறிவிப்புகள்',
@@ -1021,6 +1022,7 @@ const ta: Record<string, any> = {
     chooseFromLibrary: 'நூலகத்திலிருந்து தேர்வு செய்',
     back: 'பின்',
     loading: 'ஏற்றுகிறது...',
+    markAllRead: 'அனைத்தையும் படித்ததாக',
     noResults: 'முடிவுகள் இல்லை',
     adjustSearch: 'உங்கள் தேடலை சரிசெய்ய முயற்சிக்கவும்',
     statusOpen: 'திறந்த',

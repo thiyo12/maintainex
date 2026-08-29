@@ -57,3 +57,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
+
+// Mark all of the user's notifications as read
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const updated = await prisma.notification.updateMany({
+      where: { userId: user.id, read: false },
+      data: { read: true },
+    })
+
+    return NextResponse.json({ success: true, updated: updated.count })
+  } catch (error) {
+    console.error('Notifications mark-all error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}

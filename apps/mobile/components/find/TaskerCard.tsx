@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import PressScale from './PressScale'
@@ -14,9 +14,10 @@ interface Props {
   hourlyRate: number
   skills?: string[]
   onPress: () => void
+  onMessage?: () => void
 }
 
-export default function TaskerCard({ name, rating, completedJobs, isVerified, isOnline, distance, hourlyRate, skills, onPress }: Props) {
+export default function TaskerCard({ name, rating, completedJobs, isVerified, isOnline, distance, hourlyRate, skills, onPress, onMessage }: Props) {
   const colors = useColors()
   const { t } = useTranslation()
   const styles = makeStyles(colors)
@@ -67,6 +68,11 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, { backgroundColor: isOnline ? '#10B981' : colors.border }]} />
             <Text style={[styles.statusText, { color: colors.muted }]}>{isOnline ? t('common.online') : t('common.offline')}</Text>
+            {onMessage && (
+              <TouchableOpacity onPress={onMessage} hitSlop={8} style={[styles.messageBtn, { backgroundColor: colors.border }]}>
+                <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -107,6 +113,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 12 },
+  messageBtn: { marginLeft: 'auto', width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
   skillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   skillChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   skillText: { fontSize: 11, fontFamily: 'Outfit_500Medium' },

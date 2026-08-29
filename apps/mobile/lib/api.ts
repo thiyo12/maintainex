@@ -160,6 +160,8 @@ export const notifications = {
     request<void>('/api/mobile/notifications', { method: 'POST', body: JSON.stringify({ token }) }),
   markRead: (id: string) =>
     request<void>(`/api/mobile/notifications/${id}`, { method: 'PUT' }),
+  markAllRead: () =>
+    request<{ success: boolean; updated: number }>('/api/mobile/notifications', { method: 'PUT' }),
 }
 
 // Conversations & Messages
