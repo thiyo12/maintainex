@@ -26,12 +26,51 @@ export async function POST(
     if (!quote || quote.jobId !== job.id) return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     if (quote.status !== 'PENDING') return NextResponse.json({ error: 'Quote is not available' }, { status: 400 })
 
-    await prisma.$transaction([
-      prisma.jobQuote.update({ where: { id: quoteId }, data: { status: 'ACCEPTED' } }),
-      prisma.jobQuote.updateMany({ where: { jobId: job.id, id: { not: quoteId } }, data: { status: 'REJECTED' } }),
-      prisma.marketplaceJob.update({ where: { id: job.id }, data: { status: 'IN_PROGRESS' } }),
-      prisma.jobWorkspace.create({ data: { jobId: job.id } }),
-    ])
+    const quotePrice = Number(quote.price)
+    const serviceFeeCents = Math.round(quotePrice * 0.1 * 100) / 100
+    const totalAmountCents = quotePrice + serviceFeeCents
+
+    const existingEscrow = await prisma.jobEscrow.findFirst({
+      where: { jobId: job.id, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
+    })
+
+    await prisma.$transaction(async (tx) => {
+      await tx.jobQuote.update({ where: { id: quoteId }, data: { status: 'ACCEPTED' } })
+      await tx.jobQuote.updateMany({ where: { jobId: job.id, id: { not: quoteId } }, data: { status: 'REJECTED' } })
+      await tx.marketplaceJob.update({ where: { id: job.id }, data: { status: 'QUOTE_ACCEPTED' } })
+      await tx.jobWorkspace.upsert({
+        where: { jobId: job.id },
+        create: { jobId: job.id },
+        update: { progressStatus: 'ACCEPTED' },
+      })
+      if (existingEscrow) {
+        await tx.jobEscrow.update({
+          where: { id: existingEscrow.id },
+          data: {
+            quoteId: quote.id,
+            providerId: quote.providerId,
+            amount: quote.price,
+            serviceFee: BigInt(Math.round(serviceFeeCents)),
+            totalAmount: BigInt(Math.round(totalAmountCents)),
+            status: 'PENDING_PAYMENT',
+            heldAt: null,
+          },
+        })
+      } else {
+        await tx.jobEscrow.create({
+          data: {
+            jobId: job.id,
+            quoteId: quote.id,
+            customerId: job.customerId,
+            providerId: quote.providerId,
+            amount: quote.price,
+            serviceFee: BigInt(Math.round(serviceFeeCents)),
+            totalAmount: BigInt(Math.round(totalAmountCents)),
+            status: 'PENDING_PAYMENT',
+          },
+        })
+      }
+    })
 
     notifyQuoteAccepted(job.id, quote.providerId, job.title)
 

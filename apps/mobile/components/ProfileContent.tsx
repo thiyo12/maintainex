@@ -1,6 +1,6 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated, Alert, Switch } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { User, PencilSimple, ShieldCheck, Bell, CreditCard, MapPin, Globe, Translate, ArrowsLeftRight, Question, FileText, Info, SignOut, CaretRight, Clock, Shield, Sun, Moon, ChatText } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
@@ -8,7 +8,7 @@ import { useAuth } from '../lib/auth'
 import { useCountry } from '../lib/country'
 import { useColors, useTheme } from '../lib/ThemeContext'
 import { fonts } from '../lib/fonts'
-import { getAuthToken } from '../lib/api'
+import { getAuthToken, notifications } from '../lib/api'
 import LanguageSelector from './ui/LanguageSelector'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
@@ -22,8 +22,23 @@ export default function ProfileContent() {
   const { user, logout } = useAuth()
   const { selectedCountry, countries, setCountry } = useCountry()
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
+  const [unread, setUnread] = useState(0)
 
-  function MenuRow({ icon: Icon, label, onPress, color: accent }: any) {
+  useFocusEffect(
+    useCallback(() => {
+      let active = true
+      const refresh = () => {
+        notifications.unreadCount().then(({ count }) => {
+          if (active) setUnread(count)
+        }).catch(() => {})
+      }
+      refresh()
+      const timer = setInterval(refresh, 60000)
+      return () => { active = false; clearInterval(timer) }
+    }, [])
+  )
+
+  function MenuRow({ icon: Icon, label, onPress, color: accent, badge }: any) {
     const scale = useRef(new Animated.Value(1)).current
     return (
       <TouchableOpacity
@@ -37,6 +52,11 @@ export default function ProfileContent() {
             <Icon size={20} color={accent || colors.amber} weight="fill" />
           </View>
           <Text style={[styles.menuLabel, { color: colors.ink }]}>{label}</Text>
+          {badge != null && badge > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          ) : null}
           <CaretRight size={16} color={colors.muted} weight="bold" />
         </Animated.View>
       </TouchableOpacity>
@@ -102,7 +122,7 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/edit-profile')} />
           <MenuRow icon={ShieldCheck} label={t('verify.title')} color="#8B5CF6"
             onPress={() => router.push('/(tasker)/identity')} />
-          <MenuRow icon={Bell} label={t('profile.notifications')} color="#F59E0B"
+          <MenuRow icon={Bell} label={t('profile.notifications')} color="#F59E0B" badge={unread}
             onPress={() => router.push('/notifications')} />
           <MenuRow icon={CreditCard} label={t('profile.payment')} color="#10B981"
             onPress={() => router.push('/settings/payment')} />
@@ -187,6 +207,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   menuIconWrap: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
   menuLabel: { fontSize: 15, fontFamily: fonts.bodyMedium, flex: 1 },
+  badge: {
+    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.error,
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginRight: 4,
+  },
+  badgeText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
   logoutBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     marginHorizontal: 20, padding: 16, borderRadius: 20,

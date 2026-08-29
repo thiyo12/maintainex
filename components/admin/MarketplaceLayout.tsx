@@ -7,7 +7,7 @@ import {
   FiHome, FiUsers, FiFileText, FiShield, FiGrid,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX, FiUserCheck,
   FiAlertCircle, FiList, FiBell, FiStar, FiFlag, FiZap, FiDollarSign,
-  FiMessageSquare, FiAlertTriangle,
+  FiMessageSquare, FiAlertTriangle, FiSend,
 } from 'react-icons/fi'
 import { useAuth } from './AuthProvider'
 import { useQuery } from '@tanstack/react-query'
@@ -19,6 +19,7 @@ const navigation = [
   { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT', 'SUPPORT'] },
   { name: 'Disputes', href: '/admin/marketplace/disputes', icon: FiMessageSquare, roles: ['SUPER_ADMIN', 'MANAGER', 'SUPPORT'] },
   { name: 'Escrow', href: '/admin/marketplace/escrow', icon: FiShield, roles: ['SUPER_ADMIN', 'FINANCE'] },
+  { name: 'Settlements', href: '/admin/marketplace/financial/settlements', icon: FiSend, roles: ['SUPER_ADMIN', 'FINANCE'] },
   { name: 'Revenue', href: '/admin/marketplace/revenue', icon: FiDollarSign, roles: ['SUPER_ADMIN', 'FINANCE'] },
   { name: 'Fraud Centre', href: '/admin/marketplace/fraud', icon: FiAlertTriangle, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT', 'SUPPORT'] },
   { name: 'Offers', href: '/admin/marketplace/offers', icon: FiZap, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'] },

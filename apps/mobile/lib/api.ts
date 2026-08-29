@@ -162,6 +162,8 @@ export const notifications = {
     request<void>(`/api/mobile/notifications/${id}`, { method: 'PUT' }),
   markAllRead: () =>
     request<{ success: boolean; updated: number }>('/api/mobile/notifications', { method: 'PUT' }),
+  unreadCount: () =>
+    request<{ count: number }>('/api/mobile/notifications/unread-count'),
 }
 
 // Conversations & Messages

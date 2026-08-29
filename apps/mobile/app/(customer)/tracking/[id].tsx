@@ -1,8 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, ActivityIndicator } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps'
+import MapView, { Marker, PROVIDER_DEFAULT, AnimatedRegion } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
@@ -10,6 +6,8 @@ import { useTranslation } from 'react-i18next'
 import { fonts } from '../../../lib/fonts'
 import { v2Jobs, v2JobActions } from '../../../lib/api-v2'
 import Avatar from '../../../components/ui/Avatar'
+
+const AnimatedMarker = Animated.createAnimatedComponent(Marker) as any
 
 const { height } = Dimensions.get('window')
 const MAP_HEIGHT = height * 0.45
@@ -24,6 +22,7 @@ export default function LiveTrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuth()
   const pulseAnim = useRef(new Animated.Value(1)).current
+  const animCoord = useRef(new AnimatedRegion({ latitude: COLOMBO_COORDS.latitude, longitude: COLOMBO_COORDS.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 })).current
   const [job, setJob] = useState<any>(null)
   const [workspace, setWorkspace] = useState<any>(null)
   const [providerCoord, setProviderCoord] = useState<{ latitude: number; longitude: number } | null>(null)
@@ -31,8 +30,7 @@ export default function LiveTrackingScreen() {
   const [actionLoading, setActionLoading] = useState('')
 
   const statusMap: Record<string, { label: string; step: number }> = {
-    ASSIGNED: { label: t('booking.statusOnWay'), step: 0 },
-    EN_ROUTE: { label: t('booking.statusOnWay'), step: 1 },
+    QUOTE_ACCEPTED: { label: t('jobDetail.quoteAccepted'), step: 1 },
     IN_PROGRESS: { label: t('booking.statusInProgress'), step: 2 },
     COMPLETED: { label: t('booking.statusCompleted'), step: 3 },
   }
@@ -56,29 +54,58 @@ export default function LiveTrackingScreen() {
     return () => pulse.stop()
   }, [id])
 
-  // Poll provider location every 10s
+  // Poll provider location every 15s via the live tasker location endpoint,
+  // falling back to job data (acceptedQuote.provider) when unavailable
+  const liveFailed = useRef(false)
   useEffect(() => {
     if (!id || job?.status === 'COMPLETED' || job?.status === 'CANCELLED') return
     const interval = setInterval(async () => {
       try {
+        const live = await v2Jobs.getTaskerLocation(id)
+        if (live.location && typeof live.location.latitude === 'number') {
+          setProviderCoord({ latitude: live.location.latitude, longitude: live.location.longitude })
+          liveFailed.current = false
+        } else {
+          liveFailed.current = true
+        }
+      } catch {
+        liveFailed.current = true
+      }
+      try {
         const res = await v2Jobs.get(id)
         setJob(res.job)
-        if (res.job.acceptedQuote?.provider?.latitude) {
+        if (liveFailed.current && res.job.acceptedQuote?.provider?.latitude) {
           setProviderCoord({
             latitude: res.job.acceptedQuote.provider.latitude,
             longitude: res.job.acceptedQuote.provider.longitude,
           })
         }
       } catch {}
-    }, 10000)
+    }, 15000)
     return () => clearInterval(interval)
   }, [id, job?.status])
+
+  // Smoothly animate the marker toward the latest provider coordinate
+  useEffect(() => {
+    if (!providerCoord) return
+    Animated.timing(animCoord, {
+      toValue: { latitude: providerCoord.latitude, longitude: providerCoord.longitude },
+      duration: 1500,
+      useNativeDriver: false,
+    }).start()
+  }, [providerCoord])
 
   const loadData = async () => {
     try {
       const res = await v2Jobs.get(id)
       setJob(res.job)
       setWorkspace(res.job.workspace || null)
+      if (res.job.acceptedQuote?.provider?.latitude) {
+        setProviderCoord({
+          latitude: res.job.acceptedQuote.provider.latitude,
+          longitude: res.job.acceptedQuote.provider.longitude,
+        })
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -120,14 +147,15 @@ export default function LiveTrackingScreen() {
             </View>
           </Marker>
           {providerCoord && (
-            <Marker
-              coordinate={providerCoord}
+            <AnimatedMarker
+              coordinate={animCoord}
               title={t('tracking.provider')}
             >
+              <Animated.View style={[styles.taskerPulse, { opacity: pulseAnim, transform: [{ scale: pulseAnim }] }]} />
               <View style={styles.taskerMarker}>
-                <Ionicons name="construct" size={16} color={colors.white} />
+                <Avatar name={job?.acceptedQuote?.provider?.name || t('tracking.provider')} size={24} color={colors.amber} />
               </View>
-            </Marker>
+            </AnimatedMarker>
           )}
         </MapView>
 
@@ -220,14 +248,24 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderColor: colors.white,
   },
   taskerMarker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.amber,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.white,
+    borderWidth: 2.5,
+    borderColor: colors.amber,
+    overflow: 'hidden',
+  },
+  taskerPulse: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.amberLight,
+    top: -5,
+    left: -5,
   },
   etaPill: {
     position: 'absolute',

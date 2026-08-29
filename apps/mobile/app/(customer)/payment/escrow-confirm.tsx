@@ -27,6 +27,7 @@ export default function EscrowConfirmScreen() {
     setLoading(true)
     try {
       await v2JobActions.selectQuote(bookingId, quoteId)
+      await v2JobActions.depositEscrow(bookingId, totalAmount)
       router.replace(`/(customer)/jobs/v2/confirm/${bookingId}`)
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to accept quote.')

@@ -78,7 +78,8 @@ export default function V2ProviderManageJobScreen() {
 
   useEffect(() => { loadJob() }, [id])
 
-  // Send tasker location every 10s when navigation started
+  // Send tasker location every 30s while sharing. Foreground-only: updates
+  // pause automatically when the app is backgrounded (acceptable by design).
   useEffect(() => {
     if (!locationSharing || !id) return
     const interval = setInterval(async () => {
@@ -91,9 +92,16 @@ export default function V2ProviderManageJobScreen() {
           body: JSON.stringify({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
         })
       } catch {}
-    }, 10000)
+    }, 30000)
     return () => clearInterval(interval)
   }, [locationSharing, id])
+
+  // Auto-stop sharing when the job completes or the workspace moves past ACCEPTED
+  useEffect(() => {
+    if (!locationSharing) return
+    const done = workspace && !['ACCEPTED', 'IN_PROGRESS'].includes(workspace.progressStatus)
+    if (done) setLocationSharing(false)
+  }, [workspace?.progressStatus, locationSharing])
 
   const startLocationSharing = async () => {
     try {
@@ -107,6 +115,10 @@ export default function V2ProviderManageJobScreen() {
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
     }
+  }
+
+  const stopLocationSharing = async () => {
+    setLocationSharing(false)
   }
 
   const handleMarkComplete = async () => {
@@ -328,7 +340,13 @@ export default function V2ProviderManageJobScreen() {
               {locationSharing && (
                 <View style={styles.sharingActive}>
                   <Ionicons name="radio-outline" size={18} color={colors.success} />
-                  <Text style={styles.sharingActiveText}>{t('tracking.sharingLocation')}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sharingActiveText}>{t('tracking.sharingLocation')}</Text>
+                    <Text style={styles.sharingHint}>{t('tracking.keepOpenShare')}</Text>
+                  </View>
+                  <TouchableOpacity onPress={stopLocationSharing} style={styles.stopSharingBtn}>
+                    <Text style={styles.stopSharingText}>{t('tracking.stopSharing')}</Text>
+                  </TouchableOpacity>
                 </View>
               )}
               {workspace.progressStatus === 'ACCEPTED' && !generatedOtp && (
@@ -532,4 +550,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   waitingText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amberDark },
   sharingActive: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12 },
   sharingActiveText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.success },
+  sharingHint: { fontSize: 11, fontFamily: fonts.body, color: '#065F46', marginTop: 2 },
+  stopSharingBtn: { backgroundColor: '#065F46', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  stopSharingText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
 })

@@ -20,11 +20,13 @@ export async function GET(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const isOwner = job.customerId === user.id
+    let isQuoter = isOwner
     if (!isOwner) {
       const userQuote = await prisma.jobQuote.findFirst({
         where: { jobId: job.id, providerId: user.id },
       })
-      if (!userQuote) {
+      isQuoter = !!userQuote
+      if (job.status !== 'OPEN' && !isQuoter) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }
@@ -34,10 +36,9 @@ export async function GET(
       select: { id: true, name: true, phone: true, email: true },
     })
 
-    const quotes = await prisma.jobQuote.findMany({
-      where: { jobId: job.id },
-      orderBy: { price: 'asc' },
-    })
+    const quotes = isOwner || isQuoter
+      ? await prisma.jobQuote.findMany({ where: { jobId: job.id }, orderBy: { price: 'asc' } })
+      : []
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
     const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })

@@ -9,6 +9,7 @@ import { fonts } from '../../../lib/fonts'
 const tabConfigs = [
   { name: 'index', key: 'company.dashboard', icon: 'grid-outline' as const },
   { name: 'contracts-list', key: 'company.contracts', icon: 'document-text-outline' as const },
+  { name: 'inbox', key: 'company.inbox', icon: 'chatbubble-ellipses-outline' as const },
   { name: 'milestones-list', key: 'company.milestones', icon: 'flag-outline' as const },
   { name: 'team', key: 'company.team', icon: 'people-outline' as const },
   { name: 'earnings-list', key: 'company.earnings', icon: 'cash-outline' as const },

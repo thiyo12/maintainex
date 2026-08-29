@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { notifyEscrowTimeout } from '@/lib/notifications'
+import { sendExpoPush } from '@/lib/push'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,27 +28,75 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Process pending payouts
-    const pendingPayouts = await prisma.payoutRequest.findMany({
-      where: { status: 'pending' },
+    // 24h escrow funding timeout: QUOTE_ACCEPTED jobs with unfunded escrow revert to OPEN
+    const fundingCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const staleEscrows = await prisma.jobEscrow.findMany({
+      where: { status: 'PENDING_PAYMENT', createdAt: { lte: fundingCutoff } },
     })
 
-    let processed = 0
-    for (const payout of pendingPayouts) {
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-      if (new Date(payout.createdAt) <= oneDayAgo) {
-        await prisma.payoutRequest.update({
-          where: { id: payout.id },
-          data: { status: 'processing' },
+    let escrowTimeouts = 0
+    for (const escrow of staleEscrows) {
+      const acceptedQuote = await prisma.jobQuote.findFirst({
+        where: { jobId: escrow.jobId, status: 'ACCEPTED' },
+      })
+
+      await prisma.$transaction(async (tx) => {
+        await tx.jobEscrow.update({ where: { id: escrow.id }, data: { status: 'CANCELLED' } })
+        await tx.marketplaceJob.update({
+          where: { id: escrow.jobId },
+          data: { status: 'OPEN', isActive: true },
         })
-        processed++
+        if (acceptedQuote) {
+          await tx.jobQuote.update({ where: { id: acceptedQuote.id }, data: { status: 'PENDING' } })
+        }
+      })
+
+      notifyEscrowTimeout(escrow.jobId, escrow.providerId)
+      const provider = await prisma.user.findUnique({
+        where: { id: escrow.providerId },
+        select: { pushToken: true },
+      })
+      if (provider?.pushToken) {
+        void sendExpoPush(
+          provider.pushToken,
+          'Job Available Again',
+          'Customer did not fund escrow — job is available again',
+          { screen: '/(tasker)/jobs', id: escrow.jobId }
+        )
       }
+      escrowTimeouts++
     }
+
+    // Reconcile manual payouts: fails payouts stuck in PROCESSING for >48h
+    const processingCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000)
+    const staleProcessing = await prisma.payout.findMany({
+      where: {
+        status: 'PROCESSING',
+        createdAt: { lte: processingCutoff },
+      },
+    })
+
+    let payoutsFailed = 0
+    for (const payout of staleProcessing) {
+      await prisma.payout.update({
+        where: { id: payout.id },
+        data: {
+          status: 'FAILED',
+          rejectedReason: 'Auto-failed: payout stuck in processing for over 48 hours',
+        },
+      })
+      payoutsFailed++
+    }
+
+    const pendingPayoutCount = await prisma.payout.count({ where: { status: 'PENDING' } })
 
     return NextResponse.json({
       success: true,
       suspensionsLifted: suspendedUsers.length,
-      payoutsProcessing: processed,
+      escrowTimeouts,
+      payoutsProcessing: 0,
+      payoutsFailed,
+      pendingPayouts: pendingPayoutCount,
     })
   } catch (error) {
     console.error('[CRON] Daily maintenance error:', error)

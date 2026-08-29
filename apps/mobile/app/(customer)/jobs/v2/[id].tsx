@@ -400,14 +400,17 @@ export default function V2JobDetailScreen() {
         )}
 
         {/* ─── Action Cards ─── */}
-        {job.status === 'IN_PROGRESS' && !escrow && (
+        {(job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') || (job.status === 'IN_PROGRESS' && !escrow) ? (
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
             <Lock size={32} color={colors.ink} weight="fill" />
-            <Text style={styles.actionCardTitle}>Secure Payment</Text>
-            <Text style={styles.actionCardDesc}>Deposit LKR {job.budgetAmount} into escrow to start the work</Text>
+            <Text style={styles.actionCardTitle}>Fund Escrow</Text>
+            <Text style={styles.actionCardDesc}>
+              Deposit LKR {escrow?.amount || job.budgetAmount} into escrow to start the work
+              {escrow?.createdAt ? ` — fund within 24 hours or the job will reopen` : ''}
+            </Text>
             <ActionBtn label="Deposit Now" loadingKey="escrow" onPress={handleDepositEscrow} />
           </View>
-        )}
+        ) : null}
 
         {escrow && escrow.status === 'PROTECTED' && !job.addressSharedAt && (
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>

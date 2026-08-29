@@ -1539,9 +1539,13 @@ model Payout {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   amount      BigInt
   description String?
-  status      String    @default("PENDING") // PENDING, CLEARED, FAILED
-  source      String // JOB, CONTRACT, MILESTONE
+  status      String    @default("PENDING") // PENDING, PROCESSING, CLEARED, REJECTED, FAILED
+  source      String // JOB, CONTRACT, MILESTONE, WITHDRAWAL
   sourceId    String? // Job ID, Contract ID, etc.
+  method      String? // bank, wallet
+  bankDetails String? // JSON: account holder / account number / branch / bank name / notes
+  rejectedReason String? // set when status = REJECTED
+  processedBy String? // AdminUser email/id that processed this payout
   createdAt   DateTime  @default(now())
   clearedAt   DateTime?
 

@@ -16,7 +16,9 @@ export async function POST(
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the customer can deposit escrow' }, { status: 403 })
-    if (job.status !== 'IN_PROGRESS') return NextResponse.json({ error: 'Job must be in progress' }, { status: 400 })
+    if (job.status !== 'QUOTE_ACCEPTED' && job.status !== 'IN_PROGRESS') {
+      return NextResponse.json({ error: 'No quote accepted or job not ready for escrow' }, { status: 400 })
+    }
 
     const quote = await prisma.jobQuote.findFirst({
       where: { jobId: job.id, status: 'ACCEPTED' },
@@ -24,7 +26,9 @@ export async function POST(
     if (!quote) return NextResponse.json({ error: 'No accepted quote found' }, { status: 400 })
 
     const existingEscrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-    if (existingEscrow) return NextResponse.json({ error: 'Escrow already exists' }, { status: 409 })
+    if (existingEscrow && existingEscrow.status !== 'PENDING_PAYMENT' && existingEscrow.status !== 'CANCELLED') {
+      return NextResponse.json({ error: 'Escrow already exists' }, { status: 409 })
+    }
 
     const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
     const quotePrice = Number(quote.price)
@@ -53,18 +57,32 @@ export async function POST(
           referenceId: params.id,
         },
       })
-      await tx.jobEscrow.create({
-        data: {
-          jobId: job.id,
-          quoteId: quote.id,
-          customerId: user.id,
-          providerId: quote.providerId,
-          amount: quote.price,
-          serviceFee: BigInt(Math.round(serviceFeeCents)),
-          totalAmount: BigInt(Math.round(totalAmountCents)),
-          status: 'PROTECTED',
-          heldAt: new Date(),
-        },
+      if (existingEscrow) {
+        await tx.jobEscrow.update({
+          where: { id: existingEscrow.id },
+          data: {
+            status: 'PROTECTED',
+            heldAt: new Date(),
+          },
+        })
+      } else {
+        await tx.jobEscrow.create({
+          data: {
+            jobId: job.id,
+            quoteId: quote.id,
+            customerId: user.id,
+            providerId: quote.providerId,
+            amount: quote.price,
+            serviceFee: BigInt(Math.round(serviceFeeCents)),
+            totalAmount: BigInt(Math.round(totalAmountCents)),
+            status: 'PROTECTED',
+            heldAt: new Date(),
+          },
+        })
+      }
+      await tx.marketplaceJob.update({
+        where: { id: job.id },
+        data: { status: 'IN_PROGRESS' },
       })
     })
 

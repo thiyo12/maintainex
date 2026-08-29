@@ -246,6 +246,18 @@ export default function CompanyDashboard() {
               </View>
               <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('company.subscription')}</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/jobs/v2/browse')}>
+              <View style={[styles.gridIcon, { backgroundColor: colors.indigoBg }]}>
+                <Ionicons name="search-outline" size={22} color={colors.indigo} />
+              </View>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('company.browseJobs')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(company)/jobs/v2/my-quotes')}>
+              <View style={[styles.gridIcon, { backgroundColor: colors.blueBg }]}>
+                <Ionicons name="document-text-outline" size={22} color={colors.blue} />
+              </View>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('company.myQuotes')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

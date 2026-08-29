@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const { amount } = await request.json()
+    const { amount, method, bankDetails } = await request.json()
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: 'Valid amount required' }, { status: 400 })
     }
@@ -19,10 +19,12 @@ export async function POST(request: NextRequest) {
     const payout = await prisma.payout.create({
       data: {
         userId: user.id,
-        amount,
+        amount: Math.round(amount * 100),
         description: 'Withdrawal request',
         status: 'PENDING',
         source: 'WITHDRAWAL',
+        method: method && ['bank', 'wallet'].includes(method) ? method : 'bank',
+        bankDetails: bankDetails ? String(bankDetails) : null,
       },
     })
 

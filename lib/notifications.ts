@@ -92,3 +92,22 @@ export async function notifyPaymentReleased(jobId: string, providerId: string, j
     referenceId: jobId,
   })
 }
+
+export async function notifyEscrowTimeout(jobId: string, providerId: string) {
+  return createNotification({
+    userId: providerId,
+    title: 'Job Available Again',
+    body: 'Customer did not fund escrow — job is available again',
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
+export async function notifyPayoutProcessed(userId: string, title: string, body: string) {
+  return createNotification({
+    userId,
+    title,
+    body,
+    referenceType: 'WALLET',
+  })
+}

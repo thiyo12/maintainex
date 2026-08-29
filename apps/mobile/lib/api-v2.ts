@@ -76,6 +76,8 @@ export const v2Jobs = {
     v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`),
   pollNew: (since: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`),
+  getTaskerLocation: (id: string) =>
+    v2Request<{ sharing: boolean; location: { providerId: string; latitude: number; longitude: number; updatedAt: string } | null }>(`/api/mobile/taskers/${id}/location`),
 }
 
 export const v2Quotes = {

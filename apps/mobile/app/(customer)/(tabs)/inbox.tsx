@@ -38,6 +38,7 @@ export default function CustomerInbox() {
   const filtered = conversationsData.filter(c =>
     c.otherUser?.name?.toLowerCase().includes(search.toLowerCase())
   )
+  const totalUnread = conversationsData.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
 
   const formatTime = (dateStr: string) => {
     if (!dateStr) return ''
@@ -54,7 +55,14 @@ export default function CustomerInbox() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
-        <Text style={styles.heading}>{t('customer.messages')}</Text>
+        <View style={styles.headingRow}>
+          <Text style={styles.heading}>{t('customer.messages')}</Text>
+          {totalUnread > 0 ? (
+            <View style={styles.headingBadge}>
+              <Text style={styles.headingBadgeText}>{totalUnread}</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.searchBar}>
@@ -128,7 +136,13 @@ export default function CustomerInbox() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  headingBadge: {
+    minWidth: 22, height: 22, borderRadius: 11, backgroundColor: colors.customerAccent,
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6,
+  },
+  headingBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
