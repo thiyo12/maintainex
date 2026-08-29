@@ -11,6 +11,7 @@ import { fonts } from '../../../../lib/fonts'
 import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '../../../../lib/api-v2'
 import JobLifecycleTracker from '../../../../components/ui/JobLifecycleTracker'
 import { emit, removedJobs } from '../../../../lib/events'
+import NewChatModal from '../../../../components/chat/NewChatModal'
 
 function usePulse() {
   const anim = useRef(new Animated.Value(0)).current
@@ -73,6 +74,8 @@ export default function V2JobDetailScreen() {
   const [addressApartment, setAddressApartment] = useState('')
   const [addressLandmark, setAddressLandmark] = useState('')
   const [bargainModal, setBargainModal] = useState<V2Quote | null>(null)
+  const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
+  const [msgPrefill, setMsgPrefill] = useState('')
   const [bargainPrice, setBargainPrice] = useState('')
   const [otpInput, setOtpInput] = useState('')
   const [otpError, setOtpError] = useState('')
@@ -318,7 +321,7 @@ export default function V2JobDetailScreen() {
                   </View>
                 </View>
                 {q.message ? <Text style={[styles.quoteMsg, { color: colors.ink }]}>{q.message}</Text> : null}
-                {q.status === 'PENDING' && (
+                {q.status === 'PENDING' ? (
                   <View style={styles.quoteActions}>
                     <ActionBtn label="Accept" loadingKey={q.id} onPress={() => handleSelectQuote(q.id)} />
 <TouchableOpacity style={[styles.quoteActionBtn, { borderColor: colors.amber, flexDirection: 'row' }]}
@@ -327,6 +330,18 @@ export default function V2JobDetailScreen() {
   <Text style={[styles.quoteActionBtnText, { color: colors.amber }]}>Bargain</Text>
 </TouchableOpacity>
                   </View>
+                ) : null}
+                {q.provider?.id && (
+                  <TouchableOpacity
+                    style={[styles.messageRow, { borderTopColor: colors.border }]}
+                    onPress={() => {
+                      setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
+                      setMsgRecipient({ id: q.provider.id, name: q.provider.name || 'Provider' })
+                    }}
+                  >
+                    <ChatCircle size={16} color={colors.amber} weight="fill" />
+                    <Text style={[styles.messageRowText, { color: colors.ink }]}>Message {q.provider?.name || 'provider'}</Text>
+                  </TouchableOpacity>
                 )}
               </View>
               )
@@ -368,6 +383,16 @@ export default function V2JobDetailScreen() {
                   </View>
                   {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.fixedRate}</Text> : null}
                 </View>
+                <TouchableOpacity
+                  hitSlop={8}
+                  onPress={() => {
+                    setMsgPrefill(`Hi ${p.name || ''}, I saw your profile for "${job?.title || 'this job'}". Are you available?`)
+                    setMsgRecipient({ id: p.id, name: p.name || 'Tasker' })
+                  }}
+                  style={[styles.messageIconBtn, { backgroundColor: colors.amberLight }]}
+                >
+                  <ChatCircle size={16} color={colors.amber} weight="fill" />
+                </TouchableOpacity>
                 <CaretRight size={16} color={colors.muted} weight="bold" />
               </TouchableOpacity>
             ))}
@@ -520,6 +545,14 @@ export default function V2JobDetailScreen() {
           </View>
         </View>
       </Modal>
+      <NewChatModal
+        visible={!!msgRecipient}
+        onClose={() => setMsgRecipient(null)}
+        recipient={msgRecipient}
+        jobId={id}
+        jobTitle={job?.title}
+        prefilled={msgPrefill}
+      />
     </SafeAreaView>
   )
 }
@@ -586,6 +619,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
   quoteActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
   quoteActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   quoteActionBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  messageRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, marginTop: 10, borderTopWidth: 1 },
+  messageRowText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  messageIconBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
 
   aiEstimateBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 14, borderWidth: 1.5, marginBottom: 12 },
   aiEstimateBannerText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1, lineHeight: 18 },

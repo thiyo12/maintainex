@@ -8,6 +8,7 @@ import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
+import NewChatModal from '../../../../../components/chat/NewChatModal'
 import * as Location from 'expo-location'
 
 export default function V2ProviderManageJobScreen() {
@@ -42,6 +43,7 @@ export default function V2ProviderManageJobScreen() {
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
   const [locationSharing, setLocationSharing] = useState(false)
+  const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
 
   const loadJob = async () => {
     try {
@@ -245,6 +247,15 @@ export default function V2ProviderManageJobScreen() {
                 <Text style={styles.detailLocation}>{job.locationName}</Text>
               </View>
             )}
+            {job.customer?.id && (
+              <TouchableOpacity
+                style={[styles.msgBtn, { backgroundColor: colors.amber }]}
+                onPress={() => setMsgRecipient({ id: job.customer!.id!, name: job.customer?.name || 'Customer' })}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.ink} />
+                <Text style={styles.msgBtnText}>Message customer</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -418,6 +429,14 @@ export default function V2ProviderManageJobScreen() {
           </TouchableOpacity>
         )}
       </ScrollView>
+      <NewChatModal
+        visible={!!msgRecipient}
+        onClose={() => setMsgRecipient(null)}
+        recipient={msgRecipient}
+        jobId={id}
+        jobTitle={job?.title}
+        prefilled={`Hi ${job?.customer?.name || 'there'}, I'd like to discuss "${job?.title || 'your job'}".`}
+      />
     </SafeAreaView>
   )
 }
@@ -440,6 +459,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   detailLabel: { fontSize: 11, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   detailValue: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 2 },
   detailLocation: { fontSize: 13, color: colors.muted },
+  msgBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 12, marginTop: 12 },
+  msgBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
   locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
 
   addressCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },

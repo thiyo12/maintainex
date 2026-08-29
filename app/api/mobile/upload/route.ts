@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const kind = String(formData.get('kind') || 'mobile').toLowerCase()
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
@@ -46,6 +47,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large. Maximum 10MB.' }, { status: 400 })
     }
 
+    if (kind === 'avatar' && !file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'Avatar must be an image' }, { status: 400 })
+    }
+
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
@@ -55,6 +60,16 @@ export async function POST(request: NextRequest) {
     }
 
     const secureFilename = generateSecureFilename(file.name)
+
+    // Avatars must be publicly readable (chat list/detail across users)
+    if (kind === 'avatar') {
+      const publicAvatarDir = path.join(process.cwd(), 'public', 'uploads', 'avatars')
+      await mkdir(publicAvatarDir, { recursive: true })
+      const avatarFilename = `${user.id}-${Date.now()}-${secureFilename}`
+      const avatarPath = path.join(publicAvatarDir, avatarFilename)
+      await writeFile(avatarPath, buffer)
+      return NextResponse.json({ url: `/uploads/avatars/${avatarFilename}`, filename: avatarFilename, public: true })
+    }
 
     const uploadDir = path.join(process.cwd(), 'uploads', 'mobile', user.id)
     await mkdir(uploadDir, { recursive: true })

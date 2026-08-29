@@ -19,6 +19,12 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
 
+export function resolveImageUri(uri?: string | null): string | null {
+  if (!uri) return null
+  if (uri.startsWith('/api/mobile/files/')) return null // legacy, not publicly readable
+  return uri.startsWith('http') ? uri : `${API_URL}${uri}`
+}
+
 let authToken: string | null = null
 
 export const setAuthToken = async (token: string | null) => {
@@ -137,6 +143,8 @@ export const taskers = {
   get: (id: string) => request<TaskerProfile>(`/api/mobile/taskers/${id}`),
   updateProfile: (data: any) =>
     request<TaskerProfile>('/api/mobile/taskers/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  getMyProfile: () =>
+    request<TaskerProfile>('/api/mobile/taskers/profile'),
   updateLocation: (data: { latitude: number; longitude: number }) =>
     request<void>('/api/mobile/taskers/location', { method: 'PUT', body: JSON.stringify(data) }),
   setOnline: (isOnline: boolean) =>
@@ -157,15 +165,21 @@ export const notifications = {
 // Conversations & Messages
 export const conversations = {
   list: () =>
-    request<{ id: string; otherUser: { id: string; name: string } | null; lastMessage: any; unreadCount: number; updatedAt: string }[]>('/api/mobile/conversations'),
+    request<{ id: string; jobId?: string | null; otherUser: { id: string; name: string; profileImage?: string } | null; lastMessage: any; unreadCount: number; updatedAt: string }[]>('/api/mobile/conversations'),
   create: (data: { participantId: string; jobId?: string; initialMessage?: string }) =>
     request<{ id: string; existing: boolean }>('/api/mobile/conversations', { method: 'POST', body: JSON.stringify(data) }),
   get: (id: string) =>
-    request<{ id: string; participants: any[]; messages: any[] }>(`/api/mobile/conversations/${id}`),
+    request<{ id: string; jobId?: string | null; job?: { id: string; title: string; ref: string; status?: string } | null; participants: any[]; messages: any[] }>(`/api/mobile/conversations/${id}`),
   sendMessage: (conversationId: string, text: string) =>
     request<any>(`/api/mobile/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ text }) }),
   getMessages: (conversationId: string, after?: string) =>
     request<any[]>(`/api/mobile/conversations/${conversationId}/messages${after ? `?after=${after}` : ''}`),
+}
+
+export const skillsApi = {
+  list: () => request<any[]>('/api/mobile/taskers/skills'),
+  save: (data: any[]) =>
+    request<{ saved: number }>('/api/mobile/taskers/skills', { method: 'PUT', body: JSON.stringify({ skills: data }) }),
 }
 
 // Disputes
@@ -256,7 +270,7 @@ export const search = {
 
 // File upload
 export const upload = {
-  file: async (fileUri: string) => {
+  file: async (fileUri: string, kind?: 'avatar' | 'attachment') => {
     const token = await getAuthToken()
     const formData = new FormData()
     const filename = fileUri.split('/').pop() || 'photo.jpg'
@@ -266,6 +280,7 @@ export const upload = {
       name: filename,
       type: `image/${ext}`,
     } as any)
+    if (kind) formData.append('kind', kind)
     const res = await fetch(`${API_URL}/api/mobile/upload`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

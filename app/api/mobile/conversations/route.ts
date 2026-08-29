@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
       include: {
         participants: {
           include: {
-            user: { select: { id: true, name: true } },
+            user: {
+              select: { id: true, name: true, taskerProfile: { select: { profileImage: true } } },
+            },
           },
         },
         messages: {
@@ -27,6 +29,20 @@ export async function GET(request: NextRequest) {
       orderBy: { updatedAt: 'desc' },
     })
 
+    const ids = conversations.map(c => c.id)
+    const unreadRows = ids.length > 0
+      ? await prisma.message.groupBy({
+          by: ['conversationId'],
+          where: {
+            conversationId: { in: ids },
+            senderId: { not: user.id },
+            read: false,
+          },
+          _count: true,
+        })
+      : []
+    const unreadMap = new Map(unreadRows.map(r => [r.conversationId, r._count]))
+
     return NextResponse.json(
       conversations.map(c => {
         const otherParticipant = c.participants.find(p => p.userId !== user.id)
@@ -34,9 +50,11 @@ export async function GET(request: NextRequest) {
         return {
           id: c.id,
           jobId: c.jobId,
-          otherUser: otherParticipant ? { id: otherParticipant.user.id, name: otherParticipant.user.name } : null,
+          otherUser: otherParticipant
+            ? { id: otherParticipant.user.id, name: otherParticipant.user.name, profileImage: otherParticipant.user.taskerProfile?.profileImage }
+            : null,
           lastMessage: lastMsg ? { text: lastMsg.text, createdAt: lastMsg.createdAt.toISOString(), senderId: lastMsg.senderId } : null,
-          unreadCount: 0,
+          unreadCount: unreadMap.get(c.id) || 0,
           updatedAt: c.updatedAt.toISOString(),
         }
       })
@@ -61,11 +79,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'participantId required' }, { status: 400 })
     }
 
+    // Dedup scoped to job + the same two participants
     const existingConversation = await prisma.conversation.findFirst({
       where: {
         AND: [
           { participants: { some: { userId: user.id } } },
           { participants: { some: { userId: participantId } } },
+          ...(jobId ? [{ jobId }] : []),
         ],
       },
       include: { participants: true },
@@ -95,7 +115,9 @@ export async function POST(request: NextRequest) {
       },
       include: {
         participants: {
-          include: { user: { select: { id: true, name: true } } },
+          include: {
+            user: { select: { id: true, name: true, taskerProfile: { select: { profileImage: true } } } },
+          },
         },
         messages: { take: 1, orderBy: { createdAt: 'desc' } },
       },
@@ -104,7 +126,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: conversation.id,
       jobId: conversation.jobId,
-      participants: conversation.participants.map(p => ({ id: p.user.id, name: p.user.name })),
+      participants: conversation.participants.map(p => ({ id: p.user.id, name: p.user.name, profileImage: p.user.taskerProfile?.profileImage })),
     })
   } catch (error) {
     console.error('Conversation create error:', error)

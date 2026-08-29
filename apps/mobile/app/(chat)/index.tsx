@@ -1,10 +1,10 @@
 import { useState, useCallback, useRef } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Animated, RefreshControl } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Animated, RefreshControl, Image } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { conversations } from '../../lib/api'
+import { conversations, resolveImageUri } from '../../lib/api'
 import { useColors } from '../../lib/ThemeContext'
 import PressScale from '../../components/find/PressScale'
 
@@ -33,7 +33,7 @@ export default function ChatListScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchConversations()
-      const interval = setInterval(fetchConversations, 10000)
+      const interval = setInterval(fetchConversations, 30000)
       return () => clearInterval(interval)
     }, [fetchConversations])
   )
@@ -87,9 +87,13 @@ export default function ChatListScreen() {
               <View style={styles.conversationCard}>
               <View style={styles.avatarWrap}>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {item.otherUser?.name?.[0] || '?'}
-                  </Text>
+                  {resolveImageUri(item.otherUser?.profileImage) ? (
+                    <Image source={{ uri: resolveImageUri(item.otherUser?.profileImage)! }} style={styles.avatarImg} />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {item.otherUser?.name?.[0] || '?'}
+                    </Text>
+                  )}
                 </View>
               </View>
               <View style={styles.conversationContent}>
@@ -165,6 +169,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
+  avatarImg: { width: 48, height: 48, borderRadius: 24 },
   conversationContent: { flex: 1 },
   conversationTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   conversationName: { fontSize: 15, fontWeight: '700', color: colors.dark },

@@ -1119,6 +1119,7 @@ model TaskerSkill {
   jobId           String
   job             TemplateJob   @relation(fields: [jobId], references: [id])
   experienceYears Int           @default(0)
+  experienceLevel Int           @default(1) // 1 = Beginner, 2 = Intermediate, 3 = Expert
   hourlyRate      Float         @default(0)
   fixedRate       Float         @default(0)
   currency        String        @default("LKR")

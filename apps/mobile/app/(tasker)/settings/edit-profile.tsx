@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
-import { auth, upload } from '../../../lib/api'
+import { taskers, auth, upload, resolveImageUri } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 
 export default function TaskerEditProfile() {
@@ -20,6 +20,8 @@ export default function TaskerEditProfile() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [profileImage, setProfileImage] = useState('')
+  const [bio, setBio] = useState('')
+  const [hourlyRate, setHourlyRate] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -31,6 +33,15 @@ export default function TaskerEditProfile() {
       setPhone(user.phone || '')
       setProfileImage(user.profileImage || '')
     }
+    const loadTaskerProfile = async () => {
+      try {
+        const p = await taskers.getMyProfile()
+        setBio(p.bio || '')
+        setHourlyRate(p.hourlyRate != null ? String(p.hourlyRate) : '')
+        if (p.profileImage) setProfileImage(p.profileImage)
+      } catch { /* ignore */ }
+    }
+    loadTaskerProfile()
   }, [user])
 
   const pickImage = async () => {
@@ -46,7 +57,7 @@ export default function TaskerEditProfile() {
     if (!result.canceled && result.assets[0]) {
       setUploading(true)
       try {
-        const { url } = await upload.file(result.assets[0].uri)
+        const { url } = await upload.file(result.assets[0].uri, 'avatar')
         setProfileImage(url)
       } catch {
         Alert.alert(t('common.error'), 'Failed to upload image')
@@ -63,6 +74,13 @@ export default function TaskerEditProfile() {
     }
     setSaving(true)
     try {
+      await taskers.updateProfile({
+        name: name.trim(),
+        phone: phone.trim(),
+        bio: bio.trim(),
+        hourlyRate: hourlyRate.trim() ? Number(hourlyRate) : undefined,
+        profileImage: profileImage || undefined,
+      })
       await auth.updateProfile({ name: name.trim(), phone: phone.trim(), profileImage: profileImage || undefined })
       await refreshUser()
       Alert.alert(t('common.success'), t('profile.editProfileHeader'))
@@ -81,8 +99,8 @@ export default function TaskerEditProfile() {
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.avatarSection}>
             <View style={styles.avatar}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={{ width: 80, height: 80, borderRadius: 22 }} />
+              {resolveImageUri(profileImage) ? (
+                <Image source={{ uri: resolveImageUri(profileImage)! }} style={{ width: 80, height: 80, borderRadius: 22 }} />
               ) : (
                 <Text style={styles.avatarText}>{(name || 'T')[0]}</Text>
               )}
@@ -111,6 +129,16 @@ export default function TaskerEditProfile() {
           </View>
           <Text style={styles.label}>{t('profile.phone')}</Text>
           <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder={t('auth.register.phonePlaceholder')} />
+          <Text style={styles.label}>Hourly rate (LKR)</Text>
+          <TextInput style={styles.input} value={hourlyRate} onChangeText={setHourlyRate} keyboardType="numeric" placeholder="e.g. 1500" />
+          <Text style={styles.label}>About me</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 90, textAlignVertical: 'top' }]}
+            value={bio}
+            onChangeText={setBio}
+            multiline
+            placeholder="Tell customers about your experience and services…"
+          />
           <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
             {saving ? (
               <ActivityIndicator size="small" color={colors.white} />

@@ -4,11 +4,23 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { conversations, auth } from '../../lib/api'
+import { conversations, auth, resolveImageUri } from '../../lib/api'
 import { useTheme } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 
 const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
+const CLIENT_CONTACT = /\+?\d[\d\s\-.]{6,}\d|[\w.+-]+@[\w-]+\.[\w.-]{2,}/g
+const CLIENT_PAYMENT = /\b(paypal|bank\s*transfer|bank\s*deposit|wire\s*transfer|cash\s*app|cashapp|pay\s*me\s*directly|outside\s*(the\s*)?app|venmo|payoneer|zelle|upi|gcash|paytm)\b/gi
+const CONTACT_PLACEHOLDER = '[Contact details removed]'
+
+function detectWarnings(text: string): string[] {
+  const warnings: string[] = []
+  CLIENT_CONTACT.lastIndex = 0
+  CLIENT_PAYMENT.lastIndex = 0
+  if (CLIENT_CONTACT.test(text)) warnings.push('Please keep all communications on Maintainex.')
+  if (CLIENT_PAYMENT.test(text)) warnings.push('Reminder: all payments must go through Maintainex')
+  return warnings
+}
 
 export default function ChatDetailScreen() {
   const { t } = useTranslation()
@@ -30,9 +42,11 @@ export default function ChatDetailScreen() {
     return []
   })
   const [inputText, setInputText] = useState('')
+  const [preWarn, setPreWarn] = useState<string[]>([])
   const [loading, setLoading] = useState(isDemo ? false : true)
   const [userId, setUserId] = useState<string | null>(isDemo ? '__me__' : null)
   const [otherUser, setOtherUser] = useState<any>(isDemo ? { id: (id as string || '').replace('demo_', ''), name: decodeURIComponent(testUser as string || '') } : null)
+  const [job, setJob] = useState<any>(null)
   const [sending, setSending] = useState(false)
   const [isClosed, setIsClosed] = useState(() => isDemo || CLOSED_STATUSES.includes((status as string || '').toUpperCase()))
   const flatListRef = useRef<FlatList>(null)
@@ -51,6 +65,7 @@ export default function ChatDetailScreen() {
     try {
       const data = await conversations.get(id as string)
       setMessages(data.messages || [])
+      if (data.job) setJob(data.job)
       if (data.participants?.length > 0 && !otherUser) {
         const other = data.participants.find((p: any) => p.id !== userId)
         if (other) setOtherUser(other)
@@ -92,10 +107,11 @@ export default function ChatDetailScreen() {
     }
     setMessages(prev => [...prev, optimisticMsg])
     setInputText('')
+    setPreWarn([])
     setSending(true)
     try {
-      await conversations.sendMessage(id as string, text)
-      setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'sent' } : m))
+      const res = await conversations.sendMessage(id as string, text)
+      setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'sent', text: res?.text || m.text } : m))
     } catch {
       setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'failed' } : m))
     } finally {
@@ -137,7 +153,7 @@ export default function ChatDetailScreen() {
   }
 
   const otherName = otherUser?.name || t('home.chat')
-  const otherAvatar = otherUser?.profileImage || otherUser?.avatar
+  const otherAvatar = resolveImageUri(otherUser?.profileImage || otherUser?.avatar)
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -155,6 +171,11 @@ export default function ChatDetailScreen() {
           )}
           <View>
             <Text style={[styles.chatName, { color: colors.ink }]}>{otherName}</Text>
+            {job ? (
+              <Text style={[styles.chatJobSub, { color: colors.muted }]} numberOfLines={1}>
+                {job.title} • {job.ref}
+              </Text>
+            ) : null}
           </View>
         </View>
         <TouchableOpacity onPress={() => router.push(`/(customer)/find/tasker-profile/${otherUser?.id || ''}`)}>
@@ -195,11 +216,18 @@ export default function ChatDetailScreen() {
             renderItem={({ item, index }) => {
               const isUser = userId ? item.senderId === userId : false
               const showDate = shouldShowDate(index)
+              const flagged = item.text?.includes(CONTACT_PLACEHOLDER)
               return (
                 <View>
                   {showDate && (
                     <View style={styles.dateSep}>
                       <Text style={[styles.dateSepText, { color: colors.muted }]}>{formatDate(item.createdAt || item.updatedAt)}</Text>
+                    </View>
+                  )}
+                  {flagged && !isUser && (
+                    <View style={[styles.flagBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
+                      <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
+                      <Text style={[styles.flagBannerText, { color: colors.ink }]}>Reminder: all payments must go through Maintainex</Text>
                     </View>
                   )}
                   <View style={[styles.messageWrap, { maxWidth: '78%' }, isUser ? styles.messageSent : styles.messageReceived]}>
@@ -234,11 +262,17 @@ export default function ChatDetailScreen() {
           </View>
         ) : (
           <View style={[styles.inputBar, { borderTopColor: colors.border, backgroundColor: colors.white }]}>
+            {preWarn.length > 0 && (
+              <View style={[styles.flagBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
+                <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
+                <Text style={[styles.flagBannerText, { color: colors.ink }]}>{preWarn.join(' · ')}</Text>
+              </View>
+            )}
             <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.input, { color: colors.ink }]}
                 value={inputText}
-                onChangeText={setInputText}
+                onChangeText={(t) => { setInputText(t); setPreWarn(detectWarnings(t)) }}
                 placeholder={t('chat.inputPlaceholder')}
                 placeholderTextColor={colors.muted}
                 multiline
@@ -274,6 +308,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   avatarImg: { width: 36, height: 36, borderRadius: 18 },
   avatarText: { fontSize: 14, fontFamily: fonts.heading },
   chatName: { fontSize: 15, fontFamily: fonts.bodyMedium },
+  chatJobSub: { fontSize: 11, fontFamily: fonts.body, marginTop: 1 },
   safetyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,6 +319,16 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
   },
   safetyText: { fontSize: 12, fontFamily: fonts.body, flex: 1, lineHeight: 16 },
+  flagBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  flagBannerText: { fontSize: 11, fontFamily: fonts.body, flex: 1, lineHeight: 15 },
   messagesContainer: { padding: 16, paddingBottom: 8 },
   dateSep: { alignItems: 'center', marginVertical: 12 },
   dateSepText: { fontSize: 11, fontFamily: fonts.body },

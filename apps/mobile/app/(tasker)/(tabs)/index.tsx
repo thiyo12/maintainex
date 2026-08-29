@@ -143,7 +143,7 @@ export default function TaskerDashboard() {
           </View>
         </View>
 
-        {/* AI Search */}
+        {/* Browse new jobs */}
         <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
           <AISearchBar
             placeholder={t('tasker.searchJobs')}
@@ -152,9 +152,6 @@ export default function TaskerDashboard() {
             }}
             onJobSelect={(jobId, jobName) => {
               router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
-            }}
-            onPostJob={(query) => {
-              router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
             }}
           />
         </View>
@@ -318,23 +315,17 @@ export default function TaskerDashboard() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>{t('home.postOptions.title')}</Text>
           <View style={styles.grid}>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(customer)/jobs/v2/create')}>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(tasker)/settings/job-selection')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.amberBg }]}>
-                <Briefcase size={22} color={colors.amberDark} weight="fill" />
+                <Wrench size={22} color={colors.amberDark} weight="fill" />
               </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.postJob')}</Text>
+              <Text style={[styles.gridLabel, { color: colors.ink }]}>Your Services</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(customer)/(tabs)/explore')}>
               <View style={[styles.gridIcon, { backgroundColor: '#DBEAFE' }]}>
                 <MagnifyingGlass size={22} color="#3B82F6" weight="bold" />
               </View>
               <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.findWork')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(customer)/jobs/new')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#D1FAE5' }]}>
-                <ChatCircle size={22} color="#059669" weight="fill" />
-              </View>
-              <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.quickBooking')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/settings/my-profile')}>
               <View style={[styles.gridIcon, { backgroundColor: '#EDE9FE' }]}>

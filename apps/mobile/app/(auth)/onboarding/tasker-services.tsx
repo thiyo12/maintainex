@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert,
+  ScrollView, ActivityIndicator, Alert, TextInput,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -50,6 +50,8 @@ export default function TaskerServicesOnboarding() {
   const [allrounder, setAllrounder] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [phone, setPhone] = useState('')
+  const needsPhone = !user?.phone
 
   useEffect(() => {
     fetchCategories()
@@ -101,13 +103,20 @@ export default function TaskerServicesOnboarding() {
       Alert.alert(t('errors.selectionRequired'), t('errors.selectService'))
       return
     }
+    if (needsPhone && phone.trim().length < 7) {
+      Alert.alert(t('common.error'), 'Please add a valid phone number so customers can reach you.')
+      return
+    }
     setSaving(true)
     try {
       const token = await getAuthToken()
       const res = await fetch(`${API_URL}/api/mobile/taskers/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ skills: Array.from(selectedIds) }),
+        body: JSON.stringify({
+          skills: Array.from(selectedIds),
+          ...(needsPhone ? { phone: phone.trim() } : {}),
+        }),
       })
       if (!res.ok) {
         const err = await res.json()
@@ -133,6 +142,21 @@ export default function TaskerServicesOnboarding() {
       <Text style={styles.subtitle}>
         {t('auth.onboarding.selectServicesDesc')}
       </Text>
+
+      {needsPhone && (
+        <View style={styles.phoneCard}>
+          <Text style={styles.phoneLabel}>Phone number</Text>
+          <TextInput
+            style={[styles.phoneInput, { backgroundColor: colors.surface, color: colors.ink, borderColor: colors.border }]}
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder="e.g. 077 123 4567"
+            placeholderTextColor={colors.muted}
+          />
+          <Text style={styles.phoneHint}>Customers use this to reach you. Keep it up to date in Settings.</Text>
+        </View>
+      )}
 
       <TouchableOpacity
         style={[styles.allrounderCard, allrounder && styles.allrounderCardActive]}
@@ -195,6 +219,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
   backButton: { marginBottom: 16, alignSelf: 'flex-start' },
   title: { fontSize: 26, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 8 },
   subtitle: { fontSize: 15, fontFamily: fonts.body, color: colors.muted, marginBottom: 24, lineHeight: 22 },
+  phoneCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, marginBottom: 16, backgroundColor: colors.white },
+  phoneLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 8 },
+  phoneInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, fontFamily: fonts.body },
+  phoneHint: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 6 },
   allrounderCard: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 16, borderRadius: 16, backgroundColor: colors.white,

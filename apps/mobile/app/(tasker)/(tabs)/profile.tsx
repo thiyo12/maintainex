@@ -242,6 +242,38 @@ export default function TaskerProfile() {
         </Animated.View>
 
         <OfferProgramSection variant="tasker" taskerId={user?.id} />
+
+        <Animated.View style={[styles.card, { marginBottom: 24 }]}>
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+              onPress={() => router.push('/(tasker)/(tabs)/earnings')}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: '#D1FAE5' }]}>
+                <Ionicons name="wallet-outline" size={16} color="#059669" />
+              </View>
+              <Text style={[styles.menuTitle, { color: colors.ink }]}>Earnings</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+              onPress={() => router.push('/(tasker)/settings/job-selection')}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: colors.amberLight }]}>
+                <Ionicons name="construct-outline" size={16} color={colors.amberDark} />
+              </View>
+              <Text style={[styles.menuTitle, { color: colors.ink }]}>Your Services</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/settings/my-profile')}>
+              <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
+                <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
+              </View>
+              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('tasker.myProfile')}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   )
@@ -274,6 +306,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
   statValue: { fontSize: 17, fontFamily: fonts.headingBold, letterSpacing: -0.3 },
   statLabel: { fontSize: 9, fontFamily: fonts.bodyMedium, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
   section: { padding: 16 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  menuIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  menuTitle: { flex: 1, fontSize: 14, fontFamily: fonts.bodyMedium },
   sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   sectionTitle: { fontSize: 12, fontFamily: fonts.headingBold },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

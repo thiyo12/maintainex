@@ -9,7 +9,6 @@ import { fonts } from '../../../lib/fonts'
 const tabConfigs = [
   { name: 'index', key: 'tasker.browse', icon: 'compass-outline' as const },
   { name: 'my-jobs', key: 'tasker.myJobs', icon: 'briefcase-outline' as const },
-  { name: 'earnings', key: 'tasker.earnings', icon: 'cash-outline' as const },
   { name: 'profile', key: 'tasker.profile', icon: 'person-outline' as const },
 ]
 
@@ -53,6 +52,7 @@ export default function TaskerTabs() {
           }}
         />
       ))}
+      <Tabs.Screen name="earnings" options={{ href: null }} />
     </Tabs>
   )
 }
