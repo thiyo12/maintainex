@@ -18,7 +18,6 @@ const securityHeaders: Record<string, string> = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
 

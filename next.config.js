@@ -47,7 +47,7 @@ const nextConfig = {
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'same-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com https://placehold.co https://i.pravatar.cc https://cdn.tailwindcss.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'" },
+          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com https://placehold.co https://i.pravatar.cc https://cdn.tailwindcss.com; connect-src 'self' https://api.cloudinary.com https://*.cloudinary.com; media-src 'self' https://res.cloudinary.com https://*.cloudinary.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
         ],
       },
