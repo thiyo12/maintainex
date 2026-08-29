@@ -476,5 +476,6 @@ export const config = {
   matcher: [
     '/api/:path*',
     '/admin/:path*',
+    '/setup/:path*',
   ],
 }
