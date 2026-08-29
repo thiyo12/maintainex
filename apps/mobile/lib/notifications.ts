@@ -1,19 +1,27 @@
-import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 import { notifications as api } from './api'
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-})
+let Notifications: any = null
+try {
+  if (Platform.OS !== 'web') {
+    Notifications = require('expo-notifications')
+  }
+} catch {}
+
+if (Notifications) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  })
+}
 
 let registered = false
 
 export async function registerForPushNotifications() {
-  if (registered) return
+  if (registered || !Notifications) return
   try {
     const { status: existing } = await Notifications.getPermissionsAsync()
     let finalStatus = existing
@@ -45,14 +53,15 @@ export async function registerForPushNotifications() {
 }
 
 export function addNotificationListeners(
-  onReceived?: (notification: Notifications.Notification) => void,
-  onResponse?: (response: Notifications.NotificationResponse) => void,
+  onReceived?: (notification: any) => void,
+  onResponse?: (response: any) => void,
 ) {
-  const receivedSub = Notifications.addNotificationReceivedListener(n => {
+  if (!Notifications) return () => {}
+  const receivedSub = Notifications.addNotificationReceivedListener((n: any) => {
     console.log('[push] received:', n.request.content.title)
     onReceived?.(n)
   })
-  const responseSub = Notifications.addNotificationResponseReceivedListener(r => {
+  const responseSub = Notifications.addNotificationResponseReceivedListener((r: any) => {
     console.log('[push] tapped:', r.notification.request.content.data)
     onResponse?.(r)
   })

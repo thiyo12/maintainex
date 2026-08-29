@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { notifyQuoteSubmitted } from '@/lib/notifications'
 
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+
+    const profile = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
+    const companyProfile = await prisma.companyProfile.findUnique({ where: { userId: user.id } })
+    if (!profile && !companyProfile) {
+      return NextResponse.json({ error: 'You must have a provider profile to submit quotes' }, { status: 403 })
+    }
+    if (user.identityStatus !== 'VERIFIED') {
+      return NextResponse.json({ error: 'Your identity must be verified before submitting quotes. Please complete KYC verification.' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { jobId, providerType, price, estimatedCompletionTime, message, attachments } = body

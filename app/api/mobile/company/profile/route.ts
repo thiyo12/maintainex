@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 function safeParseJson(val: string | null | undefined): string[] {
   if (!val) return []
@@ -78,6 +78,8 @@ export async function PUT(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const data = await request.json()
     const profile = await prisma.companyProfile.upsert({

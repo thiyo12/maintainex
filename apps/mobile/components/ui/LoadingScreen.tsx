@@ -26,56 +26,79 @@ export function LoadingScreen({ onDone }: Props) {
   const d3Op        = useRef(new Animated.Value(0.25)).current
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(iconScale,  { toValue: 1, friction: 4, tension: 60, useNativeDriver: true }),
-      Animated.timing(iconRotate, { toValue: 0, duration: 600, useNativeDriver: true }),
-    ]).start()
-    Animated.sequence([
+    const anims: Animated.CompositeAnimation[] = []
+
+    const a1 = Animated.parallel([
+      Animated.spring(iconScale,  { toValue: 1, friction: 4, tension: 60, useNativeDriver: false }),
+      Animated.timing(iconRotate, { toValue: 0, duration: 600, useNativeDriver: false }),
+    ])
+    anims.push(a1)
+    a1.start()
+
+    const a2 = Animated.sequence([
       Animated.delay(250),
       Animated.parallel([
-        Animated.timing(titleOp, { toValue: 1, duration: 450, useNativeDriver: true }),
-        Animated.timing(titleY,  { toValue: 0, duration: 450, useNativeDriver: true }),
+        Animated.timing(titleOp, { toValue: 1, duration: 450, useNativeDriver: false }),
+        Animated.timing(titleY,  { toValue: 0, duration: 450, useNativeDriver: false }),
       ]),
-    ]).start()
-    Animated.sequence([
+    ])
+    anims.push(a2)
+    a2.start()
+
+    const a3 = Animated.sequence([
       Animated.delay(400),
       Animated.parallel([
-        Animated.timing(subOp, { toValue: 1, duration: 450, useNativeDriver: true }),
-        Animated.timing(subY,  { toValue: 0, duration: 450, useNativeDriver: true }),
+        Animated.timing(subOp, { toValue: 1, duration: 450, useNativeDriver: false }),
+        Animated.timing(subY,  { toValue: 0, duration: 450, useNativeDriver: false }),
       ]),
-    ]).start()
-    Animated.loop(
+    ])
+    anims.push(a3)
+    a3.start()
+
+    const a4 = Animated.loop(
       Animated.sequence([
         Animated.timing(barW, { toValue: 0.9, duration: 2500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
         Animated.timing(barW, { toValue: 0,   duration: 400,  useNativeDriver: false }),
       ])
-    ).start()
-    const ringAnim = (s: Animated.Value, op: Animated.Value, delay: number) =>
-      Animated.loop(Animated.sequence([
+    )
+    anims.push(a4)
+    a4.start()
+
+    const ringAnim = (s: Animated.Value, op: Animated.Value, delay: number) => {
+      const a = Animated.loop(Animated.sequence([
         Animated.delay(delay),
         Animated.parallel([
-          Animated.timing(s,  { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(op, { toValue: 1,    duration: 1500, useNativeDriver: true }),
+          Animated.timing(s,  { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+          Animated.timing(op, { toValue: 1,    duration: 1500, useNativeDriver: false }),
         ]),
         Animated.parallel([
-          Animated.timing(s,  { toValue: 0.95, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(op, { toValue: 0.5,  duration: 1500, useNativeDriver: true }),
+          Animated.timing(s,  { toValue: 0.95, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
+          Animated.timing(op, { toValue: 0.5,  duration: 1500, useNativeDriver: false }),
         ]),
-      ])).start()
+      ]))
+      anims.push(a)
+      a.start()
+    }
     ringAnim(ring1S, ring1Op, 0)
     ringAnim(ring2S, ring2Op, 500)
-    const dotAnim = (op: Animated.Value, delay: number) =>
-      Animated.loop(Animated.sequence([
+
+    const dotAnim = (op: Animated.Value, delay: number) => {
+      const a = Animated.loop(Animated.sequence([
         Animated.delay(delay),
-        Animated.timing(op, { toValue: 1,    duration: 400, useNativeDriver: true }),
-        Animated.timing(op, { toValue: 0.25, duration: 400, useNativeDriver: true }),
-      ])).start()
+        Animated.timing(op, { toValue: 1,    duration: 400, useNativeDriver: false }),
+        Animated.timing(op, { toValue: 0.25, duration: 400, useNativeDriver: false }),
+      ]))
+      anims.push(a)
+      a.start()
+    }
     dotAnim(d1Op, 0)
     dotAnim(d2Op, 180)
     dotAnim(d3Op, 360)
-    if (onDone) {
-      const entranceEnd = setTimeout(onDone, 1000)
-      return () => clearTimeout(entranceEnd)
+
+    const entranceEnd = setTimeout(onDone || (() => {}), 1000)
+    return () => {
+      clearTimeout(entranceEnd)
+      anims.forEach(a => { try { a.stop() } catch {} })
     }
   }, [onDone])
 

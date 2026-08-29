@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAdminSession } from '@/lib/admin-auth'
+
+const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT']
 
 // GET: List all wishlist items or waitlist signups
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view')
 
@@ -82,6 +89,10 @@ export async function GET(request: NextRequest) {
 // POST: Create new wishlist item
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { title, description, category, priority, requestedBy } = body
 
@@ -110,6 +121,10 @@ export async function POST(request: NextRequest) {
 // PUT: Update wishlist item
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { itemId, status, priority, assignedTo, notes } = body
 
@@ -139,6 +154,10 @@ export async function PUT(request: NextRequest) {
 // DELETE: Delete wishlist item
 export async function DELETE(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const itemId = searchParams.get('itemId')
 

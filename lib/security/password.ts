@@ -2,7 +2,8 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
 const ROUNDS = 14
-const PEPPER = process.env.PASSWORD_PEPPER || 'maintainex-pepper-change-in-production'
+if (!process.env.PASSWORD_PEPPER) throw new Error('[SECURITY] PASSWORD_PEPPER env var is required')
+const PEPPER = process.env.PASSWORD_PEPPER
 
 export async function hashPassword(password: string): Promise<string> {
   const peppered = crypto.createHash('sha256').update(password + PEPPER).digest('hex')

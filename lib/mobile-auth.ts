@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import { prisma } from './prisma'
 
@@ -36,6 +36,53 @@ export function getTokenFromRequest(request: NextRequest): string | null {
   return null
 }
 
+export type AuthenticatedUser = {
+  id: string
+  email: string
+  name: string
+  phone: string | null
+  role: string
+  isActive: boolean
+  identityStatus: string | null
+  lastNameChangedAt: Date | null
+  isSuspended: boolean
+  isBanned: boolean
+  suspendedUntil: Date | null
+  suspensionReason: string | null
+  banReason: string | null
+}
+
+export function assertNotSuspended(user: AuthenticatedUser): NextResponse | null {
+  if (user.isBanned) {
+    return NextResponse.json({
+      error: 'Account banned',
+      code: 'BANNED',
+      reason: user.banReason || 'Your account has been permanently banned for violating platform terms.',
+    }, { status: 403 })
+  }
+
+  if (user.isSuspended) {
+    if (!user.suspendedUntil) {
+      return NextResponse.json({
+        error: 'Account suspended',
+        code: 'SUSPENDED',
+        reason: user.suspensionReason || 'Your account has been suspended.',
+      }, { status: 403 })
+    }
+
+    if (new Date(user.suspendedUntil) > new Date()) {
+      return NextResponse.json({
+        error: 'Account temporarily suspended',
+        code: 'SUSPENDED',
+        reason: user.suspensionReason || 'Your account is temporarily suspended.',
+        suspendedUntil: user.suspendedUntil.toISOString(),
+      }, { status: 403 })
+    }
+  }
+
+  return null
+}
+
 export async function authenticateRequest(request: NextRequest) {
   const token = getTokenFromRequest(request)
   if (!token) return null
@@ -44,7 +91,7 @@ export async function authenticateRequest(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.id },
-    select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, identityStatus: true, lastNameChangedAt: true },
+    select: { id: true, email: true, name: true, phone: true, role: true, isActive: true, identityStatus: true, lastNameChangedAt: true, isSuspended: true, isBanned: true, suspendedUntil: true, suspensionReason: true, banReason: true },
   })
 
   if (!user || !user.isActive) return null

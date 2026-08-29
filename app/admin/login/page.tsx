@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
 import { FiLogIn, FiEye, FiEyeOff, FiShield } from 'react-icons/fi'
-import { setStoredUser } from '@/lib/auth-client'
 import { useAuthStore } from '@/lib/auth-store'
 import { setAccessToken } from '@/lib/admin-api'
 
@@ -48,7 +47,6 @@ export default function AdminLogin() {
           assignedCountries: mpData.user.assignedCountries || [],
           authType: 'adminUser',
         })
-        setStoredUser(mpData.user)
         toast.success('Login successful!')
         window.location.href = '/admin/dashboard'
         return
@@ -69,7 +67,6 @@ export default function AdminLogin() {
       }
 
       if (webData.success && webData.user) {
-        setStoredUser(webData.user)
         useAuthStore.getState().setAdminUser({
           id: webData.user.id,
           email: webData.user.email,
@@ -118,7 +115,6 @@ export default function AdminLogin() {
         assignedCountries: data.user.assignedCountries || [],
         authType: 'adminUser',
       })
-      setStoredUser(data.user)
       toast.success('Login successful!')
       window.location.href = '/admin/dashboard'
     } catch {

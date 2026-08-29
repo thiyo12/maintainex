@@ -1,10 +1,21 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { getStoredUser, setStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
+import { useRouter } from 'next/navigation'
+
+interface AdminUser {
+  id: string
+  email: string
+  role: string
+  name: string | null
+  branchId: string | null
+  province: string | null
+  region: string | null
+  canEditServices: boolean
+}
 
 interface SessionContextType {
-  user: StoredUser | null
+  user: AdminUser | null
   loading: boolean
 }
 
@@ -15,16 +26,30 @@ export function useAdminSession() {
 }
 
 export function AdminSessionProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<StoredUser | null>(null)
+  const [user, setUser] = useState<AdminUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
-    const storedUser = getStoredUser()
-    if (storedUser) {
-      setUser(storedUser)
+    async function fetchSession() {
+      try {
+        const res = await fetch('/api/admin/auth/me', { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          setUser(data.user)
+        } else {
+          setUser(null)
+          router.push('/admin/login')
+        }
+      } catch {
+        setUser(null)
+        router.push('/admin/login')
+      } finally {
+        setLoading(false)
+      }
     }
-    setLoading(false)
-  }, [])
+    fetchSession()
+  }, [router])
 
   return (
     <SessionContext.Provider value={{ user, loading }}>

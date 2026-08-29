@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -85,6 +85,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const body = await request.json()
     const job = await prisma.jobPosting.findUnique({ where: { id: params.id } })
@@ -142,12 +144,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const job = await prisma.jobPosting.findUnique({ where: { id: params.id } })
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    if (job.customerId !== user.id && !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) {
+    if (job.customerId !== user.id && !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Not your job' }, { status: 403 })
     }
 

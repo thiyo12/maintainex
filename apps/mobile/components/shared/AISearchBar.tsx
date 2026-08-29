@@ -65,13 +65,9 @@ export default function AISearchBar({
   useEffect(() => {
     Animated.loop(Animated.sequence([
       Animated.parallel([
-        Animated.timing(glowRadius, { toValue: 20, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        Animated.timing(glowOp, { toValue: 0.5, duration: 1800, useNativeDriver: false }),
         Animated.timing(sparkScale, { toValue: 1.2, duration: 1800, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(glowRadius, { toValue: 8, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: false }),
-        Animated.timing(glowOp, { toValue: 0.2, duration: 1800, useNativeDriver: false }),
         Animated.timing(sparkScale, { toValue: 1.0, duration: 1800, useNativeDriver: true }),
       ]),
     ])).start()

@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/auth-utils'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+  }
+
+  const session = await getSession(request)
+  if (!session || session.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const results: Record<string, number> = {}
 
@@ -83,7 +93,7 @@ export async function POST() {
     const adminCount = await prisma.adminUser.count()
     if (adminCount < 3) {
       const staff = [
-        { email: 'moderator@maintainex.com', firstName: 'Mod', lastName: 'Erator', role: 'MODERATOR', assignedCountries: 'LK' },
+        { email: 'moderator@maintainex.com', firstName: 'Mod', lastName: 'Erator', role: 'USER_MANAGEMENT', assignedCountries: 'LK' },
         { email: 'support@maintainex.com', firstName: 'Sup', lastName: 'Port', role: 'SUPPORT', assignedCountries: 'LK,CA' },
       ]
       let created = 0

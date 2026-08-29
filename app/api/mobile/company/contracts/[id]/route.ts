@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -58,6 +58,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { status, progress } = await request.json()
     const updateData: any = {}

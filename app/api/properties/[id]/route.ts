@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -35,12 +36,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = params
     const body = await request.json()
 
     const listing = await prisma.realEstateListing.findUnique({ where: { id } })
     if (!listing) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+    }
+
+    if (listing.postedBy !== session.id && session.role !== 'SUPER_ADMIN' && session.role !== 'MANAGER') {
+      return NextResponse.json({ error: 'Unauthorized - You can only edit your own listings' }, { status: 403 })
     }
 
     const data: any = {}
@@ -80,11 +90,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = params
 
     const listing = await prisma.realEstateListing.findUnique({ where: { id } })
     if (!listing) {
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+    }
+
+    if (listing.postedBy !== session.id && session.role !== 'SUPER_ADMIN' && session.role !== 'MANAGER') {
+      return NextResponse.json({ error: 'Unauthorized - You can only delete your own listings' }, { status: 403 })
     }
 
     await prisma.realEstateListing.delete({ where: { id } })

@@ -34,7 +34,7 @@ export function getSessionFromCookie(request: NextRequest): AdminSession | null 
 
   // Fallback to old base64+HMAC custom token
   const payload = verifySimpleToken(rawToken)
-  if (!payload || payload.authType !== 'adminUser') return null
+  if (!payload) return null
   return {
     id: payload.id,
     email: payload.email,

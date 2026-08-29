@@ -59,7 +59,9 @@ export default function RegisterScreen() {
     try {
       await register({ name, email, password, phone, role })
       setSignupData({ name, email, phone, password, role })
-      router.push({ pathname: '/(auth)/otp', params: { phone, role } })
+      if (role === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
+      else if (role === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
+      else router.replace('/(customer)')
     } catch (err: any) {
       let message = err.message || t('errors.generic')
       try {

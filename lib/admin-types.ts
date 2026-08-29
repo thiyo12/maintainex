@@ -1,11 +1,12 @@
-export type AdminRole = 'SUPER_ADMIN' | 'OPERATIONS' | 'FINANCE' | 'SUPPORT' | 'MODERATOR'
+export type AdminRole = 'SUPER_ADMIN' | 'MANAGER' | 'FINANCE' | 'USER_MANAGEMENT' | 'SUPPORT' | 'TECHNICAL'
 
 export const ADMIN_ROLES: Record<AdminRole, { label: string; color: string; description: string }> = {
-  SUPER_ADMIN: { label: 'Super Admin', color: 'purple', description: 'Full platform access' },
-  OPERATIONS: { label: 'Operations', color: 'blue', description: 'User, tasker, company & job management' },
-  FINANCE: { label: 'Finance', color: 'green', description: 'Commission, wallets & settlements' },
-  SUPPORT: { label: 'Support', color: 'yellow', description: 'Disputes, complaints & user tickets' },
-  MODERATOR: { label: 'Moderator', color: 'orange', description: 'KYC review & content moderation' },
+  SUPER_ADMIN: { label: 'Super Admin', color: 'purple', description: 'Full platform access, can reassign work queue' },
+  MANAGER: { label: 'Manager', color: 'blue', description: 'Full read, reassign work, resolve escalations, manage work queue' },
+  FINANCE: { label: 'Finance', color: 'green', description: 'Commission, wallets & settlements — settlement queue' },
+  USER_MANAGEMENT: { label: 'User Management', color: 'orange', description: 'KYC review, user suspension & ban — KYC queue' },
+  SUPPORT: { label: 'Support', color: 'yellow', description: 'Disputes, complaints & user tickets — dispute queue' },
+  TECHNICAL: { label: 'Technical', color: 'cyan', description: 'Security audit, system health & error logs — system queue' },
 }
 
 export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
@@ -21,21 +22,22 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'disputes:view', 'disputes:resolve',
     'cheating:view', 'cheating:action',
     'support:view', 'support:respond',
+    'queue:view', 'queue:manage', 'queue:assign',
     'analytics:view',
     'admins:view', 'admins:create', 'admins:edit', 'admins:delete',
     'settings:view', 'settings:edit',
     'security:view', 'security:audit',
     'wishlist:view', 'wishlist:manage',
   ],
-  OPERATIONS: [
+  MANAGER: [
     'dashboard:view',
-    'users:view', 'users:edit', 'users:ban', 'users:suspend',
-    'taskers:view', 'taskers:edit', 'taskers:ban', 'taskers:verify',
-    'companies:view', 'companies:edit', 'companies:ban', 'companies:verify',
-    'kyc:view', 'kyc:approve', 'kyc:reject',
-    'jobs:view', 'jobs:manage', 'jobs:cancel',
+    'users:view', 'users:edit',
+    'taskers:view', 'taskers:edit', 'taskers:verify',
+    'companies:view', 'companies:edit', 'companies:verify',
+    'jobs:view', 'jobs:manage',
     'disputes:view', 'disputes:resolve',
     'cheating:view', 'cheating:action',
+    'queue:view', 'queue:manage', 'queue:assign',
     'analytics:view',
     'wishlist:view', 'wishlist:manage',
   ],
@@ -46,7 +48,17 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'companies:view',
     'commission:view', 'commission:manage', 'commission:config',
     'wallets:view', 'wallets:manage',
+    'queue:view',
     'analytics:view',
+  ],
+  USER_MANAGEMENT: [
+    'dashboard:view',
+    'users:view', 'users:edit', 'users:ban', 'users:suspend',
+    'taskers:view', 'taskers:edit', 'taskers:ban', 'taskers:verify',
+    'companies:view', 'companies:edit', 'companies:ban', 'companies:verify',
+    'kyc:view', 'kyc:approve', 'kyc:reject',
+    'cheating:view', 'cheating:action',
+    'queue:view',
   ],
   SUPPORT: [
     'dashboard:view',
@@ -54,18 +66,16 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'taskers:view',
     'companies:view',
     'disputes:view', 'disputes:resolve',
-    'cheating:view', 'cheating:action',
+    'cheating:view',
     'support:view', 'support:respond',
     'kyc:view',
+    'queue:view',
   ],
-  MODERATOR: [
+  TECHNICAL: [
     'dashboard:view',
-    'users:view',
-    'taskers:view',
-    'companies:view',
-    'kyc:view', 'kyc:approve', 'kyc:reject',
-    'cheating:view', 'cheating:action',
-    'wishlist:view', 'wishlist:manage',
+    'security:view', 'security:audit',
+    'queue:view',
+    'analytics:view',
   ],
 }
 
@@ -85,6 +95,8 @@ export type AuditAction =
   | 'PROPERTY_APPROVE' | 'PROPERTY_REJECT' | 'PROPERTY_FEATURE'
   | 'COMMISSION_CONFIG' | 'WALLET_FREEZE' | 'WALLET_UNFREEZE'
   | 'SETTLEMENT_PROCESS' | 'SETTLEMENT_OVERDUE'
+  | 'COMMISSION_PAYMENT_CONFIRM'
+  | 'JOB_FLAG'
 
 export interface AdminSession {
   id: string

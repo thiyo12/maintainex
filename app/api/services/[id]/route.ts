@@ -90,28 +90,19 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('=== Service PATCH called ===')
-    console.log('Service ID:', params.id)
-    
     const session = await getSession(request)
-    console.log('Session:', session)
     
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized', reason: 'No session' }, { status: 401 })
     }
     
     const canEdit = session.role === 'SUPER_ADMIN' || session.canEditServices
-    console.log('canEdit:', canEdit)
 
     if (!canEdit) {
       return NextResponse.json({ error: 'Only Super Admin or authorized admins can update services' }, { status: 403 })
     }
 
     const body = await request.json()
-    console.log('=== PATCH API Received ===')
-    console.log('Request body:', body)
-    console.log('Image field:', body.image)
-    
     const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features } = body
 
     const service = await prisma.service.update({
@@ -131,9 +122,6 @@ export async function PATCH(
       },
       include: { category: true }
     })
-
-    console.log('=== Updated Service ===')
-    console.log('Service image:', service.image)
 
     return NextResponse.json({
       ...service,

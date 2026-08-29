@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { notifyAllAdmins } from '@/lib/admin-notifications'
+import { createWorkItem } from '@/lib/work-queue'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,6 +10,8 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { jobId, reason, description } = await request.json()
     if (!jobId || !reason || !description) {
@@ -30,6 +33,14 @@ export async function POST(request: NextRequest) {
     })
 
     await notifyAllAdmins('dispute_raised', `New Dispute: ${reason}`, `Dispute raised by ${user.name || user.email} on job "${job.title}"`, `/admin/marketplace/escrow`)
+
+    await createWorkItem({
+      category: 'dispute',
+      title: `Dispute: ${reason}`,
+      description: `${user.name || user.email} raised a dispute on job "${job.title}". ${description}`,
+      targetTable: 'Dispute',
+      targetId: dispute.id,
+    })
 
     return NextResponse.json({
       id: dispute.id,

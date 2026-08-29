@@ -7,7 +7,6 @@ import {
   FiActivity, FiArrowUp, FiArrowDown, FiRefreshCw, FiX, FiPlus,
   FiWifi, FiServer, FiEye, FiUserX
 } from 'react-icons/fi'
-import { getAuthHeader } from '@/lib/auth-client'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface SecurityData {
@@ -84,8 +83,7 @@ export default function SecurityMonitorPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/admin/security/monitor', { headers: { ...authHeaders } })
+      const res = await fetch('/api/admin/security/monitor', { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
       if (!res.ok) throw new Error('Failed to fetch')
       const json = await res.json()
@@ -110,10 +108,9 @@ export default function SecurityMonitorPage() {
     }
     setBlocking(true)
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/admin/security/blocked-ips', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip: blockIP.trim(), reason: blockReason.trim(), durationMinutes: blockDuration }),
       })
       const json = await res.json()
@@ -135,10 +132,9 @@ export default function SecurityMonitorPage() {
 
   const handleUnblockIP = async (ip: string) => {
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/admin/security/blocked-ips', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip }),
       })
       if (res.ok) {

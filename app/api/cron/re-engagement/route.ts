@@ -4,8 +4,9 @@ import { getSetting } from '@/lib/settings'
 import { createNotification } from '@/lib/notifications'
 
 export async function GET(request: NextRequest) {
+  if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET || 'maintainex-cron-secret'}`) {
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
 import { getProvinceFromDistrict } from '@/lib/provinces'
-import bcrypt from 'bcryptjs'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,8 +9,6 @@ export async function GET(request: NextRequest) {
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
-    console.log('Bookings API called by:', session.email, 'role:', session.role)
     
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -91,6 +88,11 @@ function isValidName(name: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await request.json()
     
     let { name, phone, email, district, address, subService, date, time, notes, budgetMin, budgetMax } = body
@@ -158,19 +160,10 @@ export async function POST(request: NextRequest) {
       branchId = anyBranch?.id || null
     }
 
-    let user = await prisma.user.findUnique({ where: { email } })
+    let user = await prisma.user.findUnique({ where: { email: session.email } })
     
     if (!user) {
-      const hashedPassword = await bcrypt.hash('temp-password-123', 10)
-      user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          phone,
-          passwordHash: hashedPassword,
-          role: 'CUSTOMER'
-        }
-      })
+      return NextResponse.json({ error: 'User account not found' }, { status: 400 })
     }
 
     if (!serviceId || !branchId) {

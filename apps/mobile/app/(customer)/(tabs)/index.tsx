@@ -544,7 +544,7 @@ export default function CustomerHome() {
                 <ChatCircle size={16} color={colors.amberDark} weight="regular" />
                 <Text style={[styles.secTitle, { color: colors.ink }]}>{t('customer.messages')}</Text>
               </View>
-              <TouchableOpacity style={styles.secMore} onPress={() => router.push('/(tabs)/inbox')}>
+              <TouchableOpacity style={styles.secMore} onPress={() => router.push('/(customer)/(tabs)/inbox')}>
                 <Text style={[styles.secMoreText, { color: colors.amberDark }]}>{t('common.viewAll')}</Text>
                 <CaretRight size={12} color={colors.amberDark} weight="bold" />
               </TouchableOpacity>

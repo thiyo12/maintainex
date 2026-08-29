@@ -5,7 +5,8 @@ import { translateJobStatus } from '../../../lib/i18n'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Bell, Briefcase, MagnifyingGlass, ChatCircle, User, Flame, Star, CheckCircle, Lightning, ArrowRight, MapPin, Clock, Wallet, House, Buildings, CaretRight, Users, Trophy, Wrench, Sun } from 'phosphor-react-native'
-import * as Notifications from 'expo-notifications'
+let Notifications: any = null
+try { Notifications = require('expo-notifications') } catch {}
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Jobs } from '../../../lib/api-v2'
@@ -317,13 +318,13 @@ export default function TaskerDashboard() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>{t('home.postOptions.title')}</Text>
           <View style={styles.grid}>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/post-job')}>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(customer)/jobs/v2/create')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.amberBg }]}>
                 <Briefcase size={22} color={colors.amberDark} weight="fill" />
               </View>
               <Text style={[styles.gridLabel, { color: colors.ink }]}>{t('tasker.postJob')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(tabs)/find/index')}>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/(customer)/(tabs)/explore')}>
               <View style={[styles.gridIcon, { backgroundColor: '#DBEAFE' }]}>
                 <MagnifyingGlass size={22} color="#3B82F6" weight="bold" />
               </View>

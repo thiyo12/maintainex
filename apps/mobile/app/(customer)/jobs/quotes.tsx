@@ -62,7 +62,7 @@ export default function QuotesScreen() {
                   <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>{t('quotes.viewProfile')}</Text></TouchableOpacity>
                   <TouchableOpacity
                     style={styles.acceptBtn}
-                    onPress={() => router.push(`/(customer)/booking/confirm?jobId=${jobId || ''}&bidId=${q.id}&taskerName=${q.tasker?.user?.name || ''}&price=${q.amount}` as any)}
+                    onPress={() => router.push(`/(customer)/payment/escrow-confirm?bookingId=${jobId || ''}&quoteId=${q.id}&taskerName=${q.tasker?.user?.name || ''}&quotedAmount=${q.amount}&jobTitle=${encodeURIComponent(job?.title || '')}` as any)}
                   >
                     <Text style={styles.acceptBtnText}>{t('quotes.accept')}</Text>
                   </TouchableOpacity>

@@ -6,7 +6,6 @@ import {
   FiShield, FiSearch, FiFilter, FiClock, FiUser, FiGlobe,
   FiAlertTriangle, FiInfo, FiChevronLeft, FiChevronRight
 } from 'react-icons/fi'
-import { getAuthHeader } from '@/lib/auth-client'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface AuditLog {
@@ -67,14 +66,13 @@ export default function SecurityLogs() {
   const fetchLogs = useCallback(async () => {
     setLoading(true)
     try {
-      const authHeaders = getAuthHeader()
       const params = new URLSearchParams({ page: String(page), limit: '50' })
       if (filters.action) params.set('action', filters.action)
       if (filters.adminUserId) params.set('adminUserId', filters.adminUserId)
       if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
 
-      const res = await fetch(`/api/admin/security/logs?${params}`, { headers: { ...authHeaders } })
+      const res = await fetch(`/api/admin/security/logs?${params}`, { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
       const json = await res.json()
       setData(json)

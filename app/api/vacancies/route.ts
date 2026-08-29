@@ -8,13 +8,28 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive')
     const branchId = searchParams.get('branchId')
 
+    const session = await getSession(request)
+
     let where: any = {}
-    if (isActive === 'true') where.isActive = true
-    if (branchId) where.branchId = branchId
+    if (session) {
+      if (isActive === 'true') where.isActive = true
+      if (isActive === 'false') where.isActive = false
+      if (branchId) where.branchId = branchId
+    } else {
+      where.isActive = true
+    }
 
     const vacancies = await prisma.jobVacancy.findMany({
       where,
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      select: session ? undefined : {
+        id: true,
+        title: true,
+        description: true,
+        location: true,
+        isActive: true,
+        createdAt: true,
+      }
     })
 
     return NextResponse.json(vacancies)
@@ -32,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const canManage = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(session.role)
+    const canManage = ['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(session.role)
 
     if (!canManage) {
       return NextResponse.json({ error: 'Permission denied' }, { status: 403 })

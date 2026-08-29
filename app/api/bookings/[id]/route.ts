@@ -40,7 +40,8 @@ export async function GET(
     let user = null
     if (booking.userId) {
       user = await prisma.user.findUnique({
-        where: { id: booking.userId }
+        where: { id: booking.userId },
+        select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true }
       })
     }
 
@@ -143,7 +144,8 @@ export async function PATCH(
     let user = null
     if (booking.userId) {
       user = await prisma.user.findUnique({
-        where: { id: booking.userId }
+        where: { id: booking.userId },
+        select: { id: true, name: true, email: true, phone: true, role: true, isActive: true, createdAt: true }
       })
     }
 

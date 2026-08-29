@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
@@ -73,7 +72,7 @@ function CustomerPageContent() {
       if (statusFilter) params.set('status', statusFilter)
 
       const res = await fetch(`/api/admin/users?${params}`, {
-        headers: { ...getAuthHeader() },
+        headers: { },
       })
 
       if (res.status === 401) {
@@ -109,7 +108,6 @@ function CustomerPageContent() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeader(),
         },
         body: JSON.stringify({
           userId: confirmAction.userId,

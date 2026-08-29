@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAdminSession } from '@/lib/admin-auth'
+
+const ALLOWED_ROLES = ['SUPER_ADMIN', 'USER_MANAGEMENT']
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const page = parseInt(searchParams.get('page') || '1')
@@ -87,6 +94,10 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { documentId, status, reviewNote } = body
 

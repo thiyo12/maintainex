@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiCreditCard, FiUser, FiDollarSign, FiRefreshCw, FiLock, FiUnlock, FiArrowUp, FiArrowDown, FiSearch } from 'react-icons/fi'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 
 interface ProviderWallet {
   id: string
@@ -54,9 +53,8 @@ export default function WalletsPage() {
   const fetchWallets = async () => {
     setLoading(true)
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admin/financial/wallets?type=${activeTab}`, {
-        headers: { ...authHeaders }
+        headers: { }
       })
       if (res.status === 401) {
         window.location.href = '/admin/login'
@@ -81,10 +79,9 @@ export default function WalletsPage() {
   const handleFreezeToggle = async (walletId: string, currentlyFrozen: boolean) => {
     setFreezeLoading(walletId)
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/admin/financial/wallets', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletId, action: currentlyFrozen ? 'UNFREEZE' : 'FREEZE' })
       })
       const data = await res.json()

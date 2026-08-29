@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    await prisma.$executeRawUnsafe(`DELETE FROM PricingCache WHERE expiresAt < datetime('now')`)
+    await prisma.$executeRaw`DELETE FROM PricingCache WHERE expiresAt < datetime('now')`
 
     return NextResponse.json({
       success: true,

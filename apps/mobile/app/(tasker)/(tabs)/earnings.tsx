@@ -9,12 +9,23 @@ import { earnings } from '../../../lib/api'
 
 type Period = 'weekly' | 'monthly' | 'yearly'
 
+interface CommissionPayment {
+  id: string
+  referenceNumber: string
+  amountDue: number
+  method: string
+  weekStart: string
+  weekEnd: string
+  dueAt: string
+}
+
 interface EarningsData {
   balance: number
   totalEarned: number
   totalJobs: number
   pendingAmount?: number
   transactions: { job: string; amount: number; date: string; status: string }[]
+  pendingCommissionPayments?: CommissionPayment[]
 }
 
 export default function TaskerEarnings() {
@@ -61,6 +72,27 @@ export default function TaskerEarnings() {
               <Text style={styles.withdrawBtnText}>{t('wallet.withdraw')}</Text>
             </TouchableOpacity>
           </View>
+
+          {(data?.pendingCommissionPayments || []).length > 0 && (
+            <View style={styles.commissionSection}>
+              <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
+              {data?.pendingCommissionPayments?.map((cp) => (
+                <View key={cp.id} style={styles.commissionCard}>
+                  <View style={styles.commissionHeader}>
+                    <Ionicons name="cash-outline" size={20} color={colors.amber} />
+                    <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
+                  </View>
+                  <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
+                  <Text style={styles.commissionInstruction}>
+                    Pay this amount to any Maintainex agent using reference: {cp.referenceNumber}
+                  </Text>
+                  <Text style={styles.commissionWeek}>
+                    Week: {new Date(cp.weekStart).toLocaleDateString()} - {new Date(cp.weekEnd).toLocaleDateString()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
@@ -208,4 +240,55 @@ const makeStyles = (colors: any) => StyleSheet.create({
   txAmount: { fontSize: 15, fontFamily: fonts.bodyMedium },
   empty: { alignItems: 'center', paddingTop: 40 },
   emptyTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.muted },
+  commissionSection: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  commissionTitle: {
+    fontSize: 16,
+    fontFamily: fonts.bodyMedium,
+    color: colors.ink,
+    marginBottom: 10,
+  },
+  commissionCard: {
+    backgroundColor: colors.white,
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.amber,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  commissionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  commissionRef: {
+    fontSize: 16,
+    fontFamily: fonts.heading,
+    color: colors.amber,
+  },
+  commissionAmount: {
+    fontSize: 20,
+    fontFamily: fonts.heading,
+    color: colors.ink,
+    marginBottom: 8,
+  },
+  commissionInstruction: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.muted,
+    marginBottom: 4,
+  },
+  commissionWeek: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.muted,
+  },
 })

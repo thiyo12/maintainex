@@ -49,18 +49,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         await SecureStore.setItemAsync('last_active_at', String(Date.now()))
         await setAuthToken(token)
-        setUser(JSON.parse(storedUser))
-        // Validate token against server — if stale, clear session
+
+        let parsedUser: User | null = null
         try {
-        const meRes = await auth.me()
-        setUser({ ...JSON.parse(storedUser), needsOnboarding: meRes.needsOnboarding })
-        await SecureStore.setItemAsync('auth_user', JSON.stringify({ ...JSON.parse(storedUser), needsOnboarding: meRes.needsOnboarding }))
+          parsedUser = JSON.parse(storedUser)
         } catch {
-          await SecureStore.deleteItemAsync('auth_token')
           await SecureStore.deleteItemAsync('auth_user')
-          await SecureStore.deleteItemAsync('last_active_at')
-          setAuthToken(null)
           setUser(null)
+          return
+        }
+
+        setUser(parsedUser)
+
+        // Validate token against server with retry — only clear session on auth errors
+        let retries = 2
+        while (retries >= 0) {
+          try {
+            const meRes = await auth.me()
+            const updatedUser = { ...parsedUser, needsOnboarding: meRes.needsOnboarding } as User
+            setUser(updatedUser)
+            await SecureStore.setItemAsync('auth_user', JSON.stringify(updatedUser))
+            break
+          } catch (err: any) {
+            retries--
+            // 401/403 = token revoked — clear session immediately
+            if (err?.message?.includes('401') || err?.message?.includes('403') || err?.message?.includes('Unauthorized')) {
+              await SecureStore.deleteItemAsync('auth_token')
+              await SecureStore.deleteItemAsync('auth_user')
+              await SecureStore.deleteItemAsync('last_active_at')
+              setAuthToken(null)
+              setUser(null)
+              break
+            }
+            // Network/transient error — retry after delay
+            if (retries >= 0) {
+              await new Promise(r => setTimeout(r, 1000 * (2 - retries)))
+            } else {
+              // All retries exhausted — keep cached user, let app function offline
+              console.warn('auth.me() failed after retries, using cached session')
+            }
+          }
         }
       }
     } catch {

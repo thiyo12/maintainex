@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink } from 'react-icons/fi'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 
 interface KYCDocument {
   id: string
@@ -90,7 +89,7 @@ export default function KYCPage() {
     try {
       const statusParam = activeTab === 'ALL' ? '' : `&status=${activeTab}`
       const res = await fetch(`/api/admin/kyc?page=1&limit=100${statusParam}`, {
-        headers: { ...getAuthHeader() },
+        headers: { },
       })
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
@@ -108,7 +107,7 @@ export default function KYCPage() {
     try {
       const res = await fetch('/api/admin/kyc', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: docId, status: 'APPROVED' }),
       })
       if (!res.ok) throw new Error('Failed')
@@ -131,7 +130,7 @@ export default function KYCPage() {
     try {
       const res = await fetch('/api/admin/kyc', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: docId, status: 'REJECTED', reviewNote: rejectReason }),
       })
       if (!res.ok) throw new Error('Failed')

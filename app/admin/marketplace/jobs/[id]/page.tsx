@@ -1,17 +1,14 @@
 'use client'
 
-import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { FiArrowLeft, FiAlertCircle, FiRefreshCw } from 'react-icons/fi'
+import { FiArrowLeft, FiAlertCircle, FiRefreshCw, FiFlag, FiXCircle, FiDollarSign } from 'react-icons/fi'
 import api from '@/lib/api'
-import { useAuthStore } from '@/lib/auth-store'
 import { PERMISSION } from '@/lib/permissions'
 import { PermissionGate } from '@/components/admin/PermissionGate'
 import { formatMoney } from '@/lib/money'
 import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/admin/ConfirmDialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -24,6 +21,7 @@ interface JobDetail {
   budgetCents: number | null
   currency: string
   categoryId: string | null
+  source: 'V1' | 'V2'
   client: { id: string; name: string | null; email: string }
   worker: { id: string; name: string | null; email: string } | null
   escrow: { id: string; status: string; amountCents: number } | null
@@ -41,9 +39,7 @@ const STATUS_MAP: Record<string, string> = {
 export default function MarketplaceJobDetail() {
   const params = useParams()
   const router = useRouter()
-  const adminUser = useAuthStore((s) => s.adminUser)
   const queryClient = useQueryClient()
-  const [confirmCancel, setConfirmCancel] = useState(false)
 
   const { data: job, isLoading, error, refetch } = useQuery<JobDetail>({
     queryKey: ['admin-marketplace-job', params.id],
@@ -55,22 +51,29 @@ export default function MarketplaceJobDetail() {
     },
   })
 
-  const cancelMutation = useMutation({
-    mutationFn: async () => {
-      const res = await api.patch(`/api/admin/marketplace/jobs/${params.id}`, {
-        action: 'cancel',
-        reason: 'Admin force cancellation',
-      })
+  const patchAction = useMutation({
+    mutationFn: async ({ action, reason }: { action: string; reason: string }) => {
+      const res = await api.patch(`/api/admin/marketplace/jobs/${params.id}`, { action, reason })
       return res.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-marketplace-job', params.id] })
-      toast.success('Job cancelled successfully')
+      toast.success('Action completed successfully')
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.error || 'Failed to cancel job')
+      toast.error(err.response?.data?.error || 'Action failed')
     },
   })
+
+  function promptAndRun(action: string, label: string) {
+    const reason = window.prompt(`Reason for ${label}:`)
+    if (reason === null) return
+    if (!reason.trim()) {
+      toast.error('Reason is required')
+      return
+    }
+    patchAction.mutate({ action, reason: reason.trim() })
+  }
 
   if (isLoading) {
     return (
@@ -107,8 +110,10 @@ export default function MarketplaceJobDetail() {
     )
   }
 
+  const isActive = job.status !== 'COMPLETED' && job.status !== 'CANCELLED'
+  const hasEscrow = !!job.escrow && ['PENDING', 'PROTECTED', 'ON_HOLD'].includes(job.escrow.status)
+
   return (
-    <>
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-4">
@@ -117,6 +122,7 @@ export default function MarketplaceJobDetail() {
           </Button>
           <h1 className="text-2xl font-bold text-gray-900">{job.title}</h1>
           <Badge className={STATUS_MAP[job.status] || 'bg-gray-100 text-gray-800'}>{job.status}</Badge>
+          <Badge variant="outline" className="text-xs">{job.source}</Badge>
         </div>
         <Button variant="outline" onClick={() => refetch()}><FiRefreshCw className="mr-2 h-4 w-4" /> Refresh</Button>
       </div>
@@ -158,14 +164,39 @@ export default function MarketplaceJobDetail() {
           <Card>
             <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+              {isActive && (
+                <>
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => promptAndRun('cancel', 'Cancel Job')}
+                    disabled={patchAction.isPending}
+                  >
+                    <FiXCircle className="mr-2 h-4 w-4" />
+                    {patchAction.isPending ? 'Processing...' : 'Cancel Job'}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                    onClick={() => promptAndRun('flag', 'Flag for Review')}
+                    disabled={patchAction.isPending}
+                  >
+                    <FiFlag className="mr-2 h-4 w-4" />
+                    {patchAction.isPending ? 'Processing...' : 'Flag for Review'}
+                  </Button>
+                </>
+              )}
+
+              {hasEscrow && (
                 <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={() => setConfirmCancel(true)}
-                  disabled={cancelMutation.isPending}
+                  variant="outline"
+                  className="w-full border-red-300 text-red-700 hover:bg-red-50"
+                  onClick={() => promptAndRun('force_refund', 'Force Refund Escrow')}
+                  disabled={patchAction.isPending}
                 >
-                  {cancelMutation.isPending ? 'Cancelling...' : 'Force Cancel Job'}
+                  <FiDollarSign className="mr-2 h-4 w-4" />
+                  {patchAction.isPending ? 'Processing...' : 'Force Refund Escrow'}
                 </Button>
               )}
             </CardContent>
@@ -195,16 +226,5 @@ export default function MarketplaceJobDetail() {
         </Card>
       )}
     </div>
-
-      <ConfirmDialog
-        open={confirmCancel}
-        onOpenChange={setConfirmCancel}
-        title="Force Cancel Job"
-        description="Are you sure you want to force cancel this job? This action cannot be undone."
-        confirmLabel="Cancel Job"
-        onConfirm={() => { cancelMutation.mutate(); setConfirmCancel(false) }}
-        loading={cancelMutation.isPending}
-      />
-    </>
   )
 }

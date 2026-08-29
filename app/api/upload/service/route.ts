@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth-utils'
 import { uploadToCloudinary } from '@/lib/cloudinary'
 
 export async function GET() {
-  return NextResponse.json({ 
+  return NextResponse.json({
     message: 'Upload endpoint - use POST to upload images',
     uploadTo: 'Cloudinary'
   })
@@ -11,28 +11,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('=== Upload API called (Cloudinary) ===')
-    
     const session = await getSession(request)
-    console.log('Session result:', session)
-    
+
     if (!session) {
-      console.log('=== AUTH FAILED ===')
       return NextResponse.json({ error: 'Unauthorized', reason: 'No valid session' }, { status: 401 })
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    console.log('Permissions - isSuper:', isSuper)
 
     if (!isSuper) {
-      console.log('=== PERMISSION DENIED ===')
       return NextResponse.json({ error: 'Only Super Admin can upload images' }, { status: 403 })
     }
 
-    console.log('Parsing form data...')
     const formData = await request.formData()
     const file = formData.get('file') as File | null
-    console.log('File received:', file?.name, file?.size, file?.type)
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -48,23 +40,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size exceeds 10MB limit' }, { status: 400 })
     }
 
-    console.log('Reading file buffer...')
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    console.log('Buffer size:', buffer.length)
 
-    console.log('Uploading to Cloudinary...')
     const result = await uploadToCloudinary(buffer, 'services', file.name)
-    console.log('Cloudinary upload success:', result.url)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       url: result.url,
       fileName: result.publicId
     })
   } catch (error) {
-    console.error('!!! Upload error:', error)
-    return NextResponse.json({ 
-      error: 'Failed to upload file', 
+    return NextResponse.json({
+      error: 'Failed to upload file',
       details: 'Upload failed'
     }, { status: 500 })
   }

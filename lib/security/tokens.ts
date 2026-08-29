@@ -19,10 +19,10 @@ export async function createPasswordResetToken(userId: string): Promise<string> 
   const id = crypto.randomUUID()
   const createdAt = new Date()
 
-  await prisma.$executeRawUnsafe(
-    'INSERT INTO PasswordResetToken (id, userId, tokenHash, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?)',
-    id, userId, tokenHash, expiresAt.toISOString(), createdAt.toISOString()
-  )
+  await prisma.$executeRaw`
+    INSERT INTO PasswordResetToken (id, userId, tokenHash, expiresAt, createdAt)
+    VALUES (${id}, ${userId}, ${tokenHash}, ${expiresAt.toISOString()}, ${createdAt.toISOString()})
+  `
 
   return token
 }
@@ -30,10 +30,9 @@ export async function createPasswordResetToken(userId: string): Promise<string> 
 export async function verifyPasswordResetToken(token: string): Promise<{ userId: string } | null> {
   const tokenHash = hashToken(token)
 
-  const result = await prisma.$queryRawUnsafe(
-    'SELECT id, userId, expiresAt, usedAt FROM PasswordResetToken WHERE tokenHash = ? LIMIT 1',
-    tokenHash
-  ) as Array<{ id: string; userId: string; expiresAt: string; usedAt: string | null }>
+  const result = await prisma.$queryRaw`
+    SELECT id, userId, expiresAt, usedAt FROM PasswordResetToken WHERE tokenHash = ${tokenHash} LIMIT 1
+  ` as Array<{ id: string; userId: string; expiresAt: string; usedAt: string | null }>
 
   if (!result || result.length === 0) return null
 
@@ -41,20 +40,18 @@ export async function verifyPasswordResetToken(token: string): Promise<{ userId:
   if (row.usedAt) return null
   if (new Date(row.expiresAt) < new Date()) return null
 
-  await prisma.$executeRawUnsafe(
-    'UPDATE PasswordResetToken SET usedAt = ? WHERE id = ?',
-    new Date().toISOString(), row.id
-  )
+  await prisma.$executeRaw`
+    UPDATE PasswordResetToken SET usedAt = ${new Date().toISOString()} WHERE id = ${row.id}
+  `
 
   return { userId: row.userId }
 }
 
 export async function cleanupExpiredTokens(): Promise<number> {
   try {
-    const result = await prisma.$executeRawUnsafe(
-      'DELETE FROM PasswordResetToken WHERE expiresAt < ? OR usedAt IS NOT NULL',
-      new Date().toISOString()
-    )
+    const result = await prisma.$executeRaw`
+      DELETE FROM PasswordResetToken WHERE expiresAt < ${new Date().toISOString()} OR usedAt IS NOT NULL
+    `
     return result as number
   } catch (e) {
     console.error('Token cleanup failed:', e)

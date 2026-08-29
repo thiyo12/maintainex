@@ -77,15 +77,19 @@ export const auth = {
     request<AuthResponse>('/api/mobile/auth/login', { method: 'POST', body: JSON.stringify({ phone: data.phone, password: data.otp }) }),
   requestOtp: (phone: string) =>
     request<{ success: boolean }>('/api/mobile/auth/otp', { method: 'POST', body: JSON.stringify({ phone }) }),
-  sendOtp: (data: { phone: string; userId?: string }) =>
-    request<{ success: boolean; devCode?: string }>('/api/mobile/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
-  verifyOtp: (data: { phone: string; code: string }) =>
+  sendOtp: (data: { email: string }) =>
+    request<{ success: boolean }>('/api/mobile/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
+  verifyOtp: (data: { email: string; code: string }) =>
     request<{ success: boolean }>('/api/mobile/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
   me: () => request<{ user: import('./types').User; needsOnboarding?: boolean }>('/api/mobile/auth/me'),
   updateProfile: (data: { name?: string; phone?: string; profileImage?: string }) =>
     request<{ user: import('./types').User }>('/api/mobile/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
   switchRole: (role: string) =>
     request<import('./types').AuthResponse>('/api/mobile/auth/switch-role', { method: 'PUT', body: JSON.stringify({ role }) }),
+  forgotPassword: (data: { email: string }) =>
+    request<{ success: boolean }>('/api/mobile/auth/forgot-password', { method: 'POST', body: JSON.stringify(data) }),
+  resetPassword: (data: { email: string; code: string; newPassword: string }) =>
+    request<AuthResponse>('/api/mobile/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // Categories & Services

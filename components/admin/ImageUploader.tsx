@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { FiUpload, FiX, FiCheck, FiAlertCircle, FiCrop } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { getAuthHeader } from '@/lib/auth-client'
 import ImageCropper from './ImageCropper'
 
 interface ImageUploaderProps {
@@ -69,12 +68,10 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       const formData = new FormData()
       formData.append('file', file)
 
-      const authHeaders = getAuthHeader()
-      console.log('Auth headers:', authHeaders)
       
       const response = await fetch('/api/upload/service', {
         method: 'POST',
-        headers: { ...authHeaders },
+        headers: { },
         body: formData
       })
 
@@ -214,11 +211,10 @@ export default function ImageUploader({ value, onChange, disabled }: ImageUpload
       formData.append('file', file)
       console.log('Uploading file:', file.name, file.size, file.type)
 
-      const authHeaders = getAuthHeader()
       
       const response = await fetch('/api/upload/service', {
         method: 'POST',
-        headers: { ...authHeaders },
+        headers: { },
         body: formData
       })
 

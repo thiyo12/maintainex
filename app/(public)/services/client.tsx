@@ -139,7 +139,7 @@ function ServicesContent({ cityName }: { cityName?: string }) {
         category: category.name,
         categoryId: category.id
       }))
-      router.push(`/booking?serviceId=${firstSvc.id}&category=${category.slug}`)
+      router.push('/waitlist')
     }
   }
 
@@ -269,7 +269,7 @@ function ServicesContent({ cityName }: { cityName?: string }) {
                                     price: service.price,
                                     category: category.name
                                   }))
-                                  router.push(`/booking?serviceId=${service.id}&category=${category.slug}`)
+                                  router.push('/waitlist')
                                 }}
                                 className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2.5 rounded-full transition-colors text-sm`}
                               >

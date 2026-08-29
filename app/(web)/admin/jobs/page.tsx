@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiTool, FiEye, FiXCircle, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 
 interface Job {
   id: string
@@ -88,7 +87,7 @@ export default function JobsPage() {
     try {
       const statusParam = activeTab === 'ALL' ? '' : `&status=${activeTab}`
       const res = await fetch(`/api/admin/jobs?page=${page}&limit=15${statusParam}`, {
-        headers: { ...getAuthHeader() },
+        headers: { },
       })
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
@@ -109,7 +108,7 @@ export default function JobsPage() {
     try {
       const res = await fetch(`/api/admin/jobs`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId, status: 'CANCELLED', source }),
       })
       if (!res.ok) throw new Error('Failed')

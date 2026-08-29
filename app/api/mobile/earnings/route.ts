@@ -30,6 +30,23 @@ export async function GET(request: NextRequest) {
       },
     })
 
+    const pendingCommissionPayments = await prisma.commissionPayment.findMany({
+      where: {
+        providerId: user.id,
+        status: 'PENDING',
+      },
+      include: {
+        weeklySettlement: {
+          select: {
+            weekStart: true,
+            weekEnd: true,
+            commissionOwed: true,
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
     return NextResponse.json({
       totalEarned,
       pendingAmount,
@@ -43,6 +60,15 @@ export async function GET(request: NextRequest) {
         source: p.source,
         createdAt: p.createdAt.toISOString(),
         clearedAt: p.clearedAt?.toISOString(),
+      })),
+      pendingCommissionPayments: pendingCommissionPayments.map(cp => ({
+        id: cp.id,
+        referenceNumber: cp.referenceNumber,
+        amountDue: cp.amountDue,
+        method: cp.method,
+        weekStart: cp.weeklySettlement.weekStart.toISOString(),
+        weekEnd: cp.weeklySettlement.weekEnd.toISOString(),
+        dueAt: cp.createdAt.toISOString(),
       })),
     })
   } catch (error) {

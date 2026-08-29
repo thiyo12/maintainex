@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { jobs } from '../../../../lib/api'
+import { v2Jobs, v2JobActions } from '../../../../lib/api-v2'
 import { useAuth } from '../../../../lib/auth'
 import { JobPosting } from '../../../../lib/types'
 
@@ -21,20 +22,53 @@ export default function JobCompleteScreen() {
   const [error, setError] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [isV2, setIsV2] = useState(false)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    jobs.get(id as string)
-      .then(setJob)
-      .catch((e) => setError(e.message))
+    v2Jobs.get(id as string)
+      .then((res) => {
+        const v2 = res.job
+        setIsV2(true)
+        setJob({
+          id: v2.id,
+          title: v2.title,
+          description: v2.description,
+          category: v2.categoryId,
+          budget: v2.budgetAmount,
+          location: v2.locationName || '',
+          status: v2.status,
+          scheduledDate: v2.preferredDate || undefined,
+          createdAt: v2.createdAt,
+          customer: v2.customer,
+          bids: [],
+          assignedTasker: v2.acceptedQuote?.provider ? {
+            id: v2.acceptedQuote.provider.id,
+            userId: v2.acceptedQuote.provider.id,
+            rating: v2.acceptedQuote.providerRating || 0,
+            completedJobs: 0,
+            hourlyRate: 0,
+            user: v2.acceptedQuote.provider,
+          } : null,
+        } as JobPosting)
+      })
+      .catch(() => {
+        jobs.get(id as string)
+          .then(setJob)
+          .catch((e) => setError(e.message))
+      })
       .finally(() => setLoading(false))
   }, [id])
 
   const handleComplete = async () => {
     setCompleting(true)
     try {
-      await jobs.complete(id as string)
+      if (isV2) {
+        await v2JobActions.complete(id as string, 'APPROVE_COMPLETION')
+      } else {
+        await jobs.complete(id as string)
+      }
       setConfirmed(true)
     } catch (e: any) {
       setError(e.message)

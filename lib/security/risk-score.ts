@@ -62,6 +62,50 @@ export async function assessLoginRisk(
     reasons.push('Login attempt during unusual hours (midnight-5am)')
   }
 
+  const recentFromIP = await prisma.rateLimitLog.findMany({
+    where: {
+      identifier: ip,
+      type: 'login-failed',
+      createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 20,
+    select: { createdAt: true },
+  })
+  if (recentFromIP.length >= 3) {
+    const intervals: number[] = []
+    for (let i = 1; i < recentFromIP.length; i++) {
+      intervals.push(recentFromIP[i].createdAt.getTime() - recentFromIP[i - 1].createdAt.getTime())
+    }
+    if (intervals.length >= 2) {
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length
+      const variance = intervals.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / intervals.length
+      const cv = Math.sqrt(variance) / avg
+      if (cv < 0.15 && avg < 5000) {
+        score += 35
+        reasons.push('BOT_DETECTED: Login attempts at unnaturally regular intervals (cron pattern)')
+      }
+    }
+  }
+
+  const uniqueEmailsFromIP = await prisma.failedLogin.groupBy({
+    by: ['email'],
+    where: {
+      ipAddress: ip,
+      createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+    },
+  })
+  if (uniqueEmailsFromIP.length >= 3) {
+    score += 25
+    reasons.push(`CREDENTIAL_STUFFING: ${uniqueEmailsFromIP.length} different emails attempted from same IP`)
+  }
+
+  const userAgentBots = /bot|crawl|spider|scrape|curl|wget|python|java|go-http|node-fetch|axios/i
+  if (userAgentBots.test(userAgent)) {
+    score += 20
+    reasons.push(`AUTOMATED_CLIENT: User agent matches known bot patterns: ${userAgent.substring(0, 80)}`)
+  }
+
   let level: RiskAssessment['level'] = 'LOW'
   const actions: string[] = []
 

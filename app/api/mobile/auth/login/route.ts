@@ -31,6 +31,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
     }
 
+    if (user.isSuspended) {
+      if (!user.suspendedUntil || new Date(user.suspendedUntil) > new Date()) {
+        return NextResponse.json({
+          error: 'Account suspended',
+          code: 'SUSPENDED',
+          reason: user.suspensionReason || 'Your account has been suspended. Please contact support.',
+          suspendedUntil: user.suspendedUntil?.toISOString() || null,
+        }, { status: 403 })
+      }
+    }
+
+    if (user.isBanned) {
+      return NextResponse.json({
+        error: 'Account banned',
+        code: 'BANNED',
+        reason: user.banReason || 'Your account has been permanently banned.',
+      }, { status: 403 })
+    }
+
     const failIp = request.headers.get('x-forwarded-for')?.split(',')[0] || ip
 
     const failedRecord = await prisma.failedLogin.findUnique({
@@ -41,6 +60,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Account temporarily locked. Try again in ${remainingMin} minutes.` }, { status: 423 })
     }
 
+    const totalFailuresForEmail = await prisma.failedLogin.aggregate({
+      where: { email, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
+      _sum: { attemptCount: true },
+    })
+    const totalAttempts = totalFailuresForEmail._sum.attemptCount || 0
+    if (totalAttempts >= 15) {
+      return NextResponse.json({ error: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.' }, { status: 423 })
+    }
+
     const passwordCheck = await verifyPasswordWithMigration(password, user.passwordHash)
     if (!passwordCheck.valid) {
       try {
@@ -48,8 +76,6 @@ export async function POST(request: NextRequest) {
           where: { email_ipAddress: { email, ipAddress: failIp } },
           update: {
             attemptCount: { increment: 1 },
-            blocked: { set: true },
-            blockUntil: new Date(Date.now() + 15 * 60 * 1000),
             userAgent: request.headers.get('user-agent') || 'unknown',
           },
           create: {
@@ -71,6 +97,17 @@ export async function POST(request: NextRequest) {
           })
         }
 
+        const newTotal = await prisma.failedLogin.aggregate({
+          where: { email, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
+          _sum: { attemptCount: true },
+        })
+        if ((newTotal._sum.attemptCount || 0) >= 10) {
+          await prisma.failedLogin.updateMany({
+            where: { email },
+            data: { blocked: true, blockUntil: new Date(Date.now() + 15 * 60 * 1000) }
+          })
+        }
+
         try {
           await prisma.rateLimitLog.create({
             data: {
@@ -85,6 +122,25 @@ export async function POST(request: NextRequest) {
             }
           })
         } catch {}
+
+        const diffEmailCount = await prisma.failedLogin.groupBy({
+          by: ['email'],
+          where: {
+            ipAddress: failIp,
+            createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) },
+          },
+        })
+        if (diffEmailCount.length >= 5) {
+          try {
+            const { blockIP } = await import('@/lib/security/rate-limiter')
+            await blockIP(failIp, 'CREDENTIAL_STUFFING: 5+ different emails tested from same IP in 15 minutes', 60)
+            const { recordSecurityEvent } = await import('@/lib/security/risk-score')
+            await recordSecurityEvent('CREDENTIAL_STUFFING', 'SECURITY', null, 'IP', failIp, 'CRITICAL', {
+              emailCount: diffEmailCount.length,
+              emails: diffEmailCount.map((e) => e.email),
+            })
+          } catch {}
+        }
 
         const { assessLoginRisk } = await import('@/lib/security/risk-score')
         const risk = await assessLoginRisk(null, email, failIp, request.headers.get('user-agent') || 'unknown')

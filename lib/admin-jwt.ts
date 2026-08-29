@@ -3,11 +3,13 @@ import crypto from 'crypto'
 import type { AdminRole } from './admin-types'
 
 function getJwtSecret(): string {
-  return process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-jwt-secret-change-in-production'
+  if (!process.env.JWT_SECRET && !process.env.NEXTAUTH_SECRET) throw new Error('[SECURITY] JWT_SECRET or NEXTAUTH_SECRET env var is required')
+  return process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET!
 }
 
 function getJwtRefreshSecret(): string {
-  return process.env.JWT_REFRESH_SECRET || 'dev-jwt-refresh-secret-change-in-production'
+  if (!process.env.JWT_REFRESH_SECRET) throw new Error('[SECURITY] JWT_REFRESH_SECRET env var is required')
+  return process.env.JWT_REFRESH_SECRET
 }
 
 export interface AccessTokenPayload {

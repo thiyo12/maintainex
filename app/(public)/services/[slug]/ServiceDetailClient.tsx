@@ -290,7 +290,7 @@ export default function ServiceDetailClient({
                         id: service.id, name: service.name, price: service.price, category: service.category?.name
                       }))
                       const districtParam = city ? `&district=${encodeURIComponent(city)}` : ''
-                      router.push(`/booking?serviceId=${service.id}&category=${service.category?.slug}${districtParam}`)
+                      router.push(`/waitlist`)
                     }}
                     className="w-full bg-amber-500 hover:bg-amber-600 text-ink font-bold py-4 px-6 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-center text-sm md:text-lg mb-4"
                   >
@@ -385,7 +385,7 @@ export default function ServiceDetailClient({
               Book now and let our professional team handle the cleaning. Easy scheduling, instant confirmation.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href={`/booking?serviceId=${service.id}&category=${service.category?.slug}${city ? `&district=${encodeURIComponent(city)}` : ''}`}
+              <Link href="/waitlist"
                 className="bg-amber-500 hover:bg-amber-600 text-ink font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber active:scale-[0.98] text-lg"
               >
                 {city ? `Book ${service.name} in ${city}` : 'Book Now'}

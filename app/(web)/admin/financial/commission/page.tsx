@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiDollarSign, FiClock, FiAlertTriangle, FiCheckCircle, FiFilter, FiRefreshCw } from 'react-icons/fi'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 
 interface Settlement {
   id: string
@@ -58,9 +57,8 @@ export default function CommissionPage() {
   const fetchSettlements = async () => {
     setLoading(true)
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admin/financial/commission?status=${filter}`, {
-        headers: { ...authHeaders }
+        headers: { }
       })
       if (res.status === 401) {
         window.location.href = '/admin/login'
@@ -91,10 +89,9 @@ export default function CommissionPage() {
   const handleAction = async (settlementId: string, action: string) => {
     setActionLoading(settlementId)
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/admin/financial/commission', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settlementId, action })
       })
       const data = await res.json()

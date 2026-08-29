@@ -18,7 +18,6 @@ export async function POST(request: NextRequest) {
 
     if (user) {
       const token = await createPasswordResetToken(user.id)
-      console.log('Password reset token:', token)
     }
 
     return NextResponse.json({

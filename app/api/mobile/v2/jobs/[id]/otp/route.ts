@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function POST(
   request: NextRequest,
@@ -9,6 +9,8 @@ export async function POST(
   try {
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })

@@ -7,7 +7,6 @@ import {
   FiGlobe, FiMail, FiClock, FiUsers, FiLock, FiAlertTriangle,
   FiToggleLeft, FiToggleRight
 } from 'react-icons/fi'
-import { getAuthHeader } from '@/lib/auth-client'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface PlatformSettings {
@@ -55,8 +54,7 @@ export default function AdminSettings() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/admin/settings', { headers: { ...authHeaders } })
+      const res = await fetch('/api/admin/settings', { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
       if (res.ok) {
         const data = await res.json()
@@ -74,10 +72,9 @@ export default function AdminSettings() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/admin/settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       })
       if (!res.ok) throw new Error()

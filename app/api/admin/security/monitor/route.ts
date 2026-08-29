@@ -5,7 +5,7 @@ import { getAdminSession } from '@/lib/admin-auth'
 export async function GET(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
-    if (!session || !['SUPER_ADMIN', 'OPERATIONS'].includes(session.role)) {
+    if (!session || !['SUPER_ADMIN', 'TECHNICAL'].includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
       riskDistributionRaw,
       topThreatsRaw,
       hourlyLoginData,
+      credentialStuffsRaw,
+      botAgentsRaw,
     ] = await Promise.all([
       prisma.securityAudit.count({
         where: { createdAt: { gte: startOfDay } },
@@ -104,6 +106,25 @@ export async function GET(request: NextRequest) {
           success: true,
         },
       }),
+      prisma.failedLogin.groupBy({
+        by: ['ipAddress'],
+        where: {
+          createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+        },
+        _count: { email: true, ipAddress: true },
+        having: { email: { _count: { gte: 3 } } },
+        orderBy: { _count: { email: 'desc' } },
+        take: 10,
+      }),
+      prisma.rateLimitLog.findMany({
+        where: {
+          createdAt: { gte: startOfDay },
+          type: 'login-failed',
+        },
+        select: { identifier: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
     ])
 
     const riskDistribution: Record<string, number> = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 }
@@ -132,6 +153,34 @@ export async function GET(request: NextRequest) {
       riskLevel: t._count.ipAddress >= 10 ? 'HIGH' : t._count.ipAddress >= 5 ? 'MEDIUM' : 'LOW',
       reason: 'Multiple failed logins',
     }))
+
+    const credentialStuffs = credentialStuffsRaw.map((c: any) => ({
+      ip: c.ipAddress,
+      uniqueEmails: c._count.email,
+      riskLevel: c._count.email >= 5 ? 'CRITICAL' : c._count.email >= 3 ? 'HIGH' : 'MEDIUM',
+    }))
+
+    const ipTimestamps = new Map<string, number[]>()
+    botAgentsRaw.forEach((r: any) => {
+      const existing = ipTimestamps.get(r.identifier) || []
+      existing.push(r.createdAt.getTime())
+      ipTimestamps.set(r.identifier, existing)
+    })
+    const botsDetected: { ip: string; intervalVariance: number; requestCount: number }[] = []
+    ipTimestamps.forEach((timestamps, ip) => {
+      if (timestamps.length < 3) return
+      timestamps.sort((a, b) => a - b)
+      const intervals: number[] = []
+      for (let i = 1; i < timestamps.length; i++) {
+        intervals.push(timestamps[i] - timestamps[i - 1])
+      }
+      const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length
+      const variance = intervals.reduce((s, v) => s + Math.pow(v - avg, 2), 0) / intervals.length
+      const cv = avg > 0 ? Math.sqrt(variance) / avg : 1
+      if (cv < 0.2 && avg < 5000 && timestamps.length >= 3) {
+        botsDetected.push({ ip, intervalVariance: Math.round(cv * 100) / 100, requestCount: timestamps.length })
+      }
+    })
 
     return NextResponse.json({
       summary: {
@@ -168,6 +217,8 @@ export async function GET(request: NextRequest) {
       },
       riskDistribution,
       topThreats,
+      credentialStuffs,
+      botsDetected,
     })
   } catch (error) {
     console.error('Security monitor GET error:', error)

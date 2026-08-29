@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiEye, FiCheck, FiX, FiSearch } from 'react-icons/fi'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 
 interface Dispute {
   id: string
@@ -63,7 +62,7 @@ export default function DisputesPage() {
     try {
       const statusParam = activeTab === 'ALL' ? '' : `&status=${activeTab}`
       const res = await fetch(`/api/admin/disputes?status=${activeTab === 'ALL' ? '' : activeTab}`, {
-        headers: { ...getAuthHeader() },
+        headers: { },
       })
       if (!res.ok) throw new Error('Failed')
       const data = await res.json()
@@ -84,7 +83,7 @@ export default function DisputesPage() {
     try {
       const res = await fetch('/api/admin/disputes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disputeId, status: 'RESOLVED', resolution: resolveNotes }),
       })
       if (!res.ok) throw new Error('Failed')
@@ -104,7 +103,7 @@ export default function DisputesPage() {
     try {
       const res = await fetch('/api/admin/disputes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disputeId, status: 'DISMISSED' }),
       })
       if (!res.ok) throw new Error('Failed')
@@ -123,7 +122,7 @@ export default function DisputesPage() {
     try {
       const res = await fetch('/api/admin/disputes', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ disputeId, status: 'UNDER_REVIEW' }),
       })
       if (!res.ok) throw new Error('Failed')

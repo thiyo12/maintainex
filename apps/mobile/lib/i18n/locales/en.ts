@@ -124,8 +124,8 @@ const en = {
       companyDesc: 'Manage team & bid on projects',
     },
     otp: {
-      title: 'Verify Phone',
-      subtitle: 'Enter the OTP sent to your phone',
+      title: 'Verify Email',
+      subtitle: 'Enter the code sent to your email',
       description: 'We sent a 6 digit code to ',
       placeholder: 'Enter OTP',
       button: 'Verify',
@@ -135,6 +135,22 @@ const en = {
       devCode: 'Dev code: ',
       autoFilled: ' (auto-filled)',
       verificationFailed: 'Verification Failed',
+    },
+    forgotPassword: {
+      title: 'Forgot Password?',
+      description: "Enter your email and we'll send you a reset code.",
+      checkEmail: 'Check your email',
+      codeSentTo: 'We sent a reset code to',
+      enterCode: 'Enter Reset Code',
+      tryDifferentEmail: 'Try a different email',
+      sendCode: 'Send Reset Code',
+    },
+    resetPassword: {
+      title: 'Reset Password',
+      description: 'Enter the code sent to',
+      button: 'Reset Password',
+      success: 'Success',
+      successMessage: 'Your password has been reset. You can now login.',
     },
     language: 'Language',
     roleSelect: {

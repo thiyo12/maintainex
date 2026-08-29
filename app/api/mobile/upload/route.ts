@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { writeFile, mkdir } from 'fs/promises'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import path from 'path'
@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const uploadIp = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || user.id
     const now = Date.now()
@@ -54,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     const secureFilename = generateSecureFilename(file.name)
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'mobile', user.id)
+    const uploadDir = path.join(process.cwd(), 'uploads', 'mobile', user.id)
     await mkdir(uploadDir, { recursive: true })
 
     const filename = secureFilename
@@ -62,13 +64,13 @@ export async function POST(request: NextRequest) {
 
     await writeFile(filepath, buffer)
 
-    const indexFile = path.join(process.cwd(), 'public', 'uploads', 'mobile', '.photo-index.json')
+    const indexFile = path.join(process.cwd(), 'uploads', 'mobile', '.photo-index.json')
     let index: Record<string, string> = {}
     try { if (existsSync(indexFile)) index = JSON.parse(readFileSync(indexFile, 'utf-8')) } catch {}
     index[filename] = new Date().toISOString()
     try { writeFileSync(indexFile, JSON.stringify(index)) } catch {}
 
-    const url = `/uploads/mobile/${user.id}/${filename}`
+    const url = `/api/mobile/files/${user.id}/${filename}`
 
     return NextResponse.json({ url, filename })
   } catch (error) {

@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "permission": "edit",
+      "pattern": "app/**",
+      "action": "allow"
+    },
+    {
+      "permission": "edit",
+      "pattern": "lib/**",
+      "action": "allow"
+    },
+    {
+      "permission": "edit",
+      "pattern": "components/**",
+      "action": "allow"
+    },
+    {
+      "permission": "edit",
+      "pattern": "middleware.ts",
+      "action": "allow"
+    },
+    {
+      "permission": "edit",
+      "pattern": "prisma/**",
+      "action": "allow"
+    },
+    {
+      "permission": "edit",
+      "pattern": ".opencode/**",
+      "action": "allow"
+    }
+  ]
+}

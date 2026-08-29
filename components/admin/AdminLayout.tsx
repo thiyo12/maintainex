@@ -10,8 +10,7 @@ import {
   FiAlertTriangle, FiMessageSquare, FiBarChart2, FiChevronDown,
   FiChevronRight, FiCreditCard, FiFile, FiClock, FiSearch, FiBell
 } from 'react-icons/fi'
-import { AdminSessionProvider } from './AdminSessionProvider'
-import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
+import { AdminSessionProvider, useAdminSession } from './AdminSessionProvider'
 import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface NavItem {
@@ -82,27 +81,13 @@ const NAVIGATION: NavItem[] = [
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [user, setUser] = useState<StoredUser | null>(null)
-  const [loading, setLoading] = useState(true)
   const [expandedItems, setExpandedItems] = useState<string[]>([])
+  const { user, loading } = useAdminSession()
 
   const isLoginPage = pathname === '/admin/login'
   const adminRole = (user?.role || 'SUPPORT') as AdminRole
 
-  useEffect(() => {
-    if (isLoginPage) { setLoading(false); return }
-    const storedUser = getStoredUser()
-    if (storedUser && storedUser.id && storedUser.email && storedUser.role) {
-      setUser(storedUser)
-      setLoading(false)
-    } else {
-      window.location.href = '/admin/login'
-    }
-  }, [isLoginPage])
-
   const handleLogout = useCallback(() => {
-    clearStoredUser()
-    localStorage.removeItem('admin_user')
     localStorage.removeItem('admin_token')
     document.cookie = 'admin_token=; path=/; max-age=0'
     window.location.href = '/admin/login'
@@ -151,10 +136,11 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
   const roleLabels: Record<string, { label: string; color: string }> = {
     SUPER_ADMIN: { label: 'Super Admin', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
-    OPERATIONS: { label: 'Operations', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+    MANAGER: { label: 'Manager', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
     FINANCE: { label: 'Finance', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+    USER_MANAGEMENT: { label: 'User Management', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
     SUPPORT: { label: 'Support', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-    MODERATOR: { label: 'Moderator', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+    TECHNICAL: { label: 'Technical', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' },
     ADMIN: { label: 'Admin', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
   }
 

@@ -5,7 +5,7 @@ import { getAdminSession } from '@/lib/admin-auth'
 export async function GET(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
+    if (!session || !['SUPER_ADMIN', 'TECHNICAL'].includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

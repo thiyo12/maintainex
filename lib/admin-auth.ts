@@ -1,8 +1,11 @@
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
+import { verifyAccessToken } from './admin-jwt'
 
-const JWT_SECRET: string = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-jwt-secret-change-in-production'
-const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET || 'dev-jwt-refresh-secret-change-in-production'
+if (!process.env.JWT_SECRET && !process.env.NEXTAUTH_SECRET) throw new Error('[SECURITY] JWT_SECRET or NEXTAUTH_SECRET env var is required')
+const JWT_SECRET: string = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET!
+if (!process.env.JWT_REFRESH_SECRET) throw new Error('[SECURITY] JWT_REFRESH_SECRET env var is required')
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET
 
 function hmacSign(data: string): string {
   return crypto.createHmac('sha256', JWT_SECRET).update(data).digest('hex')
@@ -57,7 +60,19 @@ export function createSimpleToken(data: any): string {
   return `${encoded}.${signature}`
 }
 
-export async function getAdminSession(request: { cookies: { get: (name: string) => { value: string } | undefined } }) {
+export async function getAdminSession(request: { headers: { get: (name: string) => string | null }, cookies: { get: (name: string) => { value: string } | undefined } }) {
+  // Try Bearer header first (for API/mobile clients)
+  const authHeader = request.headers.get('Authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const rawToken = authHeader.slice(7)
+    // Try new JWT access token first
+    const jwtPayload = verifyAccessToken(rawToken)
+    if (jwtPayload) return jwtPayload
+    // Fallback to old simple token
+    const payload = verifySimpleToken(rawToken)
+    if (payload) return payload
+  }
+  // Fallback to cookie
   const token = request.cookies.get('admin_token')?.value
   if (!token) return null
   const payload = verifySimpleToken(token)

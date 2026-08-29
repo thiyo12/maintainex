@@ -86,6 +86,8 @@ export async function GET(request: NextRequest) {
       ...l,
       photos: l.photos ? JSON.parse(l.photos) : [],
       amenities: l.amenities ? JSON.parse(l.amenities) : [],
+      contactPhone: myOnly ? l.contactPhone : undefined,
+      contactName: myOnly ? l.contactName : undefined,
     }))
 
     return NextResponse.json({

@@ -6,7 +6,6 @@ import {
   FiActivity, FiUsers, FiClock, FiShield, FiFilter, FiRefreshCw,
   FiEye, FiArrowRight, FiCircle, FiSearch, FiCalendar, FiChevronDown,
 } from 'react-icons/fi'
-import { getAuthHeader } from '@/lib/auth-client'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import AdminLayout from '@/components/admin/AdminLayout'
 
@@ -125,8 +124,7 @@ export default function StaffActivityMonitor() {
   const fetchData = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true)
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/admin/staff/activity', { headers: { ...authHeaders } })
+      const res = await fetch('/api/admin/staff/activity', { headers: { } })
       if (res.status === 401) {
         window.location.href = '/admin/login'
         return

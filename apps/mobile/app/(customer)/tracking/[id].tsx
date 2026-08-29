@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import MapView, { Marker } from 'react-native-maps'
+import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
@@ -102,6 +102,7 @@ export default function LiveTrackingScreen() {
       {/* Map */}
       <View style={styles.mapContainer}>
         <MapView
+          provider={PROVIDER_DEFAULT}
           style={styles.map}
           initialRegion={{
             latitude: COLOMBO_COORDS.latitude,

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { FiUsers, FiCheckCircle, FiClock, FiShield, FiDollarSign, FiAlertTriangle, FiBriefcase, FiUserX } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
-import { getAuthHeader } from '@/lib/auth-client'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface DashboardStats {
@@ -46,9 +45,8 @@ export default function AdminDashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/dashboard', {
-        headers: { ...authHeaders }
+        headers: { }
       })
 
       if (res.status === 401) {

@@ -9,6 +9,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!['SUPER_ADMIN', 'MANAGER'].includes(session.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role') || 'CUSTOMER'
     const page = parseInt(searchParams.get('page') || '1')

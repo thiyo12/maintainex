@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { createWorkItem } from '@/lib/work-queue'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const body = await request.json()
     const { docType, side, imageUrl } = body
@@ -61,6 +64,14 @@ export async function POST(request: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: { identityStatus: 'PENDING' },
+    })
+
+    await createWorkItem({
+      category: 'kyc',
+      title: `KYC document submitted — ${docType} (${side})`,
+      description: `User ${user.name || user.email} submitted a ${docType} for identity verification.`,
+      targetTable: 'IdentityDocument',
+      targetId: doc.id,
     })
 
     return NextResponse.json({ document: doc }, { status: 201 })

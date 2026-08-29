@@ -32,7 +32,7 @@ const COMPANY_TABS = [
 export default function BottomNav({ role, active, onPress, unreadMessages = 0 }: Props) {
   const { colors } = useTheme()
   const { t } = useTranslation()
-  const fabGlow = useRef(new Animated.Value(0.45)).current
+  const fabGlow = useRef(new Animated.Value(0.55)).current
 
   const TASKER_TABS = [
     { id: 'home',    label: t('customer.browse'), icon: 'home-outline'          },
@@ -51,10 +51,7 @@ export default function BottomNav({ role, active, onPress, unreadMessages = 0 }:
   ]
 
   useEffect(() => {
-    Animated.loop(Animated.sequence([
-      Animated.timing(fabGlow, { toValue: 0.65, duration: 1200, useNativeDriver: false }),
-      Animated.timing(fabGlow, { toValue: 0.45, duration: 1200, useNativeDriver: false }),
-    ])).start()
+    // Shadow animation disabled — useNativeDriver: false crashes on Android New Architecture
   }, [])
 
   const tabs = role === 'tasker' ? TASKER_TABS : COMPANY_TABS

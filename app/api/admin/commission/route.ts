@@ -1,10 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCommissionRate, calculateCommission } from '@/lib/mxid'
+import { getAdminSession } from '@/lib/admin-auth'
+import { createWorkItem } from '@/lib/work-queue'
+import crypto from 'crypto'
+
+const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
+
+function generateReferenceNumber(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let ref = 'REF-'
+  const bytes = crypto.randomBytes(5)
+  for (let i = 0; i < 5; i++) {
+    ref += chars[bytes[i] % chars.length]
+  }
+  return ref
+}
+
+async function createCommissionPayment(settlementId: string, providerId: string, amountDue: number): Promise<string> {
+  let referenceNumber = generateReferenceNumber()
+  let attempts = 0
+  while (attempts < 10) {
+    const existing = await prisma.commissionPayment.findUnique({
+      where: { referenceNumber }
+    })
+    if (!existing) break
+    referenceNumber = generateReferenceNumber()
+    attempts++
+  }
+  const payment = await prisma.commissionPayment.create({
+    data: {
+      providerId,
+      weeklySettlementId: settlementId,
+      referenceNumber,
+      amountDue,
+      method: 'CASH',
+      status: 'PENDING',
+    }
+  })
+  return payment.referenceNumber
+}
 
 // GET: List all commission settlements with optional filters
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // PENDING, PAID, OVERDUE, SUSPENDED
     const providerType = searchParams.get('providerType') // TASKER, COMPANY
@@ -63,6 +106,10 @@ export async function GET(request: NextRequest) {
 // POST: Create weekly settlement for a provider
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { providerId, providerType, weekStart } = body
 
@@ -110,7 +157,12 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ settlement })
+    let commissionPaymentRef: string | null = null
+    if (commissionOwed > 0) {
+      commissionPaymentRef = await createCommissionPayment(settlement.id, providerId, commissionOwed)
+    }
+
+    return NextResponse.json({ settlement, commissionPaymentRef })
   } catch (error) {
     console.error('Commission POST error:', error)
     return NextResponse.json({ error: 'Failed to create settlement' }, { status: 500 })
@@ -120,6 +172,10 @@ export async function POST(request: NextRequest) {
 // PUT: Mark settlement as paid
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { settlementId, action } = body
 
@@ -140,6 +196,22 @@ export async function PUT(request: NextRequest) {
       case 'MARK_OVERDUE':
         updateData = {
           status: 'OVERDUE'
+        }
+        // Create work queue item for overdue settlement
+        const overdueSettlement = await prisma.weeklySettlement.findUnique({
+          where: { id: settlementId },
+          select: { providerId: true, providerType: true, commissionOwed: true, weekStart: true, weekEnd: true }
+        })
+        if (overdueSettlement) {
+          await createWorkItem({
+            category: 'settlement',
+            title: `Weekly settlement overdue — ${overdueSettlement.providerType}`,
+            description: `Provider ${overdueSettlement.providerId} has an overdue commission of ${(overdueSettlement.commissionOwed / 100).toFixed(2)} for week ${overdueSettlement.weekStart.toISOString().split('T')[0]} to ${overdueSettlement.weekEnd.toISOString().split('T')[0]}.`,
+            targetTable: 'WeeklySettlement',
+            targetId: settlementId,
+            severity: 'high',
+            priority: 'high',
+          })
         }
         break
       case 'SUSPEND':

@@ -160,7 +160,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(session.role)) {
+    if (!['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(session.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 

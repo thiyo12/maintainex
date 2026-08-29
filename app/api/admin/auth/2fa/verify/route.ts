@@ -6,7 +6,8 @@ import { signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefre
 import { getIp } from '@/lib/admin-rbac'
 import type { AdminRole } from '@/lib/admin-types'
 
-const TEMP_TOKEN_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production'
+if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
+const TEMP_TOKEN_SECRET = process.env.JWT_SECRET
 
 function parseCountries(val: string): string[] {
   if (!val) return []

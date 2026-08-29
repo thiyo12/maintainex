@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
-import { bookings } from '../../../../lib/api'
-import { Booking } from '../../../../lib/types'
+import { v2Jobs } from '../../../../lib/api-v2'
+import type { V2Job } from '../../../../lib/api-v2'
 
 export default function ReceiptScreen() {
   const { t } = useTranslation()
@@ -14,7 +14,7 @@ export default function ReceiptScreen() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
-  const [booking, setBooking] = useState<Booking | null>(null)
+  const [job, setJob] = useState<(V2Job & { quotes: any[]; escrow: any }) | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fadeAnim = useRef(new Animated.Value(0)).current
@@ -30,8 +30,8 @@ export default function ReceiptScreen() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    bookings.get(id as string)
-      .then(setBooking)
+    v2Jobs.get(id as string)
+      .then((res) => setJob(res.job))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
@@ -54,20 +54,21 @@ export default function ReceiptScreen() {
     )
   }
 
-  const subtotal = booking?.price || 0
-  const fee = Math.round(subtotal * 0.05)
+  const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
+  const subtotal = acceptedQuote?.price || job?.budgetAmount || 0
+  const fee = job?.escrow ? Number(job.escrow.serviceFee) : Math.round(subtotal * 0.1)
   const total = subtotal + fee
-  const serviceDate = booking?.date
-    ? new Date(booking.date).toLocaleDateString('en-US', {
+  const serviceDate = job?.preferredDate
+    ? new Date(job.preferredDate).toLocaleDateString('en-US', {
         weekday: 'short',
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       })
     : ''
-  const serviceTime = booking?.time || ''
+  const serviceTime = job?.timeSlot || ''
   const dateDisplay = serviceTime ? `${serviceDate} at ${serviceTime}` : serviceDate
-  const locationDisplay = booking?.district || ''
+  const locationDisplay = job?.locationName || ''
 
   return (
     <SafeAreaView style={styles.container}>
@@ -86,9 +87,9 @@ export default function ReceiptScreen() {
           <View style={styles.divider} />
 
           <View style={styles.serviceSection}>
-            <Text style={styles.serviceTitle}>{booking?.serviceName || t('receipt.service')}</Text>
+            <Text style={styles.serviceTitle}>{job?.title || t('receipt.service')}</Text>
             <Text style={styles.serviceMeta}>
-              {booking?.categoryName || ''}{locationDisplay ? ` • ${locationDisplay}` : ''}
+              {locationDisplay}
             </Text>
             <Text style={styles.serviceDate}>{dateDisplay}</Text>
           </View>
@@ -124,8 +125,8 @@ export default function ReceiptScreen() {
           <View style={styles.paymentSection}>
             <Text style={styles.paymentLabel}>{t('receipt.paidOn')}</Text>
             <Text style={styles.paymentValue}>
-              {booking?.createdAt
-                ? new Date(booking.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+              {job?.createdAt
+                ? new Date(job.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
                 : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
             </Text>
           </View>

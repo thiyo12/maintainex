@@ -9,7 +9,7 @@ export interface AdminUser {
   email: string
   firstName: string
   lastName: string
-  role: 'SUPER_ADMIN' | 'OPERATIONS' | 'FINANCE' | 'MODERATOR' | 'SUPPORT'
+  role: 'SUPER_ADMIN' | 'MANAGER' | 'FINANCE' | 'USER_MANAGEMENT' | 'SUPPORT' | 'TECHNICAL'
   assignedCountries: string[]
 }
 

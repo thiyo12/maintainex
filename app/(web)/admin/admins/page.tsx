@@ -7,7 +7,6 @@ import {
   FiUserCheck, FiPlus, FiEdit2, FiTrash2, FiX, FiSearch,
   FiShield, FiClock, FiMail, FiUser, FiActivity
 } from 'react-icons/fi'
-import { getAuthHeader } from '@/lib/auth-client'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import AdminLayout from '@/components/admin/AdminLayout'
 
@@ -30,13 +29,14 @@ interface AdminUser {
 
 const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   SUPER_ADMIN: { label: 'Super Admin', color: 'text-purple-400', bg: 'bg-purple-500/20 border-purple-500/30' },
-  OPERATIONS: { label: 'Operations', color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
+  MANAGER: { label: 'Manager', color: 'text-blue-400', bg: 'bg-blue-500/20 border-blue-500/30' },
   FINANCE: { label: 'Finance', color: 'text-green-400', bg: 'bg-green-500/20 border-green-500/30' },
   SUPPORT: { label: 'Support', color: 'text-yellow-400', bg: 'bg-yellow-500/20 border-yellow-500/30' },
-  MODERATOR: { label: 'Moderator', color: 'text-orange-400', bg: 'bg-orange-500/20 border-orange-500/30' },
+  USER_MANAGEMENT: { label: 'User Management', color: 'text-orange-400', bg: 'bg-orange-500/20 border-orange-500/30' },
+  TECHNICAL: { label: 'Technical', color: 'text-cyan-400', bg: 'bg-cyan-500/20 border-cyan-500/30' },
 }
 
-const ROLES = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'SUPPORT', 'MODERATOR']
+const ROLES = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'SUPPORT', 'USER_MANAGEMENT', 'TECHNICAL']
 
 export default function AdminManagement() {
   const { user } = useAdminSession()
@@ -58,8 +58,7 @@ export default function AdminManagement() {
 
   const fetchAdmins = useCallback(async () => {
     try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/admin/admins', { headers: { ...authHeaders } })
+      const res = await fetch('/api/admin/admins', { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
       const data = await res.json()
       setAdmins(data.admins || [])
@@ -105,11 +104,10 @@ export default function AdminManagement() {
     e.preventDefault()
     setSaving(true)
     try {
-      const authHeaders = getAuthHeader()
       if (editingAdmin) {
         const res = await fetch('/api/admin/admins', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...authHeaders },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: editingAdmin.id, role: form.role }),
         })
         if (!res.ok) throw new Error()
@@ -117,7 +115,7 @@ export default function AdminManagement() {
       } else {
         const res = await fetch('/api/admin/admins', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
         })
         if (!res.ok) {
@@ -137,10 +135,9 @@ export default function AdminManagement() {
 
   const handleToggleActive = async (admin: AdminUser) => {
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch('/api/admin/admins', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: admin.id, isActive: !admin.isActive }),
       })
       if (!res.ok) throw new Error()
@@ -154,10 +151,9 @@ export default function AdminManagement() {
   const handleDelete = async (admin: AdminUser) => {
     if (!confirm(`Soft delete ${admin.firstName} ${admin.lastName}?`)) return
     try {
-      const authHeaders = getAuthHeader()
       const res = await fetch(`/api/admin/admins?id=${admin.id}`, {
         method: 'DELETE',
-        headers: { ...authHeaders },
+        headers: { },
       })
       if (!res.ok) throw new Error()
       toast.success('Admin removed')

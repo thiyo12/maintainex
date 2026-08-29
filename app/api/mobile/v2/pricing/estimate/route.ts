@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPriceEstimate } from '@/lib/pricing-engine'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+
     const body = await request.json()
     const {
       categoryId, categoryName, description, title,
@@ -25,7 +29,7 @@ export async function POST(request: NextRequest) {
       areaId,
       cityId,
       stateId,
-      countryCode: countryCode || (user ? undefined : 'LK'),
+      countryCode: countryCode || 'LK',
       urgency: urgency || 'normal',
       preferredDate,
       preferredTime,

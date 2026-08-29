@@ -5,7 +5,7 @@ import { authenticateRequest } from '@/lib/mobile-auth'
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) {
+    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'OPERATIONS', 'FINANCE'].includes(user.role)) {
+    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

@@ -336,7 +336,7 @@ async function main() {
         email: adminEmail,
         password: adminPassword,
         name: 'Northern Admin',
-        role: 'OPERATIONS',
+        role: 'MANAGER',
         branchId: northernBranch.id,
         isActive: true
       }

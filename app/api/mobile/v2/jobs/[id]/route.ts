@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { getLocationName } from '@/lib/locations'
 
+function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<string, any> {
+  if (_isOwner) return data
+  return { ...data, phone: null, email: null }
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -13,6 +18,16 @@ export async function GET(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+    const isOwner = job.customerId === user.id
+    if (!isOwner) {
+      const userQuote = await prisma.jobQuote.findFirst({
+        where: { jobId: job.id, providerId: user.id },
+      })
+      if (!userQuote) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
 
     const customer = await prisma.user.findUnique({
       where: { id: job.customerId },
@@ -68,7 +83,8 @@ export async function GET(
           })
           if (p) { providerRating = p.rating; completedJobs = p.completedProjects }
         }
-        return { ...q, price: Number(q.price), provider, providerRating, completedJobs }
+        const isQuoteOwner = q.providerId === user.id
+        return { ...q, price: Number(q.price), provider: provider ? redactSensitive(provider, isQuoteOwner) : null, providerRating, completedJobs }
       })
     )
 
@@ -77,7 +93,7 @@ export async function GET(
         ...job,
         budgetAmount: Number(job.budgetAmount),
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
-        customer,
+        customer: customer ? redactSensitive(customer, isOwner) : null,
         locationName,
         quotes: enrichedQuotes,
         escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null,

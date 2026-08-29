@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,13 +38,19 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { token } = await request.json()
     if (!token) {
       return NextResponse.json({ error: 'Push token required' }, { status: 400 })
     }
 
-    console.log(`Push token registered for user ${user.id}: ${token}`)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { pushToken: token },
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Push register error:', error)

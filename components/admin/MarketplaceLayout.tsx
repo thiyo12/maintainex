@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -9,49 +9,36 @@ import {
   FiAlertCircle, FiList, FiBell, FiStar, FiFlag, FiZap, FiDollarSign,
   FiMessageSquare, FiAlertTriangle,
 } from 'react-icons/fi'
-import { getStoredUser, clearStoredUser, type StoredUser } from '@/lib/auth-client'
+import { useAuth } from './AuthProvider'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome, roles: ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Users', href: '/admin/marketplace/users', icon: FiUsers, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Disputes', href: '/admin/marketplace/disputes', icon: FiMessageSquare, roles: ['SUPER_ADMIN', 'OPERATIONS', 'SUPPORT'] },
+  { name: 'Dashboard', href: '/admin/marketplace/dashboard', icon: FiHome, roles: ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL'] },
+  { name: 'Users', href: '/admin/marketplace/users', icon: FiUsers, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT', 'SUPPORT'] },
+  { name: 'Jobs', href: '/admin/marketplace/jobs', icon: FiFileText, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT', 'SUPPORT'] },
+  { name: 'Disputes', href: '/admin/marketplace/disputes', icon: FiMessageSquare, roles: ['SUPER_ADMIN', 'MANAGER', 'SUPPORT'] },
   { name: 'Escrow', href: '/admin/marketplace/escrow', icon: FiShield, roles: ['SUPER_ADMIN', 'FINANCE'] },
   { name: 'Revenue', href: '/admin/marketplace/revenue', icon: FiDollarSign, roles: ['SUPER_ADMIN', 'FINANCE'] },
-  { name: 'Fraud Centre', href: '/admin/marketplace/fraud', icon: FiAlertTriangle, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Offers', href: '/admin/marketplace/offers', icon: FiZap, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
-  { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
+  { name: 'Fraud Centre', href: '/admin/marketplace/fraud', icon: FiAlertTriangle, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT', 'SUPPORT'] },
+  { name: 'Offers', href: '/admin/marketplace/offers', icon: FiZap, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'] },
+  { name: 'Categories', href: '/admin/marketplace/categories', icon: FiGrid, roles: ['SUPER_ADMIN', 'MANAGER'] },
   { name: 'Staff', href: '/admin/marketplace/staff', icon: FiUserCheck, roles: ['SUPER_ADMIN'] },
   { name: 'Settings', href: '/admin/marketplace/settings', icon: FiSettings, roles: ['SUPER_ADMIN'] },
-  { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList, roles: ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell, roles: ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT'] },
-  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
-  { name: 'Properties', href: '/admin/marketplace/properties', icon: FiHome, roles: ['SUPER_ADMIN', 'OPERATIONS', 'MODERATOR'] },
-  { name: 'Alert Centre', href: '/admin/marketplace/alerts', icon: FiAlertCircle, roles: ['SUPER_ADMIN', 'OPERATIONS', 'SUPPORT'] },
+  { name: 'Audit Logs', href: '/admin/marketplace/audit-logs', icon: FiList, roles: ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL'] },
+  { name: 'Notifications', href: '/admin/marketplace/notifications', icon: FiBell, roles: ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL'] },
+  { name: 'Reviews', href: '/admin/marketplace/reviews', icon: FiStar, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'] },
+  { name: 'Properties', href: '/admin/marketplace/properties', icon: FiHome, roles: ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'] },
+  { name: 'Work Queue', href: '/admin/marketplace/alerts', icon: FiAlertCircle, roles: ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL'] },
 ]
 
 export default function MarketplaceLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [user, setUser] = useState<StoredUser | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const storedUser = getStoredUser()
-    if (storedUser && storedUser.id && storedUser.email && storedUser.role) {
-      setUser(storedUser)
-      setLoading(false)
-    } else {
-      window.location.href = '/admin/login'
-    }
-  }, [])
+  const { user, isLoading: loading } = useAuth()
 
   const handleLogout = async () => {
-    clearStoredUser()
-    localStorage.removeItem('admin_user')
     localStorage.removeItem('admin_token')
     try { await fetch('/api/admin/auth/logout', { method: 'POST', credentials: 'include' }) } catch {}
     try { await fetch('/api/auth/logout') } catch {}
@@ -160,7 +147,7 @@ export default function MarketplaceLayout({ children }: { children: React.ReactN
               <div className="w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: '#F59E0B' }}>
                 <span className="font-bold" style={{ color: '#0B0C12' }}>
-                  {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'M'}
+                  {user.firstName?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'M'}
                 </span>
               </div>
             </div>

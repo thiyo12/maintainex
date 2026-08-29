@@ -1,14 +1,19 @@
-'use server'
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getSession } from '@/lib/auth-utils'
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+  }
+
+  const session = await getSession(request)
+  if (!session || session.role !== 'SUPER_ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
-    console.log('Creating Industry table...')
-    
-    // Use Prisma's executeRaw to create table directly
-    await prisma.$executeRawUnsafe(`
+    await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "Industry" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "name" TEXT NOT NULL,
@@ -21,11 +26,8 @@ export async function POST() {
         "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
         "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
       )
-    `)
+    `
 
-    console.log('Table created! Seeding industries...')
-
-    // Seed default industries
     const industries = [
       { name: 'Shopping Malls', icon: '🏬', displayOrder: 1 },
       { name: 'Schools', icon: '🏫', displayOrder: 2 },
@@ -38,33 +40,30 @@ export async function POST() {
 
     for (const ind of industries) {
       const id = ind.name.toLowerCase().replace(/ /g, '-')
-      await prisma.$executeRawUnsafe(
-        `INSERT INTO "Industry" (id, name, icon, "displayOrder") VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-        id, ind.name, ind.icon, ind.displayOrder
-      )
+      await prisma.$executeRaw`
+        INSERT INTO "Industry" (id, name, icon, "displayOrder")
+        VALUES (${id}, ${ind.name}, ${ind.icon}, ${ind.displayOrder})
+        ON CONFLICT DO NOTHING
+      `
     }
 
     const result = await prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(*) as count FROM "Industry"
     `
 
-    console.log('Success! Industries:', result)
-
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Industry table created and seeded!',
       count: Number(result[0]?.count || 0)
     })
   } catch (error) {
-    console.error('Setup error:', error)
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: 'Failed to setup',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }
 
-// Also allow GET for easy testing
-export async function GET() {
-  return POST()
+export async function GET(request: NextRequest) {
+  return POST(request)
 }

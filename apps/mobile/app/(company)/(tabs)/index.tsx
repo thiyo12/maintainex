@@ -222,7 +222,7 @@ export default function CompanyDashboard() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink, marginBottom: 12 }]}>{t('home.postOptions.title')}</Text>
           <View style={styles.grid}>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/post-job')}>
+            <TouchableOpacity style={[styles.gridCard, { backgroundColor: colors.white }]} onPress={() => router.push('/(customer)/jobs/v2/create')}>
               <View style={[styles.gridIcon, { backgroundColor: colors.amberBg }]}>
                 <Ionicons name="briefcase-outline" size={22} color={colors.amberDark} />
               </View>

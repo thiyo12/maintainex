@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
@@ -63,6 +64,27 @@ export default function CompanyEarnings() {
           <Text style={styles.changeText}>↑ {revenueChange}% {t('company.fromLast', { period })}</Text>
         </View>
       </View>
+
+      {(earnings?.pendingCommissionPayments || []).length > 0 && (
+        <View style={styles.commissionSection}>
+          <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
+          {earnings?.pendingCommissionPayments?.map((cp: any) => (
+            <View key={cp.id} style={styles.commissionCard}>
+              <View style={styles.commissionHeader}>
+                <Ionicons name="cash-outline" size={20} color={colors.amber} />
+                <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
+              </View>
+              <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
+              <Text style={styles.commissionInstruction}>
+                Pay this amount to any Maintainex agent using reference: {cp.referenceNumber}
+              </Text>
+              <Text style={styles.commissionWeek}>
+                Week: {new Date(cp.weekStart).toLocaleDateString()} - {new Date(cp.weekEnd).toLocaleDateString()}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
@@ -203,4 +225,53 @@ const makeStyles = (colors: any) => StyleSheet.create({
   payoutAmount: { fontSize: 14, fontWeight: '700' },
   payoutStatus: { fontSize: 11, color: colors.muted, marginTop: 2 },
   emptyText: { textAlign: 'center', color: colors.muted, marginTop: 20, fontSize: 14 },
+  commissionSection: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  commissionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.ink,
+    marginBottom: 10,
+  },
+  commissionCard: {
+    backgroundColor: colors.white,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.amber,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  commissionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  commissionRef: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.amber,
+  },
+  commissionAmount: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.ink,
+    marginBottom: 8,
+  },
+  commissionInstruction: {
+    fontSize: 13,
+    color: colors.muted,
+    marginBottom: 4,
+  },
+  commissionWeek: {
+    fontSize: 12,
+    color: colors.muted,
+  },
 })

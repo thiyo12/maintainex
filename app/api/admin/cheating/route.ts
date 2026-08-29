@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getAdminSession } from '@/lib/admin-auth'
+
+const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT']
 
 // GET: List all off-platform deal reports
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // PENDING, CONFIRMED, DISMISSED
     const page = parseInt(searchParams.get('page') || '1')
@@ -49,6 +56,10 @@ export async function GET(request: NextRequest) {
 // POST: Submit new off-platform deal report
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { reporterId, againstUserId, againstUserType, jobId, evidence, evidenceUrls } = body
 
@@ -78,6 +89,10 @@ export async function POST(request: NextRequest) {
 // PUT: Review report (confirm/dismiss)
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { reportId, status, action, actionNote, reviewedBy } = body
 

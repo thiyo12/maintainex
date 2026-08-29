@@ -52,18 +52,20 @@ type AdminForm = z.infer<typeof adminSchema>
 
 const ROLE_HIERARCHY: Record<string, string> = {
   SUPER_ADMIN: 'Super Admin',
-  OPERATIONS: 'Operations',
+  MANAGER: 'Manager',
   FINANCE: 'Finance',
-  MODERATOR: 'Moderator',
+  USER_MANAGEMENT: 'User Management',
   SUPPORT: 'Support',
+  TECHNICAL: 'Technical',
 }
 
 const roleBadgeClass: Record<string, string> = {
   SUPER_ADMIN: 'bg-red-100 text-red-800',
-  OPERATIONS: 'bg-blue-100 text-blue-800',
+  MANAGER: 'bg-blue-100 text-blue-800',
   FINANCE: 'bg-indigo-100 text-indigo-800',
-  MODERATOR: 'bg-yellow-100 text-yellow-800',
+  USER_MANAGEMENT: 'bg-orange-100 text-orange-800',
   SUPPORT: 'bg-gray-100 text-gray-800',
+  TECHNICAL: 'bg-cyan-100 text-cyan-800',
 }
 
 export default function MarketplaceAdminUsers() {
@@ -78,7 +80,7 @@ export default function MarketplaceAdminUsers() {
 
   const form = useForm<AdminForm>({
     resolver: zodResolver(adminSchema),
-    defaultValues: { email: '', firstName: '', lastName: '', role: 'MODERATOR', assignedCountries: '' },
+    defaultValues: { email: '', firstName: '', lastName: '', role: 'SUPPORT', assignedCountries: '' },
   })
 
   const { data: admins, isLoading, error, refetch } = useQuery<Admin[]>({
@@ -114,7 +116,7 @@ export default function MarketplaceAdminUsers() {
 
       if (!vars.id && result.data?.tempPassword) {
         setTempPassword(result.data.tempPassword)
-        form.reset({ email: '', firstName: '', lastName: '', role: 'MODERATOR', assignedCountries: '' })
+        form.reset({ email: '', firstName: '', lastName: '', role: 'SUPPORT', assignedCountries: '' })
         setEditing(null)
       } else {
         setDialogOpen(false)
@@ -156,7 +158,7 @@ export default function MarketplaceAdminUsers() {
   }
 
   const openCreate = () => {
-    form.reset({ email: '', firstName: '', lastName: '', role: 'MODERATOR', assignedCountries: '' })
+    form.reset({ email: '', firstName: '', lastName: '', role: 'SUPPORT', assignedCountries: '' })
     setEditing(null)
     setTempPassword('')
     setDialogOpen(true)
@@ -316,10 +318,11 @@ export default function MarketplaceAdminUsers() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
-                    <SelectItem value="OPERATIONS">Operations</SelectItem>
+                    <SelectItem value="MANAGER">Manager</SelectItem>
                     <SelectItem value="FINANCE">Finance</SelectItem>
-                    <SelectItem value="MODERATOR">Moderator</SelectItem>
+                    <SelectItem value="USER_MANAGEMENT">User Management</SelectItem>
                     <SelectItem value="SUPPORT">Support</SelectItem>
+                    <SelectItem value="TECHNICAL">Technical</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

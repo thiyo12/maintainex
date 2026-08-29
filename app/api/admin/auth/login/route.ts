@@ -6,7 +6,8 @@ import { createAuditLog, getIp } from '@/lib/admin-rbac'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
 import type { AdminRole } from '@/lib/admin-types'
 
-const TEMP_TOKEN_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production'
+if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
+const TEMP_TOKEN_SECRET = process.env.JWT_SECRET
 const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 30
 

@@ -1990,26 +1990,31 @@ model AdminSession {
   @@index([refreshTokenHash])
 }
 
-/// Alert centre — auto-created on fraud/dispute/payout events
+/// Work queue — auto-created on KYC/dispute/settlement/flagged-job events
 model AdminAlert {
-  id          String    @id @default(cuid())
-  type        String    // fraud, dispute, payout, system
-  severity    String    // critical, high, medium, low
-  title       String
-  description String?
-  targetTable String?
-  targetId    String?
-  assignedTo  String?
-  status      String    @default("open") // open, in_progress, resolved, dismissed
-  slaMinutes  Int?
-  resolvedAt  DateTime?
-  resolvedBy  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  type         String    // fraud, dispute, payout, system, kyc, settlement, flagged_job
+  severity     String    // critical, high, medium, low
+  title        String
+  description  String?
+  targetTable  String?
+  targetId     String?
+  assignedTo   String?   // staff admin user ID (null = unassigned)
+  assignedRole String?   // which role should handle this: USER_MANAGEMENT, SUPPORT, FINANCE, MANAGER
+  priority     String    @default("medium") // urgent, high, medium, low
+  notes        String?   // staff comments / resolution notes
+  status       String    @default("open") // open, in_progress, resolved, dismissed
+  slaMinutes   Int?
+  resolvedAt   DateTime?
+  resolvedBy   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status, severity])
   @@index([type, createdAt])
   @@index([assignedTo, status])
+  @@index([assignedRole, status])
+  @@index([status, priority, createdAt])
 }
 
 model PlatformSettings {
@@ -2467,12 +2472,34 @@ model WeeklySettlement {
   notes           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  commissionPayments CommissionPayment[]
 
   @@unique([providerId, weekStart])
   @@index([providerId])
   @@index([status])
   @@index([weekStart])
   @@index([dueAt])
+}
+
+/// Phase 3: Cash-to-agent commission payment
+model CommissionPayment {
+  id                String    @id @default(cuid())
+  providerId        String
+  weeklySettlementId String
+  weeklySettlement  WeeklySettlement @relation(fields: [weeklySettlementId], references: [id])
+  referenceNumber   String    @unique // REF-XXXXX auto-generated
+  amountDue         Float
+  method            String    @default("CASH") // CASH, BANK
+  status            String    @default("PENDING") // PENDING, CONFIRMED
+  confirmedById     String?   // AdminUser id (FINANCE or SUPER_ADMIN)
+  confirmedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([providerId])
+  @@index([referenceNumber])
+  @@index([weeklySettlementId])
+  @@index([status])
 }
 
 /// Off-platform deal reports (cheating)

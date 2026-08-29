@@ -16,7 +16,7 @@ export default function OtpScreen() {
   const colors = useColors()
     const styles = makeStyles(colors)
   const router = useRouter()
-  const { phone, role } = useLocalSearchParams<{ phone: string; role: string }>()
+  const { email, role } = useLocalSearchParams<{ email: string; role: string }>()
   const { t } = useTranslation()
   const { register } = useAuth()
 
@@ -27,8 +27,8 @@ export default function OtpScreen() {
   const inputRefs = useRef<(TextInput | null)[]>([])
 
   useEffect(() => {
-    if (phone) sendOtp()
-  }, [phone])
+    if (email) sendOtp()
+  }, [email])
 
   useEffect(() => {
     if (resendTimer <= 0) return
@@ -44,7 +44,7 @@ export default function OtpScreen() {
   const sendOtp = async () => {
     setSending(true)
     try {
-      await auth.sendOtp({ phone: phone || '' })
+      await auth.sendOtp({ email: email || '' })
     } catch (err: any) {
       Alert.alert(t('common.error'), t('errors.failedToSendCode'))
     } finally {
@@ -83,7 +83,7 @@ export default function OtpScreen() {
 
     setLoading(true)
     try {
-      await auth.verifyOtp({ phone: phone || '', code })
+      await auth.verifyOtp({ email: email || '', code })
 
       const userRole = role || 'CUSTOMER'
       if (userRole === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
@@ -109,7 +109,7 @@ export default function OtpScreen() {
 
       <Text style={[styles.title, { color: colors.ink }]}>{t('auth.otp.title')}</Text>
       <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        {t('auth.otp.description')}{phone || ''}
+        {t('auth.otp.description')}{email || ''}
       </Text>
 
       <View style={styles.codeRow}>

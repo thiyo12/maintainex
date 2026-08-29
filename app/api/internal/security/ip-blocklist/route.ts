@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET || 'maintainex-internal-sync-2024'
+if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
+const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET
 
 export async function GET(request: NextRequest) {
   const syncHeader = request.headers.get('x-internal-sync')

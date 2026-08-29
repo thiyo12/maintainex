@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiCalendar, FiDownload, FiRefreshCw, FiFilter } from 'react-icons/fi'
 import AdminLayout from '@/components/admin/AdminLayout'
-import { getAuthHeader } from '@/lib/auth-client'
 
 interface Settlement {
   id: string
@@ -45,12 +44,11 @@ export default function SettlementsPage() {
   const fetchSettlements = async () => {
     setLoading(true)
     try {
-      const authHeaders = getAuthHeader()
       const params = new URLSearchParams({ status: 'PAID' })
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
       const res = await fetch(`/api/admin/financial/commission?${params}`, {
-        headers: { ...authHeaders }
+        headers: { }
       })
       if (res.status === 401) {
         window.location.href = '/admin/login'

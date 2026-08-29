@@ -13,6 +13,8 @@ const securityHeaders: Record<string, string> = {
   'X-XSS-Protection': '1; mode=block',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
   'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.cloudinary.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com https://*.cloudinary.com; connect-src 'self' https://api.cloudinary.com; frame-ancestors 'none'",
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 }
@@ -150,7 +152,8 @@ const ipBlocklistExpiry = new Map<string, number>()
 let lastBlocklistSync = 0
 const BLOCKLIST_SYNC_INTERVAL = 60000
 
-const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET || 'maintainex-internal-sync-2024'
+if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
+const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET
 
 async function syncIPBlocklist(request: NextRequest) {
   const now = Date.now()
@@ -281,7 +284,7 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  const isLoginRoute = pathname.startsWith('/api/auth') || pathname.startsWith('/api/admin/auth')
+  const isLoginRoute = pathname.startsWith('/api/admin/auth')
   const rateLimitType = isLoginRoute ? 'auth' : 'admin'
   const rateLimit = getInMemoryRateLimit(ip, rateLimitType)
 
@@ -318,6 +321,24 @@ export async function middleware(request: NextRequest) {
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
+  if (pathname.startsWith('/setup') || pathname.startsWith('/api/industries/init')) {
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse(
+        JSON.stringify({ error: 'Not available in production' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+    const session = await getSession(request)
+    if (!session || session.role !== 'SUPER_ADMIN') {
+      const loginUrl = new URL('/admin/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      response = NextResponse.redirect(loginUrl)
+      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+    }
+    response = NextResponse.next()
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
   if (pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     const session = await getSession(request)
     if (!session) {
@@ -327,7 +348,7 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    const validWebRoles = ['SUPER_ADMIN', 'OPERATIONS', 'FINANCE', 'MODERATOR', 'SUPPORT']
+    const validWebRoles = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL']
 
     if (!validWebRoles.includes(session.role)) {
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
@@ -401,8 +422,8 @@ export async function middleware(request: NextRequest) {
 
   if (
     pathname.startsWith('/api/') &&
-    pathname !== '/api/auth/login' &&
-    pathname !== '/api/auth/logout' &&
+    pathname !== '/api/admin/auth/login' &&
+    pathname !== '/api/admin/auth/logout' &&
     pathname !== '/api/health' &&
     pathname !== '/api/waitlist' &&
     pathname !== '/api/auth/forgot-password' &&

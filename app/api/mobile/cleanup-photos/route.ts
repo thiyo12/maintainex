@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { unlinkSync, readdirSync, statSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'mobile')
+const UPLOAD_DIR = join(process.cwd(), 'uploads', 'mobile')
 const MAX_AGE_MS = 4 * 24 * 60 * 60 * 1000
 const INDEX_FILE = join(UPLOAD_DIR, '.photo-index.json')
 

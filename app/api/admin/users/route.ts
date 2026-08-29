@@ -5,7 +5,7 @@ import { getSession } from '@/lib/auth-utils'
 export async function GET(request: NextRequest) {
   try {
     const session = await getSession(request)
-    if (!session) {
+    if (!session || !['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'].includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const session = await getSession(request)
-    if (!session) {
+    if (!session || !['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'].includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

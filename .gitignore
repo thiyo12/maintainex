@@ -48,6 +48,12 @@ next-env.d.ts
 *.db
 *.db-journal
 
+# Uploads (private user files)
+uploads/
+
 # Logs
 *.log
 logs/
+
+# Agent reference (contains infra details, never commit)
+AGENTS.md

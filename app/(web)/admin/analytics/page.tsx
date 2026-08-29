@@ -6,7 +6,6 @@ import {
   FiUsers, FiUserCheck, FiBriefcase, FiTool, FiDollarSign,
   FiTrendingUp, FiActivity, FiClock, FiArrowUpRight, FiArrowDownRight
 } from 'react-icons/fi'
-import { getAuthHeader } from '@/lib/auth-client'
 import AdminLayout from '@/components/admin/AdminLayout'
 
 interface AnalyticsData {
@@ -62,8 +61,7 @@ export default function AnalyticsOverview() {
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      const authHeaders = getAuthHeader()
-      const res = await fetch('/api/admin/analytics', { headers: { ...authHeaders } })
+      const res = await fetch('/api/admin/analytics', { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
       const json = await res.json()
       setData(json)

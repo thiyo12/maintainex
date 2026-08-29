@@ -3,6 +3,7 @@
     "name": "Maintainex",
     "slug": "maintainex",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "maintainex",
@@ -15,12 +16,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "lk.maintainex.app",
-      "config": {
-        "googleMapsApiKey": "YOUR_GOOGLE_MAPS_KEY"
-      },
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Maintainex needs your location to find nearby taskers and track jobs.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Maintainex needs background location to share live tasker tracking during active jobs."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Maintainex needs background location to share live tasker tracking during active jobs.",
+        "NSLocationAlwaysUsageDescription": "Maintainex needs background location for live tracking during active jobs.",
+        "NSCameraUsageDescription": "Maintainex needs camera access to take photos for job evidence and profile pictures.",
+        "NSPhotoLibraryUsageDescription": "Maintainex needs photo library access to upload job evidence and profile pictures.",
+        "NSMicrophoneUsageDescription": "Maintainex needs microphone access for voice messages in chat.",
+        "NSFaceIDUsageDescription": "Maintainex uses Face ID for secure authentication.",
+        "NSMotionUsageDescription": "Maintainex uses motion data for location accuracy."
       }
     },
     "android": {
@@ -29,11 +34,6 @@
         "backgroundColor": "#F59E0B"
       },
       "package": "lk.maintainex.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": "YOUR_GOOGLE_MAPS_KEY"
-        }
-      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -52,7 +52,9 @@
       "expo-font",
       "expo-localization",
       "expo-splash-screen",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-notifications"
+
     ],
     "experiments": {
       "typedRoutes": true

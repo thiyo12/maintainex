@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -26,7 +26,7 @@ export default function JobPostedConfirmation() {
     Animated.timing(countAnim, {
       toValue: 24,
       duration: 1500,
-      useNativeDriver: false,
+      useNativeDriver: true,
     }).start()
   }, [])
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function PUT(request: NextRequest) {
   try {
@@ -8,6 +8,8 @@ export async function PUT(request: NextRequest) {
     if (!user || user.role !== 'TASKER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { isOnline } = await request.json()
     await prisma.taskerProfile.update({

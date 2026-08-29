@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
+import { getAdminSession } from '@/lib/admin-auth'
+
+const ALLOWED_ROLES = ['SUPER_ADMIN']
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const now = new Date()
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000)
@@ -79,6 +86,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
     const { email, firstName, lastName, role, password, assignedCountries } = body
 
@@ -123,8 +134,12 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const body = await request.json()
-    const { id, role, isActive } = body
+    const { id, role, isActive, password } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Admin ID required' }, { status: 400 })
@@ -133,6 +148,12 @@ export async function PATCH(request: NextRequest) {
     const updateData: Record<string, any> = {}
     if (role !== undefined) updateData.role = role
     if (isActive !== undefined) updateData.isActive = isActive
+    if (password !== undefined) {
+      if (typeof password !== 'string' || password.length < 8) {
+        return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+      }
+      updateData.passwordHash = await hash(password, 12)
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -160,6 +181,10 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const session = await getAdminSession(request)
+    if (!session || !ALLOWED_ROLES.includes(session.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
