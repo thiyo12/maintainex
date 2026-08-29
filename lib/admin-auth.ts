@@ -2,13 +2,13 @@ import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { verifyAccessToken } from './admin-jwt'
 
-if (!process.env.JWT_SECRET && !process.env.NEXTAUTH_SECRET) throw new Error('[SECURITY] JWT_SECRET or NEXTAUTH_SECRET env var is required')
-const JWT_SECRET: string = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET!
-if (!process.env.JWT_REFRESH_SECRET) throw new Error('[SECURITY] JWT_REFRESH_SECRET env var is required')
-const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET
+function getJwtSecret(): string {
+  if (!process.env.JWT_SECRET && !process.env.NEXTAUTH_SECRET) throw new Error('[SECURITY] JWT_SECRET or NEXTAUTH_SECRET env var is required')
+  return process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET!
+}
 
 function hmacSign(data: string): string {
-  return crypto.createHmac('sha256', JWT_SECRET).update(data).digest('hex')
+  return crypto.createHmac('sha256', getJwtSecret()).update(data).digest('hex')
 }
 
 function b64UrlDecode(str: string): string {
@@ -23,7 +23,7 @@ export function verifySimpleToken(token: string): any {
 
     if (parts.length === 3) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET) as any
+        const decoded = jwt.verify(token, getJwtSecret()) as any
         return {
           id: decoded.sub || decoded.id,
           email: decoded.email,

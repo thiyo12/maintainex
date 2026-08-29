@@ -6,8 +6,10 @@ import { signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefre
 import { getIp } from '@/lib/admin-rbac'
 import type { AdminRole } from '@/lib/admin-types'
 
-if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
-const TEMP_TOKEN_SECRET = process.env.JWT_SECRET
+function getTempTokenSecret(): string {
+  if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
+  return process.env.JWT_SECRET
+}
 
 function parseCountries(val: string): string[] {
   if (!val) return []
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     let tempPayload: { sub: string; purpose: string; email: string }
     try {
-      tempPayload = jwt.verify(tempToken, TEMP_TOKEN_SECRET) as any
+      tempPayload = jwt.verify(tempToken, getTempTokenSecret()) as any
     } catch {
       return NextResponse.json({ error: 'Invalid or expired temp token' }, { status: 401 })
     }

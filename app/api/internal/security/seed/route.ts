@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
-const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET
+function getInternalSyncSecret(): string {
+  if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
+  return process.env.INTERNAL_SYNC_SECRET
+}
 
 function randomIp(): string {
   return `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
@@ -31,7 +33,7 @@ function randomEmail(): string {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('x-internal-sync')
-    if (!authHeader || authHeader !== INTERNAL_SYNC_SECRET) {
+    if (!authHeader || authHeader !== getInternalSyncSecret()) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

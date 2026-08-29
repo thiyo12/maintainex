@@ -6,8 +6,10 @@ import { createAuditLog, getIp } from '@/lib/admin-rbac'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
 import type { AdminRole } from '@/lib/admin-types'
 
-if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
-const TEMP_TOKEN_SECRET = process.env.JWT_SECRET
+function getTempTokenSecret(): string {
+  if (!process.env.JWT_SECRET) throw new Error('[SECURITY] JWT_SECRET env var is required')
+  return process.env.JWT_SECRET
+}
 const MAX_ATTEMPTS = 5
 const LOCK_MINUTES = 30
 
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
     if (adminUser.totpEnabled && adminUser.totpSecret) {
       const tempToken = jwt.sign(
         { sub: adminUser.id, purpose: '2fa_verify', email: adminUser.email },
-        TEMP_TOKEN_SECRET,
+        getTempTokenSecret(),
         { expiresIn: '5m' }
       )
       await recordLoginAttempt({ adminUserId: adminUser.id, email, ipAddress: ip, userAgent, success: true, failureReason: '2FA_REQUIRED' })

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required')
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is required')
+  }
+  return secret
 }
 
 const securityHeaders: Record<string, string> = {
@@ -66,7 +69,7 @@ async function verifyJwtSignature(headerB64: string, payloadB64: string, signatu
     const signature = Uint8Array.from(atob(signatureB64.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
     const key = await crypto.subtle.importKey(
       'raw',
-      new TextEncoder().encode(JWT_SECRET!),
+      new TextEncoder().encode(getJwtSecret()),
       { name: 'HMAC', hash: 'SHA-256' },
       false,
       ['verify']
@@ -100,7 +103,7 @@ async function verifySimpleToken(token: string): Promise<any> {
     }
     const [encoded, legacySig] = parts
     if (!encoded) return null
-    const expectedSig = Buffer.from(JWT_SECRET + encoded).toString('base64').slice(0, 32)
+    const expectedSig = Buffer.from(getJwtSecret() + encoded).toString('base64').slice(0, 32)
     if (legacySig !== expectedSig) return null
     const payload = JSON.parse(b64UrlDecode(encoded))
     const maxAge = 30 * 24 * 60 * 60 * 1000
@@ -152,8 +155,10 @@ const ipBlocklistExpiry = new Map<string, number>()
 let lastBlocklistSync = 0
 const BLOCKLIST_SYNC_INTERVAL = 60000
 
-if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
-const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET
+function getInternalSyncSecret(): string {
+  if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
+  return process.env.INTERNAL_SYNC_SECRET
+}
 
 async function syncIPBlocklist(request: NextRequest) {
   const now = Date.now()
@@ -162,7 +167,7 @@ async function syncIPBlocklist(request: NextRequest) {
   try {
     const url = new URL('/api/internal/security/ip-blocklist', request.url)
     const resp = await fetch(url.toString(), {
-      headers: { 'x-internal-sync': INTERNAL_SYNC_SECRET },
+      headers: { 'x-internal-sync': getInternalSyncSecret() },
       cache: 'no-store',
     })
     if (resp.ok) {

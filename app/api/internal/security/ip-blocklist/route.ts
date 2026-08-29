@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
-const INTERNAL_SYNC_SECRET = process.env.INTERNAL_SYNC_SECRET
+function getInternalSyncSecret(): string {
+  if (!process.env.INTERNAL_SYNC_SECRET) throw new Error('[SECURITY] INTERNAL_SYNC_SECRET env var is required')
+  return process.env.INTERNAL_SYNC_SECRET
+}
 
 export async function GET(request: NextRequest) {
   const syncHeader = request.headers.get('x-internal-sync')
-  if (!syncHeader || syncHeader !== INTERNAL_SYNC_SECRET) {
+  if (!syncHeader || syncHeader !== getInternalSyncSecret()) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

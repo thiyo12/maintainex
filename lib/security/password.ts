@@ -2,21 +2,24 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
 const ROUNDS = 14
-if (!process.env.PASSWORD_PEPPER) throw new Error('[SECURITY] PASSWORD_PEPPER env var is required')
-const PEPPER = process.env.PASSWORD_PEPPER
+
+function getPepper(): string {
+  if (!process.env.PASSWORD_PEPPER) throw new Error('[SECURITY] PASSWORD_PEPPER env var is required')
+  return process.env.PASSWORD_PEPPER
+}
 
 export async function hashPassword(password: string): Promise<string> {
-  const peppered = crypto.createHash('sha256').update(password + PEPPER).digest('hex')
+  const peppered = crypto.createHash('sha256').update(password + getPepper()).digest('hex')
   return bcrypt.hash(peppered, ROUNDS)
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const peppered = crypto.createHash('sha256').update(password + PEPPER).digest('hex')
+  const peppered = crypto.createHash('sha256').update(password + getPepper()).digest('hex')
   return bcrypt.compare(peppered, hash)
 }
 
 export async function verifyPasswordWithMigration(password: string, hash: string): Promise<{ valid: boolean; needsMigration: boolean }> {
-  const peppered = crypto.createHash('sha256').update(password + PEPPER).digest('hex')
+  const peppered = crypto.createHash('sha256').update(password + getPepper()).digest('hex')
   if (await bcrypt.compare(peppered, hash)) {
     return { valid: true, needsMigration: false }
   }
