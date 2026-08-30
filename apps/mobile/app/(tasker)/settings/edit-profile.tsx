@@ -17,7 +17,10 @@ export default function TaskerEditProfile() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { user, refreshUser } = useAuth()
+  const verified = user?.identityStatus === 'VERIFIED' || user?.identityStatus === 'APPROVED'
+  const nameLocked = !!verified
   const [name, setName] = useState('')
+  const [nickname, setNickname] = useState('')
   const [phone, setPhone] = useState('')
   const [profileImage, setProfileImage] = useState('')
   const [bio, setBio] = useState('')
@@ -39,6 +42,7 @@ export default function TaskerEditProfile() {
         setBio(p.bio || '')
         setHourlyRate(p.hourlyRate != null ? String(p.hourlyRate) : '')
         if (p.profileImage) setProfileImage(p.profileImage)
+        if (p.user?.nickname) setNickname(p.user.nickname)
       } catch { /* ignore */ }
     }
     loadTaskerProfile()
@@ -52,7 +56,9 @@ export default function TaskerEditProfile() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
     })
     if (!result.canceled && result.assets[0]) {
       setUploading(true)
@@ -75,13 +81,14 @@ export default function TaskerEditProfile() {
     setSaving(true)
     try {
       await taskers.updateProfile({
-        name: name.trim(),
+        name: nameLocked ? undefined : name.trim(),
+        nickname: nickname.trim() || undefined,
         phone: phone.trim(),
         bio: bio.trim(),
         hourlyRate: hourlyRate.trim() ? Number(hourlyRate) : undefined,
         profileImage: profileImage || undefined,
       })
-      await auth.updateProfile({ name: name.trim(), phone: phone.trim(), profileImage: profileImage || undefined })
+      await auth.updateProfile({ name: nameLocked ? undefined : name.trim(), phone: phone.trim(), profileImage: profileImage || undefined })
       await refreshUser()
       Alert.alert(t('common.success'), t('profile.editProfileHeader'))
       router.back()
@@ -112,10 +119,33 @@ export default function TaskerEditProfile() {
                 <Text style={styles.changePhoto}>{t('components.addPhoto')}</Text>
               )}
             </TouchableOpacity>
+            <Text style={styles.faceHint}>{t('profile.photoFaceHint')}</Text>
           </View>
-          <Text style={styles.label}>{t('profile.fullName')}</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('auth.register.namePlaceholder')} />
-          {user?.lastNameChangedAt && (() => {
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>{t('profile.fullName')}</Text>
+            {nameLocked && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
+                <Text style={styles.verifiedBadgeText}>{t('profile.nameLocked')}</Text>
+              </View>
+            )}
+          </View>
+          <View style={[styles.input, nameLocked && { backgroundColor: colors.surface, justifyContent: 'center' }]}>
+            <Text style={{ fontSize: fontSizes.body, color: nameLocked ? colors.muted : colors.ink }}>{name}</Text>
+          </View>
+          {nameLocked && (
+            <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4, fontFamily: fonts.body }}>{t('profile.nameLockedHint')}</Text>
+          )}
+          <Text style={styles.label}>{t('profile.nickname')}</Text>
+          <TextInput
+            style={styles.input}
+            value={nickname}
+            onChangeText={setNickname}
+            placeholder={t('profile.nicknamePlaceholder')}
+            autoCorrect={false}
+          />
+          <Text style={{ fontSize: 11, color: colors.muted, marginTop: 4, fontFamily: fonts.body }}>{t('profile.nicknameHint')}</Text>
+          {user?.lastNameChangedAt && !nameLocked && (() => {
             const d = Math.floor((Date.now() - new Date(user.lastNameChangedAt).getTime()) / (1000 * 60 * 60 * 24))
             if (d < 30) {
               const a = new Date(user.lastNameChangedAt); a.setDate(a.getDate() + 30)
@@ -163,7 +193,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   avatarText: { fontSize: 32, fontFamily: fonts.heading, color: colors.white },
   changePhoto: { fontSize: fontSizes.bodySmall, color: colors.muted, fontFamily: fonts.bodyMedium },
+  faceHint: { fontSize: 12, color: colors.muted, fontFamily: fonts.body, marginTop: 8, textAlign: 'center' },
   label: { fontSize: fontSizes.bodySmall, fontFamily: fonts.bodyMedium, color: colors.muted, marginBottom: 6, marginTop: 12 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, marginBottom: 6 },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.amberBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  verifiedBadgeText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.amberDark },
   input: {
     backgroundColor: colors.white, borderRadius: 14, padding: 14, fontSize: fontSizes.body,
     borderWidth: 1, borderColor: colors.border, color: colors.ink,

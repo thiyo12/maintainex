@@ -96,19 +96,19 @@ export default function ProfileContent() {
           <Text style={[styles.email, { color: colors.muted }]}>{user?.email || ''}</Text>
           <Text style={[styles.phone, { color: colors.muted }]}>{user?.phone || ''}</Text>
           <TouchableOpacity
-            style={[styles.identityBadge, identityStatus === 'APPROVED' ? styles.identityApproved : identityStatus === 'PENDING' ? styles.identityPending : styles.identityUnverified]}
+            style={[styles.identityBadge, (identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? styles.identityApproved : identityStatus === 'PENDING' ? styles.identityPending : styles.identityUnverified]}
             onPress={() => router.push('/(tasker)/identity')}
             activeOpacity={0.7}
           >
-            {identityStatus === 'APPROVED' ? (
+            {(identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? (
               <ShieldCheck size={14} color="#059669" weight="fill" />
             ) : identityStatus === 'PENDING' ? (
               <Clock size={14} color="#D97706" weight="fill" />
             ) : (
               <Shield size={14} color="#DC2626" weight="regular" />
             )}
-            <Text style={[styles.identityBadgeText, { color: identityStatus === 'APPROVED' ? '#059669' : identityStatus === 'PENDING' ? '#D97706' : '#DC2626' }]}>
-              {identityStatus === 'APPROVED' ? t('verify.status.verified') : identityStatus === 'PENDING' ? t('verify.status.pending') : identityStatus === 'REJECTED' ? t('verify.status.rejected') : t('verify.status.notSubmitted')}
+            <Text style={[styles.identityBadgeText, { color: (identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? '#059669' : identityStatus === 'PENDING' ? '#D97706' : '#DC2626' }]}>
+              {(identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? t('verify.status.verified') : identityStatus === 'PENDING' ? t('verify.status.pending') : identityStatus === 'REJECTED' ? t('verify.status.rejected') : t('verify.status.notSubmitted')}
             </Text>
           </TouchableOpacity>
         </View>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -26,10 +26,11 @@ export default function IdentityVerificationScreen() {
   const [uploadingFront, setUploadingFront] = useState(false)
   const [uploadingBack, setUploadingBack] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [fullName, setFullName] = useState('')
 
   useEffect(() => {
     v2Identity.getStatus().then((data: any) => {
-      if (data.identityStatus === 'APPROVED') {
+      if (data.identityStatus === 'APPROVED' || data.identityStatus === 'VERIFIED') {
         Alert.alert(t('verify.alreadyVerified'), t('verify.alreadyVerified'))
         router.back()
       }
@@ -87,15 +88,19 @@ export default function IdentityVerificationScreen() {
       Alert.alert(t('common.error'), t('verify.selectDocType'))
       return
     }
+    if (!fullName.trim()) {
+      Alert.alert(t('common.error'), t('verify.enterFullName'))
+      return
+    }
     if (!frontUri) {
       Alert.alert(t('common.error'), t('verify.uploadPhotoFront'))
       return
     }
     setSubmitting(true)
     try {
-      await v2Identity.uploadDocument(docType, 'FRONT', frontUri)
+      await v2Identity.uploadDocument(docType, 'FRONT', frontUri, fullName.trim())
       if (backUri) {
-        await v2Identity.uploadDocument(docType, 'BACK', backUri)
+        await v2Identity.uploadDocument(docType, 'BACK', backUri, fullName.trim())
       }
       Alert.alert(t('common.success'), t('verify.underReview'))
       router.back()
@@ -126,6 +131,20 @@ export default function IdentityVerificationScreen() {
         </View>
 
         <Text style={styles.subtitle}>{t('verify.subtitle')}</Text>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('verify.fullNameLabel')}</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={fullName}
+            onChangeText={setFullName}
+            placeholder={t('verify.fullNamePlaceholder')}
+            placeholderTextColor={colors.muted}
+            autoCapitalize="words"
+            autoCorrect={false}
+          />
+          <Text style={styles.note}>{t('verify.fullNameHint')}</Text>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('verify.selectDocumentType')}</Text>
@@ -227,6 +246,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
   subtitle: { fontSize: 14, color: colors.muted, paddingHorizontal: 20, marginBottom: 24, lineHeight: 20 },
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, marginBottom: 12 },
+  nameInput: {
+    backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 15,
+    color: colors.ink, borderWidth: 1.5, borderColor: colors.border, marginBottom: 8,
+  },
   docOption: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
     padding: 16, borderRadius: 12, marginBottom: 8,

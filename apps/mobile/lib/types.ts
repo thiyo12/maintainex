@@ -8,6 +8,10 @@ export interface User {
   role: UserRole
   isActive: boolean
   createdAt: string
+  identityStatus?: string
+  nickname?: string
+  profileImage?: string
+  lastNameChangedAt?: string
   needsOnboarding?: boolean
 }
 

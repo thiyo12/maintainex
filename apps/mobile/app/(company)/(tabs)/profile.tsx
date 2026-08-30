@@ -192,7 +192,7 @@ export default function CompanyProfile() {
           name={name}
           roleLabel={t('company.roleLabel')}
           variant="company"
-          verified={identityStatus === 'APPROVED'}
+          verified={identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'}
           onEdit={() => router.push('/(company)/settings/edit-profile')}
           onSettings={() => router.push('/notifications')}
         />

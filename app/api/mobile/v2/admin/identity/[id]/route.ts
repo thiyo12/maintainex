@@ -46,9 +46,13 @@ export async function PATCH(
         where: { userId: doc.userId, status: 'APPROVED' },
       })
       if (allDocs.length >= 1) {
+        // Unify on 'VERIFIED': quotes are gated on this exact value.
+        // Also lock the user's name to the full name captured from the ID
+        // document, so it can't be changed afterwards.
+        const nameUpdate = doc.fullName?.trim() ? { name: doc.fullName.trim() } : {}
         await prisma.user.update({
           where: { id: doc.userId },
-          data: { identityStatus: 'APPROVED' },
+          data: { identityStatus: 'VERIFIED', ...nameUpdate },
         })
       }
     }

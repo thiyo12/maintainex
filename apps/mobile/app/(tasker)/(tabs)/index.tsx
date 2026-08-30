@@ -171,10 +171,10 @@ export default function TaskerDashboard() {
           <LinearGradient
             colors={isOnline ? [colors.accent, colors.accentDim] : [colors.surface, colors.surfaceHigh]}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={styles.availCard}
+            style={[styles.availCard, !isOnline && styles.availCardOffline]}
           >
             <View style={styles.availLeft}>
-              <View style={[styles.availDot, { backgroundColor: isOnline ? colors.background : colors.textMuted }]} />
+              <View style={[styles.availDot, { backgroundColor: isOnline ? colors.background : colors.textSecondary }]} />
               <View>
                 <Text style={[styles.availTitle, { color: isOnline ? colors.background : colors.textPrimary }]}>
                   {isOnline ? t('ui.youreOnline') : t('ui.youreOffline')}
@@ -184,8 +184,11 @@ export default function TaskerDashboard() {
                 </Text>
               </View>
             </View>
-            <View style={[styles.availBadge, { backgroundColor: isOnline ? colors.background : colors.surfaceHigh }]}>
-              <Text style={[styles.availBadgeText, { color: isOnline ? colors.background : colors.textPrimary }]}>{t('tasker.online')}{isOnline ? ' ✓' : ' ✕'}</Text>
+            <View style={[styles.availBadge, isOnline ? styles.availBadgeOn : styles.availBadgeOff]}>
+              {!isOnline && <View style={styles.availPing} />}
+              <Text style={[styles.availBadgeText, { color: isOnline ? colors.background : colors.textPrimary }]}>
+                {isOnline ? t('tasker.online') : t('tasker.paused')}
+              </Text>
             </View>
           </LinearGradient>
         </PressableScale>
@@ -330,11 +333,15 @@ const styles = StyleSheet.create({
 
   availPress: { marginTop: spacing.lg, borderRadius: radius.lg, ...shadows.card },
   availCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.lg, padding: spacing.md },
+  availCardOffline: { borderWidth: 1, borderColor: colors.border },
   availLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   availDot: { width: 12, height: 12, borderRadius: 6 },
   availTitle: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 15 },
   availSub: { ...typography.caption, marginTop: 2 },
-  availBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
+  availBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
+  availBadgeOn: { backgroundColor: colors.background },
+  availBadgeOff: { backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.border },
+  availPing: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
   availBadgeText: { ...typography.caption, fontFamily: 'Outfit_700Bold' },
 
   earnCard: { marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadows.card },

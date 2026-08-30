@@ -10,6 +10,7 @@ interface Props {
   name: string
   subtitle?: string
   roleLabel?: string
+  nickname?: string
   variant?: 'tasker' | 'company'
   verified?: boolean
   onEdit?: () => void
@@ -17,7 +18,7 @@ interface Props {
 }
 
 export default function ProfileHeader({
-  initials, name, subtitle, roleLabel, variant = 'tasker', verified,
+  initials, name, subtitle, roleLabel, nickname, variant = 'tasker', verified,
   onEdit, onSettings,
 }: Props) {
   const colors = useColors()
@@ -61,6 +62,9 @@ export default function ProfileHeader({
         </View>
         <View style={styles.headInfo}>
           <Text style={[styles.name, { color: colors.ink }]}>{name}</Text>
+          {nickname ? (
+            <Text style={styles.nickname}>{nickname}</Text>
+          ) : null}
           <View style={styles.roleLine}>
             <RoleIcon size={12} color={colors.amber} weight="fill" />
             <Text style={[styles.roleText, { color: colors.muted }]}>
@@ -88,6 +92,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   vbadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: '#3B82F6', justifyContent: 'center', alignItems: 'center', borderWidth: 2.5, borderColor: '#FFFFFF' },
   headInfo: { flex: 1, paddingBottom: 4 },
   name: { fontSize: 17, fontFamily: fonts.heading, letterSpacing: -0.3 },
+  nickname: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#6B7280', marginTop: 1 },
   roleLine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   roleText: { fontSize: 12, fontFamily: fonts.body },
   editBtn: { marginHorizontal: 16, marginBottom: 14, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start' },

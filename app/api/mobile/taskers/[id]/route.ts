@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const tasker = await prisma.taskerProfile.findUnique({
       where: { id: params.id },
       include: {
-        user: { select: { id: true, name: true, phone: true, email: true } },
+        user: { select: { id: true, name: true, phone: true, email: true, nickname: true } },
         reviews: { include: { reviewer: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 20 },
       },
     })

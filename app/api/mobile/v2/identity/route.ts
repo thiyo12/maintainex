@@ -35,10 +35,14 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { docType, side, imageUrl } = body
+    const { docType, side, imageUrl, fullName } = body
 
     if (!docType || !side || !imageUrl) {
       return NextResponse.json({ error: 'Missing required fields: docType, side, imageUrl' }, { status: 400 })
+    }
+
+    if (user.role === 'TASKER' && !fullName?.trim()) {
+      return NextResponse.json({ error: 'Full name exactly as on the ID is required' }, { status: 400 })
     }
 
     const validDocTypes = ['PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE']
@@ -57,6 +61,7 @@ export async function POST(request: NextRequest) {
         docType,
         side,
         imageUrl,
+        fullName: fullName?.trim() || null,
         status: 'PENDING',
       },
     })

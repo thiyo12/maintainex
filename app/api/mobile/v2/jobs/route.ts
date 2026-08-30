@@ -114,6 +114,46 @@ export async function GET(request: NextRequest) {
     } else if (role === 'provider') {
       where.status = 'OPEN'
       if (areaId) where.areaId = areaId
+
+      // Taskers only see jobs in the categories they selected under "Your Services".
+      // Primary source of truth: TaskerSkill → TemplateJob.categoryId (JobCategory id).
+      // Fallback for legacy profiles without a service selection: profile.skills slugs.
+      let allowedCategoryIds: string[] = []
+      const selections = await prisma.taskerSkill.findMany({
+        where: { tasker: { userId: user.id } },
+        select: { jobId: true },
+      })
+
+      if (selections.length > 0) {
+        const templateJobs = await prisma.templateJob.findMany({
+          where: { id: { in: selections.map(s => s.jobId) } },
+          select: { categoryId: true },
+        })
+        allowedCategoryIds = [...new Set(templateJobs.map(j => j.categoryId))]
+      } else {
+        const profile = await prisma.taskerProfile.findUnique({
+          where: { userId: user.id },
+          select: { skills: true },
+        })
+        const slugs: string[] = []
+        if (profile?.skills) {
+          try {
+            const parsed = JSON.parse(profile.skills)
+            if (Array.isArray(parsed)) slugs.push(...parsed.map(String))
+          } catch {
+            slugs.push(profile.skills)
+          }
+        }
+        if (slugs.length > 0) {
+          const categories = await prisma.category.findMany({
+            where: { slug: { in: slugs } },
+            select: { id: true },
+          })
+          allowedCategoryIds = [...new Set([...categories.map(c => c.id), ...slugs])]
+        }
+      }
+
+      where.categoryId = { in: allowedCategoryIds }
     } else {
       where.customerId = user.id
     }

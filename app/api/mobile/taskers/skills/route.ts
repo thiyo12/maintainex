@@ -108,12 +108,13 @@ export async function PUT(request: NextRequest) {
     const jobIds = [...new Set(skills.map(s => s.jobId))]
     if (jobIds.length === 0) {
       await prisma.taskerSkill.deleteMany({ where: { taskerId: tasker.id } })
+      await prisma.taskerProfile.update({ where: { id: tasker.id }, data: { skills: '[]' } })
       return NextResponse.json({ saved: 0 })
     }
 
     const jobs = await prisma.templateJob.findMany({
       where: { id: { in: jobIds }, isActive: true },
-      select: { id: true, isCompanyOnly: true },
+      select: { id: true, isCompanyOnly: true, categoryId: true },
     })
     const allowedIds = new Set(jobs.filter(j => !j.isCompanyOnly).map(j => j.id))
 
@@ -150,9 +151,44 @@ export async function PUT(request: NextRequest) {
       saved++
     }
 
+    // Keep the category-level skills (used by job matching + the tasker job feed)
+    // in sync with the detailed service selection.
+    await syncCategorySkills(tasker.id, jobs.filter(j => allowedIds.has(j.id)))
+
     return NextResponse.json({ saved })
   } catch (error) {
     console.error('Tasker skills save error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
+}
+
+async function syncCategorySkills(taskerId: string, selectedJobs: { id: string; categoryId: string }[]): Promise<void> {
+  const categoryIds = [...new Set(selectedJobs.map(j => j.categoryId).filter(Boolean))]
+  if (categoryIds.length === 0) {
+    await prisma.taskerProfile.update({ where: { id: taskerId }, data: { skills: '[]' } })
+    return
+  }
+
+  const jobCats = await prisma.jobCategory.findMany({
+    where: { id: { in: categoryIds } },
+    select: { name: true },
+  })
+
+  // Resolve to marketplace category slugs where possible (category names map to
+  // curated slugs like "electrical"); otherwise fall back to a slugified name.
+  const marketplace = await prisma.category.findMany({
+    where: { isActive: true },
+    select: { name: true, slug: true },
+  })
+  const byName = new Map(marketplace.map(c => [c.name.toLowerCase(), c.slug]))
+
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const slugs = jobCats
+    .map(c => byName.get(c.name.toLowerCase()) || slugify(c.name))
+    .filter((s): s is string => !!s)
+
+  await prisma.taskerProfile.update({
+    where: { id: taskerId },
+    data: { skills: JSON.stringify([...new Set(slugs)]) },
+  })
 }

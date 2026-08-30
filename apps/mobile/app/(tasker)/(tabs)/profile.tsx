@@ -129,6 +129,7 @@ export default function TaskerProfile() {
   }
 
   const name = profile?.user?.name || user?.name || t('customer.tasker')
+  const nickname = profile?.user?.nickname || user?.nickname || ''
   const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase() || 'T'
   const skills = profile?.skills || []
   const rating = profile?.rating || 0
@@ -151,9 +152,10 @@ export default function TaskerProfile() {
         <ProfileHeader
           initials={initials}
           name={name}
+          nickname={nickname}
           roleLabel={`Electrician · Colombo 6`}
           variant="tasker"
-          verified={identityStatus === 'APPROVED'}
+          verified={identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'}
           onEdit={() => router.push('/(tasker)/settings/edit-profile')}
           onSettings={() => router.push('/notifications')}
         />

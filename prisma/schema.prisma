@@ -23,6 +23,7 @@ model User {
   suspendedUntil   DateTime?
   suspensionReason String?
   pushToken        String?
+  nickname         String?
   lastNameChangedAt DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -1871,6 +1872,7 @@ model IdentityDocument {
   docType    String    // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
   side       String    // FRONT or BACK
   imageUrl   String
+  fullName   String? // "Full name exactly as on the ID" captured at submission
   status     String    @default("PENDING") // PENDING, APPROVED, REJECTED
   reviewNote String?
   reviewedBy String?

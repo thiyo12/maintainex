@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     }
     const tasker = await prisma.taskerProfile.findUnique({
       where: { userId: user.id },
-      include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+      include: { user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } } },
     })
     if (!tasker) {
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
@@ -53,7 +53,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
     }
 
-    const { bio, hourlyRate, skills, serviceAreas, profileImage, name, phone } = await request.json()
+    const { bio, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
     if (bio !== undefined) updateData.bio = bio
     if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
@@ -61,10 +61,18 @@ export async function PUT(request: NextRequest) {
     if (serviceAreas !== undefined) updateData.serviceAreas = JSON.stringify(serviceAreas)
     if (profileImage !== undefined) updateData.profileImage = profileImage
 
-    if (name !== undefined || phone !== undefined) {
-      const userUpdate: any = {}
-      if (name !== undefined) userUpdate.name = name
-      if (phone !== undefined) userUpdate.phone = phone
+    const userUpdate: any = {}
+    if (phone !== undefined) userUpdate.phone = phone
+    if (nickname !== undefined) userUpdate.nickname = nickname?.trim() || null
+
+    if (name !== undefined) {
+      if (user.identityStatus === 'VERIFIED' && name.trim() !== user.name) {
+        return NextResponse.json({ error: 'Name is locked after identity verification. Use your verified name.' }, { status: 400 })
+      }
+      userUpdate.name = name
+    }
+
+    if (Object.keys(userUpdate).length > 0) {
       await prisma.user.update({ where: { id: user.id }, data: userUpdate })
     }
 
