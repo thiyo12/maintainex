@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
-import { colors, typography } from '../../../lib/theme'
+import { colors, typography } from '../../../lib/design'
 
 const tabConfigs = [
   { name: 'index', key: 'home.browse', icon: 'home-outline' as const },

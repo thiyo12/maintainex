@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 
 import { jobs } from '../../../lib/api'
 import type { JobPosting } from '../../../lib/types'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/theme'
+import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'
 import PressableScale from '../../../components/ui/PressableScale'

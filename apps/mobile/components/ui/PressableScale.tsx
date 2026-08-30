@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react'
 import { Pressable, StyleProp, ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
-import { animations } from '../../lib/theme'
+import { animations } from '../../lib/design'
 
 interface Props {
   children: React.ReactNode

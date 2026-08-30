@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { View, StyleSheet, StyleProp, ViewStyle, Dimensions } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, interpolate } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
-import { colors, radius } from '../../lib/theme'
+import { colors, radius } from '../../lib/design'
 
 interface Props {
   width?: number | `${number}%`

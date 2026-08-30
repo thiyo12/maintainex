@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { colors, radius, typography } from '../../lib/theme'
+import { colors, radius, typography } from '../../lib/design'
 
 type Status =
   | 'OPEN'

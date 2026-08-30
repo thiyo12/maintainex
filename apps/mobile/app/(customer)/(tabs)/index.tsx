@@ -13,7 +13,7 @@ import { v2Jobs, v2Quotes, v2Match } from '../../../lib/api-v2'
 import { taskers, notifications } from '../../../lib/api'
 import { translateJobStatus } from '../../../lib/i18n'
 import { on, removedJobs, subscribe, getVersion } from '../../../lib/events'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/theme'
+import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
 import { CATEGORY_VISUALS, categoryIcon, CategoryVisual } from '../../../lib/categoryVisuals'
 
 import AISearchBar from '../../../components/shared/AISearchBar'

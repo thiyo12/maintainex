@@ -3,7 +3,7 @@ import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
-import { colors } from '../../../lib/theme'
+import { colors } from '../../../lib/design'
 
 const tabConfigs = [
   { name: 'index', key: 'tasker.browse', icon: 'compass-outline' as const },

@@ -2,8 +2,8 @@ import React, { useEffect } from 'react'
 import { View } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
-import { colors } from '../../lib/theme'
-import { animations } from '../../lib/theme'
+import { colors } from '../../lib/design'
+import { animations } from '../../lib/design'
 
 interface Props {
   name: keyof typeof Ionicons.glyphMap

@@ -2,7 +2,7 @@ import React from 'react'
 import { View, Image, Text, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { SealCheck } from 'phosphor-react-native'
-import { colors, typography } from '../../lib/theme'
+import { colors, typography } from '../../lib/design'
 
 interface Props {
   uri?: string | null

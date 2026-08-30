@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native'
 import PressableScale from './PressableScale'
-import { colors, radius, shadows } from '../../lib/theme'
+import { colors, radius, shadows } from '../../lib/design'
 
 interface Props {
   children: React.ReactNode

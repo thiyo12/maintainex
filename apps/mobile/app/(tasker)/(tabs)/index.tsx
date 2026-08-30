@@ -9,7 +9,7 @@ import { useAuth } from '../../../lib/auth'
 import { taskers, earnings, notifications } from '../../../lib/api'
 import { v2Jobs } from '../../../lib/api-v2'
 import { on } from '../../../lib/events'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/theme'
+import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
 import { categoryIcon } from '../../../lib/categoryVisuals'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'

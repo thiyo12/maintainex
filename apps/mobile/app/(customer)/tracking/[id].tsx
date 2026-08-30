@@ -10,7 +10,7 @@ import Reanimated, { ZoomIn } from 'react-native-reanimated'
 
 import { useColors } from '../../../lib/ThemeContext'
 import { v2Jobs } from '../../../lib/api-v2'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/theme'
+import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'
 import PressableScale from '../../../components/ui/PressableScale'

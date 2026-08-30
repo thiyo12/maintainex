@@ -10,7 +10,7 @@ import {
   useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold,
   Outfit_800ExtraBold, Outfit_900Black,
 } from '@expo-google-fonts/outfit'
-import { colors as themeColors } from '../lib/theme'
+import { colors as themeColors } from '../lib/design'
 
 import { AuthProvider } from '../lib/auth'
 import i18next, { initI18n } from '../lib/i18n'

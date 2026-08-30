@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useTranslation } from 'react-i18next'
-import { colors, typography, shadows, animations } from '../../lib/theme'
+import { colors, typography, shadows, animations } from '../../lib/design'
 
 type Role = 'tasker' | 'company'
 

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native'
 import LottieView from 'lottie-react-native'
 import { Icon } from 'phosphor-react-native'
 import PressableScale from './PressableScale'
-import { colors, radius, spacing, typography } from '../../lib/theme'
+import { colors, radius, spacing, typography } from '../../lib/design'
 
 interface Props {
   lottieUrl?: string | null
