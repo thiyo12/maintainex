@@ -25,33 +25,56 @@ Configure a persistent volume in Dokploy to store uploaded files on the host mac
    - **Docker** → **Volumes**
    - Or look for a **" volumes"** tab/icon
 
-### Step 4: Add Persistent Volume
+### Step 4: Add Persistent Volumes (TWO required)
 
-Click **"Add Volume"** or **"Create Volume"** and fill in:
+There are **two** upload locations in the app (recent production build). A single `uploads` volume for `public/uploads` is NOT enough — the mobile job photos live at `uploads/mobile/` and must be a separate volume, otherwise user photos are wiped on every redeploy.
 
-| Field | Value |
-|-------|-------|
-| **Volume Name** | `uploads` |
-| **Host Path** | `/root/dokploy/volumes/uploads` (create this folder on VPS first) |
-| **Container Path** | `/app/public/uploads` |
-| **Type** | `Bind Mount` or `Volume` |
+Click **"Add Volume"** / **"Create Volume"** for each:
 
-### Step 5: Create Host Directory (SSH Required)
+| Field | Value (Volume 1 — static/avatar images) | Value (Volume 2 — mobile job photos) |
+|-------|-------------------------------|------------------------------|
+| **Volume Name** | `uploads` | `uploads-mobile` |
+| **Host Path** | `/root/dokploy/volumes/uploads` | `/root/dokploy/volumes/uploads-mobile` |
+| **Container Path** | `/app/public/uploads` | `/app/uploads/mobile` |
+| **Type** | `Bind Mount` | `Bind Mount` |
 
-Connect to your VPS via SSH and create the directory:
+> **Why `uploads/mobile`:** the mobile upload endpoint (`app/api/mobile/upload/route.ts`) writes files to `<cwd>/uploads/mobile/<userId>/` and serves them via `/api/mobile/files/...`. This lives OUTSIDE `public/` and only inside the container's writable layer, so without this second volume every redeploy loses all job/avatar photos. The DB still holds the old URL strings, which would then return 404.
+
+### Step 5: Create Host Directories (SSH Required)
+
+Connect to your VPS via SSH and create the directories:
 
 ```bash
 # Connect to VPS
 ssh root@your-vps-ip
 
-# Create the uploads directory
+# Create the uploads directories (both)
 mkdir -p /root/dokploy/volumes/uploads
+mkdir -p /root/dokploy/volumes/uploads-mobile
 
 # Set permissions
-chmod 755 /root/dokploy/volumes/uploads
+chmod -R 755 /root/dokploy/volumes/uploads
+chmod -R 755 /root/dokploy/volumes/uploads-mobile
 
 # Verify
 ls -la /root/dokploy/volumes/
+```
+
+### Step 5b: BACK UP existing data BEFORE the first slim redeploy
+
+If you are redeploying on top of a running container that already has uploaded files (and no volume was mounted before), back them up FIRST or the slim rebuild wipes them:
+
+```bash
+# Find the running container
+docker ps --filter name=maintainex --format "{{.Names}}"
+
+# Copy current uploads out of the container (adjust container name)
+docker cp <container-name>:/app/uploads/mobile /root/dokploy/backups/uploads-mobile
+docker cp <container-name>:/app/public/uploads /root/dokploy/backups/public-uploads
+
+# After mounting the volumes, restore any data that was already sitting in the container
+cp -an /root/dokploy/backups/uploads-mobile/. /root/dokploy/volumes/uploads-mobile/
+cp -an /root/dokploy/backups/public-uploads/. /root/dokploy/volumes/uploads/
 ```
 
 ### Step 6: Redeploy the Container
@@ -74,6 +97,7 @@ services:
   app:
     volumes:
       - /root/dokploy/volumes/uploads:/app/public/uploads
+      - /root/dokploy/volumes/uploads-mobile:/app/uploads/mobile
 ```
 
 ### Option B: Edit Dokploy's Docker Compose
@@ -83,6 +107,7 @@ services:
 ```yaml
 volumes:
   - /root/dokploy/volumes/uploads:/app/public/uploads
+  - /root/dokploy/volumes/uploads-mobile:/app/uploads/mobile
 ```
 
 ### Option C: Hostinger Cloud Panel
@@ -141,17 +166,23 @@ chown -R 1000:1000 /root/dokploy/volumes/uploads
 # Connect to VPS
 ssh root@YOUR_VPS_IP
 
-# Create directory
+# Create directories (if not already)
 mkdir -p /root/dokploy/volumes/uploads
+mkdir -p /root/dokploy/volumes/uploads-mobile
 
 # Set permissions
-chmod 755 /root/dokploy/volumes/uploads
+chmod -R 755 /root/dokploy/volumes/uploads
+chmod -R 755 /root/dokploy/volumes/uploads-mobile
 
 # List Docker containers
 docker ps
 
 # Check container volumes
 docker inspect container-name | grep -A 20 Mounts
+
+# Verify both mounts are populated
+ls -la /root/dokploy/volumes/uploads/
+ls -la /root/dokploy/volumes/uploads-mobile/
 
 # Restart container
 docker restart container-name
