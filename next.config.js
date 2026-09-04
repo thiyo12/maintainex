@@ -21,17 +21,32 @@ const nextConfig = {
         destination: '/waitlist',
         permanent: true,
       },
-      {
-        source: '/services/:slug/:city',
-        destination: '/waitlist',
-        permanent: true,
-      },
-      {
-        source: '/services/:slug',
-        destination: '/waitlist',
-        permanent: true,
-      },
-    ]
+        {
+          source: '/services/:slug/:city',
+          destination: '/waitlist',
+          permanent: true,
+        },
+        {
+          source: '/services/:slug',
+          destination: '/waitlist',
+          permanent: true,
+        },
+        {
+          source: '/booking/confirmation',
+          destination: '/waitlist',
+          permanent: true,
+        },
+        {
+          source: '/customer/:path*',
+          destination: '/',
+          permanent: true,
+        },
+        {
+          source: '/coconut/:path*',
+          destination: '/admin/login',
+          permanent: true,
+        },
+      ]
   },
   async headers() {
     return [
