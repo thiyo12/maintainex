@@ -26,8 +26,11 @@ echo "  ✓ Source code ($(du -sh "$WORK_DIR/code" | cut -f1))"
 echo "[2/5] Backing up live database..."
 mkdir -p "$WORK_DIR/database"
 
-DB_CONTAINER=$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$SERVER" "docker ps --format '{{.Names}}' | grep maintainex-db | head -1")
-ssh -o BatchMode=yes "$SERVER" "docker exec $DB_CONTAINER pg_dump -U postgres -d postgres --clean --if-exists" > "$WORK_DIR/database/maintainex-live-dump.sql"
+SSH_KEY="$HOME/.ssh/id_ed25519_ssaaxcy"
+SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=10"
+
+DB_CONTAINER=$(ssh $SSH_OPTS "$SERVER" "docker ps --format '{{.Names}}' | grep maintainex-db | head -1")
+ssh $SSH_OPTS "$SERVER" "docker exec $DB_CONTAINER pg_dump -U postgres -d postgres --clean --if-exists" > "$WORK_DIR/database/maintainex-live-dump.sql"
 
 echo "  ✓ Database dump ($(du -sh "$WORK_DIR/database/maintainex-live-dump.sql" | cut -f1))"
 
