@@ -314,6 +314,32 @@ export async function middleware(request: NextRequest) {
     return applyCoconutHeaders(response, rateLimit.remaining, rateLimit.resetAt)
   }
 
+  if (pathname.startsWith('/admin/marketplace')) {
+    const rest = pathname.replace(/^\/admin\/marketplace/, '')
+    let target = '/admin/dashboard'
+    const segments = rest.split('/').filter(Boolean)
+    const first = segments[0]
+    const second = segments[1]
+    const id = segments[2]
+    if (first === 'dashboard') target = '/admin/dashboard'
+    else if (first === 'users') target = id ? `/admin/users/customers/${id}` : '/admin/users/customers'
+    else if (first === 'jobs') target = id ? `/admin/jobs/${id}` : '/admin/jobs'
+    else if (first === 'disputes') target = '/admin/jobs/disputes'
+    else if (first === 'escrow') target = '/admin/financial/wallets'
+    else if (first === 'financial' && second === 'settlements') target = '/admin/financial/settlements'
+    else if (first === 'financial') target = '/admin/financial'
+    else if (first === 'revenue' || first === 'offers') target = '/admin/financial'
+    else if (first === 'reviews' || first === 'alerts' || first === 'custom-jobs' || first === 'properties') target = '/admin/jobs'
+    else if (first === 'notifications') target = '/admin/analytics'
+    else if (first === 'fraud') target = '/admin/cheating'
+    else if (first === 'categories' || first === 'settings') target = '/admin/settings'
+    else if (first === 'audit-logs') target = '/admin/analytics/security'
+    else if (first === 'staff') target = '/admin/admins'
+    const url = new URL(target, request.url)
+    response = NextResponse.redirect(url, 301)
+    return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+  }
+
   if (pathname.startsWith('/api/seed/')) {
     if (process.env.NODE_ENV === 'production') {
       return new NextResponse(
