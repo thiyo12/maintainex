@@ -939,6 +939,7 @@ export default function HomeClient() {
         <div className="border-t border-white/10 py-6 px-6">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <span className="text-sm text-[#9ca3af]">&copy; 2026 MaintainEX. All rights reserved.</span>
+            <span className="text-sm text-[#9ca3af]">Design & Developed by <a href="https://instagram.com/thiyothman" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-brand transition font-semibold">Thiyothman</a></span>
             <div className="flex gap-4">
               <a href="https://x.com/maintainex" target="_blank" rel="noopener noreferrer" className="text-[#d1d5db] hover:text-brand transition">Twitter</a>
               <a href="https://instagram.com/maintainex" target="_blank" rel="noopener noreferrer" className="text-[#d1d5db] hover:text-brand transition">Instagram</a>
