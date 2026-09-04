@@ -93,6 +93,17 @@ export default function Footer() {
           <p className="text-xs text-muted-foreground">
             &copy; {new Date().getFullYear()} Maintainex — Made in Sri Lanka with care
           </p>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Design & Developed by{' '}
+            <a
+              href="https://instagram.com/thiyothman"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-600 hover:text-amber-500 font-semibold transition-colors"
+            >
+              Thiyothman
+            </a>
+          </p>
         </div>
       </div>
     </footer>
