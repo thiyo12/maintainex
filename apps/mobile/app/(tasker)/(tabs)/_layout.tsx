@@ -4,11 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
 import { colors } from '../../../lib/design'
+import { Compass, Briefcase, User } from 'phosphor-react-native'
 
 const tabConfigs = [
-  { name: 'index', key: 'tasker.browse', icon: 'compass-outline' as const },
-  { name: 'my-jobs', key: 'tasker.myJobs', icon: 'briefcase-outline' as const },
-  { name: 'profile', key: 'tasker.profile', icon: 'person-outline' as const },
+  { name: 'index', key: 'tasker.browse', icon: Compass },
+  { name: 'my-jobs', key: 'tasker.myJobs', icon: Briefcase },
+  { name: 'profile', key: 'tasker.profile', icon: User },
 ]
 
 export default function TaskerTabs() {
@@ -45,7 +46,7 @@ export default function TaskerTabs() {
           options={{
             title: t(tab.key),
             tabBarIcon: ({ focused }) => (
-              <TabIcon name={tab.icon} focused={focused} />
+              <TabIcon icon={tab.icon} focused={focused} />
             ),
           }}
         />

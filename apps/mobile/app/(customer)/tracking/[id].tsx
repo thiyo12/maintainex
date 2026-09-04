@@ -1,10 +1,11 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { View, Text, StyleSheet, Dimensions, ActivityIndicator, Animated } from 'react-native'
-import MapView, { Marker, PROVIDER_DEFAULT, AnimatedRegion } from 'react-native-maps'
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT, AnimatedRegion } from 'react-native-maps'
+import MapViewDirections from 'react-native-maps-directions'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet'
-import { ArrowLeft, Star, Check, ChatCircle, PaperPlaneTilt, MapPin, Timer, Hash } from 'phosphor-react-native'
+import { ArrowLeft, Star, Check, ChatCircle, PaperPlaneTilt, Timer, Hash } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import Reanimated, { ZoomIn } from 'react-native-reanimated'
 
@@ -39,8 +40,10 @@ export default function LiveTrackingScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const sheetRef = useRef<BottomSheet>(null)
+  const mapRef = useRef<MapView>(null)
 
   const pulseAnim = useRef(new Animated.Value(1)).current
+  const routePulse = useRef(new Animated.Value(1)).current
   const animCoord = useRef(
     new AnimatedRegion({ latitude: FALLBACK_COORDS.latitude, longitude: FALLBACK_COORDS.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 })
   ).current
@@ -49,6 +52,9 @@ export default function LiveTrackingScreen() {
   const [workspace, setWorkspace] = useState<any>(null)
   const [sharing, setSharing] = useState(false)
   const [providerCoord, setProviderCoord] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [eta, setEta] = useState<number | null>(null)
+  const [routeDistance, setRouteDistance] = useState<number | null>(null)
+  const [routeFailed, setRouteFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [chatVisible, setChatVisible] = useState(false)
   const liveFailed = useRef(false)
@@ -96,9 +102,16 @@ export default function LiveTrackingScreen() {
       ])
     )
     pulse.start()
+    const routeLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(routePulse, { toValue: 1.3, duration: 750, useNativeDriver: true }),
+        Animated.timing(routePulse, { toValue: 1, duration: 750, useNativeDriver: true }),
+      ])
+    )
+    routeLoop.start()
     if (id) loadData()
-    return () => pulse.stop()
-  }, [id, loadData, pulseAnim])
+    return () => { pulse.stop(); routeLoop.stop() }
+  }, [id, loadData, pulseAnim, routePulse])
 
   useEffect(() => {
     if (!id || job?.status === 'COMPLETED' || job?.status === 'CANCELLED') return
@@ -170,21 +183,48 @@ export default function LiveTrackingScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.mapArea}>
-        <MapView provider={PROVIDER_DEFAULT} style={StyleSheet.absoluteFill} initialRegion={reg}>
+        <MapView ref={mapRef} provider={PROVIDER_DEFAULT} style={StyleSheet.absoluteFill} initialRegion={reg}>
           {jobCoords && (
-            <Marker coordinate={jobCoords} title={job?.title || t('booking.jobLocation')}>
-              <View style={styles.customerMarker}>
-                <MapPin size={16} color={colors.ink} weight="fill" />
+            <Marker coordinate={jobCoords} anchor={{ x: 0.5, y: 1 }} title={job?.title || t('booking.jobLocation')}>
+              <View style={styles.destMarker}>
+                <Text style={styles.destMarkerText}>YOUR LOCATION</Text>
               </View>
             </Marker>
           )}
           {providerCoord && (
-            <AnimatedMarker coordinate={animCoord} title={provider?.name || t('tracking.provider')}>
-              <Animated.View style={[styles.taskerPulse, { opacity: pulseAnim, transform: [{ scale: pulseAnim }] }]} />
-              <View style={styles.taskerMarker}>
-                <AvatarCircle uri={provider?.avatar || provider?.profileImage} name={provider?.name || 'T'} size={30} showOnline={sharing} />
+            <AnimatedMarker coordinate={animCoord} anchor={{ x: 0.5, y: 0.5 }} title={provider?.name || t('tracking.provider')}>
+              <View style={styles.taskerCircle}>
+                <Text style={styles.taskerEmoji}>🔧</Text>
               </View>
             </AnimatedMarker>
+          )}
+          {providerCoord && jobCoords && job?.status !== 'COMPLETED' && job?.status !== 'CANCELLED' && (
+            routeFailed ? (
+              <Polyline
+                coordinates={[providerCoord, jobCoords]}
+                strokeColor="#F59E0B"
+                strokeWidth={4}
+                lineDashPattern={[8, 4]}
+              />
+            ) : (
+              <MapViewDirections
+                origin={providerCoord}
+                destination={jobCoords}
+                apikey=""
+                strokeWidth={4}
+                strokeColor="#F59E0B"
+                optimizeWaypoints={true}
+                onReady={(result) => {
+                  setEta(Math.ceil(result.duration))
+                  setRouteDistance(result.distance)
+                  mapRef.current?.fitToCoordinates(result.coordinates, {
+                    edgePadding: { top: 80, right: 40, bottom: 300, left: 40 },
+                    animated: true,
+                  })
+                }}
+                onError={() => setRouteFailed(true)}
+              />
+            )
           )}
         </MapView>
 
@@ -212,6 +252,16 @@ export default function LiveTrackingScreen() {
       >
         <BottomSheetScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
           <Text style={styles.statusTitle}>{statusLabel}</Text>
+
+          {eta !== null && step <= 3 && (
+            <View style={styles.etaRow}>
+              <View style={styles.routeDotWrap}>
+                <Animated.View style={[styles.routeDot, { transform: [{ scale: routePulse }] }]} />
+              </View>
+              <Text style={styles.etaText}>In transit · arriving in {eta} min</Text>
+              <Text style={styles.distText}>{routeDistance?.toFixed(1)} km left</Text>
+            </View>
+          )}
 
           <View style={styles.progressRow}>
             {steps.map((label, i) => {
@@ -313,6 +363,21 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 3, borderColor: colors.ink, ...shadows.card,
   },
+  destMarker: {
+    backgroundColor: '#0B0C12',
+    borderRadius: 8, padding: 6,
+    borderWidth: 2, borderColor: '#F59E0B',
+  },
+  destMarkerText: { color: '#F59E0B', fontSize: 11, fontWeight: '700' },
+  taskerCircle: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: '#F59E0B',
+    borderWidth: 3, borderColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.3,
+    shadowRadius: 4, elevation: 5,
+  },
+  taskerEmoji: { color: '#000', fontSize: 20 },
   taskerMarker: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: colors.ink,
     alignItems: 'center', justifyContent: 'center',
@@ -322,6 +387,15 @@ const styles = StyleSheet.create({
     position: 'absolute', width: 50, height: 50, borderRadius: 25,
     backgroundColor: 'rgba(245,158,11,0.35)', top: -6, left: -6,
   },
+
+  etaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.accentSoft, borderRadius: radius.md,
+    padding: spacing.md, marginBottom: spacing.lg,
+  },
+  routeDotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
+  routeDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#F59E0B' },
+  distText: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_600SemiBold' },
 
   overlayTop: { position: 'absolute', top: 46, left: 0, right: 0, alignItems: 'center' },
   etaPill: {

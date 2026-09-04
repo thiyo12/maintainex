@@ -93,7 +93,7 @@ export default function BookingConfirmedScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB', alignItems: 'center', paddingHorizontal: 24, paddingTop: 40 },
+  container: { flex: 1, backgroundColor: colors.background, alignItems: 'center', paddingHorizontal: 24, paddingTop: 40 },
   circle: {
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: colors.green, justifyContent: 'center', alignItems: 'center', marginBottom: 20,

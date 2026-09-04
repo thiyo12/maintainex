@@ -68,7 +68,17 @@ export default function RegisterScreen() {
         const parsed = JSON.parse(message)
         message = parsed.error || message
       } catch {}
-      Alert.alert(t('errors.registrationFailed'), message)
+      const isDuplicate = /already registered/i.test(message)
+      Alert.alert(
+        t('errors.registrationFailed'),
+        message,
+        isDuplicate
+          ? [
+              { text: t('auth.login.button'), onPress: () => router.replace('/(auth)/login') },
+              { text: t('common.ok'), style: 'cancel' },
+            ]
+          : undefined
+      )
     } finally {
       setLoading(false)
     }

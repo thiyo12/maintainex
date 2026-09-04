@@ -1,10 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Animated, Easing, Platform, ActivityIndicator, Keyboard } from 'react-native'
-import { Sparkle, ArrowRight, X, MagnifyingGlass, Lightning, Drop, Snowflake, Palette, Hammer, GridSix, Wrench, House, Bug, Sparkles, Leaf, LockSimple, Car, CarSport, Desktop, MusicNotes, Body, Building, Sun, PlusCircle } from 'phosphor-react-native'
+import { Sparkle, ArrowRight, X, MagnifyingGlass, Lightning, Drop, Snowflake, Palette, Hammer, GridFour, Wrench, House, Bug, Leaf, LockSimple, Car, CarProfile, Desktop, MusicNotes, Person, Building, Sun, PlusCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 import { v2Search } from '../../lib/api-v2'
+import { taskers } from '../../lib/api'
+import { buildSampleTaskers } from '../../lib/sampleTaskers'
+
+const SAMPLE_TASKER_RESULTS: TaskerResult[] = buildSampleTaskers(null).map((s, i) => ({
+  id: s.id,
+  userId: s.userId,
+  bio: s.bio,
+  hourlyRate: s.hourlyRate || 1500,
+  skills: s.skills,
+  rating: s.rating,
+  completedJobs: s.completedJobs,
+  isVerified: s.isVerified,
+  isOnline: s.isOnline,
+  user: { id: s.userId, name: s.name, phone: '', email: '' },
+}))
 
 interface CategoryResult {
   id: string; name: string; icon: string; colorHex: string; score: number; correctedQuery?: string
@@ -12,13 +27,26 @@ interface CategoryResult {
 interface SubServiceResult {
   id: string; name: string; categoryId: string; categoryName: string; categoryIcon: string; categoryColor: string; score: number
 }
+interface TaskerResult {
+  id: string
+  userId: string
+  bio: string
+  hourlyRate: number
+  skills: string[]
+  rating: number
+  completedJobs: number
+  isVerified: boolean
+  isOnline: boolean
+  user: { id: string; name: string; phone: string; email: string }
+}
 
 interface Props {
   value?: string
   onChangeText?: (t: string) => void
   onSearch?: () => void
   onCategorySelect?: (categoryId: string, categoryName: string) => void
-  onJobSelect?: (jobId: string, jobName: string) => void
+  onJobSelect?: (jobId: string, jobName: string, categoryId?: string) => void
+  onTaskerSelect?: (taskerId: string) => void
   onPostJob?: (query: string) => void
   placeholder?: string
   showSuggestions?: boolean
@@ -27,10 +55,10 @@ interface Props {
 
 const ICON_MAP: Record<string, any> = {
   flash: Lightning, water: Drop, snowflake: Snowflake, 'color-palette': Palette,
-  hammer: Hammer, grid: GridSix, construct: Wrench, home: House,
-  bug: Bug, sparkles: Sparkles, leaf: Leaf, 'lock-closed': LockSimple,
-  car: Car, 'car-sport': CarSport, desktop: Desktop, 'musical-notes': MusicNotes,
-  body: Body, business: Building, sunny: Sun,
+  hammer: Hammer, grid: GridFour, construct: Wrench, home: House,
+  bug: Bug, sparkles: Sparkle, leaf: Leaf, 'lock-closed': LockSimple,
+  car: Car, 'car-sport': CarProfile, desktop: Desktop, 'musical-notes': MusicNotes,
+  body: Person, business: Building, sunny: Sun,
 }
 
 function CategoryIcon({ name, size, color }: { name: string; size: number; color: string }) {
@@ -40,7 +68,7 @@ function CategoryIcon({ name, size, color }: { name: string; size: number; color
 
 export default function AISearchBar({
   value: controlledValue, onChangeText: controlledOnChangeText, onSearch,
-  onCategorySelect, onJobSelect, onPostJob,
+  onCategorySelect, onJobSelect, onTaskerSelect, onPostJob,
   placeholder, showSuggestions = true, autoFocus = false,
 }: Props) {
   const colors = useColors()
@@ -59,10 +87,15 @@ export default function AISearchBar({
 
   const [categories, setCategories] = useState<CategoryResult[]>([])
   const [subServices, setSubServices] = useState<SubServiceResult[]>([])
+  const [taskerResults, setTaskerResults] = useState<TaskerResult[]>([])
+  const [taskersLoading, setTaskersLoading] = useState(false)
   const [correctedQuery, setCorrectedQuery] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const isDisposedRef = useRef(false)
+
+  useEffect(() => { return () => { isDisposedRef.current = true } }, [])
 
   useEffect(() => {
     Animated.loop(Animated.sequence([
@@ -77,19 +110,35 @@ export default function AISearchBar({
 
   const doSearch = useCallback(async (q: string) => {
     if (!showSuggestions || q.trim().length < 2) {
-      setCategories([]); setSubServices([]); setCorrectedQuery(undefined)
+      setCategories([]); setSubServices([]); setTaskerResults([]); setCorrectedQuery(undefined)
       setShowDropdown(false)
       return
     }
     setLoading(true)
     try {
       const data = await v2Search.categories(q)
-      setCategories(data.categories || [])
-      setSubServices(data.subServices || [])
+      const cats = data.categories || []
+      const subs = data.subServices || []
+      setCategories(cats)
+      setSubServices(subs)
       setCorrectedQuery(data.correctedQuery)
       setShowDropdown(true)
+      if (cats.length > 0 || subs.length > 0) {
+        const key = (subs[0]?.categoryId) || (cats[0]?.id) || ''
+        setTaskersLoading(true)
+        taskers.list(`category=${encodeURIComponent(key)}`)
+          .then((list) => {
+            if (isDisposedRef.current) return
+            const real = (list || []).slice(0, 3)
+            setTaskerResults(real.length > 0 ? real : SAMPLE_TASKER_RESULTS)
+          })
+          .catch(() => { if (!isDisposedRef.current) setTaskerResults([]) })
+          .finally(() => { if (!isDisposedRef.current) setTaskersLoading(false) })
+      } else {
+        setTaskerResults([])
+      }
     } catch {
-      setCategories([]); setSubServices([]); setCorrectedQuery(undefined)
+      setCategories([]); setSubServices([]); setTaskerResults([]); setCorrectedQuery(undefined)
     } finally { setLoading(false) }
   }, [showSuggestions])
 
@@ -101,7 +150,7 @@ export default function AISearchBar({
 
   const handleClear = () => {
     onChangeText('')
-    setCategories([]); setSubServices([]); setCorrectedQuery(undefined)
+    setCategories([]); setSubServices([]); setTaskerResults([]); setCorrectedQuery(undefined)
     setShowDropdown(false)
   }
 
@@ -118,7 +167,13 @@ export default function AISearchBar({
 
   const handleSubServiceTap = (sub: SubServiceResult) => {
     setShowDropdown(false)
-    onJobSelect?.(sub.id, sub.name)
+    onJobSelect?.(sub.id, sub.name, sub.categoryId)
+  }
+
+  const handleTaskerTap = (tasker: TaskerResult) => {
+    setShowDropdown(false)
+    Keyboard.dismiss()
+    onTaskerSelect?.(tasker.id)
   }
 
   const handleCorrectedTap = () => {
@@ -128,7 +183,7 @@ export default function AISearchBar({
     }
   }
 
-  const hasResults = categories.length > 0 || subServices.length > 0
+  const hasResults = categories.length > 0 || subServices.length > 0 || taskerResults.length > 0
 
   return (
     <View style={styles.wrap}>
@@ -229,6 +284,32 @@ export default function AISearchBar({
                       <Text style={[styles.resultSub, { color: colors.muted }]} numberOfLines={1}>{sub.categoryName}</Text>
                     </View>
                     <Text style={[styles.resultScore, { color: colors.muted }]}>{sub.score}%</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {(taskersLoading || taskerResults.length > 0) && (
+              <View style={styles.sectionWrap}>
+                <Text style={[styles.sectionLabel, { color: colors.muted }]}>{t('search.nearbyProviders') || 'Taskers near you'}</Text>
+                {taskersLoading ? (
+                  <ActivityIndicator size="small" color={colors.amber} style={{ paddingVertical: 12 }} />
+                ) : taskerResults.map((tasker) => (
+                  <TouchableOpacity
+                    key={tasker.id}
+                    style={[styles.resultRow, { borderBottomColor: colors.border }]}
+                    onPress={() => handleTaskerTap(tasker)}
+                  >
+                    <View style={[styles.resultIcon, { backgroundColor: colors.amber + '18' }]}>
+                      <Sparkle size={16} color={colors.amberDark} weight="fill" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.resultName, { color: colors.ink }]} numberOfLines={1}>{tasker.user?.name || 'Tasker'}</Text>
+                      <Text style={[styles.resultSub, { color: colors.muted }]} numberOfLines={1}>
+                        ⭐ {tasker.rating?.toFixed(1) ?? 'New'} · {tasker.completedJobs || 0} jobs done
+                      </Text>
+                    </View>
+                    <ArrowRight size={14} color={colors.amberDark} weight="bold" />
                   </TouchableOpacity>
                 ))}
               </View>

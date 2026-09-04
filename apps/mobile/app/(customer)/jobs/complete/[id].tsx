@@ -199,7 +199,7 @@ export default function JobCompleteScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   backBtn: { paddingHorizontal: 24, paddingTop: 8 },
   backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
   header: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 16, paddingBottom: 20 },

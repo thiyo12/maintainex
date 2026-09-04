@@ -64,6 +64,12 @@ export async function GET(
 
     const locationName = job.areaId ? getLocationName(job.areaId) : null
 
+    const [jobCategory, templateJob, serviceTemplate] = await Promise.all([
+      job.categoryId ? prisma.jobCategory.findUnique({ where: { id: job.categoryId }, select: { name: true } }) : null,
+      job.templateJobId ? prisma.templateJob.findUnique({ where: { id: job.templateJobId }, select: { name: true } }) : null,
+      job.serviceTemplateId ? prisma.serviceTemplate.findUnique({ where: { id: job.serviceTemplateId }, select: { name: true } }) : null,
+    ])
+
     const enrichedQuotes = await Promise.all(
       quotes.map(async (q) => {
         const provider = await prisma.user.findUnique({
@@ -94,6 +100,11 @@ export async function GET(
         ...job,
         budgetAmount: Number(job.budgetAmount),
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
+        smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
+        notifiedCount: job.notifiedCount,
+        categoryName: jobCategory?.name || null,
+        templateJobName: templateJob?.name || null,
+        serviceTemplateName: serviceTemplate?.name || null,
         customer: customer ? redactSensitive(customer, isOwner) : null,
         locationName,
         quotes: enrichedQuotes,

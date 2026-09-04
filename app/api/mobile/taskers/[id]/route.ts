@@ -20,7 +20,42 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     })
 
     if (!tasker) {
-      return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
+      const byUser = await prisma.taskerProfile.findUnique({
+        where: { userId: params.id },
+        include: {
+          user: { select: { id: true, name: true, phone: true, email: true, nickname: true } },
+          reviews: { include: { reviewer: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 20 },
+        },
+      })
+      if (!byUser) {
+        return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
+      }
+      const resolved = byUser
+      return NextResponse.json({
+        id: resolved.id,
+        userId: resolved.userId,
+        bio: resolved.bio,
+        hourlyRate: resolved.hourlyRate,
+        skills: safeParseJsonArr(resolved.skills),
+        serviceAreas: safeParseJsonArr(resolved.serviceAreas),
+        rating: resolved.rating,
+        completedJobs: resolved.completedJobs,
+        isVerified: resolved.isVerified,
+        isOnline: resolved.isOnline,
+        completionRate: resolved.completionRate,
+        avgResponseMin: resolved.avgResponseMin,
+        latitude: resolved.latitude,
+        longitude: resolved.longitude,
+        profileImage: resolved.profileImage,
+        user: resolved.user,
+        reviews: resolved.reviews.map(r => ({
+          id: r.id,
+          rating: r.rating,
+          comment: r.comment,
+          reviewerName: r.reviewer.name,
+          createdAt: r.createdAt.toISOString(),
+        })),
+      })
     }
 
     return NextResponse.json({
@@ -34,6 +69,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       completedJobs: tasker.completedJobs,
       isVerified: tasker.isVerified,
       isOnline: tasker.isOnline,
+      completionRate: tasker.completionRate,
+      avgResponseMin: tasker.avgResponseMin,
       latitude: tasker.latitude,
       longitude: tasker.longitude,
       profileImage: tasker.profileImage,

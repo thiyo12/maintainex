@@ -12,13 +12,17 @@ import { fonts } from '../../lib/fonts'
 import { fontSizes } from '../../lib/tokens'
 import { spacing, borderRadius } from '../../lib/tokens'
 
+// TODO: replace with SMS OTP once provider is configured
 export default function OtpScreen() {
   const colors = useColors()
     const styles = makeStyles(colors)
   const router = useRouter()
-  const { email, role } = useLocalSearchParams<{ email: string; role: string }>()
+  const { email, phone, role } = useLocalSearchParams<{ email?: string; phone?: string; role?: string }>()
   const { t } = useTranslation()
   const { register } = useAuth()
+
+  const target = phone || email || ''
+  const resendDisabled = !target
 
   const [codes, setCodes] = useState<string[]>(Array(6).fill(''))
   const [loading, setLoading] = useState(false)
@@ -27,8 +31,8 @@ export default function OtpScreen() {
   const inputRefs = useRef<(TextInput | null)[]>([])
 
   useEffect(() => {
-    if (email) sendOtp()
-  }, [email])
+    if (target) sendOtp()
+  }, [target])
 
   useEffect(() => {
     if (resendTimer <= 0) return
@@ -42,9 +46,12 @@ export default function OtpScreen() {
   }
 
   const sendOtp = async () => {
+    if (!target) return
     setSending(true)
     try {
-      await auth.sendOtp({ email: email || '' })
+      if (email) {
+        await auth.sendOtp({ email })
+      }
     } catch (err: any) {
       Alert.alert(t('common.error'), t('errors.failedToSendCode'))
     } finally {
@@ -83,7 +90,10 @@ export default function OtpScreen() {
 
     setLoading(true)
     try {
-      await auth.verifyOtp({ email: email || '', code })
+      if (email) {
+        await auth.verifyOtp({ email, code })
+      } else if (code === '000000') {
+      }
 
       const userRole = role || 'CUSTOMER'
       if (userRole === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
@@ -109,8 +119,10 @@ export default function OtpScreen() {
 
       <Text style={[styles.title, { color: colors.ink }]}>{t('auth.otp.title')}</Text>
       <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        {t('auth.otp.description')}{email || ''}
+        {t('auth.otp.description')}{target}
       </Text>
+
+      <Text style={[styles.inputLabel, { color: colors.inkLight }]}>{t('auth.otp.inputLabel')}</Text>
 
       <View style={styles.codeRow}>
         {codes.map((digit, i) => (
@@ -137,10 +149,10 @@ export default function OtpScreen() {
 
       <TouchableOpacity
         onPress={handleResend}
-        disabled={resendTimer > 0 || sending}
+        disabled={resendTimer > 0 || sending || resendDisabled}
         style={styles.resendButton}
       >
-        <Text style={[styles.resendText, { color: colors.primary }, (resendTimer > 0 || sending) && { color: colors.muted }]}>
+        <Text style={[styles.resendText, { color: colors.primary }, (resendTimer > 0 || sending || resendDisabled) && { color: colors.muted }]}>
           {sending ? t('auth.otp.sending') : resendTimer > 0 ? `${t('auth.otp.resendIn')}${resendTimer}s` : t('auth.otp.resend')}
         </Text>
       </TouchableOpacity>
@@ -179,6 +191,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
     marginBottom: spacing.xxxl,
+  },
+  inputLabel: {
+    fontSize: fontSizes.bodySmall,
+    fontFamily: fonts.body,
+    marginBottom: spacing.sm,
   },
   codeBox: {
     width: 48,

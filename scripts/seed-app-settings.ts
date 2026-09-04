@@ -12,6 +12,7 @@ const DEFAULTS = [
   { key: 'matching.wave2_wait_min', value: '15', type: 'number', label: 'Wave 2 wait (min)', description: 'Minutes to wait before sending wave 3', groupName: 'matching' },
   { key: 'matching.wave3_wait_min', value: '15', type: 'number', label: 'Wave 3 wait (min)', description: 'Minutes before notifying customer of no match', groupName: 'matching' },
   { key: 'matching.max_active_jobs', value: '3', type: 'number', label: 'Max active jobs per tasker', description: 'Tasker excluded from matching if at this limit', groupName: 'matching' },
+  { key: 'matching.response_hours', value: '2', type: 'number', label: 'Customer response window (hours)', description: 'Hours a job waits for tasker responses before auto-escalation to admin', groupName: 'matching' },
 
   // Score weights
   { key: 'score.weight_rating', value: '35', type: 'number', label: 'Rating weight (%)', description: 'How much rating affects match score', groupName: 'scoring' },

@@ -304,6 +304,53 @@ export const v2Pricing = {
   }),
 }
 
+export interface SmartQuestionOption {
+  label: string
+  value: string
+  priceEffect?: number
+}
+export interface SmartQuestion {
+  key: string
+  label: string
+  type: 'single' | 'multi' | 'text' | 'number'
+  options?: SmartQuestionOption[]
+  placeholder?: string
+  required?: boolean
+}
+export interface SmartTemplate {
+  id: string
+  slug: string
+  name: string
+  description: string
+  jobCategory: { id: string; name: string; slug: string | null }
+  questions: SmartQuestion[]
+  defaultDurationMinutes: number
+  priceMin: number
+  priceMax: number
+  currency: string
+  refJob: { id: string; name: string; durationMinutes: number; priceMin: number; priceMax: number } | null
+}
+export interface SmartPriceEstimate {
+  currency: string
+  symbol: string
+  priceRange: { min: number; max: number; base: number }
+  breakdown: { label: string; factor: number }[]
+  timeEstimateMinutes: number
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export const v2SmartBooking = {
+  templates: (jobCategoryId?: string) =>
+    v2Request<SmartTemplate[]>(
+      `/api/mobile/v2/service-templates${jobCategoryId ? `?jobCategoryId=${encodeURIComponent(jobCategoryId)}` : ''}`
+    ),
+  priceEstimate: (data: { templateId: string; answers: Record<string, any>; countryCode?: string; urgency?: string }) =>
+    v2Request<SmartPriceEstimate>('/api/mobile/v2/price-estimate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+}
+
 export interface SearchResult {
   id: string
   name: string
@@ -400,4 +447,33 @@ export const v2Schedule = {
     ),
   cluster: () =>
     v2Request<{ clusters: any[] }>('/api/mobile/v2/schedule?action=cluster'),
+}
+
+export interface CustomJobRequestInput {
+  title: string
+  description: string
+  categoryId?: string | null
+  cityName?: string | null
+  budgetMin?: number | null
+  budgetMax?: number | null
+}
+
+export interface CustomJobRequest {
+  id: string
+  title: string
+  description: string
+  status: string
+  adminNote?: string | null
+  convertedJobId?: string | null
+  createdAt: string
+}
+
+export const v2CustomJobs = {
+  submit: (input: CustomJobRequestInput) =>
+    v2Request<{ request: any }>('/api/mobile/v2/custom-jobs', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  list: () =>
+    v2Request<{ requests: CustomJobRequest[] }>('/api/mobile/v2/custom-jobs'),
 }

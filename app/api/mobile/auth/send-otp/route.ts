@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { sendOtpEmail } from '@/lib/email'
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       },
     })
+
+    await sendOtpEmail(user.email, code)
 
     return NextResponse.json({ success: true })
   } catch (error) {

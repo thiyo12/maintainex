@@ -51,18 +51,31 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     // Job context for the chat header
-    let jobContext: { id: string; title: string; ref: string; status?: string } | null = null
+    let jobContext: {
+      id: string; title: string; ref: string; status?: string;
+      categoryName?: string | null; photos: string[]; budgetAmount?: number;
+      aiEstimate?: any; responseState?: string | null;
+    } | null = null
     if (conversation.jobId) {
       const job = await prisma.marketplaceJob.findUnique({
         where: { id: conversation.jobId },
-        select: { id: true, title: true, status: true },
       })
       if (job) {
+        let photos: string[] = []
+        try { const parsed = JSON.parse(job.photos); if (Array.isArray(parsed)) photos = parsed.filter((p) => typeof p === 'string') } catch { photos = [] }
+        let aiEstimate: any = null
+        try { if (job.aiEstimateJson) aiEstimate = JSON.parse(job.aiEstimateJson) } catch { aiEstimate = null }
+        const cat = job.categoryId ? await prisma.jobCategory.findUnique({ where: { id: job.categoryId }, select: { name: true } }) : null
         jobContext = {
           id: job.id,
           title: job.title,
           ref: `#MX-${job.id.slice(-6).toUpperCase()}`,
           status: job.status,
+          categoryName: cat?.name || null,
+          photos,
+          budgetAmount: Number(job.budgetAmount),
+          aiEstimate,
+          responseState: job.responseState,
         }
       }
     }

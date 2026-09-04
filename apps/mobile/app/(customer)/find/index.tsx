@@ -36,8 +36,6 @@ export default function FindJobCategories() {
 
   useEffect(() => { fetch() }, [fetch])
 
-  useEffect(() => { fetch()   }, [fetch])
-
   const onRefresh = () => {
     setRefreshing(true)
     fetch()
@@ -54,14 +52,14 @@ export default function FindJobCategories() {
 
       <AISearchBar
         placeholder={t('find.search')}
-        onCategorySelect={(catId, catName) => {
-          router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+        onCategorySelect={(catId) => {
+          router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } })
         }}
-        onJobSelect={(jobId, jobName) => {
-          router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+        onJobSelect={(jobId) => {
+          router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } })
         }}
         onPostJob={(query) => {
-          router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+          router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } })
         }}
       />
 
@@ -93,9 +91,9 @@ export default function FindJobCategories() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 22, fontWeight: '700', color: '#1F2937' },
-  subtitle: { fontSize: 13, color: '#9CA3AF', marginTop: 4 },
+  title: { fontSize: 22, fontWeight: '700', color: colors.ink },
+  subtitle: { fontSize: 13, color: colors.muted, marginTop: 4 },
   list: { paddingHorizontal: 16, paddingBottom: 32 },
 })

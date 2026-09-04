@@ -35,6 +35,7 @@ export const lightColors = {
   cream:      '#F9FAFB',
   error:      '#EF4444',
   dark:       '#111827',
+  darkMid:    '#4B5563',
 }
 
 export const darkColors = {
@@ -74,6 +75,7 @@ export const darkColors = {
   cream:      '#15161E',
   error:      '#EF4444',
   dark:       '#F3F4F6',
+  darkMid:    '#9CA3AF',
 }
 
 export const colors = lightColors

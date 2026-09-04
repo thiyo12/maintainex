@@ -20,7 +20,7 @@ export default function ChatListScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 12 },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark },
 })

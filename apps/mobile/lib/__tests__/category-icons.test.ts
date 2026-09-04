@@ -78,6 +78,26 @@ describe('getCategoryIcon', () => {
     expect(getCategoryIcon('sunny')).toBe('sunny-outline')
   })
 
+  it('maps wrench to wrench-outline', () => {
+    expect(getCategoryIcon('wrench')).toBe('wrench-outline')
+  })
+
+  it('maps diamond to diamond-outline', () => {
+    expect(getCategoryIcon('diamond')).toBe('diamond-outline')
+  })
+
+  it('maps hardware-chip to hardware-chip-outline', () => {
+    expect(getCategoryIcon('hardware-chip')).toBe('hardware-chip-outline')
+  })
+
+  it('maps key to key-outline', () => {
+    expect(getCategoryIcon('key')).toBe('key-outline')
+  })
+
+  it('maps shirt to shirt-outline', () => {
+    expect(getCategoryIcon('shirt')).toBe('shirt-outline')
+  })
+
   it('falls back to construct-outline for unknown icon', () => {
     expect(getCategoryIcon('unknown-icon-name')).toBe('construct-outline')
   })

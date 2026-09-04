@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { seedJobCategories } from '@/lib/v2-job-categories'
-
-function safeParseJsonArr(val: string | null | undefined): string[] {
-  if (!val) return []
-  try {
-    const parsed = JSON.parse(val)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return val ? val.split(',').map(s => s.trim()).filter(Boolean) : []
-  }
-}
+import { safeParseJsonArr, storedListIncludes } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,18 +21,12 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     })
 
-    const matchesCountry = (countriesJson: string, target: string): boolean => {
-      try {
-        const arr = JSON.parse(countriesJson)
-        return Array.isArray(arr) && arr.includes(target)
-      } catch { return false }
-    }
-
-    const categories = allCategories.filter(c => matchesCountry(c.countries, country))
+    const categories = allCategories.filter(c => storedListIncludes(c.countries, country))
 
     return NextResponse.json(categories.map(c => ({
       id: c.id,
       name: c.name,
+      slug: c.slug,
       iconName: c.iconName,
       colorHex: c.colorHex,
       sortOrder: c.sortOrder,

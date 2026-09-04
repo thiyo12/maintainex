@@ -1,22 +1,23 @@
 import React, { useEffect } from 'react'
-import { View } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text } from 'react-native'
+import { Icon } from 'phosphor-react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
-import { colors } from '../../lib/design'
-import { animations } from '../../lib/design'
+import { colors, animations } from '../../lib/design'
 
 interface Props {
-  name: keyof typeof Ionicons.glyphMap
+  icon: Icon
   focused: boolean
   activeColor?: string
   inactiveColor?: string
+  badge?: number
 }
 
 export default function TabIcon({
-  name,
+  icon: IconComponent,
   focused,
   activeColor = colors.accent,
   inactiveColor = colors.textMuted,
+  badge = 0,
 }: Props) {
   const scale = useSharedValue(1)
 
@@ -31,9 +32,31 @@ export default function TabIcon({
   return (
     <View style={{ alignItems: 'center' }}>
       <Animated.View style={animatedStyle}>
-        <Ionicons name={name} size={23} color={focused ? activeColor : inactiveColor} />
+        <IconComponent
+          size={24}
+          color={focused ? activeColor : inactiveColor}
+          weight={focused ? 'fill' : 'regular'}
+        />
       </Animated.View>
       {focused ? <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: activeColor, marginTop: 3 }} /> : null}
+      {badge > 0 ? (
+        <View style={{
+          position: 'absolute',
+          top: -3,
+          right: -10,
+          minWidth: 16,
+          height: 16,
+          borderRadius: 8,
+          backgroundColor: colors.error,
+          justifyContent: 'center',
+          alignItems: 'center',
+          paddingHorizontal: 4,
+        }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Outfit_700Bold', color: '#FFFFFF' }}>
+            {badge > 99 ? '99+' : badge}
+          </Text>
+        </View>
+      ) : null}
     </View>
   )
 }

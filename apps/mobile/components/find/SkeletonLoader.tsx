@@ -1,5 +1,6 @@
 import { View, Animated, StyleSheet, useWindowDimensions } from 'react-native'
 import { useEffect, useRef } from 'react'
+import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
   count?: number
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function SkeletonLoader({ count = 5, height = 80 }: Props) {
+  const colors = useColors()
   const opacity = useRef(new Animated.Value(0.3)).current
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function SkeletonLoader({ count = 5, height = 80 }: Props) {
   return (
     <View style={styles.container}>
       {Array.from({ length: count }).map((_, i) => (
-        <Animated.View key={i} style={[styles.skeleton, { height, opacity, width: width - 32 }]} />
+        <Animated.View key={i} style={[styles.skeleton, { height, opacity, width: width - 32, backgroundColor: colors.border }]} />
       ))}
     </View>
   )
@@ -33,5 +35,5 @@ export default function SkeletonLoader({ count = 5, height = 80 }: Props) {
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 16, gap: 10, paddingTop: 8 },
-  skeleton: { backgroundColor: '#E5E7EB', borderRadius: 12 },
+  skeleton: { borderRadius: 12 },
 })

@@ -4,15 +4,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
 import { colors } from '../../../lib/design'
+import { SquaresFour, FileText, ChatCircleDots, Flag, Users, CurrencyCircleDollar, User } from 'phosphor-react-native'
 
 const tabConfigs = [
-  { name: 'index', key: 'company.dashboard', icon: 'grid-outline' as const },
-  { name: 'contracts-list', key: 'company.contracts', icon: 'document-text-outline' as const },
-  { name: 'inbox', key: 'company.inbox', icon: 'chatbubble-ellipses-outline' as const },
-  { name: 'milestones-list', key: 'company.milestones', icon: 'flag-outline' as const },
-  { name: 'team', key: 'company.team', icon: 'people-outline' as const },
-  { name: 'earnings-list', key: 'company.earnings', icon: 'cash-outline' as const },
-  { name: 'profile', key: 'company.profile', icon: 'person-outline' as const },
+  { name: 'index', key: 'company.dashboard', icon: SquaresFour },
+  { name: 'contracts-list', key: 'company.contracts', icon: FileText },
+  { name: 'inbox', key: 'company.inbox', icon: ChatCircleDots },
+  { name: 'milestones-list', key: 'company.milestones', icon: Flag },
+  { name: 'team', key: 'company.team', icon: Users },
+  { name: 'earnings-list', key: 'company.earnings', icon: CurrencyCircleDollar },
+  { name: 'profile', key: 'company.profile', icon: User },
 ]
 
 export default function CompanyTabs() {
@@ -49,7 +50,7 @@ export default function CompanyTabs() {
           options={{
             title: t(tab.key),
             tabBarIcon: ({ focused }) => (
-              <TabIcon name={tab.icon} focused={focused} activeColor={colors.accent} />
+              <TabIcon icon={tab.icon} focused={focused} activeColor={colors.accent} />
             ),
           }}
         />

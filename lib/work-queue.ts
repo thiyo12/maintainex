@@ -1,7 +1,7 @@
 import { prisma } from './prisma'
 import type { AdminRole } from './admin-types'
 
-export type AlertCategory = 'kyc' | 'dispute' | 'settlement' | 'flagged_job' | 'fraud' | 'payout' | 'system'
+export type AlertCategory = 'kyc' | 'dispute' | 'settlement' | 'flagged_job' | 'fraud' | 'payout' | 'system' | 'tasker_escalation'
 
 const CATEGORY_ROLE_MAP: Record<AlertCategory, AdminRole> = {
   kyc: 'USER_MANAGEMENT',
@@ -11,6 +11,7 @@ const CATEGORY_ROLE_MAP: Record<AlertCategory, AdminRole> = {
   fraud: 'MANAGER',
   payout: 'FINANCE',
   system: 'TECHNICAL',
+  tasker_escalation: 'MANAGER',
 }
 
 const CATEGORY_SEVERITY_MAP: Record<AlertCategory, string> = {
@@ -21,6 +22,7 @@ const CATEGORY_SEVERITY_MAP: Record<AlertCategory, string> = {
   fraud: 'critical',
   payout: 'high',
   system: 'low',
+  tasker_escalation: 'high',
 }
 
 const CATEGORY_SLA_MAP: Record<AlertCategory, number> = {
@@ -31,6 +33,7 @@ const CATEGORY_SLA_MAP: Record<AlertCategory, number> = {
   fraud: 720,      // 12 hours
   payout: 2880,    // 48 hours
   system: 10080,   // 7 days
+  tasker_escalation: 720, // 12 hours
 }
 
 export async function createWorkItem(params: {

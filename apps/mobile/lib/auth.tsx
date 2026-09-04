@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { AppState } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { auth, setAuthToken } from './api'
 import { User } from './types'
 
-const SESSION_DURATION = 5 * 24 * 60 * 60 * 1000
+const SESSION_DURATION = 18 * 24 * 60 * 60 * 1000
 
 interface AuthContextType {
   user: User | null
@@ -13,6 +14,8 @@ interface AuthContextType {
   setSignupData: (data: { name: string; email: string; phone: string; password: string; role: string } | null) => void
   login: (email: string, password: string) => Promise<any>
   loginWithOtp: (phone: string, otp: string) => Promise<any>
+  sendLoginOtp: (identifier: string) => Promise<void>
+  otpLogin: (identifier: string, code: string) => Promise<any>
   register: (data: { email: string; password: string; name: string; phone: string; role: string }) => Promise<any>
   switchRole: (role: string) => Promise<void>
   logout: () => Promise<void>
@@ -28,6 +31,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStoredAuth()
+  }, [])
+
+  // Heartbeat: keep last_active_at fresh on launch, foreground/background
+  // transitions, and periodically while the app is in the foreground so the
+  // 18-day inactivity session window is measured accurately.
+  useEffect(() => {
+    const touch = (force = false) => {
+      const now = String(Date.now())
+      if (force || AppState.currentState === 'active') {
+        SecureStore.setItemAsync('last_active_at', now).catch(() => {})
+      }
+    }
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' || state === 'background') touch(true)
+    })
+
+    touch(true)
+    const interval = setInterval(() => touch(), 60000)
+
+    return () => {
+      sub.remove()
+      clearInterval(interval)
+    }
   }, [])
 
   const loadStoredAuth = async () => {
@@ -66,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         while (retries >= 0) {
           try {
             const meRes = await auth.me()
-            const updatedUser = { ...parsedUser, needsOnboarding: meRes.needsOnboarding } as User
+            const updatedUser = { ...parsedUser, ...meRes.user, needsOnboarding: meRes.needsOnboarding } as User
             setUser(updatedUser)
             await SecureStore.setItemAsync('auth_user', JSON.stringify(updatedUser))
             break
@@ -112,6 +139,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithOtp = useCallback(async (phone: string, otp: string) => {
     const res = await auth.loginWithOtp({ phone, otp })
+    await setAuthToken(res.token)
+    setUser(res.user)
+    await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+    await SecureStore.setItemAsync('last_active_at', String(Date.now()))
+    return res.user
+  }, [])
+
+  const sendLoginOtp = useCallback(async (identifier: string) => {
+    const trimmed = identifier.trim()
+    const isEmail = trimmed.includes('@')
+    await auth.otpLogin(isEmail ? { email: trimmed } : { phone: trimmed })
+  }, [])
+
+  const otpLogin = useCallback(async (identifier: string, code: string) => {
+    const trimmed = identifier.trim()
+    const isEmail = trimmed.includes('@')
+    const res = await auth.otpLogin(
+      isEmail ? { email: trimmed, code } : { phone: trimmed, code }
+    )
     await setAuthToken(res.token)
     setUser(res.user)
     await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
@@ -165,6 +211,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSignupData,
         login,
         loginWithOtp,
+        sendLoginOtp,
+        otpLogin,
         register,
         switchRole,
         logout,

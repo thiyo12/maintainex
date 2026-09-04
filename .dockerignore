@@ -2,9 +2,33 @@
 .env
 .env.local
 .env.production
+.env.*.local
 
 # Keep .env.example for reference
 !.env.example
+
+# Version control (huge, not needed in build context)
+.git
+.gitignore
+Dockerfile.bak
+
+# Node modules (rebuilt inside container)
+node_modules
+**/node_modules
+
+# Build artifacts (rebuilt inside container)
+.next
+out
+build
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Database dev artifacts (not needed for build)
+*.db
+*.db-journal
+
+# Mobile app sources (web build doesn't need them, shrinks context massively)
+apps/mobile/dist
 
 # Logs
 *.log

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useCallback, useState, useSyncExternalStore } from 'react'
-import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, useWindowDimensions } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import LottieView from 'lottie-react-native'
-import { Bell, MapPin, Star, CaretRight, Plus, PaperPlaneTilt } from 'phosphor-react-native'
+import { Bell, MapPin, Star, CaretRight, Plus, PaperPlaneTilt, BuildingOffice, HouseLine } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 
@@ -14,7 +14,8 @@ import { taskers, notifications } from '../../../lib/api'
 import { translateJobStatus } from '../../../lib/i18n'
 import { on, removedJobs, subscribe, getVersion } from '../../../lib/events'
 import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
-import { CATEGORY_VISUALS, categoryIcon, CategoryVisual } from '../../../lib/categoryVisuals'
+import { CATEGORY_FALLBACK, categoryVisualBySlug, categoryIcon, CategoryVisual } from '../../../lib/categoryVisuals'
+import { tierById } from '../../../lib/tiers'
 
 import AISearchBar from '../../../components/shared/AISearchBar'
 import AvatarCircle from '../../../components/ui/AvatarCircle'
@@ -33,7 +34,7 @@ const MOCK_PROVIDERS = [
   { id: 'm5', name: 'Ruwan Wick', avatar: '', rating: 4.9, completedJobs: 312, hourlyRate: 2000, isVerified: true, categories: ['Electrical', 'AC', 'Plumbing'] },
 ] as any[]
 
-function CatVisual({ visual }: { visual: CategoryVisual }) {
+function CatVisual({ visual, size = 42 }: { visual: CategoryVisual; size?: number }) {
   const [failed, setFailed] = useState(false)
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -45,7 +46,7 @@ function CatVisual({ visual }: { visual: CategoryVisual }) {
   const Icon = visual.icon
   return (
     <View style={styles.catAnimBox}>
-      <Icon size={42} color="rgba(255,255,255,0.92)" weight="fill" />
+      <Icon size={size} color="rgba(255,255,255,0.94)" weight="fill" />
       {visual.lottie && !failed ? (
         <LottieView
           source={{ uri: visual.lottie }}
@@ -124,6 +125,7 @@ function RecentJobRow({ job, onRebook, onOpen }: { job: any; onRebook: () => voi
 export default function CustomerHome() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { width: winWidth } = useWindowDimensions()
   const { user } = useAuth()
   const { t } = useTranslation()
   const { newJobId } = useLocalSearchParams<{ newJobId?: string }>()
@@ -135,6 +137,7 @@ export default function CustomerHome() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [homeCategories, setHomeCategories] = useState<any[]>([])
 
   const userId = user?.id
 
@@ -158,10 +161,24 @@ export default function CustomerHome() {
     [user, activeJob]
   )
 
+  const loadHomeCategories = useCallback(async () => {
+    setHomeCategories(CATEGORY_FALLBACK)
+    try {
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/job-categories`)
+      if (!res.ok) return
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : data.categories || data.data || []
+      if (list.length > 0) setHomeCategories(list)
+    } catch {
+      // keep showing CATEGORY_FALLBACK on network failure
+    }
+  }, [])
+
   const loadJobs = useCallback(async (refresh = false) => {
     try {
       if (refresh) setRefreshing(true)
       else setLoading(true)
+      loadHomeCategories()
       const res = await v2Jobs.list()
       const jobs = res.jobs || []
       setMyJobs(jobs)
@@ -199,7 +216,7 @@ export default function CustomerHome() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [userId, newJobId])
+  }, [userId, newJobId, loadHomeCategories])
 
   useEffect(() => {
     const unsub = on('jobsChanged', () => setRefreshKey(k => k + 1))
@@ -218,10 +235,19 @@ export default function CustomerHome() {
   }
 
   const firstName = (user?.name || t('home.user')).split(' ')[0]
+  const tier = tierById(user?.tierLevel)
+  const TierIcon = tier.icon
 
-  const openCategory = (id: string, name: string) => {
-    router.push({ pathname: '/(customer)/search', params: { category: id, name } } as any)
+  const openCategoryDetail = (id: string, _name: string) => {
+    router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: id } } as any)
   }
+
+  const catTileW = Math.floor((winWidth - spacing.md * 2 - spacing.sm) / 4.4)
+  const catRows = (() => {
+    const items = homeCategories.length > 0 ? homeCategories : CATEGORY_FALLBACK
+    const mid = Math.ceil(items.length / 2)
+    return [items.slice(0, mid), items.slice(mid)]
+  })()
 
   const provider = activeJob?.acceptedQuote?.provider
   const navToActive = () => {
@@ -242,8 +268,14 @@ export default function CustomerHome() {
         {/* ═══ Top bar ═══ */}
         <View style={styles.headerRow}>
           <AvatarCircle uri={(user as any)?.profileImage || (user as any)?.avatar} name={user?.name} size={46} />
+          <PressableScale onPress={() => router.push('/(customer)/settings/addresses' as any)} scaleTo={0.95} style={styles.locPillPress}>
+            <View style={styles.locPill}>
+              <MapPin size={14} color={colors.accent} weight="fill" />
+              <Text style={styles.locPillText} numberOfLines={1}>{region}</Text>
+            </View>
+          </PressableScale>
           <View style={styles.headerActions}>
-            <PressableScale onPress={() => router.push('/notifications')} scaleTo={0.94} style={styles.iconBtnPress}>
+            <PressableScale onPress={() => router.push('/(customer)/(tabs)/notifications' as any)} scaleTo={0.94} style={styles.iconBtnPress}>
               <View style={styles.iconBtn}>
                 <Bell size={20} color={colors.textPrimary} weight="regular" />
                 {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
@@ -254,15 +286,26 @@ export default function CustomerHome() {
 
         <View style={styles.greetingBlock}>
           <Text style={styles.greetingSub}>{getGreeting()},</Text>
-          <Text style={styles.greetingName}>{firstName} 👋</Text>
+          <Text style={styles.greetingName}>{firstName}</Text>
+          <PressableScale onPress={() => router.push('/settings/membership' as any)} scaleTo={0.95} style={{ alignSelf: 'flex-start' }}>
+            <View style={styles.tierPill}>
+              <TierIcon size={12} color={tier.color} weight="fill" />
+              <Text style={[styles.tierPillText, { color: tier.color }]}>{t(`tiers.${tier.id.toLowerCase()}`)}</Text>
+            </View>
+          </PressableScale>
         </View>
 
         {/* ═══ Hero search ═══ */}
         <AISearchBar
           placeholder={t('home.searchPlaceholder')}
-          onCategorySelect={(catId, catName) => openCategory(catId, catName)}
-          onJobSelect={(jobId, jobName) => openCategory(jobId, jobName)}
-          onPostJob={(query) => router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } } as any)}
+          onCategorySelect={(catId) => {
+            router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } } as any)
+          }}
+          onJobSelect={(jobId) => {
+            router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } } as any)
+          }}
+          onTaskerSelect={(taskerId) => router.push(`/(customer)/find/tasker-profile/${taskerId}` as any)}
+          onPostJob={(query) => router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } } as any)}
         />
 
         {/* ═══ Active job ═══ */}
@@ -305,40 +348,101 @@ export default function CustomerHome() {
           <Text style={styles.sectionTitle}>{t('home.whatDoYouNeed')}</Text>
         </View>
         {loading && relatedProviders.length === 0 ? (
-          <View style={styles.catRow}>
-            {[0, 1, 2, 3].map(i => <Skeleton key={i} width={120} height={140} radius={18} />)}
+          <View style={styles.catGrid}>
+            {[0, 1].map(row => (
+              <View key={row} style={styles.catRow}>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <View key={i} style={{ width: catTileW, alignItems: 'center' }}>
+                    <Skeleton width={catTileW - 26} height={catTileW - 26} radius={999} />
+                    <Skeleton width={catTileW - 16} height={11} radius={5} style={{ marginTop: spacing.xs }} />
+                  </View>
+                ))}
+              </View>
+            ))}
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
-            {CATEGORY_VISUALS.map((visual, i) => {
-              const label =
-                visual.id === 'general' ? t('ui.allServices') : t(`home.categories.${visual.id}`, { defaultValue: visual.id })
-              return (
-                <Animated.View key={visual.id} entering={FadeInUp.delay(i * 80).springify().damping(20).stiffness(300)}>
-                  <PressableScale onPress={() => openCategory(visual.id, label)} scaleTo={0.95} style={styles.catPress}>
-                    <LinearGradient colors={visual.gradient} style={styles.catCard}>
-                      <CatVisual visual={visual} />
-                    </LinearGradient>
-                  </PressableScale>
-                  <Text style={styles.catLabel} numberOfLines={1}>{label}</Text>
-                </Animated.View>
-              )
-            })}
-          </ScrollView>
+          <View style={styles.catGrid}>
+            {catRows.map((row, ri) => (
+              <ScrollView
+                key={ri}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.catRow}
+                snapToInterval={catTileW + spacing.xs}
+                decelerationRate="fast"
+              >
+                {row.map((item: any, i) => {
+                  const idx = ri * row.length + i
+                  const id = item.slug || item.id || ''
+                  const navId = item.id || item.slug || ''
+                  const vis = categoryVisualBySlug(id)
+                  const visual: CategoryVisual = { id, icon: vis.icon, gradient: vis.gradient }
+                  const label = item.name || item.slug || id
+                  return (
+                    <Animated.View key={id || idx} entering={FadeInUp.delay(idx * 30).springify().damping(20).stiffness(300)} style={{ width: catTileW, alignItems: 'center' }}>
+                      <PressableScale onPress={() => openCategoryDetail(navId, label)} scaleTo={0.9} style={styles.catPress}>
+                        <LinearGradient colors={visual.gradient} style={[styles.catCircle, { width: catTileW - 24, height: catTileW - 24 }]}>
+                          <CatVisual visual={visual} size={26} />
+                        </LinearGradient>
+                      </PressableScale>
+                      <Text style={styles.catLabel} numberOfLines={2}>{label}</Text>
+                    </Animated.View>
+                  )
+                })}
+              </ScrollView>
+            ))}
+          </View>
         )}
+
+        {/* ═══ Real estate ═══ */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>{t('home.realEstate')}</Text>
+        </View>
+        <View style={styles.realEstateRow}>
+          <PressableScale onPress={() => router.push('/real-estate' as any)} scaleTo={0.97} style={styles.rePress}>
+            <LinearGradient colors={[colors.surfaceHigh, colors.surface]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.reCard}>
+              <View style={styles.reIconBox}>
+                <BuildingOffice size={22} color={colors.accent} weight="fill" />
+              </View>
+              <Text style={styles.reTitle}>{t('home.browseProperties')}</Text>
+              <Text style={styles.reSub} numberOfLines={2}>{t('home.browsePropertiesSub')}</Text>
+              <View style={styles.reArrow}>
+                <CaretRight size={14} color={colors.background} weight="bold" />
+              </View>
+            </LinearGradient>
+          </PressableScale>
+          <PressableScale onPress={() => router.push('/real-estate/my-listings' as any)} scaleTo={0.97} style={styles.rePress}>
+            <LinearGradient colors={[colors.surfaceHigh, colors.surface]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.reCard}>
+              <View style={styles.reIconBox}>
+                <HouseLine size={22} color={colors.accent} weight="fill" />
+              </View>
+              <Text style={styles.reTitle}>{t('home.myListings')}</Text>
+              <Text style={styles.reSub} numberOfLines={2}>{t('home.myListingsSub')}</Text>
+              <View style={styles.reArrow}>
+                <CaretRight size={14} color={colors.background} weight="bold" />
+              </View>
+            </LinearGradient>
+          </PressableScale>
+        </View>
 
         {/* ═══ Nearby taskers ═══ */}
         {relatedProviders.length > 0 && (
           <>
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionTitle}>{t('ui.topTaskers')}</Text>
+              <Text style={styles.sectionTitle}>{t('home.topTaskersNearYou')}</Text>
+              <PressableScale onPress={() => router.push('/(customer)/find' as any)} scaleTo={0.96}>
+                <View style={styles.seeAllRow}>
+                  <Text style={styles.seeAllText}>{t('tasker.seeAll')}</Text>
+                  <CaretRight size={12} color={colors.accent} weight="bold" />
+                </View>
+              </PressableScale>
               <View style={styles.regionPill}>
                 <MapPin size={12} color={colors.accent} weight="fill" />
                 <Text style={styles.regionText}>{region}</Text>
               </View>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskersRow}>
-              {relatedProviders.map((p: any) => (
+              {relatedProviders.slice(0, 5).map((p: any) => (
                 <TaskerCard
                   key={p.id}
                   p={p}
@@ -404,7 +508,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingBottom: 140, paddingHorizontal: spacing.md },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm, gap: spacing.sm },
+  locPillPress: { flex: 1, borderRadius: radius.full },
+  locPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    paddingVertical: 10, paddingHorizontal: spacing.md, borderRadius: radius.full,
+  },
+  locPillText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold', flexShrink: 1 },
   headerActions: { flexDirection: 'row', gap: spacing.sm },
   iconBtnPress: { borderRadius: radius.full },
   iconBtn: {
@@ -421,6 +532,12 @@ const styles = StyleSheet.create({
   greetingBlock: { marginTop: spacing.lg, marginBottom: spacing.lg },
   greetingSub: { ...typography.bodyMuted, fontSize: 14, fontFamily: 'Outfit_500Medium' },
   greetingName: { ...typography.h1, fontSize: 30, letterSpacing: -0.5, marginTop: 2 },
+  tierPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    marginTop: spacing.sm, paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.full,
+    backgroundColor: colors.accentSoft,
+  },
+  tierPillText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: colors.accent },
 
   activeWrap: { marginTop: spacing.md },
   activePress: { borderRadius: radius.lg, ...shadows.card },
@@ -455,14 +572,33 @@ const styles = StyleSheet.create({
   regionPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full, backgroundColor: colors.accentSoft },
   regionText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
 
-  catRow: { gap: spacing.md, paddingRight: spacing.md },
-  catPress: { borderRadius: radius.lg },
-  catCard: {
-    width: 120, height: 140, borderRadius: radius.lg, overflow: 'hidden',
+  catGrid: { gap: spacing.md },
+  catRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.sm },
+  catPress: { borderRadius: radius.full },
+  catCircle: {
+    borderRadius: radius.full, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center',
   },
   catAnimBox: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  catLabel: { ...typography.caption, textAlign: 'center', marginTop: spacing.sm, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
+  catLabel: { fontSize: 11.5, lineHeight: 14, textAlign: 'center', marginTop: spacing.xs, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
+
+  realEstateRow: { flexDirection: 'row', gap: spacing.md },
+  rePress: { flex: 1, borderRadius: radius.md, ...shadows.card },
+  reCard: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    padding: spacing.md, paddingBottom: spacing.lg, position: 'relative', minHeight: 150,
+  },
+  reIconBox: {
+    width: 42, height: 42, borderRadius: radius.sm * 1.5,
+    backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm,
+  },
+  reTitle: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 15, marginTop: spacing.sm },
+  reSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
+  reArrow: {
+    position: 'absolute', bottom: spacing.md, right: spacing.md,
+    width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accent,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   taskersRow: { gap: spacing.md, paddingRight: spacing.md },
   taskerWrap: { width: 200 },

@@ -46,7 +46,7 @@ export default function JobPostedConfirmation() {
       <Text style={styles.counterLabel}>{t('postJob.workersNotified')}</Text>
 
       <View style={styles.buttons}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push(`/(customer)/jobs/quotes?jobId=${jobId || ''}`)}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push(`/(customer)/jobs/waiting/${jobId || ''}`)}>
           <Text style={styles.primaryBtnText}>{t('postJob.viewMyJob')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.outlineBtn} onPress={() => router.replace('/(customer)')}>
@@ -60,7 +60,7 @@ export default function JobPostedConfirmation() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,

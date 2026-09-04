@@ -3,12 +3,22 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { MapPin, ClockAfternoon, Wallet } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 import { getAuthToken } from '../../../../lib/api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
+
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180
+  const R = 6371
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
 
 export default function V2BrowseJobsScreen() {
   const colors = useColors()
@@ -20,6 +30,7 @@ export default function V2BrowseJobsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [filterArea, setFilterArea] = useState<string | null>(null)
   const [filterCity, setFilterCity] = useState<string | null>(null)
+  const [taskerCoords, setTaskerCoords] = useState<{ lat: number; lng: number } | null>(null)
 
   const [inited, setInited] = useState(false)
 
@@ -50,6 +61,7 @@ export default function V2BrowseJobsScreen() {
           const area = data.areaId || null
           if (city) setFilterCity(city)
           if (area) setFilterArea(area)
+          if (data.latitude && data.longitude) setTaskerCoords({ lat: data.latitude, lng: data.longitude })
           await loadJobs(area)
         } else {
           await loadJobs(null)
@@ -95,29 +107,73 @@ export default function V2BrowseJobsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadJobs} tintColor={colors.amber} />}
         >
-          {jobs.map((job) => (
-            <TouchableOpacity
-              key={job.id}
-              style={styles.jobCard}
-              onPress={() => router.push(`/(tasker)/jobs/v2/quote/${job.id}`)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardHeader}>
-                <View style={styles.budgetBadge}>
-                  <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount}</Text>
+          {jobs.map((job) => {
+            const smart = (job as any).smartBooking
+            const jobLat = (job as any).latitude as number | null
+            const jobLng = (job as any).longitude as number | null
+            const dist = taskerCoords && jobLat && jobLng ? haversine(taskerCoords.lat, taskerCoords.lng, jobLat, jobLng) : null
+            const answers = smart?.answers ? Object.entries(smart.answers) as [string, any][] : []
+            const estMin = smart?.estimatedPriceMin as number | null
+            const estMax = smart?.estimatedPriceMax as number | null
+            const schedDate = smart?.preferredDate || (job as any).preferredDate as string | null
+            const timeSlot = smart?.timeSlot as string | null
+            return (
+              <TouchableOpacity
+                key={job.id}
+                style={styles.jobCard}
+                onPress={() => router.push(`/(tasker)/jobs/v2/quote/${job.id}`)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={styles.budgetBadge}>
+                    <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount}</Text>
+                  </View>
+                  {dist != null && (
+                    <View style={styles.distanceBadge}>
+                      <MapPin size={12} color={colors.muted} weight="fill" />
+                      <Text style={styles.distanceText}>{dist < 1 ? '< 1' : dist.toFixed(1)} km away</Text>
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.budgetType}>{job.budgetType}</Text>
-              </View>
-              <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-              <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-              <View style={styles.cardFooter}>
-                <Text style={styles.jobDate}>{t('jobs.posted')} {new Date(job.createdAt).toLocaleDateString()}</Text>
-                <View style={styles.quoteBtn}>
-                  <Text style={styles.quoteBtnText}>{t('quotes.quote')} →</Text>
+                <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+                {answers.length > 0 && (
+                  <View style={styles.answersSummary}>
+                    {answers.slice(0, 3).map(([k, v]) => {
+                      const picks = Array.isArray(v) ? v : [v]
+                      return (
+                        <Text key={k} style={[styles.answerLine, { color: colors.muted }]} numberOfLines={1}>
+                          {String(picks.join(', '))}
+                        </Text>
+                      )
+                    })}
+                  </View>
+                )}
+                {estMin != null && (
+                  <View style={styles.estimateRow}>
+                    <Wallet size={13} color={colors.amberDark} weight="fill" />
+                    <Text style={[styles.estimateText, { color: colors.amberDark }]}>
+                      LKR {estMin.toLocaleString()} – {estMax?.toLocaleString?.() ?? ''}
+                    </Text>
+                  </View>
+                )}
+                {schedDate && (
+                  <View style={styles.metaRow}>
+                    <ClockAfternoon size={12} color={colors.muted} weight="fill" />
+                    <Text style={[styles.metaText, { color: colors.muted }]}>
+                      {new Date(schedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      {timeSlot ? ` · ${timeSlot}` : ''}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.cardFooter}>
+                  <Text style={styles.jobDate}>{t('jobs.posted')} {new Date(job.createdAt).toLocaleDateString()}</Text>
+                  <View style={styles.quoteBtn}>
+                    <Text style={styles.quoteBtnText}>{t('quotes.quote')} →</Text>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            )
+          })}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -140,9 +196,17 @@ const makeStyles = (colors: any) => StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   budgetBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   budgetBadgeText: { fontSize: 14, fontWeight: '700', color: colors.amberDark },
+  distanceBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  distanceText: { fontSize: 12, color: colors.muted },
   budgetType: { fontSize: 12, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   jobTitle: { fontSize: 17, fontWeight: '700', color: colors.ink, marginBottom: 6 },
   jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 14 },
+  answersSummary: { marginBottom: 8 },
+  answerLine: { fontSize: 12, lineHeight: 18 },
+  estimateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  estimateText: { fontSize: 14, fontWeight: '700' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 },
+  metaText: { fontSize: 12 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   jobDate: { fontSize: 12, color: colors.muted },
   quoteBtn: { backgroundColor: colors.amber, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },

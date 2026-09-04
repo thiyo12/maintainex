@@ -18,6 +18,11 @@ const iconMap: Record<string, string> = {
   body: 'body-outline',
   business: 'business-outline',
   sunny: 'sunny-outline',
+  wrench: 'wrench-outline',
+  diamond: 'diamond-outline',
+  'hardware-chip': 'hardware-chip-outline',
+  key: 'key-outline',
+  shirt: 'shirt-outline',
 }
 
 export function getCategoryIcon(iconName: string): string {

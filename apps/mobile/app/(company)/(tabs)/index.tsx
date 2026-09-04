@@ -121,14 +121,14 @@ export default function CompanyDashboard() {
         <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
           <AISearchBar
             placeholder={t('tasker.searchJobs')}
-            onCategorySelect={(catId, catName) => {
-              router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+            onCategorySelect={(catId) => {
+              router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } })
             }}
-            onJobSelect={(jobId, jobName) => {
-              router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+            onJobSelect={(jobId) => {
+              router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } })
             }}
             onPostJob={(query) => {
-              router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+              router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } })
             }}
           />
         </View>

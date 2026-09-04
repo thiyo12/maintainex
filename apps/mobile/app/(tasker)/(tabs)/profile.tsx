@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -41,7 +41,7 @@ export default function TaskerProfile() {
   const router = useRouter()
   const colors = useColors()
   const styles = makeStyles(colors)
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<TaskerProfile | null>(null)
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
@@ -90,6 +90,16 @@ export default function TaskerProfile() {
     interval = setInterval(loadCounts, 30000)
     return () => { if (interval) clearInterval(interval) }
   }, [])
+
+  const handleLogout = () => {
+    Alert.alert(t('profile.logout'), t('profile.logoutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('profile.logout'), style: 'destructive', onPress: async () => {
+        await logout()
+        router.replace('/(auth)/welcome')
+      } },
+    ])
+  }
 
   async function loadProfile() {
     if (!user?.id) return
@@ -322,6 +332,13 @@ export default function TaskerProfile() {
                 <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('tasker.myProfile')}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
+              <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="log-out-outline" size={16} color="#DC2626" />
+              </View>
+              <Text style={[styles.menuTitle, { color: '#DC2626' }]}>{t('profile.logout')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </TouchableOpacity>
           </View>

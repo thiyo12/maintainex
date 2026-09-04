@@ -171,24 +171,35 @@ async function syncCategorySkills(taskerId: string, selectedJobs: { id: string; 
 
   const jobCats = await prisma.jobCategory.findMany({
     where: { id: { in: categoryIds } },
-    select: { name: true },
+    select: { id: true, name: true, slug: true },
   })
 
-  // Resolve to marketplace category slugs where possible (category names map to
-  // curated slugs like "electrical"); otherwise fall back to a slugified name.
+  // Store the JobCategory id + slug (the canonical namespace used by job
+  // matching/blasting and the tasker search). A mapped legacy Category slug is
+  // retained as an alias so previously-onboarded taskers keep matching.
   const marketplace = await prisma.category.findMany({
     where: { isActive: true },
     select: { name: true, slug: true },
   })
-  const byName = new Map(marketplace.map(c => [c.name.toLowerCase(), c.slug]))
+  const legacyByJobName = new Map<string, string>()
+  for (const c of marketplace) {
+    for (const jc of jobCats) {
+      if (c.name.toLowerCase().includes(jc.name.toLowerCase()) || jc.name.toLowerCase().includes(c.name.toLowerCase())) {
+        legacyByJobName.set(jc.id, c.slug)
+      }
+    }
+  }
 
-  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  const slugs = jobCats
-    .map(c => byName.get(c.name.toLowerCase()) || slugify(c.name))
-    .filter((s): s is string => !!s)
+  const keys: string[] = []
+  for (const jc of jobCats) {
+    keys.push(jc.id)
+    if (jc.slug) keys.push(jc.slug)
+    const alias = legacyByJobName.get(jc.id)
+    if (alias && alias !== jc.slug) keys.push(alias)
+  }
 
   await prisma.taskerProfile.update({
     where: { id: taskerId },
-    data: { skills: JSON.stringify([...new Set(slugs)]) },
+    data: { skills: JSON.stringify([...new Set(keys)]) },
   })
 }

@@ -48,6 +48,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    if (job.responseState === 'awaiting') {
+      await prisma.marketplaceJob.update({
+        where: { id: jobId },
+        data: { responseState: 'responded' },
+      })
+    }
+
     notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
     return NextResponse.json({ quote: { ...quote, price: Number(quote.price) } }, { status: 201 })

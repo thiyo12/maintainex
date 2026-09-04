@@ -97,7 +97,7 @@ export type AuditAction =
   | 'SETTLEMENT_PROCESS' | 'SETTLEMENT_OVERDUE'
   | 'COMMISSION_PAYMENT_CONFIRM'
   | 'PAYOUT_PROCESS' | 'PAYOUT_REJECT'
-  | 'JOB_FLAG'
+  | 'JOB_FLAG' | 'JOB_ASSIGN'
 
 export interface AdminSession {
   id: string

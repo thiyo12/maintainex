@@ -103,12 +103,16 @@ export default function ChatDetailScreen() {
       text,
       senderId: userId,
       createdAt: new Date().toISOString(),
-      status: 'sending',
+      status: isDemo ? 'sent' : 'sending',
     }
     setMessages(prev => [...prev, optimisticMsg])
     setInputText('')
     setPreWarn([])
     setSending(true)
+    if (isDemo) {
+      setTimeout(() => setSending(false), 250)
+      return
+    }
     try {
       const res = await conversations.sendMessage(id as string, text)
       setMessages(prev => prev.map(m => m.id === optimisticMsg.id ? { ...m, status: 'sent', text: res?.text || m.text } : m))
@@ -211,6 +215,31 @@ export default function ChatDetailScreen() {
                   <Ionicons name="shield-checkmark" size={16} color={colors.amber} />
                   <Text style={[styles.safetyText, { color: colors.ink }]}>{t('chat.safetyMessage')}</Text>
                 </View>
+                {job?.categoryName || job?.photos?.length ? (
+                  <TouchableOpacity
+                    style={[styles.jobCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+                    onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}
+                  >
+                    {job.photos?.length ? (
+                      <Image source={{ uri: resolveImageUri(job.photos[0]) }} style={styles.jobCardImg} />
+                    ) : (
+                      <View style={[styles.jobCardImg, styles.jobCardImgPlaceholder, { backgroundColor: colors.amberBg }]}>
+                        <Ionicons name="build-outline" size={20} color={colors.amber} />
+                      </View>
+                    )}
+                    <View style={styles.jobCardBody}>
+                      <Text style={[styles.jobCardCat, { color: colors.amberDark }]} numberOfLines={1}>
+                        {job.categoryName || 'Maintenance job'}
+                      </Text>
+                      <Text style={[styles.jobCardTitle, { color: colors.ink }]} numberOfLines={2}>{job.title}</Text>
+                      <Text style={[styles.jobCardMeta, { color: colors.muted }]}>
+                        {job.ref}
+                        {job.aiEstimate?.priceRange ? ` • Estimate Rs ${job.aiEstimate.priceRange.min?.toLocaleString?.()} – ${job.aiEstimate.priceRange.max?.toLocaleString?.()}` : (job.budgetAmount ? ` • Budget Rs ${Number(job.budgetAmount).toLocaleString()}` : '')}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             }
             renderItem={({ item, index }) => {
@@ -294,7 +323,7 @@ export default function ChatDetailScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -389,4 +418,19 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderTopWidth: 1,
   },
   closedInputText: { fontSize: 13, fontFamily: fonts.body },
+  jobCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  jobCardImg: { width: 46, height: 46, borderRadius: 10 },
+  jobCardImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  jobCardBody: { flex: 1, gap: 1 },
+  jobCardCat: { fontSize: 11, fontFamily: fonts.heading },
+  jobCardTitle: { fontSize: 13, fontFamily: fonts.bodySemiBold },
+  jobCardMeta: { fontSize: 11, fontFamily: fonts.body },
 })

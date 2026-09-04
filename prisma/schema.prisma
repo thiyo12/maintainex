@@ -8,25 +8,26 @@ datasource db {
 }
 
 model User {
-  id               String   @id @default(cuid())
-  mxId             String?  @unique // MXU-XXXXX unique user ID
-  email            String   @unique
-  passwordHash     String
-  name             String
-  phone            String?
-  role             String   @default("CUSTOMER")
-  isActive         Boolean  @default(true)
-  emailVerified    Boolean  @default(false)
-  isSuspended      Boolean  @default(false)
-  isBanned         Boolean  @default(false) // Banned for off-platform deals
-  banReason        String?
-  suspendedUntil   DateTime?
-  suspensionReason String?
-  pushToken        String?
-  nickname         String?
+  id                String    @id @default(cuid())
+  mxId              String?   @unique // MXU-XXXXX unique user ID
+  email             String    @unique
+  passwordHash      String
+  name              String
+  phone             String?
+  phoneVerified     Boolean   @default(false)
+  role              String    @default("CUSTOMER")
+  isActive          Boolean   @default(true)
+  emailVerified     Boolean   @default(false)
+  isSuspended       Boolean   @default(false)
+  isBanned          Boolean   @default(false) // Banned for off-platform deals
+  banReason         String?
+  suspendedUntil    DateTime?
+  suspensionReason  String?
+  pushToken         String?
+  nickname          String?
   lastNameChangedAt DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   sessions           Session[]
   otps               OTP[]
@@ -45,12 +46,13 @@ model User {
   teamMembers        TeamMember[]
   payouts            Payout[]
   identityDocs       IdentityDocument[]
-  identityStatus     String               @default("NOT_SUBMITTED")
+  identityStatus     String                    @default("NOT_SUBMITTED")
   userDevices        UserDevice[]
   fraudEvents        FraudEvent[]
   adminFlags         AdminFlag[]
   offerBookings      OfferBooking[]
   payoutRequests     PayoutRequest[]
+  customJobRequests  CustomJobRequest[]
 }
 
 model Admin {
@@ -273,15 +275,15 @@ model Review {
 }
 
 model Settings {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     String
-  type      String   @default("string") // number, boolean, string, json
-  label     String   @default("")
-  description String @default("")
-  groupName String   @default("general")
-  updatedBy String?
-  updatedAt DateTime?
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String
+  type        String    @default("string") // number, boolean, string, json
+  label       String    @default("")
+  description String    @default("")
+  groupName   String    @default("general")
+  updatedBy   String?
+  updatedAt   DateTime?
 }
 
 model AppSetting {
@@ -300,7 +302,7 @@ model AppSetting {
 }
 
 model JobMatchQueue {
-  id          String    @id @default(cuid())
+  id          String         @id @default(cuid())
   jobId       String
   job         MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
   taskerId    String
@@ -308,10 +310,10 @@ model JobMatchQueue {
   score       Float
   rank        Int
   wave        Int?
-  status      String    @default("pending") // pending, notified, accepted, declined, expired
+  status      String         @default("pending") // pending, notified, accepted, declined, expired
   notifiedAt  DateTime?
   respondedAt DateTime?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime       @default(now())
 
   @@unique([jobId, taskerId])
   @@index([jobId, status])
@@ -320,18 +322,18 @@ model JobMatchQueue {
 }
 
 model OfferMatchQueue {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   bookingId   String
-  booking     OfferBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  booking     OfferBooking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   taskerId    String
   tasker      TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
   score       Float
   rank        Int
-  status      String    @default("pending") // pending, notified, accepted, declined, expired
+  status      String        @default("pending") // pending, notified, accepted, declined, expired
   notifiedAt  DateTime?
   expiresAt   DateTime?
   respondedAt DateTime?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime      @default(now())
 
   @@unique([bookingId, taskerId])
   @@index([bookingId, status])
@@ -340,11 +342,11 @@ model OfferMatchQueue {
 }
 
 model TaskerBadge {
-  id         String   @id @default(cuid())
-  userId     String
-  badgeId    String
-  label      String
-  awardedAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  label     String
+  awardedAt DateTime @default(now())
 
   @@unique([userId, badgeId])
   @@index([userId])
@@ -382,7 +384,7 @@ model UserDevice {
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   deviceId   String
-  platform   String    // ios, android
+  platform   String // ios, android
   pushToken  String?
   userAgent  String?
   ipAddress  String?
@@ -396,20 +398,20 @@ model UserDevice {
 }
 
 model OfferTemplate {
-  id               String   @id @default(cuid())
-  categoryId       String
-  title            String
-  description      String
-  priceLkr         Int
-  scopeNotes       String?
-  isRemote         Boolean  @default(false)
-  availabilityLabel String  @default("Today")
-  isFeatured       Boolean  @default(false)
-  isActive         Boolean  @default(true)
-  photoUrl         String?
-  enrolledCount    Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(cuid())
+  categoryId        String
+  title             String
+  description       String
+  priceLkr          Int
+  scopeNotes        String?
+  isRemote          Boolean  @default(false)
+  availabilityLabel String   @default("Today")
+  isFeatured        Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  photoUrl          String?
+  enrolledCount     Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   enrollments OfferEnrollment[]
   bookings    OfferBooking[]
@@ -420,14 +422,14 @@ model OfferTemplate {
 }
 
 model OfferEnrollment {
-  id           String   @id @default(cuid())
-  templateId   String
-  template     OfferTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  taskerId     String
-  tasker       TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
-  status       String   @default("active") // active, paused, withdrawn
-  enrolledAt   DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String        @id @default(cuid())
+  templateId String
+  template   OfferTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  taskerId   String
+  tasker     TaskerProfile @relation(fields: [taskerId], references: [id], onDelete: Cascade)
+  status     String        @default("active") // active, paused, withdrawn
+  enrolledAt DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   @@unique([templateId, taskerId])
   @@index([templateId])
@@ -435,19 +437,19 @@ model OfferEnrollment {
 }
 
 model OfferBooking {
-  id              String    @id @default(cuid())
+  id              String        @id @default(cuid())
   templateId      String
   template        OfferTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   customerId      String
-  customer        User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer        User          @relation(fields: [customerId], references: [id], onDelete: Cascade)
   taskerId        String?
   currentTaskerId String?
   scheduledAt     DateTime
   latitude        Float?
   longitude       Float?
-  status          String    @default("pending") // pending, finding, accepted, in_progress, completed, no_tasker_available, cancelled
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  status          String        @default("pending") // pending, finding, accepted, in_progress, completed, no_tasker_available, cancelled
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   matchQueue OfferMatchQueue[]
 
@@ -458,17 +460,17 @@ model OfferBooking {
 }
 
 model PayoutRequest {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount     Int
-  currency   String   @default("LKR")
-  method     String   @default("bank") // bank, wallet
-  status     String   @default("pending") // pending, processing, completed, failed
-  notes      String?
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int
+  currency    String    @default("LKR")
+  method      String    @default("bank") // bank, wallet
+  status      String    @default("pending") // pending, processing, completed, failed
+  notes       String?
   processedAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -507,6 +509,13 @@ model CustomerProfile {
   // Customer Classification
   customerType String @default("REGULAR") // REGULAR, VIP, CORPORATE, POTENTIAL
   status       String @default("ACTIVE") // ACTIVE, INACTIVE, BLACKLISTED
+
+  // Profile details
+  profileImage     String?
+  birthday         DateTime?
+  gender           String?
+  language         String?
+  emergencyContact String?
 
   // Preferences
   preferredContact String? // EMAIL, PHONE, WHATSAPP
@@ -776,7 +785,7 @@ model SecurityAudit {
   entityName String?
 
   // Details
-  description String @default("")
+  description String  @default("")
   details     String? // JSON of additional context
   oldValue    String? // JSON of previous state
   newValue    String? // JSON of new state
@@ -1074,6 +1083,7 @@ model QuotationItem {
 model JobCategory {
   id        String   @id @default(cuid())
   name      String   @unique
+  slug      String?  @unique
   iconName  String
   colorHex  String
   sortOrder Int      @default(0)
@@ -1081,7 +1091,8 @@ model JobCategory {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  jobs TemplateJob[]
+  jobs             TemplateJob[]
+  serviceTemplates ServiceTemplate[]
 
   @@index([sortOrder])
   @@index([isActive])
@@ -1107,10 +1118,62 @@ model TemplateJob {
   taskerSkills      TaskerSkill[]
   bookings          Booking[]
   seasonalOfferJobs SeasonalOfferJob[]
+  serviceTemplates  ServiceTemplate[]
 
   @@index([categoryId])
   @@index([isPopular])
   @@index([isActive])
+}
+
+// Smart booking service template: holds the smart question set + pricing hint
+// used by the 5-step booking wizard. A template belongs to a JobCategory and may
+// optionally be linked to a specific TemplateJob (sub-service).
+model ServiceTemplate {
+  id                     String       @id @default(cuid())
+  jobCategoryId          String
+  jobCategory            JobCategory  @relation(fields: [jobCategoryId], references: [id], onDelete: Cascade)
+  templateJobId          String?
+  templateJob            TemplateJob? @relation(fields: [templateJobId], references: [id], onDelete: SetNull)
+  name                   String
+  slug                   String       @unique
+  description            String
+  questionsJson          String // JSON-encoded smart question set
+  defaultDurationMinutes Int          @default(60)
+  priceMin               Float        @default(0)
+  priceMax               Float        @default(0)
+  currency               String       @default("LKR")
+  countryCode            String       @default("LK")
+  isActive               Boolean      @default(true)
+  sortOrder              Int          @default(0)
+  createdAt              DateTime     @default(now())
+
+  @@index([jobCategoryId])
+  @@index([templateJobId])
+  @@index([slug])
+  @@index([isActive])
+}
+
+// Customer submitted jobs that are not yet listed in the app.
+// Admin reviews these; if enough customers request the same job it can be
+// added as a TemplateJob/ServiceTemplate so taskers can then handle it.
+model CustomJobRequest {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String
+  description   String
+  categoryId    String?
+  cityName      String?
+  budgetMin     Float?
+  budgetMax     Float?
+  status        String       @default("PENDING") // PENDING | APPROVED | DECLINED | CONVERTED
+  adminNote     String?      // admin feedback
+  convertedJobId String?     // TemplateJob id if admin converted it into a listing
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 
 model TaskerSkill {
@@ -1151,20 +1214,20 @@ model TaskerProfile {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  mxId              String?  @unique // MXT-XXXXX unique tasker ID
-  verificationStatus String  @default("PENDING") // PENDING, VERIFIED, REJECTED
-  verificationNote  String?  // Admin rejection reason
-  verifiedBy        String?  // Admin ID who verified
-  verifiedAt        DateTime?
+  mxId               String?   @unique // MXT-XXXXX unique tasker ID
+  verificationStatus String    @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationNote   String? // Admin rejection reason
+  verifiedBy         String? // Admin ID who verified
+  verifiedAt         DateTime?
 
   bio           String?
-  hourlyRate    Float    @default(0)
+  hourlyRate    Float   @default(0)
   skills        String? // Category slugs
   serviceAreas  String? // District names
-  rating        Float    @default(0)
-  completedJobs Int      @default(0)
-  isVerified    Boolean  @default(false)
-  isOnline      Boolean  @default(false)
+  rating        Float   @default(0)
+  completedJobs Int     @default(0)
+  isVerified    Boolean @default(false)
+  isOnline      Boolean @default(false)
   profileImage  String?
 
   // Experience proof
@@ -1173,11 +1236,11 @@ model TaskerProfile {
   drivingLicenseUrl  String?
 
   // Reputation & scoring
-  compositeScore  Int     @default(50)
-  penaltyPoints   Int     @default(0)
-  completionRate  Int     @default(100)
-  avgResponseMin  Int     @default(60)
-  scoreUpdatedAt  DateTime?
+  compositeScore Int       @default(50)
+  penaltyPoints  Int       @default(0)
+  completionRate Int       @default(100)
+  avgResponseMin Int       @default(60)
+  scoreUpdatedAt DateTime?
 
   // Location
   latitude          Float?
@@ -1374,34 +1437,34 @@ model CompanyProfile {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  mxId              String?  @unique // MXC-XXXXX unique company ID
+  mxId              String? @unique // MXC-XXXXX unique company ID
   companyName       String
   registrationNo    String?
-  taxId             String?  // Tax identification number
+  taxId             String? // Tax identification number
   description       String?
   services          String
   serviceAreas      String
-  rating            Float    @default(0)
-  completedProjects Int      @default(0)
-  isVerified        Boolean  @default(false)
+  rating            Float   @default(0)
+  completedProjects Int     @default(0)
+  isVerified        Boolean @default(false)
   logo              String?
 
   // Verification
-  verificationStatus String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  verificationStatus String    @default("PENDING") // PENDING, VERIFIED, REJECTED
   verificationNote   String? // Admin rejection reason
   verifiedBy         String? // Admin ID who verified
   verifiedAt         DateTime?
   businessRegDocUrl  String? // Business registration document URL
 
   // Staff requirements
-  minStaffCount  Int     @default(3) // Minimum staff required
-  staffCount     Int     @default(0) // Actual staff count
-  staffProofUrl  String? // Proof of staff (document URL)
+  minStaffCount Int     @default(3) // Minimum staff required
+  staffCount    Int     @default(0) // Actual staff count
+  staffProofUrl String? // Proof of staff (document URL)
 
   // Location
-  latitude          Float?
-  longitude         Float?
-  serviceRadius     Float?
+  latitude      Float?
+  longitude     Float?
+  serviceRadius Float?
 
   commissionRate        Float     @default(10.0) // Changed from 15 to 10
   subscriptionStatus    String    @default("TRIAL") // TRIAL, ACTIVE, PAST_DUE, CANCELLED
@@ -1535,20 +1598,20 @@ model Milestone {
 // ============================================
 
 model Payout {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount      BigInt
-  description String?
-  status      String    @default("PENDING") // PENDING, PROCESSING, CLEARED, REJECTED, FAILED
-  source      String // JOB, CONTRACT, MILESTONE, WITHDRAWAL
-  sourceId    String? // Job ID, Contract ID, etc.
-  method      String? // bank, wallet
-  bankDetails String? // JSON: account holder / account number / branch / bank name / notes
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount         BigInt
+  description    String?
+  status         String    @default("PENDING") // PENDING, PROCESSING, CLEARED, REJECTED, FAILED
+  source         String // JOB, CONTRACT, MILESTONE, WITHDRAWAL
+  sourceId       String? // Job ID, Contract ID, etc.
+  method         String? // bank, wallet
+  bankDetails    String? // JSON: account holder / account number / branch / bank name / notes
   rejectedReason String? // set when status = REJECTED
-  processedBy String? // AdminUser email/id that processed this payout
-  createdAt   DateTime  @default(now())
-  clearedAt   DateTime?
+  processedBy    String? // AdminUser email/id that processed this payout
+  createdAt      DateTime  @default(now())
+  clearedAt      DateTime?
 
   @@index([userId])
   @@index([status])
@@ -1592,20 +1655,20 @@ model FlashOffer {
 // ============================================
 
 model SeasonalOffer {
-  id            String  @id @default(cuid())
-  title         String
-  description   String?
-  slug          String  @unique
-  season        String  // "winter" | "spring" | "summer" | "fall" | "general"
-  country       String  // "LK" | "CA"
-  image         String?
-  badgeText     String?
-  bgColor       String?
-  textColor     String?
-  displayOrder  Int     @default(0)
-  isActive      Boolean @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  slug         String   @unique
+  season       String // "winter" | "spring" | "summer" | "fall" | "general"
+  country      String // "LK" | "CA"
+  image        String?
+  badgeText    String?
+  bgColor      String?
+  textColor    String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   jobs SeasonalOfferJob[]
 
@@ -1675,35 +1738,45 @@ model Area {
 }
 
 model MarketplaceJob {
-  id               String    @id @default(cuid())
-  customerId       String
-  title            String
-  description      String
-  categoryId       String
-  photos           String
-  budgetType       String // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
-  budgetAmount     BigInt
-  areaId           String?
-  postalCode       String?
-  preferredDate    DateTime?
-  addressStreet    String? // Only shared after escrow payment
-  addressBuilding  String?
-  addressApartment String?
-  addressLandmark  String?
-  addressSharedAt  DateTime?
-  latitude         Float?
-  longitude        Float?
-  urgency          String    @default("normal") // normal, urgent, emergency
-  estimatedDuration Float?                       // Estimated hours
-  workersCount     Int       @default(1)
-  status           String    @default("OPEN") // OPEN, IN_PROGRESS, COMPLETED, CANCELLED
-  isActive         Boolean   @default(true)
-  aiEstimateJson   String?   // JSON-encoded AI price estimate
-  materialHandling String?   // tasker_brings, customer_provides, quote_both
-  currentWave      Int       @default(0)
-  waveSentAt       DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  customerId        String
+  title             String
+  description       String
+  categoryId        String
+  serviceTemplateId String?
+  templateJobId     String?
+  countryCode       String    @default("LK")
+  targetTaskerId    String?
+  photos            String
+  budgetType        String // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
+  budgetAmount      BigInt
+  areaId            String?
+  postalCode        String?
+  preferredDate     DateTime?
+  preferredTimeSlot String?
+  addressStreet     String? // Only shared after escrow payment
+  addressBuilding   String?
+  addressApartment  String?
+  addressLandmark   String?
+  addressSharedAt   DateTime?
+  latitude          Float?
+  longitude         Float?
+  urgency           String    @default("normal") // normal, urgent, emergency
+  estimatedDuration Float? // Estimated hours
+  workersCount      Int       @default(1)
+  status            String    @default("OPEN") // OPEN, QUOTE_ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED
+  responseDeadline  DateTime?
+  responseState     String    @default("awaiting") // awaiting, responded, escalated, resolved
+  escalatedAt       DateTime?
+  isActive          Boolean   @default(true)
+  aiEstimateJson    String? // JSON-encoded AI price estimate
+  materialHandling  String? // tasker_brings, customer_provides, quote_both
+  currentWave       Int       @default(0)
+  waveSentAt        DateTime?
+  notifiedCount     Int       @default(0) // Number of taskers notified (uber-style blast)
+  smartBookingJson  String? // JSON-encoded smart booking answers / estimate / timeSlot / paymentMethod / locationText
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   matchQueue JobMatchQueue[]
 
@@ -1715,11 +1788,11 @@ model MarketplaceJob {
 }
 
 model JobQuote {
-  id                      String   @id @default(cuid())
-  jobId                   String
-  providerId              String
-  providerType            String // INDIVIDUAL, COMPANY
-  price                   BigInt
+  id           String @id @default(cuid())
+  jobId        String
+  providerId   String
+  providerType String // INDIVIDUAL, COMPANY
+  price        BigInt
 
   estimatedCompletionTime String
   message                 String?
@@ -1734,22 +1807,22 @@ model JobQuote {
 }
 
 model JobEscrow {
-  id            String    @id @default(cuid())
-  jobId         String
-  quoteId       String
-  customerId    String
-  providerId    String
-  amount        BigInt // quote price in cents
-  serviceFee    BigInt // platform fee in cents
-  totalAmount   BigInt // amount + fee in cents
-  paymentMethod String    @default("CARD") // CARD, CASH
-  status        String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
-  heldAt        DateTime?
-  releasedAt    DateTime?
-  refundedAt    DateTime?
+  id              String    @id @default(cuid())
+  jobId           String
+  quoteId         String
+  customerId      String
+  providerId      String
+  amount          BigInt // quote price in cents
+  serviceFee      BigInt // platform fee in cents
+  totalAmount     BigInt // amount + fee in cents
+  paymentMethod   String    @default("CARD") // CARD, CASH
+  status          String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
+  heldAt          DateTime?
+  releasedAt      DateTime?
+  refundedAt      DateTime?
   cashConfirmedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([jobId])
   @@index([customerId])
@@ -1764,12 +1837,12 @@ model CommissionSettlement {
   providerId       String
   customerId       String
   jobAmount        BigInt // total job amount in cents (excl. fees)
-  commissionRate   Float    @default(10.0) // Changed from 15 to 10
+  commissionRate   Float     @default(10.0) // Changed from 15 to 10
   commissionAmount BigInt // jobAmount * commissionRate / 10000 (bps calc)
-  status           String   @default("PENDING") // PENDING, SETTLED
+  status           String    @default("PENDING") // PENDING, SETTLED
   settledAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([jobId])
   @@index([providerId])
@@ -1869,8 +1942,8 @@ model IdentityDocument {
   id         String    @id @default(cuid())
   userId     String
   user       User      @relation(fields: [userId], references: [id])
-  docType    String    // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
-  side       String    // FRONT or BACK
+  docType    String // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
+  side       String // FRONT or BACK
   imageUrl   String
   fullName   String? // "Full name exactly as on the ID" captured at submission
   status     String    @default("PENDING") // PENDING, APPROVED, REJECTED
@@ -1898,7 +1971,7 @@ model AdminUser {
   totpSecret          String?
   totpEnabled         Boolean   @default(false)
   totpVerifiedAt      DateTime?
-  assignedCountries   String  @default("")
+  assignedCountries   String    @default("")
   isActive            Boolean   @default(true)
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
@@ -1915,14 +1988,14 @@ model AdminUser {
 }
 
 model AdminNotification {
-  id            String   @id @default(cuid())
-  adminUserId   String
-  type          String
-  title         String
-  message       String
-  link          String?
-  read          Boolean  @default(false)
-  createdAt     DateTime @default(now())
+  id          String   @id @default(cuid())
+  adminUserId String
+  type        String
+  title       String
+  message     String
+  link        String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
 
   @@index([adminUserId, read])
   @@index([createdAt])
@@ -1966,14 +2039,14 @@ model AuditLog {
 
 /// Admin login attempt tracking with lockout
 model AdminLoginAttempt {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   adminUserId   String?
   email         String
   ipAddress     String
   userAgent     String?
   success       Boolean
   failureReason String?
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime @default(now())
 
   @@index([email, createdAt])
   @@index([adminUserId, createdAt])
@@ -1981,17 +2054,17 @@ model AdminLoginAttempt {
 
 /// Admin session tracking (replaces AdminRefreshToken for JWT auth)
 model AdminSession {
-  id                String    @id @default(cuid())
-  adminUserId       String
-  refreshTokenHash  String    @unique
-  ipAddress         String?
-  userAgent         String?
-  expiresAt         DateTime
-  lastUsedAt        DateTime?
-  isRevoked         Boolean   @default(false)
-  revokedAt         DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  adminUserId      String
+  refreshTokenHash String    @unique
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  lastUsedAt       DateTime?
+  isRevoked        Boolean   @default(false)
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([adminUserId])
   @@index([refreshTokenHash])
@@ -2000,16 +2073,16 @@ model AdminSession {
 /// Work queue — auto-created on KYC/dispute/settlement/flagged-job events
 model AdminAlert {
   id           String    @id @default(cuid())
-  type         String    // fraud, dispute, payout, system, kyc, settlement, flagged_job
-  severity     String    // critical, high, medium, low
+  type         String // fraud, dispute, payout, system, kyc, settlement, flagged_job
+  severity     String // critical, high, medium, low
   title        String
   description  String?
   targetTable  String?
   targetId     String?
-  assignedTo   String?   // staff admin user ID (null = unassigned)
-  assignedRole String?   // which role should handle this: USER_MANAGEMENT, SUPPORT, FINANCE, MANAGER
+  assignedTo   String? // staff admin user ID (null = unassigned)
+  assignedRole String? // which role should handle this: USER_MANAGEMENT, SUPPORT, FINANCE, MANAGER
   priority     String    @default("medium") // urgent, high, medium, low
-  notes        String?   // staff comments / resolution notes
+  notes        String? // staff comments / resolution notes
   status       String    @default("open") // open, in_progress, resolved, dismissed
   slaMinutes   Int?
   resolvedAt   DateTime?
@@ -2025,88 +2098,88 @@ model AdminAlert {
 }
 
 model PlatformSettings {
-  id                String   @id @default(cuid())
-  platformFeeBps    Int      @default(1000) // 10% = 1000 basis points
-  minJobAmountCents BigInt   @default(500)
-  maxJobAmountCents BigInt   @default(1000000)
-  escrowReleaseDays Int      @default(3)
-  maxActiveJobsPerUser Int   @default(10)
-  maxQuotesPerJob   Int      @default(10)
-  maxDisputesPerJob Int      @default(1)
-  autoReleaseAfterDays Int   @default(14)
-  commissionRate    Float    @default(10.0) // Platform commission percentage
-  weeklySettlementDay String @default("MONDAY") // Day commission is due
-  suspensionGracePeriodDays Int @default(7) // Days after due before suspension
-  supportEmail      String?
-  updatedBy         String?
-  updatedAt         DateTime @updatedAt
-  createdAt         DateTime @default(now())
+  id                        String   @id @default(cuid())
+  platformFeeBps            Int      @default(1000) // 10% = 1000 basis points
+  minJobAmountCents         BigInt   @default(500)
+  maxJobAmountCents         BigInt   @default(1000000)
+  escrowReleaseDays         Int      @default(3)
+  maxActiveJobsPerUser      Int      @default(10)
+  maxQuotesPerJob           Int      @default(10)
+  maxDisputesPerJob         Int      @default(1)
+  autoReleaseAfterDays      Int      @default(14)
+  commissionRate            Float    @default(10.0) // Platform commission percentage
+  weeklySettlementDay       String   @default("MONDAY") // Day commission is due
+  suspensionGracePeriodDays Int      @default(7) // Days after due before suspension
+  supportEmail              String?
+  updatedBy                 String?
+  updatedAt                 DateTime @updatedAt
+  createdAt                 DateTime @default(now())
 }
 
 model RealEstateListing {
-  id              String   @id @default(cuid())
-  postedBy        String
-  title           String
-  description     String?
+  id          String  @id @default(cuid())
+  postedBy    String
+  title       String
+  description String?
 
   // Property details
-  type            String   @default("sale")      // legacy: sale, rent, commercial, land
-  propertyType    String   @default("house")    // house, apartment, commercial, land, rental
-  purpose         String   @default("sale")      // sale, rent, commercial, land
+  type         String @default("sale") // legacy: sale, rent, commercial, land
+  propertyType String @default("house") // house, apartment, commercial, land, rental
+  purpose      String @default("sale") // sale, rent, commercial, land
 
   // Pricing
-  priceLkr        Float    @default(0)
-  pricePer        String?                        // null=sale, month/year=rent
+  priceLkr Float   @default(0)
+  pricePer String? // null=sale, month/year=rent
 
   // Location (hierarchical, text-based)
-  countryCode     String   @default("LK")
-  district        String?
-  city            String?
-  area            String?
-  address         String?
-  latitude        Float?
-  longitude       Float?
+  countryCode String  @default("LK")
+  district    String?
+  city        String?
+  area        String?
+  address     String?
+  latitude    Float?
+  longitude   Float?
 
   // Property specs
-  bedrooms        Int?
-  bathrooms       Int?
-  parking         Int?
-  areaSqft        Int?
-  propertySize    Int?                          // sqft
-  landSize        Int?                          // sqft for land
-  yearBuilt       Int?
-  isFurnished     Boolean  @default(false)
-  isNewProperty   Boolean  @default(true)       // new or used
+  bedrooms      Int?
+  bathrooms     Int?
+  parking       Int?
+  areaSqft      Int?
+  propertySize  Int? // sqft
+  landSize      Int? // sqft for land
+  yearBuilt     Int?
+  isFurnished   Boolean @default(false)
+  isNewProperty Boolean @default(true) // new or used
 
   // Media
-  photos          String?                        // JSON array
-  amenities       String?                        // JSON array stored as string (SQLite)
-  videoUrl        String?
+  photos    String? // JSON array
+  amenities String? // JSON array stored as string (SQLite)
+  videoUrl  String?
 
   // Seller info
-  contactPhone    String?
-  contactName     String?
+  contactPhone String?
+  contactName  String?
 
   // Approval workflow
-  status          String   @default("draft")    // draft, pending, approved, rejected, published
+  status          String    @default("draft") // draft, pending, approved, rejected, published
   rejectionReason String?
   reviewedBy      String?
   reviewedAt      DateTime?
 
   // Boost/Featured
-  isFeatured      Boolean  @default(false)
-  boostTier       String?                        // null, basic, premium, top
-  boostExpiresAt  DateTime?
-  boostedAt       DateTime?
+  isFeatured     Boolean   @default(false)
+  boostTier      String? // null, basic, premium, top
+  boostExpiresAt DateTime?
+  boostedAt      DateTime?
 
   // Analytics
-  views           Int      @default(0)
-  saves           Int      @default(0)
-  inquiries       Int      @default(0)
+  views     Int @default(0)
+  saves     Int @default(0)
+  inquiries Int @default(0)
 
   // Timestamps
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([postedBy])
   @@index([status])
@@ -2128,14 +2201,14 @@ model PropertyFavorite {
 }
 
 model PropertyInquiry {
-  id          String   @id @default(cuid())
-  listingId   String
-  buyerId     String
-  sellerId    String
-  type        String   // chat, call, inquiry, viewing
-  message     String?
-  status      String   @default("pending") // pending, responded, closed
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  listingId String
+  buyerId   String
+  sellerId  String
+  type      String // chat, call, inquiry, viewing
+  message   String?
+  status    String   @default("pending") // pending, responded, closed
+  createdAt DateTime @default(now())
 
   @@index([listingId])
   @@index([buyerId])
@@ -2146,10 +2219,10 @@ model PropertyBoost {
   id            String   @id @default(cuid())
   listingId     String
   userId        String
-  tier          String   // basic, premium, top
+  tier          String // basic, premium, top
   amount        Float
   currency      String
-  paymentMethod String   // wallet, card
+  paymentMethod String // wallet, card
   status        String   @default("active") // active, expired
   expiresAt     DateTime
   createdAt     DateTime @default(now())
@@ -2159,31 +2232,31 @@ model PropertyBoost {
 }
 
 model PropertyLocation {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   countryCode String
   district    String
   city        String
   area        String?
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
 
   @@index([countryCode, district])
 }
 
 /// Stores per-category/per-country pricing model weights for AI price estimation
 model PricingModel {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   categoryId           String
-  countryCode          String                        // LK, CA
-  baseRate             Float     @default(0)         // Base hourly/service rate
-  complexityMultiplier Float     @default(1.0)       // Complexity adjustment factor
-  urgencyMultiplier    Float     @default(1.0)       // Urgency surcharge multiplier
-  weekendMultiplier    Float     @default(1.0)       // Weekend/holiday surcharge
-  nightMultiplier      Float     @default(1.0)       // Night time surcharge
-  travelCostPerKm      Float     @default(0)         // Cost per km travel
-  materialCostFactor   Float     @default(0)         // Material cost as % of base
-  demandMultiplier     Float     @default(1.0)       // Demand-based adjustment
-  confidence           Float     @default(0.5)       // Model confidence (0-1)
+  countryCode          String // LK, CA
+  baseRate             Float     @default(0) // Base hourly/service rate
+  complexityMultiplier Float     @default(1.0) // Complexity adjustment factor
+  urgencyMultiplier    Float     @default(1.0) // Urgency surcharge multiplier
+  weekendMultiplier    Float     @default(1.0) // Weekend/holiday surcharge
+  nightMultiplier      Float     @default(1.0) // Night time surcharge
+  travelCostPerKm      Float     @default(0) // Cost per km travel
+  materialCostFactor   Float     @default(0) // Material cost as % of base
+  demandMultiplier     Float     @default(1.0) // Demand-based adjustment
+  confidence           Float     @default(0.5) // Model confidence (0-1)
   modelVersion         Int       @default(1)
   trainedAt            DateTime?
   createdAt            DateTime  @default(now())
@@ -2201,18 +2274,18 @@ model HistoricalJobPrice {
   countryCode    String
   cityId         String?
   areaId         String?
-  finalPrice     Float                              // Actual completed price
-  estimatedPrice Float?                             // Price estimated by system
-  budgetAmount   Float                              // Budget set when posting
-  complexity     String   @default("medium")        // simple, medium, complex
-  urgency        String   @default("normal")        // normal, urgent, emergency
-  duration       Float?                             // Estimated hours
+  finalPrice     Float // Actual completed price
+  estimatedPrice Float? // Price estimated by system
+  budgetAmount   Float // Budget set when posting
+  complexity     String   @default("medium") // simple, medium, complex
+  urgency        String   @default("normal") // normal, urgent, emergency
+  duration       Float? // Estimated hours
   workersCount   Int      @default(1)
-  travelDistance Float?                             // Km traveled
+  travelDistance Float? // Km traveled
   isWeekend      Boolean  @default(false)
   isHoliday      Boolean  @default(false)
   isNight        Boolean  @default(false)
-  materialCost   Float?                             // Material cost if applicable
+  materialCost   Float? // Material cost if applicable
   completedAt    DateTime @default(now())
   createdAt      DateTime @default(now())
 
@@ -2224,20 +2297,20 @@ model HistoricalJobPrice {
 
 /// Average market price per category per city/area for fast lookup
 model RegionalPriceIndex {
-  id            String   @id @default(cuid())
-  categoryId    String
-  countryCode   String
-  cityId        String?
-  areaId        String?
-  avgPrice      Float    @default(0)
-  minPrice      Float    @default(0)
-  maxPrice      Float    @default(0)
-  medianPrice   Float    @default(0)
-  sampleSize    Int      @default(0)
-  demandLevel   String   @default("normal")         // low, normal, high, surge
-  calculatedAt  DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  categoryId   String
+  countryCode  String
+  cityId       String?
+  areaId       String?
+  avgPrice     Float    @default(0)
+  minPrice     Float    @default(0)
+  maxPrice     Float    @default(0)
+  medianPrice  Float    @default(0)
+  sampleSize   Int      @default(0)
+  demandLevel  String   @default("normal") // low, normal, high, surge
+  calculatedAt DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@unique([categoryId, countryCode, cityId, areaId])
   @@index([countryCode])
@@ -2247,7 +2320,7 @@ model RegionalPriceIndex {
 model PricingCache {
   id        String   @id @default(cuid())
   cacheKey  String   @unique
-  response  String                                // JSON string of PriceEstimate
+  response  String // JSON string of PriceEstimate
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -2256,23 +2329,23 @@ model PricingCache {
 
 /// Provider work hours, days, and vacation status (Engine 10)
 model ProviderAvailability {
-  id             String   @id @default(cuid())
-  providerId     String
-  providerType   String                       // INDIVIDUAL, COMPANY
-  monday         Boolean  @default(true)
-  tuesday        Boolean  @default(true)
-  wednesday      Boolean  @default(true)
-  thursday       Boolean  @default(true)
-  friday         Boolean  @default(true)
-  saturday       Boolean  @default(true)
-  sunday         Boolean  @default(false)
-  startTime      String   @default("08:00")   // HH:mm
-  endTime        String   @default("18:00")   // HH:mm
-  vacationStart  DateTime?
-  vacationEnd    DateTime?
-  isAvailable    Boolean  @default(true)
-  lastUpdated    DateTime @updatedAt
-  createdAt      DateTime @default(now())
+  id            String    @id @default(cuid())
+  providerId    String
+  providerType  String // INDIVIDUAL, COMPANY
+  monday        Boolean   @default(true)
+  tuesday       Boolean   @default(true)
+  wednesday     Boolean   @default(true)
+  thursday      Boolean   @default(true)
+  friday        Boolean   @default(true)
+  saturday      Boolean   @default(true)
+  sunday        Boolean   @default(false)
+  startTime     String    @default("08:00") // HH:mm
+  endTime       String    @default("18:00") // HH:mm
+  vacationStart DateTime?
+  vacationEnd   DateTime?
+  isAvailable   Boolean   @default(true)
+  lastUpdated   DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
 
   @@unique([providerId])
   @@index([isAvailable])
@@ -2286,10 +2359,10 @@ model DemandForecast {
   cityId        String?
   areaId        String?
   forecastDate  DateTime
-  demandScore   Float    @default(0)         // 0-100
-  supplyScore   Float    @default(0)         // 0-100
-  ratio         Float    @default(1.0)       // demand/supply
-  demandLevel   String   @default("normal")  // low, normal, high, surge
+  demandScore   Float    @default(0) // 0-100
+  supplyScore   Float    @default(0) // 0-100
+  ratio         Float    @default(1.0) // demand/supply
+  demandLevel   String   @default("normal") // low, normal, high, surge
   jobCount      Int      @default(0)
   searchCount   Int      @default(0)
   providerCount Int      @default(0)
@@ -2301,14 +2374,14 @@ model DemandForecast {
 
 /// User search logs for recommendation learning (Engine 9)
 model SearchLog {
-  id           String   @id @default(cuid())
-  userId       String?
-  query        String
+  id            String   @id @default(cuid())
+  userId        String?
+  query         String
   categoryMatch String?
-  confidence   Float?
-  clickedId    String?                      // What they clicked
-  countryCode  String?
-  createdAt    DateTime @default(now())
+  confidence    Float?
+  clickedId     String? // What they clicked
+  countryCode   String?
+  createdAt     DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
@@ -2316,22 +2389,22 @@ model SearchLog {
 
 /// Auto-computed provider quality scores (Engine 11)
 model QualityMetric {
-  id                  String   @id @default(cuid())
-  providerId          String
-  providerType        String
-  qualityScore        Float    @default(50)  // 0-100
-  avgReviewRating     Float    @default(0)
-  jobCompletionRate   Float    @default(100) // percentage
-  onTimeRate          Float    @default(100) // percentage
-  disputeRate         Float    @default(0)   // percentage
-  totalJobs           Int      @default(0)
-  completedJobs       Int      @default(0)
-  disputedJobs        Int      @default(0)
-  totalReviews        Int      @default(0)
-  warningsIssued      Int      @default(0)
-  isFlagged           Boolean  @default(false)
-  lastCalculated      DateTime @updatedAt
-  createdAt           DateTime @default(now())
+  id                String   @id @default(cuid())
+  providerId        String
+  providerType      String
+  qualityScore      Float    @default(50) // 0-100
+  avgReviewRating   Float    @default(0)
+  jobCompletionRate Float    @default(100) // percentage
+  onTimeRate        Float    @default(100) // percentage
+  disputeRate       Float    @default(0) // percentage
+  totalJobs         Int      @default(0)
+  completedJobs     Int      @default(0)
+  disputedJobs      Int      @default(0)
+  totalReviews      Int      @default(0)
+  warningsIssued    Int      @default(0)
+  isFlagged         Boolean  @default(false)
+  lastCalculated    DateTime @updatedAt
+  createdAt         DateTime @default(now())
 
   @@unique([providerId])
   @@index([qualityScore])
@@ -2339,18 +2412,18 @@ model QualityMetric {
 
 /// Auto-computed customer trust scores (Engine 12)
 model CustomerTrustScore {
-  id                    String   @id @default(cuid())
-  customerId            String
-  trustScore            Float    @default(1.0) // 0.0 - 2.0
-  totalJobsPosted       Int      @default(0)
-  completedJobs         Int      @default(0)
-  cancelledJobs         Int      @default(0)
-  falseDisputes         Int      @default(0)
-  chargebacks           Int      @default(0)
-  avgProviderRating     Float    @default(0)
-  positiveReviews       Int      @default(0)
-  lastCalculated        DateTime @updatedAt
-  createdAt             DateTime @default(now())
+  id                String   @id @default(cuid())
+  customerId        String
+  trustScore        Float    @default(1.0) // 0.0 - 2.0
+  totalJobsPosted   Int      @default(0)
+  completedJobs     Int      @default(0)
+  cancelledJobs     Int      @default(0)
+  falseDisputes     Int      @default(0)
+  chargebacks       Int      @default(0)
+  avgProviderRating Float    @default(0)
+  positiveReviews   Int      @default(0)
+  lastCalculated    DateTime @updatedAt
+  createdAt         DateTime @default(now())
 
   @@unique([customerId])
   @@index([trustScore])
@@ -2358,22 +2431,22 @@ model CustomerTrustScore {
 
 /// Aggregated provider performance stats per category (Engine 11/14)
 model ProviderPerformance {
-  id                  String   @id @default(cuid())
-  providerId          String
-  providerType        String
-  categoryId          String
-  totalJobs           Int      @default(0)
-  completedJobs       Int      @default(0)
-  avgRating           Float    @default(0)
-  avgDuration         Float    @default(0)
-  totalEarnings       Float    @default(0)
-  avgEarnings         Float    @default(0)
-  disputeRate         Float    @default(0)
-  responseTimeHours   Float    @default(0)
-  acceptanceRate      Float    @default(0)
-  lastJobAt           DateTime?
-  lastCalculated      DateTime @updatedAt
-  createdAt           DateTime @default(now())
+  id                String    @id @default(cuid())
+  providerId        String
+  providerType      String
+  categoryId        String
+  totalJobs         Int       @default(0)
+  completedJobs     Int       @default(0)
+  avgRating         Float     @default(0)
+  avgDuration       Float     @default(0)
+  totalEarnings     Float     @default(0)
+  avgEarnings       Float     @default(0)
+  disputeRate       Float     @default(0)
+  responseTimeHours Float     @default(0)
+  acceptanceRate    Float     @default(0)
+  lastJobAt         DateTime?
+  lastCalculated    DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
 
   @@unique([providerId, categoryId])
   @@index([categoryId])
@@ -2381,62 +2454,62 @@ model ProviderPerformance {
 
 /// BI dashboard aggregated data (Engine 14)
 model PlatformAnalytics {
-  id              String   @id @default(cuid())
-  metricKey       String   @unique           // e.g. "revenue_2025_01", "churn_category_cleaning"
-  metricValue     Float    @default(0)
-  metadata        String?                    // JSON string for extra data
-  calculatedAt    DateTime @updatedAt
-  createdAt       DateTime @default(now())
+  id           String   @id @default(cuid())
+  metricKey    String   @unique // e.g. "revenue_2025_01", "churn_category_cleaning"
+  metricValue  Float    @default(0)
+  metadata     String? // JSON string for extra data
+  calculatedAt DateTime @updatedAt
+  createdAt    DateTime @default(now())
 
   @@index([metricKey])
 }
 
 /// Versioned AI model snapshots (Engine 15)
 model LearningModelVersion {
-  id             String   @id @default(cuid())
-  engineType     String                       // pricing, demand, search, quality, trust, matching
-  version        Int      @default(1)
-  accuracy       Float?                       // accuracy score 0-1
-  sampleSize     Int      @default(0)
-  config         String?                      // JSON config snapshot
-  status         String   @default("active")  // active, deprecated, archived
-  trainedAt      DateTime @default(now())
-  createdAt      DateTime @default(now())
+  id         String   @id @default(cuid())
+  engineType String // pricing, demand, search, quality, trust, matching
+  version    Int      @default(1)
+  accuracy   Float? // accuracy score 0-1
+  sampleSize Int      @default(0)
+  config     String? // JSON config snapshot
+  status     String   @default("active") // active, deprecated, archived
+  trainedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([engineType, status])
 }
 
 /// Category-level demand signals (Engine 8)
 model CategoryDemand {
-  id              String   @id @default(cuid())
-  categoryId      String
-  countryCode     String
-  cityId          String?
-  period          String                       // "2025-01", "2025-W02"
-  avgJobsPerDay   Float    @default(0)
-  avgSearchesPerDay Float  @default(0)
-  avgProvidersOnline Float @default(0)
-  demandLevel     String   @default("normal")  // low, normal, high, surge
-  seasonalFactor  Float    @default(1.0)
-  calculatedAt    DateTime @updatedAt
-  createdAt       DateTime @default(now())
+  id                 String   @id @default(cuid())
+  categoryId         String
+  countryCode        String
+  cityId             String?
+  period             String // "2025-01", "2025-W02"
+  avgJobsPerDay      Float    @default(0)
+  avgSearchesPerDay  Float    @default(0)
+  avgProvidersOnline Float    @default(0)
+  demandLevel        String   @default("normal") // low, normal, high, surge
+  seasonalFactor     Float    @default(1.0)
+  calculatedAt       DateTime @updatedAt
+  createdAt          DateTime @default(now())
 
   @@unique([categoryId, countryCode, cityId, period])
 }
 
 /// Provider job acceptance log for learning (Engine 10)
 model ProviderJobResponse {
-  id           String   @id @default(cuid())
-  providerId   String
-  jobId        String
-  respondedAt  DateTime?
-  acceptedAt   DateTime?
-  declinedAt   DateTime?
-  declinedReason String?
-  completedAt  DateTime?
-  wasOnTime    Boolean?
+  id                  String    @id @default(cuid())
+  providerId          String
+  jobId               String
+  respondedAt         DateTime?
+  acceptedAt          DateTime?
+  declinedAt          DateTime?
+  declinedReason      String?
+  completedAt         DateTime?
+  wasOnTime           Boolean?
   responseTimeMinutes Int?
-  createdAt    DateTime @default(now())
+  createdAt           DateTime  @default(now())
 
   @@index([providerId])
   @@index([jobId])
@@ -2463,22 +2536,22 @@ model WaitlistEntry {
 
 /// Weekly commission settlement for providers
 model WeeklySettlement {
-  id              String    @id @default(cuid())
-  providerId      String    // userId of the provider
-  providerType    String    // TASKER, COMPANY
-  weekStart       DateTime  // Monday of the week
-  weekEnd         DateTime  // Sunday of the week
-  totalEarnings   Float     @default(0) // Total earned this week
-  commissionRate  Float     @default(10.0) // Commission percentage
-  commissionOwed  Float     @default(0) // totalEarnings * commissionRate / 100
-  commissionPaid  Boolean   @default(false)
-  paidAt          DateTime?
-  dueAt           DateTime  // 7 days after weekEnd (next Monday)
-  status          String    @default("PENDING") // PENDING, PAID, OVERDUE, SUSPENDED
-  suspendedAt     DateTime?
-  notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                 String              @id @default(cuid())
+  providerId         String // userId of the provider
+  providerType       String // TASKER, COMPANY
+  weekStart          DateTime // Monday of the week
+  weekEnd            DateTime // Sunday of the week
+  totalEarnings      Float               @default(0) // Total earned this week
+  commissionRate     Float               @default(10.0) // Commission percentage
+  commissionOwed     Float               @default(0) // totalEarnings * commissionRate / 100
+  commissionPaid     Boolean             @default(false)
+  paidAt             DateTime?
+  dueAt              DateTime // 7 days after weekEnd (next Monday)
+  status             String              @default("PENDING") // PENDING, PAID, OVERDUE, SUSPENDED
+  suspendedAt        DateTime?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   commissionPayments CommissionPayment[]
 
   @@unique([providerId, weekStart])
@@ -2490,18 +2563,18 @@ model WeeklySettlement {
 
 /// Phase 3: Cash-to-agent commission payment
 model CommissionPayment {
-  id                String    @id @default(cuid())
-  providerId        String
+  id                 String           @id @default(cuid())
+  providerId         String
   weeklySettlementId String
-  weeklySettlement  WeeklySettlement @relation(fields: [weeklySettlementId], references: [id])
-  referenceNumber   String    @unique // REF-XXXXX auto-generated
-  amountDue         Float
-  method            String    @default("CASH") // CASH, BANK
-  status            String    @default("PENDING") // PENDING, CONFIRMED
-  confirmedById     String?   // AdminUser id (FINANCE or SUPER_ADMIN)
-  confirmedAt       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  weeklySettlement   WeeklySettlement @relation(fields: [weeklySettlementId], references: [id])
+  referenceNumber    String           @unique // REF-XXXXX auto-generated
+  amountDue          Float
+  method             String           @default("CASH") // CASH, BANK
+  status             String           @default("PENDING") // PENDING, CONFIRMED
+  confirmedById      String? // AdminUser id (FINANCE or SUPER_ADMIN)
+  confirmedAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   @@index([providerId])
   @@index([referenceNumber])
@@ -2511,20 +2584,20 @@ model CommissionPayment {
 
 /// Off-platform deal reports (cheating)
 model OffPlatformDeal {
-  id              String   @id @default(cuid())
-  reporterId      String   // userId of reporter
-  againstUserId   String   // userId of person being reported
-  againstUserType String   // TASKER, CUSTOMER, COMPANY
-  jobId           String?  // Related job if any
-  evidence        String   // Description of evidence
-  evidenceUrls    String?  // JSON array of evidence photo URLs
-  status          String   @default("PENDING") // PENDING, CONFIRMED, DISMISSED
-  action          String?  // BAN, WARNING, NO_ACTION
-  actionNote      String?  // Admin note on action taken
-  reviewedBy      String?  // Admin ID who reviewed
+  id              String    @id @default(cuid())
+  reporterId      String // userId of reporter
+  againstUserId   String // userId of person being reported
+  againstUserType String // TASKER, CUSTOMER, COMPANY
+  jobId           String? // Related job if any
+  evidence        String // Description of evidence
+  evidenceUrls    String? // JSON array of evidence photo URLs
+  status          String    @default("PENDING") // PENDING, CONFIRMED, DISMISSED
+  action          String? // BAN, WARNING, NO_ACTION
+  actionNote      String? // Admin note on action taken
+  reviewedBy      String? // Admin ID who reviewed
   reviewedAt      DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([reporterId])
   @@index([againstUserId])
@@ -2534,18 +2607,18 @@ model OffPlatformDeal {
 
 /// Website feature requests / wishlist
 model WishlistItem {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String
-  category    String   @default("GENERAL") // GENERAL, APP, WEBSITE, ADMIN, API
-  status      String   @default("NEW") // NEW, PLANNED, IN_PROGRESS, COMPLETED, REJECTED
-  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
-  assignedTo  String?  // Admin user ID
-  notes       String?  // Internal admin notes
-  requestedBy String?  // User who requested (email or userId)
+  category    String    @default("GENERAL") // GENERAL, APP, WEBSITE, ADMIN, API
+  status      String    @default("NEW") // NEW, PLANNED, IN_PROGRESS, COMPLETED, REJECTED
+  priority    String    @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  assignedTo  String? // Admin user ID
+  notes       String? // Internal admin notes
+  requestedBy String? // User who requested (email or userId)
   completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([status])
   @@index([priority])

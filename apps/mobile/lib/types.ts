@@ -13,6 +13,14 @@ export interface User {
   profileImage?: string
   lastNameChangedAt?: string
   needsOnboarding?: boolean
+  tierLevel?: 'EXPLORER' | 'REGULAR' | 'PREMIUM' | 'ELITE'
+  completedJobs?: number
+  totalSpent?: number
+  phoneVerified?: boolean
+  birthday?: string
+  gender?: 'MALE' | 'FEMALE' | 'OTHER'
+  language?: 'EN' | 'TA' | 'SI'
+  emergencyContact?: string
 }
 
 export interface AuthResponse {

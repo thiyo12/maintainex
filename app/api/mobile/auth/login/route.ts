@@ -13,16 +13,24 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, password } = await request.json()
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
+    const identifier = typeof email === 'string' ? email.trim() : ''
+    if (!identifier || !password) {
+      return NextResponse.json({ error: 'Email/phone and password required' }, { status: 400 })
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    let user: Awaited<ReturnType<typeof prisma.user.findFirst>> = null
+    if (emailRegex.test(identifier)) {
+      user = await prisma.user.findUnique({ where: { email: identifier } })
+    } else {
+      const digits = identifier.replace(/\D/g, '')
+      const candidates = await prisma.user.findMany({
+        where: { phone: { not: null } },
+        select: { phone: true },
+      })
+      const match = candidates.find((c) => c.phone && c.phone.replace(/\D/g, '') === digits)
+      user = match ? await prisma.user.findFirst({ where: { phone: match.phone } }) : null
     }
-
-    const user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
@@ -53,7 +61,7 @@ export async function POST(request: NextRequest) {
     const failIp = request.headers.get('x-forwarded-for')?.split(',')[0] || ip
 
     const failedRecord = await prisma.failedLogin.findUnique({
-      where: { email_ipAddress: { email, ipAddress: failIp } }
+      where: { email_ipAddress: { email: identifier, ipAddress: failIp } }
     })
     if (failedRecord && failedRecord.blocked && failedRecord.blockUntil && failedRecord.blockUntil > new Date()) {
       const remainingMin = Math.ceil((failedRecord.blockUntil.getTime() - Date.now()) / 60000)
@@ -61,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     const totalFailuresForEmail = await prisma.failedLogin.aggregate({
-      where: { email, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
+      where: { email: identifier, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
       _sum: { attemptCount: true },
     })
     const totalAttempts = totalFailuresForEmail._sum.attemptCount || 0
@@ -73,13 +81,13 @@ export async function POST(request: NextRequest) {
     if (!passwordCheck.valid) {
       try {
         await prisma.failedLogin.upsert({
-          where: { email_ipAddress: { email, ipAddress: failIp } },
+          where: { email_ipAddress: { email: identifier, ipAddress: failIp } },
           update: {
             attemptCount: { increment: 1 },
             userAgent: request.headers.get('user-agent') || 'unknown',
           },
           create: {
-            email,
+            email: identifier,
             ipAddress: failIp,
             userAgent: request.headers.get('user-agent') || 'unknown',
             attemptCount: 1,
@@ -88,22 +96,22 @@ export async function POST(request: NextRequest) {
         })
 
         const updatedRecord = await prisma.failedLogin.findUnique({
-          where: { email_ipAddress: { email, ipAddress: failIp } }
+          where: { email_ipAddress: { email: identifier, ipAddress: failIp } }
         })
         if (updatedRecord && updatedRecord.attemptCount >= 5) {
           await prisma.failedLogin.update({
-            where: { email_ipAddress: { email, ipAddress: failIp } },
+            where: { email_ipAddress: { email: identifier, ipAddress: failIp } },
             data: { blocked: true, blockUntil: new Date(Date.now() + 15 * 60 * 1000) }
           })
         }
 
         const newTotal = await prisma.failedLogin.aggregate({
-          where: { email, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
+          where: { email: identifier, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
           _sum: { attemptCount: true },
         })
         if ((newTotal._sum.attemptCount || 0) >= 10) {
           await prisma.failedLogin.updateMany({
-            where: { email },
+            where: { email: identifier },
             data: { blocked: true, blockUntil: new Date(Date.now() + 15 * 60 * 1000) }
           })
         }
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
         }
 
         const { assessLoginRisk } = await import('@/lib/security/risk-score')
-        const risk = await assessLoginRisk(null, email, failIp, request.headers.get('user-agent') || 'unknown')
+        const risk = await assessLoginRisk(null, identifier, failIp, request.headers.get('user-agent') || 'unknown')
         if (risk.level === 'CRITICAL') {
           const { blockIP } = await import('@/lib/security/rate-limiter')
           await blockIP(failIp, 'CRITICAL risk - mobile login brute force', 60)
@@ -154,7 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await prisma.failedLogin.deleteMany({ where: { email } })
+      await prisma.failedLogin.deleteMany({ where: { email: identifier } })
     } catch {}
 
     if (passwordCheck.needsMigration) {

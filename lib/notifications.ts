@@ -111,3 +111,32 @@ export async function notifyPayoutProcessed(userId: string, title: string, body:
     referenceType: 'WALLET',
   })
 }
+
+export async function notifyJobEscalated(jobId: string, customerId: string, jobTitle: string) {
+  return createNotification({
+    userId: customerId,
+    title: '⚠️ Tasker Required — No Response for 2 Hours',
+    body: `No tasker responded to "${jobTitle}" within the response window. Our team is arranging one for you.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
+export async function notifyTaskerAssigned(jobId: string, customerId: string, taskerId: string, taskerName: string, jobTitle: string) {
+  return Promise.all([
+    createNotification({
+      userId: customerId,
+      title: 'Tasker Assigned',
+      body: `${taskerName} has been assigned to your job "${jobTitle}". They will contact you shortly.`,
+      referenceType: 'JOB',
+      referenceId: jobId,
+    }),
+    createNotification({
+      userId: taskerId,
+      title: 'New Assignment',
+      body: `Admin assigned you to "${jobTitle}". Please review the job details and submit a quote.`,
+      referenceType: 'JOB',
+      referenceId: jobId,
+    }),
+  ])
+}

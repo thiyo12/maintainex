@@ -3,13 +3,16 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } fr
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
+import * as Location from 'expo-location'
 import { useColors } from '../../../../lib/ThemeContext'
 import { templateJobs, findTasker } from '../../../../lib/api'
 import { useCountry } from '../../../../lib/country'
 import TaskerCard from '../../../../components/find/TaskerCard'
+import PostJobBanner from '../../../../components/find/PostJobBanner'
 import SkeletonLoader from '../../../../components/find/SkeletonLoader'
 import EmptyState from '../../../../components/find/EmptyState'
 import NewChatModal from '@/components/chat/NewChatModal'
+import { buildSampleTaskers } from '../../../../lib/sampleTaskers'
 
 export default function FindTaskerList() {
   const colors = useColors()
@@ -22,24 +25,50 @@ export default function FindTaskerList() {
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
   const [chatRecipient, setChatRecipient] = useState<any>(null)
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
   const { selectedCountry } = useCountry()
   const router = useRouter()
 
   const fetch = useCallback(async () => {
     try {
-      const [jobData, taskerData] = await Promise.all([
-        templateJobs.get(jobId!),
-        findTasker.search({ jobId: jobId!, country: selectedCountry?.code }),
-      ])
-      setJob(jobData)
-      setTaskers(taskerData)
-    } catch (e) {
-      console.error('Failed to load taskers', e)
+      let coordsLocal = coords
+      if (!coordsLocal) {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync()
+          if (status === 'granted') {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+            coordsLocal = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+            setCoords(coordsLocal)
+          }
+        } catch {}
+      }
+
+      let jobData: any = null
+      try {
+        jobData = await templateJobs.get(jobId!)
+      } catch (e) {
+        console.error('Failed to load job', e)
+      }
+      if (jobData) setJob(jobData)
+      let taskerData: any[] = []
+      try {
+        taskerData = await findTasker.search({
+          jobId: jobId!,
+          country: selectedCountry?.code,
+          latitude: coordsLocal?.latitude,
+          longitude: coordsLocal?.longitude,
+          maxDistance: 50,
+        })
+      } catch (e) {
+        console.error('Failed to load taskers', e)
+      }
+      const sample = buildSampleTaskers(jobData)
+      setTaskers(taskerData.concat(sample))
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [jobId, selectedCountry])
+  }, [jobId, selectedCountry, coords])
 
   useEffect(() => { fetch() }, [fetch])
 
@@ -65,6 +94,17 @@ export default function FindTaskerList() {
         </View>
       )}
 
+      {job && (
+        <PostJobBanner
+          onPress={() =>
+            router.push({
+              pathname: '/(customer)/jobs/v2/create',
+              params: { categoryId: job.categoryId, templateJobId: jobId, title: job.name },
+            })
+          }
+        />
+      )}
+
       {loading ? (
         <SkeletonLoader count={5} height={110} />
       ) : taskers.length === 0 ? (
@@ -84,7 +124,11 @@ export default function FindTaskerList() {
               hourlyRate={item.hourlyRate}
               skills={item.skills}
               onPress={() => router.push(`/(customer)/find/tasker-profile/${item.id}?jobId=${jobId}` as any)}
-              onMessage={() => setChatRecipient({ id: item.userId, name: item.name })}
+              onMessage={() =>
+                item.id.startsWith('sample-tasker-')
+                  ? router.push(`/(chat)/demo_${Date.now()}?testMsg=${encodeURIComponent(`Hi ${item.name}, are you available for this job?`)}&testUser=${encodeURIComponent(item.name)}` as any)
+                  : setChatRecipient({ id: item.userId, name: item.name })
+              }
             />
           )}
           contentContainerStyle={styles.list}
@@ -112,7 +156,7 @@ export default function FindTaskerList() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   jobSummary: {
     flexDirection: 'row',
     alignItems: 'center',

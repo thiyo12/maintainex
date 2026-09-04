@@ -3,9 +3,10 @@ import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
-import { jobCategories } from '../../../lib/api'
+import { jobCategories, templateJobs } from '../../../lib/api'
 import { useCountry } from '../../../lib/country'
 import JobCard from '../../../components/find/JobCard'
+import PostJobBanner from '../../../components/find/PostJobBanner'
 import SkeletonLoader from '../../../components/find/SkeletonLoader'
 import EmptyState from '../../../components/find/EmptyState'
 import { useTranslation } from 'react-i18next'
@@ -65,51 +66,70 @@ export default function JobList() {
 
       <AISearchBar
         placeholder={t('find.search')}
-        onCategorySelect={(catId, catName) => {
-          router.push({ pathname: '/(customer)/search', params: { category: catId, name: catName } })
+        onCategorySelect={(catId) => {
+          router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } })
         }}
-        onJobSelect={(jobId, jobName) => {
-          router.push({ pathname: '/(customer)/search', params: { category: jobId, name: jobName } })
+        onJobSelect={(jobId) => {
+          router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } })
+        }}
+        onTaskerSelect={(taskerId) => {
+          router.push(`/(customer)/find/tasker-profile/${taskerId}`)
         }}
         onPostJob={(query) => {
-          router.push({ pathname: '/(customer)/search/post-job-confirm', params: { q: query } })
+          router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } })
         }}
       />
 
       {loading ? (
         <SkeletonLoader count={6} height={120} />
-      ) : filtered.length === 0 ? (
-        <EmptyState icon="search-outline" title={t('common.noResults')} subtitle={t('components.adjustSearch')} />
       ) : (
-        <FlatList
-          data={[...popular, ...regular]}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <JobCard
-              name={item.name}
-              description={item.description}
-              priceMin={item.priceMin}
-              priceMax={item.priceMax}
-              typicalDurationMinutes={item.typicalDurationMinutes}
-              isPopular={item.isPopular}
-              colorHex={category?.colorHex || colors.primary}
-              onPress={() => router.push(`/(customer)/find/job/${item.id}`)}
+        <>
+          <PostJobBanner
+            onPress={() =>
+              router.push({
+                pathname: '/(customer)/jobs/v2/create',
+                params: {
+                  categoryId,
+                  templateJobId: filtered[0]?.id || '',
+                  title: filtered[0]?.name || '',
+                },
+              })
+            }
+          />
+          {filtered.length === 0 ? (
+            <EmptyState icon="search-outline" title={t('common.noResults')} subtitle={t('components.adjustSearch')} />
+          ) : (
+            <FlatList
+              data={[...popular, ...regular]}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <JobCard
+                  name={item.name}
+                  description={item.description}
+                  priceMin={item.priceMin}
+                  priceMax={item.priceMax}
+                  typicalDurationMinutes={item.typicalDurationMinutes}
+                  isPopular={item.isPopular}
+                  colorHex={category?.colorHex || colors.primary}
+                  onPress={() => router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId: item.id } })}
+                />
+              )}
+              contentContainerStyle={styles.list}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
             />
           )}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        />
+        </>
       )}
     </View>
   )
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   header: { alignItems: 'center', paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16 },
   iconWrap: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  title: { fontSize: 20, fontWeight: '700', color: '#1F2937' },
-  subtitle: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
+  title: { fontSize: 20, fontWeight: '700', color: colors.ink },
+  subtitle: { fontSize: 13, color: colors.muted, marginTop: 2 },
   list: { paddingHorizontal: 16, paddingBottom: 32 },
 })

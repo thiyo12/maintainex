@@ -29,7 +29,15 @@ export default function V2SubmitQuoteScreen() {
         v2Jobs.get(id),
         v2Identity.getStatus(),
       ])
-      if (jobRes.status === 'fulfilled') setJob(jobRes.value.job)
+      if (jobRes.status === 'fulfilled') {
+        const j = jobRes.value.job
+        setJob(j)
+        const smart = j.smartBooking
+        if (smart?.estimatedPriceMin != null && smart?.estimatedPriceMax != null) {
+          const mid = Math.round((smart.estimatedPriceMin + smart.estimatedPriceMax) / 2)
+          setPrice(String(mid))
+        }
+      }
       else {
         Alert.alert(t('common.error'), t('errors.jobNotFound'))
         router.back()
@@ -55,7 +63,7 @@ export default function V2SubmitQuoteScreen() {
         price: parseFloat(price),
         estimatedCompletionTime, message,
       })
-      Alert.alert(t('quotes.acceptSuccess'), t('quotes.acceptSuccessDesc'), [
+      Alert.alert('Quote sent!', 'Customer has been notified.', [
         { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (e: any) {
@@ -88,6 +96,51 @@ export default function V2SubmitQuoteScreen() {
             <Text style={styles.previewType}>{job.budgetType}</Text>
           </View>
         </View>
+
+        {job.smartBooking ? (
+          <View style={styles.smartCard}>
+            <View style={styles.smartHeader}>
+              <Ionicons name="flash-outline" size={18} color={colors.accent} />
+              <Text style={styles.smartHeaderText}>Smart booking details</Text>
+            </View>
+            {job.smartBooking.categoryName ? (
+              <View style={styles.smartRow}>
+                <Text style={styles.smartLabel}>Service</Text>
+                <Text style={styles.smartValue}>{job.smartBooking.categoryName}</Text>
+              </View>
+            ) : null}
+            {job.smartBooking.answers && typeof job.smartBooking.answers === 'object' ? (
+              Object.entries(job.smartBooking.answers).map(([k, v]: [string, any]) => {
+                const picks = Array.isArray(v) ? v : [v]
+                if (picks.length === 0 || picks[0] == null || picks[0] === '') return null
+                return (
+                  <View key={k} style={styles.smartRow}>
+                    <Text style={styles.smartLabel}>{k.replace(/_/g, ' ')}</Text>
+                    <Text style={styles.smartValue}>{picks.join(', ')}</Text>
+                  </View>
+                )
+              })
+            ) : null}
+            {job.smartBooking.timeSlot ? (
+              <View style={styles.smartRow}>
+                <Text style={styles.smartLabel}>Time slot</Text>
+                <Text style={styles.smartValue}>{job.smartBooking.timeSlot}</Text>
+              </View>
+            ) : null}
+            {job.smartBooking.estimatedPriceMin != null ? (
+              <View style={styles.smartRow}>
+                <Text style={styles.smartLabel}>Est. budget</Text>
+                <Text style={styles.smartValue}>LKR {job.smartBooking.estimatedPriceMin.toLocaleString()} – {job.smartBooking.estimatedPriceMax?.toLocaleString?.() ?? ''}</Text>
+              </View>
+            ) : null}
+            <View style={styles.smartRow}>
+              <Text style={styles.smartLabel}>Requested</Text>
+              <Text style={styles.smartValue}>
+                {job.notifiedCount || 0} taskers notified via instant blast
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {!isVerified ? (
           /* ═══ KYC gate ═══ */
@@ -172,7 +225,7 @@ export default function V2SubmitQuoteScreen() {
               style={[styles.input, styles.textArea]}
               value={message}
               onChangeText={setMessage}
-              placeholder={t('quotes.message')}
+              placeholder="Hi, I can help with this. I'll bring all materials."
               placeholderTextColor={colors.textMuted}
               multiline
               numberOfLines={4}
@@ -216,6 +269,21 @@ const styles = StyleSheet.create({
   previewMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   previewBudget: { fontSize: 18, fontWeight: '800', color: colors.accent },
   previewType: { fontSize: 12, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  smartCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  smartHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  smartHeaderText: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+  smartRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  smartLabel: { fontSize: 12, fontWeight: '600', color: colors.textSecondary, textTransform: 'capitalize' },
+  smartValue: { fontSize: 13, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right', marginLeft: 12 },
 
   gateCard: {
     margin: spacing.lg,
