@@ -54,6 +54,16 @@ export default function AboutScreen() {
             <Ionicons name="shield-outline" size={18} color={colors.customerAccent} />
             <Text style={styles.policyBtnText}>  Privacy Policy</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.creditRow}
+            onPress={() => Linking.openURL('https://instagram.com/thiyothman')}
+          >
+            <Ionicons name="logo-instagram" size={12} color={colors.gray} />
+            <Text style={styles.creditText}>
+              Design & Developed by <Text style={styles.creditName}>Thiyoth</Text> · @thiyothman
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
@@ -61,7 +71,7 @@ export default function AboutScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: colors.background },
   heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
   brandCard: {
@@ -92,4 +102,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 14, marginBottom: 24,
   },
   policyBtnText: { fontSize: 14, fontWeight: '600', color: colors.customerAccent },
+  creditRow: {
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
+    gap: 4, paddingVertical: 12, marginBottom: 20,
+  },
+  creditText: { fontSize: 11, color: colors.gray },
+  creditName: { color: colors.customerAccent, fontWeight: '700' },
 })
