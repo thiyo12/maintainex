@@ -26,25 +26,10 @@ echo "  ✓ Source code ($(du -sh "$WORK_DIR/code" | cut -f1))"
 echo "[2/5] Backing up live database..."
 mkdir -p "$WORK_DIR/database"
 
-expect << EXPBACKUP > /dev/null 2>&1
-set timeout 60
-spawn ssh -o StrictHostKeyChecking=no $SERVER
-expect "#"
-send "docker exec \$(docker ps --format '{{.Names}}' | grep maintainex-db | head -1) pg_dump -U postgres -d postgres --clean --if-exists -f /tmp/maintainex-live-dump.sql 2>&1\r"
-expect "#"
-send "docker cp \$(docker ps --format '{{.Names}}' | grep maintainex-db | head -1):/tmp/maintainex-live-dump.sql /tmp/maintainex-live-dump.sql 2>&1\r"
-expect "#"
-send "cat /tmp/maintainex-live-dump.sql\r"
-expect "#"
-send "exit\r"
-expect eof
-EXPBACKUP
+DB_CONTAINER=$(ssh -o BatchMode=yes -o ConnectTimeout=10 "$SERVER" "docker ps --format '{{.Names}}' | grep maintainex-db | head -1")
+ssh -o BatchMode=yes "$SERVER" "docker exec $DB_CONTAINER pg_dump -U postgres -d postgres --clean --if-exists" > "$WORK_DIR/database/maintainex-live-dump.sql"
 
-# Save the dump (captured from expect output)
-# For simplicity, copy the one we already have
-cp "$BACKUP_DIR/db/maintainex-db-backup.sql" "$WORK_DIR/database/maintainex-db-dump.sql" 2>/dev/null || true
-echo "  ✓ Database dump saved"
-echo "  ⚠  For a LIVE dump, run: ssh root@147.93.106.54 'docker exec \$(docker ps --format \"{{.Names}}\" | grep maintainex-db | head -1) pg_dump -U postgres -d postgres --clean --if-exists' > $WORK_DIR/database/maintainex-live-dump.sql"
+echo "  ✓ Database dump ($(du -sh "$WORK_DIR/database/maintainex-live-dump.sql" | cut -f1))"
 
 # ──────────────────────────────────────────────
 # Part 3: Uploaded Files
