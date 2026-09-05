@@ -182,7 +182,7 @@ export default function HomeClient() {
             <li><a href="#about-page" className="text-white hover:text-brand transition font-medium">About</a></li>
             <li><a href="#vision-page" className="text-white hover:text-brand transition font-medium">Vision</a></li>
           </ul>
-          <a href="#waitlist" className="hidden md:inline-block bg-brand text-black py-3 px-7 rounded-full font-bold text-sm hover:bg-white hover:-translate-y-0.5 hover:shadow-lg transition-all">Join Waitlist</a>
+          <a href="#waitlist" className="hidden md:inline-flex cir-btn text-sm">Join Waitlist</a>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden flex flex-col justify-center items-center gap-[5px] w-10 h-10 focus:outline-none">
             <span className={`block w-6 h-[2px] bg-white transition-all duration-300 ${mobileOpen ? 'translate-y-[7px] rotate-45' : ''}`}></span>
             <span className={`block w-6 h-[2px] bg-white transition-all duration-300 ${mobileOpen ? 'opacity-0' : ''}`}></span>
@@ -195,7 +195,7 @@ export default function HomeClient() {
           <a href="#working" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">How It Works</a>
           <a href="#about-page" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">About</a>
           <a href="#vision-page" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Vision</a>
-          <a href="#waitlist" onClick={() => setMobileOpen(false)} className="bg-brand text-black font-semibold py-3 px-6 rounded-full">Join Waitlist</a>
+          <a href="#waitlist" onClick={() => setMobileOpen(false)} className="cir-btn text-sm px-6">Join Waitlist</a>
         </div>
       </nav>
 
@@ -227,8 +227,9 @@ export default function HomeClient() {
               <span className="text-xs sm:text-sm text-[#d1d5db]">Canada</span>
             </div>
           </div>
-          <a href="#waitlist" className="bg-white text-black py-3 sm:py-4 px-8 sm:px-12 rounded-full font-bold text-base sm:text-lg glow-amber hover:-translate-y-1 transition mb-5 sm:mb-6">
+          <a href="#waitlist" className="cir-btn text-base sm:text-lg px-8 sm:px-12 mb-5 sm:mb-6">
             Join Waitlist
+            <svg className="cir-btn__arrow" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
           </a>
           <div className="flex items-center gap-4 mb-10">
             <span className="flex items-center gap-2 text-[#d1d5db] text-sm font-medium">
@@ -489,8 +490,8 @@ export default function HomeClient() {
             <div className="p-4 border border-gray-700 rounded-2xl hover:border-brand transition"><svg className="w-6 h-6 text-brand mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><p className="font-bold text-lg">100% Guaranteed</p><p className="text-sm text-[#d1d5db] mt-1">Or your money back</p></div>
           </div>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <a href="#waitlist" className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Seeker</a>
-            <a href="#" className="bg-white/10 text-white font-semibold px-10 py-3 rounded-full shadow hover:bg-brand hover:text-black transition">Learn More &rarr;</a>
+            <a href="#waitlist" className="cir-btn">Join as Seeker<svg className="cir-btn__arrow" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
+            <a href="#" className="cir-btn--dark cir-btn">Learn More<svg className="cir-btn__arrow" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
           </div>
         </div>
       </section>
@@ -528,8 +529,8 @@ export default function HomeClient() {
           </ul>
         </div>
         <div className="mt-12 flex flex-col sm:flex-row gap-6 justify-center">
-          <a href="#waitlist" className="bg-brand text-black font-semibold px-8 py-3 rounded-full shadow glow-amber hover:-translate-y-0.5 transition">Join as Tasker</a>
-          <a href="#" className="bg-white/10 text-white font-semibold px-10 py-3 rounded-full shadow hover:bg-brand hover:text-black transition">Learn More &rarr;</a>
+          <a href="#waitlist" className="cir-btn">Join as Tasker<svg className="cir-btn__arrow" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
+          <a href="#" className="cir-btn--dark cir-btn">Learn More<svg className="cir-btn__arrow" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg></a>
         </div>
       </section>
 
@@ -663,33 +664,32 @@ export default function HomeClient() {
             }
           }}>
             <div>
-              <label className="block text-xs font-semibold text-[#d1d5db] mb-2 uppercase tracking-wider">I am a</label>
-              <div className="grid grid-cols-3 gap-3">
+              <label className="block text-xs font-semibold text-[#d1d5db] mb-3 uppercase tracking-wider">I am a</label>
+              <fieldset className="cir-radio">
                 {[
-                  { value: 'SEEKER', label: 'Seeker', desc: 'Need help', detail: 'I need home services & tasks done' },
-                  { value: 'TASKER', label: 'Tasker', desc: 'Offer help', detail: 'I fix, clean & maintain things' },
-                  { value: 'AGENCY', label: 'Agency', desc: 'Team of pros', detail: 'I manage a team of professionals' },
+                  { value: 'SEEKER', label: 'Seeker', desc: 'I need home services & tasks done', chip: 'Popular' },
+                  { value: 'TASKER', label: 'Tasker', desc: 'I fix, clean & maintain things', chip: '' },
+                  { value: 'AGENCY', label: 'Agency', desc: 'I manage a team of professionals', chip: '' },
                 ].map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setWaitlistRole(opt.value)}
-                    className={`p-4 rounded-xl border text-center transition-all ${
-                      waitlistRole === opt.value
-                        ? 'border-brand bg-brand/10 text-white'
-                        : 'border-white/10 bg-[#1a1b24] text-[#d1d5db] hover:border-white/20'
-                    }`}
-                  >
-                    <div className="text-sm font-bold">{opt.label}</div>
-                    <div className="text-xs mt-1 opacity-60">{opt.desc}</div>
-                  </button>
+                  <label key={opt.value} className="cir-radio__opt">
+                    <input
+                      type="radio"
+                      name="waitlist-role"
+                      value={opt.value}
+                      checked={waitlistRole === opt.value}
+                      onChange={() => setWaitlistRole(opt.value)}
+                    />
+                    <span className="cir-radio__dot"></span>
+                    <div className="cir-radio__body">
+                      <span className="cir-radio__t">
+                        {opt.label}
+                        {opt.chip && <span className="cir-radio__chip">{opt.chip}</span>}
+                      </span>
+                      <span className="cir-radio__d">{opt.desc}</span>
+                    </div>
+                  </label>
                 ))}
-              </div>
-              <p className="text-xs text-[#9ca3af] mt-2 pl-1">
-                {waitlistRole === 'SEEKER' && 'I need home services & tasks done'}
-                {waitlistRole === 'TASKER' && 'I fix, clean & maintain things'}
-                {waitlistRole === 'AGENCY' && 'I manage a team of professionals'}
-              </p>
+              </fieldset>
             </div>
             <input
               type="text"
@@ -724,7 +724,7 @@ export default function HomeClient() {
                 />
               </div>
             </div>
-            <button type="submit" className="w-full bg-brand text-black font-bold py-4 rounded-xl hover:bg-brand-light transition text-lg mt-4">Join the Waitlist</button>
+            <button type="submit" className="cir-btn w-full justify-center py-4 text-base mt-4">Join the Waitlist</button>
             <p className="text-xs text-[#9ca3af] text-center mt-3">No spam. Unsubscribe anytime. Join 500+ others already on the list.</p>
           </form>
         </div>
