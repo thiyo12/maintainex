@@ -74,7 +74,7 @@ export default function NewChatModal({ visible, onClose, recipient, jobId, jobTi
             disabled={sending || !message.trim()}
           >
             {sending ? (
-              <ActivityIndicator color="#0B0C12" size="small" />
+              <ActivityIndicator color="#0D0D0D" size="small" />
             ) : (
               <Text style={styles.sendText}>Send</Text>
             )}
@@ -114,5 +114,5 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
-  sendText: { fontSize: 15, fontFamily: fonts.bodyBold, color: '#0B0C12' },
+  sendText: { fontSize: 15, fontFamily: fonts.bodyBold, color: '#0D0D0D' },
 })

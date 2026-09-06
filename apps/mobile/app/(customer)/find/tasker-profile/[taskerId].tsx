@@ -193,7 +193,7 @@ export default function TaskerProfileScreen() {
               <Text style={styles.rateVal}>{t('taskerProfile.fromRate', { n: rate.toLocaleString() })}</Text>
             </View>
             <View style={styles.ratingPill}>
-              <Star size={12} color="#0B0C12" weight="fill" />
+              <Star size={12} color="#0D0D0D" weight="fill" />
               <Text style={styles.ratingPillText}>{tasker.rating?.toFixed(1) || '—'}</Text>
             </View>
           </View>
@@ -252,7 +252,7 @@ export default function TaskerProfileScreen() {
       <View style={styles.bottomBar}>
         {jobId ? (
           <PressableScale onPress={bookNow} scaleTo={0.97} style={[styles.btn, styles.btnPrimary, { flex: 1.1 }]}>
-            <CalendarCheck size={18} color="#0B0C12" weight="fill" />
+            <CalendarCheck size={18} color="#0D0D0D" weight="fill" />
             <Text style={styles.btnPrimaryText}>{t('taskerProfile.bookNow')}</Text>
           </PressableScale>
         ) : null}
@@ -261,7 +261,7 @@ export default function TaskerProfileScreen() {
           <Text style={styles.btnOutlineText}>{t('taskerProfile.message')}</Text>
         </PressableScale>
         <PressableScale onPress={() => setShowQuote(true)} scaleTo={0.97} style={[styles.btn, styles.btnPrimary]}>
-          <PaperPlaneTilt size={18} color="#0B0C12" weight="fill" />
+          <PaperPlaneTilt size={18} color="#0D0D0D" weight="fill" />
           <Text style={styles.btnPrimaryText}>{t('taskerProfile.requestQuote')}</Text>
         </PressableScale>
       </View>
@@ -305,7 +305,7 @@ export default function TaskerProfileScreen() {
             <TextInput style={styles.msgInput} value={qMsg} onChangeText={setQMsg} placeholder={t('taskerProfile.optionalMsg')} placeholderTextColor={colors.textSecondary} multiline numberOfLines={3} />
 
             <PressableScale onPress={sendQuoteReq} scaleTo={0.97} style={[styles.btn, styles.btnPrimary, { width: '100%' }]} disabled={sending}>
-              {sending ? <ActivityIndicator color="#0B0C12" /> : <Text style={styles.btnPrimaryText}>{t('taskerProfile.sendRequest')}</Text>}
+              {sending ? <ActivityIndicator color="#0D0D0D" /> : <Text style={styles.btnPrimaryText}>{t('taskerProfile.sendRequest')}</Text>}
             </PressableScale>
           </View>
         </KeyboardAvoidingView>
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
   rateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rateVal: { ...typography.h3, fontSize: 20, color: colors.accent, fontFamily: 'Outfit_700Bold' },
   ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accent, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.full },
-  ratingPillText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: '#0B0C12' },
+  ratingPillText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
 
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   btnOutline: { borderWidth: 1.5, borderColor: colors.accent, backgroundColor: 'transparent' },
   btnOutlineText: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: colors.accent },
   btnPrimary: { backgroundColor: colors.accent },
-  btnPrimaryText: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: '#0B0C12' },
+  btnPrimaryText: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
 
   modalWrap: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.6)' },
@@ -399,12 +399,12 @@ const styles = StyleSheet.create({
   dateChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   dateChipLabel: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
   dateChipVal: { fontSize: 11, fontFamily: 'Outfit_400Regular', color: colors.textSecondary, marginTop: 1 },
-  dateChipLabelActive: { color: '#0B0C12' },
+  dateChipLabelActive: { color: '#0D0D0D' },
   slotRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
   slotChip: { paddingHorizontal: 13, paddingVertical: 8, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceHigh },
   slotChipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   slotChipText: { fontSize: 12, fontFamily: 'Outfit_500Medium', color: colors.textSecondary },
-  slotChipTextActive: { color: '#0B0C12', fontFamily: 'Outfit_700Bold' },
+  slotChipTextActive: { color: '#0D0D0D', fontFamily: 'Outfit_700Bold' },
   msgInput: {
     backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     padding: 14, fontSize: 14, color: colors.textPrimary, fontFamily: 'Outfit_400Regular',

@@ -79,7 +79,7 @@ export default function myListings() {
   const statusColor = (status: string) => {
     switch (status) {
       case 'approved': return '#10B981'
-      case 'pending': return '#F59E0B'
+      case 'pending': return '#F5A623'
       case 'rejected': return '#EF4444'
       case 'draft': return '#6B7280'
       default: return colors.muted
@@ -133,7 +133,7 @@ export default function myListings() {
                 </View>
                 {item.isFeatured && (
                   <View style={[styles.featuredBadge, { backgroundColor: '#FEF3C7' }]}>
-                    <Text style={[styles.featuredText, { color: '#D97706' }]}>Featured</Text>
+                    <Text style={[styles.featuredText, { color: '#D48900' }]}>Featured</Text>
                   </View>
                 )}
                 {item.boostTier && (

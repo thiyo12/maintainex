@@ -45,7 +45,7 @@ export default function StarRating({ stars, size = 18, onRate, readonly = false,
             <Ionicons
               name="star"
               size={size}
-              color={i <= stars ? (starColor || '#F59E0B') : (emptyColor || '#E5E7EB')}
+              color={i <= stars ? (starColor || '#F5A623') : (emptyColor || '#E5E7EB')}
             />
           </Animated.View>
         </TouchableOpacity>

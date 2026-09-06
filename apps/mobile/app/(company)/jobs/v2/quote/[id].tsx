@@ -151,7 +151,7 @@ export default function CompanySubmitQuoteScreen() {
             disabled={submitting}
           >
             {submitting ? (
-              <ActivityIndicator color="#0B0C12" />
+              <ActivityIndicator color="#0D0D0D" />
             ) : (
               <Text style={styles.submitBtnText}>{t('tasker.submitQuote')}</Text>
             )}
@@ -196,5 +196,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
 
   submitBtn: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontSize: 18, fontWeight: '800', color: '#0B0C12', fontFamily: fonts.bodyMedium },
+  submitBtnText: { fontSize: 18, fontWeight: '800', color: '#0D0D0D', fontFamily: fonts.bodyMedium },
 })

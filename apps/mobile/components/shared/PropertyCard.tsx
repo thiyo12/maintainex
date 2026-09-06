@@ -32,9 +32,9 @@ export default function PropertyCard({ title, priceLkr, type, countryCode, bedro
   const currency = countryCode === 'CA' ? 'CAD' : 'LKR'
 
   const TYPE_BADGES: Record<string, { label: string; bg: string; text: string }> = {
-    sale: { label: 'SALE', bg: '#F59E0B', text: '#111827' },
+    sale: { label: 'SALE', bg: '#F5A623', text: '#111827' },
     rent: { label: 'RENT', bg: '#6366F1', text: '#FFFFFF' },
-    commercial: { label: 'LEASE', bg: '#10B981', text: '#FFFFFF' },
+    commercial: { label: 'LEASE', bg: '#22C55E', text: '#FFFFFF' },
     land: { label: 'LAND', bg: '#7C3AED', text: '#FFFFFF' },
   }
   const badge = TYPE_BADGES[type] || TYPE_BADGES.sale
@@ -57,7 +57,7 @@ export default function PropertyCard({ title, priceLkr, type, countryCode, bedro
 
         {isFeatured && (
           <View style={[styles.featuredBadge]}>
-            <Ionicons name="star" size={8} color="#F59E0B" />
+            <Ionicons name="star" size={8} color="#F5A623" />
             <Text style={styles.featuredBadgeText}>Featured</Text>
           </View>
         )}
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     borderRadius: 100,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  featuredBadgeText: { fontSize: 8, fontFamily: 'Outfit_700Bold', color: '#F59E0B' },
+  featuredBadgeText: { fontSize: 8, fontFamily: 'Outfit_700Bold', color: '#F5A623' },
   boostBadge: {
     position: 'absolute',
     top: 8,

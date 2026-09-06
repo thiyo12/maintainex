@@ -58,5 +58,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   content: { flex: 1 },
   name: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
-  count: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  count: { fontSize: 12, color: '#B3B3B3', marginTop: 2 },
 })

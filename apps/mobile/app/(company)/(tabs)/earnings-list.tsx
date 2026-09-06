@@ -76,7 +76,7 @@ export default function CompanyEarnings() {
               </View>
               <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
               <Text style={styles.commissionInstruction}>
-                Pay this amount to any Maintainex agent using reference: {cp.referenceNumber}
+                Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
               </Text>
               <Text style={styles.commissionWeek}>
                 Week: {new Date(cp.weekStart).toLocaleDateString()} - {new Date(cp.weekEnd).toLocaleDateString()}

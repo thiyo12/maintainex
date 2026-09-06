@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 
-const AMBER = '#F59E0B'
-const DARK_BG = '#0B0C12'
+const AMBER = '#F5A623'
+const DARK_BG = '#0D0D0D'
 
 export default function FindingTaskerScreen() {
   const { t } = useTranslation()
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     borderWidth: 1.5,
-    borderColor: 'rgba(245,158,11,0.15)',
+    borderColor: 'rgba(245,166,35,0.15)',
   },
   ring2: {
     width: 150,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(245,158,11,0.1)',
+    backgroundColor: 'rgba(245,166,35,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,

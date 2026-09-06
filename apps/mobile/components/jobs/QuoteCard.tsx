@@ -38,7 +38,7 @@ export default function QuoteCard({ providerName, providerType, price, message, 
           <Text style={[styles.name, { color: colors.ink }]}>{providerName}</Text>
           <Badge label={providerTypeLabels[providerType] || providerType} variant={isCompany ? 'purple' : 'amber'} />
           {rating && (
-            <Text style={[styles.rating, { color: colors.muted }]}><Ionicons name="star" size={14} color="#F59E0B" /> {rating.toFixed(1)}</Text>
+            <Text style={[styles.rating, { color: colors.muted }]}><Ionicons name="star" size={14} color="#F5A623" /> {rating.toFixed(1)}</Text>
           )}
         </View>
         <Text style={[styles.price, { color: colors.primaryDark }]}>LKR {price.toLocaleString()}</Text>

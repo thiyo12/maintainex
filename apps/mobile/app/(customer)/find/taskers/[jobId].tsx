@@ -174,7 +174,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   viewToggleText: { fontSize: 13, fontWeight: '600', color: colors.primary },
   list: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 },
   mapPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  mapText: { fontSize: 16, fontWeight: '600', color: '#9CA3AF', marginTop: 12 },
+  mapText: { fontSize: 16, fontWeight: '600', color: '#B3B3B3', marginTop: 12 },
   mapSubtext: { fontSize: 13, color: '#D1D5DB', marginTop: 4 },
   switchToList: {
     flexDirection: 'row',

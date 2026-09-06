@@ -58,7 +58,7 @@ export default function SuccessAnimation({ type = 'checkmark', size = 80, title,
     outputRange: [0.4, 0, 0.4],
   })
 
-  const bgColor = type === 'checkmark' ? '#10B981' : type === 'cross' ? '#EF4444' : '#F59E0B'
+  const bgColor = type === 'checkmark' ? '#10B981' : type === 'cross' ? '#EF4444' : '#F5A623'
   const iconName = type === 'checkmark' ? 'checkmark' : type === 'cross' ? 'close' : 'time'
 
   return (
@@ -152,11 +152,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#F5A623',
     paddingVertical: 12,
     paddingHorizontal: 32,
     borderRadius: 14,
-    shadowColor: '#F59E0B',
+    shadowColor: '#F5A623',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 20,

@@ -96,6 +96,7 @@ model OTP {
   isUsed    Boolean  @default(false)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  metadata  Json?
 
   @@index([userId])
 }

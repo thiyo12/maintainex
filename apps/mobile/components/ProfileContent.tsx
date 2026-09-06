@@ -101,13 +101,13 @@ export default function ProfileContent() {
             activeOpacity={0.7}
           >
             {(identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? (
-              <ShieldCheck size={14} color="#059669" weight="fill" />
+              <ShieldCheck size={14} color="#16A34A" weight="fill" />
             ) : identityStatus === 'PENDING' ? (
-              <Clock size={14} color="#D97706" weight="fill" />
+              <Clock size={14} color="#D48900" weight="fill" />
             ) : (
-              <Shield size={14} color="#DC2626" weight="regular" />
+              <Shield size={14} color="#EF4444" weight="regular" />
             )}
-            <Text style={[styles.identityBadgeText, { color: (identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? '#059669' : identityStatus === 'PENDING' ? '#D97706' : '#DC2626' }]}>
+            <Text style={[styles.identityBadgeText, { color: (identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? '#16A34A' : identityStatus === 'PENDING' ? '#D48900' : '#EF4444' }]}>
               {(identityStatus === 'APPROVED' || identityStatus === 'VERIFIED') ? t('verify.status.verified') : identityStatus === 'PENDING' ? t('verify.status.pending') : identityStatus === 'REJECTED' ? t('verify.status.rejected') : t('verify.status.notSubmitted')}
             </Text>
           </TouchableOpacity>
@@ -122,9 +122,9 @@ export default function ProfileContent() {
             onPress={() => router.push('/settings/edit-profile')} />
           <MenuRow icon={ShieldCheck} label={t('verify.title')} color="#8B5CF6"
             onPress={() => router.push('/(tasker)/identity')} />
-          <MenuRow icon={Bell} label={t('profile.notifications')} color="#F59E0B" badge={unread}
+          <MenuRow icon={Bell} label={t('profile.notifications')} color="#F5A623" badge={unread}
             onPress={() => router.push('/notifications')} />
-          <MenuRow icon={CreditCard} label={t('profile.payment')} color="#10B981"
+          <MenuRow icon={CreditCard} label={t('profile.payment')} color="#22C55E"
             onPress={() => router.push('/settings/payment')} />
           <MenuRow icon={MapPin} label={t('profile.savedAddresses')} color="#3B82F6"
             onPress={() => router.push('/settings/addresses')} />
@@ -147,7 +147,7 @@ export default function ProfileContent() {
             />
           </View>
 
-          <MenuRow icon={Globe} label={t('profile.countryLabel', { name: selectedCountry?.name || t('profile.notSet') })} color="#F59E0B"
+          <MenuRow icon={Globe} label={t('profile.countryLabel', { name: selectedCountry?.name || t('profile.notSet') })} color="#F5A623"
             onPress={() => {
               const labels = countries.map(c => c.name)
               Alert.alert(t('profile.selectCountry'), '', [
@@ -162,7 +162,7 @@ export default function ProfileContent() {
             <Text style={[styles.menuLabel, { color: colors.ink }]}>{t('profile.language')}</Text>
             <LanguageSelector />
           </View>
-          <MenuRow icon={ArrowsLeftRight} label={t('profile.switchToTasker')} color="#F59E0B"
+          <MenuRow icon={ArrowsLeftRight} label={t('profile.switchToTasker')} color="#F5A623"
             onPress={() => router.push('/(auth)/role-switch?target=TASKER')} />
         </View>
 

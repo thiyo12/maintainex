@@ -142,11 +142,11 @@ function getCategoryColor(name: string, isDark: boolean): CatColor {
     hvac:        { bg: '#EA580C18', border: '#EA580C30', icon: '#FB923C' },
     paint:       { bg: '#DB277718', border: '#DB277730', icon: '#F472B6' },
     carpent:     { bg: '#7C3AED18', border: '#7C3AED30', icon: '#A78BFA' },
-    mason:       { bg: '#DC262618', border: '#DC262630', icon: '#F87171' },
+    mason:       { bg: '#EF444418', border: '#EF444430', icon: '#F87171' },
     pest:        { bg: '#16A34A18', border: '#16A34A30', icon: '#4ADE80' },
-    clean:       { bg: '#05966918', border: '#05966930', icon: '#34D399' },
+    clean:       { bg: '#16A34A18', border: '#16A34A30', icon: '#34D399' },
     garden:      { bg: '#16A34A18', border: '#16A34A30', icon: '#4ADE80' },
-    security:    { bg: '#DC262618', border: '#DC262630', icon: '#F87171' },
+    security:    { bg: '#EF444418', border: '#EF444430', icon: '#F87171' },
     moving:      { bg: '#7C3AED18', border: '#7C3AED30', icon: '#A78BFA' },
     car:         { bg: '#0891B218', border: '#0891B230', icon: '#22D3EE' },
     it:          { bg: '#6366F118', border: '#6366F130', icon: '#818CF8' },
@@ -154,7 +154,7 @@ function getCategoryColor(name: string, isDark: boolean): CatColor {
     solar:       { bg: '#EA580C18', border: '#EA580C30', icon: '#FB923C' },
     personal:    { bg: '#E11D4818', border: '#E11D4830', icon: '#FB7185' },
     water:       { bg: '#0284C718', border: '#0284C730', icon: '#38BDF8' },
-    handyman:    { bg: '#D9770618', border: '#D9770630', icon: '#FBBF24' },
+    handyman:    { bg: '#D4890018', border: '#D4890030', icon: '#FBBF24' },
   }
 
   if (isDark) {
@@ -176,7 +176,7 @@ function getCategoryColor(name: string, isDark: boolean): CatColor {
     if (n.includes('personal') || n.includes('wellness') || n.includes('care')) return darkMap.personal
     if (n.includes('water') || n.includes('tank')) return darkMap.water
     if (n.includes('home repair') || n.includes('assembly') || n.includes('mounting') || n.includes('handyman')) return darkMap.handyman
-    return { bg: '#FFFFFF0D', border: '#FFFFFF18', icon: '#9CA3AF' }
+    return { bg: '#FFFFFF0D', border: '#FFFFFF18', icon: '#B3B3B3' }
   }
 
   if (n.includes('electrical') || n.includes('electrician')) return { bg: '#EFF6FF', border: '#93C5FD', icon: '#2563EB' }
@@ -184,11 +184,11 @@ function getCategoryColor(name: string, isDark: boolean): CatColor {
   if (n.includes('ac') || n.includes('hvac') || n.includes('heating') || n.includes('furnace') || n.includes('refrigeration')) return { bg: '#FFF7ED', border: '#FDBA74', icon: '#EA580C' }
   if (n.includes('paint') || n.includes('decorat')) return { bg: '#FDF2F8', border: '#F9A8D4', icon: '#DB2777' }
   if (n.includes('carpent') || n.includes('furniture') || n.includes('floor') || n.includes('tile')) return { bg: '#F5F3FF', border: '#C4B5FD', icon: '#7C3AED' }
-  if (n.includes('mason') || n.includes('concrete') || n.includes('roof') || n.includes('gutter') || n.includes('renovation') || n.includes('interior')) return { bg: '#FEF2F2', border: '#FCA5A5', icon: '#DC2626' }
+  if (n.includes('mason') || n.includes('concrete') || n.includes('roof') || n.includes('gutter') || n.includes('renovation') || n.includes('interior')) return { bg: '#FEF2F2', border: '#FCA5A5', icon: '#EF4444' }
   if (n.includes('pest') || n.includes('bug') || n.includes('insect') || n.includes('rodent')) return { bg: '#F0FDF4', border: '#86EFAC', icon: '#16A34A' }
-  if (n.includes('clean') || n.includes('disinfect')) return { bg: '#ECFDF5', border: '#6EE7B7', icon: '#059669' }
+  if (n.includes('clean') || n.includes('disinfect')) return { bg: '#ECFDF5', border: '#6EE7B7', icon: '#16A34A' }
   if (n.includes('garden') || n.includes('lawn') || n.includes('landscap') || n.includes('plant') || n.includes('tree')) return { bg: '#F0FDF4', border: '#86EFAC', icon: '#16A34A' }
-  if (n.includes('security') || n.includes('cctv') || n.includes('alarm') || n.includes('lock')) return { bg: '#FEF2F2', border: '#FCA5A5', icon: '#DC2626' }
+  if (n.includes('security') || n.includes('cctv') || n.includes('alarm') || n.includes('lock')) return { bg: '#FEF2F2', border: '#FCA5A5', icon: '#EF4444' }
   if (n.includes('moving') || n.includes('delivery') || n.includes('packing') || n.includes('lorry')) return { bg: '#F5F3FF', border: '#C4B5FD', icon: '#7C3AED' }
   if (n.includes('car') || n.includes('vehicle') || n.includes('automotive') || n.includes('mechanic') || n.includes('wash') || n.includes('tire')) return { bg: '#ECFEFF', border: '#67E8F9', icon: '#0891B2' }
   if (n.includes('it ') || n.includes('computer') || n.includes('electronics') || n.includes('tech') || n.includes('printer') || n.includes('wifi')) return { bg: '#EEF2FF', border: '#A5B4FC', icon: '#6366F1' }
@@ -196,7 +196,7 @@ function getCategoryColor(name: string, isDark: boolean): CatColor {
   if (n.includes('solar') || n.includes('energy')) return { bg: '#FFF7ED', border: '#FDBA74', icon: '#EA580C' }
   if (n.includes('personal') || n.includes('wellness') || n.includes('care')) return { bg: '#FFF1F2', border: '#FDA4AF', icon: '#E11D48' }
   if (n.includes('water') || n.includes('tank')) return { bg: '#E0F2FE', border: '#7DD3FC', icon: '#0284C7' }
-  if (n.includes('home repair') || n.includes('assembly') || n.includes('mounting') || n.includes('handyman')) return { bg: '#FFFBEB', border: '#FCD34D', icon: '#D97706' }
+  if (n.includes('home repair') || n.includes('assembly') || n.includes('mounting') || n.includes('handyman')) return { bg: '#FFFBEB', border: '#FCD34D', icon: '#D48900' }
   return { bg: '#F3F4F6', border: '#D1D5DB', icon: '#6B7280' }
 }
 

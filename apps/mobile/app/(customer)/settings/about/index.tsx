@@ -27,13 +27,13 @@ export default function AboutScreen() {
             <View style={styles.iconWrap}>
               <Ionicons name="hammer" size={36} color={colors.white} />
             </View>
-            <Text style={styles.appName}>Maintainex</Text>
+            <Text style={styles.appName}>MΛINTΛINEX</Text>
             <Text style={styles.version}>Version 1.0.0</Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.description}>
-              Maintainex is Sri Lanka's trusted platform connecting customers with skilled
+              MΛINTΛINEX is Sri Lanka's trusted platform connecting customers with skilled
               taskers for home maintenance, repairs, and professional services. We make it
               easy to find, book, and pay for quality service providers in your area.
             </Text>

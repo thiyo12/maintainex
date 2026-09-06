@@ -18,9 +18,9 @@ interface Props {
 }
 
 const FALLBACK_CATEGORIES: CategoryItem[] = [
-  { id: 'all',        name: 'All',          iconName: 'grid-outline',           colorHex: '#F59E0B' },
+  { id: 'all',        name: 'All',          iconName: 'grid-outline',           colorHex: '#F5A623' },
   { id: 'cleaning',   name: 'Cleaning',     iconName: 'sparkles-outline',       colorHex: '#0EA5E9' },
-  { id: 'electrical', name: 'Electrical',   iconName: 'flash-outline',          colorHex: '#F59E0B' },
+  { id: 'electrical', name: 'Electrical',   iconName: 'flash-outline',          colorHex: '#F5A623' },
   { id: 'plumbing',   name: 'Plumbing',     iconName: 'water-outline',          colorHex: '#3B82F6' },
   { id: 'painting',   name: 'Painting',     iconName: 'color-palette-outline',  colorHex: '#EC4899' },
   { id: 'moving',     name: 'Moving',       iconName: 'cube-outline',           colorHex: '#F97316' },
@@ -49,7 +49,7 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
             key={cat.id}
             style={[
               styles.pill,
-              isSelected && { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
+              isSelected && { backgroundColor: '#2E1A00', borderColor: '#F5A623' },
             ]}
             onPress={() => onSelect(cat.id)}
             activeOpacity={0.7}
@@ -57,9 +57,9 @@ export default function CategoryPills({ items, selected, onSelect, loading }: Pr
             <Ionicons
               name={cat.iconName as any}
               size={14}
-              color={isSelected ? '#D97706' : '#6B7280'}
+              color={isSelected ? '#D48900' : '#6B6B6B'}
             />
-            <Text style={[styles.pillLabel, { color: isSelected ? '#D97706' : '#111827' }]}>
+            <Text style={[styles.pillLabel, { color: isSelected ? '#D48900' : '#FFFFFF' }]}>
               {t(getCategoryI18nKey(cat))}
             </Text>
           </TouchableOpacity>
@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 100,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
+    borderColor: '#424242',
     gap: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -88,5 +88,5 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   pillLabel: { fontSize: 12, fontFamily: 'Outfit_700Bold' },
-  loadingText: { fontSize: 12, color: '#6B7280', paddingVertical: 8, fontFamily: 'Outfit_500Medium' },
+  loadingText: { fontSize: 12, color: '#6B6B6B', paddingVertical: 8, fontFamily: 'Outfit_500Medium' },
 })

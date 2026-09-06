@@ -16,7 +16,7 @@ export default function TermsScreen() {
       title: t('profile.termsOfService'),
       icon: 'document-text-outline' as const,
       content:
-        'By using Maintainex, you agree to these terms. Maintainex connects customers with taskers for various services. We do not directly employ taskers and are not liable for the quality of work performed. All bookings and payments are handled through our platform. You must provide accurate information when creating an account. Any misuse of the platform may result in account termination.',
+        'By using MΛINTΛINEX, you agree to these terms. MΛINTΛINEX connects customers with taskers for various services. We do not directly employ taskers and are not liable for the quality of work performed. All bookings and payments are handled through our platform. You must provide accurate information when creating an account. Any misuse of the platform may result in account termination.',
     },
     {
       title: t('profile.privacyPolicy'),
@@ -28,7 +28,7 @@ export default function TermsScreen() {
       title: t('profile.cookiePolicy'),
       icon: 'cafe-outline' as const,
       content:
-        'Maintainex uses cookies to enhance your experience. These include essential cookies for authentication, analytics cookies to help us improve the platform, and preference cookies to remember your settings. You can manage cookie preferences in your browser settings. Disabling certain cookies may affect platform functionality.',
+        'MΛINTΛINEX uses cookies to enhance your experience. These include essential cookies for authentication, analytics cookies to help us improve the platform, and preference cookies to remember your settings. You can manage cookie preferences in your browser settings. Disabling certain cookies may affect platform functionality.',
     },
   ]
 

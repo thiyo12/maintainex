@@ -2,29 +2,27 @@ import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
+  Animated, Image,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { EnvelopeSimple, ShieldCheck, ArrowRight, CaretLeft, Phone } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
+import { CaretLeft, ArrowRight, EnvelopeSimple } from 'phosphor-react-native'
 import { useAuth } from '../../lib/auth'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
+import CountryPicker, { COUNTRIES, Country } from '../../components/ui/CountryPicker'
+import OtpInput from '../../components/ui/OtpInput'
+import PressableScale from '../../components/ui/PressableScale'
 
 export default function LoginScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { t } = useTranslation()
   const { sendLoginOtp, otpLogin } = useAuth()
-  const [identifier, setIdentifier] = useState('')
-  const [codes, setCodes] = useState<string[]>(Array(6).fill(''))
+  const [country, setCountry] = useState<Country>(COUNTRIES[0])
+  const [phone, setPhone] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [sending, setSending] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [resendTimer, setResendTimer] = useState(0)
-  const inputRefs = useRef<(TextInput | null)[]>([])
-
-  const isEmail = identifier.includes('@')
+  const [otpError, setOtpError] = useState('')
+  const [maskedPhone, setMaskedPhone] = useState('')
+  const slideAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     if (resendTimer <= 0) return
@@ -32,34 +30,35 @@ export default function LoginScreen() {
     return () => clearInterval(interval)
   }, [resendTimer])
 
-  const redirectByRole = (role: string) => {
-    if (role === 'TASKER') router.replace('/(tasker)')
-    else if (role === 'COMPANY') router.replace('/(company)')
-    else router.replace('/(customer)')
-  }
+  const fullPhone = `${country.dial}${phone}`
 
-  const getErrorMessage = (err: any) => {
-    let message = err?.message || t('common.error')
-    try {
-      const parsed = JSON.parse(message)
-      message = parsed.error || message
-    } catch {}
-    return message
+  const maskPhone = (num: string) => {
+    const d = num.replace(/\D/g, '')
+    if (d.length < 4) return num
+    const prefix = d.slice(0, 3)
+    const suffix = d.slice(-2)
+    const middle = 'X'.repeat(Math.max(0, d.length - 5))
+    return `+${prefix} ${middle} ${suffix}`
   }
 
   const handleSendCode = async () => {
-    if (!identifier.trim()) {
-      Alert.alert(t('common.error'), t('errors.fillAllFields'))
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 7) {
+      Alert.alert('Error', 'Enter a valid phone number')
       return
     }
     setSending(true)
     try {
-      await sendLoginOtp(identifier)
-      setCodes(Array(6).fill(''))
+      await sendLoginOtp(fullPhone)
+      setMaskedPhone(maskPhone(fullPhone))
       setCodeSent(true)
       setResendTimer(60)
+      setOtpError('')
+      Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
     } catch (err: any) {
-      Alert.alert(t('common.error'), getErrorMessage(err))
+      let message = err?.message || 'Something went wrong'
+      try { message = JSON.parse(message).error || message } catch {}
+      Alert.alert('Error', message)
     } finally {
       setSending(false)
     }
@@ -70,40 +69,36 @@ export default function LoginScreen() {
     handleSendCode()
   }
 
-  const handleCodeChange = (text: string, index: number) => {
-    const digit = text.replace(/\D/g, '').slice(-1)
-    const newCodes = [...codes]
-    newCodes[index] = digit
-    setCodes(newCodes)
-    if (digit && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-  }
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && !codes[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
-  }
-
-  const handleVerify = async () => {
-    const code = codes.join('')
-    if (code.length < 6) {
-      Alert.alert(t('common.error'), t('errors.enterCompleteCode'))
-      return
-    }
+  const handleVerify = async (code: string) => {
     setVerifying(true)
+    setOtpError('')
     try {
-      const user = await otpLogin(identifier, code)
-      redirectByRole(user.role)
+      const user = await otpLogin(fullPhone, code)
+      if (user.role === 'TASKER') router.replace('/(tasker)')
+      else if (user.role === 'COMPANY') router.replace('/(company)')
+      else router.replace('/(customer)')
     } catch (err: any) {
-      Alert.alert(t('common.error'), getErrorMessage(err))
+      let message = err?.message || 'Invalid code'
+      try { message = JSON.parse(message).error || message } catch {}
+      setOtpError(message)
     } finally {
       setVerifying(false)
     }
   }
 
-  const allFilled = codes.every((c) => c !== '')
+  const goBack = () => {
+    if (codeSent) {
+      Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+        setCodeSent(false)
+        setOtpError('')
+      })
+    } else {
+      router.back()
+    }
+  }
+
+  const phoneDigits = phone.replace(/\D/g, '')
+  const canSend = phoneDigits.length >= 7
 
   return (
     <KeyboardAvoidingView
@@ -111,144 +106,167 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <CaretLeft size={20} color={colors.ink} weight="bold" />
+        <TouchableOpacity onPress={goBack} style={styles.backButton}>
+          <CaretLeft size={20} color="#FFFFFF" weight="bold" />
         </TouchableOpacity>
 
-        <View style={styles.headerSection}>
-          <ShieldCheck size={36} color={colors.amber} weight="fill" />
-          <Text style={styles.title}>{t('auth.login.title')}</Text>
-          <Text style={styles.subtitle}>{t('auth.login.subtitle')}</Text>
-        </View>
-
-        <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.fieldWrap}>
-            {isEmail ? (
-              <EnvelopeSimple size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            ) : (
-              <Phone size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            )}
-            <TextInput
-              style={[styles.input, { color: colors.ink, borderColor: colors.border }]}
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder={t('auth.login.emailOrPhone')}
-              keyboardType={isEmail ? 'email-address' : identifier ? 'phone-pad' : 'default'}
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!sending}
-              placeholderTextColor={colors.muted}
-            />
-          </View>
-
-          {codeSent && (
-            <View style={styles.codeSection}>
-              <Text style={styles.codeHint}>{t('auth.login.codeSentTo')} {identifier}</Text>
-              <Text style={styles.codeLabel}>{t('auth.login.enterCode')}</Text>
-              <View style={styles.codeRow}>
-                {codes.map((digit, i) => (
-                  <TextInput
-                    key={i}
-                    ref={(ref) => { inputRefs.current[i] = ref }}
-                    style={[
-                      styles.codeBox,
-                      { borderColor: digit ? colors.amber : colors.border, color: colors.ink },
-                    ]}
-                    value={digit}
-                    onChangeText={(text) => handleCodeChange(text, i)}
-                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
-                    keyboardType="number-pad"
-                    maxLength={1}
-                    selectionColor={colors.amber}
-                  />
-                ))}
+        {!codeSent ? (
+          <View style={styles.stepContainer}>
+            <View style={styles.logoSection}>
+              <View style={styles.logoBox}>
+                <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
               </View>
-
-              <TouchableOpacity
-                onPress={handleResend}
-                disabled={resendTimer > 0 || sending}
-                style={styles.resendButton}
-              >
-                <Text style={[styles.resendText, { color: colors.amber }, (resendTimer > 0 || sending) && { color: colors.muted }]}>
-                  {sending ? t('auth.login.sending') : resendTimer > 0 ? `${t('auth.login.resendIn')}${resendTimer}s` : t('auth.login.resend')}
-                </Text>
-              </TouchableOpacity>
             </View>
-          )}
 
-          {!codeSent ? (
-            <TouchableOpacity
-              style={[styles.button, sending && styles.buttonDisabled]}
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Sign in to your account</Text>
+
+            <View style={styles.phoneRow}>
+              <CountryPicker selected={country} onChange={setCountry} />
+              <TextInput
+                style={styles.phoneInput}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder={country.code === 'LK' ? '771 234 567' : '416 234 5678'}
+                placeholderTextColor="#6B6B6B"
+                keyboardType="phone-pad"
+                maxLength={15}
+              />
+            </View>
+
+            <PressableScale
+              scaleTo={0.97}
               onPress={handleSendCode}
-              disabled={sending}
+              disabled={!canSend || sending}
+              style={[styles.pillButton, !canSend && styles.pillButtonDisabled]}
             >
               {sending ? (
-                <ActivityIndicator color="#111827" />
+                <ActivityIndicator color="#0D0D0D" />
               ) : (
-                <View style={styles.buttonInner}>
-                  <Text style={styles.buttonText}>{t('auth.login.sendCode')}</Text>
-                  <ArrowRight size={18} color="#111827" weight="bold" />
+                <View style={styles.pillRow}>
+                  <Text style={styles.pillText}>Send Code</Text>
+                  <ArrowRight size={20} color="#0D0D0D" weight="bold" />
                 </View>
               )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.button, (!allFilled || verifying) && styles.buttonDisabled]}
-              onPress={handleVerify}
-              disabled={!allFilled || verifying}
-            >
-              {verifying ? (
-                <ActivityIndicator color="#111827" />
-              ) : (
-                <View style={styles.buttonInner}>
-                  <Text style={styles.buttonText}>{t('auth.login.verify')}</Text>
-                  <ArrowRight size={18} color="#111827" weight="bold" />
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
+            </PressableScale>
 
-        <TouchableOpacity onPress={() => router.push('/(auth)/welcome')} style={styles.footerWrap}>
-          <Text style={styles.footerText}>
-            {t('auth.login.noAccount')} <Text style={styles.footerLink}>{t('auth.login.signUp')}</Text>
-          </Text>
-        </TouchableOpacity>
+            <Text style={styles.hint}>We'll send a 6-digit verification code</Text>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TouchableOpacity style={styles.emailRow}>
+              <EnvelopeSimple size={18} color="#6B6B6B" weight="regular" />
+              <Text style={styles.emailText}>Continue with email</Text>
+            </TouchableOpacity>
+
+            <View style={styles.footerRow}>
+              <Text style={styles.footerLabel}>New to MΛINTΛINEX? </Text>
+              <TouchableOpacity onPress={() => router.push('/(auth)/welcome')}>
+                <Text style={styles.footerLink}>Create account</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <Animated.View style={[styles.stepContainer, { opacity: slideAnim, transform: [{ translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }]}>
+            <Text style={styles.title}>Enter the code</Text>
+            <View style={styles.codeInfo}>
+              <Text style={styles.subtitle}>Sent to {maskedPhone} </Text>
+              <TouchableOpacity onPress={goBack}>
+                <Text style={styles.wrongNumber}>Wrong number?</Text>
+              </TouchableOpacity>
+            </View>
+
+            <OtpInput
+              onComplete={handleVerify}
+              error={otpError}
+              loading={verifying}
+            />
+
+            <View style={styles.resendRow}>
+              {resendTimer > 0 ? (
+                <Text style={styles.resendDisabled}>Resend in {resendTimer}s</Text>
+              ) : (
+                <TouchableOpacity onPress={handleResend}>
+                  <Text style={styles.resendActive}>Resend code</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </Animated.View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { padding: 24, paddingTop: 60 },
-  backButton: { marginBottom: 24, width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  headerSection: { alignItems: 'center', marginBottom: 32, gap: 8 },
-  title: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink, textAlign: 'center' },
-  subtitle: { fontSize: 15, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 22 },
-
-  formCard: { borderRadius: 24, padding: 24, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
-  fieldWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 18, borderWidth: 1.5, borderColor: colors.border, marginBottom: 20, shadowColor: colors.amber, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.08, shadowRadius: 8 },
-  fieldIcon: { paddingLeft: 16 },
-  input: { flex: 1, padding: 16, fontSize: 15, fontFamily: fonts.body },
-
-  codeSection: { marginBottom: 20 },
-  codeHint: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', marginBottom: 16 },
-  codeLabel: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 10 },
-  codeRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 12 },
-  codeBox: {
-    flex: 1, height: 52, borderRadius: 14, borderWidth: 1.5,
-    textAlign: 'center', fontSize: 20, fontFamily: fonts.heading, backgroundColor: colors.white,
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  scrollContent: { padding: 24, paddingTop: 60, flexGrow: 1 },
+  backButton: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#1C1C1C',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2E2E2E',
+    marginBottom: 24,
   },
-  resendButton: { alignItems: 'center', paddingVertical: 4 },
-  resendText: { fontSize: 13, fontFamily: fonts.bodyMedium },
 
-  button: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 100, alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 },
-  buttonDisabled: { opacity: 0.5 },
-  buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  buttonText: { fontSize: 17, fontFamily: fonts.bodySemiBold, color: '#111827' },
+  logoSection: { alignItems: 'center', marginBottom: 28 },
+  logoBox: {
+    width: 72, height: 72, borderRadius: 18,
+    backgroundColor: 'rgba(245,166,35,0.08)',
+    borderWidth: 1.5, borderColor: '#F5A623',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35, shadowRadius: 18, elevation: 8,
+  },
+  logo: { width: 48, height: 48 },
 
-  footerWrap: { marginTop: 32, alignItems: 'center' },
-  footerText: { fontSize: 14, fontFamily: fonts.body, color: colors.muted, textAlign: 'center' },
-  footerLink: { fontFamily: fonts.bodyMedium, color: colors.amber },
+  stepContainer: { flex: 1 },
+  title: { fontSize: 28, fontFamily: 'Outfit_700Bold', color: '#FFFFFF', marginBottom: 8 },
+  subtitle: { fontSize: 15, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 32 },
+
+  phoneRow: {
+    flexDirection: 'row', height: 56, borderRadius: 16,
+    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
+    overflow: 'hidden', marginBottom: 24,
+  },
+  phoneInput: {
+    flex: 1, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Outfit_500Medium',
+    color: '#FFFFFF',
+  },
+
+  pillButton: {
+    height: 56, borderRadius: 16, backgroundColor: '#F5A623',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 12, elevation: 4,
+  },
+  pillButtonDisabled: { backgroundColor: '#2E2E2E', shadowOpacity: 0 },
+  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pillText: { fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
+
+  hint: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#6B6B6B', textAlign: 'center', marginTop: 12 },
+
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 28, gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#2E2E2E' },
+  dividerText: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#6B6B6B' },
+
+  emailRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, borderRadius: 16,
+    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
+  },
+  emailText: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#B3B3B3' },
+
+  footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
+  footerLabel: { fontSize: 14, fontFamily: 'Outfit_400Regular', color: '#B3B3B3' },
+  footerLink: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
+
+  codeInfo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
+  wrongNumber: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
+
+  resendRow: { alignItems: 'center', marginTop: 8 },
+  resendDisabled: { fontSize: 14, fontFamily: 'Outfit_400Regular', color: '#6B6B6B' },
+  resendActive: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
 })

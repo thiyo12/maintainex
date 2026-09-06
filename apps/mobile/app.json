@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "Maintainex",
+    "name": "MΛINTΛINEX",
     "slug": "maintainex",
     "version": "1.0.0",
     "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "maintainex",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F0F1A"
+      "backgroundColor": "#0D0D0D"
     },
     "ios": {
       "supportsTablet": true,
@@ -51,10 +51,15 @@
       "expo-secure-store",
       "expo-font",
       "expo-localization",
-      "expo-splash-screen",
       "expo-status-bar",
-      "expo-notifications"
-
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0D0D0D",
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

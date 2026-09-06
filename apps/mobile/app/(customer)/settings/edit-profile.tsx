@@ -121,9 +121,9 @@ export default function EditProfileScreen() {
         </View>
         <View style={styles.cameraBadge}>
           {uploading ? (
-            <ActivityIndicator size="small" color="#0B0C12" />
+            <ActivityIndicator size="small" color="#0D0D0D" />
           ) : (
-            <Camera size={16} color="#0B0C12" weight="fill" />
+            <Camera size={16} color="#0D0D0D" weight="fill" />
           )}
         </View>
         <Text style={styles.changePhotoText}>{t('common.edit')}</Text>
@@ -203,7 +203,7 @@ export default function EditProfileScreen() {
 
       <PressableScale onPress={handleSave} disabled={saving} scaleTo={0.97} style={[styles.saveBtn, saving && { opacity: 0.6 }]}>
         {saving ? (
-          <ActivityIndicator color="#0B0C12" />
+          <ActivityIndicator color="#0D0D0D" />
         ) : (
           <Text style={styles.saveBtnText}>{t('common.saveChanges')}</Text>
         )}
@@ -250,11 +250,11 @@ const styles = StyleSheet.create({
   },
   segmentActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   segmentText: { fontSize: 13, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
-  segmentTextActive: { color: '#0B0C12' },
+  segmentTextActive: { color: '#0D0D0D' },
 
   saveBtn: {
     backgroundColor: colors.accent, borderRadius: radius.lg, paddingVertical: 16,
     alignItems: 'center', marginTop: spacing.sm,
   },
-  saveBtnText: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: '#0B0C12' },
+  saveBtnText: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
 })

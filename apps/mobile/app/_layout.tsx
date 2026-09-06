@@ -1,5 +1,5 @@
 import { useEffect, useState, Component, ReactNode } from 'react'
-import { View } from 'react-native'
+import { Text } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
@@ -10,13 +10,13 @@ import {
   useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold,
   Outfit_800ExtraBold, Outfit_900Black,
 } from '@expo-google-fonts/outfit'
-import { colors as themeColors } from '../lib/design'
 
 import { AuthProvider } from '../lib/auth'
 import i18next, { initI18n } from '../lib/i18n'
 import { ThemeProvider } from '../lib/theme'
 import { CountryProvider } from '../lib/country'
 import { getAuthToken } from '../lib/api'
+import { LoadingScreen } from '../components/ui/LoadingScreen'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -52,7 +52,7 @@ async function registerForPushNotifications() {
   }
 }
 
-SplashScreen.preventAutoHideAsync().catch(() => {})
+SplashScreen.preventAutoHideAsync()
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
   state = { error: null }
@@ -75,11 +75,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
 }
 
 const ebStyles = {
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0B0C12', padding: 24 },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D0D0D', padding: 24 },
   title: { fontSize: 20, fontWeight: 'bold' as const, color: '#fff', marginBottom: 12 },
   msg: { fontSize: 14, color: '#999', textAlign: 'center' as const, marginBottom: 24 },
-  btn: { backgroundColor: '#F59E0B', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
-  btnText: { fontSize: 16, fontWeight: 'bold' as const, color: '#111' },
+  btn: { backgroundColor: '#F5A623', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
+  btnText: { fontSize: 16, fontWeight: 'bold' as const, color: '#0D0D0D' },
 }
 
 export default function RootLayout() {
@@ -97,17 +97,20 @@ export default function RootLayout() {
         if (saved && saved !== 'en') await i18next.changeLanguage(saved)
       } catch {}
       setI18nReady(true)
-      SplashScreen.hideAsync().catch(() => {})
+      SplashScreen.hideAsync()
       registerForPushNotifications()
     })()
   }, [])
 
   if (!fontsLoaded || !i18nReady) {
-    return <View style={{ flex: 1, backgroundColor: themeColors.background }} />
+    return <LoadingScreen />
   }
 
+  if (!Text.defaultProps) Text.defaultProps = {} as any
+  Text.defaultProps.style = { fontFamily: 'Outfit_400Regular' }
+
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: themeColors.background }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0D0D0D' }}>
     <ErrorBoundary>
     <ThemeProvider>
       <AuthProvider>

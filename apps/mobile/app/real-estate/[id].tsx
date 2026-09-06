@@ -9,7 +9,7 @@ import { fonts } from '../../lib/fonts'
 import { spacing, fontSizes } from '../../lib/tokens'
 
 const TYPE_BADGES: Record<string, { label: string; color: string }> = {
-  sale: { label: 'For Sale', color: '#F59E0B' },
+  sale: { label: 'For Sale', color: '#F5A623' },
   rent: { label: 'For Rent', color: '#6366F1' },
   commercial: { label: 'Commercial', color: '#10B981' },
   land: { label: 'Land', color: '#7C3AED' },

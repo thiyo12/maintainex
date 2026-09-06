@@ -202,7 +202,7 @@ export default function LiveTrackingScreen() {
             routeFailed ? (
               <Polyline
                 coordinates={[providerCoord, jobCoords]}
-                strokeColor="#F59E0B"
+                strokeColor="#F5A623"
                 strokeWidth={4}
                 lineDashPattern={[8, 4]}
               />
@@ -212,7 +212,7 @@ export default function LiveTrackingScreen() {
                 destination={jobCoords}
                 apikey=""
                 strokeWidth={4}
-                strokeColor="#F59E0B"
+                strokeColor="#F5A623"
                 optimizeWaypoints={true}
                 onReady={(result) => {
                   setEta(Math.ceil(result.duration))
@@ -364,14 +364,14 @@ const styles = StyleSheet.create({
     borderWidth: 3, borderColor: colors.ink, ...shadows.card,
   },
   destMarker: {
-    backgroundColor: '#0B0C12',
+    backgroundColor: '#0D0D0D',
     borderRadius: 8, padding: 6,
-    borderWidth: 2, borderColor: '#F59E0B',
+    borderWidth: 2, borderColor: '#F5A623',
   },
-  destMarkerText: { color: '#F59E0B', fontSize: 11, fontWeight: '700' },
+  destMarkerText: { color: '#F5A623', fontSize: 11, fontWeight: '700' },
   taskerCircle: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#F5A623',
     borderWidth: 3, borderColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
     shadowColor: '#000', shadowOpacity: 0.3,
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   taskerPulse: {
     position: 'absolute', width: 50, height: 50, borderRadius: 25,
-    backgroundColor: 'rgba(245,158,11,0.35)', top: -6, left: -6,
+    backgroundColor: 'rgba(245,166,35,0.35)', top: -6, left: -6,
   },
 
   etaRow: {
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     padding: spacing.md, marginBottom: spacing.lg,
   },
   routeDotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
-  routeDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#F59E0B' },
+  routeDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#F5A623' },
   distText: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_600SemiBold' },
 
   overlayTop: { position: 'absolute', top: 46, left: 0, right: 0, alignItems: 'center' },

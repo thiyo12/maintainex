@@ -10,13 +10,14 @@ interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
-  signupData: { name: string; email: string; phone: string; password: string; role: string } | null
-  setSignupData: (data: { name: string; email: string; phone: string; password: string; role: string } | null) => void
+  signupData: { name: string; email: string; phone: string; role: string } | null
+  setSignupData: (data: { name: string; email: string; phone: string; role: string } | null) => void
   login: (email: string, password: string) => Promise<any>
   loginWithOtp: (phone: string, otp: string) => Promise<any>
   sendLoginOtp: (identifier: string) => Promise<void>
   otpLogin: (identifier: string, code: string) => Promise<any>
-  register: (data: { email: string; password: string; name: string; phone: string; role: string }) => Promise<any>
+  register: (data: { name: string; phone: string; email?: string; role: string }) => Promise<any>
+  verifyRegisterOtp: (phone: string, code: string, purpose?: string) => Promise<any>
   switchRole: (role: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -27,7 +28,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [signupData, setSignupData] = useState<{ name: string; email: string; phone: string; password: string; role: string } | null>(null)
+  const [signupData, setSignupData] = useState<{ name: string; email: string; phone: string; role: string } | null>(null)
 
   useEffect(() => {
     loadStoredAuth()
@@ -165,13 +166,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.user
   }, [])
 
-  const register = useCallback(async (data: { email: string; password: string; name: string; phone: string; role: string }) => {
+  const register = useCallback(async (data: { name: string; phone: string; email?: string; role: string }) => {
     const res = await auth.register(data)
-    await setAuthToken(res.token)
-    setUser(res.user)
-    await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
-    await SecureStore.setItemAsync('last_active_at', String(Date.now()))
-    return res.user
+    return res
+  }, [])
+
+  const verifyRegisterOtp = useCallback(async (phone: string, code: string, purpose?: string) => {
+    const res = await auth.verifyOtp({ phone, code, purpose: purpose || 'PHONE_VERIFICATION' })
+    if (res.token) {
+      await setAuthToken(res.token)
+      setUser(res.user)
+      await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+      await SecureStore.setItemAsync('last_active_at', String(Date.now()))
+      return res.user
+    }
+    return res
   }, [])
 
   const logout = useCallback(async () => {
@@ -214,6 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sendLoginOtp,
         otpLogin,
         register,
+        verifyRegisterOtp,
         switchRole,
         logout,
         refreshUser,

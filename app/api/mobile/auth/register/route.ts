@@ -1,50 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { createToken } from '@/lib/mobile-auth'
+import { randomInt } from 'crypto'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { sendOtpEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const userAgent = request.headers.get('user-agent') ?? ''
     const { allowed } = checkRateLimit(ip, 5)
     if (!allowed) {
       return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
     }
 
-    const { email, password, name, phone, role } = await request.json()
+    const { name, phone, email, role } = await request.json()
 
-    if (!email || !password || !name) {
-      return NextResponse.json({ error: 'Email, password, and name required' }, { status: 400 })
+    if (!name || !phone) {
+      return NextResponse.json({ error: 'Name and phone number required' }, { status: 400 })
     }
 
-    if (password.length < 6) {
-      return NextResponse.json({ error: 'Password must be at least 6 characters' }, { status: 400 })
+    if (name.length < 2) {
+      return NextResponse.json({ error: 'Name must be at least 2 characters' }, { status: 400 })
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+    const digits = phone.replace(/\D/g, '').slice(-9)
+    if (digits.length < 7) {
+      return NextResponse.json({ error: 'Invalid phone number' }, { status: 400 })
     }
 
     const validRoles = ['CUSTOMER', 'TASKER', 'COMPANY']
     const userRole = validRoles.includes(role) ? role : 'CUSTOMER'
 
-    const existing = await prisma.user.findUnique({ where: { email } })
-    if (existing) {
-      return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
+    const existingPhone = await prisma.user.findFirst({
+      where: { phone: { endsWith: digits } },
+    })
+    if (existingPhone) {
+      return NextResponse.json({ error: 'Phone number already registered' }, { status: 409 })
     }
 
-    if (phone) {
-      const existingPhone = await prisma.user.findFirst({ where: { phone } })
-      if (existingPhone) {
-        return NextResponse.json({ error: 'Phone number already registered' }, { status: 409 })
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+      }
+      const existingEmail = await prisma.user.findUnique({ where: { email } })
+      if (existingEmail) {
+        return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
       }
     }
 
-    const passwordHash = await bcrypt.hash(password, 12)
     const user = await prisma.user.create({
-      data: { email, passwordHash, name, phone, phoneVerified: phone ? true : false, role: userRole },
+      data: {
+        name,
+        phone,
+        email: email || `${phone.replace(/\D/g, '')}@maintainex.pending`,
+        passwordHash: '',
+        phoneVerified: false,
+        role: userRole,
+      },
     })
 
     if (userRole === 'TASKER') {
@@ -53,12 +67,29 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const token = createToken({ id: user.id, email: user.email, role: user.role })
-    if (!token) return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    const otp = process.env.ALLOW_TEST_OTP === 'true'
+      ? '000000'
+      : randomInt(0, 1000000).toString().padStart(6, '0')
+    const codeHash = await bcrypt.hash(otp, 10)
+
+    await prisma.oTP.create({
+      data: {
+        userId: user.id,
+        codeHash,
+        purpose: 'PHONE_VERIFICATION',
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        metadata: { ip, userAgent },
+      },
+    })
+
+    if (email) {
+      await sendOtpEmail(email, otp)
+    }
 
     return NextResponse.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role, isActive: user.isActive, createdAt: user.createdAt.toISOString() },
+      requiresVerification: true,
+      userId: user.id,
+      user: { id: user.id, name: user.name, phone: user.phone, role: user.role },
     })
   } catch (error) {
     console.error('Register error:', error)

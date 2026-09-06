@@ -37,7 +37,7 @@ export default function Skeleton({ width = '100%', height = 18, radius: r = radi
     >
       <Animated.View style={[StyleSheet.absoluteFill, animStyle]}>
         <LinearGradient
-          colors={['#15161E', '#2A2D3E', '#15161E']}
+          colors={['#1C1C1C', '#2E2E2E', '#1C1C1C']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={{ flex: 1, width: screenWidth }}

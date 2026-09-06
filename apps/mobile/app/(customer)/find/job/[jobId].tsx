@@ -111,7 +111,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
-  metaLabel: { fontSize: 11, color: '#9CA3AF', marginTop: 4 },
+  metaLabel: { fontSize: 11, color: '#B3B3B3', marginTop: 4 },
   metaValue: { fontSize: 13, fontWeight: '600', color: '#1F2937', marginTop: 2 },
   section: { backgroundColor: '#fff', borderRadius: 12, padding: 14, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 10 },

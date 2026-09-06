@@ -43,7 +43,7 @@ export default function Button({ label, onPress, variant = 'primary', loading, d
         variant === 'ghost' && { borderWidth: 0 },
         isDisabled && styles.disabled,
         variant === 'primary' && {
-          shadowColor: '#F59E0B',
+          shadowColor: '#F5A623',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.35,
           shadowRadius: 12,

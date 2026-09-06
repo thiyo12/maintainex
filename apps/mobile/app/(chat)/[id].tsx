@@ -17,8 +17,8 @@ function detectWarnings(text: string): string[] {
   const warnings: string[] = []
   CLIENT_CONTACT.lastIndex = 0
   CLIENT_PAYMENT.lastIndex = 0
-  if (CLIENT_CONTACT.test(text)) warnings.push('Please keep all communications on Maintainex.')
-  if (CLIENT_PAYMENT.test(text)) warnings.push('Reminder: all payments must go through Maintainex')
+  if (CLIENT_CONTACT.test(text)) warnings.push('Please keep all communications on MΛINTΛINEX.')
+  if (CLIENT_PAYMENT.test(text)) warnings.push('Reminder: all payments must go through MΛINTΛINEX')
   return warnings
 }
 
@@ -256,7 +256,7 @@ export default function ChatDetailScreen() {
                   {flagged && !isUser && (
                     <View style={[styles.flagBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
                       <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
-                      <Text style={[styles.flagBannerText, { color: colors.ink }]}>Reminder: all payments must go through Maintainex</Text>
+                      <Text style={[styles.flagBannerText, { color: colors.ink }]}>Reminder: all payments must go through MΛINTΛINEX</Text>
                     </View>
                   )}
                   <View style={[styles.messageWrap, { maxWidth: '78%' }, isUser ? styles.messageSent : styles.messageReceived]}>

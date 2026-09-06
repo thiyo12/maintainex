@@ -120,7 +120,7 @@ export default function CustomerWalletScreen() {
                   })}
                 </Text>
               </View>
-              <Text style={[styles.txAmt, { color: tx.type === 'CREDIT' ? '#10B981' : colors.ink }]}>
+              <Text style={[styles.txAmt, { color: tx.type === 'CREDIT' ? '#22C55E' : colors.ink }]}>
                 {tx.type === 'CREDIT' ? '+' : '-'}LKR {tx.amount.toLocaleString()}
               </Text>
             </View>
@@ -136,8 +136,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   balanceCard: {
     margin: 16, borderRadius: 22, overflow: 'hidden',
-    backgroundColor: '#0B0C12',
-    shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 },
+    backgroundColor: '#0D0D0D',
+    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
   },
   balanceBg: { padding: 24 },

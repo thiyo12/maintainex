@@ -106,7 +106,7 @@ export default function WithdrawScreen() {
 
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
-  balanceCard: { backgroundColor: '#0B0C12', margin: 16, borderRadius: 22, padding: 24, alignItems: 'center' },
+  balanceCard: { backgroundColor: '#0D0D0D', margin: 16, borderRadius: 22, padding: 24, alignItems: 'center' },
   balanceLabel: { fontSize: 11, fontFamily: fonts.bodyMedium, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 1 },
   balanceAmt: { fontSize: 38, fontFamily: fonts.heading, color: '#FFFFFF', letterSpacing: -1, marginTop: 4 },
   section: { marginHorizontal: 16, marginBottom: 20 },
@@ -118,6 +118,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
   methodIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface || colors.cream, justifyContent: 'center', alignItems: 'center' },
   methodLbl: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
   methodSub: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 1 },
-  btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   btnTxt: { fontSize: 15, fontFamily: fonts.headingBold, color: '#111827' },
 })

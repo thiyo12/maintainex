@@ -60,7 +60,7 @@ export default function RealEstateList() {
       case 'rent': return { label: 'RENT', color: '#6366F1' }
       case 'commercial': return { label: 'COMM', color: '#10B981' }
       case 'land': return { label: 'LAND', color: '#7C3AED' }
-      default: return { label: 'SALE', color: '#F59E0B' }
+      default: return { label: 'SALE', color: '#F5A623' }
     }
   }
 

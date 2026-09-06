@@ -193,7 +193,7 @@ export default function UploadProperty() {
               {estimate.symbol} {estimate.estimatedMin?.toLocaleString()} - {estimate.estimatedMax?.toLocaleString()}
             </Text>
             <Text style={[styles.estimateSub, { color: colors.muted }]}>Market average: {estimate.symbol} {estimate.marketAverage?.toLocaleString()}</Text>
-            <View style={[styles.confidenceBadge, { backgroundColor: estimate.confidence === 'high' ? '#10B981' : estimate.confidence === 'medium' ? '#F59E0B' : '#EF4444' }]}>
+            <View style={[styles.confidenceBadge, { backgroundColor: estimate.confidence === 'high' ? '#10B981' : estimate.confidence === 'medium' ? '#F5A623' : '#EF4444' }]}>
               <Text style={styles.confidenceText}>{estimate.confidence} confidence</Text>
             </View>
           </View>

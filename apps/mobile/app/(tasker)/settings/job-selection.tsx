@@ -128,7 +128,7 @@ export default function JobSelectionScreen() {
                 cat.jobs.map((job, ji) => (
                   <TouchableOpacity key={job.id} style={styles.jobRow} onPress={() => toggle(ci, ji)} activeOpacity={0.7}>
                     <View style={[styles.check, job.selected && { backgroundColor: colors.amber, borderColor: colors.amber }]}>
-                      {job.selected && <Ionicons name="checkmark" size={13} color="#0B0C12" />}
+                      {job.selected && <Ionicons name="checkmark" size={13} color="#0D0D0D" />}
                     </View>
                     <View style={styles.jobBody}>
                       <Text style={[styles.jobName, { color: colors.ink }]}>{job.name}</Text>
@@ -158,7 +158,7 @@ export default function JobSelectionScreen() {
                                     job.experienceLevel === lv.value ? { backgroundColor: colors.amber } : { backgroundColor: colors.surface },
                                   ]}
                                 >
-                                  <Text style={[styles.levelText, { color: job.experienceLevel === lv.value ? '#0B0C12' : colors.muted }]}>
+                                  <Text style={[styles.levelText, { color: job.experienceLevel === lv.value ? '#0D0D0D' : colors.muted }]}>
                                     {lv.label}
                                   </Text>
                                 </TouchableOpacity>
@@ -176,7 +176,7 @@ export default function JobSelectionScreen() {
 
           <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.amber }, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
             {saving ? (
-              <ActivityIndicator size="small" color="#0B0C12" />
+              <ActivityIndicator size="small" color="#0D0D0D" />
             ) : (
               <Text style={styles.saveText}>Save {selectedCount > 0 ? `(${selectedCount})` : ''}</Text>
             )}
@@ -210,5 +210,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
   levelBtn: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
   levelText: { fontSize: 11, fontFamily: fonts.bodyMedium },
   saveBtn: { borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8 },
-  saveText: { fontSize: 15, fontFamily: fonts.bodyBold, color: '#0B0C12' },
+  saveText: { fontSize: 15, fontFamily: fonts.bodyBold, color: '#0D0D0D' },
 })

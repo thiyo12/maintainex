@@ -17,8 +17,8 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  OPEN:        '#10B981',
-  ASSIGNED:    '#F59E0B',
+  OPEN:        '#22C55E',
+  ASSIGNED:    '#F5A623',
   IN_PROGRESS: '#3B82F6',
   COMPLETED:   '#6B7280',
   CANCELLED:   '#EF4444',
@@ -91,7 +91,7 @@ export default function JobCard({ title, category, budget, location, distance, u
           <TouchableOpacity
             style={[styles.applyBtn, {
               backgroundColor: colors.amber,
-              shadowColor: '#F59E0B',
+              shadowColor: '#F5A623',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.35,
               shadowRadius: 8,

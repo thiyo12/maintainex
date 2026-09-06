@@ -51,7 +51,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1.5,
     marginBottom: 10,
     overflow: 'hidden',
-    shadowColor: '#F59E0B',
+    shadowColor: '#F5A623',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,

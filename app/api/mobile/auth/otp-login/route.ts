@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
 import { createToken } from '@/lib/mobile-auth'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -12,15 +12,11 @@ async function findUserByIdentifier(identifier: string) {
   if (EMAIL_REGEX.test(identifier)) {
     return prisma.user.findUnique({ where: { email: identifier } })
   }
-  const digits = identifier.replace(/\D/g, '')
+  const digits = identifier.replace(/\D/g, '').slice(-9)
   if (!digits) return null
-  const candidates = await prisma.user.findMany({
-    where: { phone: { not: null } },
-    select: { phone: true },
+  return prisma.user.findFirst({
+    where: { phone: { endsWith: digits } },
   })
-  const match = candidates.find((c) => c.phone && c.phone.replace(/\D/g, '') === digits)
-  if (!match) return null
-  return prisma.user.findFirst({ where: { phone: match.phone } })
 }
 
 function accountBlocked(user: any): NextResponse | null {
@@ -49,7 +45,8 @@ function accountBlocked(user: any): NextResponse | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
+    const userAgent = request.headers.get('user-agent') ?? ''
     const body = await request.json()
     const emailId = typeof body.email === 'string' ? body.email.trim() : ''
     const phoneId = typeof body.phone === 'string' ? body.phone.trim() : ''
@@ -69,9 +66,10 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     if (!code) {
-      const { allowed } = checkRateLimit(ip, 5)
+      const phone = phoneId || user.phone || identifier
+      const { allowed, reason } = await checkOtpSendLimit(phone, ip)
       if (!allowed) {
-        return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
+        return NextResponse.json({ error: reason }, { status: 429 })
       }
 
       const otp = process.env.ALLOW_TEST_OTP === 'true'
@@ -85,6 +83,7 @@ export async function POST(request: NextRequest) {
           codeHash,
           purpose: 'LOGIN',
           expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+          metadata: { ip, userAgent },
         },
       })
 
@@ -93,6 +92,11 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json({ success: true })
+    }
+
+    const { allowed: verifyAllowed, reason: verifyReason } = await checkOtpVerifyLimit(user.id)
+    if (!verifyAllowed) {
+      return NextResponse.json({ error: verifyReason }, { status: 429 })
     }
 
     const otpRecord = await prisma.oTP.findFirst({
@@ -114,10 +118,27 @@ export async function POST(request: NextRequest) {
     } else {
       const isValid = await bcrypt.compare(code, otpRecord.codeHash)
       if (!isValid) {
-        await prisma.oTP.update({
+        const updated = await prisma.oTP.update({
           where: { id: otpRecord.id },
           data: { attempts: { increment: 1 } },
         })
+        if (updated.attempts >= 5) {
+          await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
+          await prisma.securityAudit.create({
+            data: {
+              action: 'OTP_BRUTE_FORCE',
+              category: 'AUTH',
+              userId: user.id,
+              userEmail: user.email,
+              userRole: user.role,
+              entityType: 'OTP',
+              entityId: otpRecord.id,
+              description: `5 failed OTP attempts for ${user.email || user.phone} from IP ${ip}`,
+              ipAddress: ip,
+              userAgent,
+            },
+          })
+        }
         return NextResponse.json({ error: 'Invalid code. Please try again.' }, { status: 400 })
       }
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })

@@ -75,9 +75,9 @@ export default function EscrowConfirmScreen() {
       </View>
 
       <View style={styles.trustRow}>
-        <Ionicons name="shield-checkmark-outline" size={18} color="#10B981" />
+        <Ionicons name="shield-checkmark-outline" size={18} color="#22C55E" />
         <Text style={styles.trustTxt}>
-          Money is held securely by Maintainex. It is only released to {taskerName} after you confirm the work is done. You are protected.
+          Money is held securely by MΛINTΛINEX. It is only released to {taskerName} after you confirm the work is done. You are protected.
         </Text>
       </View>
 
@@ -100,7 +100,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: colors.ink },
-  lockBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.amberBg, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginTop: 8, marginBottom: 12, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 5 },
+  lockBox: { width: 72, height: 72, borderRadius: 20, backgroundColor: colors.amberBg, justifyContent: 'center', alignItems: 'center', alignSelf: 'center', marginTop: 8, marginBottom: 12, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 5 },
   htitle: { fontSize: 20, fontFamily: fonts.heading, color: colors.ink, letterSpacing: -0.4, marginBottom: 6, textAlign: 'center' },
   hsub: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 20, paddingHorizontal: 8, marginBottom: 20 },
   card: { backgroundColor: colors.white, borderRadius: 18, padding: 18, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 16, elevation: 4 },
@@ -112,8 +112,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   totalL: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink },
   totalV: { fontSize: 20, fontFamily: fonts.heading, color: colors.amberDark, letterSpacing: -0.5 },
   trustRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12, marginBottom: 12 },
-  trustTxt: { fontSize: 12, fontFamily: fonts.body, color: '#10B981', flex: 1, lineHeight: 18 },
-  btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  trustTxt: { fontSize: 12, fontFamily: fonts.body, color: '#22C55E', flex: 1, lineHeight: 18 },
+  btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   btnTxt: { fontSize: 15, fontFamily: fonts.headingBold, color: '#111827' },
   cancelBtn: { alignItems: 'center', marginTop: 12, padding: 12 },
   cancelTxt: { fontSize: 13, fontFamily: fonts.body, color: colors.muted },

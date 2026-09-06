@@ -23,11 +23,11 @@ export default function TermsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionTitle}>Terms of Service</Text>
         <Text style={styles.paragraph}>
-          By using Maintainex, you agree to these terms. Our platform connects users with service providers.
+          By using MΛINTΛINEX, you agree to these terms. Our platform connects users with service providers.
           We facilitate payments through escrow to protect both parties.
         </Text>
         <Text style={styles.paragraph}>
-          Service providers are independent contractors. Maintainex is not responsible for the quality of work
+          Service providers are independent contractors. MΛINTΛINEX is not responsible for the quality of work
           performed, but we provide dispute resolution to address any issues.
         </Text>
         <Text style={styles.sectionTitle}>Privacy Policy</Text>

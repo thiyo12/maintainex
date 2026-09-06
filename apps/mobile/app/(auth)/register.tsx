@@ -1,88 +1,103 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
+  Animated, Image,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { User, Phone, EnvelopeSimple, Lock, Eye, EyeSlash, CaretLeft, CheckCircle, ArrowRight } from 'phosphor-react-native'
+import { CaretLeft, User, Wrench, ArrowRight } from 'phosphor-react-native'
 import { useAuth } from '../../lib/auth'
-import { useColors } from '../../lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '../../lib/fonts'
+import CountryPicker, { COUNTRIES, Country } from '../../components/ui/CountryPicker'
+import OtpInput from '../../components/ui/OtpInput'
+import PressableScale from '../../components/ui/PressableScale'
+
+const STEPS = [1, 2, 3]
+
+const CUSTOMER_PILLS = ['Cleaning', 'Repairs', 'Home', 'More']
+const TASKER_PILLS = ['Handyman', 'Cleaning', 'Repairs', 'More']
 
 export default function RegisterScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { role: paramRole } = useLocalSearchParams<{ role: string }>()
-  const { t } = useTranslation()
-  const { register, setSignupData } = useAuth()
+  const { register, verifyRegisterOtp } = useAuth()
 
+  const [step, setStep] = useState(paramRole ? 2 : 1)
+  const [role, setRole] = useState<'CUSTOMER' | 'TASKER'>(paramRole === 'TASKER' ? 'TASKER' : paramRole === 'CUSTOMER' ? 'CUSTOMER' : '')
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
-  const [showConfirmPw, setShowConfirmPw] = useState(false)
-  const [agreeTerms, setAgreeTerms] = useState(false)
+  const [country, setCountry] = useState<Country>(COUNTRIES[0])
   const [loading, setLoading] = useState(false)
+  const [otpError, setOtpError] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const slideAnim = useRef(new Animated.Value(paramRole ? 1 : 0)).current
 
-  const role = paramRole || 'CUSTOMER'
-  const allFilled = name && phone && email && password && confirmPassword && agreeTerms
+  const fullPhone = `${country.dial}${phone.replace(/\D/g, '')}`
+  const phoneDigits = phone.replace(/\D/g, '')
+  const canStep2 = name.length >= 2 && phoneDigits.length >= 7
 
-  const roleLabel = role === 'TASKER' ? t('auth.register.joinAsTasker') : role === 'COMPANY' ? t('auth.register.registerCompany') : t('auth.register.joinAsCustomer')
+  const goNext = () => {
+    Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
+    setStep(2)
+  }
 
-  const handleNext = async () => {
-    if (!name || !phone || !email || !password || !confirmPassword) {
-      Alert.alert(t('common.error'), t('errors.fillAllFields'))
-      return
+  const goBack = () => {
+    if (step === 2 && !paramRole) {
+      Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start()
+      setStep(1)
+    } else if (step === 3) {
+      setStep(2)
+      setOtpError('')
+    } else {
+      router.back()
     }
-    if (password !== confirmPassword) {
-      Alert.alert(t('common.error'), t('errors.passwordsDoNotMatch'))
-      return
-    }
-    if (password.length < 6) {
-      Alert.alert(t('common.error'), t('errors.passwordMinLength'))
-      return
-    }
-    if (phone.replace(/\D/g, '').length < 9) {
-      Alert.alert(t('common.error'), t('errors.invalidPhone'))
-      return
-    }
-    if (!agreeTerms) {
-      Alert.alert(t('common.error'), t('errors.agreeTerms'))
-      return
-    }
+  }
 
+  const handleSendCode = async () => {
+    if (!canStep2) return
     setLoading(true)
     try {
-      await register({ name, email, password, phone, role })
-      setSignupData({ name, email, phone, password, role })
-      if (role === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
-      else if (role === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
-      else router.replace('/(customer)')
+      const res = await register({
+        name,
+        phone: fullPhone,
+        email: email || undefined,
+        role: role === 'TASKER' ? 'TASKER' : 'CUSTOMER',
+      })
+      if (res.requiresVerification) {
+        setStep(3)
+        setOtpError('')
+      }
     } catch (err: any) {
-      let message = err.message || t('errors.generic')
-      try {
-        const parsed = JSON.parse(message)
-        message = parsed.error || message
-      } catch {}
-      const isDuplicate = /already registered/i.test(message)
-      Alert.alert(
-        t('errors.registrationFailed'),
-        message,
-        isDuplicate
-          ? [
-              { text: t('auth.login.button'), onPress: () => router.replace('/(auth)/login') },
-              { text: t('common.ok'), style: 'cancel' },
-            ]
-          : undefined
-      )
+      let message = err?.message || 'Registration failed'
+      try { message = JSON.parse(message).error || message } catch {}
+      Alert.alert('Error', message)
     } finally {
       setLoading(false)
     }
   }
+
+  const handleVerifyOtp = async (code: string) => {
+    setVerifying(true)
+    setOtpError('')
+    try {
+      const user = await verifyRegisterOtp(fullPhone, code, 'PHONE_VERIFICATION')
+      if (user?.role === 'TASKER') {
+        router.replace('/(auth)/onboarding/tasker-services')
+      } else if (user?.role === 'COMPANY') {
+        router.replace('/(auth)/onboarding/company-setup')
+      } else {
+        router.replace('/(customer)')
+      }
+    } catch (err: any) {
+      let message = err?.message || 'Invalid code'
+      try { message = JSON.parse(message).error || message } catch {}
+      setOtpError(message)
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const pills = role === 'TASKER' ? TASKER_PILLS : CUSTOMER_PILLS
 
   return (
     <KeyboardAvoidingView
@@ -90,136 +105,284 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <CaretLeft size={20} color={colors.ink} weight="bold" />
-        </TouchableOpacity>
-
-        <View style={styles.headerSection}>
-          <User size={36} color={colors.amber} weight="fill" />
-          <Text style={styles.title}>{t('auth.register.createYourAccount')}</Text>
-          <Text style={styles.subtitle}>{roleLabel}</Text>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={goBack} style={styles.backButton}>
+            <CaretLeft size={20} color="#FFFFFF" weight="bold" />
+          </TouchableOpacity>
+          {step === 1 && (
+            <TouchableOpacity onPress={() => router.replace('/(auth)/login')}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.fieldWrap}>
-            <User size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.ink, borderColor: colors.border }]}
-              value={name}
-              onChangeText={setName}
-              placeholder={t('auth.register.namePlaceholder')}
-              placeholderTextColor={colors.muted}
-            />
-          </View>
-
-          <View style={styles.fieldWrap}>
-            <Phone size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.ink, borderColor: colors.border }]}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder={t('auth.register.phonePlaceholder')}
-              keyboardType="phone-pad"
-              placeholderTextColor={colors.muted}
-            />
-          </View>
-
-          <View style={styles.fieldWrap}>
-            <EnvelopeSimple size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.ink, borderColor: colors.border }]}
-              value={email}
-              onChangeText={setEmail}
-              placeholder={t('auth.register.emailPlaceholder')}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              placeholderTextColor={colors.muted}
-            />
-          </View>
-
-          <View style={styles.fieldWrap}>
-            <Lock size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.ink, borderColor: colors.border }]}
-              value={password}
-              onChangeText={setPassword}
-              placeholder={t('auth.register.passwordPlaceholder')}
-              secureTextEntry={!showPw}
-              placeholderTextColor={colors.muted}
-            />
-            <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn}>
-              {showPw ? <EyeSlash size={18} color={colors.muted} weight="regular" /> : <Eye size={18} color={colors.muted} weight="regular" />}
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.fieldWrap}>
-            <Lock size={18} color={colors.muted} weight="regular" style={styles.fieldIcon} />
-            <TextInput
-              style={[styles.input, { color: colors.ink, borderColor: colors.border }]}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder={t('auth.register.confirmPasswordPlaceholder')}
-              secureTextEntry={!showConfirmPw}
-              placeholderTextColor={colors.muted}
-            />
-            <TouchableOpacity onPress={() => setShowConfirmPw(!showConfirmPw)} style={styles.eyeBtn}>
-              {showConfirmPw ? <EyeSlash size={18} color={colors.muted} weight="regular" /> : <Eye size={18} color={colors.muted} weight="regular" />}
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity style={styles.checkboxRow} onPress={() => setAgreeTerms(!agreeTerms)}>
-            <View style={[styles.checkbox, { borderColor: colors.border }, agreeTerms && { backgroundColor: colors.amber, borderColor: colors.amber }]}>
-              {agreeTerms && <CheckCircle size={14} color="#111827" weight="fill" />}
+        {step === 1 && (
+          <View style={styles.stepContainer}>
+            <View style={styles.dotsRow}>
+              {STEPS.map((s) => (
+                <View key={s} style={[styles.dot, s === 1 && styles.dotActive]} />
+              ))}
             </View>
-            <Text style={[styles.checkboxLabel, { color: colors.muted }]}>
-              {t('auth.register.agreeTerms')}
-              <Text style={styles.termsLink}>{t('auth.register.termsOfService')}</Text>
-              {t('auth.register.and')}
-              <Text style={styles.termsLink}>{t('auth.register.privacyPolicy')}</Text>
-            </Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, (!allFilled || loading) && styles.buttonDisabled]}
-            onPress={handleNext}
-            disabled={!allFilled || loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#111827" />
-            ) : (
-              <View style={styles.buttonInner}>
-                <Text style={styles.buttonText}>{t('auth.register.next')}</Text>
-                <ArrowRight size={18} color="#111827" weight="bold" />
+            <View style={styles.logoSection}>
+              <View style={styles.logoBox}>
+                <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
               </View>
+            </View>
+
+            <Text style={styles.title}>How will you use{'\n'}MΛINTΛINEX?</Text>
+            <Text style={styles.subtitle}>Choose your role to get started.{'\n'}You can always change this later.</Text>
+
+            <PressableScale
+              scaleTo={0.97}
+              onPress={() => setRole('CUSTOMER')}
+              style={[styles.roleCard, role === 'CUSTOMER' && styles.roleCardActive]}
+            >
+              <View style={[styles.roleIconCircle, role === 'CUSTOMER' && styles.roleIconActive]}>
+                <User size={26} color={role === 'CUSTOMER' ? '#0D0D0D' : '#F5A623'} weight="fill" />
+              </View>
+              <View style={styles.roleText}>
+                <Text style={styles.roleTitle}>I need a service</Text>
+                <Text style={styles.roleSub}>Find and book trusted professionals near you.</Text>
+                <View style={styles.pillsRow}>
+                  {CUSTOMER_PILLS.map((p) => (
+                    <View key={p} style={styles.pill}>
+                      <Text style={styles.pillText}>{p}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <View style={[styles.radio, role === 'CUSTOMER' && styles.radioActive]}>
+                {role === 'CUSTOMER' && <View style={styles.radioInner} />}
+              </View>
+            </PressableScale>
+
+            <PressableScale
+              scaleTo={0.97}
+              onPress={() => setRole('TASKER')}
+              style={[styles.roleCard, role === 'TASKER' && styles.roleCardActive]}
+            >
+              <View style={[styles.roleIconCircle, role === 'TASKER' && styles.roleIconActive]}>
+                <Wrench size={26} color={role === 'TASKER' ? '#0D0D0D' : '#F5A623'} weight="fill" />
+              </View>
+              <View style={styles.roleText}>
+                <Text style={styles.roleTitle}>I offer services</Text>
+                <Text style={styles.roleSub}>Earn money with your skills and experience.</Text>
+                <View style={styles.pillsRow}>
+                  {TASKER_PILLS.map((p) => (
+                    <View key={p} style={styles.pill}>
+                      <Text style={styles.pillText}>{p}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+              <View style={[styles.radio, role === 'TASKER' && styles.radioActive]}>
+                {role === 'TASKER' && <View style={styles.radioInner} />}
+              </View>
+            </PressableScale>
+
+            <PressableScale
+              scaleTo={0.97}
+              onPress={goNext}
+              disabled={!role}
+              style={[styles.pillButton, !role && styles.pillButtonDisabled]}
+            >
+              <View style={styles.pillBtnRow}>
+                <Text style={styles.pillBtnText}>Continue</Text>
+                <ArrowRight size={20} color="#0D0D0D" weight="bold" />
+              </View>
+            </PressableScale>
+          </View>
+        )}
+
+        {step === 2 && (
+          <Animated.View style={[styles.stepContainer, { opacity: slideAnim, transform: [{ translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }]}>
+            <View style={styles.dotsRow}>
+              {STEPS.map((s) => (
+                <View key={s} style={[styles.dot, s <= 2 && styles.dotActive]} />
+              ))}
+            </View>
+
+            <Text style={styles.title}>Your details</Text>
+            <Text style={styles.subtitle}>We'll use this to create your account</Text>
+
+            <Text style={styles.fieldLabel}>Full name</Text>
+            <View style={styles.inputRow}>
+              <User size={18} color="#6B6B6B" weight="regular" style={styles.inputIcon} />
+              <TextInput
+                style={styles.textInput}
+                value={name}
+                onChangeText={setName}
+                placeholder="Kamal Perera"
+                placeholderTextColor="#6B6B6B"
+              />
+            </View>
+
+            <Text style={styles.fieldLabel}>Mobile number</Text>
+            <View style={styles.phoneRow}>
+              <CountryPicker selected={country} onChange={setCountry} />
+              <TextInput
+                style={styles.phoneInput}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder={country.code === 'LK' ? '771 234 567' : '416 234 5678'}
+                placeholderTextColor="#6B6B6B"
+                keyboardType="phone-pad"
+                maxLength={15}
+              />
+            </View>
+
+            {role === 'TASKER' && (
+              <>
+                <Text style={styles.fieldLabel}>Email (optional)</Text>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.textInput}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="kamal@email.com"
+                    placeholderTextColor="#6B6B6B"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </>
             )}
-          </TouchableOpacity>
-        </View>
+
+            <PressableScale
+              scaleTo={0.97}
+              onPress={handleSendCode}
+              disabled={!canStep2 || loading}
+              style={[styles.pillButton, !canStep2 && styles.pillButtonDisabled]}
+            >
+              {loading ? (
+                <ActivityIndicator color="#0D0D0D" />
+              ) : (
+                <View style={styles.pillBtnRow}>
+                  <Text style={styles.pillBtnText}>Send Verification Code</Text>
+                  <ArrowRight size={20} color="#0D0D0D" weight="bold" />
+                </View>
+              )}
+            </PressableScale>
+          </Animated.View>
+        )}
+
+        {step === 3 && (
+          <View style={styles.stepContainer}>
+            <View style={styles.dotsRow}>
+              {STEPS.map((s) => (
+                <View key={s} style={[styles.dot, styles.dotActive]} />
+              ))}
+            </View>
+
+            <Text style={styles.title}>Verify your number</Text>
+            <Text style={styles.subtitle}>Code sent to {fullPhone}</Text>
+
+            <OtpInput
+              onComplete={handleVerifyOtp}
+              error={otpError}
+              loading={verifying}
+            />
+
+            <View style={styles.resendRow}>
+              <TouchableOpacity onPress={() => setStep(2)}>
+                <Text style={styles.wrongNumber}>Wrong number?</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { padding: 24, paddingTop: 60 },
-  backButton: { marginBottom: 24, width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  headerSection: { alignItems: 'center', marginBottom: 28, gap: 8 },
-  title: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink, textAlign: 'center' },
-  subtitle: { fontSize: 15, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 22 },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  scrollContent: { padding: 24, paddingTop: 60, flexGrow: 1 },
 
-  formCard: { borderRadius: 24, padding: 24, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4 },
-  fieldWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 18, borderWidth: 1.5, borderColor: colors.border, marginBottom: 12, shadowColor: colors.amber, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.08, shadowRadius: 8 },
-  fieldIcon: { paddingLeft: 16 },
-  input: { flex: 1, padding: 15, fontSize: 15, fontFamily: fonts.body },
-  eyeBtn: { paddingRight: 16 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  backButton: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#1C1C1C',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2E2E2E',
+  },
+  skipText: { fontSize: 16, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF' },
 
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 20, gap: 10 },
-  checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  checkboxLabel: { flex: 1, fontSize: 13, fontFamily: fonts.body, lineHeight: 18 },
-  termsLink: { fontFamily: fonts.bodyMedium, color: colors.amber },
+  dotsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
+  dot: { width: 24, height: 4, borderRadius: 2, backgroundColor: '#2E2E2E' },
+  dotActive: { backgroundColor: '#F5A623' },
 
-  button: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 100, alignItems: 'center', shadowColor: colors.amber, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 4 },
-  buttonDisabled: { opacity: 0.5 },
-  buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  buttonText: { fontSize: 17, fontFamily: fonts.bodySemiBold, color: '#111827' },
+  logoSection: { alignItems: 'center', marginBottom: 24 },
+  logoBox: {
+    width: 64, height: 64, borderRadius: 16,
+    backgroundColor: 'rgba(245,166,35,0.08)',
+    borderWidth: 1.5, borderColor: '#F5A623',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35, shadowRadius: 16, elevation: 8,
+  },
+  logo: { width: 40, height: 40 },
+
+  stepContainer: { flex: 1 },
+  title: { fontSize: 30, fontFamily: 'Outfit_800ExtraBold', color: '#FFFFFF', marginBottom: 8, lineHeight: 36 },
+  subtitle: { fontSize: 15, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 28, lineHeight: 22 },
+
+  roleCard: {
+    flexDirection: 'row', alignItems: 'flex-start', padding: 16,
+    backgroundColor: '#1C1C1C', borderWidth: 1.5, borderColor: '#2E2E2E',
+    borderRadius: 20, marginBottom: 12,
+  },
+  roleCardActive: { borderColor: '#F5A623' },
+  roleIconCircle: {
+    width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(245,166,35,0.12)',
+    justifyContent: 'center', alignItems: 'center', marginRight: 14, marginTop: 2,
+  },
+  roleIconActive: { backgroundColor: '#F5A623' },
+  roleText: { flex: 1 },
+  roleTitle: { fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#FFFFFF', marginBottom: 3 },
+  roleSub: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 10, lineHeight: 18 },
+  pillsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  pill: {
+    paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  pillText: { fontSize: 12, fontFamily: 'Outfit_500Medium', color: '#B3B3B3' },
+
+  radio: {
+    width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#6B6B6B',
+    justifyContent: 'center', alignItems: 'center', marginTop: 4,
+  },
+  radioActive: { borderColor: '#F5A623' },
+  radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#F5A623' },
+
+  fieldLabel: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 6, marginTop: 4 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center', height: 56, borderRadius: 16,
+    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
+    marginBottom: 16, overflow: 'hidden',
+  },
+  inputIcon: { paddingLeft: 16, marginRight: 8 },
+  textInput: { flex: 1, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Outfit_500Medium', color: '#FFFFFF' },
+
+  phoneRow: {
+    flexDirection: 'row', height: 56, borderRadius: 16,
+    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
+    overflow: 'hidden', marginBottom: 16,
+  },
+  phoneInput: {
+    flex: 1, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Outfit_500Medium',
+    color: '#FFFFFF',
+  },
+
+  pillButton: {
+    height: 56, borderRadius: 16, backgroundColor: '#F5A623',
+    justifyContent: 'center', alignItems: 'center', marginTop: 8,
+    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 12, elevation: 4,
+  },
+  pillButtonDisabled: { backgroundColor: '#2E2E2E', shadowOpacity: 0 },
+  pillBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pillBtnText: { fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
+
+  resendRow: { alignItems: 'center', marginTop: 16 },
+  wrongNumber: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
 })

@@ -31,10 +31,10 @@ export default function ProgressSteps({ current, total, labels, title, percentag
             <View key={i} style={styles.stepWrap}>
               <View style={[
                 styles.dot,
-                isDone && { backgroundColor: '#10B981' },
+                isDone && { backgroundColor: '#22C55E' },
                 isCurrent && {
-                  backgroundColor: '#F59E0B',
-                  shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 0 },
+                  backgroundColor: '#F5A623',
+                  shadowColor: '#F5A623', shadowOffset: { width: 0, height: 0 },
                   shadowOpacity: 0.35, shadowRadius: 8, elevation: 4,
                 },
                 !isDone && !isCurrent && { backgroundColor: colors.border },
@@ -52,7 +52,7 @@ export default function ProgressSteps({ current, total, labels, title, percentag
                 )}
               </View>
               {i < total - 1 ? (
-                <View style={[styles.line, { backgroundColor: isDone ? '#10B981' : colors.border }]} />
+                <View style={[styles.line, { backgroundColor: isDone ? '#22C55E' : colors.border }]} />
               ) : null}
             </View>
           )
@@ -66,8 +66,8 @@ export default function ProgressSteps({ current, total, labels, title, percentag
             return (
               <Text key={i} style={[
                 styles.label,
-                isDone && { color: '#10B981' },
-                isCur && { color: '#D97706', fontFamily: 'Outfit_800ExtraBold' },
+                isDone && { color: '#22C55E' },
+                isCur && { color: '#D48900', fontFamily: 'Outfit_800ExtraBold' },
                 !isDone && !isCur && { color: '#6B7280' },
               ]}>
                 {l}

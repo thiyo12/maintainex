@@ -87,7 +87,7 @@ export default function CompanyTeam() {
                   <Text style={styles.memberRole}>{m.role}</Text>
                   {m.rating ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                      <Ionicons name="star" size={13} color="#F59E0B" />
+                      <Ionicons name="star" size={13} color="#F5A623" />
                       <Text style={[styles.memberRole, { marginTop: 0 }]}> {m.rating}</Text>
                     </View>
                   ) : null}

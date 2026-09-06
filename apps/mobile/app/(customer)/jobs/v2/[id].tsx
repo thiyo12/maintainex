@@ -279,7 +279,7 @@ export default function V2JobDetailScreen() {
           <View style={styles.section}>
             {(job as any).aiEstimate && (
               <View style={[styles.aiEstimateBanner, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
-                <Warning size={16} color="#D97706" weight="fill" />
+                <Warning size={16} color="#D48900" weight="fill" />
                 <Text style={[styles.aiEstimateBannerText, { color: '#92400E' }]}>
                   AI estimate was {((job as any).aiEstimate.symbol || 'LKR')} {((job as any).aiEstimate.priceRange?.min || 0).toLocaleString()}–{((job as any).aiEstimate.priceRange?.max || 0).toLocaleString()}
                   {((job as any).aiEstimate.materialHandling === 'tasker_brings') ? ' with materials' : ''}. Quotes below show how taskers compare.

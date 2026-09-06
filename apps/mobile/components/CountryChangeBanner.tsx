@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#F5A623',
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 50,

@@ -332,7 +332,7 @@ export default function CompanyProfile() {
               onPress={() => router.push('/notifications' as any)}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="notifications-outline" size={16} color="#D97706" />
+                <Ionicons name="notifications-outline" size={16} color="#D48900" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.notifications')}</Text>
               {unreadNotifs > 0 && (

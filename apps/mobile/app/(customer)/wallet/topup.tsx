@@ -10,8 +10,8 @@ import { v2Wallet } from '../../../lib/api-v2'
 const PRESETS = [500, 1000, 2500, 5000, 10000, 25000]
 
 const METHODS = [
-  { id: 'payhere', label: 'Card / Bank / eZ Cash', sub: 'Visa, Mastercard, Dialog, Sampath', icon: 'card-outline', badge: 'Instant', badgeColor: '#10B981' },
-  { id: 'stripe', label: 'International Card', sub: 'Visa / Mastercard (USD, CAD, GBP)', icon: 'globe-outline', badge: 'Instant', badgeColor: '#10B981' },
+  { id: 'payhere', label: 'Card / Bank / eZ Cash', sub: 'Visa, Mastercard, Dialog, Sampath', icon: 'card-outline', badge: 'Instant', badgeColor: '#22C55E' },
+  { id: 'stripe', label: 'International Card', sub: 'Visa / Mastercard (USD, CAD, GBP)', icon: 'globe-outline', badge: 'Instant', badgeColor: '#22C55E' },
   { id: 'bank_transfer', label: 'Direct Bank Transfer', sub: "People's Bank, BOC, Commercial Bank", icon: 'business-outline', badge: '1-2 hours', badgeColor: '#3B82F6' },
 ]
 
@@ -144,7 +144,7 @@ export default function TopUpScreen() {
             {[
               ['Bank', "People's Bank"],
               ['Branch', 'Jaffna'],
-              ['Account Name', 'Maintainex (Pvt) Ltd'],
+              ['Account Name', 'MΛINTΛINEX (Pvt) Ltd'],
               ['Account No.', '123-456-789'],
               ['Reference', 'Your registered phone number'],
             ].map(([l, v]) => (
@@ -180,7 +180,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   methodSub: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 1 },
   badge: { fontSize: 9, fontFamily: fonts.bodyMedium, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 100, overflow: 'hidden', textTransform: 'uppercase', letterSpacing: 0.5 },
   footer: { margin: 16 },
-  btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
+  btn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
   btnTxt: { fontSize: 15, fontFamily: fonts.headingBold, color: '#111827' },
   feeNote: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', marginTop: 10 },
   bankModal: { backgroundColor: colors.white, margin: 24, borderRadius: 18, padding: 20 },

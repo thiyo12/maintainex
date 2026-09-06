@@ -75,8 +75,8 @@ async function request<T>(
 
 // Auth
 export const auth = {
-  register: (data: { email: string; password: string; name: string; phone: string; role: string }) =>
-    request<AuthResponse>('/api/mobile/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  register: (data: { name: string; phone: string; email?: string; role: string }) =>
+    request<any>('/api/mobile/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: { email: string; password: string }) =>
     request<AuthResponse>('/api/mobile/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   loginWithOtp: (data: { phone: string; otp: string }) =>
@@ -87,8 +87,8 @@ export const auth = {
     request<{ success: boolean }>('/api/mobile/auth/otp-login', { method: 'POST', body: JSON.stringify({ phone }) }),
   sendOtp: (data: { email: string }) =>
     request<{ success: boolean }>('/api/mobile/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
-  verifyOtp: (data: { email: string; code: string }) =>
-    request<{ success: boolean }>('/api/mobile/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
+  verifyOtp: (data: { email?: string; phone?: string; code: string; purpose?: string }) =>
+    request<any>('/api/mobile/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
   me: () => request<{ user: import('./types').User; needsOnboarding?: boolean }>('/api/mobile/auth/me'),
   updateProfile: (data: { name?: string; phone?: string; profileImage?: string; birthday?: string; gender?: string; language?: string; emergencyContact?: string }) =>
     request<{ user: import('./types').User }>('/api/mobile/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),

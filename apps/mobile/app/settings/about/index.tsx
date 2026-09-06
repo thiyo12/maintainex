@@ -21,10 +21,10 @@ export default function AboutScreen() {
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.appName}>Maintainex</Text>
+        <Text style={styles.appName}>MΛINTΛINEX</Text>
         <Text style={styles.version}>Version 1.0.0</Text>
         <Text style={styles.description}>
-          Maintainex connects you with trusted professionals for all your home service needs.
+          MΛINTΛINEX connects you with trusted professionals for all your home service needs.
           From plumbing and electrical work to cleaning and repairs, find the right expert near you.
         </Text>
         <View style={styles.divider} />
