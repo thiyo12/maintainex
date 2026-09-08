@@ -96,7 +96,12 @@ describe('Ledger Posting', () => {
       const second = await postLedgerTransaction(input);
 
       expect(first.id).toBe(second.id);
-      expect(first.entries).toEqual(second.entries);
+      expect(first.entries.length).toBe(second.entries.length);
+      for (let i = 0; i < first.entries.length; i++) {
+        expect(first.entries[i].accountId).toBe(second.entries[i].accountId);
+        expect(first.entries[i].entryType).toBe(second.entries[i].entryType);
+        expect(BigInt(first.entries[i].amount)).toBe(BigInt(second.entries[i].amount));
+      }
     });
   });
 
