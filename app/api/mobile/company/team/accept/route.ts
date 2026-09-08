@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { acceptCompanyInvite } from '@/lib/phase6/invitation'
+import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,60 +18,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token is required' }, { status: 400 })
     }
 
+    const result = await acceptCompanyInvite({
+      token,
+      userId: user.id,
+      userEmail: user.email,
+    })
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
     const invite = await prisma.teamInvite.findUnique({
       where: { token },
-      include: { company: true },
+      select: { companyId: true, role: true, invitedBy: true },
     })
-    if (!invite) {
-      return NextResponse.json({ error: 'Invalid invite token' }, { status: 404 })
-    }
-    if (invite.status !== 'PENDING') {
-      return NextResponse.json({ error: 'Invite is no longer valid' }, { status: 400 })
-    }
-    if (new Date() > invite.expiresAt) {
-      await prisma.teamInvite.update({ where: { id: invite.id }, data: { status: 'EXPIRED' } })
-      return NextResponse.json({ error: 'Invite has expired' }, { status: 400 })
+
+    if (invite) {
+      await writeCompanyAuditLog({
+        companyId: invite.companyId,
+        actorId: user.id,
+        actorRole: invite.role,
+        action: 'MEMBER_ACCEPT',
+        targetType: 'TeamMember',
+        description: `${user.name || user.email} accepted invitation as ${invite.role}`,
+        metadata: { role: invite.role, invitedBy: invite.invitedBy },
+      })
     }
 
-    const existingMember = await prisma.teamMember.findFirst({
-      where: { companyId: invite.companyId, userId: user.id },
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { role: 'TASKER' },
     })
-    if (existingMember) {
-      return NextResponse.json({ error: 'You are already a member of this company' }, { status: 409 })
-    }
-
-    const emailMatch = invite.email && invite.email === user.email
-    if (invite.email && !emailMatch) {
-      return NextResponse.json({ error: 'This invite was sent to a different email address' }, { status: 403 })
-    }
-
-    const [teamMember] = await prisma.$transaction([
-      prisma.teamMember.create({
-        data: {
-          companyId: invite.companyId,
-          userId: user.id,
-          name: invite.name,
-          role: invite.role,
-          skills: '[]',
-        },
-      }),
-      prisma.teamInvite.update({
-        where: { id: invite.id },
-        data: { status: 'ACCEPTED' },
-      }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: { role: 'TASKER' },
-      }),
-    ])
 
     return NextResponse.json({
       success: true,
       teamMember: {
-        id: teamMember.id,
-        name: teamMember.name,
-        role: teamMember.role,
-        companyName: invite.company.companyName,
+        name: result.memberName,
+        companyName: result.companyName,
       },
     })
   } catch (error) {

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,7 +29,7 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  sessions           Session[]
+  sessions           UserSession[]
   otps               OTP[]
   loginActivities    LoginActivity[]
   bookings           Booking[]
@@ -73,17 +73,24 @@ model Admin {
   @@index([branchId])
 }
 
-model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String
-  userAgent String
-  isValid   Boolean  @default(true)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+model UserSession {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress        String
+  userAgent        String
+  isValid          Boolean   @default(true)
+  expiresAt        DateTime
+  createdAt        DateTime  @default(now())
+  refreshTokenHash String?
+  tokenFamilyId    String?
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  revokeReason     String?
+  updatedAt        DateTime  @updatedAt
 
   @@index([userId])
+  @@map("Session")
 }
 
 model OTP {
@@ -1479,6 +1486,7 @@ model CompanyProfile {
   specialties   CompanySpecialty[]
   invites       TeamInvite[]
   subscriptions CompanySubscription[]
+  auditLogs     CompanyAuditLog[]
 
   @@index([isVerified])
   @@index([rating])
@@ -1493,16 +1501,21 @@ model TeamMember {
   user      User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   name          String
-  role          String
+  role          String // COMPANY_OWNER, MANAGER, DISPATCHER, WORKER, FINANCE
+  status        String   @default("ACTIVE") // ACTIVE, INVITED, SUSPENDED, REMOVED
   skills        String
   isOnline      Boolean  @default(false)
   rating        Float    @default(0)
   completedJobs Int      @default(0)
+  invitedBy     String? // userId of who invited this member
   joinedAt      DateTime @default(now())
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@unique([companyId, userId])
   @@index([companyId])
+  @@index([userId])
 }
 
 model TeamInvite {
@@ -1513,9 +1526,10 @@ model TeamInvite {
   email     String?
   phone     String?
   name      String
-  role      String   @default("MEMBER") // MEMBER, ADMIN
+  role      String   @default("WORKER") // COMPANY_OWNER, MANAGER, DISPATCHER, WORKER, FINANCE
   token     String   @unique
   status    String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED, CANCELLED
+  invitedBy String? // userId of the inviter
   expiresAt DateTime
 
   createdAt DateTime @default(now())
@@ -1555,6 +1569,72 @@ model CompanySubscription {
   @@index([companyId])
   @@index([planId])
   @@index([status])
+}
+
+model Certification {
+  id               String    @id @default(cuid())
+  holderType       String    // INDIVIDUAL, COMPANY
+  holderId         String    // userId for INDIVIDUAL, companyProfile id for COMPANY
+  certificationType String   // ELECTRICAL, PLUMBING, GAS, STRUCTURAL, GENERAL, etc.
+  name             String    // Display name of the certification
+  issuer           String?   // Issuing authority
+  referenceNumber  String?   // Certificate/license number
+  issuedDate       DateTime?
+  expiryDate       DateTime?
+  verificationStatus String @default("PENDING") // PENDING, VERIFIED, REJECTED, EXPIRED
+  verificationNote String?
+  verifiedBy       String?   // Admin userId who verified
+  verifiedAt       DateTime?
+  documentUrl      String?   // Supporting document URL
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([holderType, holderId])
+  @@index([verificationStatus])
+  @@index([expiryDate])
+}
+
+model CompanyAuditLog {
+  id          String         @id @default(cuid())
+  companyId   String
+  company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actorId     String   // userId of the actor
+  actorRole   String   // Role of the actor at the time of action
+  action      String   // COMPANY_CREATE, OWNERSHIP_TRANSFER, MEMBER_INVITE, MEMBER_ACCEPT, MEMBER_REMOVE, ROLE_CHANGE, SUSPENSION, KYC_SUBMIT, KYC_APPROVE, KYC_REJECT, CERTIFICATION_ADD, CERTIFICATION_VERIFY
+  targetType  String?  // TeamMember, Certification, IdentityDocument, CompanyProfile
+  targetId    String?  // ID of the target entity
+  description String?  // Human-readable description
+  metadata    String?  // JSON string for additional data
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model ProviderDocument {
+  id           String    @id @default(cuid())
+  providerType String    // INDIVIDUAL, COMPANY
+  providerId   String    // userId for INDIVIDUAL, companyProfile id for COMPANY
+  documentType String    // BUSINESS_REG, TAX_ID, STAFF_PROOF, EXPERIENCE_PROOF, DRIVING_LICENSE, INSURANCE, OTHER
+  fileName     String
+  fileUrl      String    // Cloudinary or storage URL
+  fileSize     Int?      // bytes
+  mimeType     String?
+  verificationStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
+  verificationNote   String?
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  isPublic     Boolean   @default(false) // Should always be false for identity docs
+  uploadedBy   String    // userId who uploaded
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([providerType, providerId])
+  @@index([verificationStatus])
 }
 
 model Contract {
@@ -2058,6 +2138,7 @@ model AdminSession {
   id               String    @id @default(cuid())
   adminUserId      String
   refreshTokenHash String    @unique
+  tokenFamilyId    String?
   ipAddress        String?
   userAgent        String?
   expiresAt        DateTime
@@ -2069,6 +2150,7 @@ model AdminSession {
 
   @@index([adminUserId])
   @@index([refreshTokenHash])
+  @@index([tokenFamilyId])
 }
 
 /// Work queue — auto-created on KYC/dispute/settlement/flagged-job events
@@ -2637,4 +2719,52 @@ model EmailVerificationToken {
 
   @@index([tokenHash])
   @@index([userId])
+}
+
+model FinancialLedger {
+  id             String   @id @default(cuid())
+  accountId      String
+  accountType    String
+  entryType      String
+  amount         BigInt
+  currency       String   @default("LKR")
+  referenceType  String
+  referenceId    String
+  idempotencyKey String   @unique
+  description    String?
+  createdBy      String
+  metadata       String?
+  createdAt      DateTime @default(now())
+
+  @@index([accountId, accountType])
+  @@index([referenceType, referenceId])
+}
+
+model IdempotencyRecord {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  operation      String
+  status         String    @default("PENDING")
+  metadata       String?
+  resultPayload  String?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([idempotencyKey])
+}
+
+model WalletBalance {
+  id               String   @id @default(cuid())
+  walletId         String
+  walletType       String
+  balance          Float    @default(0)
+  availableBalance Float    @default(0)
+  pendingBalance   Float    @default(0)
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([walletType, walletId])
+  @@index([walletId])
+  @@index([walletType])
 }

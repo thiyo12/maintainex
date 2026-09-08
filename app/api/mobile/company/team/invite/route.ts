@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import crypto from 'crypto'
+import { canAssignRole } from '@/lib/phase6/rbac'
+import { getUserCompanyRole } from '@/lib/phase6/company-ownership'
+import { createCompanyInvite } from '@/lib/phase6/invitation'
+import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,9 +19,6 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
-    if (!email && !phone) {
-      return NextResponse.json({ error: 'Email or phone is required' }, { status: 400 })
-    }
 
     const profile = await prisma.companyProfile.findUnique({
       where: { userId: user.id },
@@ -32,32 +32,51 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company must be verified to invite team members' }, { status: 403 })
     }
 
-    const token = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    const actorRole = await getUserCompanyRole(profile.id, user.id)
+    if (!actorRole) {
+      return NextResponse.json({ error: 'Not a member of this company' }, { status: 403 })
+    }
 
-    const invite = await prisma.teamInvite.create({
-      data: {
-        companyId: profile.id,
-        name,
-        email,
-        phone,
-        role: role || 'MEMBER',
-        token,
-        expiresAt,
-      },
+    const targetRole = role || 'WORKER'
+    if (!canAssignRole(actorRole, targetRole)) {
+      return NextResponse.json({ error: 'Insufficient permissions to assign this role' }, { status: 403 })
+    }
+
+    const result = await createCompanyInvite({
+      companyId: profile.id,
+      inviterUserId: user.id,
+      inviterRole: actorRole,
+      name,
+      email,
+      phone,
+      role: targetRole,
+    })
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    await writeCompanyAuditLog({
+      companyId: profile.id,
+      actorId: user.id,
+      actorRole,
+      action: 'MEMBER_INVITE',
+      targetType: 'TeamInvite',
+      targetId: result.inviteId,
+      description: `Invited ${name} (${email || phone}) as ${targetRole}`,
+      metadata: { invitedEmail: email, invitedPhone: phone, role: targetRole },
     })
 
     return NextResponse.json({
       success: true,
       invite: {
-        id: invite.id,
-        name: invite.name,
-        email: invite.email,
-        phone: invite.phone,
-        role: invite.role,
-        status: invite.status,
-        expiresAt: invite.expiresAt.toISOString(),
-        token: invite.token,
+        id: result.inviteId,
+        name,
+        email,
+        phone,
+        role: targetRole,
+        status: 'PENDING',
+        token: result.token,
       },
     })
   } catch (error) {

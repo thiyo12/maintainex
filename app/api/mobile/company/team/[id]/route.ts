@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
+import { getUserCompanyRole } from '@/lib/phase6/company-ownership'
+import { canRemoveMemberSafe } from '@/lib/phase6/company-ownership'
+import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 
 export async function DELETE(
   request: NextRequest,
@@ -23,14 +26,43 @@ export async function DELETE(
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
     }
 
+    const actorRole = await getUserCompanyRole(profile.id, user.id)
+    if (!actorRole) {
+      return NextResponse.json({ error: 'Not a member of this company' }, { status: 403 })
+    }
+
     const member = await prisma.teamMember.findFirst({
-      where: { id: params.id, companyId: profile.id },
+      where: { id: params.id, companyId: profile.id, status: { not: 'REMOVED' } },
     })
     if (!member) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
     }
 
-    await prisma.teamMember.delete({ where: { id: params.id } })
+    const removal = await canRemoveMemberSafe(
+      profile.id,
+      user.id,
+      member.userId || '',
+      actorRole
+    )
+    if (!removal.allowed) {
+      return NextResponse.json({ error: removal.reason }, { status: 403 })
+    }
+
+    await prisma.teamMember.update({
+      where: { id: params.id },
+      data: { status: 'REMOVED' },
+    })
+
+    await writeCompanyAuditLog({
+      companyId: profile.id,
+      actorId: user.id,
+      actorRole,
+      action: 'MEMBER_REMOVE',
+      targetType: 'TeamMember',
+      targetId: member.id,
+      description: `Removed ${member.name} (${member.role}) from company`,
+      metadata: { removedUserId: member.userId, removedRole: member.role },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -68,6 +100,7 @@ export async function GET(
       id: member.id,
       name: member.name,
       role: member.role,
+      status: member.status,
       skills: safeParseJsonArr(member.skills),
       isOnline: member.isOnline,
       rating: member.rating,
