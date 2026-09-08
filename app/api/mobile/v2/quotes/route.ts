@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { notifyQuoteSubmitted } from '@/lib/notifications'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,20 +11,33 @@ export async function POST(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const profile = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
-    const companyProfile = await prisma.companyProfile.findUnique({ where: { userId: user.id } })
-    if (!profile && !companyProfile) {
-      return NextResponse.json({ error: 'You must have a provider profile to submit quotes' }, { status: 403 })
-    }
-    if (user.identityStatus !== 'VERIFIED') {
-      return NextResponse.json({ error: 'Your identity must be verified before submitting quotes. Please complete KYC verification.' }, { status: 403 })
-    }
-
     const body = await request.json()
-    const { jobId, providerType, price, estimatedCompletionTime, message, attachments } = body
+    const { jobId, providerType, price, estimatedCompletionTime, message, attachments, companyId } = body
 
     if (!jobId || !providerType || price == null) {
       return NextResponse.json({ error: 'Missing required fields: jobId, providerType, price' }, { status: 400 })
+    }
+
+    let resolvedProviderId = user.id
+    let resolvedProviderType = providerType
+
+    if (providerType === 'COMPANY') {
+      if (!companyId) {
+        return NextResponse.json({ error: 'companyId is required for company quotes' }, { status: 400 })
+      }
+      const { context, error } = await resolveCompanyContext(user.id, companyId, 'quotes:submit')
+      if (error) return error
+      resolvedProviderId = companyId
+      resolvedProviderType = 'COMPANY'
+    } else {
+      const profile = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
+      if (!profile) {
+        return NextResponse.json({ error: 'You must have a provider profile to submit quotes' }, { status: 403 })
+      }
+    }
+
+    if (user.identityStatus !== 'VERIFIED') {
+      return NextResponse.json({ error: 'Your identity must be verified before submitting quotes.' }, { status: 403 })
     }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -32,15 +46,15 @@ export async function POST(request: NextRequest) {
     if (job.customerId === user.id) return NextResponse.json({ error: 'Cannot quote on your own job' }, { status: 400 })
 
     const existing = await prisma.jobQuote.findFirst({
-      where: { jobId, providerId: user.id },
+      where: { jobId, providerId: resolvedProviderId },
     })
     if (existing) return NextResponse.json({ error: 'You already submitted a quote' }, { status: 409 })
 
     const quote = await prisma.jobQuote.create({
       data: {
         jobId,
-        providerId: user.id,
-        providerType,
+        providerId: resolvedProviderId,
+        providerType: resolvedProviderType,
         price,
         estimatedCompletionTime: estimatedCompletionTime || '',
         message: message || '',

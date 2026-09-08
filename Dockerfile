@@ -9,8 +9,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=installer /app/node_modules ./node_modules
 COPY . .
-RUN sed -i 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma && \
-    npx prisma generate && mkdir -p public/uploads/services && chmod 755 public/uploads/services
+RUN npx prisma generate && mkdir -p public/uploads/services && chmod 755 public/uploads/services
 RUN npm run build
 
 FROM node:20-slim
@@ -26,4 +25,4 @@ COPY --from=builder /app/next.config.js ./next.config.js
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)throw 1}).catch(()=>process.exit(1))"
-CMD npx prisma db push && npm start
+CMD npx prisma migrate deploy && npm start

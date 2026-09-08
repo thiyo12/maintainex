@@ -1,27 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
-    }
-
     const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
     const period = searchParams.get('period') || 'monthly'
 
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'finance:read')
+    if (error) return error
+
     const contracts = await prisma.contract.findMany({
-      where: { companyId: profile.id },
+      where: { companyId: context!.companyId },
       include: { milestones: true },
     })
 

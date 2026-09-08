@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { createWorkItem } from '@/lib/work-queue'
+import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,10 +67,15 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { identityStatus: 'PENDING' },
+    const result = await transitionUserKyc(prisma, {
+      userId: user.id,
+      action: 'SUBMIT',
+      documentId: doc.id,
     })
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
 
     await createWorkItem({
       category: 'kyc',

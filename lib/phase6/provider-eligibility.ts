@@ -101,12 +101,54 @@ export async function checkWorkerEligibility(
   if (user.identityStatus !== 'VERIFIED') reasons.push('Worker identity not verified')
 
   if (requiredJobId) {
-    const profile = await prisma.taskerProfile.findUnique({
-      where: { userId },
-      select: { skills: true },
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id: requiredJobId },
+      select: { categoryId: true, serviceTemplateId: true },
     })
-    if (!profile?.skills) {
-      reasons.push('Worker has no declared skills')
+    if (!job) {
+      reasons.push('Job not found')
+    } else {
+      const profile = await prisma.taskerProfile.findUnique({
+        where: { userId },
+        select: { id: true, skills: true },
+      })
+      if (!profile) {
+        reasons.push('Worker profile not found')
+      } else {
+        const hasCapability = await prisma.taskerSkill.findFirst({
+          where: {
+            taskerId: profile.id,
+            job: {
+              serviceTemplates: {
+                some: { id: job.serviceTemplateId || undefined },
+              },
+            },
+          },
+        })
+
+        if (!hasCapability) {
+          const templateMatch = job.serviceTemplateId
+            ? await prisma.serviceTemplate.findUnique({
+                where: { id: job.serviceTemplateId },
+                select: { jobCategoryId: true },
+              })
+            : null
+
+          if (templateMatch) {
+            const categoryMatch = await prisma.taskerSkill.findFirst({
+              where: {
+                taskerId: profile.id,
+                job: { categoryId: templateMatch.jobCategoryId },
+              },
+            })
+            if (!categoryMatch) {
+              reasons.push('Worker lacks required capability for this job')
+            }
+          } else {
+            reasons.push('Worker lacks required capability for this job')
+          }
+        }
+      }
     }
   }
 

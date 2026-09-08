@@ -2,8 +2,8 @@ export type CompanyRole = 'COMPANY_OWNER' | 'MANAGER' | 'DISPATCHER' | 'WORKER' 
 
 export const COMPANY_ROLES: Record<CompanyRole, { label: string; description: string }> = {
   COMPANY_OWNER: { label: 'Owner', description: 'Full company control including ownership transfer and deletion' },
-  MANAGER: { label: 'Manager', description: 'Manage workers, jobs, services, and company settings' },
-  DISPATCHER: { label: 'Dispatcher', description: 'View incoming work, assign workers, manage schedules' },
+  MANAGER: { label: 'Manager', description: 'Manage workers, jobs, services, and company settings. No finance access.' },
+  DISPATCHER: { label: 'Dispatcher', description: 'Worker assignment, scheduling, and company quote submission' },
   WORKER: { label: 'Worker', description: 'View assigned work, update execution status' },
   FINANCE: { label: 'Finance', description: 'View company financial information and payout/settlement records' },
 }
@@ -34,8 +34,7 @@ export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
     'members:read', 'members:invite',
     'workers:read', 'workers:assign', 'workers:manage',
     'jobs:read', 'jobs:manage', 'jobs:assign',
-    'quotes:read', 'quotes:submit', 'quotes:manage',
-    'finance:read',
+    'quotes:read', 'quotes:manage',
     'certifications:read',
     'documents:read', 'documents:upload',
     'verification:read',
@@ -45,7 +44,7 @@ export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
     'members:read',
     'workers:read', 'workers:assign',
     'jobs:read', 'jobs:assign',
-    'quotes:read',
+    'quotes:read', 'quotes:submit',
   ],
   WORKER: [
     'company:read',
@@ -69,14 +68,14 @@ export function getRoleHierarchyLevel(role: CompanyRole): number {
   return ROLE_HIERARCHY[role] ?? 0
 }
 
+export function hasCompanyPermission(role: CompanyRole, permission: string): boolean {
+  return COMPANY_PERMISSIONS[role]?.includes(permission) ?? false
+}
+
 export function canAssignRole(actorRole: CompanyRole, targetRole: CompanyRole): boolean {
   if (targetRole === 'COMPANY_OWNER') return false
   if (!['COMPANY_OWNER', 'MANAGER'].includes(actorRole)) return false
   return getRoleHierarchyLevel(actorRole) > getRoleHierarchyLevel(targetRole)
-}
-
-export function hasCompanyPermission(role: CompanyRole, permission: string): boolean {
-  return COMPANY_PERMISSIONS[role]?.includes(permission) ?? false
 }
 
 export function canManageMember(actorRole: CompanyRole, targetRole: CompanyRole): boolean {
@@ -92,13 +91,13 @@ export function canRemoveMember(actorRole: CompanyRole, targetRole: CompanyRole,
 }
 
 export function canAssignWorker(actorRole: CompanyRole): boolean {
-  return ['COMPANY_OWNER', 'MANAGER', 'DISPATCHER'].includes(actorRole)
+  return hasCompanyPermission(actorRole, 'workers:assign')
 }
 
 export function canSubmitQuote(actorRole: CompanyRole): boolean {
-  return ['COMPANY_OWNER', 'MANAGER', 'DISPATCHER'].includes(actorRole)
+  return hasCompanyPermission(actorRole, 'quotes:submit')
 }
 
 export function canViewFinance(actorRole: CompanyRole): boolean {
-  return ['COMPANY_OWNER', 'FINANCE'].includes(actorRole)
+  return hasCompanyPermission(actorRole, 'finance:read')
 }

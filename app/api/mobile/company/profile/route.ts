@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { assertNotSuspended } from '@/lib/mobile-auth'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 function safeParseJson(val: string | null | undefined): string[] {
   if (!val) return []
@@ -14,13 +16,19 @@ function safeParseJson(val: string | null | undefined): string[] {
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
+
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'company:read')
+    if (error) return error
+
+    const profile = await prisma.companyProfile.findUnique({
+      where: { id: context!.companyId },
       include: {
         teamMembers: true,
         contracts: {
@@ -74,29 +82,28 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const data = await request.json()
-    const profile = await prisma.companyProfile.upsert({
-      where: { userId: user.id },
-      update: {
+    const body = await request.json()
+    const { companyId, ...data } = body
+
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'company:update')
+    if (error) return error
+
+    const profile = await prisma.companyProfile.update({
+      where: { id: context!.companyId },
+      data: {
         companyName: data.companyName ?? undefined,
         registrationNo: data.registrationNo ?? undefined,
         description: data.description ?? undefined,
         services: data.services ? JSON.stringify(data.services) : undefined,
         serviceAreas: data.serviceAreas ? JSON.stringify(data.serviceAreas) : undefined,
         logo: data.logo ?? undefined,
-      },
-      create: {
-        userId: user.id,
-        companyName: data.companyName || 'My Company',
-        services: data.services ? JSON.stringify(data.services) : '[]',
-        serviceAreas: data.serviceAreas ? JSON.stringify(data.serviceAreas) : '[]',
       },
     })
 

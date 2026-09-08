@@ -130,21 +130,24 @@ export async function acceptCompanyInvite(params: {
     where: {
       companyId: invite.companyId,
       userId: params.userId,
-      status: { not: 'REMOVED' },
     },
   })
+
   if (existingMember) {
     if (existingMember.status === 'ACTIVE') {
       return { success: false, error: 'You are already a member of this company' }
     }
+
     if (existingMember.status === 'REMOVED') {
-      await prisma.teamMember.update({
-        where: { id: existingMember.id },
-        data: { status: 'ACTIVE', role: invite.role },
-      })
-      await prisma.teamInvite.update({
-        where: { id: invite.id },
-        data: { status: 'ACCEPTED' },
+      await prisma.$transaction(async (tx) => {
+        await tx.teamMember.update({
+          where: { id: existingMember.id },
+          data: { status: 'ACTIVE', role: invite.role },
+        })
+        await tx.teamInvite.update({
+          where: { id: invite.id },
+          data: { status: 'ACCEPTED' },
+        })
       })
       return { success: true, memberName: invite.name, companyName: invite.company.companyName }
     }

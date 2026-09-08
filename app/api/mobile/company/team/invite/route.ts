@@ -1,28 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { canAssignRole } from '@/lib/phase6/rbac'
-import { getUserCompanyRole } from '@/lib/phase6/company-ownership'
 import { createCompanyInvite } from '@/lib/phase6/invitation'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const { name, email, phone, role } = await request.json()
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    const body = await request.json()
+    const { companyId, name, email, phone, role } = body
+    if (!companyId || !name) {
+      return NextResponse.json({ error: 'companyId and name are required' }, { status: 400 })
     }
 
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'members:invite')
+    if (error) return error
+
     const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true, companyName: true, isVerified: true },
+      where: { id: companyId },
+      select: { isVerified: true, companyName: true },
     })
     if (!profile) {
       return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
@@ -32,20 +36,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company must be verified to invite team members' }, { status: 403 })
     }
 
-    const actorRole = await getUserCompanyRole(profile.id, user.id)
-    if (!actorRole) {
-      return NextResponse.json({ error: 'Not a member of this company' }, { status: 403 })
-    }
-
     const targetRole = role || 'WORKER'
-    if (!canAssignRole(actorRole, targetRole)) {
+    if (!canAssignRole(context!.role, targetRole)) {
       return NextResponse.json({ error: 'Insufficient permissions to assign this role' }, { status: 403 })
     }
 
     const result = await createCompanyInvite({
-      companyId: profile.id,
+      companyId,
       inviterUserId: user.id,
-      inviterRole: actorRole,
+      inviterRole: context!.role,
       name,
       email,
       phone,
@@ -57,9 +56,9 @@ export async function POST(request: NextRequest) {
     }
 
     await writeCompanyAuditLog({
-      companyId: profile.id,
+      companyId,
       actorId: user.id,
-      actorRole,
+      actorRole: context!.role,
       action: 'MEMBER_INVITE',
       targetType: 'TeamInvite',
       targetId: result.inviteId,

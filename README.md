@@ -201,17 +201,21 @@ The system covers all districts across Sri Lanka:
 
 ---
 
-## Database Reset
+## Database Setup (DEVELOPMENT ONLY, FORBIDDEN IN PRODUCTION)
 
-To reset the database with sample data:
+> **WARNING**: These commands are for local development only. Production uses `npx prisma migrate deploy`.
+
+To set up the database with sample data:
 
 ```bash
-# Reset database schema
-npx prisma db push --force-reset
+# DEVELOPMENT ONLY — Apply schema changes (safe for dev, resets on conflicts)
+npx prisma migrate dev
 
 # Seed with sample data
 npm run db:seed
 ```
+
+For production, always use `npx prisma migrate deploy` (versioned, non-destructive).
 
 ---
 

@@ -79,31 +79,38 @@ export async function canRemoveMemberSafe(
 export async function transferOwnership(
   companyId: string,
   currentOwnerId: string,
-  newOwnerId: string
+  newOwnerId: string,
+  demoteToRole: CompanyRole = 'MANAGER'
 ): Promise<{ success: boolean; error?: string }> {
-  const isCurrentOwnerLast = await isLastOwner(companyId, currentOwnerId)
-  if (isCurrentOwnerLast) {
-    const newOwnerMember = await prisma.teamMember.findFirst({
-      where: { companyId, userId: newOwnerId, status: 'ACTIVE' },
-    })
-    if (!newOwnerMember) {
-      return { success: false, error: 'New owner must be an active team member' }
-    }
+  const currentOwnerMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: currentOwnerId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+  })
+  if (!currentOwnerMembership) {
+    return { success: false, error: 'Current owner must be an active COMPANY_OWNER' }
   }
 
-  const newOwnerMember = await prisma.teamMember.findFirst({
+  const newOwnerMembership = await prisma.teamMember.findFirst({
     where: { companyId, userId: newOwnerId, status: 'ACTIVE' },
   })
-  if (!newOwnerMember) {
+  if (!newOwnerMembership) {
     return { success: false, error: 'New owner must be an active team member' }
   }
 
-  await prisma.$transaction([
-    prisma.teamMember.update({
-      where: { id: newOwnerMember.id },
+  if (newOwnerId === currentOwnerId) {
+    return { success: false, error: 'Cannot transfer ownership to yourself' }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.teamMember.update({
+      where: { id: newOwnerMembership.id },
       data: { role: 'COMPANY_OWNER' },
-    }),
-  ])
+    })
+
+    await tx.teamMember.update({
+      where: { id: currentOwnerMembership.id },
+      data: { role: demoteToRole },
+    })
+  })
 
   return { success: true }
 }

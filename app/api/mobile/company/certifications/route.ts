@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { assertNotSuspended } from '@/lib/mobile-auth'
 import { hasCompanyPermission } from '@/lib/phase6/rbac'
 import { getUserCompanyRole } from '@/lib/phase6/company-ownership'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
-    }
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
+
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'certifications:read')
+    if (error) return error
 
     const certs = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
       `SELECT * FROM "Certification" WHERE "holderType" = 'COMPANY' AND "holderId" = $1 ORDER BY "createdAt" DESC`,
-      profile.id
+      context!.companyId
     )
 
     return NextResponse.json({ certifications: certs })
@@ -34,32 +34,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true, companyName: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
-    }
-
-    const actorRole = await getUserCompanyRole(profile.id, user.id)
-    if (!actorRole || !hasCompanyPermission(actorRole, 'certifications:manage')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
-
     const body = await request.json()
-    const { certificationType, name, issuer, referenceNumber, issuedDate, expiryDate, documentUrl } = body
+    const { companyId, certificationType, name, issuer, referenceNumber, issuedDate, expiryDate, documentUrl } = body
 
-    if (!certificationType || !name) {
-      return NextResponse.json({ error: 'certificationType and name are required' }, { status: 400 })
+    if (!companyId || !certificationType || !name) {
+      return NextResponse.json({ error: 'companyId, certificationType, and name are required' }, { status: 400 })
     }
+
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'certifications:manage')
+    if (error) return error
 
     const certId = crypto.randomUUID()
     await prisma.$executeRawUnsafe(
@@ -67,7 +57,7 @@ export async function POST(request: NextRequest) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'PENDING', true, NOW(), NOW())`,
       certId,
       'COMPANY',
-      profile.id,
+      context!.companyId,
       certificationType,
       name,
       issuer || null,
@@ -78,9 +68,9 @@ export async function POST(request: NextRequest) {
     )
 
     await writeCompanyAuditLog({
-      companyId: profile.id,
+      companyId: context!.companyId,
       actorId: user.id,
-      actorRole,
+      actorRole: context!.role,
       action: 'CERTIFICATION_ADD',
       targetType: 'Certification',
       targetId: certId,

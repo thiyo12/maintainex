@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'USER_MANAGEMENT']
 
@@ -122,72 +123,22 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
-    const updated = await prisma.identityDocument.update({
-      where: { id: documentId },
-      data: {
-        status,
-        reviewNote: reviewNote || null,
-        reviewedAt: new Date(),
-      },
+    const action = status === 'APPROVED' ? 'APPROVE' : 'REJECT'
+    const result = await transitionUserKyc(prisma, {
+      userId: document.userId,
+      action,
+      documentId,
+      reviewNote: reviewNote || undefined,
+      reviewedBy: session.adminUserId,
     })
 
-    if (status === 'APPROVED') {
-      const user = await prisma.user.findUnique({
-        where: { id: document.userId },
-        include: { taskerProfile: true, companyProfile: true },
-      })
-
-      if (user?.taskerProfile) {
-        await prisma.taskerProfile.update({
-          where: { id: user.taskerProfile.id },
-          data: {
-            verificationStatus: 'VERIFIED',
-            verificationNote: 'Documents verified',
-            verifiedAt: new Date(),
-            isVerified: true,
-          },
-        })
-      }
-
-      if (user?.companyProfile) {
-        await prisma.companyProfile.update({
-          where: { id: user.companyProfile.id },
-          data: {
-            verificationStatus: 'VERIFIED',
-            verificationNote: 'Documents verified',
-            verifiedAt: new Date(),
-            isVerified: true,
-          },
-        })
-      }
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    if (status === 'REJECTED') {
-      const user = await prisma.user.findUnique({
-        where: { id: document.userId },
-        include: { taskerProfile: true, companyProfile: true },
-      })
-
-      if (user?.taskerProfile) {
-        await prisma.taskerProfile.update({
-          where: { id: user.taskerProfile.id },
-          data: {
-            verificationStatus: 'REJECTED',
-            verificationNote: reviewNote || 'Document rejected',
-          },
-        })
-      }
-
-      if (user?.companyProfile) {
-        await prisma.companyProfile.update({
-          where: { id: user.companyProfile.id },
-          data: {
-            verificationStatus: 'REJECTED',
-            verificationNote: reviewNote || 'Document rejected',
-          },
-        })
-      }
-    }
+    const updated = await prisma.identityDocument.findUnique({
+      where: { id: documentId },
+    })
 
     return NextResponse.json({ document: updated })
   } catch (error) {

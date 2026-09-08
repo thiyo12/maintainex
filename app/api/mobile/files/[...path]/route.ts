@@ -3,7 +3,7 @@ import { authenticateRequest } from '@/lib/mobile-auth'
 import { readFile } from 'fs/promises'
 import path from 'path'
 
-const MIME_TYPES: Record<string, string> = {
+const ALLOWED_MIMES: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.png': 'image/png',
@@ -11,6 +11,8 @@ const MIME_TYPES: Record<string, string> = {
   '.gif': 'image/gif',
   '.pdf': 'application/pdf',
 }
+
+const ALLOWED_EXTENSIONS = new Set(Object.keys(ALLOWED_MIMES))
 
 export async function GET(
   request: NextRequest,
@@ -38,12 +40,16 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
     }
 
+    const ext = path.extname(sanitizedFilename).toLowerCase()
+    if (!ALLOWED_EXTENSIONS.has(ext)) {
+      return NextResponse.json({ error: 'File type not allowed' }, { status: 400 })
+    }
+
     const filepath = path.join(process.cwd(), 'uploads', 'mobile', userId, sanitizedFilename)
 
     const buffer = await readFile(filepath)
 
-    const ext = path.extname(sanitizedFilename).toLowerCase()
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream'
+    const contentType = ALLOWED_MIMES[ext] || 'application/octet-stream'
 
     return new NextResponse(buffer, {
       headers: {

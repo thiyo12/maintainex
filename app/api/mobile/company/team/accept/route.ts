@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { assertNotSuspended } from '@/lib/mobile-auth'
 import { acceptCompanyInvite } from '@/lib/phase6/invitation'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

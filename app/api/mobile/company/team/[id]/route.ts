@@ -1,48 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { assertNotSuspended } from '@/lib/mobile-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
-import { getUserCompanyRole } from '@/lib/phase6/company-ownership'
 import { canRemoveMemberSafe } from '@/lib/phase6/company-ownership'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
-    }
+    const body = await request.json().catch(() => ({}))
+    const companyId = body.companyId || (await prisma.teamMember.findUnique({ where: { id: params.id }, select: { companyId: true } }))?.companyId
 
-    const actorRole = await getUserCompanyRole(profile.id, user.id)
-    if (!actorRole) {
-      return NextResponse.json({ error: 'Not a member of this company' }, { status: 403 })
-    }
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'members:remove')
+    if (error) return error
 
     const member = await prisma.teamMember.findFirst({
-      where: { id: params.id, companyId: profile.id, status: { not: 'REMOVED' } },
+      where: { id: params.id, companyId: context!.companyId, status: { not: 'REMOVED' } },
     })
     if (!member) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
     }
 
     const removal = await canRemoveMemberSafe(
-      profile.id,
+      context!.companyId,
       user.id,
       member.userId || '',
-      actorRole
+      context!.role
     )
     if (!removal.allowed) {
       return NextResponse.json({ error: removal.reason }, { status: 403 })
@@ -54,9 +48,9 @@ export async function DELETE(
     })
 
     await writeCompanyAuditLog({
-      companyId: profile.id,
+      companyId: context!.companyId,
       actorId: user.id,
-      actorRole,
+      actorRole: context!.role,
       action: 'MEMBER_REMOVE',
       targetType: 'TeamMember',
       targetId: member.id,
@@ -76,36 +70,39 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
-    }
-
-    const member = await prisma.teamMember.findFirst({
-      where: { id: params.id, companyId: profile.id },
+    const member = await prisma.teamMember.findUnique({
+      where: { id: params.id },
+      select: { companyId: true },
     })
     if (!member) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
     }
 
+    const { context, error } = await resolveCompanyContext(user.id, member.companyId, 'members:read')
+    if (error) return error
+
+    const memberDetail = await prisma.teamMember.findFirst({
+      where: { id: params.id, companyId: member.companyId },
+    })
+    if (!memberDetail) {
+      return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
+    }
+
     return NextResponse.json({
-      id: member.id,
-      name: member.name,
-      role: member.role,
-      status: member.status,
-      skills: safeParseJsonArr(member.skills),
-      isOnline: member.isOnline,
-      rating: member.rating,
-      completedJobs: member.completedJobs,
-      joinedAt: member.joinedAt.toISOString(),
+      id: memberDetail.id,
+      name: memberDetail.name,
+      role: memberDetail.role,
+      status: memberDetail.status,
+      skills: safeParseJsonArr(memberDetail.skills),
+      isOnline: memberDetail.isOnline,
+      rating: memberDetail.rating,
+      completedJobs: memberDetail.completedJobs,
+      joinedAt: memberDetail.joinedAt.toISOString(),
     })
   } catch (error) {
     console.error('Team member get error:', error)

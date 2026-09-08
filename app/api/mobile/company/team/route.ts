@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
+    const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const profile = await prisma.companyProfile.findUnique({
-      where: { userId: user.id },
-      select: { id: true },
-    })
-    if (!profile) {
-      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
-    }
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
+
+    const { context, error } = await resolveCompanyContext(user.id, companyId, 'members:read')
+    if (error) return error
 
     const [members, invites] = await Promise.all([
       prisma.teamMember.findMany({
-        where: { companyId: profile.id },
+        where: { companyId: context!.companyId },
         orderBy: [{ isOnline: 'desc' }, { rating: 'desc' }],
       }),
       prisma.teamInvite.findMany({
-        where: { companyId: profile.id, status: 'PENDING' },
+        where: { companyId: context!.companyId, status: 'PENDING' },
         orderBy: { createdAt: 'desc' },
       }),
     ])

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 export async function PATCH(
   request: NextRequest,
@@ -31,31 +32,22 @@ export async function PATCH(
       return NextResponse.json({ error: 'Document already reviewed' }, { status: 400 })
     }
 
-    const updated = await prisma.identityDocument.update({
-      where: { id: params.id },
-      data: {
-        status,
-        reviewNote: reviewNote || null,
-        reviewedBy: user.id,
-        reviewedAt: new Date(),
-      },
+    const action = status === 'APPROVED' ? 'APPROVE' : 'REJECT'
+    const result = await transitionUserKyc(prisma, {
+      userId: doc.userId,
+      action,
+      documentId: params.id,
+      reviewNote: reviewNote || undefined,
+      reviewedBy: user.id,
     })
 
-    if (status === 'APPROVED') {
-      const allDocs = await prisma.identityDocument.findMany({
-        where: { userId: doc.userId, status: 'APPROVED' },
-      })
-      if (allDocs.length >= 1) {
-        // Unify on 'VERIFIED': quotes are gated on this exact value.
-        // Also lock the user's name to the full name captured from the ID
-        // document, so it can't be changed afterwards.
-        const nameUpdate = doc.fullName?.trim() ? { name: doc.fullName.trim() } : {}
-        await prisma.user.update({
-          where: { id: doc.userId },
-          data: { identityStatus: 'VERIFIED', ...nameUpdate },
-        })
-      }
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
     }
+
+    const updated = await prisma.identityDocument.findUnique({
+      where: { id: params.id },
+    })
 
     return NextResponse.json({ document: updated })
   } catch (error) {
