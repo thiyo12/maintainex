@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import {
   postLedgerTransaction,
@@ -11,8 +11,29 @@ import {
   getLedgerEntries,
 } from '@/lib/ledger';
 import { legacyToMinorUnits, lkrCents } from '@/lib/money';
+import { assertNotProductionDb, isPostgres } from '../test-guard';
+
+assertNotProductionDb()
+
+async function ensureWalletBalance(walletId: string, walletType: string, balance: number) {
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $4, 0, 1, now(), now())
+     ON CONFLICT ("walletType", "walletId")
+     DO UPDATE SET "balance" = $4, "availableBalance" = $4, "updatedAt" = now()`,
+    `wb-${walletId}`, walletId, walletType, balance
+  )
+}
 
 describe('Ledger Posting', () => {
+  beforeAll(async () => {
+    if (isPostgres) {
+      await ensureWalletBalance('test-pw-1', 'PROVIDER', 200000)
+      await ensureWalletBalance('test-pw-2', 'PROVIDER', 200000)
+      await ensureWalletBalance('test-customer-1', 'CUSTOMER', 1000000)
+      await ensureWalletBalance('test-customer-2', 'CUSTOMER', 1000000)
+    }
+  })
   describe('postLedgerTransaction', () => {
     it('posts balanced transaction', async () => {
       const result = await postLedgerTransaction({

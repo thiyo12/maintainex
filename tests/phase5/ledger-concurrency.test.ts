@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import { postLedgerTransaction } from '@/lib/ledger';
+import { assertNotProductionDb } from '../test-guard';
+
+assertNotProductionDb()
 
 describe('Ledger Concurrency (Real PostgreSQL)', () => {
   it('2-way duplicate posting - exactly 1 durable transaction', async () => {

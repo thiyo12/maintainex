@@ -1,13 +1,32 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { postLedgerTransaction, reverseLedgerTransaction } from '../../lib/ledger'
+import { assertNotProductionDb, isPostgres } from '../test-guard'
+
+assertNotProductionDb()
 
 const prisma = new PrismaClient()
 
+async function ensureWalletBalance(walletId: string, walletType: string, balance: number) {
+  if (!isPostgres) return
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $4, 0, 1, now(), now())
+     ON CONFLICT ("walletType", "walletId")
+     DO UPDATE SET "balance" = $4, "availableBalance" = $4, "updatedAt" = now()`,
+    `wb-${walletId}`, walletId, walletType, balance
+  )
+}
+
 describe('Phase 5C — Financial Writer Integration', () => {
   beforeAll(async () => {
+    if (!isPostgres) return
     await prisma.$executeRawUnsafe(`DELETE FROM "FinancialLedger" WHERE "createdBy" = 'test-phase5c'`)
     await prisma.$executeRawUnsafe(`DELETE FROM "IdempotencyRecord" WHERE "operation" LIKE 'ESCROW_TEST_%'`)
+    await ensureWalletBalance('test:wallet-a', 'CUSTOMER', 200000)
+    await ensureWalletBalance('test:wallet-b', 'CUSTOMER', 200000)
+    await ensureWalletBalance('test:wallet-c', 'CUSTOMER', 200000)
+    await ensureWalletBalance('test:wallet-rev', 'CUSTOMER', 200000)
   })
 
   it('ledger postLedgerTransaction works inside $transaction', async () => {

@@ -1,14 +1,29 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { postLedgerTransaction, reverseLedgerTransaction } from '../../lib/ledger'
+import { assertNotProductionDb, isPostgres } from '../test-guard'
+
+assertNotProductionDb()
 
 const prisma = new PrismaClient()
+
+async function ensureWalletBalance(walletId: string, walletType: string, balance: number) {
+  if (!isPostgres) return
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $4, 0, 1, now(), now())
+     ON CONFLICT ("walletType", "walletId")
+     DO UPDATE SET "balance" = $4, "availableBalance" = $4, "updatedAt" = now()`,
+    `wb-${walletId}`, walletId, walletType, balance
+  )
+}
 
 describe('Phase 5C.1 — Comprehensive Ledger Safety Tests', () => {
   const testPrefix = 'test-5c1'
   const cleanupIds: string[] = []
 
   beforeAll(async () => {
+    if (!isPostgres) return
     await prisma.$executeRawUnsafe(
       `DELETE FROM "FinancialLedger" WHERE "createdBy" LIKE '${testPrefix}%'`
     )
@@ -18,6 +33,26 @@ describe('Phase 5C.1 — Comprehensive Ledger Safety Tests', () => {
     await prisma.$executeRawUnsafe(
       `DELETE FROM "JobEscrow" WHERE "jobId" LIKE 'job-${testPrefix}%'`
     )
+
+    const walletIds = [
+      { id: `${testPrefix}:cust-w`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:cust-w2`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:tx-w`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:rb-w`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:rb2-w`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}-atomic-cust`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}-recon-cust`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}-recon-refund-cust`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:idem-w`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:ic-w`, type: 'CUSTOMER', balance: 500000 },
+      { id: `${testPrefix}:bigint-w`, type: 'CUSTOMER', balance: 200000000 },
+      { id: `${testPrefix}:prov-w`, type: 'PROVIDER', balance: 500000 },
+      { id: `${testPrefix}:recon-wallet`, type: 'PROVIDER', balance: 500000 },
+      { id: `${testPrefix}-recon-prov`, type: 'PROVIDER', balance: 500000 },
+    ]
+    for (const w of walletIds) {
+      await ensureWalletBalance(w.id, w.type, w.balance)
+    }
   })
 
   describe('Item 4: 2-way + 5-way ledger balance', () => {

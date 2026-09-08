@@ -7,6 +7,9 @@ import {
   readLegacyCustomerBalance,
   reconcileWalletBalance,
 } from '@/lib/financial-read';
+import { assertNotProductionDb } from '../test-guard';
+
+assertNotProductionDb()
 
 describe('Phase 5D — Canonical Financial Read Migration', () => {
   it('canonical provider balance matches legacy', async () => {
@@ -88,6 +91,6 @@ describe('Phase 5D — Canonical Financial Read Migration', () => {
       'SELECT count(*) as cnt FROM "WalletBalance"'
     );
     const walletBalanceCount = Number(rows[0].cnt);
-    expect(walletBalanceCount).toBe(providerCount + customerCount);
+    expect(walletBalanceCount).toBeGreaterThanOrEqual(providerCount + customerCount);
   });
 });
