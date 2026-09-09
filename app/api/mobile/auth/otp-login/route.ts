@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
-import { createToken } from '@/lib/mobile-auth'
+import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
 
@@ -23,15 +23,13 @@ function accountBlocked(user: any): NextResponse | null {
   if (!user.isActive) {
     return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
   }
-  if (user.isSuspended) {
-    if (!user.suspendedUntil || new Date(user.suspendedUntil) > new Date()) {
-      return NextResponse.json({
-        error: 'Account suspended',
-        code: 'SUSPENDED',
-        reason: user.suspensionReason || 'Your account has been suspended. Please contact support.',
-        suspendedUntil: user.suspendedUntil?.toISOString() || null,
-      }, { status: 403 })
-    }
+  if (user.isSuspended && (!user.suspendedUntil || new Date(user.suspendedUntil) > new Date())) {
+    return NextResponse.json({
+      error: 'Account suspended',
+      code: 'SUSPENDED',
+      reason: user.suspensionReason || 'Your account has been suspended. Please contact support.',
+      suspendedUntil: user.suspendedUntil?.toISOString() || null,
+    }, { status: 403 })
   }
   if (user.isBanned) {
     return NextResponse.json({
@@ -113,6 +111,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid code found. Request a new one.' }, { status: 400 })
     }
 
+    if (otpRecord.attempts >= 5) {
+      await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
+      return NextResponse.json({ error: 'Too many wrong attempts. Request a new code.' }, { status: 429 })
+    }
+
     if (code === '000000' && process.env.ALLOW_TEST_OTP === 'true') {
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     } else {
@@ -144,12 +147,15 @@ export async function POST(request: NextRequest) {
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     }
 
-    const token = createToken({ id: user.id, email: user.email, role: user.role })
-    if (!token) return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    const authSession = await createMarketplaceAuthSession(user.id, {
+      ipAddress: ip,
+      userAgent: userAgent || undefined,
+    })
+    const response = buildAuthResponse(authSession)
 
     return NextResponse.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role, isActive: user.isActive, createdAt: user.createdAt.toISOString() },
+      ...response,
+      token: response.accessToken,
     })
   } catch (error) {
     console.error('OTP login error:', error)
