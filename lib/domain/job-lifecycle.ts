@@ -521,47 +521,71 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   return { refundAmount: refundMajor, refundCents }
 }
 
-export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string) {
-  const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
-  if (!job) throw new Error('Job not found')
-
+async function verifyDisputeAuthorization(job: { customerId: string }, ctx: TransitionContext) {
   const isCustomer = job.customerId === ctx.actorId
   const isStaff = ctx.actorType === 'STAFF'
+  if (isCustomer || isStaff) return
 
-  if (!isCustomer && !isStaff) {
-    const acceptedQuote = await prisma.jobQuote.findFirst({
-      where: { jobId, status: 'ACCEPTED' },
-    })
-    if (!acceptedQuote) throw new Error('No accepted quote')
+  const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId: ctx.jobId, status: 'ACCEPTED' } })
+  if (!acceptedQuote) throw new Error('No accepted quote')
 
-    if (ctx.actorType === 'COMPANY') {
-      if (acceptedQuote.providerType !== 'COMPANY') throw new Error('Quote is not a company quote')
-      const { checkWorkerEligibility } = await import('@/lib/phase6/provider-eligibility')
-      const eligibility = await checkWorkerEligibility(
-        acceptedQuote.providerId,
-        ctx.actorId,
-        jobId
-      )
-      if (!eligibility.eligible) {
-        throw new Error(`Worker not authorized: ${eligibility.reasons.join('; ')}`)
-      }
-    } else {
-      if (acceptedQuote.providerId !== ctx.actorId) {
-        throw new Error('Actor is not a participant in this job')
-      }
-    }
+  if (ctx.actorType === 'COMPANY') {
+    if (acceptedQuote.providerType !== 'COMPANY') throw new Error('Quote is not a company quote')
+    const { checkWorkerEligibility } = await import('@/lib/phase6/provider-eligibility')
+    const eligibility = await checkWorkerEligibility(acceptedQuote.providerId, ctx.actorId, ctx.jobId)
+    if (!eligibility.eligible) throw new Error(`Worker not authorized: ${eligibility.reasons.join('; ')}`)
+  } else {
+    if (acceptedQuote.providerId !== ctx.actorId) throw new Error('Actor is not a participant in this job')
   }
+}
 
-  const escrow = await prisma.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
-  if (!escrow) throw new Error('No protected escrow found to hold')
-  if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+/** @deprecated Use raiseJobDispute() for atomic dispute creation. Kept for backward compatibility. */
+export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string) {
+  return raiseJobDispute(ctx, jobId)
+}
 
-  const claimed = await prisma.jobEscrow.updateMany({
-    where: { id: escrow.id, status: 'PROTECTED' },
-    data: { status: 'ON_HOLD' },
+export async function raiseJobDispute(
+  ctx: TransitionContext,
+  jobId: string
+): Promise<{ escrowId: string; workspaceStatus: string }> {
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
+    if (!job) throw new Error('Job not found')
+    if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
+      throw new Error('Cannot dispute completed or cancelled jobs')
+    }
+
+    await verifyDisputeAuthorization(job, ctx)
+
+    const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
+    if (!workspace) throw new Error('Workspace not found')
+    if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, 'DISPUTED')) {
+      throw new Error(`Cannot dispute from workspace state ${workspace.progressStatus}`)
+    }
+
+    const escrow = await tx.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
+    if (!escrow) throw new Error('No protected escrow found')
+    if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+
+    const escrowClaimed = await tx.jobEscrow.updateMany({
+      where: { id: escrow.id, status: 'PROTECTED' },
+      data: { status: 'ON_HOLD' },
+    })
+    if (escrowClaimed.count !== 1) throw new Error('Escrow state changed concurrently')
+
+    const wsClaimed = await tx.jobWorkspace.updateMany({
+      where: { jobId, progressStatus: workspace.progressStatus },
+      data: { progressStatus: 'DISPUTED' },
+    })
+    if (wsClaimed.count !== 1) throw new Error('Workspace state changed concurrently')
+
+    await tx.marketplaceJob.updateMany({
+      where: { id: jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+      data: { status: 'CANCELLED' },
+    })
+
+    return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
   })
-  if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
-  return { escrowId: escrow.id }
 }
 
 export async function verifyOtpAndStartJob(
@@ -605,7 +629,7 @@ export type ReleaseMode = 'CUSTOMER_APPROVAL' | 'AUTO_RELEASE' | 'ADMIN_RESOLUTI
 export async function completeAndReleaseEscrow(
   ctx: TransitionContext,
   jobId: string,
-  options?: { releaseMode?: ReleaseMode }
+  options?: { releaseMode?: ReleaseMode; autoReleaseHours?: number }
 ): Promise<{ commission: number; netAmount: number; commissionCents: bigint; netCents: bigint; providerId: string; providerEntityId: string; providerType: string }> {
   const releaseMode = options?.releaseMode ?? 'CUSTOMER_APPROVAL'
 
@@ -625,14 +649,18 @@ export async function completeAndReleaseEscrow(
     if (releaseMode === 'AUTO_RELEASE') {
       if (workspace.progressStatus !== 'COMPLETION_REQUESTED') throw new Error('Job not awaiting completion')
       if (workspace.completionRequestedAt == null) throw new Error('No completion request timestamp')
-      const autoReleaseHours = 48
+      const autoReleaseHours = options?.autoReleaseHours ?? 48
       const hoursSinceRequest = (Date.now() - workspace.completionRequestedAt.getTime()) / (1000 * 60 * 60)
       if (hoursSinceRequest < autoReleaseHours) throw new Error('Auto-release deadline not reached')
+    } else if (releaseMode === 'ADMIN_RESOLUTION') {
+      if (workspace.progressStatus !== 'COMPLETION_REQUESTED' && workspace.progressStatus !== 'DISPUTED') {
+        throw new Error('Admin resolution requires COMPLETION_REQUESTED or DISPUTED workspace')
+      }
     } else {
       if (workspace.progressStatus !== 'COMPLETION_REQUESTED') throw new Error('Provider must request completion first')
     }
 
-    const allowedEscrowStatuses = releaseMode === 'AUTO_RELEASE' ? ['PROTECTED', 'ON_HOLD'] : ['PROTECTED']
+    const allowedEscrowStatuses = releaseMode === 'AUTO_RELEASE' ? ['PROTECTED'] : releaseMode === 'ADMIN_RESOLUTION' ? ['PROTECTED', 'ON_HOLD'] : ['PROTECTED']
     const escrow = await tx.jobEscrow.findFirst({
       where: { jobId, status: { in: allowedEscrowStatuses as any } },
     })

@@ -18,36 +18,52 @@ export async function GET(request: NextRequest) {
     const reminderHoursStr = await getSetting('escrow.reminder_hours', '36,24,12')
     const reminderHours = reminderHoursStr.split(',').map(Number)
 
-    const overdueEscrows = await prisma.jobEscrow.findMany({
-      where: {
-        status: 'ON_HOLD',
-        heldAt: { not: null },
-      },
-      select: { id: true, jobId: true, customerId: true, heldAt: true },
+    const protectedEscrows = await prisma.jobEscrow.findMany({
+      where: { status: 'PROTECTED', paymentMethod: { not: 'CASH' } },
+      select: { id: true, jobId: true, customerId: true },
     })
 
-    for (const hold of overdueEscrows) {
-      if (!hold.heldAt) continue
+    const candidateJobIds = protectedEscrows.map(e => e.jobId)
+    if (candidateJobIds.length === 0) {
+      return NextResponse.json({ success: true, processed: 0 })
+    }
 
-      const workspace = await prisma.jobWorkspace.findUnique({
-        where: { jobId: hold.jobId },
-        select: { progressStatus: true, completionRequestedAt: true },
-      })
-      if (!workspace || workspace.progressStatus === 'DISPUTED') continue
-      if (workspace.progressStatus !== 'COMPLETION_REQUESTED' || !workspace.completionRequestedAt) continue
+    const inProgressJobs = await prisma.marketplaceJob.findMany({
+      where: { id: { in: candidateJobIds }, status: 'IN_PROGRESS' },
+      select: { id: true },
+    })
+    const inProgressSet = new Set(inProgressJobs.map(j => j.id))
 
-      const hoursSinceRequest = (Date.now() - workspace.completionRequestedAt.getTime()) / (1000 * 60 * 60)
+    const workspaces = await prisma.jobWorkspace.findMany({
+      where: {
+        jobId: { in: candidateJobIds },
+        progressStatus: 'COMPLETION_REQUESTED',
+        completionRequestedAt: { not: null },
+      },
+      select: { jobId: true, completionRequestedAt: true },
+    })
+    const workspaceMap = new Map(workspaces.map(w => [w.jobId, w]))
+
+    const eligibleEscrows = protectedEscrows.filter(e =>
+      inProgressSet.has(e.jobId) && workspaceMap.has(e.jobId)
+    )
+
+    let processed = 0
+
+    for (const escrow of eligibleEscrows) {
+      const workspace = workspaceMap.get(escrow.jobId)!
+      const hoursSinceRequest = (Date.now() - workspace.completionRequestedAt!.getTime()) / (1000 * 60 * 60)
       const hoursUntilRelease = autoReleaseHours - hoursSinceRequest
 
       if (hoursUntilRelease > 0) {
         for (const hrs of reminderHours) {
           if (hoursUntilRelease <= hrs && hoursUntilRelease > hrs - 1) {
             await createNotification({
-              userId: hold.customerId,
+              userId: escrow.customerId,
               title: 'Confirm job completion',
               body: `Payment auto-releases in ${Math.round(hoursUntilRelease)} hours. Tap to confirm or dispute.`,
               referenceType: 'ESCROW_REMINDER',
-              referenceId: hold.jobId,
+              referenceId: escrow.jobId,
             })
           }
         }
@@ -56,13 +72,13 @@ export async function GET(request: NextRequest) {
 
       try {
         const result = await completeAndReleaseEscrow(
-          { jobId: hold.jobId, actorId: 'system:escrow-auto-release', actorType: 'SYSTEM' },
-          hold.jobId,
-          { releaseMode: 'AUTO_RELEASE' }
+          { jobId: escrow.jobId, actorId: 'system:escrow-auto-release', actorType: 'SYSTEM' },
+          escrow.jobId,
+          { releaseMode: 'AUTO_RELEASE', autoReleaseHours }
         )
 
         const job = await prisma.marketplaceJob.findUnique({
-          where: { id: hold.jobId },
+          where: { id: escrow.jobId },
           select: { title: true },
         })
 
@@ -71,15 +87,16 @@ export async function GET(request: NextRequest) {
           title: 'Payment Released',
           body: `Payment for "${job?.title ?? 'the job'}" has been released to your wallet.`,
           referenceType: 'PAYMENT_RELEASED',
-          referenceId: hold.jobId,
+          referenceId: escrow.jobId,
         })
         await createNotification({
-          userId: hold.customerId,
+          userId: escrow.customerId,
           title: 'Payment auto-released',
           body: 'The held payment was automatically released to the provider.',
           referenceType: 'PAYMENT_AUTO_RELEASED',
-          referenceId: hold.jobId,
+          referenceId: escrow.jobId,
         })
+        processed++
       } catch (error: any) {
         if (!String(error?.message || '').includes('No releasable escrow') &&
             !String(error?.message || '').includes('state changed') &&
@@ -91,7 +108,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, processed: overdueEscrows.length })
+    return NextResponse.json({ success: true, processed })
   } catch (error) {
     console.error('[CRON] Escrow auto-release error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

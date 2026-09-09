@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       })
 
       await prisma.$transaction(async (tx) => {
-        await tx.jobEscrow.update({ where: { id: escrow.id }, data: { status: 'CANCELLED' } })
+        await tx.jobEscrow.update({ where: { id: escrow.id, status: 'PENDING_PAYMENT' }, data: { status: 'CANCELLED' } })
         await tx.marketplaceJob.update({
           where: { id: escrow.jobId },
           data: { status: 'OPEN', isActive: true },

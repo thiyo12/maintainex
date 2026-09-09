@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { releaseEscrow } from '@/lib/domain/job-lifecycle'
+import { completeAndReleaseEscrow } from '@/lib/domain/job-lifecycle'
 import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
 
 export async function POST(
@@ -17,18 +17,13 @@ export async function POST(
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    const escrow = await prisma.jobEscrow.findFirst({
-      where: { jobId: job.id, status: 'PROTECTED' },
-      select: { providerId: true },
-    })
-    if (!escrow) return NextResponse.json({ error: 'No protected escrow found' }, { status: 404 })
-
-    const result = await releaseEscrow(
+    const result = await completeAndReleaseEscrow(
       { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
-      job.id
+      job.id,
+      { releaseMode: 'CUSTOMER_APPROVAL' }
     )
 
-    notifyPaymentReleased(job.id, escrow.providerId, job.title, result.netAmount)
+    notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
     notifyJobCompleted(job.id, job.customerId, job.title)
 
     return NextResponse.json({
@@ -40,8 +35,9 @@ export async function POST(
     console.error('Release escrow error:', error)
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
-    if (message.includes('not found') || message.includes('No protected')) return NextResponse.json({ error: message }, { status: 404 })
-    if (message.includes('IDEMPOTENCY') || message.includes('already')) return NextResponse.json({ error: message }, { status: 409 })
+    if (message.includes('not found') || message.includes('No protected') || message.includes('No releasable')) return NextResponse.json({ error: message }, { status: 404 })
+    if (message.includes('IDEMPOTENCY') || message.includes('already') || message.includes('state changed')) return NextResponse.json({ error: message }, { status: 409 })
+    if (message.includes('Provider must request completion first')) return NextResponse.json({ error: message }, { status: 400 })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

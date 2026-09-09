@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { transitionJobWorkspace, completeAndReleaseEscrow, holdEscrowForDispute, type ActorType } from '@/lib/domain/job-lifecycle'
+import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } from '@/lib/notifications'
 
 async function resolveProviderActor(jobId: string, userId: string): Promise<ActorType | null> {
@@ -90,17 +90,9 @@ export async function POST(
       }
 
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
-      const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-      if (escrow?.status === 'PROTECTED') {
-        await holdEscrowForDispute(
-          { jobId: job.id, actorId: user.id, actorType },
-          job.id
-        )
-      }
-
-      await transitionJobWorkspace(
+      await raiseJobDispute(
         { jobId: job.id, actorId: user.id, actorType },
-        'DISPUTED'
+        job.id
       )
 
       return NextResponse.json({ success: true, message: 'Dispute raised' })
