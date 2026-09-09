@@ -19,27 +19,26 @@ export function buildExplanationReasons(
   else reasons.push('Building reputation')
 
   if (components.availability >= 80) reasons.push('Currently available')
-  else if (components.availability >= 50) reasons.push('Likely available')
+  else if (components.availability === 50) reasons.push('Availability not yet confirmed')
+  else if (components.availability > 50) reasons.push('Availability signal is positive')
   else reasons.push('Availability uncertain')
 
   if (components.travel >= 80) reasons.push('Close to job location')
-  else if (components.travel >= 50) reasons.push('Within reasonable travel distance')
+  else if (components.travel === 50) reasons.push('Travel distance not yet confirmed')
+  else if (components.travel > 50) reasons.push('Travel fit is favorable')
   else reasons.push('Further from job location')
 
   if (components.experience >= 60) reasons.push('Relevant experience')
   else if (components.experience >= 30) reasons.push('Some relevant experience')
   else reasons.push('Limited relevant experience')
 
-  if (providerType === 'COMPANY') {
-    reasons.push('Company provider with team capacity')
-  }
-
+  if (providerType === 'COMPANY') reasons.push('Company provider with team capacity')
   return reasons
 }
 
 export function buildCustomerFacingReasons(
   components: ScoreComponents,
-  providerType: ProviderType,
+  _providerType: ProviderType,
 ): string[] {
   const reasons: string[] = []
 
@@ -50,6 +49,5 @@ export function buildCustomerFacingReasons(
   if (components.travel >= 70) reasons.push('Near your location')
 
   if (reasons.length === 0) reasons.push('Meets basic requirements')
-
   return reasons
 }
