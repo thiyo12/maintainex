@@ -104,7 +104,7 @@ describe('Phase 5E — Financial Atomicity Guard', () => {
     })
 
     it('debits require sufficient balance in the same UPDATE', () => {
-      expect(ledger).toContain('AND "balance" >= $3 AND "availableBalance" >= $3')
+      expect(ledger).toContain('AND "balance" >= $3 AND "availableBalance" >= $4')
       expect(ledger).toContain("if (affected === 0) throw new Error('INSUFFICIENT_FUNDS')")
     })
 

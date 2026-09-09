@@ -87,8 +87,8 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
 
   it('ledger debit is atomic and fails closed on insufficient funds', () => {
     expect(ledger).toContain('"balance" = "balance" - $3')
-    expect(ledger).toContain('"availableBalance" = "availableBalance" - $3')
-    expect(ledger).toContain('AND "balance" >= $3 AND "availableBalance" >= $3')
+    expect(ledger).toContain('"availableBalance" = "availableBalance" - $4')
+    expect(ledger).toContain('AND "balance" >= $3 AND "availableBalance" >= $4')
     expect(ledger).toContain("throw new Error('INSUFFICIENT_FUNDS')")
     expect(ledger).not.toContain('Math.random')
   })
@@ -96,7 +96,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
   it('ledger credit uses parameterized atomic upsert', () => {
     expect(ledger).toContain('ON CONFLICT ("walletType", "walletId")')
     expect(ledger).toContain('"balance" = "WalletBalance"."balance" + $3')
-    expect(ledger).toContain('"availableBalance" = "WalletBalance"."availableBalance" + $3')
+    expect(ledger).toContain('"availableBalance" = "WalletBalance"."availableBalance" + $4')
     expect(ledger).toContain('randomUUID')
   })
 
