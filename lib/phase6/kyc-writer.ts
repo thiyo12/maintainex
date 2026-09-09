@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { isValidKycTransition, isValidCompanyVerificationTransition, KycStatus, CompanyVerificationStatus } from './kyc'
+import { writeCompanyAuditLog } from './audit'
 
 export type KycAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'SUSPEND' | 'EXPIRE'
 
@@ -13,16 +14,6 @@ const KYC_ACTION_MAP: Record<KycAction, { from: KycStatus[]; to: KycStatus }> = 
 
 function mapKycActionToStatus(action: KycAction): KycStatus {
   return KYC_ACTION_MAP[action].to
-}
-
-function mapKycActionToCompanyStatus(action: KycAction): CompanyVerificationStatus | null {
-  const map: Partial<Record<KycAction, CompanyVerificationStatus>> = {
-    SUBMIT: 'PENDING',
-    APPROVE: 'VERIFIED',
-    REJECT: 'REJECTED',
-    SUSPEND: 'SUSPENDED',
-  }
-  return map[action] ?? null
 }
 
 function mapKycActionToTaskerProfileStatus(action: KycAction): string | null {
@@ -67,7 +58,7 @@ export async function transitionUserKyc(
 
   const userFull = await client.user.findUnique({
     where: { id: userId },
-    include: { taskerProfile: true, companyProfile: true },
+    include: { taskerProfile: true },
   })
 
   if (userFull?.taskerProfile) {
@@ -83,16 +74,6 @@ export async function transitionUserKyc(
       }
       if (!validProfileTransitions[currentProfileStatus]?.includes(profileTarget)) {
         return { success: false, error: `Invalid provider verification transition: ${currentProfileStatus} → ${profileTarget}` }
-      }
-    }
-  }
-
-  if (userFull?.companyProfile) {
-    const companyTarget = mapKycActionToCompanyStatus(action)
-    if (companyTarget) {
-      const currentCompanyStatus = (userFull.companyProfile.verificationStatus || 'UNVERIFIED') as CompanyVerificationStatus
-      if (!isValidCompanyVerificationTransition(currentCompanyStatus, companyTarget)) {
-        return { success: false, error: `Invalid company verification transition: ${currentCompanyStatus} → ${companyTarget}` }
       }
     }
   }
@@ -138,24 +119,102 @@ export async function transitionUserKyc(
           })
         }
       }
-
-      if (userFull?.companyProfile) {
-        const companyTarget = mapKycActionToCompanyStatus(action)
-        if (companyTarget) {
-          await tx.companyProfile.update({
-            where: { id: userFull.companyProfile.id },
-            data: {
-              verificationStatus: companyTarget,
-              verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-              ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
-            },
-          })
-        }
-      }
     })
   } catch (err: any) {
     if (err?.message === 'KYC_STATUS_CHANGED_BY_ANOTHER_REQUEST') {
       return { success: false, error: 'KYC status changed by another request' }
+    }
+    throw err
+  }
+
+  return { success: true }
+}
+
+export type CompanyVerifyAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'SUSPEND'
+
+export interface CompanyVerifyTransitionResult {
+  success: boolean
+  error?: string
+}
+
+export async function transitionCompanyVerification(
+  client: PrismaClient,
+  params: {
+    companyId: string
+    action: CompanyVerifyAction
+    reviewNote?: string
+    reviewedBy?: string
+    actorId: string
+    actorRole: string
+  }
+): Promise<CompanyVerifyTransitionResult> {
+  const { companyId, action, reviewNote, reviewedBy, actorId, actorRole } = params
+
+  const company = await client.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { id: true, verificationStatus: true },
+  })
+  if (!company) return { success: false, error: 'Company not found' }
+
+  const currentStatus = (company.verificationStatus || 'UNVERIFIED') as CompanyVerificationStatus
+
+  const actionTargetMap: Record<CompanyVerifyAction, CompanyVerificationStatus> = {
+    SUBMIT: 'PENDING',
+    APPROVE: 'VERIFIED',
+    REJECT: 'REJECTED',
+    SUSPEND: 'SUSPENDED',
+  }
+  const targetStatus = actionTargetMap[action]
+
+  if (!isValidCompanyVerificationTransition(currentStatus, targetStatus)) {
+    return { success: false, error: `Invalid company verification transition: ${currentStatus} → ${targetStatus}` }
+  }
+
+  try {
+    await client.$transaction(async (tx) => {
+      const updated = await tx.$executeRawUnsafe(
+        `UPDATE "CompanyProfile" SET "verificationStatus" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "verificationStatus" = $3`,
+        targetStatus,
+        companyId,
+        currentStatus,
+      )
+
+      if (updated === 0) {
+        throw new Error('COMPANY_STATUS_CHANGED_BY_ANOTHER_REQUEST')
+      }
+
+      const updateData: Record<string, unknown> = {
+        verificationStatus: targetStatus,
+      }
+      if (reviewNote) updateData.verificationNote = reviewNote
+      if (action === 'APPROVE') {
+        updateData.verifiedAt = new Date()
+        updateData.isVerified = true
+      }
+      if (action !== 'SUBMIT' && reviewedBy) {
+        updateData.verifiedBy = reviewedBy
+      }
+
+      await tx.companyProfile.update({
+        where: { id: companyId },
+        data: updateData,
+      })
+
+      const auditAction = action === 'APPROVE' ? 'COMPANY_VERIFY' : action === 'REJECT' ? 'COMPANY_REJECT' : 'COMPANY_UPDATE'
+      await writeCompanyAuditLog({
+        companyId,
+        actorId,
+        actorRole,
+        action: auditAction,
+        targetType: 'CompanyProfile',
+        targetId: companyId,
+        description: `Company verification ${action.toLowerCase()}ed`,
+        metadata: { previousStatus: currentStatus, newStatus: targetStatus },
+      }, tx)
+    })
+  } catch (err: any) {
+    if (err?.message === 'COMPANY_STATUS_CHANGED_BY_ANOTHER_REQUEST') {
+      return { success: false, error: 'Company verification status changed by another request' }
     }
     throw err
   }

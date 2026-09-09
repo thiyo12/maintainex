@@ -43,23 +43,19 @@ export async function writeCompanyAuditLog(
   tx?: Prisma.TransactionClient,
 ): Promise<void> {
   const client = tx ?? prisma
-  try {
-    await client.companyAuditLog.create({
-      data: {
-        companyId: params.companyId,
-        actorId: params.actorId,
-        actorRole: params.actorRole,
-        action: params.action,
-        targetType: params.targetType ?? null,
-        targetId: params.targetId ?? null,
-        description: params.description ?? null,
-        metadata: params.metadata ? JSON.stringify(params.metadata) : null,
-        ipAddress: params.ipAddress ?? null,
-      },
-    })
-  } catch (error) {
-    console.error('Failed to write company audit log:', error)
-  }
+  await client.companyAuditLog.create({
+    data: {
+      companyId: params.companyId,
+      actorId: params.actorId,
+      actorRole: params.actorRole,
+      action: params.action,
+      targetType: params.targetType ?? null,
+      targetId: params.targetId ?? null,
+      description: params.description ?? null,
+      metadata: params.metadata ? JSON.stringify(params.metadata) : null,
+      ipAddress: params.ipAddress ?? null,
+    },
+  })
 }
 
 export async function getCompanyAuditLogs(
