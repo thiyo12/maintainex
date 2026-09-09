@@ -177,7 +177,9 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
     }
   })
 
-  return { job, quote }
+  const committedJob = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
+  const committedQuote = await prisma.jobQuote.findUnique({ where: { id: quoteId } })
+  return { job: committedJob!, quote: committedQuote! }
 }
 
 export async function fundEscrow(ctx: TransitionContext, jobId: string) {

@@ -306,9 +306,14 @@ describe.skipIf(!isVPS)('4D.4 — Accept vs Cancel DB Race', () => {
   let prisma: PrismaClient
   const PREFIX = `4d4-${Date.now()}`
   const customerId = `${PREFIX}-customer`
-  const providerId = `${PREFIX}-prov`
-  const jobId = `${PREFIX}-job`
-  const quoteId = `${PREFIX}-quote`
+  const providerA = `${PREFIX}-prov-a`
+  const providerB = `${PREFIX}-prov-b`
+
+  const jobA = `${PREFIX}-job-a`
+  const quoteA = `${PREFIX}-quote-a`
+
+  const jobB = `${PREFIX}-job-b`
+  const quoteB = `${PREFIX}-quote-b`
 
   beforeAll(async () => {
     prisma = new PrismaClient()
@@ -317,77 +322,79 @@ describe.skipIf(!isVPS)('4D.4 — Accept vs Cancel DB Race', () => {
     await prisma.user.createMany({
       data: [
         { id: customerId, email: `${PREFIX}@test.com`, passwordHash: 'hash', name: 'Test Customer', role: 'CUSTOMER', isActive: true, updatedAt: new Date() },
-        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', isActive: true, updatedAt: new Date() },
+        { id: providerA, email: `${PREFIX}-pa@test.com`, passwordHash: 'hash', name: 'Provider A', role: 'TASKER', isActive: true, updatedAt: new Date() },
+        { id: providerB, email: `${PREFIX}-pb@test.com`, passwordHash: 'hash', name: 'Provider B', role: 'TASKER', isActive: true, updatedAt: new Date() },
       ],
     })
 
-    await prisma.marketplaceJob.create({
-      data: {
-        id: jobId,
-        customerId,
-        title: 'Race Test Job',
-        description: 'Test',
-        categoryId: 'test',
-        photos: '[]',
-        budgetType: 'FIXED',
-        budgetAmount: BigInt(5000),
-        status: 'OPEN',
-        urgency: 'normal',
-        workersCount: 1,
-        materialHandling: 'tasker_brings',
-        countryCode: 'LK',
-      },
+    await prisma.marketplaceJob.createMany({
+      data: [
+        {
+          id: jobA, customerId, title: 'Race Test Job A', description: 'Test',
+          categoryId: 'test', photos: '[]', budgetType: 'FIXED',
+          budgetAmount: BigInt(5000), status: 'OPEN', urgency: 'normal',
+          workersCount: 1, materialHandling: 'tasker_brings', countryCode: 'LK',
+        },
+        {
+          id: jobB, customerId, title: 'Race Test Job B', description: 'Test',
+          categoryId: 'test', photos: '[]', budgetType: 'FIXED',
+          budgetAmount: BigInt(5000), status: 'OPEN', urgency: 'normal',
+          workersCount: 1, materialHandling: 'tasker_brings', countryCode: 'LK',
+        },
+      ],
     })
 
-    await prisma.jobQuote.create({
-      data: {
-        id: quoteId,
-        jobId,
-        providerId,
-        providerType: 'INDIVIDUAL',
-        price: BigInt(5000),
-        estimatedCompletionTime: '1h',
-        attachments: '[]',
-        status: 'PENDING',
-      },
+    await prisma.jobQuote.createMany({
+      data: [
+        {
+          id: quoteA, jobId: jobA, providerId: providerA, providerType: 'INDIVIDUAL',
+          price: BigInt(5000), estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING',
+        },
+        {
+          id: quoteB, jobId: jobB, providerId: providerB, providerType: 'INDIVIDUAL',
+          price: BigInt(5000), estimatedCompletionTime: '1h', attachments: '[]', status: 'PENDING',
+        },
+      ],
     })
   })
 
   afterAll(async () => {
-    await prisma.jobEscrow.deleteMany({ where: { jobId } })
-    await prisma.jobWorkspace.deleteMany({ where: { jobId } })
-    await prisma.jobQuote.deleteMany({ where: { jobId } })
-    await prisma.marketplaceJob.deleteMany({ where: { id: jobId } })
-    await prisma.user.deleteMany({ where: { id: { in: [customerId, providerId] } } })
+    for (const jid of [jobA, jobB]) {
+      await prisma.jobEscrow.deleteMany({ where: { jobId: jid } })
+      await prisma.jobWorkspace.deleteMany({ where: { jobId: jid } })
+      await prisma.jobQuote.deleteMany({ where: { jobId: jid } })
+      await prisma.marketplaceJob.deleteMany({ where: { id: jid } })
+    }
+    await prisma.user.deleteMany({ where: { id: { in: [customerId, providerA, providerB] } } })
     await prisma.$disconnect()
   })
 
   it('Scenario A: accept wins first, cancel after', async () => {
     const { acceptJobQuote, transitionMarketplaceJob } = await import('../../lib/domain/job-lifecycle')
 
-    const acceptCtx = { jobId, actorId: customerId, actorType: 'CUSTOMER' as const }
-    const cancelCtx = { jobId, actorId: customerId, actorType: 'CUSTOMER' as const }
+    const acceptCtx = { jobId: jobA, actorId: customerId, actorType: 'CUSTOMER' as const }
+    const cancelCtx = { jobId: jobA, actorId: customerId, actorType: 'CUSTOMER' as const }
 
-    await acceptJobQuote(acceptCtx, quoteId)
+    await acceptJobQuote(acceptCtx, quoteA)
 
     const cancelResult = await transitionMarketplaceJob(cancelCtx, 'CANCELLED')
     expect(cancelResult.status).toBe('CANCELLED')
 
-    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId } })
+    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: jobA } })
     expect(workspace).toBeTruthy()
   })
 
   it('Scenario B: cancel wins first, accept rejected', async () => {
     const { acceptJobQuote, transitionMarketplaceJob } = await import('../../lib/domain/job-lifecycle')
 
-    const acceptCtx = { jobId, actorId: customerId, actorType: 'CUSTOMER' as const }
-    const cancelCtx = { jobId, actorId: customerId, actorType: 'CUSTOMER' as const }
+    const acceptCtx = { jobId: jobB, actorId: customerId, actorType: 'CUSTOMER' as const }
+    const cancelCtx = { jobId: jobB, actorId: customerId, actorType: 'CUSTOMER' as const }
 
     await transitionMarketplaceJob(cancelCtx, 'CANCELLED')
 
-    await expect(acceptJobQuote(acceptCtx, quoteId)).rejects.toThrow('Job is not open')
+    await expect(acceptJobQuote(acceptCtx, quoteB)).rejects.toThrow('Job is not open')
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id: jobB } })
     expect(job?.status).toBe('CANCELLED')
   })
 })
@@ -561,6 +568,8 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
   const customerId = `${PREFIX}-customer`
   const providerId = `${PREFIX}-prov`
   const templateJobId = `${PREFIX}-template`
+  const categoryId = `${PREFIX}-category`
+  const serviceTemplateId = `${PREFIX}-service-template`
 
   beforeAll(async () => {
     prisma = new PrismaClient()
@@ -569,16 +578,21 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
     await prisma.user.createMany({
       data: [
         { id: customerId, email: `${PREFIX}@test.com`, passwordHash: 'hash', name: 'Test Customer', role: 'CUSTOMER', isActive: true, updatedAt: new Date() },
-        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', isActive: true, updatedAt: new Date() },
+        { id: providerId, email: `${PREFIX}-p@test.com`, passwordHash: 'hash', name: 'Provider', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
       ],
     })
 
-    await prisma.taskerProfile.create({
-      data: { userId: providerId, skills: '[]', rating: 4.5, completedJobs: 10, hourlyRate: 500 },
+    await prisma.jobCategory.create({
+      data: {
+        id: categoryId,
+        name: `${PREFIX}-Category`,
+        slug: `${PREFIX}-cat`,
+        iconName: 'wrench',
+        colorHex: '#FF0000',
+        countries: 'LK',
+        isActive: true,
+      },
     })
-
-    const category = await prisma.jobCategory.findFirst()
-    const categoryId = category?.id || 'test-category'
 
     await prisma.templateJob.create({
       data: {
@@ -593,6 +607,44 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         countries: 'LK',
       },
     })
+
+    await prisma.serviceTemplate.create({
+      data: {
+        id: serviceTemplateId,
+        jobCategoryId: categoryId,
+        templateJobId,
+        name: 'Test Service Template',
+        slug: `${PREFIX}-st`,
+        description: 'Test service template',
+        questionsJson: '[]',
+        defaultDurationMinutes: 60,
+        priceMin: 3000,
+        priceMax: 5000,
+        countryCode: 'LK',
+      },
+    })
+
+    await prisma.taskerProfile.create({
+      data: {
+        userId: providerId,
+        skills: '[]',
+        rating: 4.5,
+        completedJobs: 10,
+        hourlyRate: 500,
+        verificationStatus: 'VERIFIED',
+        isVerified: true,
+      },
+    })
+
+    await prisma.taskerSkill.create({
+      data: {
+        taskerId: providerId,
+        jobId: templateJobId,
+        experienceYears: 2,
+        experienceLevel: 2,
+        hourlyRate: 500,
+      },
+    })
   })
 
   afterAll(async () => {
@@ -603,7 +655,10 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
       await prisma.jobQuote.deleteMany({ where: { jobId: job.id } })
     }
     await prisma.marketplaceJob.deleteMany({ where: { templateJobId } })
+    await prisma.taskerSkill.deleteMany({ where: { taskerId: providerId } })
+    await prisma.serviceTemplate.deleteMany({ where: { id: serviceTemplateId } })
     await prisma.templateJob.deleteMany({ where: { id: templateJobId } })
+    await prisma.jobCategory.deleteMany({ where: { id: categoryId } })
     await prisma.taskerProfile.deleteMany({ where: { userId: providerId } })
     await prisma.user.deleteMany({ where: { id: { in: [customerId, providerId] } } })
     await prisma.$disconnect()
@@ -629,6 +684,9 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
     const marketplaceJob = await prisma.marketplaceJob.findUnique({ where: { id: result.job.id } })
     expect(marketplaceJob).toBeTruthy()
     expect(marketplaceJob?.templateJobId).toBe(templateJobId)
+    expect(marketplaceJob?.addressStreet).toBe('123 Test Street')
+    expect(marketplaceJob?.preferredTimeSlot).toBe('morning')
+    expect(marketplaceJob?.preferredDate).toBeTruthy()
 
     const bookings = await prisma.booking.findMany({ where: { userId: customerId } })
     const bookNowBookings = bookings.filter(b => b.templateJobId === templateJobId)
@@ -637,6 +695,11 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: result.job.id } })
     expect(quote).toBeTruthy()
     expect(quote?.providerId).toBe(providerId)
+
+    await prisma.jobEscrow.deleteMany({ where: { jobId: result.job.id } })
+    await prisma.jobWorkspace.deleteMany({ where: { jobId: result.job.id } })
+    await prisma.jobQuote.deleteMany({ where: { jobId: result.job.id } })
+    await prisma.marketplaceJob.deleteMany({ where: { id: result.job.id } })
   })
 })
 

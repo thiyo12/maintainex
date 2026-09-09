@@ -29,13 +29,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       estimate: {
-        baseAmount: Number(estimate.baseAmount),
-        urgencyAmount: Number(estimate.urgencyAmount),
-        serviceModifiers: Number(estimate.serviceModifiers),
-        providerGross: Number(estimate.providerGross),
+        baseAmount: String(estimate.baseAmount),
+        urgencyAmount: String(estimate.urgencyAmount),
+        serviceModifiers: String(estimate.serviceModifiers),
+        providerGross: String(estimate.providerGross),
         platformFeeBps: estimate.platformFeeBps,
-        platformFeeAmount: Number(estimate.platformFeeAmount),
-        customerTotal: Number(estimate.customerTotal),
+        platformFeeAmount: String(estimate.platformFeeAmount),
+        customerTotal: String(estimate.customerTotal),
         currency: estimate.currency,
         pricingVersion: estimate.pricingVersion,
         ruleIds: estimate.ruleIds,
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof PriceBoundsError) {
       return NextResponse.json(
-        { error: error.message, minAmount: Number(error.minCents), maxAmount: Number(error.maxCents), actual: Number(error.actual) },
+        { error: error.message, minAmount: String(error.minCents), maxAmount: String(error.maxCents), actual: String(error.actual) },
         { status: 400 }
       )
     }

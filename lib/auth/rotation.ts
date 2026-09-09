@@ -33,6 +33,10 @@ export async function rotateMarketplaceRefreshToken(
     await recordReplay(session.userId, sessionId, context)
     throw new AuthError('TOKEN_REPLAY')
   }
+  if (!session.isValid) {
+    await revokeTokenFamily(session.tokenFamilyId ?? null, 'session_invalidated')
+    throw new AuthError('SESSION_INVALIDATED')
+  }
   if (session.expiresAt < new Date()) throw new AuthError('SESSION_EXPIRED')
 
   if (!session.refreshTokenHash) {
@@ -72,6 +76,7 @@ export async function rotateMarketplaceRefreshToken(
       "id" = ${sessionId}
       AND "refreshTokenHash" = ${session.refreshTokenHash}
       AND "revokedAt" IS NULL
+      AND "isValid" = true
       AND "expiresAt" > NOW()
   `
 

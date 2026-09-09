@@ -5,6 +5,7 @@ export type AuthErrorCode =
   | 'INVALID_TOKEN_PURPOSE'
   | 'SESSION_EXPIRED'
   | 'SESSION_REVOKED'
+  | 'SESSION_INVALIDATED'
   | 'TOKEN_REPLAY'
   | 'ACCOUNT_DISABLED'
   | 'ACCOUNT_SUSPENDED'
@@ -22,6 +23,7 @@ const ERROR_MAP: Record<AuthErrorCode, { status: number; message: string }> = {
   INVALID_TOKEN_PURPOSE: { status: 401, message: 'Invalid token type' },
   SESSION_EXPIRED: { status: 401, message: 'Session expired' },
   SESSION_REVOKED: { status: 401, message: 'Session revoked' },
+  SESSION_INVALIDATED: { status: 401, message: 'Session invalidated' },
   TOKEN_REPLAY: { status: 401, message: 'Token reuse detected' },
   ACCOUNT_DISABLED: { status: 401, message: 'Account disabled' },
   ACCOUNT_SUSPENDED: { status: 403, message: 'Account suspended' },

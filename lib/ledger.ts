@@ -256,6 +256,14 @@ export async function reverseLedgerTransaction(
   const originalEntries = await prisma.financialLedger.findMany({ where: { referenceId: originalTransactionId } });
   if (originalEntries.length === 0) throw new Error(`Original transaction ${originalTransactionId} not found`);
 
+  const existingReversal = await prisma.financialLedger.findFirst({
+    where: {
+      referenceType: 'REVERSAL',
+      referenceId: originalTransactionId,
+    },
+  });
+  if (existingReversal) throw new Error(`Transaction ${originalTransactionId} already reversed (ONE_REVERSAL_ONLY)`);
+
   return postLedgerTransaction({
     entries: originalEntries.map(entry => ({
       accountId: entry.accountId,

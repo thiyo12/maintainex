@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { checkIndividualProviderEligibility } from '@/lib/phase6/provider-eligibility'
+import { checkIndividualProviderEligibility, checkCompanyEligibility, checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 import { resolveJobRequirements, hasCapabilityMatch, hasRelationalCapability } from '@/lib/matching'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { createNotification } from '@/lib/notifications'
@@ -61,6 +61,8 @@ export async function createBookNowJob(input: BookNowInput) {
   if (!provider) throw new Error('Provider not found')
   if (provider.userId === input.customerId) throw new Error('Cannot book yourself')
 
+  const providerType = 'INDIVIDUAL' as const
+
   const eligibility = await checkIndividualProviderEligibility(provider.userId)
   if (!eligibility.eligible) {
     throw new Error(`Provider is not eligible: ${eligibility.reasons.join('; ')}`)
@@ -110,65 +112,71 @@ export async function createBookNowJob(input: BookNowInput) {
 
   // Quote price is provider gross. Customer-facing total/fee are preserved in
   // the immutable estimate JSON until quote acceptance creates the escrow.
-  const job = await prisma.marketplaceJob.create({
-    data: {
-      customerId: input.customerId,
-      title: templateJob.name,
-      description: templateJob.description || `Quick booking: ${templateJob.name}`,
-      categoryId: templateJob.categoryId,
-      serviceTemplateId: linkedServiceTemplate?.id || null,
-      templateJobId: templateJob.id,
-      photos: '[]',
-      budgetType: 'FIXED',
-      budgetAmount: pricing.providerGross,
-      aiEstimateJson: JSON.stringify({
-        baseAmount: pricing.baseAmount.toString(),
-        urgencyAmount: pricing.urgencyAmount.toString(),
-        serviceModifiers: pricing.serviceModifiers.toString(),
-        providerGross: pricing.providerGross.toString(),
-        platformFeeBps: pricing.platformFeeBps,
-        platformFeeAmount: pricing.platformFeeAmount.toString(),
-        customerTotal: pricing.customerTotal.toString(),
-        currency: pricing.currency,
-        pricingVersion: pricing.pricingVersion,
-        ruleIds: pricing.ruleIds,
-      }),
-      preferredDate: input.scheduledDate,
-      preferredTimeSlot: input.timeSlot,
-      addressStreet: input.address,
-      status: 'OPEN',
-      urgency: 'normal',
-      workersCount: 1,
-      materialHandling: 'tasker_brings',
-      countryCode: finalCountryCode,
-      targetTaskerId: provider.userId,
-    },
-  })
+  const result = await prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.create({
+      data: {
+        customerId: input.customerId,
+        title: templateJob.name,
+        description: templateJob.description || `Quick booking: ${templateJob.name}`,
+        categoryId: templateJob.categoryId,
+        serviceTemplateId: linkedServiceTemplate?.id || null,
+        templateJobId: templateJob.id,
+        photos: '[]',
+        budgetType: 'FIXED',
+        budgetAmount: pricing.providerGross,
+        aiEstimateJson: JSON.stringify({
+          baseAmount: pricing.baseAmount.toString(),
+          urgencyAmount: pricing.urgencyAmount.toString(),
+          serviceModifiers: pricing.serviceModifiers.toString(),
+          providerGross: pricing.providerGross.toString(),
+          platformFeeBps: pricing.platformFeeBps,
+          platformFeeAmount: pricing.platformFeeAmount.toString(),
+          customerTotal: pricing.customerTotal.toString(),
+          currency: pricing.currency,
+          pricingVersion: pricing.pricingVersion,
+          ruleIds: pricing.ruleIds,
+        }),
+        preferredDate: input.scheduledDate,
+        preferredTimeSlot: input.timeSlot,
+        addressStreet: input.address,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+        status: 'OPEN',
+        urgency: 'normal',
+        workersCount: 1,
+        materialHandling: 'tasker_brings',
+        countryCode: finalCountryCode,
+        targetTaskerId: provider.userId,
+      },
+    })
 
-  const quote = await prisma.jobQuote.create({
-    data: {
-      jobId: job.id,
-      providerId: provider.userId,
-      providerType: 'INDIVIDUAL',
-      price: pricing.providerGross,
-      estimatedCompletionTime: '1-2 hours',
-      message: input.notes || 'BOOK_NOW instant booking',
-      attachments: '[]',
-      status: 'PENDING',
-    },
+    const quote = await tx.jobQuote.create({
+      data: {
+        jobId: job.id,
+        providerId: provider.userId,
+        providerType: providerType,
+        price: pricing.providerGross,
+        estimatedCompletionTime: '1-2 hours',
+        message: input.notes || 'BOOK_NOW instant booking',
+        attachments: '[]',
+        status: 'PENDING',
+      },
+    })
+
+    return { job, quote }
   })
 
   await createNotification({
     userId: provider.userId,
     title: 'New direct booking',
-    body: `${job.title} has been booked with you.`,
+    body: `${result.job.title} has been booked with you.`,
     referenceType: 'JOB_MATCH',
-    referenceId: job.id,
+    referenceId: result.job.id,
   })
 
   return {
-    job: { ...job, budgetAmount: job.budgetAmount.toString() },
-    quote: { ...quote, price: quote.price.toString() },
+    job: { ...result.job, budgetAmount: result.job.budgetAmount.toString() },
+    quote: { ...result.quote, price: result.quote.price.toString() },
     notifiedCount: 1,
   }
 }

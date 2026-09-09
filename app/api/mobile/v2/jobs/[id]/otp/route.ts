@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { randomInt } from 'crypto'
 
 export async function POST(
   request: NextRequest,
@@ -12,37 +13,41 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
-    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    if (job.status !== 'IN_PROGRESS') {
-      return NextResponse.json({ error: 'Job is not in progress' }, { status: 400 })
-    }
+    const result = await prisma.$transaction(async (tx) => {
+      const workspace = await tx.jobWorkspace.findUnique({ where: { jobId: params.id } })
+      if (!workspace) throw new Error('Workspace not found')
+      if (workspace.progressStatus !== 'ACCEPTED') throw new Error('Job has already started')
 
-    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
-    if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
-    if (workspace.progressStatus !== 'ACCEPTED') {
-      return NextResponse.json({ error: 'Job has already started' }, { status: 400 })
-    }
+      const job = await tx.marketplaceJob.findUnique({ where: { id: params.id } })
+      if (!job) throw new Error('Job not found')
+      if (job.status !== 'IN_PROGRESS') throw new Error('Job is not in progress')
 
-    const quote = await prisma.jobQuote.findFirst({
-      where: { jobId: job.id, status: 'ACCEPTED' },
-    })
-    if (!quote) return NextResponse.json({ error: 'No accepted quote found' }, { status: 400 })
-    if (quote.providerId !== user.id) {
-      return NextResponse.json({ error: 'Only the assigned provider can generate OTP' }, { status: 403 })
-    }
+      const quote = await tx.jobQuote.findFirst({
+        where: { jobId: params.id, status: 'ACCEPTED' },
+      })
+      if (!quote) throw new Error('No accepted quote found')
+      if (quote.providerId !== user.id) throw new Error('Only the assigned provider can generate OTP')
 
-    const otp = String(Math.floor(1000 + Math.random() * 9000))
+      const otp = String(randomInt(1000, 10000))
 
-    await prisma.jobOtp.upsert({
-      where: { jobId: job.id },
-      create: { jobId: job.id, otp },
-      update: { otp, generatedAt: new Date(), verifiedAt: null },
+      await tx.jobOtp.upsert({
+        where: { jobId: params.id },
+        create: { jobId: params.id, otp },
+        update: { otp, generatedAt: new Date(), verifiedAt: null },
+      })
+
+      return { otp }
     })
 
-    return NextResponse.json({ otp })
-  } catch (error) {
+    return NextResponse.json({ otp: result.otp })
+  } catch (error: any) {
     console.error('Generate OTP error:', error)
+    if (error.message === 'Job has already started' || error.message === 'Only the assigned provider can generate OTP') {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+    if (error.message === 'Workspace not found' || error.message === 'Job not found' || error.message === 'No accepted quote found') {
+      return NextResponse.json({ error: error.message }, { status: 404 })
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

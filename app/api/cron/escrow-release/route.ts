@@ -18,6 +18,12 @@ export async function GET(request: NextRequest) {
     const reminderHoursStr = await getSetting('escrow.reminder_hours', '36,24,12')
     const reminderHours = reminderHoursStr.split(',').map(Number)
 
+    const disputedJobIds = await prisma.jobWorkspace.findMany({
+      where: { progressStatus: 'DISPUTED' },
+      select: { jobId: true },
+    })
+    const disputedSet = new Set(disputedJobIds.map(w => w.jobId))
+
     for (const hrs of reminderHours) {
       const dueSoon = await prisma.jobEscrow.findMany({
         where: {
@@ -30,6 +36,7 @@ export async function GET(request: NextRequest) {
 
       for (const hold of dueSoon) {
         if (!hold.heldAt) continue
+        if (disputedSet.has(hold.jobId)) continue
         const hoursSinceHold = (Date.now() - hold.heldAt.getTime()) / (1000 * 60 * 60)
         const hoursUntilRelease = autoReleaseHours - hoursSinceHold
         if (hoursUntilRelease > 0 && hoursUntilRelease <= hrs && hoursUntilRelease > hrs - 1) {
@@ -45,13 +52,17 @@ export async function GET(request: NextRequest) {
     }
 
     const overdue = await prisma.jobEscrow.findMany({
-      where: { status: 'ON_HOLD', heldAt: { not: null } },
+      where: {
+        status: 'ON_HOLD',
+        heldAt: { not: null },
+      },
       select: { id: true, jobId: true, customerId: true, heldAt: true },
     })
 
     let released = 0
     for (const hold of overdue) {
       if (!hold.heldAt) continue
+      if (disputedSet.has(hold.jobId)) continue
       const hoursSinceHold = (Date.now() - hold.heldAt.getTime()) / (1000 * 60 * 60)
       if (hoursSinceHold < autoReleaseHours) continue
 

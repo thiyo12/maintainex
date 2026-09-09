@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { readCanonicalProviderBalance, readCanonicalCustomerBalance } from '@/lib/financial-read'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,8 +12,8 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get('role') || 'customer'
 
     if (role === 'provider') {
-      const wallet = await prisma.providerWallet.findUnique({ where: { userId: user.id } })
-      const transactions = wallet
+      const canonical = await readCanonicalProviderBalance(user.id)
+      const transactions = canonical
         ? await prisma.walletTransaction.findMany({
             where: { userId: user.id, walletType: 'PROVIDER' },
             orderBy: { createdAt: 'desc' },
@@ -20,13 +21,20 @@ export async function GET(request: NextRequest) {
           })
         : []
       return NextResponse.json({
-        wallet: wallet || { availableBalance: 0, pendingBalance: 0 },
-        transactions,
+        wallet: canonical
+          ? {
+              availableBalance: Number(canonical.availableBalance),
+              pendingBalance: Number(canonical.pendingBalance),
+              balance: Number(canonical.balance),
+              version: canonical.version,
+            }
+          : { availableBalance: 0, pendingBalance: 0, balance: 0, version: 0 },
+        transactions: transactions.map(t => ({ ...t, amount: String(t.amount) })),
       })
     }
 
-    const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
-    const transactions = wallet
+    const canonical = await readCanonicalCustomerBalance(user.id)
+    const transactions = canonical
       ? await prisma.walletTransaction.findMany({
           where: { userId: user.id, walletType: 'CUSTOMER' },
           orderBy: { createdAt: 'desc' },
@@ -34,8 +42,15 @@ export async function GET(request: NextRequest) {
         })
       : []
     return NextResponse.json({
-      wallet: wallet || { balance: 0 },
-      transactions,
+      wallet: canonical
+        ? {
+            balance: Number(canonical.balance),
+            availableBalance: Number(canonical.availableBalance),
+            pendingBalance: Number(canonical.pendingBalance),
+            version: canonical.version,
+          }
+        : { balance: 0, availableBalance: 0, pendingBalance: 0, version: 0 },
+      transactions: transactions.map(t => ({ ...t, amount: String(t.amount) })),
     })
   } catch (error) {
     console.error('Wallet error:', error)
