@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
-import { isVPS } from '../helpers'
 
+const TEST_DB_URL = process.env.TEST_DB_URL
+const isVPS = TEST_DB_URL && TEST_DB_URL.includes('maintainex_test')
 const prisma = new PrismaClient()
 
 describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
@@ -147,8 +148,8 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
       holdEscrowForDispute({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
     ])
 
-    const released = results.find(r => r.status === 'fulfilled' && r.value?.commission !== undefined)
-    const disputed = results.find(r => r.status === 'fulfilled' && r.value?.escrowId !== undefined)
+    const released = results.find(r => r.status === 'fulfilled' && 'commission' in (r.value || {}))
+    const disputed = results.find(r => r.status === 'fulfilled' && 'escrowId' in (r.value || {}))
 
     expect(released || disputed).toBeTruthy()
 
