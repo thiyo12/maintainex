@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
+import { postLedgerTransaction } from '@/lib/ledger'
 
 const BOOST_TIERS = {
   basic: { durationDays: 7, lkr: 500, cad: 5 },
@@ -40,26 +41,63 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const currency = listing.countryCode === 'CA' ? 'CAD' : 'LKR'
     const amount = listing.countryCode === 'CA' ? tierConfig.cad : tierConfig.lkr
 
-    // Check wallet balance
-    if (paymentMethod === 'wallet') {
-      const wallet = await prisma.customerWallet.findUnique({
-        where: { userId: session.id },
-      })
+    if (paymentMethod !== 'wallet') {
+      return NextResponse.json({
+        error: 'External boost payments are not integrated yet',
+        code: 'BOOST_PAYMENT_UNAVAILABLE',
+      }, { status: 501 })
+    }
 
-      if (!wallet || wallet.balance < amount) {
-        return NextResponse.json({
-          error: `Insufficient balance. Required: ${currency} ${amount}, Available: ${currency} ${wallet?.balance || 0}`,
-        }, { status: 400 })
-      }
+    // The current customer wallet is LKR-only. Do not debit an LKR wallet for
+    // a CAD-denominated boost until multi-currency wallet accounting exists.
+    if (currency !== 'LKR') {
+      return NextResponse.json({
+        error: 'Wallet payment is not available for this currency yet',
+        code: 'WALLET_CURRENCY_UNAVAILABLE',
+      }, { status: 501 })
+    }
 
-      // Deduct from wallet
-      await prisma.customerWallet.update({
-        where: { userId: session.id },
+    const idempotencyKey = request.headers.get('idempotency-key') ||
+      (typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : '')
+    if (!idempotencyKey || idempotencyKey.length > 255) {
+      return NextResponse.json({ error: 'Valid Idempotency-Key header is required' }, { status: 400 })
+    }
+
+    const wallet = await prisma.customerWallet.findUnique({
+      where: { userId: session.id },
+      select: { id: true, balance: true },
+    })
+    if (!wallet) {
+      return NextResponse.json({ error: 'Customer wallet not found' }, { status: 409 })
+    }
+
+    const amountMinor = BigInt(amount) * 100n
+    const expiresAt = new Date()
+    expiresAt.setDate(expiresAt.getDate() + tierConfig.durationDays)
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await postLedgerTransaction({
+        entries: [
+          { accountId: wallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount: amountMinor },
+          { accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: amountMinor },
+        ],
+        referenceType: 'PROPERTY_BOOST',
+        referenceId: id,
+        idempotencyKey: `property-boost:${id}:${session.id}:${idempotencyKey}`,
+        description: `Property boost ${tier} for listing ${id}`,
+        createdBy: session.id,
+      }, tx)
+
+      // LEGACY_SHADOW_WRITE: keep the existing customer-wallet API in sync while
+      // WalletBalance is the canonical concurrency source. This shadow write is
+      // inside the same transaction as the ledger movement and boost creation.
+      const shadow = await tx.customerWallet.updateMany({
+        where: { id: wallet.id, balance: { gte: amount } },
         data: { balance: { decrement: amount } },
       })
+      if (shadow.count !== 1) throw new Error('INSUFFICIENT_FUNDS')
 
-      // Create transaction record
-      await prisma.walletTransaction.create({
+      await tx.walletTransaction.create({
         data: {
           userId: session.id,
           walletType: 'CUSTOMER',
@@ -72,34 +110,28 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           referenceId: id,
         },
       })
-    }
 
-    // Calculate expiry
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + tierConfig.durationDays)
+      await tx.propertyBoost.create({
+        data: {
+          listingId: id,
+          userId: session.id,
+          tier,
+          amount,
+          currency,
+          paymentMethod,
+          status: 'active',
+          expiresAt,
+        },
+      })
 
-    // Create boost record
-    await prisma.propertyBoost.create({
-      data: {
-        listingId: id,
-        userId: session.id,
-        tier,
-        amount,
-        currency,
-        paymentMethod,
-        status: 'active',
-        expiresAt,
-      },
-    })
-
-    // Update listing
-    const updated = await prisma.realEstateListing.update({
-      where: { id },
-      data: {
-        boostTier: tier,
-        boostExpiresAt: expiresAt,
-        boostedAt: new Date(),
-      },
+      return tx.realEstateListing.update({
+        where: { id },
+        data: {
+          boostTier: tier,
+          boostExpiresAt: expiresAt,
+          boostedAt: new Date(),
+        },
+      })
     })
 
     return NextResponse.json({
@@ -110,6 +142,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       },
     })
   } catch (error: any) {
+    if (error?.message === 'INSUFFICIENT_FUNDS') {
+      return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 })
+    }
     console.error('Error boosting property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to boost property' }, { status: 500 })
   }
