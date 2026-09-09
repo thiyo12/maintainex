@@ -26,18 +26,13 @@ export async function rotateMarketplaceRefreshToken(
   if (!parsed) throw new AuthError('INVALID_TOKEN')
 
   const { sessionId, secret } = parsed
-
-  const session = await prisma.userSession.findUnique({
-    where: { id: sessionId },
-  })
-
+  const session = await prisma.userSession.findUnique({ where: { id: sessionId } })
   if (!session) throw new AuthError('INVALID_TOKEN')
 
   if (session.revokedAt) {
     await recordReplay(session.userId, sessionId, context)
     throw new AuthError('TOKEN_REPLAY')
   }
-
   if (session.expiresAt < new Date()) throw new AuthError('SESSION_EXPIRED')
 
   if (!session.refreshTokenHash) {
@@ -46,8 +41,7 @@ export async function rotateMarketplaceRefreshToken(
     throw new AuthError('TOKEN_REPLAY')
   }
 
-  const secretValid = verifyRefreshSecret(secret, session.refreshTokenHash)
-  if (!secretValid) {
+  if (!verifyRefreshSecret(secret, session.refreshTokenHash)) {
     await revokeTokenFamily(session.tokenFamilyId ?? null, 'replay_detected')
     await recordReplay(session.userId, sessionId, context)
     throw new AuthError('TOKEN_REPLAY')
@@ -55,28 +49,21 @@ export async function rotateMarketplaceRefreshToken(
 
   const user = await prisma.user.findUnique({
     where: { id: session.userId },
-    select: {
-      id: true,
-      isActive: true,
-      isBanned: true,
-      isSuspended: true,
-      suspendedUntil: true,
-    },
+    select: { id: true, isActive: true, isBanned: true, isSuspended: true, suspendedUntil: true },
   })
-
-  if (!user) throw new AuthError('ACCOUNT_DISABLED')
-  if (!user.isActive) throw new AuthError('ACCOUNT_DISABLED')
+  if (!user || !user.isActive) throw new AuthError('ACCOUNT_DISABLED')
   if (user.isBanned) throw new AuthError('ACCOUNT_BANNED')
-  if (user.isSuspended) {
-    if (!user.suspendedUntil || user.suspendedUntil > new Date()) {
-      throw new AuthError('ACCOUNT_SUSPENDED')
-    }
+  if (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > new Date())) {
+    throw new AuthError('ACCOUNT_SUSPENDED')
   }
 
   const newRefresh = generateRefreshToken(sessionId)
 
+  // Prisma model UserSession is mapped to the historical physical table "Session".
+  // Keep the compare-and-set in raw SQL for concurrency safety, but target the
+  // mapped table name so rotation works in the real production schema.
   const rotated = await prisma.$executeRaw`
-    UPDATE "UserSession"
+    UPDATE "Session"
     SET
       "refreshTokenHash" = ${newRefresh.secretHash},
       "lastUsedAt" = NOW(),
@@ -96,12 +83,10 @@ export async function rotateMarketplaceRefreshToken(
 
   const accessToken = signMarketplaceAccessToken(session.userId, sessionId)
   const ttlMs = parseTTLSeconds(TOKEN_LIFETIMES.MARKETPLACE_ACCESS) * 1000
-  const accessTokenExpiresAt = new Date(Date.now() + ttlMs)
-
   return {
     accessToken,
     refreshToken: newRefresh.raw,
-    accessTokenExpiresAt,
+    accessTokenExpiresAt: new Date(Date.now() + ttlMs),
     sessionExpiresAt: session.expiresAt,
   }
 }
@@ -128,7 +113,6 @@ function parseTTLSeconds(ttl: string): number {
   const match = ttl.match(/^(\d+)([smhd])$/)
   if (!match) throw new Error(`Invalid TTL format: ${ttl}`)
   const value = parseInt(match[1], 10)
-  const unit = match[2]
   const multipliers: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 }
-  return value * multipliers[unit]
+  return value * multipliers[match[2]]
 }
