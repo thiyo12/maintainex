@@ -12,9 +12,7 @@ const BOOST_TIERS = {
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getSession(request)
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id } = params
     const body = await request.json()
@@ -25,14 +23,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const listing = await prisma.realEstateListing.findUnique({ where: { id } })
-    if (!listing) {
-      return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
-    }
-
-    if (listing.postedBy !== session.id) {
-      return NextResponse.json({ error: 'Not your listing' }, { status: 403 })
-    }
-
+    if (!listing) return NextResponse.json({ error: 'Listing not found' }, { status: 404 })
+    if (listing.postedBy !== session.id) return NextResponse.json({ error: 'Not your listing' }, { status: 403 })
     if (listing.status !== 'approved' && listing.status !== 'published') {
       return NextResponse.json({ error: 'Listing must be approved before boosting' }, { status: 400 })
     }
@@ -42,19 +34,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const amount = listing.countryCode === 'CA' ? tierConfig.cad : tierConfig.lkr
 
     if (paymentMethod !== 'wallet') {
-      return NextResponse.json({
-        error: 'External boost payments are not integrated yet',
-        code: 'BOOST_PAYMENT_UNAVAILABLE',
-      }, { status: 501 })
+      return NextResponse.json({ error: 'External boost payments are not integrated yet', code: 'BOOST_PAYMENT_UNAVAILABLE' }, { status: 501 })
     }
-
-    // The current customer wallet is LKR-only. Do not debit an LKR wallet for
-    // a CAD-denominated boost until multi-currency wallet accounting exists.
     if (currency !== 'LKR') {
-      return NextResponse.json({
-        error: 'Wallet payment is not available for this currency yet',
-        code: 'WALLET_CURRENCY_UNAVAILABLE',
-      }, { status: 501 })
+      return NextResponse.json({ error: 'Wallet payment is not available for this currency yet', code: 'WALLET_CURRENCY_UNAVAILABLE' }, { status: 501 })
     }
 
     const idempotencyKey = request.headers.get('idempotency-key') ||
@@ -67,15 +50,35 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       where: { userId: session.id },
       select: { id: true, balance: true },
     })
-    if (!wallet) {
-      return NextResponse.json({ error: 'Customer wallet not found' }, { status: 409 })
-    }
+    if (!wallet) return NextResponse.json({ error: 'Customer wallet not found' }, { status: 409 })
 
     const amountMinor = BigInt(amount) * 100n
-    const expiresAt = new Date()
-    expiresAt.setDate(expiresAt.getDate() + tierConfig.durationDays)
+    const operationKey = `property-boost-op:${id}:${session.id}:${idempotencyKey}`
+    const ledgerKey = `property-boost-ledger:${id}:${session.id}:${idempotencyKey}`
+    const payloadHash = `${id}:${session.id}:${tier}:${paymentMethod}:${amount}:${currency}`
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const outcome = await prisma.$transaction(async (tx) => {
+      // Serialize retries/concurrent duplicates for the whole operation, not only
+      // the ledger leg. A ledger-only idempotency key would still allow a second
+      // compatibility shadow debit and duplicate boost record.
+      await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext($1))`, operationKey)
+
+      const existing = await tx.idempotencyRecord.findUnique({ where: { idempotencyKey: operationKey } })
+      if (existing?.status === 'COMPLETED' && existing.metadata) {
+        const metadata = JSON.parse(existing.metadata)
+        if (metadata.payloadHash !== payloadHash) throw new Error('IDEMPOTENCY_CONFLICT')
+        const currentListing = await tx.realEstateListing.findUnique({ where: { id } })
+        if (!currentListing) throw new Error('Listing not found')
+        return {
+          listing: currentListing,
+          expiresAt: new Date(metadata.expiresAt),
+          reused: true,
+        }
+      }
+
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + tierConfig.durationDays)
+
       await postLedgerTransaction({
         entries: [
           { accountId: wallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount: amountMinor },
@@ -83,14 +86,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         ],
         referenceType: 'PROPERTY_BOOST',
         referenceId: id,
-        idempotencyKey: `property-boost:${id}:${session.id}:${idempotencyKey}`,
+        idempotencyKey: ledgerKey,
         description: `Property boost ${tier} for listing ${id}`,
         createdBy: session.id,
       }, tx)
 
-      // LEGACY_SHADOW_WRITE: keep the existing customer-wallet API in sync while
-      // WalletBalance is the canonical concurrency source. This shadow write is
-      // inside the same transaction as the ledger movement and boost creation.
+      // LEGACY_SHADOW_WRITE: compatibility only. WalletBalance + FinancialLedger
+      // are canonical; this mirror is in the same transaction as the ledger and
+      // is protected by the operation-level idempotency lock above.
       const shadow = await tx.customerWallet.updateMany({
         where: { id: wallet.id, balance: { gte: amount } },
         data: { balance: { decrement: amount } },
@@ -111,40 +114,39 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         },
       })
 
-      await tx.propertyBoost.create({
+      const boost = await tx.propertyBoost.create({
+        data: { listingId: id, userId: session.id, tier, amount, currency, paymentMethod, status: 'active', expiresAt },
+      })
+
+      const updated = await tx.realEstateListing.update({
+        where: { id },
+        data: { boostTier: tier, boostExpiresAt: expiresAt, boostedAt: new Date() },
+      })
+
+      await tx.idempotencyRecord.create({
         data: {
-          listingId: id,
-          userId: session.id,
-          tier,
-          amount,
-          currency,
-          paymentMethod,
-          status: 'active',
-          expiresAt,
+          idempotencyKey: operationKey,
+          operation: 'PROPERTY_BOOST',
+          status: 'COMPLETED',
+          metadata: JSON.stringify({ boostId: boost.id, payloadHash, expiresAt: expiresAt.toISOString() }),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       })
 
-      return tx.realEstateListing.update({
-        where: { id },
-        data: {
-          boostTier: tier,
-          boostExpiresAt: expiresAt,
-          boostedAt: new Date(),
-        },
-      })
+      return { listing: updated, expiresAt, reused: false }
     })
 
     return NextResponse.json({
       success: true,
+      idempotentReplay: outcome.reused,
       data: {
-        listing: updated,
-        boost: { tier, amount, currency, expiresAt },
+        listing: outcome.listing,
+        boost: { tier, amount, currency, expiresAt: outcome.expiresAt },
       },
     })
   } catch (error: any) {
-    if (error?.message === 'INSUFFICIENT_FUNDS') {
-      return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 })
-    }
+    if (error?.message === 'INSUFFICIENT_FUNDS') return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 })
+    if (error?.message === 'IDEMPOTENCY_CONFLICT') return NextResponse.json({ error: 'Idempotency key conflict' }, { status: 409 })
     console.error('Error boosting property:', error)
     return NextResponse.json({ error: error?.message || 'Failed to boost property' }, { status: 500 })
   }
