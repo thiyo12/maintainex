@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { type Currency, bigIntToSafeNumber } from './money';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 function serializeBigInt(obj: unknown): string {
   return JSON.stringify(obj, (_key, value) =>
@@ -138,7 +138,7 @@ export async function postLedgerTransaction(
       }
     }
 
-    const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const transactionId = `txn_${randomUUID()}`;
     await client.idempotencyRecord.create({
       data: {
         idempotencyKey: input.idempotencyKey,
@@ -186,8 +186,6 @@ export async function postLedgerTransaction(
 
     for (const update of walletUpdates.values()) {
       const walletId = await resolveWalletId(client, update);
-      // FinancialLedger is BigInt minor units (cents). WalletBalance is a legacy
-      // Float compatibility cache in major LKR, so conversion belongs here.
       const deltaMajor = bigIntToSafeNumber(update.amount) / 100;
       const walletType = update.accountType === 'CUSTOMER_WALLET' ? 'CUSTOMER' : 'PROVIDER';
 
