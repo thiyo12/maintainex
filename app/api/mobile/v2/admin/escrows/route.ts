@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
-import { postLedgerTransaction } from '@/lib/ledger'
-import { readCanonicalProviderBalance } from '@/lib/financial-read'
-import { bigIntToSafeNumber } from '@/lib/money'
-import { refundEscrow } from '@/lib/domain/job-lifecycle'
+import { releaseEscrow, refundEscrow } from '@/lib/domain/job-lifecycle'
+
+function serializeEscrow<T extends { amount: bigint; serviceFee: bigint; totalAmount: bigint }>(escrow: T) {
+  return {
+    ...escrow,
+    amount: escrow.amount.toString(),
+    serviceFee: escrow.serviceFee.toString(),
+    totalAmount: escrow.totalAmount.toString(),
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-
-    const where: any = {}
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20))
+    const where: { status?: string } = {}
     if (status) where.status = status
 
     const [escrows, total] = await Promise.all([
@@ -29,7 +36,7 @@ export async function GET(request: NextRequest) {
       prisma.jobEscrow.count({ where }),
     ])
 
-    return NextResponse.json({ escrows: escrows.map((e) => ({ ...e, amount: bigIntToSafeNumber(e.amount), serviceFee: bigIntToSafeNumber(e.serviceFee), totalAmount: bigIntToSafeNumber(e.totalAmount) })), total, page, limit })
+    return NextResponse.json({ escrows: escrows.map(serializeEscrow), total, page, limit })
   } catch (error) {
     console.error('Admin escrows error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -39,89 +46,54 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const body = await request.json()
-    const { escrowId, action } = body
-
-    if (!escrowId || !action) {
-      return NextResponse.json({ error: 'escrowId and action required' }, { status: 400 })
+    const escrowId = typeof body.escrowId === 'string' ? body.escrowId.trim() : ''
+    const action = typeof body.action === 'string' ? body.action.trim().toUpperCase() : ''
+    if (!escrowId || !['RELEASE', 'REFUND'].includes(action)) {
+      return NextResponse.json({ error: 'escrowId and action RELEASE or REFUND required' }, { status: 400 })
     }
 
     const escrow = await prisma.jobEscrow.findUnique({ where: { id: escrowId } })
     if (!escrow) return NextResponse.json({ error: 'Escrow not found' }, { status: 404 })
+    if (escrow.status !== 'ON_HOLD') {
+      return NextResponse.json({ error: 'Escrow must be ON_HOLD for an admin resolution' }, { status: 400 })
+    }
 
     if (action === 'RELEASE') {
-      if (escrow.status !== 'ON_HOLD') {
-        return NextResponse.json({ error: 'Escrow must be ON_HOLD to force-release' }, { status: 400 })
-      }
-
-      const providerWallet = await prisma.providerWallet.findUnique({
-        where: { userId: escrow.providerId },
-      })
-      const canonicalProviderBalance = await readCanonicalProviderBalance(escrow.providerId)
-      const currentProviderBalance = canonicalProviderBalance ? bigIntToSafeNumber(canonicalProviderBalance.availableBalance) : (providerWallet?.availableBalance || 0)
-
-      await prisma.$transaction(async (tx) => {
-        await tx.jobEscrow.update({
-          where: { id: escrow.id },
-          data: { status: 'RELEASED', releasedAt: new Date() },
-        })
-        await tx.providerWallet.upsert({
-          where: { userId: escrow.providerId },
-          create: { userId: escrow.providerId, availableBalance: bigIntToSafeNumber(escrow.amount) },
-          update: { availableBalance: { increment: bigIntToSafeNumber(escrow.amount) } },
-        })
-        await tx.walletTransaction.create({
-          data: {
-            userId: escrow.providerId,
-            walletType: 'PROVIDER',
-            type: 'CREDIT',
-            amount: bigIntToSafeNumber(escrow.amount),
-            balanceBefore: currentProviderBalance,
-            balanceAfter: currentProviderBalance + bigIntToSafeNumber(escrow.amount),
-            reference: 'Admin force-release escrow',
-            referenceType: 'ESCROW_RELEASE',
-            referenceId: escrow.id,
-          },
-        })
-        await tx.marketplaceJob.update({
-          where: { id: escrow.jobId },
-          data: { status: 'COMPLETED' },
-        })
-
-        await postLedgerTransaction({
-          entries: [
-            { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.amount },
-            { accountId: `provider:${escrow.providerId}`, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: escrow.amount },
-          ],
-          referenceType: 'ESCROW_RELEASE',
-          referenceId: escrow.id,
-          idempotencyKey: `admin-escrow-release:${escrow.id}`,
-          description: 'Admin force-release escrow',
-          createdBy: user.id,
-        }, tx)
-      })
-
-      return NextResponse.json({ success: true, message: 'Escrow released by admin' })
-    }
-
-    if (action === 'REFUND') {
-      if (escrow.status !== 'ON_HOLD') {
-        return NextResponse.json({ error: 'Escrow must be ON_HOLD to refund' }, { status: 400 })
-      }
-
-      const result = await refundEscrow(
-        { jobId: escrow.jobId, actorId: user.id, actorType: 'STAFF' },
-        escrow.jobId
+      const result = await releaseEscrow(
+        { jobId: escrow.jobId, actorId: user.id, actorType: 'STAFF', reason: 'Admin force-release' },
+        escrow.jobId,
       )
-
-      return NextResponse.json({ success: true, message: 'Escrow refunded by admin', refundAmount: result.refundAmount })
+      return NextResponse.json({
+        success: true,
+        message: 'Escrow released by admin through canonical ledger',
+        netAmount: result.netAmount,
+        commission: result.commission,
+      })
     }
 
-    return NextResponse.json({ error: 'Action must be RELEASE or REFUND' }, { status: 400 })
+    const result = await refundEscrow(
+      { jobId: escrow.jobId, actorId: user.id, actorType: 'STAFF', reason: 'Admin refund' },
+      escrow.jobId,
+    )
+    return NextResponse.json({
+      success: true,
+      message: 'Escrow refunded by admin through canonical ledger',
+      refundAmount: result.refundAmount,
+    })
   } catch (error) {
     console.error('Admin escrow action error:', error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Server error'
+    if (message.includes('already') || message.includes('concurrently') || message.includes('state changed')) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (message === 'CASH_PAYMENT_DISABLED') {
+      return NextResponse.json({ error: 'Cash settlement is disabled until a funded cash accounting flow is implemented' }, { status: 503 })
+    }
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
