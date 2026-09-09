@@ -38,6 +38,7 @@ jobs:
       CRON_SECRET: phase07-ci-cron-secret-012345678901234567
       INTERNAL_SYNC_SECRET: phase07-ci-sync-secret-01234567890123456
       ALLOW_TEST_OTP: "true"
+      VPS_INTEGRATION: "true"
       CLOUDINARY_CLOUD_NAME: test
       CLOUDINARY_API_KEY: test
       CLOUDINARY_API_SECRET: test
