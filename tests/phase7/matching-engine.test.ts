@@ -8,6 +8,10 @@
  *
  * NOTE: These tests create and clean up their own data. They use unique
  * timestamps to avoid collisions with existing data.
+ *
+ * Phase 7.2: Creates proper JobCategory with CUID + slug, uses CUID
+ * as MarketplaceJob.categoryId. Tests prove slug-based matching works
+ * correctly through the canonical capability resolver.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
@@ -18,6 +22,7 @@ const prisma = new PrismaClient()
 
 describe('Phase 7 — Matching Engine Integration', () => {
   let ts: number
+  let testCategoryId: string
   let customerId: string
   let jobId: string
   let companyAId: string
@@ -34,6 +39,20 @@ describe('Phase 7 — Matching Engine Integration', () => {
   beforeAll(async () => {
     try {
     ts = Date.now()
+
+    // Create JobCategory with real CUID + slug
+    const category = await prisma.jobCategory.create({
+      data: {
+        name: `ME Category ${ts}`,
+        slug: `me-cat-${ts}`,
+        iconName: 'wrench',
+        colorHex: '#000000',
+        countries: '["LK"]',
+        isActive: true,
+        sortOrder: 0,
+      },
+    })
+    testCategoryId = category.id
 
     // Customer
     const customer = await prisma.user.create({
@@ -62,7 +81,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       data: {
         userId: ownerAId,
         companyName: `ME CoA ${ts}`,
-        services: JSON.stringify(['plumbing', 'electrical']),
+        services: JSON.stringify([`me-cat-${ts}`, 'electrical']),
         serviceAreas: '[]',
         isVerified: true,
         verificationStatus: 'VERIFIED',
@@ -97,7 +116,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       data: {
         userId: ownerBId,
         companyName: `ME CoB ${ts}`,
-        services: JSON.stringify(['plumbing']),
+        services: JSON.stringify([`me-cat-${ts}`]),
         serviceAreas: '[]',
         isVerified: true,
         verificationStatus: 'VERIFIED',
@@ -131,7 +150,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     await prisma.taskerProfile.create({
       data: {
         userId: individualProviderId,
-        skills: JSON.stringify(['plumbing', 'renovation']),
+        skills: JSON.stringify([`me-cat-${ts}`, 'renovation']),
         isVerified: true,
         verificationStatus: 'VERIFIED',
         completedJobs: 15,
@@ -154,7 +173,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     await prisma.taskerProfile.create({
       data: {
         userId: suspendedProviderId,
-        skills: JSON.stringify(['plumbing']),
+        skills: JSON.stringify([`me-cat-${ts}`]),
         isVerified: true,
         verificationStatus: 'VERIFIED',
       },
@@ -175,7 +194,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     await prisma.taskerProfile.create({
       data: {
         userId: bannedProviderId,
-        skills: JSON.stringify(['plumbing']),
+        skills: JSON.stringify([`me-cat-${ts}`]),
         isVerified: true,
         verificationStatus: 'VERIFIED',
       },
@@ -195,7 +214,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
     await prisma.taskerProfile.create({
       data: {
         userId: unverifiedIdentityProviderId,
-        skills: JSON.stringify(['plumbing']),
+        skills: JSON.stringify([`me-cat-${ts}`]),
         isVerified: true,
         verificationStatus: 'VERIFIED',
       },
@@ -238,18 +257,18 @@ describe('Phase 7 — Matching Engine Integration', () => {
         userId: memberOfCompanyAId,
         name: 'ME MemberA',
         role: 'WORKER',
-        skills: JSON.stringify(['plumbing']),
+        skills: JSON.stringify([`me-cat-${ts}`]),
         status: 'ACTIVE',
       },
     })
 
-    // Job
+    // Job — uses CUID from real JobCategory
     const job = await prisma.marketplaceJob.create({
       data: {
         customerId,
         title: 'ME Test Job',
         description: 'Plumbing repair',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
         photos: '[]',
         budgetType: 'FIXED',
         budgetAmount: 15000n,
@@ -269,10 +288,10 @@ describe('Phase 7 — Matching Engine Integration', () => {
     if (companyIds.length) await prisma.companyProfile.deleteMany({ where: { id: { in: companyIds } } }).catch(() => {})
     const userIds = [customerId, ownerAId, ownerBId, individualProviderId, suspendedProviderId, bannedProviderId, unverifiedIdentityProviderId, noCapabilitiesProviderId, memberOfCompanyAId].filter(Boolean) as string[]
     if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } }).catch(() => {})
+    if (testCategoryId) await prisma.jobCategory.delete({ where: { id: testCategoryId } }).catch(() => {})
   })
 
   it('findCandidates with no eligible providers returns empty candidates', async () => {
-    // Use a nonexistent job ID
     const result = await findCandidates(prisma, {
       jobId: 'nonexistent-job-id',
       jobMode: 'QUOTE',
@@ -288,7 +307,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     const found = result.candidates.find(c => c.providerId === individualProviderId)
@@ -301,7 +320,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     const found = result.candidates.find(c => c.providerId === companyAId)
@@ -314,7 +333,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     const excluded = result.excluded.find(e => e.providerId === suspendedProviderId)
@@ -327,7 +346,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     const excluded = result.excluded.find(e => e.providerId === bannedProviderId)
@@ -340,7 +359,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     const excluded = result.excluded.find(e => e.providerId === unverifiedIdentityProviderId)
@@ -353,7 +372,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     const excluded = result.excluded.find(e => e.providerId === noCapabilitiesProviderId)
@@ -366,7 +385,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     for (let i = 1; i < result.candidates.length; i++) {
@@ -379,7 +398,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     result.candidates.forEach((c, i) => {
@@ -404,7 +423,7 @@ describe('Phase 7 — Matching Engine Integration', () => {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
+      categoryId: testCategoryId,
     }
     const result = await findCandidates(prisma, input)
     expect(result.scoreVersion).toBeDefined()
@@ -413,19 +432,14 @@ describe('Phase 7 — Matching Engine Integration', () => {
   })
 
   it('cross-company isolation: company A member not matched to other company jobs', async () => {
-    // memberOfCompanyAId is a member of companyA.
-    // As an individual provider, they should still appear as individual (not company).
-    // Cross-company isolation means: company A's team members don't appear
-    // as providers for company B's matching context.
     const input: MatchingInput = {
       jobId,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
-      categoryId: 'plumbing',
-      companyId: companyBId, // requesting from B's perspective
+      categoryId: testCategoryId,
+      companyId: companyBId,
     }
     const result = await findCandidates(prisma, input)
-    // memberOfCompanyAId should NOT appear as a COMPANY provider
     const asCompany = result.candidates.find(
       c => c.providerId === memberOfCompanyAId && c.providerType === 'COMPANY',
     )

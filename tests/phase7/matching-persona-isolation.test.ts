@@ -8,6 +8,8 @@
  *
  * Includes both pure unit tests (scoring isolation) and DB tests
  * (findCandidates persona isolation).
+ *
+ * Phase 7.2: Creates proper JobCategory with CUID + slug for DB tests.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
@@ -60,6 +62,8 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
 
   describe('DB tests — findCandidates persona isolation', () => {
     let ts: number
+    let testCategoryId: string
+    let testCategorySlug: string
     let customerId: string
     let jobId: string
     let companyAId: string
@@ -72,6 +76,21 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
     beforeAll(async () => {
       try {
       ts = Date.now()
+
+      // Create JobCategory with real CUID + slug
+      const category = await prisma.jobCategory.create({
+        data: {
+          name: `PI Category ${ts}`,
+          slug: `pi-cat-${ts}`,
+          iconName: 'wrench',
+          colorHex: '#000000',
+          countries: '["LK"]',
+          isActive: true,
+          sortOrder: 0,
+        },
+      })
+      testCategoryId = category.id
+      testCategorySlug = category.slug!
 
       // Customer
       const customer = await prisma.user.create({
@@ -100,7 +119,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         data: {
           userId: ownerAId,
           companyName: `PI CoA ${ts}`,
-          services: JSON.stringify(['plumbing']),
+          services: JSON.stringify([testCategorySlug]),
           serviceAreas: '[]',
           isVerified: true,
           verificationStatus: 'VERIFIED',
@@ -165,7 +184,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
       await prisma.taskerProfile.create({
         data: {
           userId: individualUserId,
-          skills: JSON.stringify(['plumbing']),
+          skills: JSON.stringify([testCategorySlug]),
           isVerified: true,
           verificationStatus: 'VERIFIED',
         },
@@ -185,7 +204,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
       await prisma.taskerProfile.create({
         data: {
           userId: companyAMemberUserId,
-          skills: JSON.stringify(['plumbing', 'renovation']),
+          skills: JSON.stringify([testCategorySlug, 'renovation']),
           isVerified: true,
           verificationStatus: 'VERIFIED',
         },
@@ -196,18 +215,18 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
           userId: companyAMemberUserId,
           name: 'PI MemberA',
           role: 'WORKER',
-          skills: JSON.stringify(['plumbing']),
+          skills: JSON.stringify([testCategorySlug]),
           status: 'ACTIVE',
         },
       })
 
-      // Job
+      // Job — uses CUID from real JobCategory
       const job = await prisma.marketplaceJob.create({
         data: {
           customerId,
           title: 'PI Test Job',
           description: 'Plumbing work',
-          categoryId: 'plumbing',
+          categoryId: testCategoryId,
           photos: '[]',
           budgetType: 'FIXED',
           budgetAmount: 10000n,
@@ -228,6 +247,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
       const userIds = [customerId, ownerAId, ownerBId, individualUserId, companyAMemberUserId].filter(Boolean) as string[]
       if (userIds.length) await prisma.user.deleteMany({ where: { id: { in: userIds } } }).catch(() => {}
       )
+      if (testCategoryId) await prisma.jobCategory.delete({ where: { id: testCategoryId } }).catch(() => {})
     })
 
     it('individual providers never matched as company providers', async () => {
@@ -235,7 +255,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
       }
       const result = await findCandidates(prisma, input)
       const indivAsCompany = result.candidates.find(
@@ -249,7 +269,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
       }
       const result = await findCandidates(prisma, input)
       const companyAsIndiv = result.candidates.find(
@@ -265,14 +285,13 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
       }
       const result = await findCandidates(prisma, input)
       const indivCandidate = result.candidates.find(
         c => c.providerId === individualUserId && c.providerType === 'INDIVIDUAL',
       )
       expect(indivCandidate).toBeDefined()
-      // Individual has 'plumbing' skill → capability should be 100
       expect(indivCandidate!.components.capability).toBe(100)
     })
 
@@ -281,14 +300,13 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
       }
       const result = await findCandidates(prisma, input)
       const companyCandidate = result.candidates.find(
         c => c.providerId === companyAId && c.providerType === 'COMPANY',
       )
       expect(companyCandidate).toBeDefined()
-      // Company A has 'plumbing' service → capability should be 100
       expect(companyCandidate!.components.capability).toBe(100)
     })
 
@@ -297,11 +315,10 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
         companyId: companyBId,
       }
       const result = await findCandidates(prisma, input)
-      // companyAMemberUserId should NOT appear as a COMPANY provider for company B
       const memberAsCompanyB = result.candidates.find(
         c => c.providerId === companyAMemberUserId && c.providerType === 'COMPANY',
       )
@@ -313,7 +330,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
       }
       const result = await findCandidates(prisma, input)
       const asIndividual = result.candidates.find(
@@ -322,11 +339,8 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
       const asCompany = result.candidates.find(
         c => c.providerId === companyAId && c.providerType === 'COMPANY',
       )
-      // The member appears as individual (via taskerProfile)
       expect(asIndividual).toBeDefined()
-      // The company they belong to appears as company (via companyProfile)
       expect(asCompany).toBeDefined()
-      // They should NOT appear as the company itself
       const memberAsCompany = result.candidates.find(
         c => c.providerId === companyAMemberUserId && c.providerType === 'COMPANY',
       )
@@ -338,7 +352,7 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
         jobId,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
-        categoryId: 'plumbing',
+        categoryId: testCategoryId,
       }
       const result = await findCandidates(prisma, input)
       const asIndividual = result.candidates.find(
@@ -349,7 +363,6 @@ describe('Phase 7 — Matching Engine Persona Isolation', () => {
       )
       expect(asIndividual).toBeDefined()
       expect(companyCandidate).toBeDefined()
-      // Both should have valid scores (may be different due to different data sources)
       expect(asIndividual!.score).toBeGreaterThanOrEqual(0)
       expect(companyCandidate!.score).toBeGreaterThanOrEqual(0)
     })

@@ -7,7 +7,7 @@ import {
 import {
   DEFAULT_WEIGHTS, MATCHING_SCORE_VERSION, validateWeights,
   computeCapabilityScore, computeReliabilityScore, computeReputationScore,
-  computeAvailabilityScore, computeTravelScore, computeExperienceScore,
+  computeExperienceScore,
   computeTotalScore,
 } from './scoring'
 import { rankCandidates } from './ranking'
@@ -21,25 +21,85 @@ const DEFAULT_CONFIG: MatchingConfig = {
   weights: { ...DEFAULT_WEIGHTS },
 }
 
-export function hasCapabilityMatch(
-  providerSkills: string[],
-  jobCategoryId: string,
-  jobServiceTemplateId?: string | null,
-): boolean {
-  if (providerSkills.length === 0) return false
-  const normalized = providerSkills.map(s => s.toLowerCase().trim())
+export interface JobRequirements {
+  categorySlug: string
+  categoryId: string
+  templateJobIds: string[]
+  serviceTemplateSlug: string | null
+}
 
-  if (jobServiceTemplateId) {
-    if (normalized.includes(jobServiceTemplateId.toLowerCase())) return true
-    if (normalized.includes(jobCategoryId.toLowerCase())) return true
-    return false
+export async function resolveJobRequirements(
+  client: PrismaClient,
+  categoryId: string,
+  serviceTemplateId?: string | null,
+  templateJobId?: string | null,
+): Promise<JobRequirements | null> {
+  const category = await client.jobCategory.findUnique({
+    where: { id: categoryId },
+    select: { id: true, slug: true },
+  })
+  if (!category || !category.slug) return null
+
+  let serviceTemplateSlug: string | null = null
+  const templateJobIds: string[] = []
+
+  if (serviceTemplateId) {
+    const st = await (client as any).serviceTemplate.findUnique({
+      where: { id: serviceTemplateId },
+      select: { slug: true, templateJobId: true, jobCategoryId: true },
+    })
+    if (st) {
+      serviceTemplateSlug = st.slug
+      if (st.templateJobId) templateJobIds.push(st.templateJobId)
+    }
   }
 
-  if (normalized.includes(jobCategoryId.toLowerCase())) return true
-  const partialMatch = normalized.some(s =>
-    jobCategoryId.toLowerCase().includes(s) || s.includes(jobCategoryId.toLowerCase())
-  )
-  return partialMatch
+  if (templateJobId && !templateJobIds.includes(templateJobId)) {
+    templateJobIds.push(templateJobId)
+  }
+
+  return {
+    categorySlug: category.slug,
+    categoryId: category.id,
+    templateJobIds,
+    serviceTemplateSlug,
+  }
+}
+
+export function hasCapabilityMatch(
+  providerLegacySkills: string[],
+  jobReqs: JobRequirements,
+): boolean {
+  if (providerLegacySkills.length === 0) return false
+  const normalized = providerLegacySkills.map(s => s.toLowerCase().trim())
+
+  if (jobReqs.serviceTemplateSlug) {
+    if (normalized.includes(jobReqs.serviceTemplateSlug.toLowerCase())) return true
+  }
+
+  if (normalized.includes(jobReqs.categorySlug.toLowerCase())) return true
+
+  return false
+}
+
+export function hasRelationalCapability(
+  taskerJobIds: string[],
+  jobReqs: JobRequirements,
+): boolean {
+  if (taskerJobIds.length === 0) return false
+  if (jobReqs.templateJobIds.length === 0) return false
+  return taskerJobIds.some(id => jobReqs.templateJobIds.includes(id))
+}
+
+export function hasCompanySpecialtyCapability(
+  specialties: Array<{ categoryId: string | null; jobId: string | null }>,
+  jobReqs: JobRequirements,
+): boolean {
+  return specialties.some(sp => {
+    if (sp.categoryId && sp.categoryId === jobReqs.categoryId) return true
+    if (sp.jobId && jobReqs.templateJobIds.includes(sp.jobId)) return true
+    return false
+  })
 }
 
 export async function resolveMatchingConfig(
@@ -83,15 +143,23 @@ export async function findCandidates(
 
   const job = await client.marketplaceJob.findUnique({
     where: { id: input.jobId },
-    select: { categoryId: true, serviceTemplateId: true, customerId: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, customerId: true },
   })
   if (!job) {
     return { jobId: input.jobId, candidates: [], excluded: [], scoreVersion: config.matchingVersion, generatedAt: new Date() }
   }
 
+  const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
+  if (!jobReqs) {
+    return { jobId: input.jobId, candidates: [], excluded: [], scoreVersion: config.matchingVersion, generatedAt: new Date() }
+  }
+
   const individualProfiles = await client.taskerProfile.findMany({
     where: { verificationStatus: 'VERIFIED', isVerified: true },
-    include: { user: { select: { id: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true } } },
+    include: {
+      user: { select: { id: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true } },
+      taskerSkills: { select: { jobId: true } },
+    },
   })
 
   for (const profile of individualProfiles) {
@@ -116,13 +184,22 @@ export async function findCandidates(
       continue
     }
 
-    const skills = parseSkills(profile.skills)
-    if (!hasCapabilityMatch(skills, job.categoryId, job.serviceTemplateId)) {
-      excluded.push({ providerId: profile.userId, providerType: 'INDIVIDUAL', reason: 'CAPABILITY_MISMATCH', detail: `Provider skills [${skills.join(', ')}] do not match job categoryId=${job.categoryId}` })
+    const legacySkills = parseSkills(profile.skills)
+    const relationalJobIds = profile.taskerSkills.map((ts: { jobId: string }) => ts.jobId)
+    const hasRelational = hasRelationalCapability(relationalJobIds, jobReqs)
+    const hasLegacy = hasCapabilityMatch(legacySkills, jobReqs)
+
+    if (!hasRelational && !hasLegacy) {
+      excluded.push({
+        providerId: profile.userId,
+        providerType: 'INDIVIDUAL',
+        reason: 'CAPABILITY_MISMATCH',
+        detail: `Provider skills [${legacySkills.join(', ')}] do not match job category slug=${jobReqs.categorySlug}`,
+      })
       continue
     }
 
-    const components = scoreIndividual(profile, job.categoryId, job.serviceTemplateId, input)
+    const components = scoreIndividual(profile, jobReqs, input)
     const totalScore = computeTotalScore(components, config.weights)
 
     candidates.push({
@@ -139,7 +216,10 @@ export async function findCandidates(
 
   const companies = await client.companyProfile.findMany({
     where: { verificationStatus: 'VERIFIED', isVerified: true },
-    include: { user: { select: { id: true, isSuspended: true, isBanned: true } } },
+    include: {
+      user: { select: { id: true, isSuspended: true, isBanned: true } },
+      specialties: { select: { categoryId: true, jobId: true } },
+    },
   })
 
   for (const company of companies) {
@@ -159,13 +239,21 @@ export async function findCandidates(
       continue
     }
 
-    const companySkills = parseSkills(company.services)
-    if (!hasCapabilityMatch(companySkills, job.categoryId, job.serviceTemplateId)) {
-      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'CAPABILITY_MISMATCH', detail: `Company services [${companySkills.join(', ')}] do not match job categoryId=${job.categoryId}` })
+    const legacyServices = parseSkills(company.services)
+    const hasSpecialty = hasCompanySpecialtyCapability(company.specialties, jobReqs)
+    const hasLegacy = hasCapabilityMatch(legacyServices, jobReqs)
+
+    if (!hasSpecialty && !hasLegacy) {
+      excluded.push({
+        providerId: company.id,
+        providerType: 'COMPANY',
+        reason: 'CAPABILITY_MISMATCH',
+        detail: `Company services [${legacyServices.join(', ')}] do not match job category slug=${jobReqs.categorySlug}`,
+      })
       continue
     }
 
-    const components = scoreCompany(company, job.categoryId, job.serviceTemplateId, input)
+    const components = scoreCompany(company, jobReqs, input)
     const totalScore = computeTotalScore(components, config.weights)
 
     candidates.push({
@@ -194,8 +282,7 @@ export async function findCandidates(
 
 function scoreIndividual(
   profile: any,
-  categoryId: string,
-  serviceTemplateId: string | null,
+  jobReqs: JobRequirements,
   input: MatchingInput,
 ): ScoreComponents {
   const skills = parseSkills(profile.skills)
@@ -204,7 +291,7 @@ function scoreIndividual(
   const reviewCount = profile.completedJobs || 0
 
   return {
-    capability: computeCapabilityScore(skills, categoryId, serviceTemplateId || undefined),
+    capability: computeCapabilityScore(skills, jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
     reliability: computeReliabilityScore(completedJobs, 0),
     reputation: computeReputationScore(rating, reviewCount),
     availability: NEUTRAL_SCORE,
@@ -215,8 +302,7 @@ function scoreIndividual(
 
 function scoreCompany(
   company: any,
-  categoryId: string,
-  serviceTemplateId: string | null,
+  jobReqs: JobRequirements,
   input: MatchingInput,
 ): ScoreComponents {
   const skills = parseSkills(company.services)
@@ -224,7 +310,7 @@ function scoreCompany(
   const rating = company.rating || 0
 
   return {
-    capability: computeCapabilityScore(skills, categoryId, serviceTemplateId || undefined),
+    capability: computeCapabilityScore(skills, jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
     reliability: computeReliabilityScore(completedProjects, 0),
     reputation: computeReputationScore(rating, completedProjects),
     availability: NEUTRAL_SCORE,

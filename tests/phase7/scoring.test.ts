@@ -31,14 +31,14 @@ describe('Phase 7 — Matching Engine Scoring', () => {
       expect(score).toBe(100)
     })
 
-    it('partial match returns 60', () => {
+    it('partial match returns 20 (no exact match)', () => {
       const score = computeCapabilityScore(['plumb'], 'plumbing')
-      expect(score).toBe(60)
+      expect(score).toBe(20)
     })
 
-    it('partial match in reverse returns 60', () => {
+    it('partial match in reverse returns 20 (no exact match)', () => {
       const score = computeCapabilityScore(['plumbing services'], 'plumbing')
-      expect(score).toBe(60)
+      expect(score).toBe(20)
     })
 
     it('no match returns 20', () => {

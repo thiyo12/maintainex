@@ -36,10 +36,7 @@ export function computeCapabilityScore(
   }
 
   if (normalizedSkills.includes(jobCategoryId.toLowerCase())) return 100
-  const partialMatch = normalizedSkills.some(s =>
-    jobCategoryId.toLowerCase().includes(s) || s.includes(jobCategoryId.toLowerCase())
-  )
-  return partialMatch ? 60 : 20
+  return 20
 }
 
 export function computeReliabilityScore(
