@@ -3,6 +3,26 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { requestPayout } from '@/lib/payout-engine'
 
+function parseMajorAmountToMinor(value: unknown): bigint | null {
+  let raw: string
+  if (typeof value === 'string') {
+    raw = value.trim()
+  } else if (typeof value === 'number' && Number.isFinite(value)) {
+    raw = value.toString()
+  } else {
+    return null
+  }
+
+  // LKR withdrawal API accepts major units with at most 2 decimal places.
+  // Convert with string arithmetic so 0.1/0.2 floating-point behaviour can
+  // never change a financial amount.
+  if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null
+  const [whole, fractional = ''] = raw.split('.')
+  const cents = `${fractional}00`.slice(0, 2)
+  const amountMinor = BigInt(whole) * 100n + BigInt(cents)
+  return amountMinor > 0n ? amountMinor : null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -11,9 +31,9 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const amount = Number(body.amount)
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'Valid amount required' }, { status: 400 })
+    const amountCents = parseMajorAmountToMinor(body.amount)
+    if (amountCents === null) {
+      return NextResponse.json({ error: 'Valid amount required with at most 2 decimal places' }, { status: 400 })
     }
 
     const method = typeof body.method === 'string' && ['bank', 'wallet'].includes(body.method)
@@ -23,11 +43,10 @@ export async function POST(request: NextRequest) {
     const idempotencyKey = request.headers.get('idempotency-key') ||
       (typeof body.idempotencyKey === 'string' ? body.idempotencyKey.trim() : '')
 
-    if (!idempotencyKey) {
-      return NextResponse.json({ error: 'Idempotency-Key header is required' }, { status: 400 })
+    if (!idempotencyKey || idempotencyKey.length > 255) {
+      return NextResponse.json({ error: 'Valid Idempotency-Key header is required' }, { status: 400 })
     }
 
-    const amountCents = BigInt(Math.round(amount * 100))
     const result = await requestPayout(
       user.id,
       amountCents,
