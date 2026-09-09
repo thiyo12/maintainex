@@ -4,6 +4,18 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { acceptJobQuote } from '@/lib/domain/job-lifecycle'
 import { notifyQuoteAccepted } from '@/lib/notifications'
 
+async function resolveNotificationUser(providerId: string, providerType: string): Promise<string> {
+  if (providerType === 'COMPANY') {
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: providerId },
+      select: { userId: true },
+    })
+    if (!company) throw new Error('Company provider not found')
+    return company.userId
+  }
+  return providerId
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -20,10 +32,11 @@ export async function POST(
 
     const result = await acceptJobQuote(
       { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
-      quoteId
+      quoteId,
     )
 
-    notifyQuoteAccepted(result.job.id, result.quote.providerId, result.job.title)
+    const notificationUserId = await resolveNotificationUser(result.quote.providerId, result.quote.providerType)
+    notifyQuoteAccepted(result.job.id, notificationUserId, result.job.title)
 
     return NextResponse.json({
       success: true,
