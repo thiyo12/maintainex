@@ -3,6 +3,13 @@ import { prisma } from '@/lib/prisma'
 import { calculatePrice, PriceBoundsError, PricingInputError } from '@/lib/pricing/engine'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
+function parsePositiveNumber(value: unknown): number | undefined | null {
+  if (value === undefined || value === null || value === '') return undefined
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return null
+  return parsed
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -11,29 +18,37 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { categoryId, serviceTemplateId, urgency, quantity, durationMinutes, countryCode } = body
-    if (!categoryId) return NextResponse.json({ error: 'categoryId is required' }, { status: 400 })
+    const { categoryId, serviceTemplateId, urgency, countryCode } = body
+    if (typeof categoryId !== 'string' || !categoryId.trim()) {
+      return NextResponse.json({ error: 'categoryId is required' }, { status: 400 })
+    }
+
+    const quantity = parsePositiveNumber(body.quantity)
+    const durationMinutes = parsePositiveNumber(body.durationMinutes)
+    if (quantity === null || durationMinutes === null) {
+      return NextResponse.json({ error: 'quantity and durationMinutes must be positive finite numbers' }, { status: 400 })
+    }
 
     const estimate = await calculatePrice(prisma, {
       jobId: `estimate-${Date.now()}-${user.id}`,
-      categoryId,
-      serviceTemplateId: serviceTemplateId || undefined,
+      categoryId: categoryId.trim(),
+      serviceTemplateId: typeof serviceTemplateId === 'string' && serviceTemplateId.trim() ? serviceTemplateId.trim() : undefined,
       mode: 'QUOTE',
-      urgency: (urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
-      quantity: quantity ? Number(quantity) : undefined,
-      durationMinutes: durationMinutes ? Number(durationMinutes) : undefined,
-      countryCode: countryCode || 'GLOBAL',
+      urgency: (typeof urgency === 'string' ? urgency.toUpperCase() : 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
+      quantity,
+      durationMinutes,
+      countryCode: typeof countryCode === 'string' && countryCode.trim() ? countryCode.trim().toUpperCase() : 'GLOBAL',
     })
 
     return NextResponse.json({
       estimate: {
-        baseAmount: Number(estimate.baseAmount),
-        urgencyAmount: Number(estimate.urgencyAmount),
-        serviceModifiers: Number(estimate.serviceModifiers),
-        providerGross: Number(estimate.providerGross),
+        baseAmount: estimate.baseAmount.toString(),
+        urgencyAmount: estimate.urgencyAmount.toString(),
+        serviceModifiers: estimate.serviceModifiers.toString(),
+        providerGross: estimate.providerGross.toString(),
         platformFeeBps: estimate.platformFeeBps,
-        platformFeeAmount: Number(estimate.platformFeeAmount),
-        customerTotal: Number(estimate.customerTotal),
+        platformFeeAmount: estimate.platformFeeAmount.toString(),
+        customerTotal: estimate.customerTotal.toString(),
         currency: estimate.currency,
         pricingVersion: estimate.pricingVersion,
         ruleIds: estimate.ruleIds,
@@ -45,7 +60,12 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof PriceBoundsError) {
       return NextResponse.json(
-        { error: error.message, minAmount: Number(error.minCents), maxAmount: Number(error.maxCents), actual: Number(error.actual) },
+        {
+          error: error.message,
+          minAmount: error.minCents.toString(),
+          maxAmount: error.maxCents.toString(),
+          actual: error.actual.toString(),
+        },
         { status: 400 }
       )
     }
