@@ -65,14 +65,6 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      # The 202601 baseline is the immutable snapshot of the already-existing
-      # production database. Two compatibility migrations are already represented
-      # by that snapshot and must not be replayed on top of it:
-      # - 202506 name-change cooldown (pre-baseline historical migration)
-      # - 202608 customer-profile fields (the baseline already contains the final
-      #   columns/types, including birthday as TIMESTAMP rather than the older TEXT)
-      # In CI only, load the immutable baseline and mark those migrations resolved.
-      # Every genuinely post-baseline migration still runs with prisma migrate deploy.
       - name: Bootstrap isolated DB from immutable production baseline
         run: |
           npx prisma db execute --file prisma/migrations/20260101000000_baseline/migration.sql --schema prisma/schema.prisma
@@ -87,7 +79,19 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Phase 0-7 regression tests
-        run: npx vitest run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          npx vitest run tests --reporter=verbose 2>&1 | tee vitest-output.txt
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase0-7-vitest-output
+          path: vitest-output.txt
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Production build
         env:
