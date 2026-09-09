@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { revokeAllUserSessions } from '@/lib/auth/sessions'
 import { hashPassword } from '@/lib/security/password'
 
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user.isActive || user.isBanned || (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > new Date()))) {
-      return NextResponse.json({ error: 'Account is not eligible for password reset login' }, { status: 403 })
+      return NextResponse.json({ error: 'Account is not eligible for password reset' }, { status: 403 })
     }
 
     if (code !== '000000' || process.env.ALLOW_TEST_OTP !== 'true') {
@@ -85,15 +84,10 @@ export async function POST(request: NextRequest) {
 
     await revokeAllUserSessions(user.id, 'password_reset')
 
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || undefined
-    const userAgent = request.headers.get('user-agent') || undefined
-    const authSession = await createMarketplaceAuthSession(user.id, { ipAddress: ip, userAgent })
-    const response = buildAuthResponse(authSession)
-
     return NextResponse.json({
       success: true,
-      ...response,
-      token: response.accessToken,
+      requiresLogin: true,
+      message: 'Password reset successful. Please sign in again.',
     })
   } catch (error) {
     console.error('Mobile reset password error:', error)
