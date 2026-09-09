@@ -45,8 +45,8 @@ describe('Phase 5E — Financial Atomicity Guard', () => {
       expect(adminEscrows).not.toContain('walletTransaction.create(')
     })
 
-    it('cron auto-release delegates to releaseEscrow', () => {
-      expect(cronRelease).toContain('releaseEscrow')
+    it('cron auto-release delegates to canonical lifecycle writers', () => {
+      expect(cronRelease).toContain('completeAndReleaseEscrow')
       expect(cronRelease).not.toContain('providerWallet.upsert(')
       expect(cronRelease).not.toContain('walletTransaction.create(')
     })

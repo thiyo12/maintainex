@@ -1982,11 +1982,12 @@ model WalletTransaction {
 }
 
 model JobWorkspace {
-  id             String   @id @default(cuid())
-  jobId          String   @unique
-  progressStatus String   @default("ACCEPTED") // ACCEPTED, IN_PROGRESS, WAITING_CUSTOMER, COMPLETION_REQUESTED, COMPLETED, DISPUTED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                      String    @id @default(cuid())
+  jobId                   String    @unique
+  progressStatus          String    @default("ACCEPTED") // ACCEPTED, IN_PROGRESS, WAITING_CUSTOMER, COMPLETION_REQUESTED, COMPLETED, DISPUTED
+  completionRequestedAt   DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@index([jobId])
 }
@@ -2769,6 +2770,7 @@ model EmailVerificationToken {
 
 model FinancialLedger {
   id             String   @id @default(cuid())
+  groupId        String?
   accountId      String
   accountType    String
   entryType      String
@@ -2784,6 +2786,7 @@ model FinancialLedger {
 
   @@index([accountId, accountType])
   @@index([referenceType, referenceId])
+  @@index([groupId])
 }
 
 model IdempotencyRecord {

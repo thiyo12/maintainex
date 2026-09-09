@@ -156,6 +156,7 @@ export async function postLedgerTransaction(
       const entryIdempotencyKey = `${input.idempotencyKey}:${entry.accountId}:${entry.entryType}:${entry.amount}`;
       const ledgerEntry = await client.financialLedger.create({
         data: {
+          groupId: transactionId,
           accountId: entry.accountId,
           accountType: entry.accountType,
           entryType: entry.entryType,
@@ -249,33 +250,37 @@ export async function postLedgerTransaction(
 }
 
 export async function reverseLedgerTransaction(
-  originalTransactionId: string,
+  originalGroupId: string,
   reason: string,
   createdBy: string
 ): Promise<PostedLedgerTransaction> {
-  const originalEntries = await prisma.financialLedger.findMany({ where: { referenceId: originalTransactionId } });
-  if (originalEntries.length === 0) throw new Error(`Original transaction ${originalTransactionId} not found`);
+  return prisma.$transaction(async (tx) => {
+    const originalEntries = await tx.financialLedger.findMany({
+      where: { groupId: originalGroupId },
+    });
+    if (originalEntries.length === 0) throw new Error(`Original transaction ${originalGroupId} not found`);
 
-  const existingReversal = await prisma.financialLedger.findFirst({
-    where: {
+    const existingReversal = await tx.financialLedger.findFirst({
+      where: {
+        referenceType: 'REVERSAL',
+        referenceId: originalGroupId,
+      },
+    });
+    if (existingReversal) throw new Error(`Transaction ${originalGroupId} already reversed (ONE_REVERSAL_ONLY)`);
+
+    return postLedgerTransaction({
+      entries: originalEntries.map(entry => ({
+        accountId: entry.accountId,
+        accountType: entry.accountType,
+        entryType: (entry.entryType === 'CREDIT' ? 'DEBIT' : 'CREDIT') as 'CREDIT' | 'DEBIT',
+        amount: entry.amount,
+      })),
       referenceType: 'REVERSAL',
-      referenceId: originalTransactionId,
-    },
-  });
-  if (existingReversal) throw new Error(`Transaction ${originalTransactionId} already reversed (ONE_REVERSAL_ONLY)`);
-
-  return postLedgerTransaction({
-    entries: originalEntries.map(entry => ({
-      accountId: entry.accountId,
-      accountType: entry.accountType,
-      entryType: (entry.entryType === 'CREDIT' ? 'DEBIT' : 'CREDIT') as 'CREDIT' | 'DEBIT',
-      amount: entry.amount,
-    })),
-    referenceType: 'REVERSAL',
-    referenceId: originalTransactionId,
-    idempotencyKey: `reversal:${originalTransactionId}:${reason.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)}`,
-    description: `Reversal of ${originalTransactionId}: ${reason}`,
-    createdBy,
+      referenceId: originalGroupId,
+      idempotencyKey: `reversal:${originalGroupId}`,
+      description: `Reversal of ${originalGroupId}: ${reason}`,
+      createdBy,
+    }, tx);
   });
 }
 

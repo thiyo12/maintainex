@@ -82,7 +82,10 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
 
   const changed = await prisma.jobWorkspace.updateMany({
     where: { jobId: ctx.jobId, progressStatus: workspace.progressStatus },
-    data: { progressStatus: targetStatus },
+    data: {
+      progressStatus: targetStatus,
+      ...(targetStatus === 'COMPLETION_REQUESTED' ? { completionRequestedAt: new Date() } : {}),
+    },
   })
   if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
 
@@ -523,12 +526,30 @@ export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string
   if (!job) throw new Error('Job not found')
 
   const isCustomer = job.customerId === ctx.actorId
-  const isProvider = !!(await prisma.jobQuote.findFirst({
-    where: { jobId, providerId: ctx.actorId, status: 'ACCEPTED' },
-    select: { id: true },
-  }))
-  if (!isCustomer && !isProvider && ctx.actorType !== 'STAFF' && ctx.actorType !== 'COMPANY') {
-    throw new Error('Actor is not a participant in this job')
+  const isStaff = ctx.actorType === 'STAFF'
+
+  if (!isCustomer && !isStaff) {
+    const acceptedQuote = await prisma.jobQuote.findFirst({
+      where: { jobId, status: 'ACCEPTED' },
+    })
+    if (!acceptedQuote) throw new Error('No accepted quote')
+
+    if (ctx.actorType === 'COMPANY') {
+      if (acceptedQuote.providerType !== 'COMPANY') throw new Error('Quote is not a company quote')
+      const { checkWorkerEligibility } = await import('@/lib/phase6/provider-eligibility')
+      const eligibility = await checkWorkerEligibility(
+        acceptedQuote.providerId,
+        ctx.actorId,
+        jobId
+      )
+      if (!eligibility.eligible) {
+        throw new Error(`Worker not authorized: ${eligibility.reasons.join('; ')}`)
+      }
+    } else {
+      if (acceptedQuote.providerId !== ctx.actorId) {
+        throw new Error('Actor is not a participant in this job')
+      }
+    }
   }
 
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
@@ -541,4 +562,199 @@ export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string
   })
   if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
   return { escrowId: escrow.id }
+}
+
+export async function verifyOtpAndStartJob(
+  ctx: TransitionContext,
+  jobId: string,
+  otp: string
+): Promise<{ success: boolean }> {
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
+    if (!job) throw new Error('Job not found')
+    if (job.customerId !== ctx.actorId) throw new Error('Only the customer can verify OTP')
+    if (job.status !== 'IN_PROGRESS') throw new Error('Job is not in IN_PROGRESS status')
+
+    const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
+    if (!workspace) throw new Error('Workspace not found')
+    if (workspace.progressStatus !== 'ACCEPTED') throw new Error('Job already started')
+
+    const otpRecord = await tx.jobOtp.findUnique({ where: { jobId } })
+    if (!otpRecord) throw new Error('No OTP generated')
+    if (otpRecord.verifiedAt) throw new Error('OTP already used')
+    if (otpRecord.otp !== otp) throw new Error('Invalid OTP')
+
+    const otpClaimed = await tx.jobOtp.updateMany({
+      where: { id: otpRecord.id, verifiedAt: null },
+      data: { verifiedAt: new Date() },
+    })
+    if (otpClaimed.count !== 1) throw new Error('OTP already used')
+
+    const wsClaimed = await tx.jobWorkspace.updateMany({
+      where: { jobId, progressStatus: 'ACCEPTED' },
+      data: { progressStatus: 'IN_PROGRESS', updatedAt: new Date() },
+    })
+    if (wsClaimed.count !== 1) throw new Error('Workspace state changed')
+
+    return { success: true }
+  })
+}
+
+export type ReleaseMode = 'CUSTOMER_APPROVAL' | 'AUTO_RELEASE' | 'ADMIN_RESOLUTION'
+
+export async function completeAndReleaseEscrow(
+  ctx: TransitionContext,
+  jobId: string,
+  options?: { releaseMode?: ReleaseMode }
+): Promise<{ commission: number; netAmount: number; commissionCents: bigint; netCents: bigint; providerId: string; providerEntityId: string; providerType: string }> {
+  const releaseMode = options?.releaseMode ?? 'CUSTOMER_APPROVAL'
+
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
+    if (!job) throw new Error('Job not found')
+
+    if (releaseMode === 'CUSTOMER_APPROVAL') {
+      if (job.customerId !== ctx.actorId) throw new Error('Only the customer can approve')
+    }
+
+    if (job.status !== 'IN_PROGRESS') throw new Error('Job is not in progress')
+
+    const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
+    if (!workspace) throw new Error('Workspace not found')
+
+    if (releaseMode === 'AUTO_RELEASE') {
+      if (workspace.progressStatus !== 'COMPLETION_REQUESTED') throw new Error('Job not awaiting completion')
+      if (workspace.completionRequestedAt == null) throw new Error('No completion request timestamp')
+      const autoReleaseHours = 48
+      const hoursSinceRequest = (Date.now() - workspace.completionRequestedAt.getTime()) / (1000 * 60 * 60)
+      if (hoursSinceRequest < autoReleaseHours) throw new Error('Auto-release deadline not reached')
+    } else {
+      if (workspace.progressStatus !== 'COMPLETION_REQUESTED') throw new Error('Provider must request completion first')
+    }
+
+    const allowedEscrowStatuses = releaseMode === 'AUTO_RELEASE' ? ['PROTECTED', 'ON_HOLD'] : ['PROTECTED']
+    const escrow = await tx.jobEscrow.findFirst({
+      where: { jobId, status: { in: allowedEscrowStatuses as any } },
+    })
+    if (!escrow) throw new Error('No releasable escrow found')
+    if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+
+    const quote = await tx.jobQuote.findUnique({
+      where: { id: escrow.quoteId },
+      select: { providerId: true, providerType: true },
+    })
+    if (!quote) throw new Error('Accepted quote not found')
+    if (quote.providerId !== escrow.providerId) throw new Error('Escrow provider identity mismatch')
+
+    const identity = await resolvePayoutIdentity(quote.providerId, quote.providerType)
+    const defaultRate = await getCommissionRate()
+    const rawRate = identity.commissionRate ?? defaultRate
+    const rate = Math.max(0, Math.min(100, rawRate))
+    const rateBps = BigInt(Math.round(rate * 100))
+    const commissionCents = (escrow.amount * rateBps) / 10000n
+    const netCents = escrow.amount - commissionCents
+    const platformCents = commissionCents + escrow.serviceFee
+    const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
+    const netMajor = bigIntToSafeNumber(netCents) / 100
+
+    const claimed = await tx.jobEscrow.updateMany({
+      where: { id: escrow.id, status: { in: allowedEscrowStatuses as any }, paymentMethod: { not: 'CASH' } },
+      data: { status: 'RELEASED', releasedAt: new Date() },
+    })
+    if (claimed.count !== 1) throw new Error('Escrow already released or state changed')
+
+    const providerWalletSeed = await tx.providerWallet.upsert({
+      where: { userId: identity.payoutUserId },
+      create: { userId: identity.payoutUserId, availableBalance: 0 },
+      update: {},
+      select: { id: true },
+    })
+
+    const ledgerEntries: Array<{
+      accountId: string
+      accountType: string
+      entryType: 'CREDIT' | 'DEBIT'
+      amount: bigint
+    }> = [
+      { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.totalAmount },
+      { accountId: providerWalletSeed.id, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: netCents },
+    ]
+    if (platformCents > 0n) {
+      ledgerEntries.push({ accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: platformCents })
+    }
+
+    await postLedgerTransaction({
+      entries: ledgerEntries,
+      referenceType: 'ESCROW_RELEASE',
+      referenceId: escrow.id,
+      idempotencyKey: `escrow-release:${escrow.id}`,
+      description: `Escrow release for job ${jobId} (mode: ${releaseMode})`,
+      createdBy: ctx.actorId,
+      metadata: JSON.stringify({
+        providerEntityId: identity.providerEntityId,
+        payoutUserId: identity.payoutUserId,
+        providerType: quote.providerType,
+        serviceFeeCents: escrow.serviceFee.toString(),
+        commissionCents: commissionCents.toString(),
+        releaseMode,
+      }),
+    }, tx)
+
+    const providerWallet = await tx.providerWallet.update({
+      where: { userId: identity.payoutUserId },
+      data: { availableBalance: { increment: netMajor } },
+      select: { availableBalance: true },
+    })
+
+    await tx.walletTransaction.create({
+      data: {
+        userId: identity.payoutUserId,
+        walletType: 'PROVIDER',
+        type: 'CREDIT',
+        amount: netMajor,
+        balanceBefore: providerWallet.availableBalance - netMajor,
+        balanceAfter: providerWallet.availableBalance,
+        reference: commissionCents > 0n
+          ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+          : `Escrow release for job ${jobId}`,
+        referenceType: 'ESCROW_RELEASE',
+        referenceId: escrow.id,
+      },
+    })
+
+    await tx.jobWorkspace.updateMany({
+      where: { jobId, progressStatus: { not: 'COMPLETED' } },
+      data: { progressStatus: 'COMPLETED', updatedAt: new Date() },
+    })
+
+    await tx.marketplaceJob.updateMany({
+      where: { id: jobId, status: 'IN_PROGRESS' },
+      data: { status: 'COMPLETED', updatedAt: new Date() },
+    })
+
+    if (commissionCents > 0n) {
+      await tx.commissionSettlement.create({
+        data: {
+          jobId,
+          escrowId: escrow.id,
+          providerId: identity.payoutUserId,
+          customerId: escrow.customerId,
+          jobAmount: escrow.amount,
+          commissionRate: rate,
+          commissionAmount: commissionCents,
+          status: 'PENDING',
+        },
+      })
+    }
+
+    return {
+      commission: commissionMajor,
+      netAmount: netMajor,
+      commissionCents,
+      netCents,
+      providerId: identity.payoutUserId,
+      providerEntityId: identity.providerEntityId,
+      providerType: quote.providerType,
+    }
+  })
 }

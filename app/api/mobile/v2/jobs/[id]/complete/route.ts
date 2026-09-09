@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { transitionJobWorkspace, releaseEscrow, holdEscrowForDispute, type ActorType } from '@/lib/domain/job-lifecycle'
+import { transitionJobWorkspace, completeAndReleaseEscrow, holdEscrowForDispute, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } from '@/lib/notifications'
 
 async function resolveProviderActor(jobId: string, userId: string): Promise<ActorType | null> {
@@ -64,34 +64,10 @@ export async function POST(
     }
 
     if (action === 'APPROVE_COMPLETION') {
-      if (job.customerId !== user.id) {
-        return NextResponse.json({ error: 'Only the customer can approve' }, { status: 403 })
-      }
-
-      const casResult = await prisma.$executeRawUnsafe(
-        `UPDATE "JobWorkspace"
-         SET "progressStatus" = 'COMPLETED', "updatedAt" = NOW()
-         WHERE "jobId" = $1 AND "progressStatus" = 'COMPLETION_REQUESTED'`,
-        job.id
-      )
-      if (casResult !== 1) {
-        return NextResponse.json({ error: 'Provider must request completion first' }, { status: 400 })
-      }
-
-      const result = await releaseEscrow(
+      const result = await completeAndReleaseEscrow(
         { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
         job.id
       )
-
-      await prisma.jobWorkspace.update({
-        where: { jobId: job.id },
-        data: { progressStatus: 'COMPLETED', updatedAt: new Date() },
-      })
-
-      await prisma.marketplaceJob.update({
-        where: { id: job.id },
-        data: { status: 'COMPLETED', updatedAt: new Date() },
-      })
 
       notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
       notifyJobCompleted(job.id, job.customerId, job.title)
@@ -111,20 +87,6 @@ export async function POST(
       }
       if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
         return NextResponse.json({ error: 'Cannot dispute completed or cancelled jobs' }, { status: 400 })
-      }
-
-      if (providerActor === 'COMPANY') {
-        const quote = await prisma.jobQuote.findFirst({
-          where: { jobId: job.id, status: 'ACCEPTED' },
-          select: { providerId: true },
-        })
-        if (quote) {
-          const { checkWorkerEligibility } = await import('@/lib/phase6/provider-eligibility')
-          const eligibility = await checkWorkerEligibility(quote.providerId, user.id, job.id)
-          if (!eligibility.eligible) {
-            return NextResponse.json({ error: 'Insufficient permissions', reasons: eligibility.reasons }, { status: 403 })
-          }
-        }
       }
 
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!

@@ -8,6 +8,7 @@ export interface BookNowInput {
   customerId: string
   templateJobId: string
   providerId: string
+  providerType?: 'INDIVIDUAL' | 'COMPANY'
   scheduledDate: Date
   timeSlot: string
   address: string
@@ -41,32 +42,11 @@ export async function createBookNowJob(input: BookNowInput) {
   })
   if (!templateJob?.isActive) throw new Error('Template job not found or inactive')
 
-  // Backward compatible at the API boundary: older clients send TaskerProfile.id,
-  // newer callers may send User.id. Canonical individual provider identity is User.id.
-  const provider = await prisma.taskerProfile.findFirst({
-    where: {
-      OR: [
-        { id: input.providerId },
-        { userId: input.providerId },
-      ],
-    },
-    select: {
-      id: true,
-      userId: true,
-      skills: true,
-      taskerSkills: { select: { jobId: true } },
-      user: { select: { name: true } },
-    },
-  })
-  if (!provider) throw new Error('Provider not found')
-  if (provider.userId === input.customerId) throw new Error('Cannot book yourself')
+  const resolvedProviderType = input.providerType ?? 'INDIVIDUAL'
 
-  const providerType = 'INDIVIDUAL' as const
-
-  const eligibility = await checkIndividualProviderEligibility(provider.userId)
-  if (!eligibility.eligible) {
-    throw new Error(`Provider is not eligible: ${eligibility.reasons.join('; ')}`)
-  }
+  const finalCountryCode = typeof input.countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(input.countryCode)
+    ? input.countryCode.toUpperCase()
+    : 'LK'
 
   const linkedServiceTemplate = await prisma.serviceTemplate.findFirst({
     where: {
@@ -85,18 +65,77 @@ export async function createBookNowJob(input: BookNowInput) {
   )
   if (!requirements) throw new Error('Invalid template/category relationship')
 
-  const relationalMatch = hasRelationalCapability(
-    provider.taskerSkills.map(skill => skill.jobId),
-    requirements,
-  )
-  const legacyMatch = hasCapabilityMatch(parseLegacyCapabilities(provider.skills), requirements)
-  if (!relationalMatch && !legacyMatch) {
-    throw new Error('Provider lacks required capability for this booking')
-  }
+  let resolvedProviderUserId: string
+  let resolvedProviderEntityId: string
+  let resolvedNotificationUserId: string
 
-  const finalCountryCode = typeof input.countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(input.countryCode)
-    ? input.countryCode.toUpperCase()
-    : 'LK'
+  if (resolvedProviderType === 'COMPANY') {
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: input.providerId },
+      select: { id: true, userId: true, companyName: true },
+    })
+    if (!company) throw new Error('Company not found')
+
+    const eligibility = await checkCompanyEligibility(company.id)
+    if (!eligibility.eligible) {
+      throw new Error(`Company not eligible: ${eligibility.reasons.join('; ')}`)
+    }
+
+    const specialty = await prisma.companySpecialty.findFirst({
+      where: { companyId: company.id, jobId: templateJob.id },
+    })
+    if (!specialty) {
+      const catSpecialty = await prisma.companySpecialty.findFirst({
+        where: { companyId: company.id, categoryId: templateJob.categoryId },
+      })
+      if (!catSpecialty) throw new Error('Company lacks required capability for this booking')
+    }
+
+    resolvedProviderUserId = company.userId
+    resolvedProviderEntityId = company.id
+
+    const owner = await prisma.teamMember.findFirst({
+      where: { companyId: company.id, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+      select: { userId: true },
+    })
+    resolvedNotificationUserId = owner?.userId ?? company.userId
+  } else {
+    const provider = await prisma.taskerProfile.findFirst({
+      where: {
+        OR: [
+          { id: input.providerId },
+          { userId: input.providerId },
+        ],
+      },
+      select: {
+        id: true,
+        userId: true,
+        skills: true,
+        taskerSkills: { select: { jobId: true } },
+        user: { select: { name: true } },
+      },
+    })
+    if (!provider) throw new Error('Provider not found')
+    if (provider.userId === input.customerId) throw new Error('Cannot book yourself')
+
+    const eligibility = await checkIndividualProviderEligibility(provider.userId)
+    if (!eligibility.eligible) {
+      throw new Error(`Provider is not eligible: ${eligibility.reasons.join('; ')}`)
+    }
+
+    const relationalMatch = hasRelationalCapability(
+      provider.taskerSkills.map(skill => skill.jobId),
+      requirements,
+    )
+    const legacyMatch = hasCapabilityMatch(parseLegacyCapabilities(provider.skills), requirements)
+    if (!relationalMatch && !legacyMatch) {
+      throw new Error('Provider lacks required capability for this booking')
+    }
+
+    resolvedProviderUserId = provider.userId
+    resolvedProviderEntityId = provider.userId
+    resolvedNotificationUserId = provider.userId
+  }
 
   const pricing = await calculatePrice(prisma, {
     jobId: `pending-book-now-${Date.now()}-${input.customerId}`,
@@ -106,12 +145,16 @@ export async function createBookNowJob(input: BookNowInput) {
     urgency: 'NORMAL',
     quantity: 1,
     countryCode: finalCountryCode,
-    providerId: provider.userId,
-    providerType: 'INDIVIDUAL',
+    providerId: resolvedProviderEntityId,
+    providerType: resolvedProviderType,
   })
 
-  // Quote price is provider gross. Customer-facing total/fee are preserved in
-  // the immutable estimate JSON until quote acceptance creates the escrow.
+  const smartBooking = JSON.stringify({
+    district: input.district,
+    timeSlot: input.timeSlot,
+    countryCode: finalCountryCode,
+  })
+
   const result = await prisma.$transaction(async (tx) => {
     const job = await tx.marketplaceJob.create({
       data: {
@@ -141,20 +184,21 @@ export async function createBookNowJob(input: BookNowInput) {
         addressStreet: input.address,
         latitude: input.latitude ?? null,
         longitude: input.longitude ?? null,
+        smartBookingJson: smartBooking,
         status: 'OPEN',
         urgency: 'normal',
         workersCount: 1,
         materialHandling: 'tasker_brings',
         countryCode: finalCountryCode,
-        targetTaskerId: provider.userId,
+        targetTaskerId: resolvedProviderUserId,
       },
     })
 
     const quote = await tx.jobQuote.create({
       data: {
         jobId: job.id,
-        providerId: provider.userId,
-        providerType: providerType,
+        providerId: resolvedProviderEntityId,
+        providerType: resolvedProviderType,
         price: pricing.providerGross,
         estimatedCompletionTime: '1-2 hours',
         message: input.notes || 'BOOK_NOW instant booking',
@@ -167,7 +211,7 @@ export async function createBookNowJob(input: BookNowInput) {
   })
 
   await createNotification({
-    userId: provider.userId,
+    userId: resolvedNotificationUserId,
     title: 'New direct booking',
     body: `${result.job.title} has been booked with you.`,
     referenceType: 'JOB_MATCH',

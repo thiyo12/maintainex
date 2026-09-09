@@ -36,7 +36,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
     expect(refundRoute).toContain('refundEscrow')
     expect(adminEscrows).toContain('releaseEscrow')
     expect(adminEscrows).toContain('refundEscrow')
-    expect(cron).toContain('releaseEscrow')
+    expect(cron).toContain('completeAndReleaseEscrow')
     expect(refundRoute).not.toContain('customerWallet.update(')
     expect(adminEscrows).not.toContain('providerWallet.upsert(')
     expect(cron).not.toContain('providerWallet.upsert(')

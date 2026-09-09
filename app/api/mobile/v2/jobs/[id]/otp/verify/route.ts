@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { transitionJobWorkspace } from '@/lib/domain/job-lifecycle'
+import { verifyOtpAndStartJob } from '@/lib/domain/job-lifecycle'
 import { notifyJobStarted } from '@/lib/notifications'
 
 export async function POST(
@@ -22,42 +22,25 @@ export async function POST(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    if (job.customerId !== user.id) {
-      return NextResponse.json({ error: 'Only the customer can verify OTP' }, { status: 403 })
-    }
 
-    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
-    if (!workspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
-    if (workspace.progressStatus !== 'ACCEPTED') {
-      return NextResponse.json({ error: 'OTP already verified or job already started' }, { status: 400 })
-    }
-
-    const otpRecord = await prisma.jobOtp.findUnique({ where: { jobId: job.id } })
-    if (!otpRecord) {
-      return NextResponse.json({ error: 'No OTP generated yet. Ask the provider to generate one.' }, { status: 400 })
-    }
-    if (otpRecord.verifiedAt) {
-      return NextResponse.json({ error: 'OTP already used' }, { status: 400 })
-    }
-    if (otpRecord.otp !== otp) {
-      return NextResponse.json({ error: 'Invalid OTP' }, { status: 403 })
-    }
-
-    await prisma.jobOtp.update({
-      where: { id: otpRecord.id },
-      data: { verifiedAt: new Date() },
-    })
-
-    await transitionJobWorkspace(
-      { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
-      'IN_PROGRESS'
+    await verifyOtpAndStartJob(
+      { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
+      params.id,
+      otp
     )
 
     notifyJobStarted(job.id, job.customerId, job.title)
 
     return NextResponse.json({ success: true, message: 'Job started' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Verify OTP error:', error)
+    const message = error?.message || 'Server error'
+    if (message.includes('OTP') || message.includes('otp') || message.includes('already started') || message.includes('No OTP')) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+    if (message.includes('Invalid OTP')) {
+      return NextResponse.json({ error: message }, { status: 403 })
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

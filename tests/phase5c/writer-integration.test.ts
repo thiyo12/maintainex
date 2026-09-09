@@ -170,7 +170,7 @@ describe('Phase 5C — Financial Writer Integration', () => {
     })
 
     const reversal = await reverseLedgerTransaction(
-      'test-escrow-rev-001',
+      original.id,
       'test-5c-reversal-reverse-001',
       'test-phase5c'
     )

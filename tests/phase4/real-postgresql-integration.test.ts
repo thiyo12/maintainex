@@ -564,6 +564,7 @@ describe.skipIf(!isVPS)('4D.5 — Cancellation Policy + Final State', () => {
 
 describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
   let prisma: PrismaClient
+  let taskerProfileId: string
   const PREFIX = `4d6-${Date.now()}`
   const customerId = `${PREFIX}-customer`
   const providerId = `${PREFIX}-prov`
@@ -624,7 +625,7 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
       },
     })
 
-    await prisma.taskerProfile.create({
+    const taskerProfile = await prisma.taskerProfile.create({
       data: {
         userId: providerId,
         skills: '[]',
@@ -635,10 +636,11 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
         isVerified: true,
       },
     })
+    taskerProfileId = taskerProfile.id
 
     await prisma.taskerSkill.create({
       data: {
-        taskerId: providerId,
+        taskerId: taskerProfileId,
         jobId: templateJobId,
         experienceYears: 2,
         experienceLevel: 2,
@@ -655,7 +657,7 @@ describe.skipIf(!isVPS)('4D.6 — BOOK_NOW Real DB Test', () => {
       await prisma.jobQuote.deleteMany({ where: { jobId: job.id } })
     }
     await prisma.marketplaceJob.deleteMany({ where: { templateJobId } })
-    await prisma.taskerSkill.deleteMany({ where: { taskerId: providerId } })
+    await prisma.taskerSkill.deleteMany({ where: { taskerId: taskerProfileId } })
     await prisma.serviceTemplate.deleteMany({ where: { id: serviceTemplateId } })
     await prisma.templateJob.deleteMany({ where: { id: templateJobId } })
     await prisma.jobCategory.deleteMany({ where: { id: categoryId } })

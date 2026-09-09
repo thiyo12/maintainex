@@ -23,13 +23,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         wallet: canonical
           ? {
-              availableBalance: Number(canonical.availableBalance),
-              pendingBalance: Number(canonical.pendingBalance),
-              balance: Number(canonical.balance),
+              availableBalance: String(canonical.availableBalance),
+              pendingBalance: String(canonical.pendingBalance),
+              balance: String(canonical.balance),
               version: canonical.version,
             }
-          : { availableBalance: 0, pendingBalance: 0, balance: 0, version: 0 },
-        transactions: transactions.map(t => ({ ...t, amount: String(t.amount) })),
+          : { availableBalance: '0', pendingBalance: '0', balance: '0', version: 0 },
+        transactions: transactions.map(t => ({
+          ...t,
+          amount: String(t.amount),
+          balanceBefore: String(t.balanceBefore),
+          balanceAfter: String(t.balanceAfter),
+        })),
       })
     }
 
@@ -44,13 +49,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       wallet: canonical
         ? {
-            balance: Number(canonical.balance),
-            availableBalance: Number(canonical.availableBalance),
-            pendingBalance: Number(canonical.pendingBalance),
+            balance: String(canonical.balance),
+            availableBalance: String(canonical.availableBalance),
+            pendingBalance: String(canonical.pendingBalance),
             version: canonical.version,
           }
-        : { balance: 0, availableBalance: 0, pendingBalance: 0, version: 0 },
-      transactions: transactions.map(t => ({ ...t, amount: String(t.amount) })),
+        : { balance: '0', availableBalance: '0', pendingBalance: '0', version: 0 },
+      transactions: transactions.map(t => ({
+        ...t,
+        amount: String(t.amount),
+        balanceBefore: String(t.balanceBefore),
+        balanceAfter: String(t.balanceAfter),
+      })),
     })
   } catch (error) {
     console.error('Wallet error:', error)
@@ -75,10 +85,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment gateway not yet integrated. Top-up coming soon.' }, { status: 501 })
     }
 
-    // This endpoint represents the legacy CUSTOMER wallet. Customer-wallet
-    // cash-out has no canonical payout model yet, so fail closed instead of
-    // mutating the Float balance directly. Provider withdrawals use the
-    // canonical payout engine at POST /api/mobile/withdraw.
     if (action === 'WITHDRAW') {
       return NextResponse.json({
         error: 'Customer wallet withdrawals are temporarily unavailable',
