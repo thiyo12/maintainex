@@ -2,13 +2,12 @@ import { PrismaClient } from '@prisma/client'
 import { checkIndividualProviderEligibility, checkCompanyEligibility } from '@/lib/phase6/provider-eligibility'
 import {
   MatchingInput, MatchResult, MatchCandidate, ExcludedProvider,
-  ProviderType, MatchingConfig, ScoreComponents, MatchExclusionReason,
+  MatchingConfig, ScoreComponents, MatchExclusionReason,
 } from './types'
 import {
   DEFAULT_WEIGHTS, MATCHING_SCORE_VERSION, validateWeights,
   computeCapabilityScore, computeReliabilityScore, computeReputationScore,
-  computeExperienceScore,
-  computeTotalScore,
+  computeExperienceScore, computeTotalScore,
 } from './scoring'
 import { rankCandidates } from './ranking'
 import { buildExplanationReasons } from './explanations'
@@ -38,24 +37,36 @@ export async function resolveJobRequirements(
     where: { id: categoryId },
     select: { id: true, slug: true },
   })
-  if (!category || !category.slug) return null
+  if (!category?.slug) return null
 
   let serviceTemplateSlug: string | null = null
   const templateJobIds: string[] = []
 
   if (serviceTemplateId) {
-    const st = await (client as any).serviceTemplate.findUnique({
+    const serviceTemplate = await client.serviceTemplate.findUnique({
       where: { id: serviceTemplateId },
       select: { slug: true, templateJobId: true, jobCategoryId: true },
     })
-    if (st) {
-      serviceTemplateSlug = st.slug
-      if (st.templateJobId) templateJobIds.push(st.templateJobId)
+    if (!serviceTemplate || serviceTemplate.jobCategoryId !== category.id) return null
+
+    serviceTemplateSlug = serviceTemplate.slug
+    if (serviceTemplate.templateJobId) {
+      const linkedTemplateJob = await client.templateJob.findUnique({
+        where: { id: serviceTemplate.templateJobId },
+        select: { id: true, categoryId: true },
+      })
+      if (!linkedTemplateJob || linkedTemplateJob.categoryId !== category.id) return null
+      templateJobIds.push(linkedTemplateJob.id)
     }
   }
 
-  if (templateJobId && !templateJobIds.includes(templateJobId)) {
-    templateJobIds.push(templateJobId)
+  if (templateJobId) {
+    const directTemplateJob = await client.templateJob.findUnique({
+      where: { id: templateJobId },
+      select: { id: true, categoryId: true },
+    })
+    if (!directTemplateJob || directTemplateJob.categoryId !== category.id) return null
+    if (!templateJobIds.includes(directTemplateJob.id)) templateJobIds.push(directTemplateJob.id)
   }
 
   return {
@@ -71,49 +82,40 @@ export function hasCapabilityMatch(
   jobReqs: JobRequirements,
 ): boolean {
   if (providerLegacySkills.length === 0) return false
-  const normalized = providerLegacySkills.map(s => s.toLowerCase().trim())
+  const normalized = providerLegacySkills.map((s) => s.toLowerCase().trim())
 
-  if (jobReqs.serviceTemplateSlug) {
-    if (normalized.includes(jobReqs.serviceTemplateSlug.toLowerCase())) return true
+  if (jobReqs.serviceTemplateSlug && normalized.includes(jobReqs.serviceTemplateSlug.toLowerCase())) {
+    return true
   }
-
-  if (normalized.includes(jobReqs.categorySlug.toLowerCase())) return true
-
-  return false
+  return normalized.includes(jobReqs.categorySlug.toLowerCase())
 }
 
 export function hasRelationalCapability(
   taskerJobIds: string[],
   jobReqs: JobRequirements,
 ): boolean {
-  if (taskerJobIds.length === 0) return false
-  if (jobReqs.templateJobIds.length === 0) return false
-  return taskerJobIds.some(id => jobReqs.templateJobIds.includes(id))
+  if (taskerJobIds.length === 0 || jobReqs.templateJobIds.length === 0) return false
+  return taskerJobIds.some((id) => jobReqs.templateJobIds.includes(id))
 }
 
 export function hasCompanySpecialtyCapability(
   specialties: Array<{ categoryId: string | null; jobId: string | null }>,
   jobReqs: JobRequirements,
 ): boolean {
-  return specialties.some(sp => {
-    if (sp.categoryId && sp.categoryId === jobReqs.categoryId) return true
-    if (sp.jobId && jobReqs.templateJobIds.includes(sp.jobId)) return true
-    return false
-  })
+  return specialties.some((specialty) =>
+    specialty.categoryId === jobReqs.categoryId ||
+    (!!specialty.jobId && jobReqs.templateJobIds.includes(specialty.jobId))
+  )
 }
 
 export async function resolveMatchingConfig(
   client: PrismaClient,
   countryCode: string,
 ): Promise<MatchingConfig> {
-  const row = await (client as any).marketConfig.findUnique({
-    where: { countryCode },
-  }).catch(() => null)
-
+  const row = await client.marketConfig.findUnique({ where: { countryCode } }).catch(() => null)
   const globalRow = countryCode !== 'GLOBAL'
-    ? await (client as any).marketConfig.findUnique({ where: { countryCode: 'GLOBAL' } }).catch(() => null)
+    ? await client.marketConfig.findUnique({ where: { countryCode: 'GLOBAL' } }).catch(() => null)
     : null
-
   const cfg = row || globalRow
   if (!cfg) return { ...DEFAULT_CONFIG, countryCode }
 
@@ -143,22 +145,23 @@ export async function findCandidates(
 
   const job = await client.marketplaceJob.findUnique({
     where: { id: input.jobId },
-    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, customerId: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true },
   })
-  if (!job) {
-    return { jobId: input.jobId, candidates: [], excluded: [], scoreVersion: config.matchingVersion, generatedAt: new Date() }
-  }
+  if (!job) return emptyResult(input.jobId, config.matchingVersion)
 
   const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
-  if (!jobReqs) {
-    return { jobId: input.jobId, candidates: [], excluded: [], scoreVersion: config.matchingVersion, generatedAt: new Date() }
-  }
+  if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)
 
   const individualProfiles = await client.taskerProfile.findMany({
     where: { verificationStatus: 'VERIFIED', isVerified: true },
     include: {
       user: { select: { id: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true } },
-      taskerSkills: { select: { jobId: true } },
+      taskerSkills: {
+        select: {
+          jobId: true,
+          job: { select: { categoryId: true } },
+        },
+      },
     },
   })
 
@@ -179,14 +182,19 @@ export async function findCandidates(
 
     const eligibility = await checkIndividualProviderEligibility(profile.userId)
     if (!eligibility.eligible) {
-      const reason = mapEligibilityReason(eligibility.reasons[0])
-      excluded.push({ providerId: profile.userId, providerType: 'INDIVIDUAL', reason, detail: eligibility.reasons.join('; ') })
+      excluded.push({
+        providerId: profile.userId,
+        providerType: 'INDIVIDUAL',
+        reason: mapEligibilityReason(eligibility.reasons[0]),
+        detail: eligibility.reasons.join('; '),
+      })
       continue
     }
 
     const legacySkills = parseSkills(profile.skills)
-    const relationalJobIds = profile.taskerSkills.map((ts: { jobId: string }) => ts.jobId)
-    const hasRelational = hasRelationalCapability(relationalJobIds, jobReqs)
+    const hasRelational = profile.taskerSkills.some((skill) =>
+      skill.job.categoryId === jobReqs.categoryId || jobReqs.templateJobIds.includes(skill.jobId)
+    )
     const hasLegacy = hasCapabilityMatch(legacySkills, jobReqs)
 
     if (!hasRelational && !hasLegacy) {
@@ -194,19 +202,17 @@ export async function findCandidates(
         providerId: profile.userId,
         providerType: 'INDIVIDUAL',
         reason: 'CAPABILITY_MISMATCH',
-        detail: `Provider skills [${legacySkills.join(', ')}] do not match job category slug=${jobReqs.categorySlug}`,
+        detail: `Provider capabilities do not match category slug=${jobReqs.categorySlug}`,
       })
       continue
     }
 
-    const components = scoreIndividual(profile, jobReqs, input)
-    const totalScore = computeTotalScore(components, config.weights)
-
+    const components = scoreIndividual(profile, jobReqs, hasRelational)
     candidates.push({
       providerId: profile.userId,
       providerType: 'INDIVIDUAL',
       userId: profile.userId,
-      score: totalScore,
+      score: computeTotalScore(components, config.weights),
       rank: 0,
       scoreVersion: config.matchingVersion,
       components,
@@ -232,10 +238,14 @@ export async function findCandidates(
       continue
     }
 
-    const companyEligibility = await checkCompanyEligibility(company.id)
-    if (!companyEligibility.eligible) {
-      const reason = mapCompanyEligibilityReason(companyEligibility.reasons[0])
-      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason, detail: companyEligibility.reasons.join('; ') })
+    const eligibility = await checkCompanyEligibility(company.id)
+    if (!eligibility.eligible) {
+      excluded.push({
+        providerId: company.id,
+        providerType: 'COMPANY',
+        reason: mapCompanyEligibilityReason(eligibility.reasons[0]),
+        detail: eligibility.reasons.join('; '),
+      })
       continue
     }
 
@@ -248,20 +258,18 @@ export async function findCandidates(
         providerId: company.id,
         providerType: 'COMPANY',
         reason: 'CAPABILITY_MISMATCH',
-        detail: `Company services [${legacyServices.join(', ')}] do not match job category slug=${jobReqs.categorySlug}`,
+        detail: `Company capabilities do not match category slug=${jobReqs.categorySlug}`,
       })
       continue
     }
 
-    const components = scoreCompany(company, jobReqs, input)
-    const totalScore = computeTotalScore(components, config.weights)
-
+    const components = scoreCompany(company, jobReqs, hasSpecialty)
     candidates.push({
       providerId: company.id,
       providerType: 'COMPANY',
       companyId: company.id,
       userId: company.userId,
-      score: totalScore,
+      score: computeTotalScore(components, config.weights),
       rank: 0,
       scoreVersion: config.matchingVersion,
       components,
@@ -269,71 +277,58 @@ export async function findCandidates(
     })
   }
 
-  const ranked = rankCandidates(candidates)
-
   return {
     jobId: input.jobId,
-    candidates: ranked,
+    candidates: rankCandidates(candidates),
     excluded,
     scoreVersion: config.matchingVersion,
     generatedAt: new Date(),
   }
 }
 
-function scoreIndividual(
-  profile: any,
-  jobReqs: JobRequirements,
-  input: MatchingInput,
-): ScoreComponents {
-  const skills = parseSkills(profile.skills)
+function scoreIndividual(profile: any, jobReqs: JobRequirements, exactRelationalMatch: boolean): ScoreComponents {
   const completedJobs = profile.completedJobs || 0
-  const rating = profile.rating || 0
-  const reviewCount = profile.completedJobs || 0
-
   return {
-    capability: computeCapabilityScore(skills, jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
+    capability: exactRelationalMatch ? 100 : computeCapabilityScore(parseSkills(profile.skills), jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
     reliability: computeReliabilityScore(completedJobs, 0),
-    reputation: computeReputationScore(rating, reviewCount),
+    reputation: computeReputationScore(profile.rating || 0, completedJobs),
     availability: NEUTRAL_SCORE,
     travel: NEUTRAL_SCORE,
     experience: computeExperienceScore(completedJobs, 0),
   }
 }
 
-function scoreCompany(
-  company: any,
-  jobReqs: JobRequirements,
-  input: MatchingInput,
-): ScoreComponents {
-  const skills = parseSkills(company.services)
+function scoreCompany(company: any, jobReqs: JobRequirements, exactRelationalMatch: boolean): ScoreComponents {
   const completedProjects = company.completedProjects || 0
-  const rating = company.rating || 0
-
   return {
-    capability: computeCapabilityScore(skills, jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
+    capability: exactRelationalMatch ? 100 : computeCapabilityScore(parseSkills(company.services), jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
     reliability: computeReliabilityScore(completedProjects, 0),
-    reputation: computeReputationScore(rating, completedProjects),
+    reputation: computeReputationScore(company.rating || 0, completedProjects),
     availability: NEUTRAL_SCORE,
     travel: NEUTRAL_SCORE,
     experience: computeExperienceScore(completedProjects, 0),
   }
 }
 
+function emptyResult(jobId: string, scoreVersion: string): MatchResult {
+  return { jobId, candidates: [], excluded: [], scoreVersion, generatedAt: new Date() }
+}
+
 function parseSkills(skillsJson: string | null): string[] {
   if (!skillsJson || skillsJson === '[]' || skillsJson === '') return []
   try {
     const parsed = JSON.parse(skillsJson)
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? parsed.map(String) : []
   } catch {
-    return []
+    return [skillsJson].filter(Boolean)
   }
 }
 
 function mapEligibilityReason(reason: string): MatchExclusionReason {
   if (reason.includes('suspended')) return 'PROVIDER_SUSPENDED'
   if (reason.includes('banned')) return 'PROVIDER_BANNED'
-  if (reason.includes('not found')) return 'PROVIDER_NOT_FOUND'
   if (reason.includes('profile not found')) return 'NO_PROVIDER_PROFILE'
+  if (reason.includes('not found')) return 'PROVIDER_NOT_FOUND'
   if (reason.includes('verification')) return 'PROVIDER_VERIFICATION_NOT_APPROVED'
   if (reason.includes('capabilities')) return 'NO_SERVICE_CAPABILITIES'
   if (reason.includes('capability') || reason.includes('lacks')) return 'CAPABILITY_MISMATCH'
@@ -344,11 +339,11 @@ function mapEligibilityReason(reason: string): MatchExclusionReason {
 function mapCompanyEligibilityReason(reason: string): MatchExclusionReason {
   if (reason.includes('suspended')) return 'COMPANY_OWNER_SUSPENDED'
   if (reason.includes('banned')) return 'COMPANY_OWNER_BANNED'
-  if (reason.includes('not found')) return 'PROVIDER_NOT_FOUND'
   if (reason.includes('verification')) return 'COMPANY_NOT_VERIFIED'
   if (reason.includes('capabilities')) return 'NO_SERVICE_CAPABILITIES'
   if (reason.includes('owner')) return 'NO_ACTIVE_COMPANY_OWNER'
   if (reason.includes('subscription')) return 'COMPANY_SUBSCRIPTION_CANCELLED'
+  if (reason.includes('not found')) return 'PROVIDER_NOT_FOUND'
   return 'PROVIDER_NOT_FOUND'
 }
 
