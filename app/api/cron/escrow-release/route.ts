@@ -56,7 +56,11 @@ export async function GET(request: NextRequest) {
       if (hoursSinceHold < autoReleaseHours) continue
 
       try {
-        const result = await releaseEscrow({ actorId: 'system:escrow-auto-release', actorType: 'STAFF' }, hold.jobId)
+        const result = await releaseEscrow({
+          jobId: hold.jobId,
+          actorId: 'system:escrow-auto-release',
+          actorType: 'STAFF',
+        }, hold.jobId)
         const job = await prisma.marketplaceJob.findUnique({
           where: { id: hold.jobId },
           select: { title: true },
