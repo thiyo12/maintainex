@@ -1874,6 +1874,8 @@ model JobQuote {
   providerId   String
   providerType String // INDIVIDUAL, COMPANY
   price        BigInt
+  actorUserId  String? // UserId who submitted the quote (for company quotes, the acting member)
+  actorRole    String? // Company role of actor at time of submission (COMPANY_OWNER, MANAGER, DISPATCHER)
 
   estimatedCompletionTime String
   message                 String?

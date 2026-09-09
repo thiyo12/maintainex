@@ -31,7 +31,7 @@ export interface KycTransitionResult {
 }
 
 export async function transitionUserKyc(
-  prisma: PrismaClient,
+  client: PrismaClient,
   params: {
     userId: string
     action: KycAction
@@ -42,7 +42,7 @@ export async function transitionUserKyc(
 ): Promise<KycTransitionResult> {
   const { userId, action, documentId, reviewNote, reviewedBy } = params
 
-  const user = await prisma.user.findUnique({
+  const user = await client.user.findUnique({
     where: { id: userId },
     select: { identityStatus: true },
   })
@@ -55,7 +55,39 @@ export async function transitionUserKyc(
     return { success: false, error: `Invalid KYC transition: ${currentStatus} → ${targetStatus}` }
   }
 
-  await prisma.$transaction(async (tx) => {
+  const userFull = await client.user.findUnique({
+    where: { id: userId },
+    include: { taskerProfile: true, companyProfile: true },
+  })
+
+  if (userFull?.taskerProfile) {
+    const profileTarget = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : null
+    if (profileTarget) {
+      const currentProfileStatus = (userFull.taskerProfile.verificationStatus || 'NOT_SUBMITTED') as any
+      const validProfileTransitions: Record<string, string[]> = {
+        NOT_SUBMITTED: ['PENDING'],
+        PENDING: ['VERIFIED', 'REJECTED'],
+        VERIFIED: ['SUSPENDED'],
+        REJECTED: ['PENDING'],
+        SUSPENDED: ['PENDING'],
+      }
+      if (!validProfileTransitions[currentProfileStatus]?.includes(profileTarget)) {
+        return { success: false, error: `Invalid provider verification transition: ${currentProfileStatus} → ${profileTarget}` }
+      }
+    }
+  }
+
+  if (userFull?.companyProfile) {
+    const companyTarget = mapKycActionToCompanyStatus(action)
+    if (companyTarget) {
+      const currentCompanyStatus = (userFull.companyProfile.verificationStatus || 'UNVERIFIED') as CompanyVerificationStatus
+      if (!isValidCompanyVerificationTransition(currentCompanyStatus, companyTarget)) {
+        return { success: false, error: `Invalid company verification transition: ${currentCompanyStatus} → ${companyTarget}` }
+      }
+    }
+  }
+
+  await client.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
       data: { identityStatus: targetStatus },
@@ -76,11 +108,6 @@ export async function transitionUserKyc(
       }
     }
 
-    const userFull = await tx.user.findUnique({
-      where: { id: userId },
-      include: { taskerProfile: true, companyProfile: true },
-    })
-
     if (userFull?.taskerProfile) {
       const profileStatus = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : undefined
       if (profileStatus) {
@@ -98,17 +125,14 @@ export async function transitionUserKyc(
     if (userFull?.companyProfile) {
       const companyTarget = mapKycActionToCompanyStatus(action)
       if (companyTarget) {
-        const currentCompanyStatus = (userFull.companyProfile.verificationStatus || 'UNVERIFIED') as CompanyVerificationStatus
-        if (isValidCompanyVerificationTransition(currentCompanyStatus, companyTarget)) {
-          await tx.companyProfile.update({
-            where: { id: userFull.companyProfile.id },
-            data: {
-              verificationStatus: companyTarget,
-              verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-              ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
-            },
-          })
-        }
+        await tx.companyProfile.update({
+          where: { id: userFull.companyProfile.id },
+          data: {
+            verificationStatus: companyTarget,
+            verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
+            ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
+          },
+        })
       }
     }
   })

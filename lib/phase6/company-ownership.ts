@@ -82,6 +82,10 @@ export async function transferOwnership(
   newOwnerId: string,
   demoteToRole: CompanyRole = 'MANAGER'
 ): Promise<{ success: boolean; error?: string }> {
+  if (demoteToRole === 'COMPANY_OWNER') {
+    return { success: false, error: 'Demote role cannot be COMPANY_OWNER' }
+  }
+
   const currentOwnerMembership = await prisma.teamMember.findFirst({
     where: { companyId, userId: currentOwnerId, role: 'COMPANY_OWNER', status: 'ACTIVE' },
   })
@@ -100,17 +104,37 @@ export async function transferOwnership(
     return { success: false, error: 'Cannot transfer ownership to yourself' }
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.teamMember.update({
-      where: { id: newOwnerMembership.id },
-      data: { role: 'COMPANY_OWNER' },
-    })
+  const promoted = await prisma.$executeRaw`
+    UPDATE "TeamMember"
+    SET "role" = 'COMPANY_OWNER', "updatedAt" = NOW()
+    WHERE "id" = ${newOwnerMembership.id}
+      AND "companyId" = ${companyId}
+      AND "status" = 'ACTIVE'
+      AND "role" != 'COMPANY_OWNER'
+  `
 
-    await tx.teamMember.update({
-      where: { id: currentOwnerMembership.id },
-      data: { role: demoteToRole },
-    })
-  })
+  if (promoted === 0) {
+    return { success: false, error: 'Failed to promote new owner (concurrent transfer detected)' }
+  }
+
+  const demoted = await prisma.$executeRaw`
+    UPDATE "TeamMember"
+    SET "role" = ${demoteToRole}, "updatedAt" = NOW()
+    WHERE "id" = ${currentOwnerMembership.id}
+      AND "companyId" = ${companyId}
+      AND "status" = 'ACTIVE'
+      AND "role" = 'COMPANY_OWNER'
+  `
+
+  if (demoted === 0) {
+    await prisma.$executeRaw`
+      UPDATE "TeamMember"
+      SET "role" = 'WORKER', "updatedAt" = NOW()
+      WHERE "id" = ${newOwnerMembership.id}
+        AND "role" = 'COMPANY_OWNER'
+    `
+    return { success: false, error: 'Failed to demote previous owner (concurrent transfer detected)' }
+  }
 
   return { success: true }
 }

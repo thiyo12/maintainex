@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
-import { assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
@@ -60,6 +59,24 @@ export async function POST(request: NextRequest) {
         where: { id: jobId },
         data: { targetTaskerId: workerUserId, status: 'QUOTE_ACCEPTED' },
       })
+
+      const existingWorkspace = await tx.jobWorkspace.findUnique({
+        where: { jobId },
+      })
+
+      if (existingWorkspace) {
+        await tx.jobWorkspace.update({
+          where: { jobId },
+          data: { progressStatus: 'ACCEPTED', updatedAt: new Date() },
+        })
+      } else {
+        await tx.jobWorkspace.create({
+          data: {
+            jobId,
+            progressStatus: 'ACCEPTED',
+          },
+        })
+      }
 
       await writeCompanyAuditLog({
         companyId,
