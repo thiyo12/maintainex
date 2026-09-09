@@ -24,16 +24,9 @@ export async function resolveQuoteVisibility(
   })
   if (!job) return { allowedQuoteIds: [], isCustomer: false }
 
-  const isCustomer = job.customerId === userId
-  if (isCustomer) return { allowedQuoteIds: [], isCustomer: true }
-
-  const allowedQuoteIds: string[] = []
-
-  const myIndividualQuote = await client.jobQuote.findFirst({
-    where: { jobId, providerId: userId, providerType: 'INDIVIDUAL' },
-    select: { id: true },
-  })
-  if (myIndividualQuote) allowedQuoteIds.push(myIndividualQuote.id)
+  if (job.customerId === userId) {
+    return { allowedQuoteIds: [], isCustomer: true }
+  }
 
   if (companyId) {
     const membership = await client.teamMember.findFirst({
@@ -41,17 +34,33 @@ export async function resolveQuoteVisibility(
       select: { role: true },
     })
 
-    if (membership) {
-      const role = membership.role as CompanyRole
-      if (hasCompanyPermission(role, 'quotes:read')) {
-        const myCompanyQuote = await client.jobQuote.findFirst({
-          where: { jobId, providerId: companyId, providerType: 'COMPANY' },
-          select: { id: true },
-        })
-        if (myCompanyQuote) allowedQuoteIds.push(myCompanyQuote.id)
-      }
+    if (!membership) {
+      return { allowedQuoteIds: [], isCustomer: false }
+    }
+
+    const role = membership.role as CompanyRole
+    if (!hasCompanyPermission(role, 'quotes:read')) {
+      return { allowedQuoteIds: [], isCustomer: false }
+    }
+
+    const companyQuote = await client.jobQuote.findFirst({
+      where: { jobId, providerId: companyId, providerType: 'COMPANY' },
+      select: { id: true },
+    })
+
+    return {
+      allowedQuoteIds: companyQuote ? [companyQuote.id] : [],
+      isCustomer: false,
     }
   }
 
-  return { allowedQuoteIds, isCustomer: false }
+  const individualQuote = await client.jobQuote.findFirst({
+    where: { jobId, providerId: userId, providerType: 'INDIVIDUAL' },
+    select: { id: true },
+  })
+
+  return {
+    allowedQuoteIds: individualQuote ? [individualQuote.id] : [],
+    isCustomer: false,
+  }
 }

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
 import { transitionCompanyVerification } from '@/lib/phase6/kyc-writer'
-
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT']
+import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 
 const VALID_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'SUSPEND'] as const
 
@@ -12,9 +11,22 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const principal = await authenticateStaffRequest(request)
+    if (!principal) {
+      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
+    }
+
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: principal.adminUserId },
+      select: { id: true, role: true, isActive: true, deletedAt: true },
+    })
+    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
+      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
+    }
+
+    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
+    if (!permissions?.includes('companies:verify')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const companyId = params.id
@@ -41,9 +53,9 @@ export async function PATCH(
       companyId,
       action,
       reviewNote: reviewNote || undefined,
-      reviewedBy: session.adminUserId,
-      actorId: session.adminUserId,
-      actorRole: session.role,
+      reviewedBy: principal.adminUserId,
+      actorId: principal.adminUserId,
+      actorRole: adminUser.role,
     })
 
     if (!result.success) {

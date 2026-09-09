@@ -185,11 +185,11 @@ export async function transitionCompanyVerification(
 
       const updateData: Record<string, unknown> = {
         verificationStatus: targetStatus,
+        isVerified: action === 'APPROVE',
       }
       if (reviewNote) updateData.verificationNote = reviewNote
       if (action === 'APPROVE') {
         updateData.verifiedAt = new Date()
-        updateData.isVerified = true
       }
       if (action !== 'SUBMIT' && reviewedBy) {
         updateData.verifiedBy = reviewedBy

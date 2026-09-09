@@ -178,4 +178,45 @@ describe('Phase 6.5 — Admin Company Verification Route', () => {
     expect(result.success).toBe(false)
     expect(result.error).toBe('Company not found')
   })
+
+  it('VERIFIED → SUSPENDED: isVerified=false', async () => {
+    await transitionCompanyVerification(prisma, {
+      companyId, action: 'SUBMIT', actorId: ownerUserId, actorRole: 'COMPANY_OWNER',
+    })
+    await transitionCompanyVerification(prisma, {
+      companyId, action: 'APPROVE', reviewedBy: 'admin', actorId: 'admin', actorRole: 'SUPER_ADMIN',
+    })
+
+    const verified = await prisma.companyProfile.findUnique({ where: { id: companyId }, select: { verificationStatus: true, isVerified: true } })
+    expect(verified?.verificationStatus).toBe('VERIFIED')
+    expect(verified?.isVerified).toBe(true)
+
+    await transitionCompanyVerification(prisma, {
+      companyId, action: 'SUSPEND', reviewNote: 'violation', reviewedBy: 'admin', actorId: 'admin', actorRole: 'SUPER_ADMIN',
+    })
+
+    const suspended = await prisma.companyProfile.findUnique({ where: { id: companyId }, select: { verificationStatus: true, isVerified: true } })
+    expect(suspended?.verificationStatus).toBe('SUSPENDED')
+    expect(suspended?.isVerified).toBe(false)
+  })
+
+  it('SUSPENDED → PENDING: isVerified=false', async () => {
+    await transitionCompanyVerification(prisma, {
+      companyId, action: 'SUBMIT', actorId: ownerUserId, actorRole: 'COMPANY_OWNER',
+    })
+
+    const pending = await prisma.companyProfile.findUnique({ where: { id: companyId }, select: { verificationStatus: true, isVerified: true } })
+    expect(pending?.verificationStatus).toBe('PENDING')
+    expect(pending?.isVerified).toBe(false)
+  })
+
+  it('PENDING → VERIFIED: isVerified=true', async () => {
+    await transitionCompanyVerification(prisma, {
+      companyId, action: 'APPROVE', reviewedBy: 'admin', actorId: 'admin', actorRole: 'SUPER_ADMIN',
+    })
+
+    const verified = await prisma.companyProfile.findUnique({ where: { id: companyId }, select: { verificationStatus: true, isVerified: true } })
+    expect(verified?.verificationStatus).toBe('VERIFIED')
+    expect(verified?.isVerified).toBe(true)
+  })
 })
