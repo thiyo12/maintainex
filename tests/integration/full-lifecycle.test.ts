@@ -209,7 +209,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(commission).toBeTruthy()
   })
 
-  it('COMPANY provider: full lifecycle', async () => {
+  it('COMPANY provider: full lifecycle from creation to completion', async () => {
     const { createBookNowJob } = await import('@/lib/domain/book-now')
 
     const bookResult = await createBookNowJob({
@@ -230,6 +230,71 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
 
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: bookResult.job.id } })
     expect(quote?.providerType).toBe('COMPANY')
+
+    const { acceptJobQuote, fundEscrow, verifyOtpAndStartJob, transitionJobWorkspace, completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
+
+    await acceptJobQuote(
+      { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
+      quote!.id
+    )
+
+    const wsAccepted = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
+    expect(wsAccepted?.progressStatus).toBe('ACCEPTED')
+
+    await fundEscrow(
+      { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
+      bookResult.job.id
+    )
+
+    const fundedEscrow = await prisma.jobEscrow.findFirst({ where: { jobId: bookResult.job.id } })
+    expect(fundedEscrow?.status).toBe('PROTECTED')
+    expect(fundedEscrow?.providerId).toBe(companyProfileId)
+
+    const fundedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
+    expect(fundedJob?.status).toBe('IN_PROGRESS')
+
+    await prisma.jobOtp.create({ data: { jobId: bookResult.job.id, otp: '5678' } })
+
+    await verifyOtpAndStartJob(
+      { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
+      bookResult.job.id,
+      '5678'
+    )
+
+    const wsAfterOtp = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
+    expect(wsAfterOtp?.progressStatus).toBe('IN_PROGRESS')
+
+    await transitionJobWorkspace(
+      { jobId: bookResult.job.id, actorId: companyUserId, actorType: 'PROVIDER' },
+      'COMPLETION_REQUESTED'
+    )
+
+    const wsAfterComplete = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
+    expect(wsAfterComplete?.progressStatus).toBe('COMPLETION_REQUESTED')
+
+    const releaseResult = await completeAndReleaseEscrow(
+      { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
+      bookResult.job.id
+    )
+
+    expect(releaseResult.commission).toBeGreaterThanOrEqual(0)
+    expect(releaseResult.netAmount).toBeGreaterThan(0)
+    expect(releaseResult.providerType).toBe('COMPANY')
+
+    const finalJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
+    expect(finalJob?.status).toBe('COMPLETED')
+
+    const finalEscrow = await prisma.jobEscrow.findFirst({ where: { jobId: bookResult.job.id } })
+    expect(finalEscrow?.status).toBe('RELEASED')
+
+    const ledgerEntries = await prisma.financialLedger.findMany({
+      where: { referenceId: finalEscrow!.id, referenceType: 'ESCROW_RELEASE' },
+    })
+    expect(ledgerEntries.length).toBeGreaterThanOrEqual(2)
+
+    const commission = await prisma.commissionSettlement.findFirst({ where: { jobId: bookResult.job.id } })
+    expect(commission).toBeTruthy()
+    expect(commission?.providerId).toBe(companyOwnerId)
   })
 
   it('dispute path: hold escrow for dispute', async () => {
