@@ -4,6 +4,18 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { fundEscrow } from '@/lib/domain/job-lifecycle'
 import { notifyEscrowDeposited } from '@/lib/notifications'
 
+async function resolveProviderNotificationUser(providerId: string, providerType: string): Promise<string> {
+  if (providerType === 'COMPANY') {
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: providerId },
+      select: { userId: true },
+    })
+    if (!company) throw new Error('Company provider not found')
+    return company.userId
+  }
+  return providerId
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -19,24 +31,30 @@ export async function POST(
 
     const quote = await prisma.jobQuote.findFirst({
       where: { jobId: job.id, status: 'ACCEPTED' },
-      select: { providerId: true },
+      select: { providerId: true, providerType: true },
     })
 
     await fundEscrow(
       { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
-      job.id
+      job.id,
     )
 
-    if (quote) notifyEscrowDeposited(job.id, quote.providerId, job.title)
+    if (quote) {
+      const notificationUserId = await resolveProviderNotificationUser(quote.providerId, quote.providerType)
+      notifyEscrowDeposited(job.id, notificationUserId, job.title)
+    }
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error: any) {
     console.error('Escrow error:', error)
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
-    if (message.includes('already active')) return NextResponse.json({ error: message }, { status: 409 })
-    if (message.includes('Insufficient') || message.includes('not ready') || message.includes('accepted quote')) {
+    if (message.includes('already active') || message.includes('state changed')) return NextResponse.json({ error: message }, { status: 409 })
+    if (message.includes('INSUFFICIENT_FUNDS') || message.includes('Insufficient') || message.includes('not ready') || message.includes('accepted quote')) {
       return NextResponse.json({ error: message }, { status: 400 })
+    }
+    if (message.includes('Cash escrow')) {
+      return NextResponse.json({ error: message }, { status: 503 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
@@ -53,8 +71,22 @@ export async function GET(
     const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    const isParticipant = job.customerId === user.id ||
-      !!(await prisma.jobQuote.findFirst({ where: { jobId: params.id, providerId: user.id, status: 'ACCEPTED' } }))
+    let isParticipant = job.customerId === user.id
+    if (!isParticipant) {
+      const acceptedQuote = await prisma.jobQuote.findFirst({
+        where: { jobId: params.id, status: 'ACCEPTED' },
+        select: { providerId: true, providerType: true },
+      })
+      if (acceptedQuote?.providerType === 'INDIVIDUAL') {
+        isParticipant = acceptedQuote.providerId === user.id
+      } else if (acceptedQuote?.providerType === 'COMPANY') {
+        isParticipant = !!(await prisma.teamMember.findFirst({
+          where: { companyId: acceptedQuote.providerId, userId: user.id, status: 'ACTIVE' },
+          select: { id: true },
+        }))
+      }
+    }
+
     if (!isParticipant) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: params.id } })
