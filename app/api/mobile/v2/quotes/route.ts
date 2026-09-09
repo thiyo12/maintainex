@@ -4,6 +4,18 @@ import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/mark
 import { notifyQuoteSubmitted } from '@/lib/notifications'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
+import { findCandidates } from '@/lib/matching'
+import { validateQuotePrice } from '@/lib/pricing/engine'
+
+function parsePositiveMinorUnits(value: unknown): bigint | null {
+  if (typeof value === 'bigint') return value > 0n ? value : null
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value)
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    const parsed = BigInt(value.trim())
+    return parsed > 0n ? parsed : null
+  }
+  return null
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +25,15 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { jobId, providerType, price, estimatedCompletionTime, message, attachments, companyId } = body
+    const { jobId, providerType, estimatedCompletionTime, message, attachments, companyId } = body
+    const priceMinor = parsePositiveMinorUnits(body.price)
 
-    if (!jobId || !providerType || price == null) {
-      return NextResponse.json({ error: 'Missing required fields: jobId, providerType, price' }, { status: 400 })
+    if (!jobId || !['INDIVIDUAL', 'COMPANY'].includes(providerType) || priceMinor === null) {
+      return NextResponse.json({ error: 'Missing or invalid required fields: jobId, providerType, price' }, { status: 400 })
     }
 
     let resolvedProviderId = user.id
-    let resolvedProviderType = providerType
+    let resolvedProviderType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
     let actorUserId: string | null = null
     let actorRole: string | null = null
 
@@ -35,20 +48,45 @@ export async function POST(request: NextRequest) {
       actorUserId = user.id
       actorRole = context!.role
     } else {
-      const profile = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
+      const profile = await prisma.taskerProfile.findUnique({ where: { userId: user.id }, select: { id: true } })
       if (!profile) {
         return NextResponse.json({ error: 'You must have a provider profile to submit quotes' }, { status: 403 })
       }
-    }
-
-    if (user.identityStatus !== 'VERIFIED') {
-      return NextResponse.json({ error: 'Your identity must be verified before submitting quotes.' }, { status: 403 })
     }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.status !== 'OPEN') return NextResponse.json({ error: 'Job is not accepting quotes' }, { status: 400 })
     if (job.customerId === user.id) return NextResponse.json({ error: 'Cannot quote on your own job' }, { status: 400 })
+
+    const matching = await findCandidates(prisma, {
+      jobId: job.id,
+      userId: job.customerId,
+      jobMode: job.budgetType === 'REQUEST_QUOTES' ? 'QUOTE' : 'BOOK_NOW',
+      urgency: (job.urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
+      categoryId: job.categoryId,
+      serviceTemplateId: job.serviceTemplateId || undefined,
+      latitude: job.latitude,
+      longitude: job.longitude,
+      countryCode: job.countryCode || 'GLOBAL',
+    })
+    const eligible = matching.candidates.some(candidate =>
+      candidate.providerType === resolvedProviderType && candidate.providerId === resolvedProviderId
+    )
+    if (!eligible) {
+      const exclusion = matching.excluded.find(candidate =>
+        candidate.providerType === resolvedProviderType && candidate.providerId === resolvedProviderId
+      )
+      return NextResponse.json({
+        error: 'Provider is not eligible or does not have the required capability for this job',
+        reason: exclusion?.reason || 'CAPABILITY_MISMATCH',
+      }, { status: 403 })
+    }
+
+    const priceCheck = validateQuotePrice(priceMinor, job.budgetAmount)
+    if (!priceCheck.valid) {
+      return NextResponse.json({ error: priceCheck.error }, { status: 400 })
+    }
 
     const existing = await prisma.jobQuote.findFirst({
       where: { jobId, providerId: resolvedProviderId },
@@ -60,25 +98,25 @@ export async function POST(request: NextRequest) {
         jobId,
         providerId: resolvedProviderId,
         providerType: resolvedProviderType,
-        price,
+        price: priceMinor,
         actorUserId,
         actorRole,
-        estimatedCompletionTime: estimatedCompletionTime || '',
-        message: message || '',
-        attachments: JSON.stringify(attachments || []),
+        estimatedCompletionTime: typeof estimatedCompletionTime === 'string' ? estimatedCompletionTime.slice(0, 200) : '',
+        message: typeof message === 'string' ? message.slice(0, 5000) : '',
+        attachments: JSON.stringify(Array.isArray(attachments) ? attachments : []),
       },
     })
 
     if (job.responseState === 'awaiting') {
-      await prisma.marketplaceJob.update({
-        where: { id: jobId },
+      await prisma.marketplaceJob.updateMany({
+        where: { id: jobId, responseState: 'awaiting' },
         data: { responseState: 'responded' },
       })
     }
 
     notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
-    return NextResponse.json({ quote: { ...quote, price: Number(quote.price) } }, { status: 201 })
+    return NextResponse.json({ quote: { ...quote, price: quote.price.toString() } }, { status: 201 })
   } catch (error) {
     console.error('Create quote error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -137,7 +175,7 @@ export async function GET(request: NextRequest) {
           if (companyProfile) { rating = companyProfile.rating; completedJobs = companyProfile.completedProjects }
         }
 
-        return { ...q, price: Number(q.price), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
+        return { ...q, price: q.price.toString(), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
       })
     )
 
