@@ -64,17 +64,20 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      # This repository was baselined from an already-existing production DB in
-      # 2026. One compatibility migration is timestamped before that baseline
-      # and therefore cannot bootstrap an empty database by itself. Do not edit
-      # or reorder those already-applied production migrations. In CI only, load
-      # the immutable baseline, mark the historical pre-baseline migration and
-      # baseline as applied, then prove every later migration deploys normally.
+      # The 202601 baseline is the immutable snapshot of the already-existing
+      # production database. Two compatibility migrations are already represented
+      # by that snapshot and must not be replayed on top of it:
+      # - 202506 name-change cooldown (pre-baseline historical migration)
+      # - 202608 customer-profile fields (the baseline already contains the final
+      #   columns/types, including birthday as TIMESTAMP rather than the older TEXT)
+      # In CI only, load the immutable baseline and mark those migrations resolved.
+      # Every genuinely post-baseline migration still runs with prisma migrate deploy.
       - name: Bootstrap isolated DB from immutable production baseline
         run: |
           npx prisma db execute --file prisma/migrations/20260101000000_baseline/migration.sql --schema prisma/schema.prisma
           npx prisma migrate resolve --applied 20250626000000_add_name_change_cooldown
           npx prisma migrate resolve --applied 20260101000000_baseline
+          npx prisma migrate resolve --applied 20260830000000_add_customer_profile_fields
 
       - name: Apply post-baseline migrations with production command
         run: npx prisma migrate deploy
