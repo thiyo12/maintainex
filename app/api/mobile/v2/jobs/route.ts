@@ -9,12 +9,20 @@ import { sendExpoPush } from '@/lib/push'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
+function parseBigIntInput(value: unknown): bigint | null {
+  if (typeof value === 'bigint') return value > 0n ? value : null
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value)
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    const parsed = BigInt(value.trim())
+    return parsed > 0n ? parsed : null
+  }
+  return null
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
@@ -27,25 +35,18 @@ export async function POST(request: NextRequest) {
       serviceTemplateId, templateJobId, preferredTimeSlot, countryCode, targetTaskerId,
     } = body
 
-    title = sanitize(title, 200)
-    description = sanitize(description, 5000)
-    categoryId = sanitize(categoryId, 50)
-    if (areaId) areaId = sanitize(areaId, 50)
-    if (postalCode) postalCode = sanitize(postalCode, 20)
-    if (serviceTemplateId) serviceTemplateId = sanitize(serviceTemplateId, 50)
-    if (templateJobId) templateJobId = sanitize(templateJobId, 50)
-    if (targetTaskerId) targetTaskerId = sanitize(targetTaskerId, 50)
-    const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
-    const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
-    let finalSmartBookingJson: string | null = null
-    if (typeof smartBookingJson === 'string' && smartBookingJson.trim().length > 0) {
-      finalSmartBookingJson = sanitize(smartBookingJson, 20000)
-    } else if (smartBookingJson && typeof smartBookingJson === 'object') {
-      finalSmartBookingJson = JSON.stringify(smartBookingJson)
-    }
+    title = typeof title === 'string' ? sanitize(title, 200) : ''
+    description = typeof description === 'string' ? sanitize(description, 5000) : ''
+    categoryId = typeof categoryId === 'string' ? sanitize(categoryId, 80) : ''
+    if (typeof areaId === 'string') areaId = sanitize(areaId, 80)
+    if (typeof postalCode === 'string') postalCode = sanitize(postalCode, 20)
+    if (typeof serviceTemplateId === 'string') serviceTemplateId = sanitize(serviceTemplateId, 80)
+    if (typeof templateJobId === 'string') templateJobId = sanitize(templateJobId, 80)
+    if (typeof targetTaskerId === 'string') targetTaskerId = sanitize(targetTaskerId, 80)
 
-    if (!title || !description || !categoryId || !budgetType || budgetAmount == null) {
-      return NextResponse.json({ error: 'Missing required fields: title, description, categoryId, budgetType, budgetAmount' }, { status: 400 })
+    const budgetMinor = parseBigIntInput(budgetAmount)
+    if (!title || !description || !categoryId || !budgetType || budgetMinor === null) {
+      return NextResponse.json({ error: 'Missing or invalid required fields: title, description, categoryId, budgetType, budgetAmount' }, { status: 400 })
     }
 
     const validBudgetTypes = ['FIXED', 'HOURLY', 'NEGOTIABLE', 'REQUEST_QUOTES']
@@ -53,10 +54,61 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid budgetType. Must be FIXED, HOURLY, NEGOTIABLE, or REQUEST_QUOTES' }, { status: 400 })
     }
 
-    let aiEstimateJson: string | null = null
+    const category = await prisma.jobCategory.findUnique({
+      where: { id: categoryId },
+      select: { id: true, isActive: true },
+    })
+    if (!category?.isActive) return NextResponse.json({ error: 'Invalid or inactive categoryId' }, { status: 400 })
+
+    let serviceTemplate: { id: string; jobCategoryId: string; templateJobId: string | null; isActive: boolean } | null = null
+    if (serviceTemplateId) {
+      serviceTemplate = await prisma.serviceTemplate.findUnique({
+        where: { id: serviceTemplateId },
+        select: { id: true, jobCategoryId: true, templateJobId: true, isActive: true },
+      })
+      if (!serviceTemplate?.isActive || serviceTemplate.jobCategoryId !== categoryId) {
+        return NextResponse.json({ error: 'serviceTemplateId does not belong to categoryId' }, { status: 400 })
+      }
+    }
+
+    if (templateJobId) {
+      const templateJob = await prisma.templateJob.findUnique({
+        where: { id: templateJobId },
+        select: { id: true, categoryId: true, isActive: true },
+      })
+      if (!templateJob?.isActive || templateJob.categoryId !== categoryId) {
+        return NextResponse.json({ error: 'templateJobId does not belong to categoryId' }, { status: 400 })
+      }
+      if (serviceTemplate?.templateJobId && serviceTemplate.templateJobId !== templateJob.id) {
+        return NextResponse.json({ error: 'templateJobId conflicts with serviceTemplateId' }, { status: 400 })
+      }
+    } else if (serviceTemplate?.templateJobId) {
+      templateJobId = serviceTemplate.templateJobId
+    }
+
+    if (serviceTemplate?.templateJobId) {
+      const linked = await prisma.templateJob.findUnique({
+        where: { id: serviceTemplate.templateJobId },
+        select: { categoryId: true, isActive: true },
+      })
+      if (!linked?.isActive || linked.categoryId !== categoryId) {
+        return NextResponse.json({ error: 'Service template has invalid TemplateJob relationship' }, { status: 400 })
+      }
+    }
+
+    const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
+    const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
     const validMaterialHandling = ['tasker_brings', 'customer_provides', 'quote_both']
     const finalMaterialHandling = validMaterialHandling.includes(materialHandling) ? materialHandling : 'tasker_brings'
 
+    let finalSmartBookingJson: string | null = null
+    if (typeof smartBookingJson === 'string' && smartBookingJson.trim().length > 0) {
+      finalSmartBookingJson = sanitize(smartBookingJson, 20000)
+    } else if (smartBookingJson && typeof smartBookingJson === 'object') {
+      finalSmartBookingJson = JSON.stringify(smartBookingJson)
+    }
+
+    let aiEstimateJson: string | null = null
     try {
       const estimate = await calculatePrice(prisma, {
         jobId: `pending-${Date.now()}-${user.id}`,
@@ -66,22 +118,22 @@ export async function POST(request: NextRequest) {
         urgency: (urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
         quantity: workersCount ? Number(workersCount) : undefined,
         durationMinutes: estimatedDuration ? Math.round(Number(estimatedDuration) * 60) : undefined,
-        countryCode: 'GLOBAL',
+        countryCode: finalCountryCode,
       })
       aiEstimateJson = JSON.stringify({
-        baseAmount: Number(estimate.baseAmount),
-        urgencyAmount: Number(estimate.urgencyAmount),
-        serviceModifiers: Number(estimate.serviceModifiers),
-        providerGross: Number(estimate.providerGross),
+        baseAmount: estimate.baseAmount.toString(),
+        urgencyAmount: estimate.urgencyAmount.toString(),
+        serviceModifiers: estimate.serviceModifiers.toString(),
+        providerGross: estimate.providerGross.toString(),
         platformFeeBps: estimate.platformFeeBps,
-        platformFeeAmount: Number(estimate.platformFeeAmount),
-        customerTotal: Number(estimate.customerTotal),
+        platformFeeAmount: estimate.platformFeeAmount.toString(),
+        customerTotal: estimate.customerTotal.toString(),
         currency: estimate.currency,
         pricingVersion: estimate.pricingVersion,
         ruleIds: estimate.ruleIds,
       })
-    } catch (e) {
-      console.error('AI estimate generation failed:', e)
+    } catch (error) {
+      console.error('Canonical price estimate generation failed:', error)
     }
 
     const job = await prisma.marketplaceJob.create({
@@ -96,21 +148,21 @@ export async function POST(request: NextRequest) {
         countryCode: finalCountryCode,
         targetTaskerId: targetTaskerId || null,
         responseDeadline: new Date(Date.now() + (await getSetting('matching.response_hours', 2)) * 60 * 60 * 1000),
-        photos: JSON.stringify(photos || []),
+        photos: JSON.stringify(Array.isArray(photos) ? photos : []),
         budgetType,
-        budgetAmount,
+        budgetAmount: budgetMinor,
         areaId: areaId || null,
         postalCode: postalCode || null,
         preferredDate: preferredDate ? new Date(preferredDate) : null,
-        urgency: urgency || 'normal',
+        urgency: typeof urgency === 'string' ? urgency.toLowerCase() : 'normal',
         estimatedDuration: estimatedDuration ? Number(estimatedDuration) : null,
-        workersCount: workersCount ? Number(workersCount) : 1,
+        workersCount: workersCount ? Math.max(1, Number(workersCount)) : 1,
         status: 'OPEN',
         aiEstimateJson,
         materialHandling: finalMaterialHandling,
         smartBookingJson: finalSmartBookingJson,
-        latitude: typeof latitude === 'number' && isFinite(latitude) ? latitude : null,
-        longitude: typeof longitude === 'number' && isFinite(longitude) ? longitude : null,
+        latitude: typeof latitude === 'number' && Number.isFinite(latitude) ? latitude : null,
+        longitude: typeof longitude === 'number' && Number.isFinite(longitude) ? longitude : null,
       },
     })
 
@@ -118,14 +170,14 @@ export async function POST(request: NextRequest) {
     try {
       const blast = await blastJobToTaskers(job.id)
       notifiedCount = blast.matched
-    } catch (err) {
-      console.error('Blast job error:', err)
+    } catch (error) {
+      console.error('Blast job error:', error)
     }
 
     let conversationId: string | null = null
     if (job.targetTaskerId) {
-      const tasker = await prisma.taskerProfile.findUnique({
-        where: { id: job.targetTaskerId },
+      const tasker = await prisma.taskerProfile.findFirst({
+        where: { OR: [{ id: job.targetTaskerId }, { userId: job.targetTaskerId }] },
         include: { user: { select: { id: true, name: true, pushToken: true } } },
       })
       if (tasker) {
@@ -151,7 +203,7 @@ export async function POST(request: NextRequest) {
           conversationId = conversation.id
         }
         const taskerName = tasker.user.name || 'Your tasker'
-        await notifyTaskerAssigned(job.id, user.id, job.targetTaskerId, taskerName, job.title)
+        await notifyTaskerAssigned(job.id, user.id, tasker.id, taskerName, job.title)
         if (tasker.user.pushToken) {
           await sendExpoPush(
             tasker.user.pushToken,
@@ -164,7 +216,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      job: { ...job, budgetAmount: Number(job.budgetAmount) },
+      job: { ...job, budgetAmount: job.budgetAmount.toString() },
       notifiedCount,
       conversationId,
       estimatedResponseTime: '5-30 minutes',
@@ -178,9 +230,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -188,7 +238,7 @@ export async function GET(request: NextRequest) {
     const myQuotes = searchParams.get('myQuotes')
     const areaId = searchParams.get('areaId')
 
-    let where: any = { isActive: true }
+    const where: any = { isActive: true }
 
     if (myQuotes === 'true') {
       const quoteJobIds = await prisma.jobQuote.findMany({
@@ -196,26 +246,19 @@ export async function GET(request: NextRequest) {
         select: { jobId: true },
         distinct: ['jobId'],
       })
-      where.id = { in: quoteJobIds.map(q => q.jobId) }
+      where.id = { in: quoteJobIds.map((quote) => quote.jobId) }
     } else if (role === 'provider') {
       where.status = 'OPEN'
       if (areaId) where.areaId = areaId
 
-      // Taskers only see jobs in the categories they selected under "Your Services".
-      // Primary source of truth: TaskerSkill → TemplateJob.categoryId (JobCategory id).
-      // Fallback for legacy profiles without a service selection: profile.skills slugs.
       let allowedCategoryIds: string[] = []
       const selections = await prisma.taskerSkill.findMany({
         where: { tasker: { userId: user.id } },
-        select: { jobId: true },
+        select: { job: { select: { categoryId: true } } },
       })
 
       if (selections.length > 0) {
-        const templateJobs = await prisma.templateJob.findMany({
-          where: { id: { in: selections.map(s => s.jobId) } },
-          select: { categoryId: true },
-        })
-        allowedCategoryIds = [...new Set(templateJobs.map(j => j.categoryId))]
+        allowedCategoryIds = [...new Set(selections.map((selection) => selection.job.categoryId))]
       } else {
         const profile = await prisma.taskerProfile.findUnique({
           where: { userId: user.id },
@@ -231,11 +274,11 @@ export async function GET(request: NextRequest) {
           }
         }
         if (slugs.length > 0) {
-          const categories = await prisma.category.findMany({
-            where: { slug: { in: slugs } },
+          const categories = await prisma.jobCategory.findMany({
+            where: { slug: { in: slugs }, isActive: true },
             select: { id: true },
           })
-          allowedCategoryIds = [...new Set([...categories.map(c => c.id), ...slugs])]
+          allowedCategoryIds = categories.map((category) => category.id)
         }
       }
 
@@ -252,12 +295,14 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    return NextResponse.json({ jobs: jobs.map((j) => ({
-      ...j,
-      budgetAmount: Number(j.budgetAmount),
-      aiEstimate: j.aiEstimateJson ? JSON.parse(j.aiEstimateJson) : null,
-      smartBooking: j.smartBookingJson ? JSON.parse(j.smartBookingJson) : null,
-    })) })
+    return NextResponse.json({
+      jobs: jobs.map((job) => ({
+        ...job,
+        budgetAmount: job.budgetAmount.toString(),
+        aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
+        smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
+      })),
+    })
   } catch (error) {
     console.error('List jobs error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
