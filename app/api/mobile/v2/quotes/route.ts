@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { notifyQuoteSubmitted } from '@/lib/notifications'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,80 +93,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const jobId = searchParams.get('jobId')
     if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
+    const companyId = searchParams.get('companyId')
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    const isCustomer = job.customerId === user.id
+    const { allowedQuoteIds, isCustomer } = await resolveQuoteVisibility(prisma, {
+      userId: user.id,
+      jobId,
+      companyId,
+    })
 
-    if (!isCustomer) {
-      const allowedQuoteIds: string[] = []
-
-      const myIndividualQuote = await prisma.jobQuote.findFirst({
-        where: { jobId, providerId: user.id, providerType: 'INDIVIDUAL' },
-      })
-      if (myIndividualQuote) allowedQuoteIds.push(myIndividualQuote.id)
-
-      const membership = await prisma.teamMember.findFirst({
-        where: { userId: user.id, status: 'ACTIVE' },
-        select: { companyId: true, role: true },
-      })
-
-      if (membership) {
-        const { hasCompanyPermission } = await import('@/lib/phase6/rbac')
-        if (hasCompanyPermission(membership.role as any, 'quotes:read')) {
-          const myCompanyQuote = await prisma.jobQuote.findFirst({
-            where: { jobId, providerId: membership.companyId, providerType: 'COMPANY' },
-          })
-          if (myCompanyQuote) allowedQuoteIds.push(myCompanyQuote.id)
-        }
-      }
-
-      if (allowedQuoteIds.length === 0) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-      }
-
-      const quotes = await prisma.jobQuote.findMany({
-        where: { id: { in: allowedQuoteIds } },
-        orderBy: { price: 'asc' },
-      })
-
-      const enriched = await Promise.all(
-        quotes.map(async (q) => {
-          let provider: { id: string; name?: string | null; phone?: string | null; email?: string | null } | null = null
-          let rating = 0
-          let completedJobs = 0
-
-          if (q.providerType === 'INDIVIDUAL') {
-            provider = await prisma.user.findUnique({
-              where: { id: q.providerId },
-              select: { id: true, name: true },
-            })
-            const p = await prisma.taskerProfile.findUnique({
-              where: { userId: q.providerId },
-              select: { rating: true, completedJobs: true },
-            })
-            if (p) { rating = p.rating; completedJobs = p.completedJobs }
-          } else {
-            const companyProfile = await prisma.companyProfile.findUnique({
-              where: { id: q.providerId },
-              select: { id: true, companyName: true, rating: true, completedProjects: true },
-            })
-            provider = companyProfile ? { id: companyProfile.id, name: companyProfile.companyName } : { id: q.providerId }
-            if (companyProfile) { rating = companyProfile.rating; completedJobs = companyProfile.completedProjects }
-          }
-
-          return { ...q, price: Number(q.price), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
-        })
-      )
-
-      return NextResponse.json({ quotes: enriched })
+    if (!isCustomer && allowedQuoteIds.length === 0) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const quotes = await prisma.jobQuote.findMany({
-      where: { jobId },
-      orderBy: { price: 'asc' },
-    })
+    const quotes = isCustomer
+      ? await prisma.jobQuote.findMany({ where: { jobId }, orderBy: { price: 'asc' } })
+      : await prisma.jobQuote.findMany({ where: { id: { in: allowedQuoteIds } }, orderBy: { price: 'asc' } })
 
     const enriched = await Promise.all(
       quotes.map(async (q) => {
@@ -176,7 +121,7 @@ export async function GET(request: NextRequest) {
         if (q.providerType === 'INDIVIDUAL') {
           provider = await prisma.user.findUnique({
             where: { id: q.providerId },
-            select: { id: true, name: true, phone: true, email: true },
+            select: isCustomer ? { id: true, name: true, phone: true, email: true } : { id: true, name: true },
           })
           const p = await prisma.taskerProfile.findUnique({
             where: { userId: q.providerId },

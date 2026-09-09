@@ -114,7 +114,7 @@ export async function transitionUserKyc(
             data: {
               verificationStatus: taskerStatus,
               verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-              ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
+              ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : { isVerified: false }),
             },
           })
         }

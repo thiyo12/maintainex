@@ -43,7 +43,7 @@ export async function writeCompanyAuditLog(
   tx?: Prisma.TransactionClient,
 ): Promise<void> {
   const client = tx ?? prisma
-  await client.companyAuditLog.create({
+  const promise = client.companyAuditLog.create({
     data: {
       companyId: params.companyId,
       actorId: params.actorId,
@@ -56,6 +56,14 @@ export async function writeCompanyAuditLog(
       ipAddress: params.ipAddress ?? null,
     },
   })
+
+  if (tx) {
+    await promise
+  } else {
+    promise.catch((error) => {
+      console.error('Audit log write failed (best-effort):', error)
+    })
+  }
 }
 
 export async function getCompanyAuditLogs(
