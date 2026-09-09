@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { type Currency, bigIntToSafeNumber } from './money';
+import { type Currency } from './money';
 import { createHash, randomUUID } from 'crypto';
 
 function serializeBigInt(obj: unknown): string {
@@ -187,7 +187,7 @@ export async function postLedgerTransaction(
 
     for (const update of walletUpdates.values()) {
       const walletId = await resolveWalletId(client, update);
-      const deltaMajor = bigIntToSafeNumber(update.amount) / 100;
+      const delta = update.amount;
       const walletType = update.accountType === 'CUSTOMER_WALLET' ? 'CUSTOMER' : 'PROVIDER';
 
       if (update.entryType === 'CREDIT') {
@@ -199,7 +199,7 @@ export async function postLedgerTransaction(
                          "availableBalance" = "WalletBalance"."availableBalance" + $4,
                          "version" = "WalletBalance"."version" + 1,
                          "updatedAt" = now()`,
-          walletId, walletType, deltaMajor, deltaMajor
+          walletId, walletType, delta, delta
         );
       } else {
         const affected = await client.$executeRawUnsafe(
@@ -210,7 +210,7 @@ export async function postLedgerTransaction(
                "updatedAt" = now()
            WHERE "walletType" = $2 AND "walletId" = $1
              AND "balance" >= $3 AND "availableBalance" >= $4`,
-          walletId, walletType, deltaMajor, deltaMajor
+          walletId, walletType, delta, delta
         );
         if (affected === 0) throw new Error('INSUFFICIENT_FUNDS');
       }

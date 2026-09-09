@@ -45,18 +45,19 @@ describePG('Phase 5E.2 — Balance Underflow / Double-Spend Guard (PostgreSQL)',
   })
 
   async function setBalanceMajor(amount: number) {
+    const minorUnits = BigInt(Math.round(amount * 100))
     await prisma.$executeRawUnsafe(
       `UPDATE "WalletBalance" SET "balance" = $1, "availableBalance" = $1, "version" = 1, "updatedAt" = now()
-       WHERE "walletId" = $2 AND "walletType" = 'CUSTOMER'`, amount, TEST_WALLET_ID
+       WHERE "walletId" = $2 AND "walletType" = 'CUSTOMER'`, minorUnits, TEST_WALLET_ID
     )
     await prisma.$executeRawUnsafe(`UPDATE "CustomerWallet" SET "balance" = $1, "updatedAt" = now() WHERE "userId" = $2`, amount, TEST_USER_ID)
   }
 
   async function getWalletBalanceMajor(): Promise<number> {
-    const rows = await prisma.$queryRawUnsafe<Array<{ balance: number }>>(
+    const rows = await prisma.$queryRawUnsafe<Array<{ balance: bigint }>>(
       `SELECT "balance" FROM "WalletBalance" WHERE "walletId" = $1 AND "walletType" = 'CUSTOMER'`, TEST_WALLET_ID
     )
-    return rows.length > 0 ? Number(rows[0].balance) : 0
+    return rows.length > 0 ? Number(rows[0].balance) / 100 : 0
   }
 
   async function getLedgerDebitMinor(): Promise<number> {

@@ -1,18 +1,13 @@
 import { prisma } from './prisma';
+import { legacyToMinorUnits } from './money';
 
 export interface CanonicalWalletBalance {
   walletId: string;
   walletType: 'PROVIDER' | 'CUSTOMER';
-  // Canonical public/read-layer amounts are always minor units.
   balance: bigint;
   availableBalance: bigint;
   pendingBalance: bigint;
   version: number;
-}
-
-function majorNumberToMinor(value: number): bigint {
-  if (!Number.isFinite(value)) throw new Error('Invalid wallet balance');
-  return BigInt(Math.round(value * 100));
 }
 
 async function queryWalletBalance(
@@ -23,9 +18,9 @@ async function queryWalletBalance(
   const rows = await prisma.$queryRawUnsafe<Array<{
     walletId: string;
     walletType: string;
-    balance: number;
-    availableBalance: number;
-    pendingBalance: number;
+    balance: bigint;
+    availableBalance: bigint;
+    pendingBalance: bigint;
     version: number;
   }>>(
     `SELECT wb."walletId", wb."walletType", wb.balance, wb."availableBalance", wb."pendingBalance", wb.version
@@ -40,9 +35,9 @@ async function queryWalletBalance(
   return {
     walletId: row.walletId,
     walletType: row.walletType as 'PROVIDER' | 'CUSTOMER',
-    balance: majorNumberToMinor(row.balance),
-    availableBalance: majorNumberToMinor(row.availableBalance),
-    pendingBalance: majorNumberToMinor(row.pendingBalance),
+    balance: row.balance,
+    availableBalance: row.availableBalance,
+    pendingBalance: row.pendingBalance,
     version: row.version,
   };
 }
@@ -76,7 +71,7 @@ export async function readLegacyCustomerBalance(userId: string): Promise<number 
 }
 
 export function legacyToCanonicalMinor(legacyBalance: number): bigint {
-  return majorNumberToMinor(legacyBalance);
+  return legacyToMinorUnits(legacyBalance);
 }
 
 export async function reconcileWalletBalance(

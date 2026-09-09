@@ -2806,9 +2806,9 @@ model WalletBalance {
   id               String   @id @default(cuid())
   walletId         String
   walletType       String
-  balance          Float    @default(0)
-  availableBalance Float    @default(0)
-  pendingBalance   Float    @default(0)
+  balance          BigInt   @default(0)
+  availableBalance BigInt   @default(0)
+  pendingBalance   BigInt   @default(0)
   version          Int      @default(1)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
