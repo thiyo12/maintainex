@@ -52,6 +52,43 @@ CREATE UNIQUE INDEX IF NOT EXISTS "WalletBalance_walletType_walletId_key" ON "Wa
 CREATE INDEX IF NOT EXISTS "WalletBalance_walletId_idx" ON "WalletBalance"("walletId");
 CREATE INDEX IF NOT EXISTS "WalletBalance_walletType_idx" ON "WalletBalance"("walletType");
 
+-- Backfill existing legacy wallet balances once when a canonical cache row is
+-- missing. Existing canonical rows are never overwritten, which keeps this safe
+-- on databases that already ran part of the Phase 5 rollout.
+INSERT INTO "WalletBalance" (
+  "id", "walletId", "walletType", "balance", "availableBalance",
+  "pendingBalance", "version", "createdAt", "updatedAt"
+)
+SELECT
+  'wb_customer_' || cw.id,
+  cw.id,
+  'CUSTOMER',
+  cw.balance,
+  cw.balance,
+  0,
+  1,
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+FROM "CustomerWallet" cw
+ON CONFLICT ("walletType", "walletId") DO NOTHING;
+
+INSERT INTO "WalletBalance" (
+  "id", "walletId", "walletType", "balance", "availableBalance",
+  "pendingBalance", "version", "createdAt", "updatedAt"
+)
+SELECT
+  'wb_provider_' || pw.id,
+  pw.id,
+  'PROVIDER',
+  pw."availableBalance",
+  pw."availableBalance",
+  pw."pendingBalance",
+  1,
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+FROM "ProviderWallet" pw
+ON CONFLICT ("walletType", "walletId") DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS "PriceSnapshot" (
   "id" TEXT NOT NULL,
   "jobId" TEXT NOT NULL,
