@@ -50,15 +50,12 @@ function computePayloadFingerprint(entries: LedgerEntry[], currency: Currency): 
   return createHash('sha256').update(`${currency}:${normalized}`).digest('hex');
 }
 
-function validateEntries(entries: LedgerEntry[], currency: Currency): void {
-  if (entries.length < 2) {
-    throw new Error('Ledger transaction must have at least 2 entries');
-  }
+function validateEntries(entries: LedgerEntry[], _currency: Currency): void {
+  if (entries.length < 2) throw new Error('Ledger transaction must have at least 2 entries');
 
   const totalCredits = entries
     .filter(e => e.entryType === 'CREDIT')
     .reduce((sum, e) => sum + e.amount, 0n);
-
   const totalDebits = entries
     .filter(e => e.entryType === 'DEBIT')
     .reduce((sum, e) => sum + e.amount, 0n);
@@ -66,47 +63,50 @@ function validateEntries(entries: LedgerEntry[], currency: Currency): void {
   if (totalCredits !== totalDebits) {
     throw new Error(`Unbalanced ledger: credits=${totalCredits} debits=${totalDebits}`);
   }
-
-  if (totalCredits === 0n) {
-    throw new Error('Ledger transaction must have non-zero amounts');
-  }
+  if (totalCredits === 0n) throw new Error('Ledger transaction must have non-zero amounts');
 
   for (const entry of entries) {
-    if (entry.amount <= 0n) {
-      throw new Error(`Entry amount must be positive: ${entry.amount}`);
-    }
-    if (!entry.accountId) {
-      throw new Error('Entry must have an accountId');
-    }
-    if (!entry.accountType) {
-      throw new Error('Entry must have an accountType');
-    }
+    if (entry.amount <= 0n) throw new Error(`Entry amount must be positive: ${entry.amount}`);
+    if (!entry.accountId) throw new Error('Entry must have an accountId');
+    if (!entry.accountType) throw new Error('Entry must have an accountType');
   }
 }
 
 function validateIdempotencyKey(key: string): void {
-  if (!key || key.length > 255) {
-    throw new Error('Invalid idempotency key');
-  }
+  if (!key || key.length > 255) throw new Error('Invalid idempotency key');
 }
 
 function isUniqueConstraintViolation(error: any): boolean {
-  if (error?.code === 'P2010') {
-    return error?.meta?.code === '23505';
-  }
-  if (error?.code === 'P2002') {
-    return true;
-  }
-  if (error?.message?.includes('23505')) {
-    return true;
-  }
-  if (error?.message?.includes('duplicate key') || error?.message?.includes('unique constraint')) {
-    return true;
-  }
-  return false;
+  if (error?.code === 'P2010') return error?.meta?.code === '23505';
+  if (error?.code === 'P2002') return true;
+  if (error?.message?.includes('23505')) return true;
+  return !!(error?.message?.includes('duplicate key') || error?.message?.includes('unique constraint'));
 }
 
 type PrismaTxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+type WalletUpdate = {
+  amount: bigint;
+  entryType: 'CREDIT' | 'DEBIT';
+  accountType: string;
+  accountId: string;
+};
+
+async function resolveWalletId(client: PrismaTxClient, update: WalletUpdate): Promise<string> {
+  if (update.accountId.startsWith('customer:')) {
+    const userId = update.accountId.slice('customer:'.length);
+    const wallet = await client.customerWallet.findUnique({ where: { userId }, select: { id: true } });
+    if (!wallet) throw new Error('WALLET_NOT_FOUND');
+    return wallet.id;
+  }
+  if (update.accountId.startsWith('provider:')) {
+    const userId = update.accountId.slice('provider:'.length);
+    const wallet = await client.providerWallet.findUnique({ where: { userId }, select: { id: true } });
+    if (!wallet) throw new Error('WALLET_NOT_FOUND');
+    return wallet.id;
+  }
+  return update.accountId;
+}
 
 export async function postLedgerTransaction(
   input: PostLedgerTransactionInput,
@@ -115,7 +115,6 @@ export async function postLedgerTransaction(
   const currency = input.currency || 'LKR';
   validateEntries(input.entries, currency);
   validateIdempotencyKey(input.idempotencyKey);
-
   const fingerprint = computePayloadFingerprint(input.entries, currency);
 
   const runWith = async (client: PrismaTxClient) => {
@@ -125,11 +124,14 @@ export async function postLedgerTransaction(
 
     if (existing) {
       if (existing.status === 'COMPLETED' && existing.resultPayload) {
-        const storedFingerprint = existing.metadata || '';
-        if (storedFingerprint !== fingerprint) {
+        if ((existing.metadata || '') !== fingerprint) {
           throw new Error(`IDEMPOTENCY_CONFLICT: key=${input.idempotencyKey}`);
         }
-        return JSON.parse(existing.resultPayload) as PostedLedgerTransaction;
+        const parsed = JSON.parse(existing.resultPayload) as PostedLedgerTransaction;
+        return {
+          ...parsed,
+          entries: parsed.entries.map(entry => ({ ...entry, amount: BigInt(entry.amount) })),
+        };
       }
       if (existing.status === 'PENDING') {
         throw new Error(`Duplicate pending idempotency key: ${input.idempotencyKey}`);
@@ -137,7 +139,6 @@ export async function postLedgerTransaction(
     }
 
     const transactionId = `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
     await client.idempotencyRecord.create({
       data: {
         idempotencyKey: input.idempotencyKey,
@@ -148,8 +149,8 @@ export async function postLedgerTransaction(
       },
     });
 
-    const createdEntries = [];
-    const walletUpdates = new Map<string, { amount: bigint; entryType: 'CREDIT' | 'DEBIT'; accountType: string; accountId: string }>();
+    const createdEntries: PostedLedgerTransaction['entries'] = [];
+    const walletUpdates = new Map<string, WalletUpdate>();
 
     for (const entry of input.entries) {
       const entryIdempotencyKey = `${input.idempotencyKey}:${entry.accountId}:${entry.entryType}:${entry.amount}`;
@@ -176,124 +177,97 @@ export async function postLedgerTransaction(
       });
 
       if (entry.accountType === 'CUSTOMER_WALLET' || entry.accountType === 'PROVIDER_WALLET') {
-        const existing = walletUpdates.get(entry.accountId);
-        if (existing) {
-          existing.amount += entry.amount;
-        } else {
-          walletUpdates.set(entry.accountId, { amount: entry.amount, entryType: entry.entryType, accountType: entry.accountType, accountId: entry.accountId });
-        }
+        const key = `${entry.accountType}:${entry.accountId}:${entry.entryType}`;
+        const previous = walletUpdates.get(key);
+        if (previous) previous.amount += entry.amount;
+        else walletUpdates.set(key, { ...entry });
       }
     }
 
-    for (const [, update] of walletUpdates) {
-      const walletId = update.accountId.replace(/^(customer|provider):/, '');
-      const delta = bigIntToSafeNumber(update.amount);
+    for (const update of walletUpdates.values()) {
+      const walletId = await resolveWalletId(client, update);
+      // FinancialLedger is BigInt minor units (cents). WalletBalance is a legacy
+      // Float compatibility cache in major LKR, so conversion belongs here.
+      const deltaMajor = bigIntToSafeNumber(update.amount) / 100;
       const walletType = update.accountType === 'CUSTOMER_WALLET' ? 'CUSTOMER' : 'PROVIDER';
 
       if (update.entryType === 'CREDIT') {
         await client.$executeRawUnsafe(
           `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 0, 1, now(), now())
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $3, 0, 1, now(), now())
            ON CONFLICT ("walletType", "walletId")
-           DO UPDATE SET "availableBalance" = "WalletBalance"."availableBalance" + $4,
-                         "balance" = "WalletBalance"."balance" + $3,
+           DO UPDATE SET "balance" = "WalletBalance"."balance" + $3,
+                         "availableBalance" = "WalletBalance"."availableBalance" + $3,
+                         "version" = "WalletBalance"."version" + 1,
                          "updatedAt" = now()`,
-          walletId,
-          walletType,
-          walletType === 'CUSTOMER' ? delta : 0,
-          walletType === 'PROVIDER' ? delta : 0
+          walletId, walletType, deltaMajor
         );
       } else {
         const affected = await client.$executeRawUnsafe(
           `UPDATE "WalletBalance"
            SET "balance" = "balance" - $3,
-               "availableBalance" = "availableBalance" - $4,
+               "availableBalance" = "availableBalance" - $3,
                "version" = "version" + 1,
                "updatedAt" = now()
            WHERE "walletType" = $2 AND "walletId" = $1
-             AND "balance" >= $3 AND "availableBalance" >= $4`,
-          walletId,
-          walletType,
-          walletType === 'CUSTOMER' ? delta : 0,
-          walletType === 'PROVIDER' ? delta : 0
+             AND "balance" >= $3 AND "availableBalance" >= $3`,
+          walletId, walletType, deltaMajor
         );
-        if (affected === 0) {
-          throw new Error('INSUFFICIENT_FUNDS');
-        }
+        if (affected === 0) throw new Error('INSUFFICIENT_FUNDS');
       }
     }
 
-    const result: PostedLedgerTransaction = {
-      id: transactionId,
-      entries: createdEntries,
-    };
-
+    const result: PostedLedgerTransaction = { id: transactionId, entries: createdEntries };
     await client.idempotencyRecord.update({
       where: { idempotencyKey: input.idempotencyKey },
-      data: {
-        status: 'COMPLETED',
-        resultPayload: serializeBigInt(result),
-      },
+      data: { status: 'COMPLETED', resultPayload: serializeBigInt(result) },
     });
-
     return result;
   };
 
-  if (tx) {
-    return runWith(tx);
-  }
+  if (tx) return runWith(tx);
 
   try {
-    return await prisma.$transaction(async (innerTx) => runWith(innerTx));
+    return await prisma.$transaction(async innerTx => runWith(innerTx));
   } catch (error: any) {
     if (isUniqueConstraintViolation(error)) {
       const retry = await prisma.idempotencyRecord.findUnique({
         where: { idempotencyKey: input.idempotencyKey },
       });
-
-      if (retry && retry.status === 'COMPLETED' && retry.resultPayload) {
-        const storedFingerprint = retry.metadata || '';
-        if (storedFingerprint !== fingerprint) {
+      if (retry?.status === 'COMPLETED' && retry.resultPayload) {
+        if ((retry.metadata || '') !== fingerprint) {
           throw new Error(`IDEMPOTENCY_CONFLICT: key=${input.idempotencyKey}`);
         }
-        return JSON.parse(retry.resultPayload) as PostedLedgerTransaction;
+        const parsed = JSON.parse(retry.resultPayload) as PostedLedgerTransaction;
+        return {
+          ...parsed,
+          entries: parsed.entries.map(entry => ({ ...entry, amount: BigInt(entry.amount) })),
+        };
       }
-
       throw new Error(`Idempotency key ${input.idempotencyKey} in inconsistent state after conflict`);
     }
     throw error;
   }
 }
 
-const postLedgerTransactionWithClient = postLedgerTransaction;
-
 export async function reverseLedgerTransaction(
   originalTransactionId: string,
   reason: string,
   createdBy: string
 ): Promise<PostedLedgerTransaction> {
-  const originalEntries = await prisma.financialLedger.findMany({
-    where: { referenceId: originalTransactionId },
-  });
-
-  if (originalEntries.length === 0) {
-    throw new Error(`Original transaction ${originalTransactionId} not found`);
-  }
-
-  const reversedEntries: LedgerEntry[] = originalEntries.map(entry => ({
-    accountId: entry.accountId,
-    accountType: entry.accountType,
-    entryType: (entry.entryType === 'CREDIT' ? 'DEBIT' : 'CREDIT') as 'CREDIT' | 'DEBIT',
-    amount: entry.amount,
-  }));
-
-  const reversalKey = `reversal:${originalTransactionId}:${Date.now()}`;
+  const originalEntries = await prisma.financialLedger.findMany({ where: { referenceId: originalTransactionId } });
+  if (originalEntries.length === 0) throw new Error(`Original transaction ${originalTransactionId} not found`);
 
   return postLedgerTransaction({
-    entries: reversedEntries,
+    entries: originalEntries.map(entry => ({
+      accountId: entry.accountId,
+      accountType: entry.accountType,
+      entryType: (entry.entryType === 'CREDIT' ? 'DEBIT' : 'CREDIT') as 'CREDIT' | 'DEBIT',
+      amount: entry.amount,
+    })),
     referenceType: 'REVERSAL',
     referenceId: originalTransactionId,
-    idempotencyKey: reversalKey,
+    idempotencyKey: `reversal:${originalTransactionId}:${Date.now()}`,
     description: `Reversal of ${originalTransactionId}: ${reason}`,
     createdBy,
   });
@@ -310,18 +284,8 @@ export async function postWalletCredit(
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
-      {
-        accountId: walletId,
-        accountType: walletType,
-        entryType: 'CREDIT',
-        amount,
-      },
-      {
-        accountId: 'platform',
-        accountType: 'PLATFORM',
-        entryType: 'DEBIT',
-        amount,
-      },
+      { accountId: walletId, accountType: walletType, entryType: 'CREDIT', amount },
+      { accountId: 'platform', accountType: 'PLATFORM', entryType: 'DEBIT', amount },
     ],
     referenceType,
     referenceId,
@@ -342,18 +306,8 @@ export async function postWalletDebit(
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
-      {
-        accountId: walletId,
-        accountType: walletType,
-        entryType: 'DEBIT',
-        amount,
-      },
-      {
-        accountId: 'platform',
-        accountType: 'PLATFORM',
-        entryType: 'CREDIT',
-        amount,
-      },
+      { accountId: walletId, accountType: walletType, entryType: 'DEBIT', amount },
+      { accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount },
     ],
     referenceType,
     referenceId,
@@ -371,23 +325,13 @@ export async function postEscrowDeposit(
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
-      {
-        accountId: `escrow:${escrowId}`,
-        accountType: 'ESCROW',
-        entryType: 'CREDIT',
-        amount,
-      },
-      {
-        accountId: `customer:${customerId}`,
-        accountType: 'CUSTOMER_WALLET',
-        entryType: 'DEBIT',
-        amount,
-      },
+      { accountId: `escrow:${escrowId}`, accountType: 'ESCROW', entryType: 'CREDIT', amount },
+      { accountId: `customer:${customerId}`, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount },
     ],
     referenceType: 'ESCROW_DEPOSIT',
     referenceId: escrowId,
     idempotencyKey,
-    description: `Escrow deposit for job`,
+    description: 'Escrow deposit for job',
     createdBy: 'system',
   });
 }
@@ -399,31 +343,20 @@ export async function postEscrowRelease(
   commission: bigint,
   idempotencyKey: string
 ): Promise<PostedLedgerTransaction> {
+  const providerAmount = amount - commission;
+  const entries: LedgerEntry[] = [
+    { accountId: `escrow:${escrowId}`, accountType: 'ESCROW', entryType: 'DEBIT', amount },
+    { accountId: `provider:${providerId}`, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: providerAmount },
+  ];
+  if (commission > 0n) {
+    entries.push({ accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: commission });
+  }
   return postLedgerTransaction({
-    entries: [
-      {
-        accountId: `escrow:${escrowId}`,
-        accountType: 'ESCROW',
-        entryType: 'DEBIT',
-        amount,
-      },
-      {
-        accountId: `provider:${providerId}`,
-        accountType: 'PROVIDER_WALLET',
-        entryType: 'CREDIT',
-        amount: amount - commission,
-      },
-      {
-        accountId: 'platform',
-        accountType: 'PLATFORM',
-        entryType: 'CREDIT',
-        amount: commission,
-      },
-    ],
+    entries,
     referenceType: 'ESCROW_RELEASE',
     referenceId: escrowId,
     idempotencyKey,
-    description: `Escrow release with commission`,
+    description: 'Escrow release with commission',
     createdBy: 'system',
   });
 }
@@ -436,23 +369,13 @@ export async function postEscrowRefund(
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
-      {
-        accountId: `escrow:${escrowId}`,
-        accountType: 'ESCROW',
-        entryType: 'DEBIT',
-        amount,
-      },
-      {
-        accountId: `customer:${customerId}`,
-        accountType: 'CUSTOMER_WALLET',
-        entryType: 'CREDIT',
-        amount,
-      },
+      { accountId: `escrow:${escrowId}`, accountType: 'ESCROW', entryType: 'DEBIT', amount },
+      { accountId: `customer:${customerId}`, accountType: 'CUSTOMER_WALLET', entryType: 'CREDIT', amount },
     ],
     referenceType: 'ESCROW_REFUND',
     referenceId: escrowId,
     idempotencyKey,
-    description: `Escrow refund`,
+    description: 'Escrow refund',
     createdBy: 'system',
   });
 }
@@ -465,18 +388,12 @@ export async function getLedgerBalance(
     where: { accountId, accountType },
     select: { entryType: true, amount: true },
   });
-
   let credits = 0n;
   let debits = 0n;
-
   for (const entry of entries) {
-    if (entry.entryType === 'CREDIT') {
-      credits += entry.amount;
-    } else {
-      debits += entry.amount;
-    }
+    if (entry.entryType === 'CREDIT') credits += entry.amount;
+    else debits += entry.amount;
   }
-
   return { credits, debits, balance: credits - debits };
 }
 
@@ -486,10 +403,7 @@ export async function getLedgerEntries(
   options?: { limit?: number; offset?: number; referenceType?: string }
 ) {
   const where: any = { accountId, accountType };
-  if (options?.referenceType) {
-    where.referenceType = options.referenceType;
-  }
-
+  if (options?.referenceType) where.referenceType = options.referenceType;
   return prisma.financialLedger.findMany({
     where,
     orderBy: { createdAt: 'desc' },
