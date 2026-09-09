@@ -22,7 +22,7 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
 
   const profile = await prisma.taskerProfile.findUnique({
     where: { userId },
-    select: { verificationStatus: true, isVerified: true, skills: true },
+    select: { id: true, verificationStatus: true, isVerified: true, skills: true },
   })
   if (!profile) {
     return { eligible: false, reasons: ['Provider profile not found'] }
@@ -30,8 +30,13 @@ export async function checkIndividualProviderEligibility(userId: string): Promis
 
   if (profile.verificationStatus !== 'VERIFIED') reasons.push('Provider verification not approved')
   if (!profile.isVerified) reasons.push('Provider not marked as verified')
-  if (!profile.skills || profile.skills === '[]' || profile.skills === '') {
-    reasons.push('No service capabilities declared')
+
+  const hasLegacySkills = profile.skills && profile.skills !== '[]' && profile.skills !== ''
+  if (!hasLegacySkills) {
+    const relationalSkillCount = await prisma.taskerSkill.count({ where: { taskerId: profile.id } })
+    if (relationalSkillCount === 0) {
+      reasons.push('No service capabilities declared')
+    }
   }
 
   return { eligible: reasons.length === 0, reasons }
@@ -56,7 +61,14 @@ export async function checkCompanyEligibility(companyId: string): Promise<Provid
 
   if (company.verificationStatus !== 'VERIFIED') reasons.push('Company verification not approved')
   if (!company.isVerified) reasons.push('Company not marked as verified')
-  if (!company.services || company.services === '') reasons.push('No service capabilities declared')
+
+  const hasLegacyServices = company.services && company.services !== ''
+  if (!hasLegacyServices) {
+    const relationalSpecialtyCount = await prisma.companySpecialty.count({ where: { companyId } })
+    if (relationalSpecialtyCount === 0) {
+      reasons.push('No service capabilities declared')
+    }
+  }
   if (company.subscriptionStatus === 'CANCELLED') reasons.push('Subscription cancelled')
 
   const user = await prisma.user.findUnique({

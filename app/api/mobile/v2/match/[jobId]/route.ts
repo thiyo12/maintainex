@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
-import { matchTaskerCandidates, resolveJobCategoryKeys } from '@/lib/job-matching'
+import { findCandidates } from '@/lib/matching'
 
 export async function GET(
   _request: NextRequest,
@@ -15,27 +15,36 @@ export async function GET(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the job owner can view matches' }, { status: 403 })
 
-    const { keys } = await resolveJobCategoryKeys(job.categoryId)
-    const candidates = await matchTaskerCandidates({
-      matchKeys: keys,
-      lat: job.latitude,
-      lng: job.longitude,
-      maxResults: 25,
+    const result = await findCandidates(prisma, {
+      jobId: job.id,
+      userId: user.id,
+      jobMode: job.budgetType === 'REQUEST_QUOTES' ? 'QUOTE' : 'BOOK_NOW',
+      urgency: 'NORMAL',
+      categoryId: job.categoryId,
+      serviceTemplateId: job.serviceTemplateId || undefined,
+      latitude: job.latitude,
+      longitude: job.longitude,
+      countryCode: job.countryCode || 'GLOBAL',
     })
 
     return NextResponse.json({
-      providers: candidates.map((c) => ({
-        id: c.profile.userId,
-        taskerProfileId: c.profile.id,
-        name: c.profile.user.name,
-        rating: c.profile.rating,
-        completedJobs: c.profile.completedJobs,
-        profileImage: c.profile.profileImage,
-        bio: c.profile.bio || '',
-        distanceKm: c.distanceKm,
+      providers: result.candidates.map((c) => ({
+        id: c.userId || c.providerId,
+        taskerProfileId: c.providerId,
+        name: '',
+        rating: 0,
+        completedJobs: 0,
+        profileImage: '',
+        bio: '',
+        distanceKm: 0,
         score: Math.round(c.score * 100),
-        isOnline: c.profile.isOnline,
+        isOnline: false,
+        providerType: c.providerType,
+        components: c.components,
+        reasons: c.reasons,
       })),
+      excluded: result.excluded,
+      scoreVersion: result.scoreVersion,
     })
   } catch (error) {
     console.error('Match error:', error)

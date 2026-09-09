@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { postLedgerTransaction } from '@/lib/ledger'
+import { readCanonicalProviderBalance } from '@/lib/financial-read'
+import { bigIntToSafeNumber } from '@/lib/money'
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,26 +57,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Settlement already processed' }, { status: 400 })
     }
 
-    const updated = await prisma.commissionSettlement.update({
-      where: { id: settlementId },
-      data: {
-        status: 'SETTLED',
-        settledAt: new Date(),
-      },
+    const canonicalBalance = await readCanonicalProviderBalance(settlement.providerId)
+    const providerWallet = await prisma.providerWallet.findUnique({ where: { userId: settlement.providerId } })
+    const currentBalance = canonicalBalance ? bigIntToSafeNumber(canonicalBalance.availableBalance) : (providerWallet?.availableBalance || 0)
+    const commissionAmount = bigIntToSafeNumber(settlement.commissionAmount)
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.commissionSettlement.update({
+        where: { id: settlementId },
+        data: {
+          status: 'SETTLED',
+          settledAt: new Date(),
+        },
+      })
+
+      await tx.providerWallet.upsert({
+        where: { userId: settlement.providerId },
+        create: { userId: settlement.providerId, availableBalance: -commissionAmount, pendingBalance: 0 },
+        update: { availableBalance: { decrement: commissionAmount } },
+      })
+
+      await tx.walletTransaction.create({
+        data: {
+          userId: settlement.providerId,
+          walletType: 'PROVIDER',
+          type: 'DEBIT',
+          amount: commissionAmount,
+          balanceBefore: currentBalance,
+          balanceAfter: currentBalance - commissionAmount,
+          reference: `Commission settlement for job ${settlement.jobId}`,
+          referenceType: 'COMMISSION',
+          referenceId: settlement.id,
+        },
+      })
+
+      return result
     })
 
-    await prisma.walletTransaction.create({
-      data: {
-        userId: settlement.providerId,
-        walletType: 'PROVIDER',
-        type: 'DEBIT',
-        amount: Number(settlement.commissionAmount),
-        balanceBefore: 0,
-        balanceAfter: 0,
-        reference: `Commission settlement for job ${settlement.jobId}`,
-        referenceType: 'COMMISSION',
-        referenceId: settlement.id,
-      },
+    await postLedgerTransaction({
+      entries: [
+        { accountId: `provider:${settlement.providerId}`, accountType: 'PROVIDER_WALLET', entryType: 'DEBIT', amount: settlement.commissionAmount },
+        { accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: settlement.commissionAmount },
+      ],
+      referenceType: 'COMMISSION',
+      referenceId: settlement.id,
+      idempotencyKey: `commission-settle:${settlement.id}`,
+      description: `Commission settlement for job ${settlement.jobId}`,
+      createdBy: 'system',
     })
 
     return NextResponse.json({ settlement: { ...updated, jobAmount: Number(updated.jobAmount), commissionAmount: Number(updated.commissionAmount) } })

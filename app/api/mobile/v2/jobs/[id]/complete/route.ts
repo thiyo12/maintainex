@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { transitionJobWorkspace, releaseEscrow, holdEscrowForDispute, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } from '@/lib/notifications'
 
 export async function POST(
@@ -32,10 +33,11 @@ export async function POST(
         return NextResponse.json({ error: 'Job must be in progress' }, { status: 400 })
       }
 
-      await prisma.jobWorkspace.updateMany({
-        where: { jobId: job.id },
-        data: { progressStatus: 'COMPLETION_REQUESTED' },
-      })
+      const isProvider = job.customerId !== user.id
+      await transitionJobWorkspace(
+        { jobId: params.id, actorId: user.id, actorType: isProvider ? 'PROVIDER' : 'CUSTOMER' },
+        'COMPLETION_REQUESTED'
+      )
 
       notifyCompletionRequested(job.id, job.customerId, job.title)
       return NextResponse.json({ success: true, message: 'Completion pending customer approval' })
@@ -46,66 +48,24 @@ export async function POST(
         return NextResponse.json({ error: 'Only the customer can approve' }, { status: 403 })
       }
 
-      const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id, status: 'PROTECTED' } })
-      if (!escrow) return NextResponse.json({ error: 'No active escrow' }, { status: 400 })
-
       const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
       if (!workspace || workspace.progressStatus !== 'COMPLETION_REQUESTED') {
         return NextResponse.json({ error: 'Provider must request completion first' }, { status: 400 })
       }
 
-      const company = await prisma.companyProfile.findUnique({
-        where: { userId: escrow.providerId },
-        select: { commissionRate: true },
-      })
-      const escrowAmount = Number(escrow.amount)
-      const commissionRate = company?.commissionRate ?? 0
-      const commission = commissionRate > 0 ? Math.round(escrowAmount * (commissionRate / 100) * 100) / 100 : 0
-      const netAmount = escrowAmount - commission
+      const result = await releaseEscrow(
+        { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
+        job.id
+      )
 
-      const providerWallet = await prisma.providerWallet.findUnique({
-        where: { userId: escrow.providerId },
-      })
-      const currentBalance = providerWallet?.availableBalance || 0
+      await transitionJobWorkspace(
+        { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
+        'COMPLETED'
+      )
 
-      await prisma.$transaction([
-        prisma.jobEscrow.update({
-          where: { id: escrow.id },
-          data: { status: 'RELEASED', releasedAt: new Date() },
-        }),
-        prisma.providerWallet.upsert({
-          where: { userId: escrow.providerId },
-          create: { userId: escrow.providerId, availableBalance: netAmount },
-          update: { availableBalance: { increment: netAmount } },
-        }),
-        prisma.walletTransaction.create({
-          data: {
-            userId: escrow.providerId,
-            walletType: 'PROVIDER',
-            type: 'CREDIT',
-            amount: netAmount,
-            balanceBefore: currentBalance,
-            balanceAfter: currentBalance + netAmount,
-            reference: commission > 0
-              ? `Payment for job ${job.title} (${commissionRate}% commission: LKR ${commission})`
-              : `Payment for job ${job.title}`,
-            referenceType: 'ESCROW_RELEASE',
-            referenceId: escrow.id,
-          },
-        }),
-        prisma.marketplaceJob.update({
-          where: { id: job.id },
-          data: { status: 'COMPLETED' },
-        }),
-        prisma.jobWorkspace.update({
-          where: { jobId: job.id },
-          data: { progressStatus: 'COMPLETED' },
-        }),
-      ])
-
-      notifyPaymentReleased(job.id, escrow.providerId, job.title, netAmount)
+      notifyPaymentReleased(job.id, job.customerId, job.title, result.netAmount)
       notifyJobCompleted(job.id, job.customerId, job.title)
-      return NextResponse.json({ success: true, message: 'Job completed, funds released', commission, netAmount })
+      return NextResponse.json({ success: true, message: 'Job completed, funds released', commission: result.commission, netAmount: result.netAmount })
     }
 
     if (action === 'DISPUTE') {
@@ -122,27 +82,26 @@ export async function POST(
 
       const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
       if (escrow && escrow.status === 'PROTECTED') {
-        await prisma.jobEscrow.update({
-          where: { id: escrow.id },
-          data: { status: 'ON_HOLD' },
-        })
+        await holdEscrowForDispute(
+          { jobId: job.id, actorId: user.id, actorType: isCustomer ? 'CUSTOMER' : 'PROVIDER' },
+          job.id
+        )
       }
 
-      await prisma.marketplaceJob.update({
-        where: { id: job.id },
-        data: { status: 'CANCELLED' },
-      })
-      await prisma.jobWorkspace.updateMany({
-        where: { jobId: job.id },
-        data: { progressStatus: 'DISPUTED' },
-      })
+      await transitionJobWorkspace(
+        { jobId: job.id, actorId: user.id, actorType: isCustomer ? 'CUSTOMER' : 'PROVIDER' },
+        'DISPUTED'
+      )
 
       return NextResponse.json({ success: true, message: 'Dispute raised' })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Complete job error:', error)
+    if (error.message?.includes('Cannot transition') || error.message?.includes('cannot transition')) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

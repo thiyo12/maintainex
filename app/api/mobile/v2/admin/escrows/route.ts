@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { postLedgerTransaction } from '@/lib/ledger'
+import { readCanonicalProviderBalance } from '@/lib/financial-read'
+import { bigIntToSafeNumber } from '@/lib/money'
+import { refundEscrow } from '@/lib/domain/job-lifecycle'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +29,7 @@ export async function GET(request: NextRequest) {
       prisma.jobEscrow.count({ where }),
     ])
 
-    return NextResponse.json({ escrows: escrows.map((e) => ({ ...e, amount: Number(e.amount), serviceFee: Number(e.serviceFee), totalAmount: Number(e.totalAmount) })), total, page, limit })
+    return NextResponse.json({ escrows: escrows.map((e) => ({ ...e, amount: bigIntToSafeNumber(e.amount), serviceFee: bigIntToSafeNumber(e.serviceFee), totalAmount: bigIntToSafeNumber(e.totalAmount) })), total, page, limit })
   } catch (error) {
     console.error('Admin escrows error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -55,35 +59,49 @@ export async function PATCH(request: NextRequest) {
       const providerWallet = await prisma.providerWallet.findUnique({
         where: { userId: escrow.providerId },
       })
+      const canonicalProviderBalance = await readCanonicalProviderBalance(escrow.providerId)
+      const currentProviderBalance = canonicalProviderBalance ? bigIntToSafeNumber(canonicalProviderBalance.availableBalance) : (providerWallet?.availableBalance || 0)
 
-      await prisma.$transaction([
-        prisma.jobEscrow.update({
+      await prisma.$transaction(async (tx) => {
+        await tx.jobEscrow.update({
           where: { id: escrow.id },
           data: { status: 'RELEASED', releasedAt: new Date() },
-        }),
-        prisma.providerWallet.upsert({
+        })
+        await tx.providerWallet.upsert({
           where: { userId: escrow.providerId },
-          create: { userId: escrow.providerId, availableBalance: Number(escrow.amount) },
-          update: { availableBalance: { increment: Number(escrow.amount) } },
-        }),
-        prisma.walletTransaction.create({
+          create: { userId: escrow.providerId, availableBalance: bigIntToSafeNumber(escrow.amount) },
+          update: { availableBalance: { increment: bigIntToSafeNumber(escrow.amount) } },
+        })
+        await tx.walletTransaction.create({
           data: {
             userId: escrow.providerId,
             walletType: 'PROVIDER',
             type: 'CREDIT',
-            amount: Number(escrow.amount),
-            balanceBefore: providerWallet?.availableBalance || 0,
-            balanceAfter: (providerWallet?.availableBalance || 0) + Number(escrow.amount),
+            amount: bigIntToSafeNumber(escrow.amount),
+            balanceBefore: currentProviderBalance,
+            balanceAfter: currentProviderBalance + bigIntToSafeNumber(escrow.amount),
             reference: 'Admin force-release escrow',
             referenceType: 'ESCROW_RELEASE',
             referenceId: escrow.id,
           },
-        }),
-        prisma.marketplaceJob.update({
+        })
+        await tx.marketplaceJob.update({
           where: { id: escrow.jobId },
           data: { status: 'COMPLETED' },
-        }),
-      ])
+        })
+
+        await postLedgerTransaction({
+          entries: [
+            { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.amount },
+            { accountId: `provider:${escrow.providerId}`, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: escrow.amount },
+          ],
+          referenceType: 'ESCROW_RELEASE',
+          referenceId: escrow.id,
+          idempotencyKey: `admin-escrow-release:${escrow.id}`,
+          description: 'Admin force-release escrow',
+          createdBy: user.id,
+        }, tx)
+      })
 
       return NextResponse.json({ success: true, message: 'Escrow released by admin' })
     }
@@ -93,45 +111,17 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Escrow must be ON_HOLD to refund' }, { status: 400 })
       }
 
-      const customerWallet = await prisma.customerWallet.findUnique({
-        where: { userId: escrow.customerId },
-      })
-      const balanceBefore = customerWallet?.balance || 0
+      const result = await refundEscrow(
+        { jobId: escrow.jobId, actorId: user.id, actorType: 'STAFF' },
+        escrow.jobId
+      )
 
-      await prisma.$transaction([
-        prisma.jobEscrow.update({
-          where: { id: escrow.id },
-          data: { status: 'REFUNDED', refundedAt: new Date() },
-        }),
-        prisma.customerWallet.update({
-          where: { userId: escrow.customerId },
-          data: { balance: balanceBefore + Number(escrow.totalAmount) },
-        }),
-        prisma.walletTransaction.create({
-          data: {
-            userId: escrow.customerId,
-            walletType: 'CUSTOMER',
-            type: 'CREDIT',
-            amount: Number(escrow.totalAmount),
-            balanceBefore,
-            balanceAfter: balanceBefore + Number(escrow.totalAmount),
-            reference: 'Admin force-refund escrow',
-            referenceType: 'ESCROW_REFUND',
-            referenceId: escrow.id,
-          },
-        }),
-        prisma.marketplaceJob.update({
-          where: { id: escrow.jobId },
-          data: { status: 'CANCELLED' },
-        }),
-      ])
-
-      return NextResponse.json({ success: true, message: 'Escrow refunded by admin' })
+      return NextResponse.json({ success: true, message: 'Escrow refunded by admin', refundAmount: result.refundAmount })
     }
 
     return NextResponse.json({ error: 'Action must be RELEASE or REFUND' }, { status: 400 })
   } catch (error) {
     console.error('Admin escrow action error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 })
   }
 }

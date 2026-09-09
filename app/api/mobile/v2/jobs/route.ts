@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { blastJobToTaskers } from '@/lib/job-blast'
-import { getPriceEstimate } from '@/lib/pricing-engine'
+import { calculatePrice } from '@/lib/pricing/engine'
 import { getSetting } from '@/lib/settings'
 import { notifyTaskerAssigned } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
@@ -58,19 +58,28 @@ export async function POST(request: NextRequest) {
     const finalMaterialHandling = validMaterialHandling.includes(materialHandling) ? materialHandling : 'tasker_brings'
 
     try {
-      const estimate = await getPriceEstimate({
+      const estimate = await calculatePrice(prisma, {
+        jobId: `pending-${Date.now()}-${user.id}`,
         categoryId,
-        categoryName: title,
-        description,
-        title,
-        areaId: areaId || undefined,
-        countryCode: 'LK',
-        urgency: urgency || 'normal',
-        estimatedDuration: estimatedDuration ? Number(estimatedDuration) : undefined,
-        workersCount: workersCount ? Number(workersCount) : undefined,
-        materialHandling: finalMaterialHandling,
+        serviceTemplateId: serviceTemplateId || undefined,
+        mode: budgetType === 'REQUEST_QUOTES' ? 'QUOTE' : 'BOOK_NOW',
+        urgency: (urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
+        quantity: workersCount ? Number(workersCount) : undefined,
+        durationMinutes: estimatedDuration ? Math.round(Number(estimatedDuration) * 60) : undefined,
+        countryCode: 'GLOBAL',
       })
-      aiEstimateJson = JSON.stringify(estimate)
+      aiEstimateJson = JSON.stringify({
+        baseAmount: Number(estimate.baseAmount),
+        urgencyAmount: Number(estimate.urgencyAmount),
+        serviceModifiers: Number(estimate.serviceModifiers),
+        providerGross: Number(estimate.providerGross),
+        platformFeeBps: estimate.platformFeeBps,
+        platformFeeAmount: Number(estimate.platformFeeAmount),
+        customerTotal: Number(estimate.customerTotal),
+        currency: estimate.currency,
+        pricingVersion: estimate.pricingVersion,
+        ruleIds: estimate.ruleIds,
+      })
     } catch (e) {
       console.error('AI estimate generation failed:', e)
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { releaseEscrow } from '@/lib/domain/job-lifecycle'
 
 export async function POST(
   request: NextRequest,
@@ -24,67 +25,19 @@ export async function POST(
     if (!escrow) return NextResponse.json({ error: 'No cash escrow found for this job' }, { status: 404 })
     if (escrow.status !== 'PROTECTED') return NextResponse.json({ error: 'Escrow is not in protected status' }, { status: 400 })
 
-    const providerWallet = await prisma.providerWallet.findUnique({
-      where: { userId: escrow.providerId },
-    })
-    const currentBalance = providerWallet?.availableBalance || 0
-
-    const escrowAmount = Number(escrow.amount)
-    const commissionRate = Number(escrow.serviceFee)
-    const commission = commissionRate > 0 ? Math.round(escrowAmount * (commissionRate / 100) * 100) / 100 : 0
-    const netAmount = escrowAmount - commission
-
-    const updated = await prisma.$transaction([
-      prisma.jobEscrow.update({
-        where: { id: escrow.id },
-        data: { status: 'RELEASED', releasedAt: new Date(), cashConfirmedAt: new Date() },
-      }),
-      prisma.providerWallet.upsert({
-        where: { userId: escrow.providerId },
-        create: { userId: escrow.providerId, availableBalance: netAmount },
-        update: { availableBalance: { increment: netAmount } },
-      }),
-      prisma.walletTransaction.create({
-        data: {
-          userId: escrow.providerId,
-          walletType: 'PROVIDER',
-          type: 'CREDIT',
-          amount: netAmount,
-          balanceBefore: currentBalance,
-          balanceAfter: currentBalance + netAmount,
-          reference: commission > 0
-            ? `Cash payment for job ${job.id} (${commissionRate}% commission: LKR ${commission})`
-            : `Cash payment for job ${job.id}`,
-          referenceType: 'ESCROW_RELEASE',
-          referenceId: escrow.id,
-        },
-      }),
-      prisma.marketplaceJob.update({
-        where: { id: job.id },
-        data: { status: 'COMPLETED' },
-      }),
-      prisma.commissionSettlement.create({
-        data: {
-          jobId: job.id,
-          escrowId: escrow.id,
-          providerId: escrow.providerId,
-          customerId: escrow.customerId,
-          jobAmount: escrow.amount,
-          commissionRate,
-          commissionAmount: BigInt(Math.round(commission)),
-          status: 'PENDING',
-        },
-      }),
-    ])
+    const result = await releaseEscrow(
+      { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
+      params.id,
+      { cashConfirmed: true }
+    )
 
     return NextResponse.json({
       success: true,
-      commission,
-      netAmount,
-      settlementId: updated[4].id,
+      commission: result.commission,
+      netAmount: result.netAmount,
     })
   } catch (error) {
     console.error('Cash payment error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 })
   }
 }

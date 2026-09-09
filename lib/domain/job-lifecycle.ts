@@ -292,7 +292,8 @@ export async function fundEscrow(
 
 export async function releaseEscrow(
   ctx: TransitionContext,
-  jobId: string
+  jobId: string,
+  options?: { cashConfirmed?: boolean }
 ) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
@@ -315,7 +316,11 @@ export async function releaseEscrow(
   await prisma.$transaction(async (tx) => {
     await tx.jobEscrow.update({
       where: { id: escrow.id },
-      data: { status: 'RELEASED', releasedAt: new Date() },
+      data: {
+        status: 'RELEASED',
+        releasedAt: new Date(),
+        ...(options?.cashConfirmed ? { cashConfirmedAt: new Date() } : {}),
+      },
     })
     await tx.providerWallet.upsert({
       where: { userId: escrow.providerId },
@@ -341,6 +346,20 @@ export async function releaseEscrow(
       where: { id: jobId },
       data: { status: 'COMPLETED' },
     })
+    if (commission > 0) {
+      await tx.commissionSettlement.create({
+        data: {
+          jobId,
+          escrowId: escrow.id,
+          providerId: escrow.providerId,
+          customerId: escrow.customerId,
+          jobAmount: escrow.amount,
+          commissionRate,
+          commissionAmount: BigInt(Math.round(commission * 100)),
+          status: 'PENDING',
+        },
+      })
+    }
 
     await postLedgerTransaction({
       entries: [
@@ -368,7 +387,7 @@ export async function refundEscrow(
   if (job.customerId !== ctx.actorId) throw new Error('Only the customer can refund escrow')
 
   const escrow = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT'] } },
+    where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD'] } },
   })
   if (!escrow) throw new Error('No refundable escrow found')
 
@@ -403,6 +422,10 @@ export async function refundEscrow(
       where: { id: jobId },
       data: { status: 'CANCELLED' },
     })
+    await tx.jobQuote.update({
+      where: { id: escrow.quoteId },
+      data: { status: 'WITHDRAWN' },
+    })
 
     await postLedgerTransaction({
       entries: [
@@ -418,4 +441,24 @@ export async function refundEscrow(
   })
 
   return { refundAmount }
+}
+
+export async function holdEscrowForDispute(
+  ctx: TransitionContext,
+  jobId: string
+) {
+  const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
+  if (!job) throw new Error('Job not found')
+
+  const escrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+  })
+  if (!escrow) throw new Error('No protected escrow found to hold')
+
+  await prisma.jobEscrow.update({
+    where: { id: escrow.id },
+    data: { status: 'ON_HOLD' },
+  })
+
+  return { escrowId: escrow.id }
 }

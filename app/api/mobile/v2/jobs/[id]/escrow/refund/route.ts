@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { refundEscrow } from '@/lib/domain/job-lifecycle'
 
 export async function POST(
   _request: NextRequest,
@@ -16,50 +17,14 @@ export async function POST(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the customer can refund escrow' }, { status: 403 })
 
-    const escrow = await prisma.jobEscrow.findFirst({
-      where: { jobId: job.id, status: 'PROTECTED' },
-    })
-    if (!escrow) return NextResponse.json({ error: 'No protected escrow found' }, { status: 404 })
+    const result = await refundEscrow(
+      { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
+      params.id
+    )
 
-    const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
-    const balanceBefore = wallet?.balance || 0
-    const newBalance = balanceBefore + Number(escrow.totalAmount)
-
-    await prisma.$transaction([
-      prisma.jobEscrow.update({
-        where: { id: escrow.id },
-        data: { status: 'REFUNDED', refundedAt: new Date() },
-      }),
-      prisma.customerWallet.update({
-        where: { userId: user.id },
-        data: { balance: newBalance },
-      }),
-      prisma.walletTransaction.create({
-        data: {
-          userId: user.id,
-          walletType: 'CUSTOMER',
-          type: 'CREDIT',
-          amount: Number(escrow.totalAmount),
-          balanceBefore,
-          balanceAfter: newBalance,
-          reference: `Escrow refund for job ${job.title}`,
-          referenceType: 'ESCROW_REFUND',
-          referenceId: escrow.id,
-        },
-      }),
-      prisma.marketplaceJob.update({
-        where: { id: job.id },
-        data: { status: 'CANCELLED' },
-      }),
-      prisma.jobQuote.update({
-        where: { id: escrow.quoteId },
-        data: { status: 'WITHDRAWN' },
-      }),
-    ])
-
-    return NextResponse.json({ success: true, message: 'Escrow refunded' })
+    return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })
   } catch (error) {
     console.error('Refund escrow error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 })
   }
 }
