@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { bigIntToSafeNumber } from '@/lib/money'
+import { resolvePricingConfig } from '@/lib/pricing/rules'
+import { getCommissionRate } from '@/lib/mxid'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
@@ -56,11 +58,12 @@ export async function transitionMarketplaceJob(ctx: TransitionContext, targetSta
   if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
     throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
   }
-  const result = await prisma.marketplaceJob.updateMany({
+
+  const changed = await prisma.marketplaceJob.updateMany({
     where: { id: ctx.jobId, status: job.status },
     data: { status: targetStatus },
   })
-  if (result.count !== 1) throw new Error('Job state changed concurrently')
+  if (changed.count !== 1) throw new Error('Job state changed concurrently')
   return prisma.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
 }
 
@@ -70,11 +73,13 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
   if (!canActorPerformWorkspaceTransition(ctx.actorType, targetStatus)) {
     throw new Error(`Actor type ${ctx.actorType} cannot transition to ${targetStatus}`)
   }
+
   const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })
   if (!workspace) throw new Error('Workspace not found')
   if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, targetStatus)) {
     throw new Error(`Cannot transition workspace from ${workspace.progressStatus} to ${targetStatus}`)
   }
+
   const changed = await prisma.jobWorkspace.updateMany({
     where: { jobId: ctx.jobId, progressStatus: workspace.progressStatus },
     data: { progressStatus: targetStatus },
@@ -92,6 +97,7 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
       data: { status: 'CANCELLED' },
     })
   }
+
   return prisma.jobWorkspace.findUniqueOrThrow({ where: { jobId: ctx.jobId } })
 }
 
@@ -104,8 +110,10 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   const quote = await prisma.jobQuote.findUnique({ where: { id: quoteId } })
   if (!quote || quote.jobId !== ctx.jobId) throw new Error('Quote not found for this job')
   if (quote.status !== 'PENDING') throw new Error('Quote is not in PENDING status')
+  if (quote.price <= 0n) throw new Error('Quote price must be positive')
 
-  const serviceFee = (quote.price * 1000n) / 10000n
+  const pricingConfig = await resolvePricingConfig(prisma, job.countryCode || 'GLOBAL')
+  const serviceFee = (quote.price * BigInt(pricingConfig.commissionRateBps)) / 10000n
   const totalAmount = quote.price + serviceFee
   const existingEscrow = await prisma.jobEscrow.findFirst({
     where: { jobId: ctx.jobId, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
@@ -128,6 +136,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
       where: { jobId: ctx.jobId, id: { not: quoteId }, status: 'PENDING' },
       data: { status: 'REJECTED' },
     })
+
     await tx.jobWorkspace.upsert({
       where: { jobId: ctx.jobId },
       create: { jobId: ctx.jobId, progressStatus: 'ACCEPTED' },
@@ -143,8 +152,12 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
           amount: quote.price,
           serviceFee,
           totalAmount,
+          paymentMethod: 'CARD',
           status: 'PENDING_PAYMENT',
           heldAt: null,
+          releasedAt: null,
+          refundedAt: null,
+          cashConfirmedAt: null,
         },
       })
     } else {
@@ -157,11 +170,13 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
           amount: quote.price,
           serviceFee,
           totalAmount,
+          paymentMethod: 'CARD',
           status: 'PENDING_PAYMENT',
         },
       })
     }
   })
+
   return { job, quote }
 }
 
@@ -177,6 +192,7 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId } })
   if (!escrow) throw new Error('Escrow not initialized')
   if (!['PENDING_PAYMENT', 'CANCELLED'].includes(escrow.status)) throw new Error('Escrow already active')
+  if (escrow.paymentMethod === 'CASH') throw new Error('Cash escrow cannot be wallet-funded')
 
   const customerWallet = await prisma.customerWallet.findUnique({
     where: { userId: ctx.actorId },
@@ -184,11 +200,18 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   })
   if (!customerWallet) throw new Error('Customer wallet not found')
 
-  const serviceFee = escrow.serviceFee || (quote.price * 1000n) / 10000n
-  const totalAmount = escrow.totalAmount || (quote.price + serviceFee)
+  const serviceFee = escrow.serviceFee ?? 0n
+  const totalAmount = escrow.totalAmount ?? (quote.price + serviceFee)
+  if (totalAmount <= 0n) throw new Error('Escrow total must be positive')
   const totalMajor = bigIntToSafeNumber(totalAmount) / 100
 
   await prisma.$transaction(async (tx) => {
+    const claimed = await tx.jobEscrow.updateMany({
+      where: { id: escrow.id, status: { in: ['PENDING_PAYMENT', 'CANCELLED'] }, paymentMethod: { not: 'CASH' } },
+      data: { status: 'PROTECTED', heldAt: new Date(), amount: quote.price, serviceFee, totalAmount },
+    })
+    if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
+
     await postLedgerTransaction({
       entries: [
         { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount: totalAmount },
@@ -201,40 +224,52 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       createdBy: ctx.actorId,
     }, tx)
 
-    await tx.customerWallet.update({
+    const legacyWallet = await tx.customerWallet.update({
       where: { userId: ctx.actorId },
       data: { balance: { decrement: totalMajor } },
+      select: { balance: true },
     })
 
-    const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: ['PENDING_PAYMENT', 'CANCELLED'] } },
-      data: { status: 'PROTECTED', heldAt: new Date(), amount: quote.price, serviceFee, totalAmount },
+    await tx.walletTransaction.create({
+      data: {
+        userId: ctx.actorId,
+        walletType: 'CUSTOMER',
+        type: 'DEBIT',
+        amount: totalMajor,
+        balanceBefore: legacyWallet.balance + totalMajor,
+        balanceAfter: legacyWallet.balance,
+        reference: `Escrow deposit for job ${jobId}`,
+        referenceType: 'ESCROW_DEPOSIT',
+        referenceId: escrow.id,
+      },
     })
-    if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
 
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
       data: { status: 'IN_PROGRESS' },
     })
-
-    const legacyWallet = await tx.customerWallet.findUnique({ where: { userId: ctx.actorId }, select: { balance: true } })
-    if (legacyWallet) {
-      await tx.walletTransaction.create({
-        data: {
-          userId: ctx.actorId,
-          walletType: 'CUSTOMER',
-          type: 'DEBIT',
-          amount: totalMajor,
-          balanceBefore: legacyWallet.balance + totalMajor,
-          balanceAfter: legacyWallet.balance,
-          reference: `Escrow deposit for job ${jobId}`,
-          referenceType: 'ESCROW_DEPOSIT',
-          referenceId: escrow.id,
-        },
-      })
-    }
   })
+
   return { success: true, totalAmount, escrowId: escrow.id }
+}
+
+async function resolvePayoutIdentity(providerId: string, providerType: string) {
+  if (providerType === 'COMPANY') {
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: providerId },
+      select: { id: true, userId: true, commissionRate: true },
+    })
+    if (!company) throw new Error('Company provider not found')
+    return {
+      providerEntityId: company.id,
+      payoutUserId: company.userId,
+      commissionRate: company.commissionRate,
+    }
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: providerId }, select: { id: true } })
+  if (!user) throw new Error('Provider user not found')
+  return { providerEntityId: providerId, payoutUserId: providerId, commissionRate: null as number | null }
 }
 
 export async function releaseEscrow(
@@ -244,13 +279,34 @@ export async function releaseEscrow(
 ) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== ctx.actorId) throw new Error('Only the customer can release escrow')
 
-  const escrow = await prisma.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
-  if (!escrow) throw new Error('No protected escrow found')
+  const isStaff = ctx.actorType === 'STAFF'
+  if (!isStaff && job.customerId !== ctx.actorId) throw new Error('Only the customer or staff can release escrow')
 
-  const { getProviderCommissionRate } = await import('@/lib/mxid')
-  const rate = Math.max(0, Math.min(100, await getProviderCommissionRate(escrow.providerId)))
+  const allowedStatuses = isStaff ? ['PROTECTED', 'ON_HOLD'] : ['PROTECTED']
+  const escrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: { in: allowedStatuses } },
+  })
+  if (!escrow) throw new Error('No releasable escrow found')
+
+  // Cash does not create a funded escrow ledger balance. Until a dedicated
+  // cash settlement/commission-receivable flow exists, fail closed rather than
+  // manufacture wallet money from an unfunded escrow account.
+  if (escrow.paymentMethod === 'CASH' || options?.cashConfirmed) {
+    throw new Error('CASH_PAYMENT_DISABLED')
+  }
+
+  const quote = await prisma.jobQuote.findUnique({
+    where: { id: escrow.quoteId },
+    select: { providerId: true, providerType: true },
+  })
+  if (!quote) throw new Error('Accepted quote not found')
+  if (quote.providerId !== escrow.providerId) throw new Error('Escrow provider identity mismatch')
+
+  const identity = await resolvePayoutIdentity(quote.providerId, quote.providerType)
+  const defaultRate = await getCommissionRate()
+  const rawRate = identity.commissionRate ?? defaultRate
+  const rate = Math.max(0, Math.min(100, rawRate))
   const rateBps = BigInt(Math.round(rate * 100))
   const commissionCents = (escrow.amount * rateBps) / 10000n
   const netCents = escrow.amount - commissionCents
@@ -260,23 +316,24 @@ export async function releaseEscrow(
 
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: 'PROTECTED' },
-      data: {
-        status: 'RELEASED',
-        releasedAt: new Date(),
-        ...(options?.cashConfirmed ? { cashConfirmedAt: new Date() } : {}),
-      },
+      where: { id: escrow.id, status: { in: allowedStatuses }, paymentMethod: { not: 'CASH' } },
+      data: { status: 'RELEASED', releasedAt: new Date() },
     })
     if (claimed.count !== 1) throw new Error('Escrow already released or state changed')
 
     const providerWalletSeed = await tx.providerWallet.upsert({
-      where: { userId: escrow.providerId },
-      create: { userId: escrow.providerId, availableBalance: 0 },
+      where: { userId: identity.payoutUserId },
+      create: { userId: identity.payoutUserId, availableBalance: 0 },
       update: {},
       select: { id: true },
     })
 
-    const ledgerEntries: Array<{ accountId: string; accountType: string; entryType: 'CREDIT' | 'DEBIT'; amount: bigint }> = [
+    const ledgerEntries: Array<{
+      accountId: string
+      accountType: string
+      entryType: 'CREDIT' | 'DEBIT'
+      amount: bigint
+    }> = [
       { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.totalAmount },
       { accountId: providerWalletSeed.id, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: netCents },
     ]
@@ -291,17 +348,24 @@ export async function releaseEscrow(
       idempotencyKey: `escrow-release:${escrow.id}`,
       description: `Escrow release for job ${jobId}`,
       createdBy: ctx.actorId,
-      metadata: JSON.stringify({ serviceFeeCents: escrow.serviceFee.toString(), commissionCents: commissionCents.toString() }),
+      metadata: JSON.stringify({
+        providerEntityId: identity.providerEntityId,
+        payoutUserId: identity.payoutUserId,
+        providerType: quote.providerType,
+        serviceFeeCents: escrow.serviceFee.toString(),
+        commissionCents: commissionCents.toString(),
+      }),
     }, tx)
 
     const providerWallet = await tx.providerWallet.update({
-      where: { userId: escrow.providerId },
+      where: { userId: identity.payoutUserId },
       data: { availableBalance: { increment: netMajor } },
       select: { availableBalance: true },
     })
+
     await tx.walletTransaction.create({
       data: {
-        userId: escrow.providerId,
+        userId: identity.payoutUserId,
         walletType: 'PROVIDER',
         type: 'CREDIT',
         amount: netMajor,
@@ -315,17 +379,28 @@ export async function releaseEscrow(
       },
     })
 
-    await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'IN_PROGRESS' },
-      data: { status: 'COMPLETED' },
-    })
+    if (isStaff) {
+      await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: { not: 'COMPLETED' } },
+        data: { status: 'COMPLETED' },
+      })
+      await tx.jobWorkspace.updateMany({
+        where: { jobId, progressStatus: { not: 'COMPLETED' } },
+        data: { progressStatus: 'COMPLETED' },
+      })
+    } else {
+      await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: 'IN_PROGRESS' },
+        data: { status: 'COMPLETED' },
+      })
+    }
 
     if (commissionCents > 0n) {
       await tx.commissionSettlement.create({
         data: {
           jobId,
           escrowId: escrow.id,
-          providerId: escrow.providerId,
+          providerId: identity.payoutUserId,
           customerId: escrow.customerId,
           jobAmount: escrow.amount,
           commissionRate: rate,
@@ -336,13 +411,23 @@ export async function releaseEscrow(
     }
   })
 
-  return { commission: commissionMajor, netAmount: netMajor, commissionCents, netCents, providerId: escrow.providerId }
+  return {
+    commission: commissionMajor,
+    netAmount: netMajor,
+    commissionCents,
+    netCents,
+    providerId: identity.payoutUserId,
+    providerEntityId: identity.providerEntityId,
+    providerType: quote.providerType,
+  }
 }
 
 export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') throw new Error('Only the customer or staff can refund escrow')
+  if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') {
+    throw new Error('Only the customer or staff can refund escrow')
+  }
 
   const escrow = await prisma.jobEscrow.findFirst({
     where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD'] } },
@@ -368,6 +453,8 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     return { refundAmount: 0, refundCents: 0n }
   }
 
+  if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+
   const customerWallet = await prisma.customerWallet.findUnique({
     where: { userId: job.customerId },
     select: { id: true },
@@ -379,7 +466,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
 
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: ['PROTECTED', 'ON_HOLD'] } },
+      where: { id: escrow.id, status: { in: ['PROTECTED', 'ON_HOLD'] }, paymentMethod: { not: 'CASH' } },
       data: { status: 'REFUNDED', refundedAt: new Date() },
     })
     if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
@@ -401,6 +488,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
       data: { balance: { increment: refundMajor } },
       select: { balance: true },
     })
+
     await tx.walletTransaction.create({
       data: {
         userId: job.customerId,
@@ -414,6 +502,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
         referenceId: escrow.id,
       },
     })
+
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { not: 'COMPLETED' } },
       data: { status: 'CANCELLED' },
@@ -442,6 +531,7 @@ export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string
 
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
   if (!escrow) throw new Error('No protected escrow found to hold')
+  if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
 
   const claimed = await prisma.jobEscrow.updateMany({
     where: { id: escrow.id, status: 'PROTECTED' },
