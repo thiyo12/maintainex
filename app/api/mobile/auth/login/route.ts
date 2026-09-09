@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
-import { createToken } from '@/lib/mobile-auth'
+import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(request: NextRequest) {
@@ -31,23 +31,17 @@ export async function POST(request: NextRequest) {
       const match = candidates.find((c) => c.phone && c.phone.replace(/\D/g, '') === digits)
       user = match ? await prisma.user.findFirst({ where: { phone: match.phone } }) : null
     }
-    if (!user) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
-    }
 
-    if (!user.isActive) {
-      return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+    if (!user.isActive) return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
 
-    if (user.isSuspended) {
-      if (!user.suspendedUntil || new Date(user.suspendedUntil) > new Date()) {
-        return NextResponse.json({
-          error: 'Account suspended',
-          code: 'SUSPENDED',
-          reason: user.suspensionReason || 'Your account has been suspended. Please contact support.',
-          suspendedUntil: user.suspendedUntil?.toISOString() || null,
-        }, { status: 403 })
-      }
+    if (user.isSuspended && (!user.suspendedUntil || new Date(user.suspendedUntil) > new Date())) {
+      return NextResponse.json({
+        error: 'Account suspended',
+        code: 'SUSPENDED',
+        reason: user.suspensionReason || 'Your account has been suspended. Please contact support.',
+        suspendedUntil: user.suspendedUntil?.toISOString() || null,
+      }, { status: 403 })
     }
 
     if (user.isBanned) {
@@ -59,11 +53,10 @@ export async function POST(request: NextRequest) {
     }
 
     const failIp = request.headers.get('x-forwarded-for')?.split(',')[0] || ip
-
     const failedRecord = await prisma.failedLogin.findUnique({
       where: { email_ipAddress: { email: identifier, ipAddress: failIp } }
     })
-    if (failedRecord && failedRecord.blocked && failedRecord.blockUntil && failedRecord.blockUntil > new Date()) {
+    if (failedRecord?.blocked && failedRecord.blockUntil && failedRecord.blockUntil > new Date()) {
       const remainingMin = Math.ceil((failedRecord.blockUntil.getTime() - Date.now()) / 60000)
       return NextResponse.json({ error: `Account temporarily locked. Try again in ${remainingMin} minutes.` }, { status: 423 })
     }
@@ -72,8 +65,7 @@ export async function POST(request: NextRequest) {
       where: { email: identifier, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
       _sum: { attemptCount: true },
     })
-    const totalAttempts = totalFailuresForEmail._sum.attemptCount || 0
-    if (totalAttempts >= 15) {
+    if ((totalFailuresForEmail._sum.attemptCount || 0) >= 15) {
       return NextResponse.json({ error: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.' }, { status: 423 })
     }
 
@@ -92,7 +84,7 @@ export async function POST(request: NextRequest) {
             userAgent: request.headers.get('user-agent') || 'unknown',
             attemptCount: 1,
             blocked: false,
-          }
+          },
         })
 
         const updatedRecord = await prisma.failedLogin.findUnique({
@@ -101,35 +93,9 @@ export async function POST(request: NextRequest) {
         if (updatedRecord && updatedRecord.attemptCount >= 5) {
           await prisma.failedLogin.update({
             where: { email_ipAddress: { email: identifier, ipAddress: failIp } },
-            data: { blocked: true, blockUntil: new Date(Date.now() + 15 * 60 * 1000) }
+            data: { blocked: true, blockUntil: new Date(Date.now() + 15 * 60 * 1000) },
           })
         }
-
-        const newTotal = await prisma.failedLogin.aggregate({
-          where: { email: identifier, createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
-          _sum: { attemptCount: true },
-        })
-        if ((newTotal._sum.attemptCount || 0) >= 10) {
-          await prisma.failedLogin.updateMany({
-            where: { email: identifier },
-            data: { blocked: true, blockUntil: new Date(Date.now() + 15 * 60 * 1000) }
-          })
-        }
-
-        try {
-          await prisma.rateLimitLog.create({
-            data: {
-              identifier: failIp,
-              type: 'login-failed',
-              endpoint: '/api/mobile/auth/login',
-              method: 'POST',
-              requestCount: 1,
-              windowStart: new Date(),
-              windowEnd: new Date(Date.now() + 60 * 60 * 1000),
-              limited: false,
-            }
-          })
-        } catch {}
 
         const diffEmailCount = await prisma.failedLogin.groupBy({
           by: ['email'],
@@ -150,20 +116,20 @@ export async function POST(request: NextRequest) {
           } catch {}
         }
 
-        const { assessLoginRisk } = await import('@/lib/security/risk-score')
-        const risk = await assessLoginRisk(null, identifier, failIp, request.headers.get('user-agent') || 'unknown')
-        if (risk.level === 'CRITICAL') {
-          const { blockIP } = await import('@/lib/security/rate-limiter')
-          await blockIP(failIp, 'CRITICAL risk - mobile login brute force', 60)
-        }
-      } catch (e) {}
+        try {
+          const { assessLoginRisk } = await import('@/lib/security/risk-score')
+          const risk = await assessLoginRisk(null, identifier, failIp, request.headers.get('user-agent') || 'unknown')
+          if (risk.level === 'CRITICAL') {
+            const { blockIP } = await import('@/lib/security/rate-limiter')
+            await blockIP(failIp, 'CRITICAL risk - mobile login brute force', 60)
+          }
+        } catch {}
+      } catch {}
 
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    try {
-      await prisma.failedLogin.deleteMany({ where: { email: identifier } })
-    } catch {}
+    try { await prisma.failedLogin.deleteMany({ where: { email: identifier } }) } catch {}
 
     if (passwordCheck.needsMigration) {
       try {
@@ -174,36 +140,24 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await prisma.rateLimitLog.create({
-        data: {
-          identifier: failIp,
-          type: 'login-success',
-          endpoint: '/api/mobile/auth/login',
-          method: 'POST',
-          requestCount: 1,
-          windowStart: new Date(),
-          windowEnd: new Date(Date.now() + 60 * 60 * 1000),
-          limited: false,
-        }
-      })
-    } catch {}
-
-    try {
-      const devIp = request.headers.get('x-forwarded-for')?.split(',')[0] || ip
       const userAgent = request.headers.get('user-agent') || 'unknown'
       await prisma.userDevice.upsert({
         where: { userId_deviceId: { userId: user.id, deviceId: userAgent } },
         update: { pushToken: null },
-        create: { userId: user.id, deviceId: userAgent, platform: 'web' }
+        create: { userId: user.id, deviceId: userAgent, platform: 'web' },
       })
-    } catch (e) {}
+    } catch {}
 
-    const token = createToken({ id: user.id, email: user.email, role: user.role })
-    if (!token) return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    const authSession = await createMarketplaceAuthSession(user.id, {
+      ipAddress: failIp,
+      userAgent: request.headers.get('user-agent') || undefined,
+    })
+    const response = buildAuthResponse(authSession)
 
+    // Compatibility alias for existing clients. This is the canonical short-lived access token.
     return NextResponse.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role, isActive: user.isActive, createdAt: user.createdAt.toISOString() },
+      ...response,
+      token: response.accessToken,
     })
   } catch (error) {
     console.error('Login error:', error)
