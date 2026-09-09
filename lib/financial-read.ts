@@ -3,10 +3,16 @@ import { prisma } from './prisma';
 export interface CanonicalWalletBalance {
   walletId: string;
   walletType: 'PROVIDER' | 'CUSTOMER';
+  // Canonical public/read-layer amounts are always minor units.
   balance: bigint;
   availableBalance: bigint;
   pendingBalance: bigint;
   version: number;
+}
+
+function majorNumberToMinor(value: number): bigint {
+  if (!Number.isFinite(value)) throw new Error('Invalid wallet balance');
+  return BigInt(Math.round(value * 100));
 }
 
 async function queryWalletBalance(
@@ -34,9 +40,9 @@ async function queryWalletBalance(
   return {
     walletId: row.walletId,
     walletType: row.walletType as 'PROVIDER' | 'CUSTOMER',
-    balance: BigInt(row.balance),
-    availableBalance: BigInt(row.availableBalance),
-    pendingBalance: BigInt(row.pendingBalance),
+    balance: majorNumberToMinor(row.balance),
+    availableBalance: majorNumberToMinor(row.availableBalance),
+    pendingBalance: majorNumberToMinor(row.pendingBalance),
     version: row.version,
   };
 }
@@ -70,7 +76,7 @@ export async function readLegacyCustomerBalance(userId: string): Promise<number 
 }
 
 export function legacyToCanonicalMinor(legacyBalance: number): bigint {
-  return BigInt(Math.round(legacyBalance * 100));
+  return majorNumberToMinor(legacyBalance);
 }
 
 export async function reconcileWalletBalance(
