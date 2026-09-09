@@ -45,8 +45,8 @@ export async function GET(request: NextRequest) {
           riskLevel: { in: ['HIGH', 'CRITICAL'] },
         },
       }),
-      prisma.session.count({
-        where: { isValid: true, expiresAt: { gt: now } },
+      prisma.userSession.count({
+        where: { expiresAt: { gt: now } },
       }),
       prisma.rateLimitLog.count({
         where: { createdAt: { gte: oneHourAgo } },

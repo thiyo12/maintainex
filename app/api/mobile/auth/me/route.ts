@@ -92,7 +92,7 @@ export async function DELETE(request: NextRequest) {
       where: { id: user.id },
       data: { isActive: false },
     })
-    await prisma.session.deleteMany({ where: { userId: user.id } })
+    await prisma.userSession.deleteMany({ where: { userId: user.id } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

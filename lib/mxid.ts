@@ -36,6 +36,32 @@ export async function getCommissionRate(): Promise<number> {
 }
 
 /**
+ * Get commission rate for a provider.
+ * Company providers use their CompanyProfile rate.
+ * Individual providers fall back to the platform default.
+ */
+export async function getProviderCommissionRate(providerId: string): Promise<number> {
+  const company = await prisma.companyProfile.findUnique({
+    where: { userId: providerId },
+    select: { commissionRate: true },
+  })
+  if (company?.commissionRate != null && company.commissionRate >= 0) {
+    return company.commissionRate
+  }
+  return getCommissionRate()
+}
+
+/**
+ * Calculate commission amount from escrow value.
+ * Returns { commissionRate, commission, netAmount }.
+ */
+export function computeCommission(escrowAmount: number, rate: number): { commissionRate: number; commission: number; netAmount: number } {
+  const clamped = Math.max(0, Math.min(100, rate))
+  const commission = Math.round(escrowAmount * (clamped / 100) * 100) / 100
+  return { commissionRate: clamped, commission, netAmount: escrowAmount - commission }
+}
+
+/**
  * Calculate commission amount
  */
 export function calculateCommission(amount: number, rate: number): number {
