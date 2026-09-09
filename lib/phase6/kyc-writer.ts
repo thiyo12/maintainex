@@ -25,6 +25,16 @@ function mapKycActionToCompanyStatus(action: KycAction): CompanyVerificationStat
   return map[action] ?? null
 }
 
+function mapKycActionToTaskerProfileStatus(action: KycAction): string | null {
+  const map: Partial<Record<KycAction, string>> = {
+    SUBMIT: 'PENDING',
+    APPROVE: 'VERIFIED',
+    REJECT: 'REJECTED',
+    SUSPEND: 'SUSPENDED',
+  }
+  return map[action] ?? null
+}
+
 export interface KycTransitionResult {
   success: boolean
   error?: string
@@ -61,7 +71,7 @@ export async function transitionUserKyc(
   })
 
   if (userFull?.taskerProfile) {
-    const profileTarget = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : null
+    const profileTarget = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : targetStatus === 'PENDING' ? 'PENDING' : null
     if (profileTarget) {
       const currentProfileStatus = (userFull.taskerProfile.verificationStatus || 'NOT_SUBMITTED') as any
       const validProfileTransitions: Record<string, string[]> = {
@@ -87,58 +97,67 @@ export async function transitionUserKyc(
     }
   }
 
-  const updated = await client.$executeRawUnsafe(
-    `UPDATE "User" SET "identityStatus" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "identityStatus" = $3`,
-    targetStatus,
-    userId,
-    currentStatus,
-  )
+  try {
+    await client.$transaction(async (tx) => {
+      const updated = await tx.$executeRawUnsafe(
+        `UPDATE "User" SET "identityStatus" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "identityStatus" = $3`,
+        targetStatus,
+        userId,
+        currentStatus,
+      )
 
-  if (updated === 0) {
-    return { success: false, error: 'KYC status changed by another request' }
-  }
+      if (updated === 0) {
+        throw new Error('KYC_STATUS_CHANGED_BY_ANOTHER_REQUEST')
+      }
 
-  if (documentId) {
-    const docStatus = action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : action === 'SUBMIT' ? 'PENDING' : undefined
-    if (docStatus) {
-      await client.identityDocument.update({
-        where: { id: documentId },
-        data: {
-          status: docStatus,
-          ...(reviewNote ? { reviewNote } : {}),
-          ...(reviewedBy ? { reviewedBy } : {}),
-          ...(docStatus !== 'PENDING' ? { reviewedAt: new Date() } : {}),
-        },
-      })
+      if (documentId) {
+        const docStatus = action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : action === 'SUBMIT' ? 'PENDING' : undefined
+        if (docStatus) {
+          await tx.identityDocument.update({
+            where: { id: documentId },
+            data: {
+              status: docStatus,
+              ...(reviewNote ? { reviewNote } : {}),
+              ...(reviewedBy ? { reviewedBy } : {}),
+              ...(docStatus !== 'PENDING' ? { reviewedAt: new Date() } : {}),
+            },
+          })
+        }
+      }
+
+      if (userFull?.taskerProfile) {
+        const taskerStatus = mapKycActionToTaskerProfileStatus(action)
+        if (taskerStatus) {
+          await tx.taskerProfile.update({
+            where: { id: userFull.taskerProfile.id },
+            data: {
+              verificationStatus: taskerStatus,
+              verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
+              ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
+            },
+          })
+        }
+      }
+
+      if (userFull?.companyProfile) {
+        const companyTarget = mapKycActionToCompanyStatus(action)
+        if (companyTarget) {
+          await tx.companyProfile.update({
+            where: { id: userFull.companyProfile.id },
+            data: {
+              verificationStatus: companyTarget,
+              verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
+              ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
+            },
+          })
+        }
+      }
+    })
+  } catch (err: any) {
+    if (err?.message === 'KYC_STATUS_CHANGED_BY_ANOTHER_REQUEST') {
+      return { success: false, error: 'KYC status changed by another request' }
     }
-  }
-
-  if (userFull?.taskerProfile) {
-    const profileStatus = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : undefined
-    if (profileStatus) {
-      await client.taskerProfile.update({
-        where: { id: userFull.taskerProfile.id },
-        data: {
-          verificationStatus: profileStatus,
-          verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-          ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
-        },
-      })
-    }
-  }
-
-  if (userFull?.companyProfile) {
-    const companyTarget = mapKycActionToCompanyStatus(action)
-    if (companyTarget) {
-      await client.companyProfile.update({
-        where: { id: userFull.companyProfile.id },
-        data: {
-          verificationStatus: companyTarget,
-          verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-          ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
-        },
-      })
-    }
+    throw err
   }
 
   return { success: true }

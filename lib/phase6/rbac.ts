@@ -34,7 +34,7 @@ export const COMPANY_PERMISSIONS: Record<CompanyRole, string[]> = {
     'members:read', 'members:invite',
     'workers:read', 'workers:assign', 'workers:manage',
     'jobs:read', 'jobs:manage', 'jobs:assign',
-    'quotes:read', 'quotes:manage',
+    'quotes:read', 'quotes:submit', 'quotes:manage',
     'certifications:read',
     'documents:read', 'documents:upload',
     'verification:read',

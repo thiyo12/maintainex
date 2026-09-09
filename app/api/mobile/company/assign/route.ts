@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         targetId: jobId,
         description: `Assigned ${workerProfile?.name || workerUserId} to job ${jobId}`,
         metadata: { workerUserId, hasAcceptedQuote: !!acceptedQuote },
-      })
+      }, tx)
     })
 
     return NextResponse.json({ success: true, assignedTo: workerUserId })

@@ -122,10 +122,10 @@ describe('Phase 6.2 — Company Quote Identity', () => {
     expect(quote.providerType).toBe('COMPANY')
   })
 
-  it('manager denied quotes:submit (dispatcher submits)', async () => {
-    const { context, error } = await resolveCompanyContext(managerUserId, companyId, 'quotes:submit')
-    expect(error).toBeTruthy()
-    expect(context).toBeNull()
+  it('manager can submit company quote', async () => {
+    const { context } = await resolveCompanyContext(managerUserId, companyId, 'quotes:submit')
+    expect(context).toBeTruthy()
+    expect(context!.role).toBe('MANAGER')
   })
 
   it('dispatcher can submit company quote', async () => {

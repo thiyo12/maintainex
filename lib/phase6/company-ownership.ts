@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { CompanyRole } from './rbac'
+import { writeCompanyAuditLog } from './audit'
 
 export async function getCompanyOwnerCount(companyId: string): Promise<number> {
   const count = await prisma.teamMember.count({
@@ -104,36 +105,52 @@ export async function transferOwnership(
     return { success: false, error: 'Cannot transfer ownership to yourself' }
   }
 
-  const promoted = await prisma.$executeRaw`
-    UPDATE "TeamMember"
-    SET "role" = 'COMPANY_OWNER', "updatedAt" = NOW()
-    WHERE "id" = ${newOwnerMembership.id}
-      AND "companyId" = ${companyId}
-      AND "status" = 'ACTIVE'
-      AND "role" != 'COMPANY_OWNER'
-  `
+  const originalRole = newOwnerMembership.role as CompanyRole
 
-  if (promoted === 0) {
-    return { success: false, error: 'Failed to promote new owner (concurrent transfer detected)' }
-  }
+  try {
+    await prisma.$transaction(async (tx) => {
+      const promoted = await tx.$executeRaw`
+        UPDATE "TeamMember"
+        SET "role" = 'COMPANY_OWNER', "updatedAt" = NOW()
+        WHERE "id" = ${newOwnerMembership.id}
+          AND "companyId" = ${companyId}
+          AND "status" = 'ACTIVE'
+          AND "role" != 'COMPANY_OWNER'
+      `
 
-  const demoted = await prisma.$executeRaw`
-    UPDATE "TeamMember"
-    SET "role" = ${demoteToRole}, "updatedAt" = NOW()
-    WHERE "id" = ${currentOwnerMembership.id}
-      AND "companyId" = ${companyId}
-      AND "status" = 'ACTIVE'
-      AND "role" = 'COMPANY_OWNER'
-  `
+      if (promoted === 0) {
+        throw new Error('TRANSFER_CONCURRENT')
+      }
 
-  if (demoted === 0) {
-    await prisma.$executeRaw`
-      UPDATE "TeamMember"
-      SET "role" = 'WORKER', "updatedAt" = NOW()
-      WHERE "id" = ${newOwnerMembership.id}
-        AND "role" = 'COMPANY_OWNER'
-    `
-    return { success: false, error: 'Failed to demote previous owner (concurrent transfer detected)' }
+      const demoted = await tx.$executeRaw`
+        UPDATE "TeamMember"
+        SET "role" = ${demoteToRole}, "updatedAt" = NOW()
+        WHERE "id" = ${currentOwnerMembership.id}
+          AND "companyId" = ${companyId}
+          AND "status" = 'ACTIVE'
+          AND "role" = 'COMPANY_OWNER'
+      `
+
+      if (demoted === 0) {
+        throw new Error('TRANSFER_CONCURRENT')
+      }
+
+      await writeCompanyAuditLog({
+        companyId,
+        actorId: currentOwnerId,
+        actorRole: 'COMPANY_OWNER',
+        action: 'OWNERSHIP_TRANSFER',
+        targetType: 'TeamMember',
+        targetId: newOwnerId,
+        description: `Ownership transferred from ${currentOwnerId} to ${newOwnerId}`,
+        metadata: { previousRole: originalRole, demotedTo: demoteToRole },
+      }, tx)
+    })
+  } catch (err: any) {
+    if (err?.message === 'TRANSFER_CONCURRENT') {
+      return { success: false, error: 'Concurrent transfer detected' }
+    }
+    throw err
   }
 
   return { success: true }

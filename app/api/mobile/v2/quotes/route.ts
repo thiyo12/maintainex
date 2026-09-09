@@ -96,17 +96,27 @@ export async function GET(request: NextRequest) {
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    const isOwner = job.customerId === user.id
-    const isQuoter = !isOwner && !!(await prisma.jobQuote.findFirst({ where: { jobId, providerId: user.id } }))
+    const isCustomer = job.customerId === user.id
+    const isIndividualQuoter = !!(await prisma.jobQuote.findFirst({ where: { jobId, providerId: user.id, providerType: 'INDIVIDUAL' } }))
 
-    if (!isOwner && !isQuoter) {
-      const companyMember = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-        `SELECT "id" FROM "TeamMember" WHERE "userId" = $1 AND "status" = 'ACTIVE' LIMIT 1`,
-        user.id
-      )
-      if (!companyMember.length) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    const companyQuotes = await prisma.jobQuote.findMany({ where: { jobId, providerType: 'COMPANY' } })
+    let isAuthorizedCompanyReader = false
+    for (const cq of companyQuotes) {
+      const member = await prisma.teamMember.findFirst({
+        where: {
+          userId: user.id,
+          companyId: cq.providerId,
+          status: 'ACTIVE',
+        },
+      })
+      if (member && (member.role === 'COMPANY_OWNER' || member.role === 'MANAGER' || member.role === 'DISPATCHER' || member.role === 'WORKER')) {
+        isAuthorizedCompanyReader = true
+        break
       }
+    }
+
+    if (!isCustomer && !isIndividualQuoter && !isAuthorizedCompanyReader) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     const quotes = await prisma.jobQuote.findMany({
@@ -123,7 +133,7 @@ export async function GET(request: NextRequest) {
         if (q.providerType === 'INDIVIDUAL') {
           provider = await prisma.user.findUnique({
             where: { id: q.providerId },
-            select: isOwner ? { id: true, name: true, phone: true, email: true } : { id: true, name: true },
+            select: isCustomer ? { id: true, name: true, phone: true, email: true } : { id: true, name: true },
           })
           const p = await prisma.taskerProfile.findUnique({
             where: { userId: q.providerId },

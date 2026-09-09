@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export type CompanyAuditAction =
   | 'COMPANY_CREATE'
@@ -37,9 +38,13 @@ export interface AuditLogParams {
   ipAddress?: string
 }
 
-export async function writeCompanyAuditLog(params: AuditLogParams): Promise<void> {
+export async function writeCompanyAuditLog(
+  params: AuditLogParams,
+  tx?: Prisma.TransactionClient,
+): Promise<void> {
+  const client = tx ?? prisma
   try {
-    await prisma.companyAuditLog.create({
+    await client.companyAuditLog.create({
       data: {
         companyId: params.companyId,
         actorId: params.actorId,

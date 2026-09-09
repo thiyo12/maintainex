@@ -157,7 +157,7 @@ describe('Phase 6 — Company RBAC', () => {
 
     it('owner, manager, and dispatcher can submit quotes', () => {
       expect(canSubmitQuote('COMPANY_OWNER')).toBe(true)
-      expect(canSubmitQuote('MANAGER')).toBe(false)
+      expect(canSubmitQuote('MANAGER')).toBe(true)
       expect(canSubmitQuote('DISPATCHER')).toBe(true)
       expect(canSubmitQuote('WORKER')).toBe(false)
       expect(canSubmitQuote('FINANCE')).toBe(false)

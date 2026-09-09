@@ -126,52 +126,63 @@ export async function acceptCompanyInvite(params: {
     return { success: false, error: 'This invitation was sent to a different email address' }
   }
 
-  const claimed = await prisma.$executeRaw`
-    UPDATE "TeamInvite"
-    SET "status" = 'ACCEPTED', "updatedAt" = NOW()
-    WHERE "id" = ${invite.id}
-      AND "status" = 'PENDING'
-      AND "expiresAt" > NOW()
-  `
+  try {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.$executeRaw`
+        UPDATE "TeamInvite"
+        SET "status" = 'ACCEPTED', "updatedAt" = NOW()
+        WHERE "id" = ${invite.id}
+          AND "status" = 'PENDING'
+          AND "expiresAt" > NOW()
+      `
 
-  if (claimed === 0) {
-    return { success: false, error: 'Invitation was already claimed by another request' }
-  }
+      if (claimed === 0) {
+        throw new Error('INVITE_ALREADY_CLAIMED')
+      }
 
-  const existingMember = await prisma.teamMember.findFirst({
-    where: {
-      companyId: invite.companyId,
-      userId: params.userId,
-    },
-  })
+      const existingMember = await tx.teamMember.findFirst({
+        where: {
+          companyId: invite.companyId,
+          userId: params.userId,
+        },
+      })
 
-  if (existingMember) {
-    if (existingMember.status === 'ACTIVE') {
+      if (existingMember) {
+        if (existingMember.status === 'ACTIVE') {
+          throw new Error('ALREADY_ACTIVE_MEMBER')
+        }
+
+        if (existingMember.status === 'REMOVED') {
+          await tx.teamMember.update({
+            where: { id: existingMember.id },
+            data: { status: 'ACTIVE', role: invite.role },
+          })
+        }
+      } else {
+        await tx.teamMember.create({
+          data: {
+            companyId: invite.companyId,
+            userId: params.userId,
+            name: invite.name,
+            role: invite.role,
+            skills: '[]',
+            status: 'ACTIVE',
+            invitedBy: invite.invitedBy,
+          },
+        })
+      }
+    })
+  } catch (err: any) {
+    if (err?.message === 'INVITE_ALREADY_CLAIMED') {
+      return { success: false, error: 'Invitation was already claimed by another request' }
+    }
+    if (err?.message === 'ALREADY_ACTIVE_MEMBER') {
       return { success: false, error: 'You are already a member of this company' }
     }
-
-    if (existingMember.status === 'REMOVED') {
-      await prisma.teamMember.update({
-        where: { id: existingMember.id },
-        data: { status: 'ACTIVE', role: invite.role },
-      })
-      return { success: true, memberName: invite.name, companyName: invite.company.companyName }
-    }
+    throw err
   }
 
-  const teamMember = await prisma.teamMember.create({
-    data: {
-      companyId: invite.companyId,
-      userId: params.userId,
-      name: invite.name,
-      role: invite.role,
-      skills: '[]',
-      status: 'ACTIVE',
-      invitedBy: invite.invitedBy,
-    },
-  })
-
-  return { success: true, memberName: teamMember.name, companyName: invite.company.companyName }
+  return { success: true, memberName: invite.name, companyName: invite.company.companyName }
 }
 
 export async function cancelInvite(inviteId: string, companyId: string): Promise<boolean> {
