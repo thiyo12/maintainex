@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { templateJobId, providerId, date, timeSlot, address, district, notes, latitude, longitude } = body
+    const { templateJobId, providerId, date, timeSlot, address, district, notes, latitude, longitude, countryCode } = body
 
     if (!templateJobId || !providerId || !date || !timeSlot || !address || !district) {
       return NextResponse.json({
@@ -18,17 +18,23 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    const scheduledDate = new Date(date)
+    if (Number.isNaN(scheduledDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid booking date' }, { status: 400 })
+    }
+
     const result = await createBookNowJob({
       customerId: user.id,
-      templateJobId,
-      providerId,
-      scheduledDate: new Date(date),
-      timeSlot,
-      address,
-      district,
-      notes,
+      templateJobId: String(templateJobId).trim(),
+      providerId: String(providerId).trim(),
+      scheduledDate,
+      timeSlot: String(timeSlot).trim(),
+      address: String(address).trim(),
+      district: String(district).trim(),
+      notes: typeof notes === 'string' ? notes.slice(0, 5000) : undefined,
       latitude: typeof latitude === 'number' ? latitude : undefined,
       longitude: typeof longitude === 'number' ? longitude : undefined,
+      countryCode: typeof countryCode === 'string' ? countryCode : undefined,
     })
 
     return NextResponse.json({
@@ -39,8 +45,15 @@ export async function POST(request: NextRequest) {
     }, { status: 201 })
   } catch (error: any) {
     console.error('BOOK_NOW error:', error)
-    if (error.message?.includes('not found')) {
-      return NextResponse.json({ error: error.message }, { status: 404 })
+    const message = error?.message || 'Server error'
+    if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
+    if (
+      message.includes('not eligible') ||
+      message.includes('lacks required capability') ||
+      message.includes('Cannot book yourself') ||
+      message.includes('Invalid template/category')
+    ) {
+      return NextResponse.json({ error: message }, { status: 403 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
