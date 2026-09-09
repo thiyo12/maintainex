@@ -4,9 +4,9 @@ import { sendExpoPush } from './push'
 import { findCandidates } from './matching'
 
 /**
- * Notify individual providers using the same canonical matching engine exposed
- * to customers. Company candidates remain in the canonical result but are not
- * inserted into JobMatchQueue because that legacy queue is TaskerProfile-only.
+ * Notify every provider entity returned by the canonical matching engine.
+ * JobMatchQueue remains an individual/TaskerProfile compatibility queue; company
+ * matches are delivered to the company owner without pretending they are taskers.
  */
 export async function blastJobToTaskers(jobId: string): Promise<{ matched: number; totalCandidates: number }> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -25,6 +25,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
   })
 
   let individualCandidates = result.candidates.filter((candidate) => candidate.providerType === 'INDIVIDUAL')
+  let companyCandidates = result.candidates.filter((candidate) => candidate.providerType === 'COMPANY')
 
   if (job.targetTaskerId) {
     const target = await prisma.taskerProfile.findFirst({
@@ -39,20 +40,31 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     individualCandidates = target
       ? individualCandidates.filter((candidate) => candidate.userId === target.userId)
       : []
+    companyCandidates = []
   }
 
-  const userIds = individualCandidates.map((candidate) => candidate.userId || candidate.providerId)
+  const individualUserIds = individualCandidates.map((candidate) => candidate.userId || candidate.providerId)
   const profiles = await prisma.taskerProfile.findMany({
-    where: { userId: { in: userIds } },
+    where: { userId: { in: individualUserIds } },
     include: { user: { select: { pushToken: true } } },
   })
   const profileByUser = new Map(profiles.map((profile) => [profile.userId, profile]))
 
+  const companyIds = companyCandidates.map((candidate) => candidate.companyId || candidate.providerId)
+  const companies = await prisma.companyProfile.findMany({
+    where: { id: { in: companyIds } },
+    select: {
+      id: true,
+      userId: true,
+      user: { select: { pushToken: true } },
+    },
+  })
+  const companyById = new Map(companies.map((company) => [company.id, company]))
+
   await prisma.jobMatchQueue.deleteMany({ where: { jobId } })
 
-  const pushTitle = `New job near you 🔔`
-  const estText = Number(job.budgetAmount) > 0 ? Number(job.budgetAmount).toLocaleString() : 'negotiable'
-  const pushBody = `${job.title} — Est. LKR ${estText}. Tap to quote.`
+  const pushTitle = 'New job near you 🔔'
+  const pushBody = `${job.title} — a matching job is available. Tap to quote.`
 
   let matched = 0
   for (const candidate of individualCandidates) {
@@ -93,6 +105,29 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     matched += 1
   }
 
+  for (const candidate of companyCandidates) {
+    const companyId = candidate.companyId || candidate.providerId
+    const company = companyById.get(companyId)
+    if (!company) continue
+
+    await createNotification({
+      userId: company.userId,
+      title: pushTitle,
+      body: job.title,
+      referenceType: 'JOB_MATCH',
+      referenceId: jobId,
+    })
+    if (company.user.pushToken) {
+      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
+        type: 'NEW_JOB',
+        jobId,
+        categoryId: job.categoryId,
+        companyId,
+      })
+    }
+    matched += 1
+  }
+
   await prisma.marketplaceJob.update({
     where: { id: jobId },
     data: { notifiedCount: matched, currentWave: 1, waveSentAt: new Date() },
@@ -101,7 +136,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
   if (matched === 0) {
     await createNotification({
       userId: job.customerId,
-      title: 'No taskers available right now',
+      title: 'No providers available right now',
       body: 'Try expanding your search or check back later. Your job is still posted.',
     })
   }
