@@ -3,6 +3,13 @@ import { PricingInput, PriceBreakdown } from './types'
 import { resolvePricingConfig } from './rules'
 import { computeUrgencyModifier, applyModifierBps, capUrgencySurge, computePlatformFee, validatePriceAmount } from './fees'
 
+export class PriceBoundsError extends Error {
+  constructor(message: string, public readonly minCents: bigint, public readonly maxCents: bigint, public readonly actual: bigint) {
+    super(message)
+    this.name = 'PriceBoundsError'
+  }
+}
+
 export async function calculatePrice(
   client: PrismaClient,
   input: PricingInput,
@@ -20,6 +27,16 @@ export async function calculatePrice(
   const providerGross = baseAmount + urgencyAmount + serviceModifiers
   const platformFeeAmount = computePlatformFee(providerGross, config.commissionRateBps)
   const customerTotal = providerGross + platformFeeAmount
+
+  const validation = validatePriceAmount(customerTotal, config)
+  if (!validation.valid) {
+    throw new PriceBoundsError(
+      validation.error!,
+      config.minJobAmountCents,
+      config.maxJobAmountCents,
+      customerTotal,
+    )
+  }
 
   const ruleIds = [urgency.ruleId]
   if (serviceModifiers > 0n) ruleIds.push('service_modifiers')

@@ -13,10 +13,33 @@ import {
 import { rankCandidates } from './ranking'
 import { buildExplanationReasons } from './explanations'
 
+const NEUTRAL_SCORE = 50
+
 const DEFAULT_CONFIG: MatchingConfig = {
   countryCode: 'GLOBAL',
   matchingVersion: MATCHING_SCORE_VERSION,
   weights: { ...DEFAULT_WEIGHTS },
+}
+
+export function hasCapabilityMatch(
+  providerSkills: string[],
+  jobCategoryId: string,
+  jobServiceTemplateId?: string | null,
+): boolean {
+  if (providerSkills.length === 0) return false
+  const normalized = providerSkills.map(s => s.toLowerCase().trim())
+
+  if (jobServiceTemplateId) {
+    if (normalized.includes(jobServiceTemplateId.toLowerCase())) return true
+    if (normalized.includes(jobCategoryId.toLowerCase())) return true
+    return false
+  }
+
+  if (normalized.includes(jobCategoryId.toLowerCase())) return true
+  const partialMatch = normalized.some(s =>
+    jobCategoryId.toLowerCase().includes(s) || s.includes(jobCategoryId.toLowerCase())
+  )
+  return partialMatch
 }
 
 export async function resolveMatchingConfig(
@@ -94,6 +117,11 @@ export async function findCandidates(
     }
 
     const skills = parseSkills(profile.skills)
+    if (!hasCapabilityMatch(skills, job.categoryId, job.serviceTemplateId)) {
+      excluded.push({ providerId: profile.userId, providerType: 'INDIVIDUAL', reason: 'CAPABILITY_MISMATCH', detail: `Provider skills [${skills.join(', ')}] do not match job categoryId=${job.categoryId}` })
+      continue
+    }
+
     const components = scoreIndividual(profile, job.categoryId, job.serviceTemplateId, input)
     const totalScore = computeTotalScore(components, config.weights)
 
@@ -132,6 +160,11 @@ export async function findCandidates(
     }
 
     const companySkills = parseSkills(company.services)
+    if (!hasCapabilityMatch(companySkills, job.categoryId, job.serviceTemplateId)) {
+      excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'CAPABILITY_MISMATCH', detail: `Company services [${companySkills.join(', ')}] do not match job categoryId=${job.categoryId}` })
+      continue
+    }
+
     const components = scoreCompany(company, job.categoryId, job.serviceTemplateId, input)
     const totalScore = computeTotalScore(components, config.weights)
 
@@ -174,8 +207,8 @@ function scoreIndividual(
     capability: computeCapabilityScore(skills, categoryId, serviceTemplateId || undefined),
     reliability: computeReliabilityScore(completedJobs, 0),
     reputation: computeReputationScore(rating, reviewCount),
-    availability: computeAvailabilityScore(true, false, 1),
-    travel: computeTravelScore(true, null, !input.latitude),
+    availability: NEUTRAL_SCORE,
+    travel: NEUTRAL_SCORE,
     experience: computeExperienceScore(completedJobs, 0),
   }
 }
@@ -194,8 +227,8 @@ function scoreCompany(
     capability: computeCapabilityScore(skills, categoryId, serviceTemplateId || undefined),
     reliability: computeReliabilityScore(completedProjects, 0),
     reputation: computeReputationScore(rating, completedProjects),
-    availability: computeAvailabilityScore(true, false, 1),
-    travel: computeTravelScore(true, null, !input.latitude),
+    availability: NEUTRAL_SCORE,
+    travel: NEUTRAL_SCORE,
     experience: computeExperienceScore(completedProjects, 0),
   }
 }

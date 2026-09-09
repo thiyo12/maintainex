@@ -28,12 +28,12 @@ export async function resolvePricingConfig(
 
   return {
     countryCode,
-    pricingVersion: cfg.pricingVersion || 'v1',
-    commissionRateBps: cfg.commissionRateBps || 1000,
-    urgentModifierBps: cfg.urgentModifierBps || 2500,
-    emergencyModifierBps: cfg.emergencyModifierBps || 5000,
-    urgencyCapBps: cfg.urgencyCapBps || 10000,
-    minJobAmountCents: BigInt(cfg.minJobAmountCents || 500),
-    maxJobAmountCents: BigInt(cfg.maxJobAmountCents || 10000000),
+    pricingVersion: cfg.pricingVersion ?? 'v1',
+    commissionRateBps: cfg.commissionRateBps ?? 1000,
+    urgentModifierBps: cfg.urgentModifierBps ?? 2500,
+    emergencyModifierBps: cfg.emergencyModifierBps ?? 5000,
+    urgencyCapBps: cfg.urgencyCapBps ?? 10000,
+    minJobAmountCents: cfg.minJobAmountCents != null ? BigInt(cfg.minJobAmountCents) : 500n,
+    maxJobAmountCents: cfg.maxJobAmountCents != null ? BigInt(cfg.maxJobAmountCents) : 10000000n,
   }
 }

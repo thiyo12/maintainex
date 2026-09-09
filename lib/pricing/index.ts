@@ -1,4 +1,4 @@
-export { calculatePrice, validateQuotePrice } from './engine'
+export { calculatePrice, validateQuotePrice, PriceBoundsError } from './engine'
 export { createPriceSnapshot, getPriceSnapshot, isSnapshotStillValid } from './snapshot'
 export { computePlatformFee, validatePriceAmount } from './fees'
 export { resolvePricingConfig } from './rules'
