@@ -48,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const wallet = await prisma.customerWallet.findUnique({
       where: { userId: session.id },
-      select: { id: true, balance: true },
+      select: { id: true },
     })
     if (!wallet) return NextResponse.json({ error: 'Customer wallet not found' }, { status: 409 })
 
@@ -58,9 +58,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const payloadHash = `${id}:${session.id}:${tier}:${paymentMethod}:${amount}:${currency}`
 
     const outcome = await prisma.$transaction(async (tx) => {
-      // Serialize retries/concurrent duplicates for the whole operation, not only
-      // the ledger leg. A ledger-only idempotency key would still allow a second
-      // compatibility shadow debit and duplicate boost record.
       await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext($1))`, operationKey)
 
       const existing = await tx.idempotencyRecord.findUnique({ where: { idempotencyKey: operationKey } })
@@ -69,11 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         if (metadata.payloadHash !== payloadHash) throw new Error('IDEMPOTENCY_CONFLICT')
         const currentListing = await tx.realEstateListing.findUnique({ where: { id } })
         if (!currentListing) throw new Error('Listing not found')
-        return {
-          listing: currentListing,
-          expiresAt: new Date(metadata.expiresAt),
-          reused: true,
-        }
+        return { listing: currentListing, expiresAt: new Date(metadata.expiresAt), reused: true }
       }
 
       const expiresAt = new Date()
@@ -92,13 +85,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       }, tx)
 
       // LEGACY_SHADOW_WRITE: compatibility only. WalletBalance + FinancialLedger
-      // are canonical; this mirror is in the same transaction as the ledger and
-      // is protected by the operation-level idempotency lock above.
+      // are canonical; this mirror is kept in the same transaction.
       const shadow = await tx.customerWallet.updateMany({
         where: { id: wallet.id, balance: { gte: amount } },
         data: { balance: { decrement: amount } },
       })
       if (shadow.count !== 1) throw new Error('INSUFFICIENT_FUNDS')
+
+      const shadowAfter = await tx.customerWallet.findUnique({
+        where: { id: wallet.id },
+        select: { balance: true },
+      })
+      if (!shadowAfter) throw new Error('Customer wallet not found')
 
       await tx.walletTransaction.create({
         data: {
@@ -106,8 +104,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           walletType: 'CUSTOMER',
           type: 'DEBIT',
           amount,
-          balanceBefore: wallet.balance,
-          balanceAfter: wallet.balance - amount,
+          balanceBefore: shadowAfter.balance + amount,
+          balanceAfter: shadowAfter.balance,
           reference: 'PROPERTY_BOOST',
           referenceType: 'PROPERTY_BOOST',
           referenceId: id,
@@ -139,10 +137,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     return NextResponse.json({
       success: true,
       idempotentReplay: outcome.reused,
-      data: {
-        listing: outcome.listing,
-        boost: { tier, amount, currency, expiresAt: outcome.expiresAt },
-      },
+      data: { listing: outcome.listing, boost: { tier, amount, currency, expiresAt: outcome.expiresAt } },
     })
   } catch (error: any) {
     if (error?.message === 'INSUFFICIENT_FUNDS') return NextResponse.json({ error: 'Insufficient wallet balance' }, { status: 400 })
