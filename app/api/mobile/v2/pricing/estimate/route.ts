@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { calculatePrice, PriceBoundsError } from '@/lib/pricing/engine'
+import { calculatePrice, PriceBoundsError, PricingInputError } from '@/lib/pricing/engine'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function POST(request: NextRequest) {
@@ -11,15 +11,8 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const {
-      categoryId, serviceTemplateId,
-      urgency, quantity, durationMinutes,
-      countryCode,
-    } = body
-
-    if (!categoryId) {
-      return NextResponse.json({ error: 'categoryId is required' }, { status: 400 })
-    }
+    const { categoryId, serviceTemplateId, urgency, quantity, durationMinutes, countryCode } = body
+    if (!categoryId) return NextResponse.json({ error: 'categoryId is required' }, { status: 400 })
 
     const estimate = await calculatePrice(prisma, {
       jobId: `estimate-${Date.now()}-${user.id}`,
@@ -47,15 +40,15 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error: any) {
+    if (error instanceof PricingInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     if (error instanceof PriceBoundsError) {
       return NextResponse.json(
         { error: error.message, minAmount: Number(error.minCents), maxAmount: Number(error.maxCents), actual: Number(error.actual) },
         { status: 400 }
       )
     }
-    return NextResponse.json(
-      { error: error?.message || 'Failed to estimate price' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error?.message || 'Failed to estimate price' }, { status: 500 })
   }
 }
