@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
+    if (user.identityStatus !== 'VERIFIED') {
+      return NextResponse.json({ error: 'Identity must be verified before submitting quotes' }, { status: 403 })
+    }
 
     const body = await request.json()
     const { jobId, providerType, estimatedCompletionTime, message, attachments, companyId } = body
