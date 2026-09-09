@@ -3,176 +3,119 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 
 const ROOT = join(__dirname, '..', '..')
-
-function readFile(relPath: string): string {
-  return readFileSync(join(ROOT, relPath), 'utf-8')
-}
+const readFile = (relPath: string) => readFileSync(join(ROOT, relPath), 'utf-8')
 
 describe('Phase 5E — Financial Atomicity Guard', () => {
-  describe('No direct balance mutations without ledger', () => {
-    const walletRoute = readFile('app/api/mobile/v2/wallet/route.ts')
-    const refundRoute = readFile('app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts')
-    const adminEscrows = readFile('app/api/mobile/v2/admin/escrows/route.ts')
+  const walletRoute = readFile('app/api/mobile/v2/wallet/route.ts')
+  const providerWithdraw = readFile('app/api/mobile/withdraw/route.ts')
+  const refundRoute = readFile('app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts')
+  const adminEscrows = readFile('app/api/mobile/v2/admin/escrows/route.ts')
+  const cronRelease = readFile('app/api/cron/escrow-release/route.ts')
+  const cashPayment = readFile('app/api/mobile/v2/jobs/[id]/cash-payment/route.ts')
+  const boostRoute = readFile('app/api/properties/[id]/boost/route.ts')
+  const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+  const ledger = readFile('lib/ledger.ts')
 
-    it('wallet/route.ts withdrawal is disabled (503)', () => {
-      expect(walletRoute).toContain("status: 503")
-      expect(walletRoute).not.toContain('postLedgerTransaction')
+  describe('Reachable routes use canonical financial writers', () => {
+    it('legacy customer withdrawal fails closed without balance mutation', () => {
+      expect(walletRoute).toContain('CUSTOMER_WITHDRAW_UNAVAILABLE')
+      expect(walletRoute).toContain('status: 503')
+      expect(walletRoute).not.toMatch(/data:\s*\{\s*balance:\s*newBalance/)
+      expect(walletRoute).not.toContain('customerWallet.update(')
     })
 
-    it('refund/route.ts uses atomic increment', () => {
-      expect(refundRoute).toContain('balance: { increment: refundAmount }')
-      expect(refundRoute).not.toMatch(/data:\s*\{\s*balance:\s*newBalance\s*\}/)
+    it('provider withdrawal uses canonical payout engine + idempotency', () => {
+      expect(providerWithdraw).toContain("requestPayout")
+      expect(providerWithdraw).toContain("idempotency-key")
+      expect(providerWithdraw).not.toContain('providerWallet.update(')
+      expect(providerWithdraw).not.toContain('customerWallet.update(')
     })
 
-    it('admin escrows refund uses atomic increment', () => {
-      expect(adminEscrows).toContain('balance: { increment: bigIntToSafeNumber(escrow.totalAmount) }')
-      expect(adminEscrows).not.toMatch(/data:\s*\{\s*balance:\s*balanceBefore \+/)
+    it('refund route delegates to refundEscrow', () => {
+      expect(refundRoute).toContain('refundEscrow')
+      expect(refundRoute).not.toContain('customerWallet.update(')
+      expect(refundRoute).not.toContain('walletTransaction.create(')
     })
 
-    it('admin escrows refund posts ledger entry', () => {
-      expect(adminEscrows).toContain('postLedgerTransaction')
-      expect(adminEscrows).toContain('ESCROW_REFUND')
+    it('admin escrow actions delegate to lifecycle writers', () => {
+      expect(adminEscrows).toContain('releaseEscrow')
+      expect(adminEscrows).toContain('refundEscrow')
+      expect(adminEscrows).not.toContain('providerWallet.upsert(')
+      expect(adminEscrows).not.toContain('customerWallet.update(')
+      expect(adminEscrows).not.toContain('walletTransaction.create(')
     })
 
-    it('boost/route.ts posts ledger entry for wallet payment', () => {
-      const boostRoute = readFile('app/api/properties/[id]/boost/route.ts')
+    it('cron auto-release delegates to releaseEscrow', () => {
+      expect(cronRelease).toContain('releaseEscrow')
+      expect(cronRelease).not.toContain('providerWallet.upsert(')
+      expect(cronRelease).not.toContain('walletTransaction.create(')
+    })
+
+    it('cash settlement fails closed until funded accounting exists', () => {
+      expect(cashPayment).toContain('CASH_PAYMENT_DISABLED')
+      expect(cashPayment).toContain('status: 503')
+      expect(cashPayment).not.toContain('providerWallet.upsert(')
+      expect(cashPayment).not.toContain('postLedgerTransaction')
+    })
+  })
+
+  describe('Property boost is atomically ledger-backed', () => {
+    it('server controls tier price and unsupported payment methods fail closed', () => {
+      expect(boostRoute).toContain('BOOST_TIERS')
+      expect(boostRoute).toContain('BOOST_PAYMENT_UNAVAILABLE')
+      expect(boostRoute).toContain('WALLET_CURRENCY_UNAVAILABLE')
+    })
+
+    it('wallet boost requires idempotency and posts a ledger debit', () => {
+      expect(boostRoute).toContain('idempotency-key')
       expect(boostRoute).toContain('postLedgerTransaction')
-      expect(boostRoute).toContain('PROPERTY_BOOST')
+      expect(boostRoute).toContain("referenceType: 'PROPERTY_BOOST'")
+      expect(boostRoute).toContain("accountType: 'CUSTOMER_WALLET'")
+    })
+
+    it('ledger + compatibility shadow + boost creation share one transaction', () => {
+      expect(boostRoute).toContain('prisma.$transaction(async (tx)')
+      expect(boostRoute).toContain('}, tx)')
+      expect(boostRoute).toContain('LEGACY_SHADOW_WRITE')
+      expect(boostRoute).toContain('tx.propertyBoost.create')
+      expect(boostRoute).toContain('tx.realEstateListing.update')
     })
   })
 
-  describe('All balance reads go through canonical source', () => {
-    const jobLifecycle = readFile('lib/domain/job-lifecycle.ts')
-    const cronRelease = readFile('app/api/cron/escrow-release/route.ts')
-    const cashPayment = readFile('app/api/mobile/v2/jobs/[id]/cash-payment/route.ts')
-    const adminEscrows = readFile('app/api/mobile/v2/admin/escrows/route.ts')
-
-    it('job-lifecycle.ts imports readCanonical functions', () => {
-      expect(jobLifecycle).toContain("import { readCanonicalProviderBalance, readCanonicalCustomerBalance } from '@/lib/financial-read'")
+  describe('Canonical lifecycle owns escrow money', () => {
+    it('fund/release/refund post through FinancialLedger', () => {
+      expect(lifecycle).toContain('postLedgerTransaction')
+      expect(lifecycle).toContain("referenceType: 'ESCROW_DEPOSIT'")
+      expect(lifecycle).toContain("referenceType: 'ESCROW_RELEASE'")
+      expect(lifecycle).toContain("referenceType: 'ESCROW_REFUND'")
     })
 
-    it('job-lifecycle.ts fundEscrow reads canonical balance', () => {
-      expect(jobLifecycle).toContain('readCanonicalCustomerBalance')
-    })
-
-    it('job-lifecycle.ts releaseEscrow reads canonical provider balance', () => {
-      expect(jobLifecycle).toContain('readCanonicalProviderBalance')
-    })
-
-    it('job-lifecycle.ts refundEscrow reads canonical customer balance', () => {
-      expect(jobLifecycle).toContain('readCanonicalCustomerBalance')
-    })
-
-    it('cron/escrow-release reads canonical provider balance', () => {
-      expect(cronRelease).toContain("import { readCanonicalProviderBalance } from '@/lib/financial-read'")
-      expect(cronRelease).toContain('readCanonicalProviderBalance')
-    })
-
-    it('cash-payment reads canonical provider balance', () => {
-      expect(cashPayment).toContain("import { readCanonicalProviderBalance } from '@/lib/financial-read'")
-      expect(cashPayment).toContain('readCanonicalProviderBalance')
-    })
-
-    it('admin escrows reads canonical balances', () => {
-      expect(adminEscrows).toContain("import { readCanonicalProviderBalance, readCanonicalCustomerBalance } from '@/lib/financial-read'")
-      expect(adminEscrows).toContain('readCanonicalProviderBalance')
-      expect(adminEscrows).toContain('readCanonicalCustomerBalance')
+    it('escrow state claims are compare-and-set guarded', () => {
+      expect(lifecycle).toContain('updateMany')
+      expect(lifecycle).toContain('Escrow state changed concurrently')
     })
   })
 
-  describe('Ledger writes WalletBalance atomically', () => {
-    const ledger = readFile('lib/ledger.ts')
-
-    it('postLedgerTransaction updates WalletBalance in same transaction', () => {
-      expect(ledger).toContain('$executeRawUnsafe')
+  describe('Ledger fails closed and updates WalletBalance atomically', () => {
+    it('uses one DB transaction and an idempotency record', () => {
+      expect(ledger).toContain('idempotencyRecord')
+      expect(ledger).toContain('prisma.$transaction')
       expect(ledger).toContain('WalletBalance')
-      expect(ledger).toContain('ON CONFLICT')
     })
 
-    it('WalletBalance updates aggregate multiple entries per account', () => {
-      expect(ledger).toContain('walletUpdates')
+    it('debits require sufficient balance in the same UPDATE', () => {
+      expect(ledger).toContain('AND "balance" >= $3 AND "availableBalance" >= $3')
+      expect(ledger).toContain("if (affected === 0) throw new Error('INSUFFICIENT_FUNDS')")
     })
 
-    it('WalletBalance updates handle both CUSTOMER_WALLET and PROVIDER_WALLET', () => {
-      expect(ledger).toContain("accountType === 'CUSTOMER_WALLET'")
-      expect(ledger).toContain("accountType === 'PROVIDER_WALLET'")
-    })
-  })
-
-  describe('Fail-closed: no silent error suppression in financial paths', () => {
-    const ledger = readFile('lib/ledger.ts')
-
-    it('DEBIT path has no catch block suppressing DB errors', () => {
-      const debitIdx = ledger.indexOf('UPDATE "WalletBalance"')
-      const debitEndIdx = ledger.indexOf('}', debitIdx)
-      const debitSection = ledger.substring(debitIdx, debitEndIdx + 50)
-      expect(debitSection).not.toContain('P1000')
-      expect(debitSection).not.toContain('does not exist')
-      expect(debitSection).not.toMatch(/catch\s*\(e/)
+    it('financial transaction IDs use randomUUID, not Math.random', () => {
+      expect(ledger).toContain('randomUUID')
+      expect(ledger).not.toContain('Math.random')
     })
 
-    it('CREDIT path has no catch block suppressing DB errors', () => {
-      const creditIdx = ledger.indexOf('INSERT INTO "WalletBalance"')
-      const creditEndIdx = ledger.indexOf('}', creditIdx)
-      const creditSection = ledger.substring(creditIdx, creditEndIdx + 50)
-      expect(creditSection).not.toContain('P1000')
-      expect(creditSection).not.toContain('does not exist')
-      expect(creditSection).not.toMatch(/catch\s*\(e/)
-    })
-
-    it('no broad string matching could hide PostgreSQL errors', () => {
-      expect(ledger).not.toMatch(/e\.message\?\.includes\(.*does not exist.*\)/)
-      expect(ledger).not.toMatch(/e\.code\s*===\s*'P1000'/)
-    })
-  })
-
-  describe('No absolute balance sets remain in financial paths', () => {
-    const walletRoute = readFile('app/api/mobile/v2/wallet/route.ts')
-    const refundRoute = readFile('app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts')
-    const adminEscrows = readFile('app/api/mobile/v2/admin/escrows/route.ts')
-    const jobLifecycle = readFile('lib/domain/job-lifecycle.ts')
-    const cronRelease = readFile('app/api/cron/escrow-release/route.ts')
-    const cashPayment = readFile('app/api/mobile/v2/jobs/[id]/cash-payment/route.ts')
-
-    it('no absolute balance set in wallet route', () => {
-      expect(walletRoute).not.toMatch(/data:\s*\{\s*balance:\s*newBalance\s*\}/)
-      expect(walletRoute).not.toMatch(/data:\s*\{\s*balance:\s*wallet\.balance\s*-\s*amount\s*\}/)
-    })
-
-    it('no absolute balance set in refund route', () => {
-      expect(refundRoute).not.toMatch(/data:\s*\{\s*balance:\s*newBalance\s*\}/)
-    })
-
-    it('no absolute balance set in admin escrows', () => {
-      expect(adminEscrows).not.toMatch(/data:\s*\{\s*balance:\s*balanceBefore\s*\+/)
-    })
-
-    it('job-lifecycle uses atomic increments for wallet updates', () => {
-      expect(jobLifecycle).toContain('balance: { decrement: totalAmountCents }')
-      expect(jobLifecycle).toContain('balance: { increment: refundAmount }')
-      expect(jobLifecycle).toContain('availableBalance: { increment: netAmount }')
-    })
-
-    it('cron release uses atomic increment', () => {
-      expect(cronRelease).toContain('availableBalance: { increment: netAmount }')
-    })
-
-    it('cash payment uses atomic increment', () => {
-      expect(cashPayment).toContain('availableBalance: { increment: netAmount }')
-    })
-  })
-
-  describe('Float field retirement classification', () => {
-    it('all FinancialLedger writes use BigInt', () => {
-      const ledger = readFile('lib/ledger.ts')
-      expect(ledger).toContain('amount: bigint')
-    })
-
-    it('canonical reads return bigint values', () => {
-      const financialRead = readFile('lib/financial-read.ts')
-      expect(financialRead).toContain('CanonicalWalletBalance')
-      expect(financialRead).toContain('balance: bigint')
-      expect(financialRead).toContain('availableBalance: bigint')
+    it('does not suppress missing-table/database errors', () => {
+      expect(ledger).not.toMatch(/P1000/)
+      expect(ledger).not.toMatch(/does not exist.*return/)
     })
   })
 })
