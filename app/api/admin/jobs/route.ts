@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
 
 interface UnifiedJob {
   id: string
@@ -173,7 +174,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const validStatuses = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+    const validStatuses = ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
     }
@@ -183,11 +184,15 @@ export async function PATCH(request: NextRequest) {
       if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
-      const updated = await prisma.marketplaceJob.update({
-        where: { id: jobId },
-        data: { status },
-      })
-      return NextResponse.json({ job: { ...updated, source: 'V2' } })
+      try {
+        const updated = await transitionMarketplaceJob(
+          { jobId, actorId: session.adminUserId, actorType: 'STAFF' },
+          status as JobStatus
+        )
+        return NextResponse.json({ job: { ...updated, source: 'V2' } })
+      } catch (e) {
+        return NextResponse.json({ error: e instanceof Error ? e.message : 'Transition failed' }, { status: 400 })
+      }
     }
 
     // Default to V1

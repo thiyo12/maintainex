@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { transitionJobWorkspace } from '@/lib/domain/job-lifecycle'
 import { notifyJobStarted } from '@/lib/notifications'
 
 export async function POST(
@@ -42,16 +43,15 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid OTP' }, { status: 403 })
     }
 
-    await prisma.$transaction([
-      prisma.jobOtp.update({
-        where: { id: otpRecord.id },
-        data: { verifiedAt: new Date() },
-      }),
-      prisma.jobWorkspace.update({
-        where: { jobId: job.id },
-        data: { progressStatus: 'IN_PROGRESS' },
-      }),
-    ])
+    await prisma.jobOtp.update({
+      where: { id: otpRecord.id },
+      data: { verifiedAt: new Date() },
+    })
+
+    await transitionJobWorkspace(
+      { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
+      'IN_PROGRESS'
+    )
 
     notifyJobStarted(job.id, job.customerId, job.title)
 

@@ -192,24 +192,24 @@ export async function postLedgerTransaction(
       if (update.entryType === 'CREDIT') {
         await client.$executeRawUnsafe(
           `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $3, 0, 1, now(), now())
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 0, 1, now(), now())
            ON CONFLICT ("walletType", "walletId")
            DO UPDATE SET "balance" = "WalletBalance"."balance" + $3,
-                         "availableBalance" = "WalletBalance"."availableBalance" + $3,
+                         "availableBalance" = "WalletBalance"."availableBalance" + $4,
                          "version" = "WalletBalance"."version" + 1,
                          "updatedAt" = now()`,
-          walletId, walletType, deltaMajor
+          walletId, walletType, deltaMajor, deltaMajor
         );
       } else {
         const affected = await client.$executeRawUnsafe(
           `UPDATE "WalletBalance"
            SET "balance" = "balance" - $3,
-               "availableBalance" = "availableBalance" - $3,
+               "availableBalance" = "availableBalance" - $4,
                "version" = "version" + 1,
                "updatedAt" = now()
            WHERE "walletType" = $2 AND "walletId" = $1
-             AND "balance" >= $3 AND "availableBalance" >= $3`,
-          walletId, walletType, deltaMajor
+             AND "balance" >= $3 AND "availableBalance" >= $4`,
+          walletId, walletType, deltaMajor, deltaMajor
         );
         if (affected === 0) throw new Error('INSUFFICIENT_FUNDS');
       }
@@ -265,7 +265,7 @@ export async function reverseLedgerTransaction(
     })),
     referenceType: 'REVERSAL',
     referenceId: originalTransactionId,
-    idempotencyKey: `reversal:${originalTransactionId}:${Date.now()}`,
+    idempotencyKey: `reversal:${originalTransactionId}:${reason.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)}`,
     description: `Reversal of ${originalTransactionId}: ${reason}`,
     createdBy,
   });
