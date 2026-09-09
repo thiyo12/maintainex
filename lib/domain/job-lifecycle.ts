@@ -180,21 +180,22 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   if (!quote) throw new Error('No accepted quote found')
 
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId } })
-  if (escrow && !['PENDING_PAYMENT', 'CANCELLED'].includes(escrow.status)) throw new Error('Escrow already active')
+  if (!escrow) throw new Error('Escrow not initialized')
+  if (!['PENDING_PAYMENT', 'CANCELLED'].includes(escrow.status)) throw new Error('Escrow already active')
 
-  const serviceFee = escrow?.serviceFee ?? (quote.price * 1000n) / 10000n
-  const totalAmount = escrow?.totalAmount ?? (quote.price + serviceFee)
+  const serviceFee = escrow.serviceFee || (quote.price * 1000n) / 10000n
+  const totalAmount = escrow.totalAmount || (quote.price + serviceFee)
   const totalMajor = bigIntToSafeNumber(totalAmount) / 100
 
   await prisma.$transaction(async (tx) => {
     await postLedgerTransaction({
       entries: [
         { accountId: `customer:${ctx.actorId}`, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount: totalAmount },
-        { accountId: `escrow:${jobId}`, accountType: 'ESCROW', entryType: 'CREDIT', amount: totalAmount },
+        { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'CREDIT', amount: totalAmount },
       ],
       referenceType: 'ESCROW_DEPOSIT',
-      referenceId: jobId,
-      idempotencyKey: `escrow-deposit:${jobId}`,
+      referenceId: escrow.id,
+      idempotencyKey: `escrow-deposit:${escrow.id}`,
       description: `Escrow deposit for job ${jobId}`,
       createdBy: ctx.actorId,
     }, tx)
@@ -204,27 +205,11 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       data: { balance: { decrement: totalMajor } },
     })
 
-    if (escrow) {
-      const claimed = await tx.jobEscrow.updateMany({
-        where: { id: escrow.id, status: { in: ['PENDING_PAYMENT', 'CANCELLED'] } },
-        data: { status: 'PROTECTED', heldAt: new Date(), amount: quote.price, serviceFee, totalAmount },
-      })
-      if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
-    } else {
-      await tx.jobEscrow.create({
-        data: {
-          jobId,
-          quoteId: quote.id,
-          customerId: ctx.actorId,
-          providerId: quote.providerId,
-          amount: quote.price,
-          serviceFee,
-          totalAmount,
-          status: 'PROTECTED',
-          heldAt: new Date(),
-        },
-      })
-    }
+    const claimed = await tx.jobEscrow.updateMany({
+      where: { id: escrow.id, status: { in: ['PENDING_PAYMENT', 'CANCELLED'] } },
+      data: { status: 'PROTECTED', heldAt: new Date(), amount: quote.price, serviceFee, totalAmount },
+    })
+    if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
 
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
@@ -243,13 +228,13 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
           balanceAfter: legacyWallet.balance,
           reference: `Escrow deposit for job ${jobId}`,
           referenceType: 'ESCROW_DEPOSIT',
-          referenceId: jobId,
+          referenceId: escrow.id,
         },
       })
     }
   })
 
-  return { success: true, totalAmount }
+  return { success: true, totalAmount, escrowId: escrow.id }
 }
 
 export async function releaseEscrow(
@@ -444,7 +429,9 @@ export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string
     where: { jobId, providerId: ctx.actorId, status: 'ACCEPTED' },
     select: { id: true },
   }))
-  if (!isCustomer && !isProvider && ctx.actorType !== 'STAFF') throw new Error('Actor is not a participant in this job')
+  if (!isCustomer && !isProvider && ctx.actorType !== 'STAFF' && ctx.actorType !== 'COMPANY') {
+    throw new Error('Actor is not a participant in this job')
+  }
 
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
   if (!escrow) throw new Error('No protected escrow found to hold')
