@@ -80,6 +80,7 @@ async function tryCanonicalAuth(token: string): Promise<AuthenticatedUser | null
   })
   if (!session) return null
   if (session.userId !== claims.sub) return null
+  if (!session.isValid) return null
   if (session.revokedAt) return null
   if (session.expiresAt < new Date()) return null
 
