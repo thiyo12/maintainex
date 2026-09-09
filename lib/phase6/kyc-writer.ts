@@ -87,55 +87,59 @@ export async function transitionUserKyc(
     }
   }
 
-  await client.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: userId },
-      data: { identityStatus: targetStatus },
-    })
+  const updated = await client.$executeRawUnsafe(
+    `UPDATE "User" SET "identityStatus" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "identityStatus" = $3`,
+    targetStatus,
+    userId,
+    currentStatus,
+  )
 
-    if (documentId) {
-      const docStatus = action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : action === 'SUBMIT' ? 'PENDING' : undefined
-      if (docStatus) {
-        await tx.identityDocument.update({
-          where: { id: documentId },
-          data: {
-            status: docStatus,
-            ...(reviewNote ? { reviewNote } : {}),
-            ...(reviewedBy ? { reviewedBy } : {}),
-            ...(docStatus !== 'PENDING' ? { reviewedAt: new Date() } : {}),
-          },
-        })
-      }
-    }
+  if (updated === 0) {
+    return { success: false, error: 'KYC status changed by another request' }
+  }
 
-    if (userFull?.taskerProfile) {
-      const profileStatus = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : undefined
-      if (profileStatus) {
-        await tx.taskerProfile.update({
-          where: { id: userFull.taskerProfile.id },
-          data: {
-            verificationStatus: profileStatus,
-            verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-            ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
-          },
-        })
-      }
+  if (documentId) {
+    const docStatus = action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : action === 'SUBMIT' ? 'PENDING' : undefined
+    if (docStatus) {
+      await client.identityDocument.update({
+        where: { id: documentId },
+        data: {
+          status: docStatus,
+          ...(reviewNote ? { reviewNote } : {}),
+          ...(reviewedBy ? { reviewedBy } : {}),
+          ...(docStatus !== 'PENDING' ? { reviewedAt: new Date() } : {}),
+        },
+      })
     }
+  }
 
-    if (userFull?.companyProfile) {
-      const companyTarget = mapKycActionToCompanyStatus(action)
-      if (companyTarget) {
-        await tx.companyProfile.update({
-          where: { id: userFull.companyProfile.id },
-          data: {
-            verificationStatus: companyTarget,
-            verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
-            ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
-          },
-        })
-      }
+  if (userFull?.taskerProfile) {
+    const profileStatus = targetStatus === 'VERIFIED' ? 'VERIFIED' : targetStatus === 'REJECTED' ? 'REJECTED' : undefined
+    if (profileStatus) {
+      await client.taskerProfile.update({
+        where: { id: userFull.taskerProfile.id },
+        data: {
+          verificationStatus: profileStatus,
+          verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
+          ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
+        },
+      })
     }
-  })
+  }
+
+  if (userFull?.companyProfile) {
+    const companyTarget = mapKycActionToCompanyStatus(action)
+    if (companyTarget) {
+      await client.companyProfile.update({
+        where: { id: userFull.companyProfile.id },
+        data: {
+          verificationStatus: companyTarget,
+          verificationNote: reviewNote || (action === 'APPROVE' ? 'Documents verified' : undefined),
+          ...(action === 'APPROVE' ? { verifiedAt: new Date(), isVerified: true } : {}),
+        },
+      })
+    }
+  }
 
   return { success: true }
 }

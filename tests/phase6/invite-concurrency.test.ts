@@ -48,12 +48,13 @@ describe('Phase 6.2 — Invitation Concurrency', () => {
   })
 
   it('real concurrent acceptance: exactly one wins', async () => {
+    const sharedEmail = `concurrent-invite-${Date.now()}@test.com`
     const invite = await createCompanyInvite({
       companyId,
       inviterUserId: ownerUserId,
       inviterRole: 'COMPANY_OWNER',
       name: 'Concurrent User',
-      email: `concurrent-invite-${Date.now()}@test.com`,
+      email: sharedEmail,
       role: 'WORKER',
     })
     expect(invite.success).toBe(true)
@@ -72,7 +73,7 @@ describe('Phase 6.2 — Invitation Concurrency', () => {
         acceptCompanyInvite({
           token: inviteToken,
           userId: u.id,
-          userEmail: `concurrent-invite-${Date.now()}@test.com`,
+          userEmail: sharedEmail,
         })
       )
     )
@@ -96,12 +97,13 @@ describe('Phase 6.2 — Invitation Concurrency', () => {
   })
 
   it('second acceptance after first already accepted returns error', async () => {
+    const sharedEmail2 = `sequential-invite-${Date.now()}@test.com`
     const invite2 = await createCompanyInvite({
       companyId,
       inviterUserId: ownerUserId,
       inviterRole: 'COMPANY_OWNER',
       name: 'Sequential User',
-      email: `sequential-invite-${Date.now()}@test.com`,
+      email: sharedEmail2,
       role: 'WORKER',
     })
     expect(invite2.success).toBe(true)
@@ -116,14 +118,14 @@ describe('Phase 6.2 — Invitation Concurrency', () => {
     const first = await acceptCompanyInvite({
       token: invite2.token!,
       userId: user1.id,
-      userEmail: `seq-user1-${Date.now()}@test.com`,
+      userEmail: sharedEmail2,
     })
     expect(first.success).toBe(true)
 
     const second = await acceptCompanyInvite({
       token: invite2.token!,
       userId: user2.id,
-      userEmail: `seq-user2-${Date.now()}@test.com`,
+      userEmail: sharedEmail2,
     })
     expect(second.success).toBe(false)
 
