@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { acceptCompanyInvite, createCompanyInvite } from '@/lib/phase6/invitation'
-import { getCompanyMembers, getUserCompanyRole, canRemoveMemberSafe } from '@/lib/phase6/company-ownership'
+import { getUserCompanyRole, canRemoveMemberSafe } from '@/lib/phase6/company-ownership'
 
 const prisma = new PrismaClient()
 
@@ -53,12 +53,13 @@ describe('Phase 6.1 — Removed Member Reactivation', () => {
   })
 
   it('full lifecycle: invite → accept → remove → re-invite → accept → ACTIVE', async () => {
+    const inviteEmail1 = `react-member-lifecycle-${Date.now()}@test.com`
     const invite1 = await createCompanyInvite({
       companyId,
       inviterUserId: ownerUserId,
       inviterRole: 'COMPANY_OWNER',
       name: 'Member',
-      email: `react-member-lifecycle-${Date.now()}@test.com`,
+      email: inviteEmail1,
       role: 'WORKER',
     })
     expect(invite1.success).toBe(true)
@@ -66,7 +67,7 @@ describe('Phase 6.1 — Removed Member Reactivation', () => {
     const accept1 = await acceptCompanyInvite({
       token: invite1.token!,
       userId: memberUserId,
-      userEmail: `react-member-lifecycle-${Date.now()}@test.com`,
+      userEmail: inviteEmail1,
     })
     expect(accept1.success).toBe(true)
 
@@ -87,12 +88,13 @@ describe('Phase 6.1 — Removed Member Reactivation', () => {
     role = await getUserCompanyRole(companyId, memberUserId)
     expect(role).toBeNull()
 
+    const inviteEmail2 = `react-member-lifecycle-2-${Date.now()}@test.com`
     const invite2 = await createCompanyInvite({
       companyId,
       inviterUserId: ownerUserId,
       inviterRole: 'COMPANY_OWNER',
       name: 'Member',
-      email: `react-member-lifecycle-2-${Date.now()}@test.com`,
+      email: inviteEmail2,
       role: 'DISPATCHER',
     })
     expect(invite2.success).toBe(true)
@@ -100,7 +102,7 @@ describe('Phase 6.1 — Removed Member Reactivation', () => {
     const accept2 = await acceptCompanyInvite({
       token: invite2.token!,
       userId: memberUserId,
-      userEmail: `react-member-lifecycle-2-${Date.now()}@test.com`,
+      userEmail: inviteEmail2,
     })
     expect(accept2.success).toBe(true)
 
@@ -114,12 +116,13 @@ describe('Phase 6.1 — Removed Member Reactivation', () => {
   })
 
   it('concurrent double acceptance yields exactly one ACTIVE membership', async () => {
+    const inviteEmail = `concurrent-${Date.now()}@test.com`
     const invite = await createCompanyInvite({
       companyId,
       inviterUserId: ownerUserId,
       inviterRole: 'COMPANY_OWNER',
       name: 'Concurrent Member',
-      email: `concurrent-${Date.now()}@test.com`,
+      email: inviteEmail,
       role: 'WORKER',
     })
     expect(invite.success).toBe(true)
@@ -131,14 +134,14 @@ describe('Phase 6.1 — Removed Member Reactivation', () => {
     const accept1 = await acceptCompanyInvite({
       token: invite.token!,
       userId: concurrentUser.id,
-      userEmail: `concurrent-${Date.now()}@test.com`,
+      userEmail: inviteEmail,
     })
     expect(accept1.success).toBe(true)
 
-    const accept2 = await acceptCompanyInvite({
+    await acceptCompanyInvite({
       token: invite.token!,
       userId: concurrentUser.id,
-      userEmail: `concurrent-${Date.now()}@test.com`,
+      userEmail: inviteEmail,
     })
 
     const activeMembers = await prisma.teamMember.findMany({
