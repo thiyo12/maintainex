@@ -199,8 +199,6 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       createdBy: ctx.actorId,
     }, tx)
 
-    // Legacy Float models are compatibility mirrors only. Canonical funds were
-    // already atomically reserved by WalletBalance + FinancialLedger above.
     await tx.customerWallet.update({
       where: { userId: ctx.actorId },
       data: { balance: { decrement: totalMajor } },
@@ -271,6 +269,7 @@ export async function releaseEscrow(
   const rateBps = BigInt(Math.round(rate * 100))
   const commissionCents = (escrow.amount * rateBps) / 10000n
   const netCents = escrow.amount - commissionCents
+  const platformCents = commissionCents + escrow.serviceFee
   const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
   const netMajor = bigIntToSafeNumber(netCents) / 100
 
@@ -285,12 +284,18 @@ export async function releaseEscrow(
     })
     if (claimed.count !== 1) throw new Error('Escrow already released or state changed')
 
+    await tx.providerWallet.upsert({
+      where: { userId: escrow.providerId },
+      create: { userId: escrow.providerId, availableBalance: 0 },
+      update: {},
+    })
+
     const ledgerEntries: Array<{ accountId: string; accountType: string; entryType: 'CREDIT' | 'DEBIT'; amount: bigint }> = [
-      { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.amount },
+      { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.totalAmount },
       { accountId: `provider:${escrow.providerId}`, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: netCents },
     ]
-    if (commissionCents > 0n) {
-      ledgerEntries.push({ accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: commissionCents })
+    if (platformCents > 0n) {
+      ledgerEntries.push({ accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: platformCents })
     }
 
     await postLedgerTransaction({
@@ -300,12 +305,12 @@ export async function releaseEscrow(
       idempotencyKey: `escrow-release:${escrow.id}`,
       description: `Escrow release for job ${jobId}`,
       createdBy: ctx.actorId,
+      metadata: JSON.stringify({ serviceFeeCents: escrow.serviceFee.toString(), commissionCents: commissionCents.toString() }),
     }, tx)
 
-    const providerWallet = await tx.providerWallet.upsert({
+    const providerWallet = await tx.providerWallet.update({
       where: { userId: escrow.providerId },
-      create: { userId: escrow.providerId, availableBalance: netMajor },
-      update: { availableBalance: { increment: netMajor } },
+      data: { availableBalance: { increment: netMajor } },
       select: { availableBalance: true },
     })
     await tx.walletTransaction.create({
@@ -358,12 +363,31 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   })
   if (!escrow) throw new Error('No refundable escrow found')
 
+  if (escrow.status === 'PENDING_PAYMENT') {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.jobEscrow.updateMany({
+        where: { id: escrow.id, status: 'PENDING_PAYMENT' },
+        data: { status: 'CANCELLED' },
+      })
+      if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
+      await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: { not: 'COMPLETED' } },
+        data: { status: 'CANCELLED' },
+      })
+      await tx.jobQuote.updateMany({
+        where: { id: escrow.quoteId, status: 'ACCEPTED' },
+        data: { status: 'WITHDRAWN' },
+      })
+    })
+    return { refundAmount: 0, refundCents: 0n }
+  }
+
   const refundCents = escrow.totalAmount
   const refundMajor = bigIntToSafeNumber(refundCents) / 100
 
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD'] } },
+      where: { id: escrow.id, status: { in: ['PROTECTED', 'ON_HOLD'] } },
       data: { status: 'REFUNDED', refundedAt: new Date() },
     })
     if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
