@@ -4,6 +4,28 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { transitionJobWorkspace, releaseEscrow, holdEscrowForDispute, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } from '@/lib/notifications'
 
+async function resolveProviderActor(jobId: string, userId: string): Promise<ActorType | null> {
+  const acceptedQuote = await prisma.jobQuote.findFirst({
+    where: { jobId, status: 'ACCEPTED' },
+    select: { providerId: true, providerType: true },
+  })
+  if (!acceptedQuote) return null
+
+  if (acceptedQuote.providerType === 'INDIVIDUAL' && acceptedQuote.providerId === userId) {
+    return 'PROVIDER'
+  }
+
+  if (acceptedQuote.providerType === 'COMPANY') {
+    const membership = await prisma.teamMember.findFirst({
+      where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
+      select: { id: true },
+    })
+    if (membership) return 'COMPANY'
+  }
+
+  return null
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -25,17 +47,15 @@ export async function POST(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     if (action === 'MARK_COMPLETE') {
-      const quote = await prisma.jobQuote.findFirst({
-        where: { jobId: params.id, providerId: user.id },
-      })
-      if (!quote) return NextResponse.json({ error: 'Only the assigned provider can mark complete' }, { status: 403 })
       if (job.status !== 'IN_PROGRESS') {
         return NextResponse.json({ error: 'Job must be in progress' }, { status: 400 })
       }
 
-      const isProvider = job.customerId !== user.id
+      const actorType = await resolveProviderActor(job.id, user.id)
+      if (!actorType) return NextResponse.json({ error: 'Only the assigned provider can mark complete' }, { status: 403 })
+
       await transitionJobWorkspace(
-        { jobId: params.id, actorId: user.id, actorType: isProvider ? 'PROVIDER' : 'CUSTOMER' },
+        { jobId: job.id, actorId: user.id, actorType },
         'COMPLETION_REQUESTED'
       )
 
@@ -63,33 +83,37 @@ export async function POST(
         'COMPLETED'
       )
 
-      notifyPaymentReleased(job.id, job.customerId, job.title, result.netAmount)
+      notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
       notifyJobCompleted(job.id, job.customerId, job.title)
-      return NextResponse.json({ success: true, message: 'Job completed, funds released', commission: result.commission, netAmount: result.netAmount })
+      return NextResponse.json({
+        success: true,
+        message: 'Job completed, funds released',
+        commission: result.commission,
+        netAmount: result.netAmount,
+      })
     }
 
     if (action === 'DISPUTE') {
       const isCustomer = job.customerId === user.id
-      const isProvider = !isCustomer && !!(await prisma.jobQuote.findFirst({
-        where: { jobId: job.id, providerId: user.id },
-      }))
-      if (!isCustomer && !isProvider) {
+      const providerActor = isCustomer ? null : await resolveProviderActor(job.id, user.id)
+      if (!isCustomer && !providerActor) {
         return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
       }
       if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
         return NextResponse.json({ error: 'Cannot dispute completed or cancelled jobs' }, { status: 400 })
       }
 
+      const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
       const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-      if (escrow && escrow.status === 'PROTECTED') {
+      if (escrow?.status === 'PROTECTED') {
         await holdEscrowForDispute(
-          { jobId: job.id, actorId: user.id, actorType: isCustomer ? 'CUSTOMER' : 'PROVIDER' },
+          { jobId: job.id, actorId: user.id, actorType },
           job.id
         )
       }
 
       await transitionJobWorkspace(
-        { jobId: job.id, actorId: user.id, actorType: isCustomer ? 'CUSTOMER' : 'PROVIDER' },
+        { jobId: job.id, actorId: user.id, actorType },
         'DISPUTED'
       )
 
@@ -99,8 +123,12 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error: any) {
     console.error('Complete job error:', error)
-    if (error.message?.includes('Cannot transition') || error.message?.includes('cannot transition')) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    const message = error?.message || 'Server error'
+    if (message.includes('Cannot transition') || message.includes('cannot transition') || message.includes('Actor type')) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+    if (message.includes('already released') || message.includes('concurrently')) {
+      return NextResponse.json({ error: message }, { status: 409 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
