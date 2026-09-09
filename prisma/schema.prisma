@@ -2201,6 +2201,50 @@ model PlatformSettings {
   createdAt                 DateTime @default(now())
 }
 
+// Phase 7 — Immutable price snapshot for every priced transaction
+model PriceSnapshot {
+  id                String   @id @default(cuid())
+  jobId             String
+  pricingVersion    String   // e.g. "v1"
+  currency          String   @default("LKR")
+  baseAmount        BigInt   // service base in minor units
+  urgencyAmount     BigInt   @default(0) // urgency surcharge
+  serviceModifiers  BigInt   @default(0) // other modifiers
+  platformFeeBps    Int      // commission basis points at time of quote
+  platformFeeAmount BigInt   // commission amount in minor units
+  providerGross     BigInt   // base + urgency + modifiers
+  customerTotal     BigInt   // providerGross + platformFeeAmount
+  ruleIds           String   @default("[]") // JSON array of applied rule IDs
+  createdAt         DateTime @default(now())
+
+  @@index([jobId])
+}
+
+// Phase 7 — Configurable matching/pricing market settings (country-neutral)
+model MarketConfig {
+  id                 String  @id @default(cuid())
+  countryCode        String  @unique // "GLOBAL" for defaults, "LK", "CA" etc.
+  matchingVersion    String  @default("v1")
+  pricingVersion     String  @default("v1")
+  // Matching weights (must sum to 100)
+  weightCapability   Int     @default(30)
+  weightReliability  Int     @default(20)
+  weightReputation   Int     @default(20)
+  weightAvailability Int     @default(15)
+  weightTravel       Int     @default(10)
+  weightExperience   Int     @default(5)
+  // Pricing modifiers (basis points, 100 = 1%)
+  urgentModifierBps  Int     @default(2500)  // 25%
+  emergencyModifierBps Int   @default(5000)  // 50%
+  urgencyCapBps      Int     @default(10000) // max 100% surge
+  // Platform commission
+  commissionRateBps  Int     @default(1000)  // 10%
+  minJobAmountCents  BigInt  @default(500)
+  maxJobAmountCents  BigInt  @default(10000000)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model RealEstateListing {
   id          String  @id @default(cuid())
   postedBy    String
