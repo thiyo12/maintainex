@@ -51,8 +51,7 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { amount, action } = body
-    if (!amount || amount <= 0) return NextResponse.json({ error: 'Valid amount required' }, { status: 400 })
+    const { action } = body
     if (!['TOP_UP', 'WITHDRAW'].includes(action)) {
       return NextResponse.json({ error: 'action must be TOP_UP or WITHDRAW' }, { status: 400 })
     }
@@ -61,36 +60,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment gateway not yet integrated. Top-up coming soon.' }, { status: 501 })
     }
 
+    // This endpoint represents the legacy CUSTOMER wallet. Customer-wallet
+    // cash-out has no canonical payout model yet, so fail closed instead of
+    // mutating the Float balance directly. Provider withdrawals use the
+    // canonical payout engine at POST /api/mobile/withdraw.
     if (action === 'WITHDRAW') {
-      const wallet = await prisma.customerWallet.findUnique({ where: { userId: user.id } })
-      if (!wallet || wallet.balance < amount) {
-        return NextResponse.json({ error: 'Insufficient balance' }, { status: 400 })
-      }
-      if (amount < 100) {
-        return NextResponse.json({ error: 'Minimum withdrawal is LKR 100' }, { status: 400 })
-      }
-      const newBalance = wallet.balance - amount
-
-      await prisma.$transaction([
-        prisma.customerWallet.update({
-          where: { userId: user.id },
-          data: { balance: newBalance },
-        }),
-        prisma.walletTransaction.create({
-          data: {
-            userId: user.id,
-            walletType: 'CUSTOMER',
-            type: 'DEBIT',
-            amount,
-            balanceBefore: wallet.balance,
-            balanceAfter: newBalance,
-            reference: 'Wallet withdrawal',
-            referenceType: 'WITHDRAWAL',
-            referenceId: '',
-          },
-        }),
-      ])
-      return NextResponse.json({ success: true, balance: newBalance })
+      return NextResponse.json({
+        error: 'Customer wallet withdrawals are temporarily unavailable',
+        code: 'CUSTOMER_WITHDRAW_UNAVAILABLE',
+      }, { status: 503 })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
