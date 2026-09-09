@@ -11,7 +11,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     services:
       postgres:
@@ -64,7 +64,19 @@ jobs:
       - name: Validate Prisma schema
         run: npx prisma validate
 
-      - name: Apply migrations to isolated CI database
+      # This repository was baselined from an already-existing production DB in
+      # 2026. One compatibility migration is timestamped before that baseline
+      # and therefore cannot bootstrap an empty database by itself. Do not edit
+      # or reorder those already-applied production migrations. In CI only, load
+      # the immutable baseline, mark the historical pre-baseline migration and
+      # baseline as applied, then prove every later migration deploys normally.
+      - name: Bootstrap isolated DB from immutable production baseline
+        run: |
+          npx prisma db execute --file prisma/migrations/20260101000000_baseline/migration.sql --schema prisma/schema.prisma
+          npx prisma migrate resolve --applied 20250626000000_add_name_change_cooldown
+          npx prisma migrate resolve --applied 20260101000000_baseline
+
+      - name: Apply post-baseline migrations with production command
         run: npx prisma migrate deploy
 
       - name: TypeScript
