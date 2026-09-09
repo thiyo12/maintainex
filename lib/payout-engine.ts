@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { postLedgerTransaction } from '@/lib/ledger'
+import { bigIntToSafeNumber } from '@/lib/money'
 
 export type PayoutStatus =
   | 'REQUESTED'
@@ -29,6 +29,33 @@ export type PayoutResult =
   | { ok: true; payoutId: string; status: PayoutStatus }
   | { ok: false; error: string; code: string }
 
+function isUniqueConstraintViolation(error: any): boolean {
+  return error?.code === 'P2002' ||
+    error?.meta?.code === '23505' ||
+    error?.message?.includes('duplicate key') ||
+    error?.message?.includes('unique constraint')
+}
+
+function safeMajorAmount(amountCents: bigint): number {
+  return bigIntToSafeNumber(amountCents) / 100
+}
+
+async function readCompletedIdempotency(idempotencyKey: string): Promise<{ payoutId: string; status: PayoutStatus; payloadHash?: string } | null> {
+  const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+  if (!existing?.metadata || existing.status !== 'COMPLETED') return null
+  try {
+    const parsed = JSON.parse(existing.metadata)
+    if (!parsed.payoutId || !parsed.status) return null
+    return {
+      payoutId: String(parsed.payoutId),
+      status: parsed.status as PayoutStatus,
+      payloadHash: typeof parsed.payloadHash === 'string' ? parsed.payloadHash : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function requestPayout(
   userId: string,
   amountCents: bigint,
@@ -37,19 +64,25 @@ export async function requestPayout(
   idempotencyKey: string,
   createdBy: string
 ): Promise<PayoutResult> {
-  const minPayoutCents = BigInt(500 * 100)
+  const minPayoutCents = 50000n
+  if (amountCents <= 0n) {
+    return { ok: false, error: 'Withdrawal amount must be positive', code: 'INVALID_AMOUNT' }
+  }
   if (amountCents < minPayoutCents) {
-    return { ok: false, error: `Minimum withdrawal is LKR ${(Number(minPayoutCents) / 100).toFixed(0)}`, code: 'BELOW_MINIMUM' }
+    return { ok: false, error: 'Minimum withdrawal is LKR 500', code: 'BELOW_MINIMUM' }
+  }
+
+  try {
+    safeMajorAmount(amountCents)
+  } catch {
+    return { ok: false, error: 'Withdrawal amount is outside the supported safe range', code: 'INVALID_AMOUNT' }
   }
 
   const payloadHash = `${userId}:${amountCents.toString()}:${method}`
-  const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+  const existing = await readCompletedIdempotency(idempotencyKey)
   if (existing) {
-    if (existing.metadata) {
-      const parsed = JSON.parse(existing.metadata)
-      if (parsed.payoutId && parsed.payloadHash === payloadHash) {
-        return { ok: true, payoutId: parsed.payoutId, status: parsed.status as PayoutStatus }
-      }
+    if (existing.payloadHash === payloadHash) {
+      return { ok: true, payoutId: existing.payoutId, status: existing.status }
     }
     return { ok: false, error: 'Idempotency key conflict', code: 'IDEMPOTENCY_CONFLICT' }
   }
@@ -58,22 +91,26 @@ export async function requestPayout(
   if (!wallet) return { ok: false, error: 'Provider wallet not found', code: 'WALLET_NOT_FOUND' }
   if (wallet.isFrozen) return { ok: false, error: 'Wallet is frozen', code: 'WALLET_FROZEN' }
 
-  const walletId = wallet.id
-  const amountNum = Number(amountCents) / 100
-
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      const locked = await tx.$queryRawUnsafe<Array<{ balance: number; available: number }>>(
-        `SELECT balance, "availableBalance" as available FROM "WalletBalance"
-         WHERE "walletId" = $1 AND "walletType" = 'PROVIDER' FOR UPDATE`,
-        walletId
+    const payout = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRawUnsafe<Array<{ available: number }>>(
+        `SELECT "availableBalance" as available
+         FROM "WalletBalance"
+         WHERE "walletId" = $1 AND "walletType" = 'PROVIDER'
+         FOR UPDATE`,
+        wallet.id,
       )
       if (locked.length === 0) throw new Error('BALANCE_NOT_FOUND')
 
-      const available = BigInt(Math.round(locked[0].available * 100))
-      if (available < amountCents) throw new Error('INSUFFICIENT_FUNDS')
+      const availableCents = BigInt(Math.round(locked[0].available * 100))
+      if (availableCents < amountCents) throw new Error('INSUFFICIENT_FUNDS')
 
-      const payout = await tx.payout.create({
+      // Re-check idempotency after acquiring the wallet lock. A concurrent
+      // request may have completed while this transaction was waiting.
+      const raced = await tx.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+      if (raced) throw new Error('IDEMPOTENCY_RACE')
+
+      const created = await tx.payout.create({
         data: {
           userId,
           amount: amountCents,
@@ -81,50 +118,51 @@ export async function requestPayout(
           source: 'WITHDRAWAL',
           method,
           bankDetails,
-          description: `Withdrawal request for ${(Number(amountCents) / 100).toFixed(0)} LKR`,
-        }
+          description: `Withdrawal request for ${safeMajorAmount(amountCents).toFixed(2)} LKR`,
+        },
       })
 
-      const affected = await tx.$executeRawUnsafe(
-        `UPDATE "WalletBalance"
-         SET balance = balance - $3, "availableBalance" = "availableBalance" - $3, "updatedAt" = NOW()
-         WHERE "walletId" = $1 AND "walletType" = 'PROVIDER' AND "availableBalance" >= $3`,
-        walletId, 'PROVIDER', amountNum
-      )
-      if (affected === 0) throw new Error('INSUFFICIENT_FUNDS')
-
-      await tx.$executeRawUnsafe(
-        `INSERT INTO "FinancialLedger"
-         (id, "accountId", "accountType", "entryType", amount, currency, "referenceType", "referenceId", "idempotencyKey", description, "createdBy", "createdAt")
-         VALUES
-         (gen_random_uuid()::text, $1, 'PROVIDER_WALLET', 'DEBIT', $2, 'LKR', 'WITHDRAWAL_RESERVED', $3, $4, $5, $6, NOW()),
-         (gen_random_uuid()::text, 'platform', 'PLATFORM', 'CREDIT', $2, 'LKR', 'WITHDRAWAL_RESERVED', $3, $5 || ':platform', $5, $6, NOW())`,
-        walletId, Number(amountCents), payout.id, idempotencyKey,
-        `Withdrawal reservation for payout ${payout.id}`, createdBy
-      )
+      await postLedgerTransaction({
+        entries: [
+          { accountId: wallet.id, accountType: 'PROVIDER_WALLET', entryType: 'DEBIT', amount: amountCents },
+          { accountId: `payout:${created.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'CREDIT', amount: amountCents },
+        ],
+        referenceType: 'WITHDRAWAL_RESERVED',
+        referenceId: created.id,
+        idempotencyKey: `payout-reserve:${idempotencyKey}`,
+        description: `Withdrawal reservation for payout ${created.id}`,
+        createdBy,
+      }, tx)
 
       await tx.idempotencyRecord.create({
         data: {
           idempotencyKey,
           operation: 'PAYOUT_REQUEST',
           status: 'COMPLETED',
-          metadata: JSON.stringify({ payoutId: payout.id, status: 'RESERVED', payloadHash }),
+          metadata: JSON.stringify({ payoutId: created.id, status: 'RESERVED', payloadHash }),
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        }
+        },
       })
 
-      return payout
+      return created
     })
 
-    return { ok: true, payoutId: result.id, status: 'RESERVED' }
-  } catch (e: any) {
-    if (e.message === 'INSUFFICIENT_FUNDS') {
+    return { ok: true, payoutId: payout.id, status: 'RESERVED' }
+  } catch (error: any) {
+    if (error?.message === 'INSUFFICIENT_FUNDS') {
       return { ok: false, error: 'Insufficient funds', code: 'INSUFFICIENT_FUNDS' }
     }
-    if (e.message === 'BALANCE_NOT_FOUND') {
+    if (error?.message === 'BALANCE_NOT_FOUND') {
       return { ok: false, error: 'Canonical balance not found', code: 'BALANCE_NOT_FOUND' }
     }
-    throw e
+    if (error?.message === 'IDEMPOTENCY_RACE' || isUniqueConstraintViolation(error)) {
+      const raced = await readCompletedIdempotency(idempotencyKey)
+      if (raced?.payloadHash === payloadHash) {
+        return { ok: true, payoutId: raced.payoutId, status: raced.status }
+      }
+      return { ok: false, error: 'Idempotency key conflict', code: 'IDEMPOTENCY_CONFLICT' }
+    }
+    throw error
   }
 }
 
@@ -134,33 +172,33 @@ async function transitionPayout(
   idempotencyKey: string,
   operation: string,
   extra: Record<string, unknown> = {}
-): Promise<{ payout: { id: string; userId: string; amount: bigint; status: string }; locked: boolean }> {
-  const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
-  if (existing && existing.metadata) {
-    const parsed = JSON.parse(existing.metadata)
-    if (parsed.status) {
-      return { payout: { id: payoutId, userId: '', amount: BigInt(0), status: parsed.status }, locked: false }
-    }
+): Promise<{ payout: { id: string; userId: string; amount: bigint; status: string }; changed: boolean }> {
+  const existing = await readCompletedIdempotency(idempotencyKey)
+  if (existing) {
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+      select: { id: true, userId: true, amount: true, status: true },
+    })
+    if (!payout) throw new Error('NOT_FOUND')
+    return { payout, changed: false }
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
       `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
-      payoutId
+      payoutId,
     )
     if (rows.length === 0) throw new Error('NOT_FOUND')
 
-    const payout = rows[0]
-    if (payout.status === targetStatus) {
-      return { payout: { id: payout.id, userId: payout.userId, amount: BigInt(payout.amount), status: payout.status }, locked: false }
+    const row = rows[0]
+    if (row.status === targetStatus) {
+      return { payout: { id: row.id, userId: row.userId, amount: BigInt(row.amount), status: row.status }, changed: false }
     }
-    if (!isValidTransition(payout.status as PayoutStatus, targetStatus)) {
-      throw new Error(`INVALID_TRANSITION:${payout.status}->${targetStatus}`)
+    if (!isValidTransition(row.status as PayoutStatus, targetStatus)) {
+      throw new Error(`INVALID_TRANSITION:${row.status}->${targetStatus}`)
     }
 
-    const updateData: Record<string, unknown> = { status: targetStatus, ...extra }
-    await tx.payout.update({ where: { id: payoutId }, data: updateData })
-
+    await tx.payout.update({ where: { id: payoutId }, data: { status: targetStatus, ...extra } })
     await tx.idempotencyRecord.create({
       data: {
         idempotencyKey,
@@ -168,206 +206,193 @@ async function transitionPayout(
         status: 'COMPLETED',
         metadata: JSON.stringify({ payoutId, status: targetStatus }),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      }
+      },
     })
 
-    return { payout: { id: payout.id, userId: payout.userId, amount: BigInt(payout.amount), status: payout.status }, locked: true }
+    return { payout: { id: row.id, userId: row.userId, amount: BigInt(row.amount), status: targetStatus }, changed: true }
   })
 }
 
 export async function markProcessing(
-  payoutId: string, actorId: string, idempotencyKey: string
+  payoutId: string,
+  actorId: string,
+  idempotencyKey: string
 ): Promise<PayoutResult> {
   try {
-    const { payout, locked } = await transitionPayout(payoutId, 'PROCESSING', idempotencyKey, 'PAYOUT_PROCESSING', { processedBy: actorId })
-    if (!locked) return { ok: true, payoutId, status: payout.status as PayoutStatus }
-    return { ok: true, payoutId, status: 'PROCESSING' }
-  } catch (e: any) {
-    if (e.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
-    if (e.message?.startsWith('INVALID_TRANSITION')) return { ok: false, error: e.message, code: 'INVALID_TRANSITION' }
-    throw e
+    const { payout } = await transitionPayout(
+      payoutId,
+      'PROCESSING',
+      idempotencyKey,
+      'PAYOUT_PROCESSING',
+      { processedBy: actorId },
+    )
+    return { ok: true, payoutId, status: payout.status as PayoutStatus }
+  } catch (error: any) {
+    if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+    if (error?.message?.startsWith('INVALID_TRANSITION')) {
+      return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
+    }
+    throw error
   }
 }
 
 export async function markSucceeded(
-  payoutId: string, providerRef: string | null, idempotencyKey: string, createdBy: string
+  payoutId: string,
+  providerRef: string | null,
+  idempotencyKey: string,
+  createdBy: string
 ): Promise<PayoutResult> {
-  const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
-  if (existing && existing.metadata) {
-    const parsed = JSON.parse(existing.metadata)
-    if (parsed.status) return { ok: true, payoutId, status: parsed.status as PayoutStatus }
-  }
+  const existing = await readCompletedIdempotency(idempotencyKey)
+  if (existing) return { ok: true, payoutId, status: existing.status }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
-      `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
-      payoutId
-    )
-    if (rows.length === 0) throw new Error('NOT_FOUND')
-    const payout = rows[0]
-    if (payout.status === 'SUCCEEDED') {
-      return { ok: true, payoutId, status: payout.status as PayoutStatus }
-    }
-    if (!isValidTransition(payout.status as PayoutStatus, 'SUCCEEDED')) {
-      throw new Error(`INVALID_TRANSITION:${payout.status}->SUCCEEDED`)
-    }
-
-    await tx.payout.update({ where: { id: payoutId }, data: { status: 'SUCCEEDED', clearedAt: new Date() } })
-
-    await tx.$executeRawUnsafe(
-      `INSERT INTO "FinancialLedger"
-       (id, "accountId", "accountType", "entryType", amount, currency, "referenceType", "referenceId", "idempotencyKey", description, "createdBy", "createdAt")
-       VALUES
-       (gen_random_uuid()::text, 'platform', 'PLATFORM', 'DEBIT', $1, 'LKR', 'PAYOUT_SUCCEEDED', $2, $3, $4, $5, NOW()),
-       (gen_random_uuid()::text, 'platform', 'PLATFORM', 'CREDIT', $1, 'LKR', 'WITHDRAWAL_RESERVED', $2, $3 || ':reserved-reverse', $4, $5, NOW())`,
-      Number(payout.amount), payout.id, idempotencyKey,
-      `Payout ${payoutId} completed${providerRef ? ` (ref: ${providerRef})` : ''}`, createdBy
-    )
-
-    await tx.idempotencyRecord.create({
-      data: {
-        idempotencyKey,
-        operation: 'PAYOUT_SUCCEEDED',
-        status: 'COMPLETED',
-        metadata: JSON.stringify({ payoutId, status: 'SUCCEEDED', providerRef }),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+  try {
+    await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
+        `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
+        payoutId,
+      )
+      if (rows.length === 0) throw new Error('NOT_FOUND')
+      const payout = rows[0]
+      if (payout.status === 'SUCCEEDED') return
+      if (!isValidTransition(payout.status as PayoutStatus, 'SUCCEEDED')) {
+        throw new Error(`INVALID_TRANSITION:${payout.status}->SUCCEEDED`)
       }
+
+      const amount = BigInt(payout.amount)
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: { status: 'SUCCEEDED', clearedAt: new Date() },
+      })
+
+      // Clear the reserved payout liability to an explicit external account.
+      // This removes the old platform-credit residue on successful payouts.
+      await postLedgerTransaction({
+        entries: [
+          { accountId: `payout:${payout.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'DEBIT', amount },
+          { accountId: `external:payout:${payout.id}`, accountType: 'EXTERNAL_PAYOUT', entryType: 'CREDIT', amount },
+        ],
+        referenceType: 'PAYOUT_SUCCEEDED',
+        referenceId: payout.id,
+        idempotencyKey: `payout-success:${idempotencyKey}`,
+        description: `Payout ${payoutId} completed${providerRef ? ` (ref: ${providerRef})` : ''}`,
+        createdBy,
+      }, tx)
+
+      await tx.idempotencyRecord.create({
+        data: {
+          idempotencyKey,
+          operation: 'PAYOUT_SUCCEEDED',
+          status: 'COMPLETED',
+          metadata: JSON.stringify({ payoutId, status: 'SUCCEEDED', providerRef }),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      })
     })
 
-    return payout
-  })
+    return { ok: true, payoutId, status: 'SUCCEEDED' }
+  } catch (error: any) {
+    if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+    if (error?.message?.startsWith('INVALID_TRANSITION')) {
+      return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
+    }
+    throw error
+  }
+}
 
-  return { ok: true, payoutId, status: 'SUCCEEDED' }
+async function restoreReservedPayout(
+  payoutId: string,
+  targetStatus: 'FAILED' | 'CANCELLED',
+  reason: string,
+  idempotencyKey: string,
+  createdBy: string
+): Promise<PayoutResult> {
+  const existing = await readCompletedIdempotency(idempotencyKey)
+  if (existing) return { ok: true, payoutId, status: existing.status }
+
+  try {
+    const finalStatus = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
+        `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
+        payoutId,
+      )
+      if (rows.length === 0) throw new Error('NOT_FOUND')
+      const payout = rows[0]
+
+      if (payout.status === targetStatus) return targetStatus
+      if (['SUCCEEDED', 'FAILED', 'REVERSED', 'CANCELLED'].includes(payout.status)) {
+        return payout.status as PayoutStatus
+      }
+      if (!isValidTransition(payout.status as PayoutStatus, targetStatus)) {
+        throw new Error(`INVALID_TRANSITION:${payout.status}->${targetStatus}`)
+      }
+
+      const needsRestore = payout.status === 'RESERVED' || payout.status === 'PROCESSING'
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: { status: targetStatus, rejectedReason: reason },
+      })
+
+      if (needsRestore) {
+        const wallet = await tx.providerWallet.findUnique({
+          where: { userId: payout.userId },
+          select: { id: true },
+        })
+        if (!wallet) throw new Error('WALLET_NOT_FOUND')
+        const amount = BigInt(payout.amount)
+
+        await postLedgerTransaction({
+          entries: [
+            { accountId: `payout:${payout.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'DEBIT', amount },
+            { accountId: wallet.id, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount },
+          ],
+          referenceType: 'WITHDRAWAL_RELEASED',
+          referenceId: payout.id,
+          idempotencyKey: `payout-restore:${idempotencyKey}`,
+          description: `Payout ${payoutId} ${targetStatus.toLowerCase()}: ${reason} — funds restored`,
+          createdBy,
+        }, tx)
+      }
+
+      await tx.idempotencyRecord.create({
+        data: {
+          idempotencyKey,
+          operation: targetStatus === 'FAILED' ? 'PAYOUT_FAILED' : 'PAYOUT_CANCEL',
+          status: 'COMPLETED',
+          metadata: JSON.stringify({ payoutId, status: targetStatus }),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      })
+
+      return targetStatus
+    })
+
+    return { ok: true, payoutId, status: finalStatus }
+  } catch (error: any) {
+    if (error?.message === 'NOT_FOUND') return { ok: false, error: 'Payout not found', code: 'NOT_FOUND' }
+    if (error?.message === 'WALLET_NOT_FOUND') return { ok: false, error: 'Provider wallet not found', code: 'WALLET_NOT_FOUND' }
+    if (error?.message?.startsWith('INVALID_TRANSITION')) {
+      return { ok: false, error: error.message, code: 'INVALID_TRANSITION' }
+    }
+    throw error
+  }
 }
 
 export async function markFailed(
-  payoutId: string, reason: string, idempotencyKey: string, createdBy: string
+  payoutId: string,
+  reason: string,
+  idempotencyKey: string,
+  createdBy: string
 ): Promise<PayoutResult> {
-  const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
-  if (existing && existing.metadata) {
-    const parsed = JSON.parse(existing.metadata)
-    if (parsed.status) return { ok: true, payoutId, status: parsed.status as PayoutStatus }
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
-      `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
-      payoutId
-    )
-    if (rows.length === 0) throw new Error('NOT_FOUND')
-    const payout = rows[0]
-    if (['SUCCEEDED', 'FAILED', 'REVERSED', 'CANCELLED'].includes(payout.status)) {
-      return { ok: true, payoutId, status: payout.status as PayoutStatus }
-    }
-    if (!isValidTransition(payout.status as PayoutStatus, 'FAILED')) {
-      throw new Error(`INVALID_TRANSITION:${payout.status}->FAILED`)
-    }
-
-    const wallets = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-      `SELECT id FROM "ProviderWallet" WHERE "userId" = $1`, payout.userId
-    )
-    if (wallets.length === 0) throw new Error('WALLET_NOT_FOUND')
-    const walletId = wallets[0].id
-
-    await tx.payout.update({ where: { id: payoutId }, data: { status: 'FAILED', rejectedReason: reason } })
-
-    await tx.$executeRawUnsafe(
-      `UPDATE "WalletBalance"
-       SET balance = balance + $3, "availableBalance" = "availableBalance" + $3, "updatedAt" = NOW()
-       WHERE "walletId" = $1 AND "walletType" = 'PROVIDER'`,
-      walletId, 'PROVIDER', Number(payout.amount) / 100
-    )
-
-    await tx.$executeRawUnsafe(
-      `INSERT INTO "FinancialLedger"
-       (id, "accountId", "accountType", "entryType", amount, currency, "referenceType", "referenceId", "idempotencyKey", description, "createdBy", "createdAt")
-       VALUES
-       (gen_random_uuid()::text, 'platform', 'PLATFORM', 'DEBIT', $1, 'LKR', 'WITHDRAWAL_RELEASED', $2, $3, $4, $5, NOW()),
-       (gen_random_uuid()::text, $6, 'PROVIDER_WALLET', 'CREDIT', $1, 'LKR', 'WITHDRAWAL_RELEASED', $2, $3 || ':wallet', $4, $5, NOW())`,
-      Number(payout.amount), payout.id, idempotencyKey,
-      `Payout ${payoutId} failed: ${reason} — funds restored`, createdBy, walletId
-    )
-
-    await tx.idempotencyRecord.create({
-      data: {
-        idempotencyKey,
-        operation: 'PAYOUT_FAILED',
-        status: 'COMPLETED',
-        metadata: JSON.stringify({ payoutId, status: 'FAILED' }),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      }
-    })
-
-    return payout
-  })
-
-  return { ok: true, payoutId, status: 'FAILED' }
+  return restoreReservedPayout(payoutId, 'FAILED', reason, idempotencyKey, createdBy)
 }
 
 export async function cancelPayout(
-  payoutId: string, reason: string, idempotencyKey: string, createdBy: string
+  payoutId: string,
+  reason: string,
+  idempotencyKey: string,
+  createdBy: string
 ): Promise<PayoutResult> {
-  const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
-  if (existing && existing.metadata) {
-    const parsed = JSON.parse(existing.metadata)
-    if (parsed.status) return { ok: true, payoutId, status: parsed.status as PayoutStatus }
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
-      `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
-      payoutId
-    )
-    if (rows.length === 0) throw new Error('NOT_FOUND')
-    const payout = rows[0]
-    if (!isValidTransition(payout.status as PayoutStatus, 'CANCELLED')) {
-      throw new Error(`INVALID_TRANSITION:${payout.status}->CANCELLED`)
-    }
-
-    const needsRestore = payout.status === 'RESERVED' || payout.status === 'PROCESSING'
-
-    await tx.payout.update({ where: { id: payoutId }, data: { status: 'CANCELLED', rejectedReason: reason } })
-
-    if (needsRestore) {
-      const wallets = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-        `SELECT id FROM "ProviderWallet" WHERE "userId" = $1`, payout.userId
-      )
-      if (wallets.length > 0) {
-        const walletId = wallets[0].id
-        const restoreAmount = Number(payout.amount) / 100
-        await tx.$executeRawUnsafe(
-          `UPDATE "WalletBalance"
-           SET balance = balance + $3, "availableBalance" = "availableBalance" + $3, "updatedAt" = NOW()
-           WHERE "walletId" = $1 AND "walletType" = 'PROVIDER'`,
-          walletId, 'PROVIDER', restoreAmount
-        )
-
-        await tx.$executeRawUnsafe(
-          `INSERT INTO "FinancialLedger"
-           (id, "accountId", "accountType", "entryType", amount, currency, "referenceType", "referenceId", "idempotencyKey", description, "createdBy", "createdAt")
-           VALUES
-           (gen_random_uuid()::text, 'platform', 'PLATFORM', 'DEBIT', $1, 'LKR', 'WITHDRAWAL_RELEASED', $2, $3, $4, $5, NOW()),
-           (gen_random_uuid()::text, $6, 'PROVIDER_WALLET', 'CREDIT', $1, 'LKR', 'WITHDRAWAL_RELEASED', $2, $3 || ':wallet', $4, $5, NOW())`,
-          Number(payout.amount), payout.id, idempotencyKey,
-          `Payout ${payoutId} cancelled: ${reason} — funds restored`, createdBy, walletId
-        )
-      }
-    }
-
-    await tx.idempotencyRecord.create({
-      data: {
-        idempotencyKey,
-        operation: 'PAYOUT_CANCEL',
-        status: 'COMPLETED',
-        metadata: JSON.stringify({ payoutId, status: 'CANCELLED' }),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      }
-    })
-
-    return payout
-  })
-
-  return { ok: true, payoutId, status: 'CANCELLED' }
+  return restoreReservedPayout(payoutId, 'CANCELLED', reason, idempotencyKey, createdBy)
 }
 
 export function isTestAccount(accountId: string): boolean {
