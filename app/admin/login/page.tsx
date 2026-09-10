@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FiLogIn, FiEye, FiEyeOff, FiShield } from 'react-icons/fi'
 import { useAuthStore } from '@/lib/auth-store'
@@ -128,12 +129,12 @@ export default function AdminLogin() {
       <div className="min-h-screen gradient-bg flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <a href="/" className="inline-flex items-center space-x-2 mb-4">
+            <Link href="/" className="inline-flex items-center space-x-2 mb-4">
               <Image src="/logo.JPEG" alt="Maintainex" width={48} height={48} className="object-contain" />
               <span className="text-2xl font-bold text-dark-900">
                 Main<span className="text-primary-600">tainex</span>
               </span>
-            </a>
+            </Link>
             <h1 className="text-3xl font-bold text-dark-900">Two-Factor Authentication</h1>
             <p className="text-dark-900/70 mt-2">Enter the code from your authenticator app</p>
           </div>
@@ -186,12 +187,12 @@ export default function AdminLogin() {
     <div className="min-h-screen gradient-bg flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <a href="/" className="inline-flex items-center space-x-2 mb-4">
+          <Link href="/" className="inline-flex items-center space-x-2 mb-4">
             <Image src="/logo.JPEG" alt="Maintainex" width={48} height={48} className="object-contain" />
             <span className="text-2xl font-bold text-dark-900">
               Main<span className="text-primary-600">tainex</span>
             </span>
-          </a>
+          </Link>
           <h1 className="text-3xl font-bold text-dark-900">Admin Login</h1>
           <p className="text-dark-900/70 mt-2">Sign in to access the dashboard</p>
         </div>

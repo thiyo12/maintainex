@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Smartphone, MapPin, Shield, Star, Download, ArrowRight, CheckCircle2 } from 'lucide-react'
 
 export default function AboutClient() {
@@ -55,18 +56,18 @@ export default function AboutClient() {
       {/* FIXED NAVBAR */}
       <nav className="fixed top-0 left-0 w-full h-20 bg-[#0B0C12]/80 backdrop-blur-md border-b border-white/10 z-50">
         <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <img src="/logo.JPEG" alt="MaintainEX" className="w-8 h-8 rounded-full object-cover" />
             <span className="font-extrabold text-xl tracking-tight"><span className="text-white">Maintain</span><span className="text-brand">EX</span></span>
-          </a>
+          </Link>
           <ul className="hidden md:flex items-center gap-8">
-            <li><a href="/" className="text-white hover:text-brand transition font-medium">Home</a></li>
-            <li><a href="/#features" className="text-white hover:text-brand transition font-medium">Services</a></li>
-            <li><a href="/#working" className="text-white hover:text-brand transition font-medium">How It Works</a></li>
-            <li><a href="/about" className="text-brand font-medium">About</a></li>
-            <li><a href="/#vision-page" className="text-white hover:text-brand transition font-medium">Vision</a></li>
+            <li><Link href="/" className="text-white hover:text-brand transition font-medium">Home</Link></li>
+            <li><Link href="/#features" className="text-white hover:text-brand transition font-medium">Services</Link></li>
+            <li><Link href="/#working" className="text-white hover:text-brand transition font-medium">How It Works</Link></li>
+            <li><Link href="/about" className="text-brand font-medium">About</Link></li>
+            <li><Link href="/#vision-page" className="text-white hover:text-brand transition font-medium">Vision</Link></li>
           </ul>
-          <a href="/#waitlist" className="hidden md:inline-block bg-brand text-black py-3 px-7 rounded-full font-bold text-sm hover:bg-white hover:-translate-y-0.5 hover:shadow-lg transition-all">Join Waitlist</a>
+          <Link href="/#waitlist" className="hidden md:inline-block bg-brand text-black py-3 px-7 rounded-full font-bold text-sm hover:bg-white hover:-translate-y-0.5 hover:shadow-lg transition-all">Join Waitlist</Link>
           <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden flex flex-col justify-center items-center gap-[5px] w-10 h-10 focus:outline-none">
             <span className={`block w-6 h-[2px] bg-white transition-all duration-300 ${mobileOpen ? 'translate-y-[7px] rotate-45' : ''}`}></span>
             <span className={`block w-6 h-[2px] bg-white transition-all duration-300 ${mobileOpen ? 'opacity-0' : ''}`}></span>
@@ -74,12 +75,12 @@ export default function AboutClient() {
           </button>
         </div>
         <div className={`md:hidden bg-[#0B0C12]/95 backdrop-blur-md border-t border-white/10 flex flex-col items-center gap-5 py-6 transition-all duration-300 overflow-hidden ${mobileOpen ? 'max-h-[400px]' : 'max-h-0'}`}>
-          <a href="/" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Home</a>
-          <a href="/#features" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Services</a>
-          <a href="/#working" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">How It Works</a>
-          <a href="/about" onClick={() => setMobileOpen(false)} className="text-brand text-lg font-medium">About</a>
-          <a href="/#vision-page" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Vision</a>
-          <a href="/#waitlist" onClick={() => setMobileOpen(false)} className="bg-brand text-black font-semibold py-3 px-6 rounded-full">Join Waitlist</a>
+          <Link href="/" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Home</Link>
+          <Link href="/#features" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Services</Link>
+          <Link href="/#working" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">How It Works</Link>
+          <Link href="/about" onClick={() => setMobileOpen(false)} className="text-brand text-lg font-medium">About</Link>
+          <Link href="/#vision-page" onClick={() => setMobileOpen(false)} className="text-white text-lg hover:text-brand transition">Vision</Link>
+          <Link href="/#waitlist" onClick={() => setMobileOpen(false)} className="bg-brand text-black font-semibold py-3 px-6 rounded-full">Join Waitlist</Link>
         </div>
       </nav>
 
@@ -94,10 +95,10 @@ export default function AboutClient() {
               The app that connects you with trusted professionals for every home service — cleaning, repairs, maintenance, and more. Available in Sri Lanka and expanding worldwide.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/#waitlist" className="inline-flex items-center gap-2 bg-brand text-black font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber hover:-translate-y-1">
+              <Link href="/#waitlist" className="inline-flex items-center gap-2 bg-brand text-black font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber hover:-translate-y-1">
                 <Download className="w-5 h-5" />
                 Join the Waitlist
-              </a>
+              </Link>
               <a href="#how-it-works" className="inline-flex items-center gap-2 border-2 border-white/30 text-white hover:border-brand hover:text-brand font-bold px-8 py-4 rounded-full transition-all duration-300">
                 How It Works
                 <ArrowRight className="w-5 h-5" />
@@ -250,13 +251,13 @@ export default function AboutClient() {
               Download the app, post your first job, and get matched with a verified professional in minutes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/#waitlist" className="inline-flex items-center gap-2 bg-brand text-black font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber hover:-translate-y-1">
+              <Link href="/#waitlist" className="inline-flex items-center gap-2 bg-brand text-black font-bold px-8 py-4 rounded-full transition-all duration-300 glow-amber hover:-translate-y-1">
                 Join the Waitlist
                 <ArrowRight className="w-5 h-5" />
-              </a>
-              <a href="/contact" className="inline-flex items-center gap-2 border-2 border-white/30 text-white hover:border-brand hover:text-brand font-bold px-8 py-4 rounded-full transition-all duration-300">
+              </Link>
+              <Link href="/contact" className="inline-flex items-center gap-2 border-2 border-white/30 text-white hover:border-brand hover:text-brand font-bold px-8 py-4 rounded-full transition-all duration-300">
                 Contact Us
-              </a>
+              </Link>
             </div>
             <div className="mt-10 grid sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
               <div className="flex items-center gap-2 justify-center text-[#d1d5db]">
@@ -291,10 +292,10 @@ export default function AboutClient() {
                 Sri Lanka &bull; Canada
               </div>
             </div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Product</h4><a href="/#features" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Features</a><a href="/#pricing" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Pricing</a><a href="/#download" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Mobile App</a><a href="/#waitlist" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Join Waitlist</a></div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Platform</h4><a href="/#client" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">For Seekers</a><a href="/#tasker" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">For Professionals</a><a href="/#features" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Services</a><a href="/#working" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">How It Works</a></div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Company</h4><a href="/about" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">About Us</a><a href="/#vision-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Vision &amp; Mission</a><a href="/#investors-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Investors</a><a href="/#waitlist" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Careers</a></div>
-            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Legal</h4><a href="/#terms-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Terms of Service</a><a href="/#privacy-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Privacy Policy</a><a href="/#privacy-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Cookie Policy</a><a href="/about" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Security</a></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Product</h4><Link href="/#features" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Features</Link><Link href="/#pricing" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Pricing</Link><Link href="/#download" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Mobile App</Link><Link href="/#waitlist" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Join Waitlist</Link></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Platform</h4><Link href="/#client" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">For Seekers</Link><Link href="/#tasker" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">For Professionals</Link><Link href="/#features" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Services</Link><Link href="/#working" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">How It Works</Link></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Company</h4><Link href="/about" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">About Us</Link><Link href="/#vision-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Vision &amp; Mission</Link><Link href="/#investors-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Investors</Link><Link href="/#waitlist" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Careers</Link></div>
+            <div><h4 className="text-xs uppercase tracking-wider font-semibold text-[#9ca3af] mb-4">Legal</h4><Link href="/#terms-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Terms of Service</Link><Link href="/#privacy-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Privacy Policy</Link><Link href="/#privacy-page" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Cookie Policy</Link><Link href="/about" className="block text-[#d1d5db] text-sm hover:text-brand transition py-1">Security</Link></div>
           </div>
         </div>
         <div className="border-t border-white/10 py-6 px-6">
@@ -318,7 +319,7 @@ export default function AboutClient() {
       {/* STICKY WAITLIST BANNER */}
       <div className={`fixed bottom-0 left-0 right-0 z-50 bg-brand/95 backdrop-blur-md py-2.5 sm:py-3 px-4 sm:px-6 flex items-center justify-between gap-3 transition-all duration-500 ${bannerVisible ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
         <span className="text-black font-semibold text-xs sm:text-sm">Don&apos;t miss out — Join the waitlist!</span>
-        <a href="/#waitlist" className="bg-black text-white font-bold py-2 px-4 sm:px-6 rounded-full text-xs sm:text-sm hover:opacity-90 transition whitespace-nowrap">Join Now</a>
+        <Link href="/#waitlist" className="bg-black text-white font-bold py-2 px-4 sm:px-6 rounded-full text-xs sm:text-sm hover:opacity-90 transition whitespace-nowrap">Join Now</Link>
       </div>
     </>
   )
