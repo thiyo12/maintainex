@@ -32,8 +32,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    if (job.status !== 'OPEN' && job.status !== 'QUOTE_ACCEPTED') {
-      return NextResponse.json({ error: 'Job is not available for assignment' }, { status: 400 })
+    if (job.status !== 'QUOTE_ACCEPTED') {
+      return NextResponse.json({ error: 'Quote must be accepted before assigning a worker' }, { status: 400 })
     }
 
     if (job.targetTaskerId) {
@@ -43,6 +43,9 @@ export async function POST(request: NextRequest) {
     const acceptedQuote = await prisma.jobQuote.findFirst({
       where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
     })
+    if (!acceptedQuote) {
+      return NextResponse.json({ error: 'No accepted quote found for this company on this job' }, { status: 400 })
+    }
 
     const eligibility = await checkWorkerEligibility(companyId, workerUserId, jobId)
     if (!eligibility.eligible) {
@@ -55,28 +58,17 @@ export async function POST(request: NextRequest) {
     })
 
     await prisma.$transaction(async (tx) => {
-      await tx.marketplaceJob.update({
-        where: { id: jobId },
-        data: { targetTaskerId: workerUserId, status: 'QUOTE_ACCEPTED' },
+      const claimed = await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: 'QUOTE_ACCEPTED', targetTaskerId: null },
+        data: { targetTaskerId: workerUserId },
       })
+      if (claimed.count !== 1) throw new Error('Job state changed concurrently')
 
-      const existingWorkspace = await tx.jobWorkspace.findUnique({
+      await tx.jobWorkspace.upsert({
         where: { jobId },
+        create: { jobId, progressStatus: 'ACCEPTED' },
+        update: { progressStatus: 'ACCEPTED', updatedAt: new Date() },
       })
-
-      if (existingWorkspace) {
-        await tx.jobWorkspace.update({
-          where: { jobId },
-          data: { progressStatus: 'ACCEPTED', updatedAt: new Date() },
-        })
-      } else {
-        await tx.jobWorkspace.create({
-          data: {
-            jobId,
-            progressStatus: 'ACCEPTED',
-          },
-        })
-      }
 
       await writeCompanyAuditLog({
         companyId,
@@ -86,7 +78,7 @@ export async function POST(request: NextRequest) {
         targetType: 'MarketplaceJob',
         targetId: jobId,
         description: `Assigned ${workerProfile?.name || workerUserId} to job ${jobId}`,
-        metadata: { workerUserId, hasAcceptedQuote: !!acceptedQuote },
+        metadata: { workerUserId, hasAcceptedQuote: true },
       }, tx)
     })
 

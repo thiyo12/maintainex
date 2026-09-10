@@ -89,6 +89,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
     }
 
+    const marketplaceJob = await prisma.marketplaceJob.findUnique({
+      where: { id: dispute.jobId },
+      select: { id: true, status: true },
+    })
+
     const updated = await prisma.dispute.update({
       where: { id: disputeId },
       data: {

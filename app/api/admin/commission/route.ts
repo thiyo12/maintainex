@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCommissionRate, calculateCommission } from '@/lib/mxid'
 import { getAdminSession } from '@/lib/admin-auth'
 import { createWorkItem } from '@/lib/work-queue'
 import crypto from 'crypto'
@@ -41,7 +40,7 @@ async function createCommissionPayment(settlementId: string, providerId: string,
   return payment.referenceNumber
 }
 
-// GET: List all commission settlements with optional filters
+// GET: List commission settlements derived from canonical CommissionSettlement records
 export async function GET(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
@@ -49,53 +48,51 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') // PENDING, PAID, OVERDUE, SUSPENDED
-    const providerType = searchParams.get('providerType') // TASKER, COMPANY
+    const status = searchParams.get('status')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
 
     const where: any = {}
-    if (status) where.status = status
-    if (providerType) where.providerType = providerType
+    if (status && status !== 'ALL' && status !== '') where.status = status
 
-    const settlements = await prisma.weeklySettlement.findMany({
-      where,
-      orderBy: { weekStart: 'desc' },
-      skip,
-      take: limit
-    })
+    const [settlements, total] = await Promise.all([
+      prisma.commissionSettlement.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.commissionSettlement.count({ where }),
+    ])
 
-    const total = await prisma.weeklySettlement.count({ where })
-
-    // Calculate summary stats
-    const summary = await prisma.weeklySettlement.aggregate({
+    const summary = await prisma.commissionSettlement.aggregate({
       where: { status: 'PENDING' },
-      _sum: { commissionOwed: true, totalEarnings: true },
-      _count: true
+      _sum: { commissionAmount: true, jobAmount: true },
+      _count: true,
     })
 
-    const overdueSummary = await prisma.weeklySettlement.aggregate({
-      where: { status: 'OVERDUE' },
-      _sum: { commissionOwed: true },
-      _count: true
+    const settledSummary = await prisma.commissionSettlement.aggregate({
+      where: { status: 'SETTLED' },
+      _sum: { commissionAmount: true },
+      _count: true,
     })
 
     return NextResponse.json({
       settlements,
       summary: {
-        pendingCommission: summary._sum.commissionOwed || 0,
-        pendingEarnings: summary._sum.totalEarnings || 0,
+        pendingCommission: Number(summary._sum.commissionAmount || 0n),
+        pendingJobAmount: Number(summary._sum.jobAmount || 0n),
         pendingCount: summary._count,
-        overdueCommission: overdueSummary._sum.commissionOwed || 0,
-        overdueCount: overdueSummary._count
+        settledCommission: Number(settledSummary._sum.commissionAmount || 0n),
+        settledCount: settledSummary._count,
       },
       pagination: {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     })
   } catch (error) {
     console.error('Commission GET error:', error)
@@ -103,7 +100,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Create weekly settlement for a provider
+// POST: Settle pending canonical CommissionSettlement records for a provider
 export async function POST(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
@@ -111,65 +108,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json()
-    const { providerId, providerType, weekStart } = body
+    const { providerId } = body
 
-    if (!providerId || !providerType || !weekStart) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!providerId) {
+      return NextResponse.json({ error: 'providerId is required' }, { status: 400 })
     }
 
-    const startDate = new Date(weekStart)
-    const weekEnd = new Date(startDate)
-    weekEnd.setDate(weekEnd.getDate() + 6)
-    weekEnd.setHours(23, 59, 59, 999)
-
-    const dueAt = new Date(weekEnd)
-    dueAt.setDate(dueAt.getDate() + 7)
-
-    const commissionRate = await getCommissionRate()
-
-    // Calculate total earnings for the week from completed jobs
-    const totalEarnings = await calculateWeeklyEarnings(providerId, startDate, weekEnd)
-    const commissionOwed = calculateCommission(totalEarnings, commissionRate)
-
-    const settlement = await prisma.weeklySettlement.upsert({
-      where: {
-        providerId_weekStart: {
-          providerId,
-          weekStart: startDate
-        }
-      },
-      create: {
-        providerId,
-        providerType,
-        weekStart: startDate,
-        weekEnd,
-        totalEarnings,
-        commissionRate,
-        commissionOwed,
-        dueAt,
-        status: commissionOwed > 0 ? 'PENDING' : 'PAID'
-      },
-      update: {
-        totalEarnings,
-        commissionRate,
-        commissionOwed,
-        status: commissionOwed > 0 ? 'PENDING' : 'PAID'
-      }
+    const pendingSettlements = await prisma.commissionSettlement.findMany({
+      where: { providerId, status: 'PENDING' },
+      orderBy: { createdAt: 'asc' },
     })
 
-    let commissionPaymentRef: string | null = null
-    if (commissionOwed > 0) {
-      commissionPaymentRef = await createCommissionPayment(settlement.id, providerId, commissionOwed)
+    if (pendingSettlements.length === 0) {
+      return NextResponse.json({ settlements: [], message: 'No pending settlements' })
     }
 
-    return NextResponse.json({ settlement, commissionPaymentRef })
+    const totalCommission = pendingSettlements.reduce(
+      (sum, s) => sum + Number(s.commissionAmount),
+      0
+    )
+
+    const settled = await prisma.$transaction(async (tx) => {
+      await tx.commissionSettlement.updateMany({
+        where: { providerId, status: 'PENDING' },
+        data: { status: 'SETTLED', settledAt: new Date() },
+      })
+      return pendingSettlements
+    })
+
+    return NextResponse.json({
+      settlements: settled,
+      totalCommission,
+      count: settled.length,
+    })
   } catch (error) {
     console.error('Commission POST error:', error)
-    return NextResponse.json({ error: 'Failed to create settlement' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to settle commission' }, { status: 500 })
   }
 }
 
-// PUT: Mark settlement as paid
+// PUT: Legacy WeeklySettlement actions (MARK_PAID, MARK_OVERDUE, SUSPEND, UNSUSPEND)
 export async function PUT(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
@@ -197,7 +175,6 @@ export async function PUT(request: NextRequest) {
         updateData = {
           status: 'OVERDUE'
         }
-        // Create work queue item for overdue settlement
         const overdueSettlement = await prisma.weeklySettlement.findUnique({
           where: { id: settlementId },
           select: { providerId: true, providerType: true, commissionOwed: true, weekStart: true, weekEnd: true }
@@ -219,7 +196,6 @@ export async function PUT(request: NextRequest) {
           status: 'SUSPENDED',
           suspendedAt: new Date()
         }
-        // Also suspend the provider
         const settlement = await prisma.weeklySettlement.findUnique({
           where: { id: settlementId }
         })
@@ -229,7 +205,7 @@ export async function PUT(request: NextRequest) {
             data: {
               isSuspended: true,
               suspensionReason: 'Weekly commission not paid',
-              suspendedUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+              suspendedUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             }
           })
         }
@@ -268,45 +244,4 @@ export async function PUT(request: NextRequest) {
     console.error('Commission PUT error:', error)
     return NextResponse.json({ error: 'Failed to update settlement' }, { status: 500 })
   }
-}
-
-// Helper: Calculate weekly earnings for a provider
-async function calculateWeeklyEarnings(providerId: string, weekStart: Date, weekEnd: Date): Promise<number> {
-  // Get completed jobs in the week from MarketplaceJob
-  const jobs = await prisma.marketplaceJob.findMany({
-    where: {
-      customerId: providerId, // This is actually the provider in JobQuote context
-      status: 'COMPLETED',
-      updatedAt: {
-        gte: weekStart,
-        lte: weekEnd
-      }
-    }
-  })
-
-  // Also check JobQuote accepted jobs
-  const quotes = await prisma.jobQuote.findMany({
-    where: {
-      providerId,
-      status: 'ACCEPTED',
-      updatedAt: {
-        gte: weekStart,
-        lte: weekEnd
-      }
-    }
-  })
-
-  let totalEarnings = 0
-
-  // Sum up job amounts
-  for (const job of jobs) {
-    totalEarnings += Number(job.budgetAmount) / 100 // Convert from cents
-  }
-
-  // Sum up quote amounts
-  for (const quote of quotes) {
-    totalEarnings += Number(quote.price) / 100 // Convert from cents
-  }
-
-  return totalEarnings
 }

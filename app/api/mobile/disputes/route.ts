@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { notifyAllAdmins } from '@/lib/admin-notifications'
 import { createWorkItem } from '@/lib/work-queue'
+import { raiseJobDispute } from '@/lib/domain/job-lifecycle'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,6 +17,32 @@ export async function POST(request: NextRequest) {
     const { jobId, reason, description } = await request.json()
     if (!jobId || !reason || !description) {
       return NextResponse.json({ error: 'jobId, reason, and description required' }, { status: 400 })
+    }
+
+    const marketplaceJob = await prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { id: true, title: true } })
+    if (marketplaceJob) {
+      await raiseJobDispute(
+        { jobId, actorId: user.id, actorType: 'CUSTOMER', reason },
+        jobId
+      )
+
+      await notifyAllAdmins('dispute_raised', `New Dispute: ${reason}`, `Dispute raised by ${user.name || user.email} on job "${marketplaceJob.title}"`, `/admin/marketplace/escrow`)
+
+      await createWorkItem({
+        category: 'dispute',
+        title: `Dispute: ${reason}`,
+        description: `${user.name || user.email} raised a dispute on job "${marketplaceJob.title}". ${description}`,
+        targetTable: 'MarketplaceJob',
+        targetId: jobId,
+      })
+
+      return NextResponse.json({
+        id: jobId,
+        jobId,
+        reason,
+        status: 'DISPUTED',
+        createdAt: new Date().toISOString(),
+      })
     }
 
     const job = await prisma.jobPosting.findUnique({ where: { id: jobId } })

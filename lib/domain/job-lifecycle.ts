@@ -622,6 +622,50 @@ export async function raiseJobDispute(
   })
 }
 
+export async function expirePendingEscrow(
+  escrowId: string,
+  options?: { actorId?: string }
+): Promise<{ jobId: string; reverted: boolean }> {
+  const escrow = await prisma.jobEscrow.findUnique({ where: { id: escrowId } })
+  if (!escrow) throw new Error('Escrow not found')
+  if (escrow.status !== 'PENDING_PAYMENT') return { jobId: escrow.jobId, reverted: false }
+
+  const actorId = options?.actorId ?? 'system'
+
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.jobEscrow.updateMany({
+      where: { id: escrowId, status: 'PENDING_PAYMENT' },
+      data: { status: 'CANCELLED' },
+    })
+    if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
+
+    await tx.marketplaceJob.updateMany({
+      where: { id: escrow.jobId, status: 'QUOTE_ACCEPTED' },
+      data: { status: 'OPEN', isActive: true },
+    })
+
+    const acceptedQuote = await tx.jobQuote.findFirst({
+      where: { jobId: escrow.jobId, status: 'ACCEPTED' },
+    })
+    if (acceptedQuote) {
+      await tx.jobQuote.updateMany({
+        where: { id: acceptedQuote.id, status: 'ACCEPTED' },
+        data: { status: 'PENDING' },
+      })
+    }
+
+    const workspace = await tx.jobWorkspace.findUnique({ where: { jobId: escrow.jobId } })
+    if (workspace && workspace.progressStatus !== 'ACCEPTED') {
+      await tx.jobWorkspace.updateMany({
+        where: { jobId: escrow.jobId, progressStatus: workspace.progressStatus },
+        data: { progressStatus: 'ACCEPTED' },
+      })
+    }
+  })
+
+  return { jobId: escrow.jobId, reverted: true }
+}
+
 export async function verifyOtpAndStartJob(
   ctx: TransitionContext,
   jobId: string,

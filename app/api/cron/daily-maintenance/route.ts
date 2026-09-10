@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notifyEscrowTimeout } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
+import { expirePendingEscrow } from '@/lib/domain/job-lifecycle'
+import { markFailed } from '@/lib/payout-engine'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,20 +38,8 @@ export async function GET(request: NextRequest) {
 
     let escrowTimeouts = 0
     for (const escrow of staleEscrows) {
-      const acceptedQuote = await prisma.jobQuote.findFirst({
-        where: { jobId: escrow.jobId, status: 'ACCEPTED' },
-      })
-
-      await prisma.$transaction(async (tx) => {
-        await tx.jobEscrow.update({ where: { id: escrow.id, status: 'PENDING_PAYMENT' }, data: { status: 'CANCELLED' } })
-        await tx.marketplaceJob.update({
-          where: { id: escrow.jobId },
-          data: { status: 'OPEN', isActive: true },
-        })
-        if (acceptedQuote) {
-          await tx.jobQuote.update({ where: { id: acceptedQuote.id }, data: { status: 'PENDING' } })
-        }
-      })
+      const { reverted } = await expirePendingEscrow(escrow.id, { actorId: 'system' })
+      if (!reverted) continue
 
       notifyEscrowTimeout(escrow.jobId, escrow.providerId)
       const provider = await prisma.user.findUnique({
@@ -78,13 +68,12 @@ export async function GET(request: NextRequest) {
 
     let payoutsFailed = 0
     for (const payout of staleProcessing) {
-      await prisma.payout.update({
-        where: { id: payout.id },
-        data: {
-          status: 'FAILED',
-          rejectedReason: 'Auto-failed: payout stuck in processing for over 48 hours',
-        },
-      })
+      await markFailed(
+        payout.id,
+        'Auto-failed: payout stuck in processing for over 48 hours',
+        `cron-daily-maintenance-fail:${payout.id}`,
+        'system'
+      )
       payoutsFailed++
     }
 
