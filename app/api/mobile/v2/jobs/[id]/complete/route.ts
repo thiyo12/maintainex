@@ -1,30 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, type ActorType } from '@/lib/domain/job-lifecycle'
+import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } from '@/lib/notifications'
-
-async function resolveProviderActor(jobId: string, userId: string): Promise<ActorType | null> {
-  const acceptedQuote = await prisma.jobQuote.findFirst({
-    where: { jobId, status: 'ACCEPTED' },
-    select: { providerId: true, providerType: true },
-  })
-  if (!acceptedQuote) return null
-
-  if (acceptedQuote.providerType === 'INDIVIDUAL' && acceptedQuote.providerId === userId) {
-    return 'PROVIDER'
-  }
-
-  if (acceptedQuote.providerType === 'COMPANY') {
-    const membership = await prisma.teamMember.findFirst({
-      where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
-      select: { id: true },
-    })
-    if (membership) return 'COMPANY'
-  }
-
-  return null
-}
 
 export async function POST(
   request: NextRequest,

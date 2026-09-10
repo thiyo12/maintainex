@@ -11,6 +11,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   const providerUserId = `${prefix}-prov`
   const companyOwnerId = `${prefix}-co-owner`
   const companyWorkerId = `${prefix}-co-worker`
+  const unrelatedUserId = `${prefix}-unrelated`
   const companyProfileId = `${prefix}-company`
   const templateJobId = `${prefix}-template`
   const categoryId = `${prefix}-cat`
@@ -33,7 +34,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     await prisma.templateJob.deleteMany({ where: { id: templateJobId } })
     await prisma.jobCategory.deleteMany({ where: { id: categoryId } })
     await prisma.taskerProfile.deleteMany({ where: { userId: { in: [providerUserId, companyWorkerId] } } })
-    await prisma.user.deleteMany({ where: { id: { in: [customerUserId, providerUserId, companyOwnerId, companyWorkerId] } } })
+    await prisma.user.deleteMany({ where: { id: { in: [customerUserId, providerUserId, companyOwnerId, companyWorkerId, unrelatedUserId] } } })
     await prisma.$disconnect()
   })
 
@@ -51,6 +52,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
         { id: providerUserId, email: `${providerUserId}@test.com`, passwordHash: 'h', name: 'Race Provider', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
         { id: companyOwnerId, email: `${companyOwnerId}@test.com`, passwordHash: 'h', name: 'Race Co Owner', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
         { id: companyWorkerId, email: `${companyWorkerId}@test.com`, passwordHash: 'h', name: 'Race Co Worker', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
+        { id: unrelatedUserId, email: `${unrelatedUserId}@test.com`, passwordHash: 'h', name: 'Unrelated User', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
       ],
     })
 
@@ -310,5 +312,52 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
       where: { referenceType: 'ESCROW_RELEASE', idempotencyKey: `escrow-release:${jobId}` },
     })
     expect(ledgerEntries.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('COMPANY authorization: active authorized worker → allowed', async () => {
+    const { resolveProviderActor, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+
+    const { jobId } = await createReadyJob('auth-active', companyProfileId, 'COMPANY')
+
+    const actorType = await resolveProviderActor(jobId, companyWorkerId)
+    expect(actorType).toBe('COMPANY')
+
+    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: actorType! }, 'COMPLETION_REQUESTED')
+
+    const ws = await prisma.jobWorkspace.findUnique({ where: { jobId } })
+    expect(ws?.progressStatus).toBe('COMPLETION_REQUESTED')
+  })
+
+  it('COMPANY authorization: unrelated user → denied', async () => {
+    const { resolveProviderActor, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+
+    const { jobId } = await createReadyJob('auth-unrelated', companyProfileId, 'COMPANY')
+
+    const actorType = await resolveProviderActor(jobId, unrelatedUserId)
+    expect(actorType).toBeNull()
+
+    await expect(
+      transitionJobWorkspace({ jobId, actorId: unrelatedUserId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    ).rejects.toThrow()
+  })
+
+  it('COMPANY authorization: inactive TeamMember → denied', async () => {
+    const { resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+
+    const inactiveWorkerId = `${prefix}-inactive-worker`
+    await prisma.user.create({
+      data: { id: inactiveWorkerId, email: `${inactiveWorkerId}@test.com`, passwordHash: 'h', name: 'Inactive Worker', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
+    })
+    await prisma.teamMember.create({
+      data: { companyId: companyProfileId, userId: inactiveWorkerId, name: 'Inactive', role: 'WORKER', status: 'INACTIVE', skills: '[]' },
+    })
+
+    const { jobId } = await createReadyJob('auth-inactive', companyProfileId, 'COMPANY')
+
+    const actorType = await resolveProviderActor(jobId, inactiveWorkerId)
+    expect(actorType).toBeNull()
+
+    await prisma.teamMember.deleteMany({ where: { companyId: companyProfileId, userId: inactiveWorkerId } })
+    await prisma.user.delete({ where: { id: inactiveWorkerId } })
   })
 })

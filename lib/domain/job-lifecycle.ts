@@ -3,12 +3,35 @@ import { postLedgerTransaction } from '@/lib/ledger'
 import { bigIntToSafeNumber } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
+import { Prisma } from '@prisma/client'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
 export type WorkspaceStatus = 'ACCEPTED' | 'IN_PROGRESS' | 'WAITING_CUSTOMER' | 'COMPLETION_REQUESTED' | 'COMPLETED' | 'DISPUTED'
 export type EscrowStatus = 'PENDING_PAYMENT' | 'PROTECTED' | 'ON_HOLD' | 'RELEASED' | 'REFUNDED' | 'CANCELLED'
 export type ActorType = 'CUSTOMER' | 'PROVIDER' | 'COMPANY' | 'STAFF' | 'SYSTEM'
+
+export async function resolveProviderActor(jobId: string, userId: string): Promise<ActorType | null> {
+  const acceptedQuote = await prisma.jobQuote.findFirst({
+    where: { jobId, status: 'ACCEPTED' },
+    select: { providerId: true, providerType: true },
+  })
+  if (!acceptedQuote) return null
+
+  if (acceptedQuote.providerType === 'INDIVIDUAL' && acceptedQuote.providerId === userId) {
+    return 'PROVIDER'
+  }
+
+  if (acceptedQuote.providerType === 'COMPANY') {
+    const membership = await prisma.teamMember.findFirst({
+      where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
+      select: { id: true },
+    })
+    if (membership) return 'COMPANY'
+  }
+
+  return null
+}
 
 export interface TransitionContext {
   jobId: string
@@ -521,12 +544,17 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   return { refundAmount: refundMajor, refundCents }
 }
 
-async function verifyDisputeAuthorization(job: { customerId: string }, ctx: TransitionContext) {
+async function verifyDisputeAuthorization(
+  job: { customerId: string },
+  ctx: TransitionContext,
+  tx?: Prisma.TransactionClient
+) {
   const isCustomer = job.customerId === ctx.actorId
   const isStaff = ctx.actorType === 'STAFF'
   if (isCustomer || isStaff) return
 
-  const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId: ctx.jobId, status: 'ACCEPTED' } })
+  const db = tx ?? prisma
+  const acceptedQuote = await db.jobQuote.findFirst({ where: { jobId: ctx.jobId, status: 'ACCEPTED' } })
   if (!acceptedQuote) throw new Error('No accepted quote')
 
   if (ctx.actorType === 'COMPANY') {
@@ -555,7 +583,7 @@ export async function raiseJobDispute(
       throw new Error('Cannot dispute completed or cancelled jobs')
     }
 
-    await verifyDisputeAuthorization(job, ctx)
+    await verifyDisputeAuthorization(job, ctx, tx)
 
     const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
     if (!workspace) throw new Error('Workspace not found')

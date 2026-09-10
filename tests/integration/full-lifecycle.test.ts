@@ -231,7 +231,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: bookResult.job.id } })
     expect(quote?.providerType).toBe('COMPANY')
 
-    const { acceptJobQuote, fundEscrow, verifyOtpAndStartJob, transitionJobWorkspace, completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { acceptJobQuote, fundEscrow, verifyOtpAndStartJob, transitionJobWorkspace, completeAndReleaseEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
 
     await acceptJobQuote(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
@@ -264,8 +264,11 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const wsAfterOtp = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAfterOtp?.progressStatus).toBe('IN_PROGRESS')
 
+    const resolvedActorType = await resolveProviderActor(bookResult.job.id, companyUserId)
+    expect(resolvedActorType).toBe('COMPANY')
+
     await transitionJobWorkspace(
-      { jobId: bookResult.job.id, actorId: companyUserId, actorType: 'PROVIDER' },
+      { jobId: bookResult.job.id, actorId: companyUserId, actorType: resolvedActorType! },
       'COMPLETION_REQUESTED'
     )
 
