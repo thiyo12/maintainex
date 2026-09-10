@@ -1,11 +1,18 @@
-export type Currency = 'LKR';
+export type Currency = 'LKR' | 'CAD';
 
 export const CURRENCY_EXPONENTS: Record<Currency, number> = {
   LKR: 2,
+  CAD: 2,
 };
 
 export const CURRENCY_SYMBOLS: Record<Currency, string> = {
   LKR: 'Rs.',
+  CAD: '$',
+};
+
+export const CURRENCY_NAMES: Record<Currency, string> = {
+  LKR: 'Sri Lankan Rupee',
+  CAD: 'Canadian Dollar',
 };
 
 export interface MoneyAmount {
@@ -217,3 +224,12 @@ export function bigIntToSafeNumber(value: bigint): number {
 }
 
 export const ZERO_LKR: MoneyAmount = { amount: 0n, currency: 'LKR' };
+export const ZERO_CAD: MoneyAmount = { amount: 0n, currency: 'CAD' };
+
+export function getCurrencyForCountry(countryCode: string): Currency {
+  switch (countryCode) {
+    case 'CA': return 'CAD'
+    case 'LK': return 'LKR'
+    default: return 'LKR'
+  }
+}

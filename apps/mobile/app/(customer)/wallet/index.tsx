@@ -7,6 +7,9 @@ import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { fonts } from '../../../lib/fonts'
 import { v2Wallet } from '../../../lib/api-v2'
+import { formatCurrency, getCurrencyForCountry } from '../../../lib/currency-format'
+import { Currency } from '../../../lib/money'
+import { useCountry } from '../../../lib/country'
 
 const TX_ICONS: Record<string, { name: string; bg: string }> = {
   ESCROW_RELEASE:  { name: 'lock-closed-outline', bg: '#FEF3C7' },
@@ -26,6 +29,8 @@ export default function CustomerWalletScreen() {
   const { t } = useTranslation()
   const colors = useColors()
   const router = useRouter()
+  const { selectedCountry } = useCountry()
+  const currency: Currency = getCurrencyForCountry(selectedCountry?.code || 'LK')
   const [wallet, setWallet] = useState<any>(null)
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,9 +78,9 @@ export default function CustomerWalletScreen() {
           <View style={styles.balanceBg}>
             <Text style={styles.balanceLabel}>Available Balance</Text>
             <Text style={styles.balanceAmt}>
-              {(wallet.balance ?? 0).toLocaleString('en-LK', { minimumFractionDigits: 2 })}
+              {formatCurrency(BigInt(wallet.balance ?? 0), currency)}
             </Text>
-            <Text style={styles.balanceCurr}>{wallet.currency || 'LKR'}</Text>
+            <Text style={styles.balanceCurr}>{currency}</Text>
           </View>
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.actionBtn, styles.addBtn]} onPress={() => router.push('/(customer)/wallet/topup')} activeOpacity={0.8}>
@@ -121,7 +126,7 @@ export default function CustomerWalletScreen() {
                 </Text>
               </View>
               <Text style={[styles.txAmt, { color: tx.type === 'CREDIT' ? '#22C55E' : colors.ink }]}>
-                {tx.type === 'CREDIT' ? '+' : '-'}LKR {tx.amount.toLocaleString()}
+                {tx.type === 'CREDIT' ? '+' : '-'}{formatCurrency(BigInt(tx.amount), currency)}
               </Text>
             </View>
           )

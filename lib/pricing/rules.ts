@@ -2,6 +2,7 @@ import { PricingConfig } from './types'
 
 const DEFAULT_CONFIG: PricingConfig = {
   countryCode: 'GLOBAL',
+  defaultCurrency: 'LKR',
   pricingVersion: 'v1',
   commissionRateBps: 1000,
   urgentModifierBps: 2500,
@@ -28,6 +29,7 @@ export async function resolvePricingConfig(
 
   return {
     countryCode,
+    defaultCurrency: cfg.defaultCurrency ?? 'LKR',
     pricingVersion: cfg.pricingVersion ?? 'v1',
     commissionRateBps: cfg.commissionRateBps ?? 1000,
     urgentModifierBps: cfg.urgentModifierBps ?? 2500,

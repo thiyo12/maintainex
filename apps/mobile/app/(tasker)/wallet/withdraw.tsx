@@ -5,6 +5,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Wallet } from '../../../lib/api-v2'
+import { formatCurrency, getCurrencyForCountry } from '../../../lib/currency-format'
+import { Currency } from '../../../lib/money'
+import { useCountry } from '../../../lib/country'
 
 const METHODS = [
   { id: 'bank_transfer', label: 'Bank Transfer', sub: '2-3 business days', icon: 'business-outline' },
@@ -16,6 +19,8 @@ const METHODS = [
 export default function WithdrawScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
+  const { selectedCountry } = useCountry()
+  const currency: Currency = getCurrencyForCountry(selectedCountry?.code || 'LK')
   const [wallet, setWallet] = useState<any>(null)
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('bank_transfer')
@@ -27,7 +32,7 @@ export default function WithdrawScreen() {
 
   const handleWithdraw = async () => {
     const amt = parseFloat(amount)
-    if (!amt || amt < 500) { Alert.alert('Minimum withdrawal is LKR 500'); return }
+    if (!amt || amt < 500) { Alert.alert(`Minimum withdrawal is ${formatCurrency(BigInt(50000), currency)}`); return }
     if (!wallet || amt > (wallet.availableBalance || 0)) { Alert.alert('Insufficient balance'); return }
     setLoading(true)
     try {
@@ -50,11 +55,11 @@ export default function WithdrawScreen() {
       <ScrollView>
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available Balance</Text>
-          <Text style={styles.balanceAmt}>LKR {available.toLocaleString()}</Text>
+          <Text style={styles.balanceAmt}>{formatCurrency(BigInt(available), currency)}</Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Amount to withdraw (LKR)</Text>
+          <Text style={styles.label}>Amount to withdraw ({currency})</Text>
           <TextInput
             style={styles.input}
             value={amount}
@@ -63,7 +68,7 @@ export default function WithdrawScreen() {
             placeholderTextColor={colors.muted}
             keyboardType="decimal-pad"
           />
-          <Text style={styles.hint}>Minimum LKR 500 • Estimated 24 hours</Text>
+          <Text style={styles.hint}>Minimum {formatCurrency(BigInt(50000), currency)} • Estimated 24 hours</Text>
         </View>
 
         <View style={styles.section}>
@@ -95,7 +100,7 @@ export default function WithdrawScreen() {
           >
             <Ionicons name="arrow-up-circle-outline" size={18} color="#111827" />
             <Text style={styles.btnTxt}>
-              {loading ? 'Processing...' : `Withdraw LKR ${numAmt ? numAmt.toLocaleString() : '0'}`}
+              {loading ? 'Processing...' : `Withdraw ${formatCurrency(BigInt(Math.round(numAmt * 100)), currency)}`}
             </Text>
           </TouchableOpacity>
         </View>

@@ -44,6 +44,7 @@ export interface PriceSnapshotData {
 
 export interface PricingConfig {
   countryCode: string
+  defaultCurrency: string
   pricingVersion: string
   commissionRateBps: number
   urgentModifierBps: number

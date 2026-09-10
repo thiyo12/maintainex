@@ -18,8 +18,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const jobCategoryId = searchParams.get('jobCategoryId')
     const slug = searchParams.get('slug')
+    const country = searchParams.get('country') || 'LK'
 
-    const where: any = { isActive: true }
+    const where: any = { isActive: true, countryCode: country }
     if (jobCategoryId) where.jobCategoryId = jobCategoryId
     if (slug) where.slug = slug
 

@@ -406,7 +406,7 @@ export async function releaseEscrow(
         balanceBefore: providerWallet.availableBalance - netMajor,
         balanceAfter: providerWallet.availableBalance,
         reference: commissionCents > 0n
-          ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+          ? `Escrow release for job ${jobId} (${rate}% commission: ${escrow.currency || 'LKR'} ${commissionMajor})`
           : `Escrow release for job ${jobId}`,
         referenceType: 'ESCROW_RELEASE',
         referenceId: escrow.id,
@@ -841,7 +841,7 @@ export async function completeAndReleaseEscrow(
         balanceBefore: providerWallet.availableBalance - netMajor,
         balanceAfter: providerWallet.availableBalance,
         reference: commissionCents > 0n
-          ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+          ? `Escrow release for job ${jobId} (${rate}% commission: ${escrow.currency || 'LKR'} ${commissionMajor})`
           : `Escrow release for job ${jobId}`,
         referenceType: 'ESCROW_RELEASE',
         referenceId: escrow.id,

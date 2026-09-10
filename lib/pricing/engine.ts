@@ -122,7 +122,7 @@ export async function calculatePrice(
     platformFeeBps: config.commissionRateBps,
     platformFeeAmount,
     customerTotal,
-    currency: 'LKR',
+    currency: config.defaultCurrency || 'LKR',
     pricingVersion: config.pricingVersion,
     ruleIds,
   }

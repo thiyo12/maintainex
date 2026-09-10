@@ -61,7 +61,7 @@ export function adminAuthorize(allowedRoles: AdminRole[]) {
 export function getCountryFilter(session: AdminSession): Record<string, any> {
   if (session.role === 'SUPER_ADMIN') return {}
   if (session.assignedCountries.length === 0) return { id: '__NONE__' }
-  return { country: { in: session.assignedCountries } }
+  return { countryCode: { in: session.assignedCountries } }
 }
 
 export async function createAuditLog(params: {

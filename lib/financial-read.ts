@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { legacyToMinorUnits } from './money';
+import { legacyToMinorUnits, type Currency } from './money';
 
 export interface CanonicalWalletBalance {
   walletId: string;
@@ -7,12 +7,14 @@ export interface CanonicalWalletBalance {
   balance: bigint;
   availableBalance: bigint;
   pendingBalance: bigint;
+  currency: Currency;
   version: number;
 }
 
 async function queryWalletBalance(
   userId: string,
-  walletType: string
+  walletType: string,
+  currency: Currency = 'LKR'
 ): Promise<CanonicalWalletBalance | null> {
   const table = walletType === 'PROVIDER' ? 'ProviderWallet' : 'CustomerWallet';
   const rows = await prisma.$queryRawUnsafe<Array<{
@@ -21,14 +23,15 @@ async function queryWalletBalance(
     balance: bigint;
     availableBalance: bigint;
     pendingBalance: bigint;
+    currency: string;
     version: number;
   }>>(
-    `SELECT wb."walletId", wb."walletType", wb.balance, wb."availableBalance", wb."pendingBalance", wb.version
+    `SELECT wb."walletId", wb."walletType", wb.balance, wb."availableBalance", wb."pendingBalance", wb.currency, wb.version
      FROM "WalletBalance" wb
      INNER JOIN "${table}" w ON w.id = wb."walletId"
-     WHERE w."userId" = $1 AND wb."walletType" = $2
+     WHERE w."userId" = $1 AND wb."walletType" = $2 AND wb.currency = $3
      LIMIT 1`,
-    userId, walletType
+    userId, walletType, currency
   );
   if (rows.length === 0) return null;
   const row = rows[0];
@@ -38,20 +41,23 @@ async function queryWalletBalance(
     balance: row.balance,
     availableBalance: row.availableBalance,
     pendingBalance: row.pendingBalance,
+    currency: (row.currency || 'LKR') as Currency,
     version: row.version,
   };
 }
 
 export async function readCanonicalProviderBalance(
-  userId: string
+  userId: string,
+  currency: Currency = 'LKR'
 ): Promise<CanonicalWalletBalance | null> {
-  return queryWalletBalance(userId, 'PROVIDER');
+  return queryWalletBalance(userId, 'PROVIDER', currency);
 }
 
 export async function readCanonicalCustomerBalance(
-  userId: string
+  userId: string,
+  currency: Currency = 'LKR'
 ): Promise<CanonicalWalletBalance | null> {
-  return queryWalletBalance(userId, 'CUSTOMER');
+  return queryWalletBalance(userId, 'CUSTOMER', currency);
 }
 
 export async function readLegacyProviderBalance(userId: string): Promise<number | null> {

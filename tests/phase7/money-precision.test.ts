@@ -35,6 +35,7 @@ import { PricingConfig } from '@/lib/pricing/types'
 
 const defaultConfig: PricingConfig = {
   countryCode: 'GLOBAL',
+  defaultCurrency: 'LKR',
   pricingVersion: 'v1',
   commissionRateBps: 1000,
   urgentModifierBps: 2500,

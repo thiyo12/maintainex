@@ -16,6 +16,7 @@ model User {
   phone             String?
   phoneVerified     Boolean   @default(false)
   role              String    @default("CUSTOMER")
+  countryCode       String    @default("LK")
   isActive          Boolean   @default(true)
   emailVerified     Boolean   @default(false)
   isSuspended       Boolean   @default(false)
@@ -134,6 +135,7 @@ model Category {
   icon         String?
   image        String?
   coverImage   String?
+  countryCode  String   @default("LK")
   displayOrder Int      @default(0)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
@@ -166,6 +168,7 @@ model Service {
   duration         Int
   features         String
   image            String?
+  countryCode      String   @default("LK")
   displayOrder     Int      @default(0)
   views            Int      @default(0)
   isTrending       Boolean  @default(false)
@@ -1195,6 +1198,7 @@ model TaskerSkill {
   hourlyRate      Float         @default(0)
   fixedRate       Float         @default(0)
   currency        String        @default("LKR")
+  countryCode     String        @default("LK")
 
   @@unique([taskerId, jobId])
   @@index([taskerId])
@@ -1232,6 +1236,7 @@ model TaskerProfile {
   hourlyRate    Float   @default(0)
   skills        String? // Category slugs
   serviceAreas  String? // District names
+  countryCode   String  @default("LK")
   rating        Float   @default(0)
   completedJobs Int     @default(0)
   isVerified    Boolean @default(false)
@@ -1428,6 +1433,7 @@ model Dispute {
   description String
   resolution  String?
   status      String     @default("OPEN") // OPEN, UNDER_REVIEW, RESOLVED, DISMISSED
+  countryCode String     @default("LK")
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -1452,6 +1458,7 @@ model CompanyProfile {
   description       String?
   services          String
   serviceAreas      String
+  countryCode       String  @default("LK")
   rating            Float   @default(0)
   completedProjects Int     @default(0)
   isVerified        Boolean @default(false)
@@ -1691,6 +1698,8 @@ model Payout {
   bankDetails    String? // JSON: account holder / account number / branch / bank name / notes
   rejectedReason String? // set when status = REJECTED
   processedBy    String? // AdminUser email/id that processed this payout
+  currency       String    @default("LKR")
+  countryCode    String    @default("LK")
   createdAt      DateTime  @default(now())
   clearedAt      DateTime?
 
@@ -1899,6 +1908,7 @@ model JobEscrow {
   serviceFee      BigInt // platform fee in cents
   totalAmount     BigInt // amount + fee in cents
   paymentMethod   String    @default("CARD") // CARD, CASH
+  currency        String    @default("LKR")
   status          String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
   heldAt          DateTime?
   releasedAt      DateTime?
@@ -1922,6 +1932,8 @@ model CommissionSettlement {
   jobAmount        BigInt // total job amount in cents (excl. fees)
   commissionRate   Float     @default(10.0) // Changed from 15 to 10
   commissionAmount BigInt // jobAmount * commissionRate / 10000 (bps calc)
+  currency         String    @default("LKR")
+  countryCode      String    @default("LK")
   status           String    @default("PENDING") // PENDING, SETTLED
   settledAt        DateTime?
   createdAt        DateTime  @default(now())
@@ -1948,6 +1960,7 @@ model ProviderWallet {
   availableBalance Float    @default(0)
   pendingBalance   Float    @default(0)
   isFrozen         Boolean  @default(false)
+  currency         String   @default("LKR")
   updatedAt        DateTime @updatedAt
   createdAt        DateTime @default(now())
 }
@@ -1957,6 +1970,7 @@ model CustomerWallet {
   userId    String   @unique
   balance   Float    @default(0)
   isFrozen  Boolean  @default(false)
+  currency  String   @default("LKR")
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
@@ -1972,6 +1986,7 @@ model WalletTransaction {
   reference     String
   referenceType String // ESCROW_RELEASE, ESCROW_REFUND, WITHDRAWAL, SERVICE_FEE
   referenceId   String?
+  currency      String   @default("LKR")
   status        String   @default("COMPLETED") // PENDING, COMPLETED, FAILED
   createdAt     DateTime @default(now())
 
@@ -2034,6 +2049,7 @@ model IdentityDocument {
   reviewNote String?
   reviewedBy String?
   reviewedAt DateTime?
+  countryCode String   @default("LK")
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -2225,6 +2241,7 @@ model PriceSnapshot {
 model MarketConfig {
   id                 String  @id @default(cuid())
   countryCode        String  @unique // "GLOBAL" for defaults, "LK", "CA" etc.
+  defaultCurrency    String  @default("LKR")
   matchingVersion    String  @default("v1")
   pricingVersion     String  @default("v1")
   // Matching weights (must sum to 100)
@@ -2680,6 +2697,8 @@ model WeeklySettlement {
   status             String              @default("PENDING") // PENDING, PAID, OVERDUE, SUSPENDED
   suspendedAt        DateTime?
   notes              String?
+  currency           String              @default("LKR")
+  countryCode        String              @default("LK")
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   commissionPayments CommissionPayment[]
@@ -2703,6 +2722,8 @@ model CommissionPayment {
   status             String           @default("PENDING") // PENDING, CONFIRMED
   confirmedById      String? // AdminUser id (FINANCE or SUPER_ADMIN)
   confirmedAt        DateTime?
+  currency           String           @default("LKR")
+  countryCode        String           @default("LK")
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -2726,6 +2747,7 @@ model OffPlatformDeal {
   actionNote      String? // Admin note on action taken
   reviewedBy      String? // Admin ID who reviewed
   reviewedAt      DateTime?
+  countryCode     String    @default("LK")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -2809,11 +2831,12 @@ model WalletBalance {
   balance          BigInt   @default(0)
   availableBalance BigInt   @default(0)
   pendingBalance   BigInt   @default(0)
+  currency         String   @default("LKR")
   version          Int      @default(1)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  @@unique([walletType, walletId])
+  @@unique([walletType, walletId, currency])
   @@index([walletId])
   @@index([walletType])
 }

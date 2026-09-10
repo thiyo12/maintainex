@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { toE164 } from '@/lib/phone'
 
 export const customerSearchSchema = z.object({
   query: z.string().min(1).max(100).optional(),
@@ -68,7 +69,7 @@ export function sanitizeInput(input: string): string {
 }
 
 export function sanitizePhone(phone: string): string {
-  return phone.replace(/[^0-9+]/g, '').substring(0, 20)
+  return toE164(phone)
 }
 
 export function validateEmail(email: string): boolean {

@@ -153,9 +153,13 @@ export async function findCandidates(
   if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)
 
   const individualProfiles = await client.taskerProfile.findMany({
-    where: { verificationStatus: 'VERIFIED', isVerified: true },
+    where: {
+      verificationStatus: 'VERIFIED',
+      isVerified: true,
+      user: input.countryCode ? { countryCode: input.countryCode } : undefined,
+    },
     include: {
-      user: { select: { id: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true } },
+      user: { select: { id: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
       taskerSkills: {
         select: {
           jobId: true,
@@ -221,9 +225,13 @@ export async function findCandidates(
   }
 
   const companies = await client.companyProfile.findMany({
-    where: { verificationStatus: 'VERIFIED', isVerified: true },
+    where: {
+      verificationStatus: 'VERIFIED',
+      isVerified: true,
+      user: input.countryCode ? { countryCode: input.countryCode } : undefined,
+    },
     include: {
-      user: { select: { id: true, isSuspended: true, isBanned: true } },
+      user: { select: { id: true, isSuspended: true, isBanned: true, countryCode: true } },
       specialties: { select: { categoryId: true, jobId: true } },
     },
   })

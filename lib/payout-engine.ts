@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
-import { bigIntToSafeNumber } from '@/lib/money'
+import { bigIntToSafeNumber, type Currency, getCurrencyForCountry } from '@/lib/money'
 
 export type PayoutStatus =
   | 'REQUESTED'
@@ -62,14 +62,16 @@ export async function requestPayout(
   method: string,
   bankDetails: string | null,
   idempotencyKey: string,
-  createdBy: string
+  createdBy: string,
+  currency: Currency = 'LKR'
 ): Promise<PayoutResult> {
-  const minPayoutCents = 50000n
+  const minPayoutCents = currency === 'CAD' ? 5000n : 50000n
   if (amountCents <= 0n) {
     return { ok: false, error: 'Withdrawal amount must be positive', code: 'INVALID_AMOUNT' }
   }
   if (amountCents < minPayoutCents) {
-    return { ok: false, error: 'Minimum withdrawal is LKR 500', code: 'BELOW_MINIMUM' }
+    const minLabel = currency === 'CAD' ? 'CAD 50' : 'LKR 500'
+    return { ok: false, error: `Minimum withdrawal is ${minLabel}`, code: 'BELOW_MINIMUM' }
   }
 
   try {
@@ -96,9 +98,9 @@ export async function requestPayout(
       const locked = await tx.$queryRawUnsafe<Array<{ available: number }>>(
         `SELECT "availableBalance" as available
          FROM "WalletBalance"
-         WHERE "walletId" = $1 AND "walletType" = 'PROVIDER'
+         WHERE "walletId" = $1 AND "walletType" = 'PROVIDER' AND "currency" = $2
          FOR UPDATE`,
-        wallet.id,
+        wallet.id, currency,
       )
       if (locked.length === 0) throw new Error('BALANCE_NOT_FOUND')
 
@@ -118,7 +120,8 @@ export async function requestPayout(
           source: 'WITHDRAWAL',
           method,
           bankDetails,
-          description: `Withdrawal request for ${safeMajorAmount(amountCents).toFixed(2)} LKR`,
+          currency,
+          description: `Withdrawal request for ${safeMajorAmount(amountCents).toFixed(2)} ${currency}`,
         },
       })
 

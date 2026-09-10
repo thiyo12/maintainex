@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL']
 
@@ -10,6 +11,11 @@ export async function GET(request: NextRequest) {
     if (!session || !ALLOWED_ROLES.includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const countryFilter = getCountryFilter(session)
+    const userCountryFilter = session.role === 'SUPER_ADMIN' ? {} : { countryCode: countryFilter.countryCode || undefined }
+    const jobCountryFilter = session.role === 'SUPER_ADMIN' ? {} : { countryCode: countryFilter.countryCode || undefined }
+
     const [
       totalUsers,
       activeTaskers,
@@ -22,20 +28,22 @@ export async function GET(request: NextRequest) {
       usersByCountry,
       recentActivity,
     ] = await Promise.all([
-      prisma.user.count({ where: { isActive: true } }),
-      prisma.taskerProfile.count({ where: { isVerified: true } }),
-      prisma.companyProfile.count(),
-      prisma.marketplaceJob.count(),
-      prisma.marketplaceJob.count({ where: { status: 'OPEN' } }),
-      prisma.marketplaceJob.count({ where: { status: 'COMPLETED' } }),
-      prisma.marketplaceJob.count({ where: { status: 'CANCELLED' } }),
+      prisma.user.count({ where: { isActive: true, ...userCountryFilter } }),
+      prisma.taskerProfile.count({ where: { isVerified: true, ...userCountryFilter } }),
+      prisma.companyProfile.count({ where: userCountryFilter }),
+      prisma.marketplaceJob.count({ where: jobCountryFilter }),
+      prisma.marketplaceJob.count({ where: { status: 'OPEN', ...jobCountryFilter } }),
+      prisma.marketplaceJob.count({ where: { status: 'COMPLETED', ...jobCountryFilter } }),
+      prisma.marketplaceJob.count({ where: { status: 'CANCELLED', ...jobCountryFilter } }),
       prisma.commissionSettlement.aggregate({
         _sum: { commissionAmount: true, jobAmount: true },
         _count: true,
+        where: jobCountryFilter,
       }),
       prisma.user.groupBy({
         by: ['role'],
         _count: true,
+        where: userCountryFilter,
       }),
       prisma.activityLog.findMany({
         take: 20,
