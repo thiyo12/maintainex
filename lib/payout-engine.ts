@@ -102,7 +102,7 @@ export async function requestPayout(
       )
       if (locked.length === 0) throw new Error('BALANCE_NOT_FOUND')
 
-      const availableCents = BigInt(Math.round(locked[0].available * 100))
+      const availableCents = BigInt(locked[0].available)
       if (availableCents < amountCents) throw new Error('INSUFFICIENT_FUNDS')
 
       // Re-check idempotency after acquiring the wallet lock. A concurrent

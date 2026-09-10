@@ -9,12 +9,13 @@ const PREFIX = `phase5c-${Date.now()}`
 
 async function ensureWalletBalance(walletId: string, walletType: 'CUSTOMER' | 'PROVIDER', majorBalance: number) {
   if (!isPostgres) return
+  const minorBalance = BigInt(majorBalance) * 100n
   await prisma.$executeRawUnsafe(
     `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
      VALUES ($1, $2, $3, $4, $4, 0, 1, now(), now())
      ON CONFLICT ("walletType", "walletId")
      DO UPDATE SET "balance" = $4, "availableBalance" = $4, "pendingBalance" = 0, "updatedAt" = now()`,
-    `wb-${walletId}`, walletId, walletType, majorBalance
+    `wb-${walletId}`, walletId, walletType, minorBalance
   )
 }
 

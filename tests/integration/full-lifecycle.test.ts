@@ -94,6 +94,17 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
       ],
     })
 
+    const custWallet = await prisma.customerWallet.create({ data: { userId: customerUserId, balance: 100000 } })
+    await prisma.providerWallet.create({ data: { userId: individualProviderUserId, availableBalance: 0 } })
+    await prisma.providerWallet.create({ data: { userId: companyOwnerId, availableBalance: 0 } })
+
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
+       VALUES ($1, $1, 'CUSTOMER', 10000000, 10000000, 0, 1, NOW(), NOW())
+       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 10000000, "availableBalance" = 10000000`,
+      custWallet.id
+    )
+
     await prisma.companySpecialty.create({
       data: { companyId: companyProfileId, jobId: templateJobId },
     })

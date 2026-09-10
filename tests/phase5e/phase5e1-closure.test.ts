@@ -58,9 +58,8 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
   it('BigInt conversion helpers protect the major/minor boundary', () => {
     expect(money).toContain('bigIntToSafeNumber')
     expect(money).toContain('MAX_SAFE_INTEGER')
-    expect(financialRead).toContain('majorNumberToMinor')
-    expect(financialRead).toContain('Math.round(value * 100)')
-    expect(financialRead).not.toContain('balance: BigInt(row.balance)')
+    expect(financialRead).toContain('legacyToMinorUnits')
+    expect(financialRead).toContain('legacyToCanonicalMinor')
   })
 
   it('property boost is ledger-backed and transactionally mirrors legacy state', () => {

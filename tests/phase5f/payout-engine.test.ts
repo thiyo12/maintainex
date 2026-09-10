@@ -41,17 +41,17 @@ async function setupWallet() {
        (id, "walletId", "walletType", balance, "availableBalance", "pendingBalance", version, "createdAt", "updatedAt")
      VALUES (gen_random_uuid()::text, $1, 'PROVIDER', $2, $2, 0, 1, NOW(), NOW())`,
     WALLET_ID,
-    Number(OPENING_CENTS) / 100,
+    OPENING_CENTS,
   )
 }
 
 async function balanceMajor() {
-  const rows = await prisma.$queryRawUnsafe<Array<{ balance: number; available: number }>>(
+  const rows = await prisma.$queryRawUnsafe<Array<{ balance: bigint; available: bigint }>>(
     `SELECT balance, "availableBalance" AS available
      FROM "WalletBalance" WHERE "walletId" = $1 AND "walletType" = 'PROVIDER'`,
     WALLET_ID,
   )
-  return rows[0]
+  return { balance: Number(rows[0].balance) / 100, available: Number(rows[0].available) / 100 }
 }
 
 async function ledgerFor(payoutId: string) {

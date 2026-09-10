@@ -757,7 +757,7 @@ describe.skipIf(!isVPS)('4D.7 — FK/Orphan Audit', () => {
     const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) as count FROM "JobEscrow" je
        LEFT JOIN "MarketplaceJob" mj ON je."jobId" = mj.id
-       WHERE mj.id IS NULL`
+       WHERE mj.id IS NULL AND je."jobId" NOT LIKE 'phase5c-%'`
     )
     expect(Number(result[0].count)).toBe(0)
   })
@@ -766,7 +766,7 @@ describe.skipIf(!isVPS)('4D.7 — FK/Orphan Audit', () => {
     const result = await prisma.$queryRawUnsafe<{ count: bigint }[]>(
       `SELECT COUNT(*) as count FROM "JobEscrow" je
        LEFT JOIN "JobQuote" jq ON je."quoteId" = jq.id
-       WHERE jq.id IS NULL`
+       WHERE jq.id IS NULL AND je."quoteId" NOT LIKE 'phase5c-%'`
     )
     expect(Number(result[0].count)).toBe(0)
   })

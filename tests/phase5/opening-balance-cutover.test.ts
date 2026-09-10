@@ -84,7 +84,7 @@ describe('Phase 5D — Opening Balance Cutover', () => {
       data: {
         groupId: `opening_${preExistingWalletId}`,
         accountId: 'OPENING_BALANCE_OFFSET',
-        accountType: 'PLATFORM',
+        accountType: 'OPENING_BALANCE_OFFSET',
         entryType: 'DEBIT',
         amount: 20000n,
         currency: 'LKR',
@@ -202,7 +202,7 @@ describe('Phase 5D — Opening Balance Cutover', () => {
     );
     expect(credits.length).toBe(1);
     expect(credits[0].amount).toBe(20000n);
-    expect(credits[0].idempotencyKey).toBe('opening-balance-preexist-wallet-1');
+    expect(credits[0].idempotencyKey).toBe(`opening-balance-${preExistingWalletId}-1`);
   });
 
   it('double-entry balanced: each wallet has matching CREDIT + DEBIT on same groupId', async () => {
@@ -218,8 +218,8 @@ describe('Phase 5D — Opening Balance Cutover', () => {
         `opening-${walletId}`
       );
       expect(group.length).toBe(1);
-      expect(group[0].totalCredits).toBe(group[0].totalDebits);
-      expect(group[0].totalCredits).toBeGreaterThan(0n);
+      expect(BigInt(group[0].totalCredits)).toBe(BigInt(group[0].totalDebits));
+      expect(BigInt(group[0].totalCredits)).toBeGreaterThan(0n);
     }
   });
 

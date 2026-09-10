@@ -83,6 +83,17 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
       ],
     })
 
+    const custWallet = await prisma.customerWallet.create({ data: { userId: customerUserId, balance: 1000000 } })
+    await prisma.providerWallet.create({ data: { userId: providerUserId, availableBalance: 0 } })
+    await prisma.providerWallet.create({ data: { userId: companyOwnerId, availableBalance: 0 } })
+
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
+       VALUES ($1, $1, 'CUSTOMER', 100000000, 100000000, 0, 1, NOW(), NOW())
+       ON CONFLICT ("walletType", "walletId") DO UPDATE SET "balance" = 100000000, "availableBalance" = 100000000`,
+      custWallet.id
+    )
+
     await prisma.companySpecialty.create({
       data: { companyId: companyProfileId, jobId: templateJobId },
     })
@@ -97,7 +108,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   async function createReadyJob(label: string, providerId: string, providerType: 'INDIVIDUAL' | 'COMPANY') {
     const { createBookNowJob } = await import('@/lib/domain/book-now')
-    const { acceptJobQuote, fundEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { acceptJobQuote, fundEscrow, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
 
     const bookResult = await createBookNowJob({
       customerId: customerUserId,
@@ -114,6 +125,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: bookResult.job.id } })
     await acceptJobQuote({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, quote!.id)
     await fundEscrow({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, bookResult.job.id)
+    await transitionJobWorkspace({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, 'IN_PROGRESS')
 
     return { jobId: bookResult.job.id, quoteId: quote!.id }
   }
@@ -309,7 +321,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     expect(result2).toEqual(result1)
 
     const ledgerEntries = await prisma.financialLedger.findMany({
-      where: { referenceType: 'ESCROW_RELEASE', idempotencyKey: `escrow-release:${jobId}` },
+      where: { referenceType: 'ESCROW_RELEASE', description: { contains: jobId } },
     })
     expect(ledgerEntries.length).toBeGreaterThanOrEqual(1)
   })

@@ -9,8 +9,8 @@ const TEST_WALLET_TYPE = 'CUSTOMER'
 describe('WalletBalance BigInt precision', () => {
   beforeAll(async () => {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version")
-       VALUES ($1, $1, $2, 0, 0, 0, 1)
+      `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
+       VALUES ($1, $1, $2, 0, 0, 0, 1, NOW(), NOW())
        ON CONFLICT ("walletType", "walletId") DO NOTHING`,
       TEST_WALLET_ID, TEST_WALLET_TYPE
     )
@@ -101,6 +101,6 @@ describe('WalletBalance BigInt precision', () => {
       TEST_WALLET_ID, TEST_WALLET_TYPE
     )
     expect(typeof walletRow[0].balance).toBe('bigint')
-    expect(walletRow[0].balance).toBeInstanceOf(BigInt)
+    expect(typeof walletRow[0].available_balance).toBe('bigint')
   })
 })

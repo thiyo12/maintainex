@@ -97,6 +97,26 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
     throw new Error(`Actor type ${ctx.actorType} cannot transition to ${targetStatus}`)
   }
 
+  if (ctx.actorType === 'PROVIDER') {
+    const quote = await prisma.jobQuote.findFirst({ where: { jobId: ctx.jobId }, orderBy: { createdAt: 'asc' } })
+    if (quote) {
+      if (quote.providerType === 'COMPANY') {
+        const companyProfile = await prisma.companyProfile.findUnique({
+          where: { id: quote.providerId },
+          select: { id: true },
+        })
+        if (companyProfile) {
+          const member = await prisma.teamMember.findFirst({
+            where: { companyId: companyProfile.id, userId: ctx.actorId, status: 'ACTIVE' },
+          })
+          if (!member) throw new Error('Unauthorized: not a member of this company')
+        }
+      } else {
+        if (quote.providerId !== ctx.actorId) throw new Error('Unauthorized: not the job provider')
+      }
+    }
+  }
+
   const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })
   if (!workspace) throw new Error('Workspace not found')
   if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, targetStatus)) {
@@ -669,7 +689,27 @@ export async function completeAndReleaseEscrow(
       if (job.customerId !== ctx.actorId) throw new Error('Only the customer can approve')
     }
 
-    if (job.status !== 'IN_PROGRESS') throw new Error('Job is not in progress')
+    if (job.status !== 'IN_PROGRESS') {
+      if (job.status === 'COMPLETED') {
+        const releasedEscrow = await tx.jobEscrow.findFirst({ where: { jobId, status: 'RELEASED' } })
+        if (releasedEscrow) {
+          const releaseLedger = await tx.financialLedger.findFirst({
+            where: { referenceType: 'ESCROW_RELEASE', referenceId: releasedEscrow.id },
+          })
+          const meta = releaseLedger?.metadata ? JSON.parse(releaseLedger.metadata as string) : {}
+          return {
+            commission: bigIntToSafeNumber(BigInt(meta.commissionCents ?? '0')) / 100,
+            netAmount: bigIntToSafeNumber(releasedEscrow.amount - BigInt(meta.commissionCents ?? '0')) / 100,
+            commissionCents: BigInt(meta.commissionCents ?? '0'),
+            netCents: releasedEscrow.amount - BigInt(meta.commissionCents ?? '0'),
+            providerId: meta.payoutUserId ?? releasedEscrow.providerId,
+            providerEntityId: meta.providerEntityId ?? releasedEscrow.providerId,
+            providerType: meta.providerType ?? 'INDIVIDUAL',
+          }
+        }
+      }
+      throw new Error('Job is not in progress')
+    }
 
     const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
     if (!workspace) throw new Error('Workspace not found')
