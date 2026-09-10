@@ -62,6 +62,26 @@ export async function POST(request: NextRequest) {
     if (job.status !== 'OPEN') return NextResponse.json({ error: 'Job is not accepting quotes' }, { status: 400 })
     if (job.customerId === user.id) return NextResponse.json({ error: 'Cannot quote on your own job' }, { status: 400 })
 
+    const jobCountry = job.countryCode || 'LK'
+
+    let providerCountry: string
+    if (resolvedProviderType === 'COMPANY') {
+      const companyProfile = await prisma.companyProfile.findUnique({
+        where: { id: resolvedProviderId },
+        select: { countryCode: true },
+      })
+      providerCountry = companyProfile?.countryCode || 'LK'
+    } else {
+      providerCountry = user.countryCode || 'LK'
+    }
+
+    if (providerCountry !== jobCountry) {
+      return NextResponse.json({
+        error: 'Provider country does not match job country',
+        code: 'PROVIDER_COUNTRY_MISMATCH',
+      }, { status: 403 })
+    }
+
     const matching = await findCandidates(prisma, {
       jobId: job.id,
       userId: job.customerId,

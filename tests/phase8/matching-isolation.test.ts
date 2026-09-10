@@ -87,22 +87,22 @@ describe('Gate 7 — Matching Country Isolation (Unit Tests)', () => {
 
 describe('Gate 8 — Quote Country Eligibility (Unit)', () => {
   it('Quote creation should check provider countryCode matches job countryCode', () => {
-    const providerCountry = 'CA'
-    const jobCountry = 'LK'
+    const providerCountry: string = 'CA'
+    const jobCountry: string = 'LK'
     const eligible = providerCountry === jobCountry || providerCountry === 'GLOBAL'
     expect(eligible).toBe(false)
   })
 
   it('Same-country provider is eligible', () => {
-    const providerCountry = 'LK'
-    const jobCountry = 'LK'
+    const providerCountry: string = 'LK'
+    const jobCountry: string = 'LK'
     const eligible = providerCountry === jobCountry || providerCountry === 'GLOBAL'
     expect(eligible).toBe(true)
   })
 
   it('GLOBAL provider is eligible for any country', () => {
-    const providerCountry = 'GLOBAL'
-    const jobCountry = 'LK'
+    const providerCountry: string = 'GLOBAL'
+    const jobCountry: string = 'LK'
     const eligible = providerCountry === jobCountry || providerCountry === 'GLOBAL'
     expect(eligible).toBe(true)
   })

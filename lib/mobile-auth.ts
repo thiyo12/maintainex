@@ -22,6 +22,7 @@ export type AuthenticatedUser = {
   suspendedUntil: Date | null
   suspensionReason: string | null
   banReason: string | null
+  countryCode: string
 }
 
 export function assertNotSuspended(user: AuthenticatedUser): NextResponse | null {
@@ -69,6 +70,7 @@ const USER_SELECT = {
   suspendedUntil: true,
   suspensionReason: true,
   banReason: true,
+  countryCode: true,
 } as const
 
 async function tryCanonicalAuth(token: string): Promise<AuthenticatedUser | null> {

@@ -19,6 +19,7 @@ const USER_SELECT = {
   suspendedUntil: true,
   suspensionReason: true,
   banReason: true,
+  countryCode: true,
 } as const
 
 export async function authenticateMarketplaceUser(request: NextRequest): Promise<AuthenticatedUser | null> {
