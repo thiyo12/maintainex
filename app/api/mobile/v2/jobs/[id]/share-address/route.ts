@@ -4,9 +4,10 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
@@ -15,7 +16,7 @@ export async function POST(
     const body = await request.json()
     const { street, building, apartment, landmark } = body
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the customer can share address' }, { status: 403 })
     if (job.addressSharedAt) return NextResponse.json({ error: 'Address already shared' }, { status: 409 })

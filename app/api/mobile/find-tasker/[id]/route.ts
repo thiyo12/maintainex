@@ -3,15 +3,16 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const tasker = await prisma.taskerProfile.findFirst({
-      where: { id: params.id },
+      where: { id },
       include: {
         user: { select: { id: true, name: true, phone: true, email: true } },
         reviews: {

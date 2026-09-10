@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     const conversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id,
         participants: { some: { userId: user.id } },
       },
       include: {
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         data: { read: true },
       })
       await prisma.conversationParticipant.updateMany({
-        where: { conversationId: params.id, userId: user.id },
+        where: { conversationId: id, userId: user.id },
         data: { lastReadAt: new Date() },
       })
     }

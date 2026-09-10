@@ -4,7 +4,7 @@ import { REGIONS } from '@/lib/regions'
 import WaitlistContent from './client'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const regionKey = host.includes('ca.') ? 'CA' : 'LK'
   const c = REGIONS[regionKey].countryName

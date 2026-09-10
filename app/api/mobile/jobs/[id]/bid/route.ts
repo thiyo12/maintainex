@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
     }
 
-    const job = await prisma.jobPosting.findUnique({ where: { id: params.id } })
+    const job = await prisma.jobPosting.findUnique({ where: { id } })
     if (!job || job.status !== 'OPEN') {
       return NextResponse.json({ error: 'Job not available for bidding' }, { status: 400 })
     }
@@ -27,14 +28,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const existing = await prisma.bid.findUnique({
-      where: { jobId_taskerId: { jobId: params.id, taskerId: tasker.id } },
+      where: { jobId_taskerId: { jobId: id, taskerId: tasker.id } },
     })
     if (existing) {
       return NextResponse.json({ error: 'Already bid on this job' }, { status: 409 })
     }
 
     const bid = await prisma.bid.create({
-      data: { jobId: params.id, taskerId: tasker.id, amount: parseFloat(amount), message },
+      data: { jobId: id, taskerId: tasker.id, amount: parseFloat(amount), message },
     })
 
     return NextResponse.json({

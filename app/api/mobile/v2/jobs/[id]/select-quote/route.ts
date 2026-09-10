@@ -18,9 +18,10 @@ async function resolveNotificationUser(providerId: string, providerType: string)
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
@@ -31,7 +32,7 @@ export async function POST(
     if (!quoteId) return NextResponse.json({ error: 'quoteId required' }, { status: 400 })
 
     const result = await acceptJobQuote(
-      { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
+      { jobId: id, actorId: user.id, actorType: 'CUSTOMER' },
       quoteId,
     )
 

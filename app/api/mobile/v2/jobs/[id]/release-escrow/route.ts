@@ -6,15 +6,16 @@ import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const result = await completeAndReleaseEscrow(

@@ -6,7 +6,7 @@ import { breadcrumbSchema, organizationSchema } from '@/lib/seo'
 import AboutClient from './client'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const regionKey = getRegionFromHost(host)
   const baseUrl = regionKey === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
@@ -21,8 +21,8 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function AboutPage() {
-  const headersList = headers()
+export default async function AboutPage() {
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const regionKey = getRegionFromHost(host)
   const baseUrl = regionKey === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'

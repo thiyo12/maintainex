@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const where: Record<string, unknown> = { id: params.id }
+    const where: Record<string, unknown> = { id }
     if (user.role === 'CUSTOMER') {
       where.customerId = user.id
     }
@@ -79,8 +80,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -89,7 +91,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (blocked) return blocked
 
     const body = await request.json()
-    const job = await prisma.jobPosting.findUnique({ where: { id: params.id } })
+    const job = await prisma.jobPosting.findUnique({ where: { id } })
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
@@ -116,14 +118,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       if (body.status === 'COMPLETED') updateData.completedAt = new Date()
 
       await prisma.jobPosting.update({
-        where: { id: params.id },
+        where: { id },
         data: { status: body.status },
       })
 
       // Update assignment status
       if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(body.status)) {
         await prisma.assignment.updateMany({
-          where: { jobId: params.id, status: body.status === 'IN_PROGRESS' ? 'ASSIGNED' : undefined },
+          where: { jobId: id, status: body.status === 'IN_PROGRESS' ? 'ASSIGNED' : undefined },
           data: { status: body.status, ...(body.status === 'IN_PROGRESS' ? { startedAt: new Date() } : {}), ...(body.status === 'COMPLETED' ? { completedAt: new Date() } : {}) },
         })
       }
@@ -138,8 +140,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -147,7 +150,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const job = await prisma.jobPosting.findUnique({ where: { id: params.id } })
+    const job = await prisma.jobPosting.findUnique({ where: { id } })
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
@@ -155,7 +158,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return NextResponse.json({ error: 'Not your job' }, { status: 403 })
     }
 
-    await prisma.jobPosting.delete({ where: { id: params.id } })
+    await prisma.jobPosting.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Job delete error:', error)

@@ -6,9 +6,10 @@ import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } 
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
@@ -21,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: 'action must be MARK_COMPLETE, APPROVE_COMPLETION, or DISPUTE' }, { status: 400 })
     }
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     if (action === 'MARK_COMPLETE') {

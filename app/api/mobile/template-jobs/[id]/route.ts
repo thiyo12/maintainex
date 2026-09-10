@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { safeParseJsonArr } from '@/lib/db-utils'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const job = await prisma.templateJob.findFirst({
-      where: { id: params.id, isActive: true },
+      where: { id, isActive: true },
       include: { category: true },
     })
 

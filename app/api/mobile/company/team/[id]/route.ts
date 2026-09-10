@@ -9,9 +9,10 @@ import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -20,13 +21,13 @@ export async function DELETE(
     if (blocked) return blocked
 
     const body = await request.json().catch(() => ({}))
-    const companyId = body.companyId || (await prisma.teamMember.findUnique({ where: { id: params.id }, select: { companyId: true } }))?.companyId
+    const companyId = body.companyId || (await prisma.teamMember.findUnique({ where: { id }, select: { companyId: true } }))?.companyId
 
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'members:remove')
     if (error) return error
 
     const member = await prisma.teamMember.findFirst({
-      where: { id: params.id, companyId: context!.companyId, status: { not: 'REMOVED' } },
+      where: { id, companyId: context!.companyId, status: { not: 'REMOVED' } },
     })
     if (!member) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })
@@ -43,7 +44,7 @@ export async function DELETE(
     }
 
     await prisma.teamMember.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'REMOVED' },
     })
 
@@ -67,16 +68,17 @@ export async function DELETE(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateMarketplaceUser(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const member = await prisma.teamMember.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { companyId: true },
     })
     if (!member) {
@@ -87,7 +89,7 @@ export async function GET(
     if (error) return error
 
     const memberDetail = await prisma.teamMember.findFirst({
-      where: { id: params.id, companyId: member.companyId },
+      where: { id, companyId: member.companyId },
     })
     if (!memberDetail) {
       return NextResponse.json({ error: 'Team member not found' }, { status: 404 })

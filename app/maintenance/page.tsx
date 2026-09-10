@@ -7,7 +7,7 @@ import { REGIONS, getRegionFromHost } from '@/lib/regions'
 import type { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const c = REGIONS[getRegionFromHost(host)].countryName
   return {
@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function MaintenancePage() {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const regionKey = getRegionFromHost(host)
   const c = REGIONS[regionKey].countryName

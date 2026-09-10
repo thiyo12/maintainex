@@ -166,7 +166,7 @@ describe('Phase 6.6 — Route-Level Staff Auth (Company Verification)', () => {
 
   it('SUPER_ADMIN with valid session → APPROVE allowed', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'PENDING' } })
-    const res = await PATCH(makeRequest(superAdminToken, { action: 'APPROVE', reviewNote: 'ok' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(superAdminToken, { action: 'APPROVE', reviewNote: 'ok' }, companyId), { params: Promise.resolve({ id: companyId }) })
     const data = await res.json()
     expect(res.status).toBe(200)
     expect(data.company.verificationStatus).toBe('VERIFIED')
@@ -175,31 +175,31 @@ describe('Phase 6.6 — Route-Level Staff Auth (Company Verification)', () => {
 
   it('MANAGER with valid session → allowed', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'PENDING', isVerified: false } })
-    const res = await PATCH(makeRequest(managerToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(managerToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(200)
   })
 
   it('USER_MANAGEMENT with valid session → allowed', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'PENDING', isVerified: false } })
-    const res = await PATCH(makeRequest(userMgmtToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(userMgmtToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(200)
   })
 
   it('FINANCE → 403', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'PENDING' } })
-    const res = await PATCH(makeRequest(financeToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(financeToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(403)
   })
 
   it('SUPPORT → 403', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'PENDING' } })
-    const res = await PATCH(makeRequest(supportToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(supportToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(403)
   })
 
   it('TECHNICAL → 403', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'PENDING' } })
-    const res = await PATCH(makeRequest(technicalToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(technicalToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(403)
   })
 
@@ -209,56 +209,56 @@ describe('Phase 6.6 — Route-Level Staff Auth (Company Verification)', () => {
       STAFF_SECRET,
       { expiresIn: '30m' }
     )
-    const res = await PATCH(makeRequest(marketplaceToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(marketplaceToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('random/invalid token → 401', async () => {
-    const res = await PATCH(makeRequest('garbage-token-value', { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest('garbage-token-value', { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('expired staff session → 401', async () => {
-    const res = await PATCH(makeRequest(expiredToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(expiredToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('revoked AdminSession → 401', async () => {
-    const res = await PATCH(makeRequest(revokedToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(revokedToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('inactive AdminUser → 401', async () => {
-    const res = await PATCH(makeRequest(inactiveToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(inactiveToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('deleted AdminUser → 401', async () => {
-    const res = await PATCH(makeRequest(deletedToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(deletedToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('token signed with wrong secret → 401', async () => {
-    const res = await PATCH(makeRequest(wrongSecretToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(wrongSecretToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 
   it('wrong/nonexistent companyId → 404', async () => {
-    const res = await PATCH(makeRequest(superAdminToken, { action: 'APPROVE' }, 'nonexistent-company-id'), { params: { id: 'nonexistent-company-id' } })
+    const res = await PATCH(makeRequest(superAdminToken, { action: 'APPROVE' }, 'nonexistent-company-id'), { params: Promise.resolve({ id: 'nonexistent-company-id' }) })
     expect(res.status).toBe(404)
   })
 
   it('illegal company verification transition → zero writes', async () => {
     await prisma.companyProfile.update({ where: { id: companyId }, data: { verificationStatus: 'REJECTED' } })
     const before = await prisma.companyProfile.findUnique({ where: { id: companyId }, select: { verificationStatus: true } })
-    const res = await PATCH(makeRequest(superAdminToken, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(superAdminToken, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(400)
     const after = await prisma.companyProfile.findUnique({ where: { id: companyId }, select: { verificationStatus: true } })
     expect(after?.verificationStatus).toBe(before?.verificationStatus)
   })
 
   it('no Authorization header → 401', async () => {
-    const res = await PATCH(makeRequest(null, { action: 'APPROVE' }, companyId), { params: { id: companyId } })
+    const res = await PATCH(makeRequest(null, { action: 'APPROVE' }, companyId), { params: Promise.resolve({ id: companyId }) })
     expect(res.status).toBe(401)
   })
 })

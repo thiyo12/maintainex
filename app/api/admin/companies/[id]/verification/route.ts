@@ -8,9 +8,10 @@ const VALID_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'SUSPEND'] as const
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const principal = await authenticateStaffRequest(request)
     if (!principal) {
       return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
@@ -29,7 +30,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    const companyId = params.id
+    const companyId = id
     if (!companyId) {
       return NextResponse.json({ error: 'companyId required' }, { status: 400 })
     }

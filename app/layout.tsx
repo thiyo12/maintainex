@@ -12,7 +12,7 @@ const outfit = Outfit({ subsets: ['latin'], display: 'swap' })
 
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const regionKey = host.includes('ca.') ? 'CA' : 'LK'
   const c = REGIONS[regionKey].countryName
@@ -78,12 +78,12 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const region = host.includes('ca.') ? 'CA' : 'LK'
   const baseUrl = region === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'

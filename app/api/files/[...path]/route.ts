@@ -5,10 +5,11 @@ import path from 'path'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const filePath = path.join(process.cwd(), 'public', ...params.path)
+    const { path: paramsPath } = await params
+    const filePath = path.join(process.cwd(), 'public', ...paramsPath)
     
     if (!existsSync(filePath)) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })

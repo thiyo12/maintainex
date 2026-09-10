@@ -8,14 +8,14 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import ServiceDetailClient from '../ServiceDetailClient'
 
-function getRegionFromRequest(): 'LK' | 'CA' {
-  const headersList = headers()
+async function getRegionFromRequest(): Promise<'LK' | 'CA'> {
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   return host.includes('ca.') ? 'CA' : 'LK'
 }
 
-function getHostname(): string {
-  const headersList = headers()
+async function getHostname(): Promise<string> {
+  const headersList = await headers()
   return headersList.get('host') || 'maintainex.lk'
 }
 
@@ -23,25 +23,26 @@ export const dynamic = 'force-dynamic'
 
 const DEFAULT_REGION: 'LK' | 'CA' = 'LK'
 
-export async function generateMetadata({ params }: { params: { slug: string; city: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string; city: string }> }): Promise<Metadata> {
   try {
+    const { slug, city } = await params
     const regionKey = DEFAULT_REGION
     const c = REGIONS[regionKey].countryName
     const isCA = regionKey === 'CA'
     const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
-    const cityName = getCityBySlug(params.city, regionKey)
+    const cityName = getCityBySlug(city, regionKey)
     if (!cityName) return { title: 'City Not Found' }
 
     const service = await prisma.service.findFirst({
-      where: { slug: params.slug, isActive: true },
+      where: { slug, isActive: true },
       include: { category: true }
     })
     if (!service) return { title: 'Service Not Found' }
 
     const title = `${service.name} in ${cityName}, ${c} | Maintainex ${c}`
     const description = `Book professional ${service.name.toLowerCase()} in ${cityName}, ${c}. Trusted ${service.category?.name?.toLowerCase() || 'home service'} providers. Free quotes & same-day service in ${cityName}.`
-    const canonicalPath = `/services/${service.slug}/${params.city}`
+    const canonicalPath = `/services/${service.slug}/${city}`
 
     return {
       title: `${service.name} in ${cityName}`,
@@ -58,7 +59,7 @@ export async function generateMetadata({ params }: { params: { slug: string; cit
       },
     }
   } catch (error) {
-    console.error('Error generating metadata for city service:', params.slug, params.city, error)
+    console.error('Error generating metadata for city service:', error)
     return { title: 'Service Details | Maintainex' }
   }
 }
@@ -96,15 +97,16 @@ async function fetchRelatedServices(categoryId: string, excludeId: string) {
   }
 }
 
-export default async function CityServicePage({ params }: { params: { slug: string; city: string } }) {
+export default async function CityServicePage({ params }: { params: Promise<{ slug: string; city: string }> }) {
   try {
-    const regionKey = getRegionFromRequest()
+    const { slug, city } = await params
+    const regionKey = await getRegionFromRequest()
     const baseUrl = regionKey === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
-    const cityName = getCityBySlug(params.city, regionKey)
+    const cityName = getCityBySlug(city, regionKey)
     if (!cityName) notFound()
 
-    const service = await fetchService(params.slug)
+    const service = await fetchService(slug)
     if (!service) {
       return <ServiceDetailClient service={null} relatedServices={[]} region={regionKey} />
     }
@@ -141,7 +143,7 @@ export default async function CityServicePage({ params }: { params: { slug: stri
       { name: 'Home', url: baseUrl },
       { name: 'Services', url: `${baseUrl}/services` },
       { name: service.name, url: `${baseUrl}/services/${service.slug}` },
-      { name: cityName, url: `${baseUrl}/services/${service.slug}/${params.city}` },
+      { name: cityName, url: `${baseUrl}/services/${service.slug}/${city}` },
     ])
 
     const localBusinessJson = localBusinessSchema(regionKey, cityName)
@@ -154,11 +156,11 @@ export default async function CityServicePage({ params }: { params: { slug: stri
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJson) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessJson) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJson) }} />
-        <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} city={cityName} citySlug={params.city} faqs={faqs} />
+        <ServiceDetailClient service={serialized} relatedServices={relatedServices} region={regionKey} city={cityName} citySlug={city} faqs={faqs} />
       </>
     )
   } catch (error) {
-    console.error('Error rendering city service page:', params.slug, params.city, error)
+    console.error('Error rendering city service page:', error)
     return <ServiceDetailClient service={null} relatedServices={[]} region="LK" />
   }
 }

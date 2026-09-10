@@ -18,15 +18,16 @@ async function resolveProviderNotificationUser(providerId: string, providerType:
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const quote = await prisma.jobQuote.findFirst({
@@ -62,19 +63,20 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     let isParticipant = job.customerId === user.id
     if (!isParticipant) {
       const acceptedQuote = await prisma.jobQuote.findFirst({
-        where: { jobId: params.id, status: 'ACCEPTED' },
+        where: { jobId: id, status: 'ACCEPTED' },
         select: { providerId: true, providerType: true },
       })
       if (acceptedQuote?.providerType === 'INDIVIDUAL') {
@@ -89,7 +91,7 @@ export async function GET(
 
     if (!isParticipant) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
-    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: params.id } })
+    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
     return NextResponse.json({
       escrow: escrow ? {
         ...escrow,

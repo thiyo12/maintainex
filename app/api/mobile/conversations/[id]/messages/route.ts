@@ -6,8 +6,9 @@ import { sendExpoPush } from '@/lib/push'
 
 const DAILY_MESSAGE_LIMIT = 50
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const conversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id,
         participants: { some: { userId: user.id } },
       },
       include: {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const sentToday = await prisma.message.count({
       where: {
-        conversationId: params.id,
+        conversationId: id,
         senderId: user.id,
         createdAt: { gte: since },
       },
@@ -52,19 +53,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     // Fraud scan: always runs, never blocks — sanitizes + flags
-    const scan = await scanChatMessage(text.trim(), user.id, params.id)
+    const scan = await scanChatMessage(text.trim(), user.id, id)
     const messageText = scan.sanitizedText || text.trim()
 
     const message = await prisma.message.create({
       data: {
-        conversationId: params.id,
+        conversationId: id,
         senderId: user.id,
         text: messageText,
       },
     })
 
     await prisma.conversation.update({
-      where: { id: params.id },
+      where: { id },
       data: { updatedAt: new Date() },
     })
 
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         recipient.user.pushToken,
         user.name || 'New message',
         messageText.substring(0, 120),
-        { screen: '/(chat)/[id]', id: params.id }
+        { screen: '/(chat)/[id]', id }
       )
     }
 
@@ -94,8 +95,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -104,7 +106,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { searchParams } = new URL(request.url)
     const after = searchParams.get('after')
 
-    const where: any = { conversationId: params.id }
+    const where: any = { conversationId: id }
     if (after) {
       where.createdAt = { gt: new Date(after) }
     }
@@ -122,7 +124,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
         data: { read: true },
       })
       await prisma.conversationParticipant.updateMany({
-        where: { conversationId: params.id, userId: user.id },
+        where: { conversationId: id, userId: user.id },
         data: { lastReadAt: new Date() },
       })
     }

@@ -6,9 +6,10 @@ import { recoverPenaltyPoints } from '@/lib/reputation-engine'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
@@ -17,7 +18,7 @@ export async function POST(
     const body = await request.json()
     const { reviewType, quality, communication, timeliness, cooperation, overallExperience, comment } = body
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.status !== 'COMPLETED') return NextResponse.json({ error: 'Can only review completed jobs' }, { status: 400 })
 
@@ -112,15 +113,16 @@ export async function POST(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const [customerReview, providerReview] = await Promise.all([
-      prisma.jobReview.findMany({ where: { jobId: params.id } }),
-      prisma.providerReview.findMany({ where: { jobId: params.id } }),
+      prisma.jobReview.findMany({ where: { jobId: id } }),
+      prisma.providerReview.findMany({ where: { jobId: id } }),
     ])
     return NextResponse.json({ reviews: { customerReviews: customerReview, providerReviews: providerReview } })
   } catch (error) {

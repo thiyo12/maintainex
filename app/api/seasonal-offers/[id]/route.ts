@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getSession(request)
     if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const existing = await prisma.seasonalOffer.findUnique({ where: { id: params.id } })
+    const existing = await prisma.seasonalOffer.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Seasonal offer not found' }, { status: 404 })
     }
@@ -30,7 +31,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (displayOrder !== undefined) data.displayOrder = displayOrder
     if (isActive !== undefined) data.isActive = isActive
 
-    const offer = await prisma.seasonalOffer.update({ where: { id: params.id }, data })
+    const offer = await prisma.seasonalOffer.update({ where: { id }, data })
     return NextResponse.json(offer)
   } catch (error) {
     console.error('Error updating seasonal offer:', error)
@@ -38,19 +39,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const session = await getSession(request)
     if (!session || session.role !== 'SUPER_ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const existing = await prisma.seasonalOffer.findUnique({ where: { id: params.id } })
+    const existing = await prisma.seasonalOffer.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Seasonal offer not found' }, { status: 404 })
     }
 
-    await prisma.seasonalOffer.delete({ where: { id: params.id } })
+    await prisma.seasonalOffer.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting seasonal offer:', error)

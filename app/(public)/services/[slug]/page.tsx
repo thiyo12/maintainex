@@ -6,14 +6,14 @@ import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import ServiceDetailClient from './ServiceDetailClient'
 
-function getRegionFromRequest(): 'LK' | 'CA' {
-  const headersList = headers()
+async function getRegionFromRequest(): Promise<'LK' | 'CA'> {
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   return host.includes('ca.') ? 'CA' : 'LK'
 }
 
-function getHostname(): string {
-  const headersList = headers()
+async function getHostname(): Promise<string> {
+  const headersList = await headers()
   return headersList.get('host') || 'maintainex.lk'
 }
 
@@ -22,8 +22,9 @@ export const dynamic = 'force-dynamic'
 const DEFAULT_REGION: 'LK' | 'CA' = 'LK'
 const DEFAULT_HOST = 'maintainex.lk'
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   try {
+    const { slug } = await params
     const regionKey = DEFAULT_REGION
     const host = DEFAULT_HOST
     const c = REGIONS[regionKey].countryName
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     const baseUrl = isCA ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
     const service = await prisma.service.findFirst({
-      where: { slug: params.slug, isActive: true },
+      where: { slug, isActive: true },
       include: { category: true }
     })
     if (!service) return { title: 'Service Not Found' }
@@ -66,7 +67,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       },
     }
   } catch (error) {
-    console.error('Error generating metadata for service:', params.slug, error)
+    console.error('Error generating metadata for service:', error)
     return { title: 'Service Details | Maintainex' }
   }
 }
@@ -105,13 +106,14 @@ async function fetchRelatedServices(categoryId: string, excludeId: string) {
   }
 }
 
-export default async function ServiceDetailPage({ params }: { params: { slug: string } }) {
+export default async function ServiceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   try {
-    const regionKey = getRegionFromRequest()
-    const host = getHostname()
+    const { slug } = await params
+    const regionKey = await getRegionFromRequest()
+    const host = await getHostname()
     const baseUrl = regionKey === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
 
-    const service = await fetchService(params.slug)
+    const service = await fetchService(slug)
     if (!service) {
       return <ServiceDetailClient service={null} relatedServices={[]} region={regionKey} />
     }
@@ -162,7 +164,7 @@ export default async function ServiceDetailPage({ params }: { params: { slug: st
       </>
     )
   } catch (error) {
-    console.error('Error rendering service detail page:', params.slug, error)
+    console.error('Error rendering service detail page:', error)
     return <ServiceDetailClient service={null} relatedServices={[]} region="LK" />
   }
 }

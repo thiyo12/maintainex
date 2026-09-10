@@ -16,7 +16,7 @@ const ALLOWED_EXTENSIONS = new Set(Object.keys(ALLOWED_MIMES))
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
     const user = await authenticateRequest(request)
@@ -24,7 +24,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const [userId, ...fileParts] = params.path
+    const { path: paramsPath } = await params
+    const [userId, ...fileParts] = paramsPath
     const filename = fileParts.join('/')
 
     if (!userId || !filename) {

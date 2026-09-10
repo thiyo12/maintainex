@@ -6,9 +6,10 @@ import { notifyJobStarted } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
@@ -20,12 +21,12 @@ export async function POST(
       return NextResponse.json({ error: 'OTP is required' }, { status: 400 })
     }
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     await verifyOtpAndStartJob(
-      { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
-      params.id,
+      { jobId: id, actorId: user.id, actorType: 'CUSTOMER' },
+      id,
       otp
     )
 

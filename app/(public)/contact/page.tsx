@@ -1,4 +1,3 @@
-import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import ContactPage from './client'
 

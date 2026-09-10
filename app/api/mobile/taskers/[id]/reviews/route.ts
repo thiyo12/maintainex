@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const reviews = await prisma.taskerReview.findMany({
-      where: { taskerId: params.id },
+      where: { taskerId: id },
       include: { reviewer: { select: { name: true } } },
       orderBy: { createdAt: 'desc' },
     })

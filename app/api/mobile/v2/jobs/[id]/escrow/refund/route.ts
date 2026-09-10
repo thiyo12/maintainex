@@ -5,21 +5,22 @@ import { refundEscrow } from '@/lib/domain/job-lifecycle'
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(_request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the customer can refund escrow' }, { status: 403 })
 
     const result = await refundEscrow(
-      { jobId: params.id, actorId: user.id, actorType: 'CUSTOMER' },
-      params.id
+      { jobId: id, actorId: user.id, actorType: 'CUSTOMER' },
+      id
     )
 
     return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })

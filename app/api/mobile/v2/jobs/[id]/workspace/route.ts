@@ -27,19 +27,20 @@ async function resolveJobActor(jobId: string, customerId: string, userId: string
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const actorType = await resolveJobActor(job.id, job.customerId, user.id)
     if (!actorType) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
-    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: params.id } })
+    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: id } })
     return NextResponse.json({ workspace: workspace || null })
   } catch (error) {
     console.error('Get workspace error:', error)
@@ -49,9 +50,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
@@ -64,7 +66,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid progressStatus' }, { status: 400 })
     }
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: params.id } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const actorType = await resolveJobActor(job.id, job.customerId, user.id)

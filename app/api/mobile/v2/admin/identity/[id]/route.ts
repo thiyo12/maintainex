@@ -5,9 +5,10 @@ import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const user = await authenticateRequest(request)
     if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -21,7 +22,7 @@ export async function PATCH(
     }
 
     const doc = await prisma.identityDocument.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!doc) {
@@ -36,7 +37,7 @@ export async function PATCH(
     const result = await transitionUserKyc(prisma, {
       userId: doc.userId,
       action,
-      documentId: params.id,
+      documentId: id,
       reviewNote: reviewNote || undefined,
       reviewedBy: user.id,
     })
@@ -46,7 +47,7 @@ export async function PATCH(
     }
 
     const updated = await prisma.identityDocument.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ document: updated })

@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import CareersPage from './client'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const regionKey = getRegionFromHost(host)
   const c = REGIONS[regionKey].countryName

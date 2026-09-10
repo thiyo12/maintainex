@@ -4,9 +4,10 @@ import { getSession } from '@/lib/auth-utils'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,7 +19,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Only Super Admin or authorized admins can delete services' }, { status: 403 })
     }
 
-    const serviceId = params.id
+    const serviceId = id
 
     const service = await prisma.service.findUnique({
       where: { id: serviceId }
@@ -41,14 +42,15 @@ export async function DELETE(
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const service = await prisma.service.findFirst({
       where: {
         OR: [
-          { id: params.id },
-          { slug: params.id },
+          { id },
+          { slug: id },
         ]
       },
       include: { category: true }
@@ -87,9 +89,10 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const session = await getSession(request)
     
     if (!session) {
@@ -106,7 +109,7 @@ export async function PATCH(
     const { name, description, shortDescription, image, price, duration, categoryId, isActive, isTrending, displayOrder, features } = body
 
     const service = await prisma.service.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(name && { name }),
         ...(description !== undefined && { description }),

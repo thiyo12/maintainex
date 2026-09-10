@@ -9,12 +9,12 @@ const BOOST_TIERS = {
   top: { durationDays: 30, lkr: 2500, cad: 25 },
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession(request)
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
     const { tier, paymentMethod = 'wallet' } = body
 

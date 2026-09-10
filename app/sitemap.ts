@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 const STATIC_PATHS = ['/', '/about', '/contact', '/booking', '/services', '/careers', '/vision', '/waitlist']
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const headersList = headers()
+  const headersList = await headers()
   const host = headersList.get('host') || ''
   const region = host.includes('ca.') ? 'CA' : 'LK'
   const baseUrl = region === 'CA' ? 'https://ca.maintainex.lk' : 'https://maintainex.lk'
