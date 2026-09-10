@@ -97,24 +97,10 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
     throw new Error(`Actor type ${ctx.actorType} cannot transition to ${targetStatus}`)
   }
 
-  if (ctx.actorType === 'PROVIDER') {
-    const quote = await prisma.jobQuote.findFirst({ where: { jobId: ctx.jobId }, orderBy: { createdAt: 'asc' } })
-    if (quote) {
-      if (quote.providerType === 'COMPANY') {
-        const companyProfile = await prisma.companyProfile.findUnique({
-          where: { id: quote.providerId },
-          select: { id: true },
-        })
-        if (companyProfile) {
-          const member = await prisma.teamMember.findFirst({
-            where: { companyId: companyProfile.id, userId: ctx.actorId, status: 'ACTIVE' },
-          })
-          if (!member) throw new Error('Unauthorized: not a member of this company')
-        }
-      } else {
-        if (quote.providerId !== ctx.actorId) throw new Error('Unauthorized: not the job provider')
-      }
-    }
+  if (PROVIDER_ONLY_WORKSPACE.includes(targetStatus)) {
+    const resolved = await resolveProviderActor(ctx.jobId, ctx.actorId)
+    if (!resolved) throw new Error('Unauthorized: not the accepted provider for this job')
+    if (resolved !== ctx.actorType) throw new Error(`Actor type ${ctx.actorType} does not match provider identity ${resolved}`)
   }
 
   const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })

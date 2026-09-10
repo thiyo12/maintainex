@@ -33,8 +33,8 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     await prisma.taskerSkill.deleteMany({ where: { jobId: templateJobId } })
     await prisma.templateJob.deleteMany({ where: { id: templateJobId } })
     await prisma.jobCategory.deleteMany({ where: { id: categoryId } })
-    await prisma.taskerProfile.deleteMany({ where: { userId: { in: [providerUserId, companyWorkerId] } } })
-    await prisma.user.deleteMany({ where: { id: { in: [customerUserId, providerUserId, companyOwnerId, companyWorkerId, unrelatedUserId] } } })
+    await prisma.taskerProfile.deleteMany({ where: { userId: { in: [providerUserId, companyWorkerId, `${prefix}-other-prov`] } } })
+    await prisma.user.deleteMany({ where: { id: { in: [customerUserId, providerUserId, companyOwnerId, companyWorkerId, unrelatedUserId, `${prefix}-other-prov`] } } })
     await prisma.$disconnect()
   })
 
@@ -131,11 +131,12 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   }
 
   it('dispute vs auto-release: only one terminal state', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
 
     const { jobId } = await createReadyJob('disc-auto', companyProfileId, 'COMPANY')
 
-    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    const resolved = await resolveProviderActor(jobId, companyWorkerId)
+    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: resolved! }, 'COMPLETION_REQUESTED')
 
     const ws = await prisma.jobWorkspace.findUnique({ where: { jobId } })
     await prisma.jobWorkspace.update({
@@ -165,10 +166,11 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('concurrent release vs refund: exactly one terminal state', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow, refundEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace, completeAndReleaseEscrow, refundEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
 
     const { jobId } = await createReadyJob('rel-ref', companyProfileId, 'COMPANY')
-    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    const resolved = await resolveProviderActor(jobId, companyWorkerId)
+    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: resolved! }, 'COMPLETION_REQUESTED')
 
     const results = await Promise.allSettled([
       completeAndReleaseEscrow({ jobId, actorId: customerUserId, actorType: 'CUSTOMER' }, jobId),
@@ -288,8 +290,9 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   it('ledger entries are always balanced after concurrent operations', async () => {
     const { jobId } = await createReadyJob('balanced', companyProfileId, 'COMPANY')
-    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    const { transitionJobWorkspace, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const resolved = await resolveProviderActor(jobId, companyWorkerId)
+    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: resolved! }, 'COMPLETION_REQUESTED')
 
     const ledgerBefore = await prisma.financialLedger.findMany({ where: { referenceId: { contains: prefix } } })
 
@@ -306,10 +309,11 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('idempotency: duplicate release attempt returns same result', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace, completeAndReleaseEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
 
     const { jobId } = await createReadyJob('idemp', companyProfileId, 'COMPANY')
-    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    const resolved = await resolveProviderActor(jobId, companyWorkerId)
+    await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: resolved! }, 'COMPLETION_REQUESTED')
 
     const result1 = await completeAndReleaseEscrow({ jobId, actorId: customerUserId, actorType: 'CUSTOMER' }, jobId)
     expect(result1.commission).toBeGreaterThanOrEqual(0)
@@ -354,7 +358,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('COMPANY authorization: inactive TeamMember → denied', async () => {
-    const { resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { resolveProviderActor, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
 
     const inactiveWorkerId = `${prefix}-inactive-worker`
     await prisma.user.create({
@@ -369,7 +373,73 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     const actorType = await resolveProviderActor(jobId, inactiveWorkerId)
     expect(actorType).toBeNull()
 
+    await expect(
+      transitionJobWorkspace({ jobId, actorId: inactiveWorkerId, actorType: 'COMPANY' }, 'COMPLETION_REQUESTED')
+    ).rejects.toThrow()
+
     await prisma.teamMember.deleteMany({ where: { companyId: companyProfileId, userId: inactiveWorkerId } })
     await prisma.user.delete({ where: { id: inactiveWorkerId } })
+  })
+
+  it('COMPANY authorization: unrelated user + actorType COMPANY → denied at domain level', async () => {
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+
+    const { jobId } = await createReadyJob('auth-unrelated-co', companyProfileId, 'COMPANY')
+
+    await expect(
+      transitionJobWorkspace({ jobId, actorId: unrelatedUserId, actorType: 'COMPANY' }, 'COMPLETION_REQUESTED')
+    ).rejects.toThrow('Unauthorized')
+  })
+
+  it('PROVIDER authorization: individual provider with wrong actorType → denied', async () => {
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+
+    const { jobId } = await createReadyJob('auth-wrong-type', providerUserId, 'INDIVIDUAL')
+
+    await expect(
+      transitionJobWorkspace({ jobId, actorId: providerUserId, actorType: 'COMPANY' }, 'COMPLETION_REQUESTED')
+    ).rejects.toThrow('does not match provider identity')
+  })
+
+  it('multi-quote job: only ACCEPTED quote controls authorization', async () => {
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+
+    const otherProviderId = `${prefix}-other-prov`
+    await prisma.user.create({
+      data: { id: otherProviderId, email: `${otherProviderId}@test.com`, passwordHash: 'h', name: 'Other Provider', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
+    })
+    const otherProfile = await prisma.taskerProfile.create({
+      data: { userId: otherProviderId, skills: '[]', rating: 3.0, completedJobs: 2, hourlyRate: 300, verificationStatus: 'VERIFIED', isVerified: true },
+    })
+    await prisma.taskerSkill.create({
+      data: { taskerId: otherProfile.id, jobId: templateJobId, experienceYears: 1, experienceLevel: 1, hourlyRate: 300 },
+    })
+
+    const { jobId } = await createReadyJob('multi-q', providerUserId, 'INDIVIDUAL')
+
+    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' } })
+    expect(acceptedQuote?.providerId).toBe(providerUserId)
+
+    await prisma.jobQuote.create({
+      data: {
+        jobId,
+        providerId: otherProviderId,
+        providerType: 'INDIVIDUAL',
+        price: 250000n,
+        message: 'Other bid',
+        status: 'PENDING',
+        estimatedCompletionTime: '2h',
+        attachments: '[]',
+        updatedAt: new Date(),
+      },
+    })
+
+    await transitionJobWorkspace({ jobId, actorId: providerUserId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    const ws = await prisma.jobWorkspace.findUnique({ where: { jobId } })
+    expect(ws?.progressStatus).toBe('COMPLETION_REQUESTED')
+
+    await expect(
+      transitionJobWorkspace({ jobId, actorId: otherProviderId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
+    ).rejects.toThrow('Unauthorized')
   })
 })
