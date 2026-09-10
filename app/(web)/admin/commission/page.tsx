@@ -5,31 +5,28 @@ import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Settlement {
   id: string
+  jobId: string
+  escrowId: string
   providerId: string
-  providerType: string
-  weekStart: string
-  weekEnd: string
-  totalEarnings: number
+  customerId: string
+  jobAmount: number
   commissionRate: number
-  commissionOwed: number
-  commissionPaid: boolean
-  paidAt?: string
-  dueAt: string
+  commissionAmount: number
   status: string
-  suspendedAt?: string
-  notes?: string
+  settledAt?: string
+  createdAt: string
 }
 
 export default function CommissionPage() {
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('PENDING')
+  const [filter, setFilter] = useState('ALL')
   const [summary, setSummary] = useState({
     pendingCommission: 0,
-    pendingEarnings: 0,
+    pendingJobAmount: 0,
     pendingCount: 0,
-    overdueCommission: 0,
-    overdueCount: 0
+    settledCommission: 0,
+    settledCount: 0,
   })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -45,10 +42,10 @@ export default function CommissionPage() {
       setSettlements(data.settlements || [])
       setSummary(data.summary || {
         pendingCommission: 0,
-        pendingEarnings: 0,
+        pendingJobAmount: 0,
         pendingCount: 0,
-        overdueCommission: 0,
-        overdueCount: 0
+        settledCommission: 0,
+        settledCount: 0,
       })
     } catch (error) {
       console.error('Failed to fetch settlements:', error)
@@ -57,20 +54,20 @@ export default function CommissionPage() {
     }
   }
 
-  const handleAction = async (settlementId: string, action: string) => {
+  const handleSettle = async (settlementId: string) => {
     setActionLoading(settlementId)
     try {
       const res = await fetch('/api/admin/commission', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settlementId, action })
+        body: JSON.stringify({ settlementId, action: 'MARK_SETTLED' })
       })
 
       if (res.ok) {
         fetchSettlements()
       }
     } catch (error) {
-      console.error('Failed to perform action:', error)
+      console.error('Failed to settle:', error)
     } finally {
       setActionLoading(null)
     }
@@ -88,21 +85,15 @@ export default function CommissionPage() {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
       currency: 'LKR'
-    }).format(amount)
+    }).format(amount / 100)
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING': return 'bg-yellow-100 text-yellow-800'
-      case 'PAID': return 'bg-green-100 text-green-800'
-      case 'OVERDUE': return 'bg-red-100 text-red-800'
-      case 'SUSPENDED': return 'bg-gray-100 text-gray-800'
+      case 'SETTLED': return 'bg-green-100 text-green-800'
       default: return 'bg-gray-100 text-gray-800'
     }
-  }
-
-  const isOverdue = (dueAt: string) => {
-    return new Date(dueAt) < new Date()
   }
 
   return (
@@ -117,25 +108,24 @@ export default function CommissionPage() {
             <div className="text-2xl font-bold text-yellow-700">{formatCurrency(summary.pendingCommission)}</div>
             <div className="text-sm text-yellow-600">{summary.pendingCount} settlements</div>
           </div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="text-red-600 text-sm font-medium">Overdue Commission</div>
-            <div className="text-2xl font-bold text-red-700">{formatCurrency(summary.overdueCommission)}</div>
-            <div className="text-sm text-red-600">{summary.overdueCount} overdue</div>
-          </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="text-blue-600 text-sm font-medium">Pending Earnings</div>
-            <div className="text-2xl font-bold text-blue-700">{formatCurrency(summary.pendingEarnings)}</div>
+            <div className="text-blue-600 text-sm font-medium">Pending Job Value</div>
+            <div className="text-2xl font-bold text-blue-700">{formatCurrency(summary.pendingJobAmount)}</div>
           </div>
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="text-green-600 text-sm font-medium">Commission Rate</div>
-            <div className="text-2xl font-bold text-green-700">10%</div>
-            <div className="text-sm text-green-600">of job value</div>
+            <div className="text-green-600 text-sm font-medium">Settled Commission</div>
+            <div className="text-2xl font-bold text-green-700">{formatCurrency(summary.settledCommission)}</div>
+            <div className="text-sm text-green-600">{summary.settledCount} settled</div>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="text-gray-600 text-sm font-medium">Total Records</div>
+            <div className="text-2xl font-bold text-gray-700">{summary.pendingCount + summary.settledCount}</div>
           </div>
         </div>
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6">
-          {['PENDING', 'PAID', 'OVERDUE', 'SUSPENDED'].map((status) => (
+          {['ALL', 'PENDING', 'SETTLED'].map((status) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
@@ -161,10 +151,10 @@ export default function CommissionPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Provider</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Week</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Earnings</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Job</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Job Amount</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Commission</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Due Date</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Settled</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
                 </tr>
@@ -174,20 +164,16 @@ export default function CommissionPage() {
                   <tr key={settlement.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">{settlement.providerId.slice(0, 8)}...</div>
-                      <div className="text-sm text-gray-500">{settlement.providerType}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-sm text-gray-900">{formatDate(settlement.weekStart)}</div>
-                      <div className="text-sm text-gray-500">to {formatDate(settlement.weekEnd)}</div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(settlement.totalEarnings)}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">{formatCurrency(settlement.commissionOwed)}</div>
+                      <div className="text-sm font-medium text-gray-900">{settlement.jobId.slice(0, 8)}...</div>
                       <div className="text-sm text-gray-500">{settlement.commissionRate}%</div>
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(settlement.jobAmount)}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatCurrency(settlement.commissionAmount)}</td>
                     <td className="px-4 py-3">
-                      <div className={`text-sm ${isOverdue(settlement.dueAt) ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
-                        {formatDate(settlement.dueAt)}
+                      <div className="text-sm text-gray-900">
+                        {settlement.settledAt ? formatDate(settlement.settledAt) : '—'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -196,46 +182,15 @@ export default function CommissionPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        {settlement.status === 'PENDING' && (
-                          <>
-                            <button
-                              onClick={() => handleAction(settlement.id, 'MARK_PAID')}
-                              disabled={actionLoading === settlement.id}
-                              className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50"
-                            >
-                              {actionLoading === settlement.id ? '...' : 'Mark Paid'}
-                            </button>
-                            {isOverdue(settlement.dueAt) && (
-                              <button
-                                onClick={() => handleAction(settlement.id, 'SUSPEND')}
-                                disabled={actionLoading === settlement.id}
-                                className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50"
-                              >
-                                {actionLoading === settlement.id ? '...' : 'Suspend'}
-                              </button>
-                            )}
-                          </>
-                        )}
-                        {settlement.status === 'OVERDUE' && (
-                          <button
-                            onClick={() => handleAction(settlement.id, 'SUSPEND')}
-                            disabled={actionLoading === settlement.id}
-                            className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 disabled:opacity-50"
-                          >
-                            {actionLoading === settlement.id ? '...' : 'Suspend'}
-                          </button>
-                        )}
-                        {settlement.status === 'SUSPENDED' && (
-                          <button
-                            onClick={() => handleAction(settlement.id, 'UNSUSPEND')}
-                            disabled={actionLoading === settlement.id}
-                            className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50"
-                          >
-                            {actionLoading === settlement.id ? '...' : 'Unsuspend'}
-                          </button>
-                        )}
-                      </div>
+                      {settlement.status === 'PENDING' && (
+                        <button
+                          onClick={() => handleSettle(settlement.id)}
+                          disabled={actionLoading === settlement.id}
+                          className="px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600 disabled:opacity-50"
+                        >
+                          {actionLoading === settlement.id ? '...' : 'Mark Settled'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

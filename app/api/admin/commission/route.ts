@@ -1,46 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
-import { createWorkItem } from '@/lib/work-queue'
-import crypto from 'crypto'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
 
-function generateReferenceNumber(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let ref = 'REF-'
-  const bytes = crypto.randomBytes(5)
-  for (let i = 0; i < 5; i++) {
-    ref += chars[bytes[i] % chars.length]
+function serializeSettlement(s: Record<string, unknown>) {
+  return {
+    ...s,
+    jobAmount: Number(s.jobAmount ?? 0),
+    commissionAmount: Number(s.commissionAmount ?? 0),
   }
-  return ref
 }
 
-async function createCommissionPayment(settlementId: string, providerId: string, amountDue: number): Promise<string> {
-  let referenceNumber = generateReferenceNumber()
-  let attempts = 0
-  while (attempts < 10) {
-    const existing = await prisma.commissionPayment.findUnique({
-      where: { referenceNumber }
-    })
-    if (!existing) break
-    referenceNumber = generateReferenceNumber()
-    attempts++
-  }
-  const payment = await prisma.commissionPayment.create({
-    data: {
-      providerId,
-      weeklySettlementId: settlementId,
-      referenceNumber,
-      amountDue,
-      method: 'CASH',
-      status: 'PENDING',
-    }
-  })
-  return payment.referenceNumber
-}
-
-// GET: List commission settlements derived from canonical CommissionSettlement records
+// GET: List canonical CommissionSettlement records
 export async function GET(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
@@ -79,7 +51,7 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
-      settlements,
+      settlements: settlements.map(serializeSettlement),
       summary: {
         pendingCommission: Number(summary._sum.commissionAmount || 0n),
         pendingJobAmount: Number(summary._sum.jobAmount || 0n),
@@ -100,7 +72,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Settle pending canonical CommissionSettlement records for a provider
+// POST: Bulk-settle pending CommissionSettlement records for a provider
 export async function POST(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
@@ -137,7 +109,7 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({
-      settlements: settled,
+      settlements: settled.map(serializeSettlement),
       totalCommission,
       count: settled.length,
     })
@@ -147,7 +119,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT: Legacy WeeklySettlement actions (MARK_PAID, MARK_OVERDUE, SUSPEND, UNSUSPEND)
+// PUT: Settle a single CommissionSettlement record
 export async function PUT(request: NextRequest) {
   try {
     const session = await getAdminSession(request)
@@ -161,85 +133,27 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    let updateData: any = {}
-
-    switch (action) {
-      case 'MARK_PAID':
-        updateData = {
-          commissionPaid: true,
-          paidAt: new Date(),
-          status: 'PAID'
-        }
-        break
-      case 'MARK_OVERDUE':
-        updateData = {
-          status: 'OVERDUE'
-        }
-        const overdueSettlement = await prisma.weeklySettlement.findUnique({
-          where: { id: settlementId },
-          select: { providerId: true, providerType: true, commissionOwed: true, weekStart: true, weekEnd: true }
-        })
-        if (overdueSettlement) {
-          await createWorkItem({
-            category: 'settlement',
-            title: `Weekly settlement overdue — ${overdueSettlement.providerType}`,
-            description: `Provider ${overdueSettlement.providerId} has an overdue commission of ${(overdueSettlement.commissionOwed / 100).toFixed(2)} for week ${overdueSettlement.weekStart.toISOString().split('T')[0]} to ${overdueSettlement.weekEnd.toISOString().split('T')[0]}.`,
-            targetTable: 'WeeklySettlement',
-            targetId: settlementId,
-            severity: 'high',
-            priority: 'high',
-          })
-        }
-        break
-      case 'SUSPEND':
-        updateData = {
-          status: 'SUSPENDED',
-          suspendedAt: new Date()
-        }
-        const settlement = await prisma.weeklySettlement.findUnique({
-          where: { id: settlementId }
-        })
-        if (settlement) {
-          await prisma.user.update({
-            where: { id: settlement.providerId },
-            data: {
-              isSuspended: true,
-              suspensionReason: 'Weekly commission not paid',
-              suspendedUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-            }
-          })
-        }
-        break
-      case 'UNSUSPEND':
-        updateData = {
-          status: 'PAID',
-          commissionPaid: true,
-          paidAt: new Date()
-        }
-        const settlementToUnsuspend = await prisma.weeklySettlement.findUnique({
-          where: { id: settlementId }
-        })
-        if (settlementToUnsuspend) {
-          await prisma.user.update({
-            where: { id: settlementToUnsuspend.providerId },
-            data: {
-              isSuspended: false,
-              suspensionReason: null,
-              suspendedUntil: null
-            }
-          })
-        }
-        break
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    if (action !== 'MARK_SETTLED') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    const settlement = await prisma.weeklySettlement.update({
+    const settlement = await prisma.commissionSettlement.findUnique({
       where: { id: settlementId },
-      data: updateData
+    })
+    if (!settlement) {
+      return NextResponse.json({ error: 'Settlement not found' }, { status: 404 })
+    }
+
+    if (settlement.status === 'SETTLED') {
+      return NextResponse.json({ settlement: serializeSettlement(settlement), message: 'Already settled' })
+    }
+
+    const updated = await prisma.commissionSettlement.update({
+      where: { id: settlementId },
+      data: { status: 'SETTLED', settledAt: new Date() },
     })
 
-    return NextResponse.json({ settlement })
+    return NextResponse.json({ settlement: serializeSettlement(updated) })
   } catch (error) {
     console.error('Commission PUT error:', error)
     return NextResponse.json({ error: 'Failed to update settlement' }, { status: 500 })
