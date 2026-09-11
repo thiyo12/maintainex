@@ -3,10 +3,11 @@ import { PrismaClient } from '@prisma/client'
 import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { hasCompanyPermission } from '@/lib/phase6/rbac'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.5 — Quote Visibility Service (Canonical)', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.5 — Quote Visibility Service (Canonical)', () => {
   let companyAId: string
   let companyBId: string
   let ownerAId: string

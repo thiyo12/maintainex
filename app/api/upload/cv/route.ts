@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { v2 as cloudinary } from 'cloudinary'
+import { getSession } from '@/lib/auth-utils'
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -28,24 +29,29 @@ if (typeof window === 'undefined') {
 function checkRateLimit(ip: string): boolean {
   const now = Date.now()
   const record = rateLimitMap.get(ip)
-  
+
   if (!record || now - record.lastReset > RATE_WINDOW) {
     rateLimitMap.set(ip, { count: 1, lastReset: now })
     return true
   }
-  
+
   if (record.count >= RATE_LIMIT) {
     return false
   }
-  
+
   record.count++
   return true
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getSession(request)
+    if (!session) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    
+
     if (!checkRateLimit(ip)) {
       return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
     }

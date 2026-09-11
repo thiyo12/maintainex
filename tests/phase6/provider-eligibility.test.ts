@@ -5,10 +5,11 @@ import {
   checkCompanyEligibility,
   checkWorkerEligibility,
 } from '@/lib/phase6/provider-eligibility'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6 — Provider Eligibility', () => {
+describe.skipIf(!requiresPostgres())('Phase 6 — Provider Eligibility', () => {
   let verifiedUserId: string
   let unverifiedUserId: string
   let suspendedUserId: string

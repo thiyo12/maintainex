@@ -10,9 +10,7 @@ import {
   getLedgerBalance,
 } from '@/lib/ledger';
 import { legacyToMinorUnits } from '@/lib/money';
-import { assertNotProductionDb, isPostgres } from '../test-guard';
-
-assertNotProductionDb()
+import { isPostgres, requiresPostgres } from '../test-guard';
 
 async function ensureWalletBalance(walletId: string, walletType: string, balance: number) {
   await prisma.$executeRawUnsafe(
@@ -58,7 +56,7 @@ async function ensureProviderWallet(userId: string, majorBalance: number) {
   await ensureWalletBalance(wallet.id, 'PROVIDER', majorBalance)
 }
 
-describe('Ledger Posting', () => {
+describe.skipIf(!requiresPostgres())('Ledger Posting', () => {
   beforeAll(async () => {
     if (isPostgres) {
       await ensureWalletBalance('test-pw-1', 'PROVIDER', 200000)

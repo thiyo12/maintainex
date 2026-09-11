@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 import { isValidKycTransition } from '@/lib/phase6/kyc'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.1 — KYC State Machine Enforcement', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.1 — KYC State Machine Enforcement', () => {
   let userId: string
 
   beforeAll(async () => {

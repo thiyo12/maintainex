@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.6 — Strict Dual-Persona Quote Isolation', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.6 — Strict Dual-Persona Quote Isolation', () => {
   let companyAId: string, companyBId: string
   let ownerAId: string, ownerBId: string
   let dualPersonaUserId: string

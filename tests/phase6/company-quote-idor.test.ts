@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.3 — Company Quote IDOR/BOLA', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.3 — Company Quote IDOR/BOLA', () => {
   let companyAId: string
   let companyBId: string
   let ownerAId: string

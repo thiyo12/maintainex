@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { transitionCompanyVerification } from '@/lib/phase6/kyc-writer'
 import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.5 — Admin Company Verification Route', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.5 — Admin Company Verification Route', () => {
   let companyId: string
   let ownerUserId: string
 

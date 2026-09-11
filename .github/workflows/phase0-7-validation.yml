@@ -1,10 +1,11 @@
-name: Phase 0-7 + Phase 8 Validation
+name: Phase 0-9 Validation
 
 on:
   push:
     branches:
       - phase0-7-integration-fix
       - phase8-country-engine
+      - phase9-production-readiness
   pull_request:
     branches:
       - main
@@ -142,6 +143,19 @@ jobs:
       - name: Negative security tests (Part W)
         run: npx vitest run tests/phase8/negative-security.test.ts --reporter=verbose 2>&1 | tee /tmp/security-tests.txt
         if: always()
+
+      - name: Phase 9 security tests
+        run: npx vitest run tests/phase9/ --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+        if: always()
+
+      - name: Upload Phase 9 security test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-security-test-diagnostics
+          path: /tmp/phase9-security-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Upload security test diagnostics
         if: always()

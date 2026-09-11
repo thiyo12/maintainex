@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const user = await findUserByIdentifier(identifier)
     if (!user) {
-      return NextResponse.json({ error: 'No account found with this email or phone number.' }, { status: 404 })
+      return NextResponse.json({ error: 'If an account exists, an OTP has been sent.' }, { status: 200 })
     }
 
     const blocked = accountBlocked(user)

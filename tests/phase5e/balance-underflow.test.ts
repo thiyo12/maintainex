@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction, type LedgerEntry } from '@/lib/ledger'
-import { assertNotProductionDb, isPostgres } from '../test-guard'
+import { requiresPostgres } from '../test-guard'
 
-assertNotProductionDb()
-
-const SKIP = !isPostgres
+const SKIP = !requiresPostgres()
 const TEST_USER_ID = `test-underflow-${Date.now()}`
 const TEST_WALLET_ID = `wallet-underflow-${Date.now()}`
 const describePG = SKIP ? describe.skip : describe

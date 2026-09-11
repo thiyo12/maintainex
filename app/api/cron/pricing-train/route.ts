@@ -5,7 +5,7 @@ export const maxDuration = 300
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       totalJobs: completedJobs.length,
     })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error?.message }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Server error' }, { status: 500 })
   }
 }
 

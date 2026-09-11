@@ -1,9 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { postLedgerTransaction, reverseLedgerTransaction } from '../../lib/ledger'
-import { assertNotProductionDb, isPostgres } from '../test-guard'
-
-assertNotProductionDb()
+import { isPostgres, requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
@@ -18,7 +16,7 @@ async function ensureWalletBalance(walletId: string, walletType: string, balance
   )
 }
 
-describe('Phase 5C — Financial Writer Integration', () => {
+describe.skipIf(!requiresPostgres())('Phase 5C — Financial Writer Integration', () => {
   beforeAll(async () => {
     if (!isPostgres) return
     await prisma.$executeRawUnsafe(`DELETE FROM "FinancialLedger" WHERE "createdBy" = 'test-phase5c'`)

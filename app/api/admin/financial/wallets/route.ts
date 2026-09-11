@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
 import { getCountryFilter } from '@/lib/admin-rbac'
+import { auditWalletFreeze, auditWalletUnfreeze } from '@/lib/financial-audit'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
 
@@ -133,6 +134,11 @@ export async function PATCH(request: NextRequest) {
           where: { id: walletId },
           data: { isFrozen }
         })
+        if (isFrozen) {
+          auditWalletFreeze({ walletId, walletType: 'PROVIDER', actorId: session.sub || session.id })
+        } else {
+          auditWalletUnfreeze({ walletId, walletType: 'PROVIDER', actorId: session.sub || session.id })
+        }
         return NextResponse.json({ wallet: updated })
       }
 
@@ -156,6 +162,11 @@ export async function PATCH(request: NextRequest) {
           where: { id: walletId },
           data: { isFrozen }
         })
+        if (isFrozen) {
+          auditWalletFreeze({ walletId, walletType: 'CUSTOMER', actorId: session.sub || session.id })
+        } else {
+          auditWalletUnfreeze({ walletId, walletType: 'CUSTOMER', actorId: session.sub || session.id })
+        }
         return NextResponse.json({ wallet: updated })
       }
 

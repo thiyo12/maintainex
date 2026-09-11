@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { fundEscrow } from '@/lib/domain/job-lifecycle'
 import { notifyEscrowDeposited } from '@/lib/notifications'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { auditEscrowFund } from '@/lib/financial-audit'
 
 async function resolveProviderNotificationUser(providerId: string, providerType: string): Promise<string> {
   if (providerType === 'COMPANY') {
@@ -27,6 +29,9 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
+    const rateLimitResponse = await requireFinancialRateLimit(request, 'escrow-fund')
+    if (rateLimitResponse) return rateLimitResponse
+
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
@@ -39,6 +44,17 @@ export async function POST(
       { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
       job.id,
     )
+
+    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
+    if (escrow) {
+      auditEscrowFund({
+        jobId: job.id,
+        escrowId: escrow.id,
+        actorId: user.id,
+        amount: escrow.totalAmount ?? escrow.amount,
+        currency: escrow.currency,
+      })
+    }
 
     if (quote) {
       const notificationUserId = await resolveProviderNotificationUser(quote.providerId, quote.providerType)

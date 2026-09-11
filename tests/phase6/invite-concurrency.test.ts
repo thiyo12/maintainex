@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { createCompanyInvite, acceptCompanyInvite } from '@/lib/phase6/invitation'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.2 — Invitation Concurrency', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.2 — Invitation Concurrency', () => {
   let companyId: string
   let ownerUserId: string
   let inviteToken: string

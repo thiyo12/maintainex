@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma'
 import { postLedgerTransaction, getLedgerBalance } from '../../lib/ledger'
 import { readCanonicalCustomerBalance } from '../../lib/financial-read'
 import { randomUUID } from 'crypto'
+import { requiresPostgres } from '../test-guard'
 
 const PREFIX = `lmoney-${randomUUID().slice(0, 8)}`
 const userId = `${PREFIX}-user`
@@ -10,7 +11,7 @@ const walletId = `${PREFIX}-wallet`
 
 const LARGE_AMOUNT = 9_007_199_254_740_993n // > Number.MAX_SAFE_INTEGER, < PG BIGINT max
 
-describe('WalletBalance BigInt precision >MAX_SAFE_INTEGER', () => {
+describe.skipIf(!requiresPostgres())('WalletBalance BigInt precision >MAX_SAFE_INTEGER', () => {
   beforeAll(async () => {
     await prisma.user.create({
       data: {

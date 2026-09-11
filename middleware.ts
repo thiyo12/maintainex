@@ -265,13 +265,33 @@ declare global {
   var __rateLimitCleanup: ReturnType<typeof setInterval> | undefined
 }
 
+function generateRequestId(): string {
+  return crypto.randomUUID()
+}
+
+function parseIncomingRequestId(request: NextRequest): string | null {
+  const header = request.headers.get('x-request-id')
+  if (!header) return null
+  const trimmed = header.trim()
+  if (trimmed.length > 128) return null
+  if (!/^[a-zA-Z0-9\-_]+$/.test(trimmed)) return null
+  return trimmed
+}
+
+function applyRequestId(response: NextResponse, requestId: string): NextResponse {
+  response.headers.set('X-Request-Id', requestId)
+  return response
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const requestId = parseIncomingRequestId(request) || generateRequestId()
 
   if (isAiCrawler(request)) {
     const response = NextResponse.next()
     response.headers.set('X-Robots-Tag', 'all')
     response.headers.set('Cache-Control', 'public, max-age=3600')
+    applyRequestId(response, requestId)
     return applySecurityHeaders(response)
   }
 
@@ -282,10 +302,10 @@ export async function middleware(request: NextRequest) {
   await syncIPBlocklist(request)
 
   if (isIpBlocked(ip)) {
-    return new NextResponse(
+    return applyRequestId(new NextResponse(
       JSON.stringify({ error: 'Access denied', code: 'IP_BLOCKED' }),
       { status: 403, headers: { 'Content-Type': 'application/json' } }
-    )
+    ), requestId)
   }
 
   const isLoginRoute = pathname.startsWith('/api/admin/auth')
@@ -293,7 +313,7 @@ export async function middleware(request: NextRequest) {
   const rateLimit = getInMemoryRateLimit(ip, rateLimitType)
 
   if (rateLimit.limited) {
-    return new NextResponse(
+    return applyRequestId(new NextResponse(
       JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
       {
         status: 429,
@@ -304,13 +324,14 @@ export async function middleware(request: NextRequest) {
           'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
         },
       }
-    )
+    ), requestId)
   }
 
   let response: NextResponse
 
   if (pathname.startsWith('/admin/login') || pathname.startsWith('/admin/api/auth')) {
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applyCoconutHeaders(response, rateLimit.remaining, rateLimit.resetAt)
   }
 
@@ -337,35 +358,39 @@ export async function middleware(request: NextRequest) {
     else if (first === 'staff') target = '/admin/admins'
     const url = new URL(target, request.url)
     response = NextResponse.redirect(url, 301)
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname.startsWith('/api/seed/')) {
     if (process.env.NODE_ENV === 'production') {
-      return new NextResponse(
+      return applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Not available in production' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
+      ), requestId)
     }
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname.startsWith('/setup') || pathname.startsWith('/api/industries/init')) {
     if (process.env.NODE_ENV === 'production') {
-      return new NextResponse(
+      return applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Not available in production' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
+      ), requestId)
     }
     const session = await getSession(request)
     if (!session || session.role !== 'SUPER_ADMIN') {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       response = NextResponse.redirect(loginUrl)
+      applyRequestId(response, requestId)
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
@@ -375,6 +400,7 @@ export async function middleware(request: NextRequest) {
       const loginUrl = new URL('/admin/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       response = NextResponse.redirect(loginUrl)
+      applyRequestId(response, requestId)
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
@@ -382,12 +408,14 @@ export async function middleware(request: NextRequest) {
 
     if (!validWebRoles.includes(session.role)) {
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
+      applyRequestId(response, requestId)
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
     response = NextResponse.next()
     response.headers.set('X-Admin-Id', session.id)
     response.headers.set('X-Admin-Role', session.role)
+    applyRequestId(response, requestId)
 
     if (pathname.startsWith('/admin/api/') || pathname.startsWith('/api/')) {
       response.headers.set('Cache-Control', 'no-store, must-revalidate')
@@ -398,6 +426,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === '/api/auth/forgot-password' || pathname === '/api/auth/reset-password') {
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
@@ -405,27 +434,31 @@ export async function middleware(request: NextRequest) {
     response = NextResponse.next()
     applySecurityHeaders(response)
     response.headers.set('Access-Control-Allow-Origin', '*')
+    applyRequestId(response, requestId)
     return response
   }
 
   if (pathname === '/api/waitlist') {
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname.startsWith('/api/bookings') && !pathname.includes('admin')) {
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname.startsWith('/api/vacancies')) {
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname.startsWith('/api/mobile/')) {
     if (rateLimit.limited) {
-      return new NextResponse(
+      return applyRequestId(new NextResponse(
         JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }),
         {
           status: 429,
@@ -436,12 +469,13 @@ export async function middleware(request: NextRequest) {
             'X-RateLimit-Reset': Math.floor(rateLimit.resetAt.getTime() / 1000).toString(),
           },
         }
-      )
+      ), requestId)
     }
     response = NextResponse.next()
     applySecurityHeaders(response)
     applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt)
-    response.headers.set('Access-Control-Allow-Origin', '*')
+    applyRequestId(response, requestId)
+    response.headers.set('Access-Control-Allow-Origin', process.env.MOBILE_CORS_ORIGIN || '*')
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     if (request.method === 'OPTIONS') {
@@ -480,20 +514,24 @@ export async function middleware(request: NextRequest) {
         { error: 'Unauthorized', code: 'NO_SESSION' },
         { status: 401 }
       )
+      applyRequestId(response, requestId)
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
     response = NextResponse.next()
     response.headers.set('X-User-Id', session.id)
     response.headers.set('X-User-Role', session.role)
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   if (pathname === '/maintenance' || pathname.startsWith('/api/settings/maintenance')) {
     response = NextResponse.next()
+    applyRequestId(response, requestId)
     return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
   }
 
   response = NextResponse.next()
+  applyRequestId(response, requestId)
   return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
 }
 

@@ -30,3 +30,9 @@ export function isTestDatabase(): boolean {
 }
 
 export const isPostgres = url.includes('postgresql')
+
+const REQUIRES_POSTGRES_MARKER = '__requiresPostgres__'
+
+export function requiresPostgres(): boolean {
+  return isPostgres && isTestDatabase()
+}

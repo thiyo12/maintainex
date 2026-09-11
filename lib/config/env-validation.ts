@@ -8,6 +8,7 @@ const REQUIRED_SECRETS = [
   'STAFF_JWT_SECRET',
   'PASSWORD_PEPPER',
   'INTERNAL_SYNC_SECRET',
+  'CRON_SECRET',
 ] as const
 
 function validateSecretLength(name: string, value: string, minBytes: number) {

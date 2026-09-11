@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
     const result = await runLearningCycle()
     return NextResponse.json(result)
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Learning cycle failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   const rawAuth = request.headers.get('authorization')
-  if (rawAuth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || rawAuth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -27,6 +27,6 @@ export async function POST(request: NextRequest) {
     const result = await runLearningCycle()
     return NextResponse.json(result)
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Learning cycle failed' }, { status: 500 })
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

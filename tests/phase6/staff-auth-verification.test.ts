@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { PATCH } from '@/app/api/admin/companies/[id]/verification/route'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
@@ -31,7 +32,7 @@ function makeRequest(token: string | null, body: Record<string, unknown>, compan
   })
 }
 
-describe('Phase 6.6 — Route-Level Staff Auth (Company Verification)', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Company Verification)', () => {
   let companyId: string
   let superAdminId: string, managerId: string, userMgmtId: string, financeId: string, supportId: string, technicalId: string
   let superAdminSessionId: string, managerSessionId: string, userMgmtSessionId: string
