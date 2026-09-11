@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
 import { getStatsForPeriod } from '@/lib/activity-log'
 import { prisma } from '@/lib/prisma'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 function getDateRange(period: string): { start: Date; end: Date } {
   const end = new Date()
@@ -64,7 +66,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    const doc = new (require('jspdf')).jsPDF()
+    const doc = new jsPDF()
 
     doc.setFontSize(20)
     doc.setTextColor(30, 41, 59)
@@ -85,7 +87,6 @@ export async function GET(request: NextRequest) {
     doc.setTextColor(30, 41, 59)
     doc.text('Bookings Summary', 14, 54)
 
-    const { default: autoTable } = require('jspdf-autotable')
     autoTable(doc, {
       startY: 58,
       head: [['Metric', 'Count']],
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: [255, 195, 0], textColor: [31, 41, 55] },
     })
 
-    let currentY = doc.lastAutoTable.finalY + 15
+    let currentY = ((doc as any).lastAutoTable?.finalY ?? 58)
 
     doc.setFontSize(14)
     doc.setTextColor(30, 41, 59)
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] },
     })
 
-    currentY = doc.lastAutoTable.finalY + 15
+    currentY = ((doc as any).lastAutoTable?.finalY ?? currentY) + 15
 
     doc.setFontSize(14)
     doc.setTextColor(30, 41, 59)
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
       headStyles: { fillColor: [139, 92, 246], textColor: [255, 255, 255] },
     })
 
-    currentY = doc.lastAutoTable.finalY + 15
+    currentY = ((doc as any).lastAutoTable?.finalY ?? currentY) + 15
 
     doc.setFontSize(14)
     doc.setTextColor(30, 41, 59)

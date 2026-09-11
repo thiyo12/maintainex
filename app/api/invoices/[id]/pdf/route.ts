@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export async function GET(
   request: NextRequest,
@@ -27,7 +29,6 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
-    const jsPDF = require('jspdf')
     const doc = new jsPDF()
 
     // Header
@@ -99,7 +100,6 @@ export async function GET(
       `LKR ${item.totalPrice.toLocaleString()}`
     ])
 
-    const autoTable = require('jspdf-autotable')
     autoTable(doc, {
       startY: 140,
       head: [['Description', 'Qty', 'Unit Price', 'Total (LKR)']],
@@ -122,7 +122,7 @@ export async function GET(
       }
     })
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10
+    const finalY = ((doc as any).lastAutoTable?.finalY ?? 140) + 10
     
     // Totals
     doc.setFontSize(10)
