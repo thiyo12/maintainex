@@ -214,10 +214,11 @@ jobs:
             .
         if: always()
 
-      - name: Docker container start and health check
+      - name: Docker container start
         run: |
           docker run -d \
             --name phase9-ci-test \
+            --add-host=host.docker.internal:host-gateway \
             -p 3199:3000 \
             -e DATABASE_URL="postgresql://maintainex:maintainex_ci@host.docker.internal:5432/maintainex_test_phase07_ci" \
             -e NEXTAUTH_URL="http://localhost:3199" \
@@ -234,16 +235,29 @@ jobs:
             -e CLOUDINARY_API_SECRET="test" \
             -e NODE_ENV="production" \
             maintainex:phase9-ci-${GITHUB_SHA}
-          echo "Waiting for container startup..."
-          sleep 15
-          echo "Checking container logs for errors..."
-          docker logs phase9-ci-test 2>&1 | tail -30 || true
+          echo "Waiting 10s for container startup (prisma migrate deploy + next start)..."
+          sleep 10
+          RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
+          echo "Container running: $RUNNING"
+          if [ "$RUNNING" != "true" ]; then
+            echo "FAIL: Container exited during startup"
+            docker logs phase9-ci-test 2>&1 || true
+            exit 1
+          fi
+          echo "Container is alive. Startup logs:"
+          docker logs phase9-ci-test 2>&1 | tail -20 || true
         if: always()
 
       - name: Docker health check
         run: |
-          echo "Checking /api/health endpoint..."
-          for i in 1 2 3 4 5; do
+          echo "Waiting for Next.js to finish booting after prisma migrate..."
+          for i in 1 2 3 4 5 6 7 8; do
+            RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
+            if [ "$RUNNING" != "true" ]; then
+              echo "FAIL: Container died during startup"
+              docker logs phase9-ci-test 2>&1 | tail -40 || true
+              exit 1
+            fi
             HTTP_CODE=$(curl -s -o /tmp/health-response.json -w "%{http_code}" http://localhost:3199/api/health 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "Health check PASSED (HTTP $HTTP_CODE)"
@@ -253,22 +267,30 @@ jobs:
             echo "Attempt $i: HTTP $HTTP_CODE, retrying in 5s..."
             sleep 5
           done
-          echo "Health check FAILED after 5 attempts"
+          echo "Health check FAILED after 8 attempts"
           docker logs phase9-ci-test 2>&1 | tail -50 || true
           exit 1
         if: always()
 
       - name: Verify non-root user
         run: |
-          echo "Checking running user in container..."
-          CONTAINER_USER=$(docker exec phase9-ci-test whoami 2>/dev/null || echo "UNKNOWN")
-          CONTAINER_UID=$(docker exec phase9-ci-test id -u 2>/dev/null || echo "UNKNOWN")
-          echo "Container user: $CONTAINER_USER (UID: $CONTAINER_UID)"
-          if [ "$CONTAINER_USER" = "root" ]; then
-            echo "FAIL: Container is running as root"
+          RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
+          if [ "$RUNNING" != "true" ]; then
+            echo "FAIL: Container is not running, cannot check UID"
+            docker logs phase9-ci-test 2>&1 | tail -20 || true
             exit 1
           fi
-          echo "PASS: Container is not running as root"
+          UID_VALUE=$(docker exec phase9-ci-test id -u 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "FAIL: docker exec id -u failed: $UID_VALUE"
+            exit 1
+          fi
+          echo "Container UID: $UID_VALUE"
+          if [ "$UID_VALUE" = "0" ]; then
+            echo "FAIL: Container is running as root (UID 0)"
+            exit 1
+          fi
+          echo "PASS: Container running as non-root (UID $UID_VALUE)"
         if: always()
 
       - name: Docker cleanup
