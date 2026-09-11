@@ -100,6 +100,9 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
+      - name: Prisma schema integrity tests
+        run: npx vitest run tests/phase0 --reporter=verbose
+
       - name: Phase 8 unit tests
         run: npx vitest run tests/phase8 --reporter=verbose
 

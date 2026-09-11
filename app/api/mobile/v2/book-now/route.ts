@@ -23,6 +23,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid booking date' }, { status: 400 })
     }
 
+    const requestedCountryCode = typeof countryCode === 'string' && countryCode.trim()
+      ? countryCode.trim().toUpperCase()
+      : user.countryCode
+
+    if (requestedCountryCode !== user.countryCode) {
+      return NextResponse.json({
+        error: 'Country mismatch: you cannot create jobs in a different country',
+        code: 'COUNTRY_MISMATCH',
+      }, { status: 403 })
+    }
+
     const result = await createBookNowJob({
       customerId: user.id,
       templateJobId: String(templateJobId).trim(),

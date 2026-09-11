@@ -46,7 +46,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid Idempotency-Key header is required' }, { status: 400 })
     }
 
-    const userCurrency: Currency = getCurrencyForCountry(user.countryCode || 'LK')
+    const wallet = await prisma.providerWallet.findUnique({ where: { userId: user.id } })
+    const userCurrency: Currency = (wallet?.currency as Currency) || getCurrencyForCountry(user.countryCode || 'LK')
 
     if (userCurrency === 'CAD') {
       return NextResponse.json({

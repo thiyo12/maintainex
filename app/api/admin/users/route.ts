@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth-utils'
+import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await getAdminSession(request)
     if (!session || !['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'].includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -19,6 +20,13 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * pageSize
 
     const where: any = {}
+    const countryFilter = getCountryFilter(session)
+
+    if (countryFilter.id === '__NONE__') {
+      return NextResponse.json({ users: [], total: 0, page, pageSize, totalPages: 0 })
+    }
+
+    Object.assign(where, countryFilter)
 
     if (type === 'customer') {
       where.role = 'CUSTOMER'
@@ -135,7 +143,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await getAdminSession(request)
     if (!session || !['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT'].includes(session.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -145,6 +153,22 @@ export async function PATCH(request: NextRequest) {
 
     if (!userId || !action) {
       return NextResponse.json({ error: 'userId and action are required' }, { status: 400 })
+    }
+
+    const countryFilter = getCountryFilter(session)
+    if (countryFilter.id === '__NONE__') {
+      return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, countryCode: true } })
+    if (!targetUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN' && countryFilter.countryCode) {
+      if (!countryFilter.countryCode.in?.includes(targetUser.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const updateData: any = { updatedAt: new Date() }

@@ -1441,8 +1441,8 @@ model Dispute {
   updatedAt   DateTime   @updatedAt
 
   @@index([jobId])
-  @@index([raisedById])
   @@index([status])
+  @@index([countryCode])
 }
 
 // ============================================
@@ -1948,6 +1948,7 @@ model CommissionSettlement {
   @@index([jobId])
   @@index([providerId])
   @@index([status])
+  @@index([countryCode])
 }
 
 model JobOtp {
