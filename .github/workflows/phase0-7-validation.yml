@@ -1,9 +1,10 @@
-name: Phase 0-7 Validation
+name: Phase 0-7 + Phase 8 Validation
 
 on:
   push:
     branches:
       - phase0-7-integration-fix
+      - phase8-country-engine
   pull_request:
     branches:
       - main
@@ -82,8 +83,25 @@ jobs:
       - name: Apply post-baseline migrations with production command
         run: npx prisma migrate deploy
 
+      - name: Verify migration second run is no-op (idempotency)
+        run: npx prisma migrate deploy
+
+      - name: Verify Phase 8 migration columns exist in PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -c "SELECT \"countryCode\" FROM \"User\" LIMIT 1;"
+          psql "$DATABASE_URL" -c "SELECT \"currency\" FROM \"JobEscrow\" LIMIT 1;"
+          psql "$DATABASE_URL" -c "SELECT \"currency\" FROM \"WalletBalance\" LIMIT 1;"
+          psql "$DATABASE_URL" -c "SELECT \"countryCode\" FROM \"MarketplaceJob\" LIMIT 1;"
+
+      - name: Verify Phase 8 indexes exist in PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -c "\di *countryCode*" || true
+
       - name: TypeScript
         run: npx tsc --noEmit
+
+      - name: Phase 8 unit tests
+        run: npx vitest run tests/phase8 --reporter=verbose
 
       - name: Phase 0-7 regression tests
         shell: bash

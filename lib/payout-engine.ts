@@ -130,6 +130,7 @@ export async function requestPayout(
           { accountId: wallet.id, accountType: 'PROVIDER_WALLET', entryType: 'DEBIT', amount: amountCents },
           { accountId: `payout:${created.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'CREDIT', amount: amountCents },
         ],
+        currency,
         referenceType: 'WITHDRAWAL_RESERVED',
         referenceId: created.id,
         idempotencyKey: `payout-reserve:${idempotencyKey}`,
@@ -187,10 +188,10 @@ async function transitionPayout(
   }
 
   return prisma.$transaction(async (tx) => {
-    const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
-      `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
-      payoutId,
-    )
+      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string }>>(
+        `SELECT id, "userId", amount::text, status, currency FROM "Payout" WHERE id = $1 FOR UPDATE`,
+        payoutId,
+      )
     if (rows.length === 0) throw new Error('NOT_FOUND')
 
     const row = rows[0]
@@ -250,8 +251,8 @@ export async function markSucceeded(
 
   try {
     await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
-        `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
+      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string }>>(
+        `SELECT id, "userId", amount::text, status, currency FROM "Payout" WHERE id = $1 FOR UPDATE`,
         payoutId,
       )
       if (rows.length === 0) throw new Error('NOT_FOUND')
@@ -274,6 +275,7 @@ export async function markSucceeded(
           { accountId: `payout:${payout.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'DEBIT', amount },
           { accountId: `external:payout:${payout.id}`, accountType: 'EXTERNAL_PAYOUT', entryType: 'CREDIT', amount },
         ],
+        currency: payout.currency as Currency,
         referenceType: 'PAYOUT_SUCCEEDED',
         referenceId: payout.id,
         idempotencyKey: `payout-success:${idempotencyKey}`,
@@ -314,8 +316,8 @@ async function restoreReservedPayout(
 
   try {
     const finalStatus = await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string }>>(
-        `SELECT id, "userId", amount::text, status FROM "Payout" WHERE id = $1 FOR UPDATE`,
+      const rows = await tx.$queryRawUnsafe<Array<{ id: string; userId: string; amount: string; status: string; currency: string }>>(
+        `SELECT id, "userId", amount::text, status, currency FROM "Payout" WHERE id = $1 FOR UPDATE`,
         payoutId,
       )
       if (rows.length === 0) throw new Error('NOT_FOUND')
@@ -348,6 +350,7 @@ async function restoreReservedPayout(
             { accountId: `payout:${payout.id}`, accountType: 'PAYOUT_CLEARING', entryType: 'DEBIT', amount },
             { accountId: wallet.id, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount },
           ],
+          currency: payout.currency as Currency,
           referenceType: 'WITHDRAWAL_RELEASED',
           referenceId: payout.id,
           idempotencyKey: `payout-restore:${idempotencyKey}`,

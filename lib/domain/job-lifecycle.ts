@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
-import { bigIntToSafeNumber } from '@/lib/money'
+import { bigIntToSafeNumber, type Currency } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
 import { Prisma } from '@prisma/client'
@@ -251,6 +251,7 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
         { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount: totalAmount },
         { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'CREDIT', amount: totalAmount },
       ],
+      currency: escrow.currency as Currency,
       referenceType: 'ESCROW_DEPOSIT',
       referenceId: escrow.id,
       idempotencyKey: `escrow-deposit:${escrow.id}`,
@@ -377,6 +378,7 @@ export async function releaseEscrow(
 
     await postLedgerTransaction({
       entries: ledgerEntries,
+      currency: escrow.currency as Currency,
       referenceType: 'ESCROW_RELEASE',
       referenceId: escrow.id,
       idempotencyKey: `escrow-release:${escrow.id}`,
@@ -510,6 +512,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
         { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: refundCents },
         { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'CREDIT', amount: refundCents },
       ],
+      currency: escrow.currency as Currency,
       referenceType: 'ESCROW_REFUND',
       referenceId: escrow.id,
       idempotencyKey: `escrow-refund:${escrow.id}`,
@@ -811,6 +814,7 @@ export async function completeAndReleaseEscrow(
 
     await postLedgerTransaction({
       entries: ledgerEntries,
+      currency: escrow.currency as Currency,
       referenceType: 'ESCROW_RELEASE',
       referenceId: escrow.id,
       idempotencyKey: `escrow-release:${escrow.id}`,

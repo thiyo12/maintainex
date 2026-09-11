@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { requestPayout } from '@/lib/payout-engine'
+import { getCurrencyForCountry } from '@/lib/money'
+import type { Currency } from '@/lib/money'
 
 function parseMajorAmountToMinor(value: unknown): bigint | null {
   let raw: string
@@ -13,9 +15,6 @@ function parseMajorAmountToMinor(value: unknown): bigint | null {
     return null
   }
 
-  // LKR withdrawal API accepts major units with at most 2 decimal places.
-  // Convert with string arithmetic so 0.1/0.2 floating-point behaviour can
-  // never change a financial amount.
   if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) return null
   const [whole, fractional = ''] = raw.split('.')
   const cents = `${fractional}00`.slice(0, 2)
@@ -47,13 +46,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid Idempotency-Key header is required' }, { status: 400 })
     }
 
+    const userCurrency: Currency = getCurrencyForCountry(user.countryCode || 'LK')
+
+    if (userCurrency === 'CAD') {
+      return NextResponse.json({
+        error: 'CAD withdrawals are not yet supported',
+        code: 'CAD_WITHDRAWAL_NOT_SUPPORTED',
+      }, { status: 400 })
+    }
+
     const result = await requestPayout(
       user.id,
       amountCents,
       method,
       bankDetails,
       idempotencyKey,
-      user.id
+      user.id,
+      userCurrency,
     )
 
     if (!result.ok) {
@@ -72,7 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       id: payout.id,
       amount: payout.amount.toString(),
-      currency: 'LKR',
+      currency: payout.currency,
       status: payout.status,
       createdAt: payout.createdAt.toISOString(),
     }, { status: 201 })

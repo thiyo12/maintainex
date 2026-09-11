@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     }
 
     const countryFilter = getCountryFilter(session)
-    const userCountryFilter = session.role === 'SUPER_ADMIN' ? {} : { countryCode: countryFilter.countryCode || undefined }
-    const jobCountryFilter = session.role === 'SUPER_ADMIN' ? {} : { countryCode: countryFilter.countryCode || undefined }
+    const userCountryFilter = session.role === 'SUPER_ADMIN' ? {} : countryFilter
+    const jobCountryFilter = session.role === 'SUPER_ADMIN' ? {} : countryFilter
 
     const [
       totalUsers,
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     const monthlyRevenue = await prisma.commissionSettlement.groupBy({
       by: ['status'],
-      where: { status: 'SETTLED' },
+      where: { status: 'SETTLED', ...jobCountryFilter },
       _sum: { commissionAmount: true },
     })
 

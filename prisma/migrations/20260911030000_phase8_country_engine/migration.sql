@@ -108,3 +108,13 @@ ALTER TABLE "WalletBalance" DROP CONSTRAINT IF EXISTS "WalletBalance_walletType_
 
 -- Step 3: Create new unique constraint including currency
 ALTER TABLE "WalletBalance" ADD CONSTRAINT "WalletBalance_walletType_walletId_currency_key" UNIQUE ("walletType", "walletId", "currency");
+
+-- =============================================
+-- 20. Country code indexes for frequently queried models
+-- =============================================
+CREATE INDEX IF NOT EXISTS "User_countryCode_idx" ON "User"("countryCode");
+CREATE INDEX IF NOT EXISTS "TaskerProfile_countryCode_idx" ON "TaskerProfile"("countryCode");
+CREATE INDEX IF NOT EXISTS "CompanyProfile_countryCode_idx" ON "CompanyProfile"("countryCode");
+CREATE INDEX IF NOT EXISTS "MarketplaceJob_countryCode_idx" ON "MarketplaceJob"("countryCode");
+CREATE INDEX IF NOT EXISTS "CommissionSettlement_countryCode_idx" ON "CommissionSettlement"("countryCode");
+CREATE INDEX IF NOT EXISTS "Payout_countryCode_idx" ON "Payout"("countryCode");
