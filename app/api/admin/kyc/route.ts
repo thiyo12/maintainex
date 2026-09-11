@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'USER_MANAGEMENT']
@@ -17,11 +18,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
+    const countryFilter = getCountryFilter(session)
+
     const where: any = {}
     if (status && status !== 'ALL') where.status = status
 
     const documents = await prisma.identityDocument.findMany({
-      where,
+      where: { ...where, ...countryFilter },
       include: {
         user: {
           select: {
@@ -69,12 +72,12 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
-    const total = await prisma.identityDocument.count({ where })
+    const total = await prisma.identityDocument.count({ where: { ...where, ...countryFilter } })
 
     const summary = {
-      pending: await prisma.identityDocument.count({ where: { status: 'PENDING' } }),
-      verified: await prisma.identityDocument.count({ where: { status: 'APPROVED' } }),
-      rejected: await prisma.identityDocument.count({ where: { status: 'REJECTED' } }),
+      pending: await prisma.identityDocument.count({ where: { status: 'PENDING', ...countryFilter } }),
+      verified: await prisma.identityDocument.count({ where: { status: 'APPROVED', ...countryFilter } }),
+      rejected: await prisma.identityDocument.count({ where: { status: 'REJECTED', ...countryFilter } }),
     }
 
     return NextResponse.json({
@@ -116,11 +119,21 @@ export async function PATCH(request: NextRequest) {
 
     const document = await prisma.identityDocument.findUnique({
       where: { id: documentId },
-      select: { userId: true },
+      select: { userId: true, countryCode: true },
     })
 
     if (!document) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN') {
+      const countryFilter = getCountryFilter(session)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(document.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: document belongs to a different country' }, { status: 403 })
+      }
     }
 
     const action = status === 'APPROVED' ? 'APPROVE' : 'REJECT'

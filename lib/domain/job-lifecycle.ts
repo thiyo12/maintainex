@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
-import { bigIntToSafeNumber } from '@/lib/money'
+import { bigIntToSafeNumber, type Currency } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
 import { Prisma } from '@prisma/client'
@@ -144,7 +144,15 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   if (quote.status !== 'PENDING') throw new Error('Quote is not in PENDING status')
   if (quote.price <= 0n) throw new Error('Quote price must be positive')
 
-  const pricingConfig = await resolvePricingConfig(prisma, job.countryCode || 'GLOBAL')
+  const jobCountry = job.countryCode || 'GLOBAL'
+  const pricingConfig = await resolvePricingConfig(prisma, jobCountry)
+
+  if (jobCountry !== 'GLOBAL' && jobCountry !== pricingConfig.countryCode) {
+    throw new Error(
+      `PRICING_COUNTRY_MISMATCH: job country=${jobCountry} but resolved pricing config country=${pricingConfig.countryCode}. Refusing to proceed.`
+    )
+  }
+
   const serviceFee = (quote.price * BigInt(pricingConfig.commissionRateBps)) / 10000n
   const totalAmount = quote.price + serviceFee
   const existingEscrow = await prisma.jobEscrow.findFirst({
@@ -184,6 +192,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
           amount: quote.price,
           serviceFee,
           totalAmount,
+          currency: pricingConfig.defaultCurrency as Currency,
           paymentMethod: 'CARD',
           status: 'PENDING_PAYMENT',
           heldAt: null,
@@ -202,6 +211,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
           amount: quote.price,
           serviceFee,
           totalAmount,
+          currency: pricingConfig.defaultCurrency as Currency,
           paymentMethod: 'CARD',
           status: 'PENDING_PAYMENT',
         },
@@ -234,6 +244,15 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   })
   if (!customerWallet) throw new Error('Customer wallet not found')
 
+  const escrowCurrency = escrow.currency as Currency
+
+  const canonicalBalance = await prisma.walletBalance.findFirst({
+    where: { walletId: customerWallet.id, walletType: 'CUSTOMER', currency: escrowCurrency },
+  })
+  if (!canonicalBalance) {
+    throw new Error(`WALLET_CURRENCY_NOT_FOUND: canonical ${escrowCurrency} balance does not exist for customer`)
+  }
+
   const serviceFee = escrow.serviceFee ?? 0n
   const totalAmount = escrow.totalAmount ?? (quote.price + serviceFee)
   if (totalAmount <= 0n) throw new Error('Escrow total must be positive')
@@ -251,6 +270,7 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
         { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'DEBIT', amount: totalAmount },
         { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'CREDIT', amount: totalAmount },
       ],
+      currency: escrowCurrency,
       referenceType: 'ESCROW_DEPOSIT',
       referenceId: escrow.id,
       idempotencyKey: `escrow-deposit:${escrow.id}`,
@@ -258,25 +278,27 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       createdBy: ctx.actorId,
     }, tx)
 
-    const legacyWallet = await tx.customerWallet.update({
-      where: { userId: ctx.actorId },
-      data: { balance: { decrement: totalMajor } },
-      select: { balance: true },
-    })
+    if (escrowCurrency === 'LKR') {
+      const legacyWallet = await tx.customerWallet.update({
+        where: { userId: ctx.actorId },
+        data: { balance: { decrement: totalMajor } },
+        select: { balance: true },
+      })
 
-    await tx.walletTransaction.create({
-      data: {
-        userId: ctx.actorId,
-        walletType: 'CUSTOMER',
-        type: 'DEBIT',
-        amount: totalMajor,
-        balanceBefore: legacyWallet.balance + totalMajor,
-        balanceAfter: legacyWallet.balance,
-        reference: `Escrow deposit for job ${jobId}`,
-        referenceType: 'ESCROW_DEPOSIT',
-        referenceId: escrow.id,
-      },
-    })
+      await tx.walletTransaction.create({
+        data: {
+          userId: ctx.actorId,
+          walletType: 'CUSTOMER',
+          type: 'DEBIT',
+          amount: totalMajor,
+          balanceBefore: legacyWallet.balance + totalMajor,
+          balanceAfter: legacyWallet.balance,
+          reference: `Escrow deposit for job ${jobId}`,
+          referenceType: 'ESCROW_DEPOSIT',
+          referenceId: escrow.id,
+        },
+      })
+    }
 
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
@@ -377,6 +399,7 @@ export async function releaseEscrow(
 
     await postLedgerTransaction({
       entries: ledgerEntries,
+      currency: escrow.currency as Currency,
       referenceType: 'ESCROW_RELEASE',
       referenceId: escrow.id,
       idempotencyKey: `escrow-release:${escrow.id}`,
@@ -391,27 +414,30 @@ export async function releaseEscrow(
       }),
     }, tx)
 
-    const providerWallet = await tx.providerWallet.update({
-      where: { userId: identity.payoutUserId },
-      data: { availableBalance: { increment: netMajor } },
-      select: { availableBalance: true },
-    })
+    const escrowCurrency = escrow.currency as Currency
+    if (escrowCurrency === 'LKR') {
+      const providerWallet = await tx.providerWallet.update({
+        where: { userId: identity.payoutUserId },
+        data: { availableBalance: { increment: netMajor } },
+        select: { availableBalance: true },
+      })
 
-    await tx.walletTransaction.create({
-      data: {
-        userId: identity.payoutUserId,
-        walletType: 'PROVIDER',
-        type: 'CREDIT',
-        amount: netMajor,
-        balanceBefore: providerWallet.availableBalance - netMajor,
-        balanceAfter: providerWallet.availableBalance,
-        reference: commissionCents > 0n
-          ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
-          : `Escrow release for job ${jobId}`,
-        referenceType: 'ESCROW_RELEASE',
-        referenceId: escrow.id,
-      },
-    })
+      await tx.walletTransaction.create({
+        data: {
+          userId: identity.payoutUserId,
+          walletType: 'PROVIDER',
+          type: 'CREDIT',
+          amount: netMajor,
+          balanceBefore: providerWallet.availableBalance - netMajor,
+          balanceAfter: providerWallet.availableBalance,
+          reference: commissionCents > 0n
+            ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+            : `Escrow release for job ${jobId}`,
+          referenceType: 'ESCROW_RELEASE',
+          referenceId: escrow.id,
+        },
+      })
+    }
 
     if (isStaff) {
       await tx.marketplaceJob.updateMany({
@@ -439,6 +465,8 @@ export async function releaseEscrow(
           jobAmount: escrow.amount,
           commissionRate: rate,
           commissionAmount: commissionCents,
+          currency: escrowCurrency,
+          countryCode: job.countryCode || 'LK',
           status: 'PENDING',
         },
       })
@@ -495,49 +523,53 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   })
   if (!customerWallet) throw new Error('Customer wallet not found')
 
-  const refundCents = escrow.totalAmount
-  const refundMajor = bigIntToSafeNumber(refundCents) / 100
+    const refundCents = escrow.totalAmount
+    const refundMajor = bigIntToSafeNumber(refundCents) / 100
 
-  await prisma.$transaction(async (tx) => {
-    const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: ['PROTECTED', 'ON_HOLD'] }, paymentMethod: { not: 'CASH' } },
-      data: { status: 'REFUNDED', refundedAt: new Date() },
-    })
-    if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.jobEscrow.updateMany({
+        where: { id: escrow.id, status: { in: ['PROTECTED', 'ON_HOLD'] }, paymentMethod: { not: 'CASH' } },
+        data: { status: 'REFUNDED', refundedAt: new Date() },
+      })
+      if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
 
-    await postLedgerTransaction({
-      entries: [
-        { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: refundCents },
-        { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'CREDIT', amount: refundCents },
-      ],
-      referenceType: 'ESCROW_REFUND',
-      referenceId: escrow.id,
-      idempotencyKey: `escrow-refund:${escrow.id}`,
-      description: `Escrow refund for job ${jobId}`,
-      createdBy: ctx.actorId,
-    }, tx)
-
-    const legacyCustomerWallet = await tx.customerWallet.update({
-      where: { userId: job.customerId },
-      data: { balance: { increment: refundMajor } },
-      select: { balance: true },
-    })
-
-    await tx.walletTransaction.create({
-      data: {
-        userId: job.customerId,
-        walletType: 'CUSTOMER',
-        type: 'CREDIT',
-        amount: refundMajor,
-        balanceBefore: legacyCustomerWallet.balance - refundMajor,
-        balanceAfter: legacyCustomerWallet.balance,
-        reference: `Escrow refund for job ${jobId}`,
+      await postLedgerTransaction({
+        entries: [
+          { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: refundCents },
+          { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'CREDIT', amount: refundCents },
+        ],
+        currency: escrow.currency as Currency,
         referenceType: 'ESCROW_REFUND',
         referenceId: escrow.id,
-      },
-    })
+        idempotencyKey: `escrow-refund:${escrow.id}`,
+        description: `Escrow refund for job ${jobId}`,
+        createdBy: ctx.actorId,
+      }, tx)
 
-    await tx.marketplaceJob.updateMany({
+      const escrowCurrency = escrow.currency as Currency
+      if (escrowCurrency === 'LKR') {
+        const legacyCustomerWallet = await tx.customerWallet.update({
+          where: { userId: job.customerId },
+          data: { balance: { increment: refundMajor } },
+          select: { balance: true },
+        })
+
+        await tx.walletTransaction.create({
+          data: {
+            userId: job.customerId,
+            walletType: 'CUSTOMER',
+            type: 'CREDIT',
+            amount: refundMajor,
+            balanceBefore: legacyCustomerWallet.balance - refundMajor,
+            balanceAfter: legacyCustomerWallet.balance,
+            reference: `Escrow refund for job ${jobId}`,
+            referenceType: 'ESCROW_REFUND',
+            referenceId: escrow.id,
+          },
+        })
+      }
+
+      await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { not: 'COMPLETED' } },
       data: { status: 'CANCELLED' },
     })
@@ -811,6 +843,7 @@ export async function completeAndReleaseEscrow(
 
     await postLedgerTransaction({
       entries: ledgerEntries,
+      currency: escrow.currency as Currency,
       referenceType: 'ESCROW_RELEASE',
       referenceId: escrow.id,
       idempotencyKey: `escrow-release:${escrow.id}`,
@@ -826,27 +859,30 @@ export async function completeAndReleaseEscrow(
       }),
     }, tx)
 
-    const providerWallet = await tx.providerWallet.update({
-      where: { userId: identity.payoutUserId },
-      data: { availableBalance: { increment: netMajor } },
-      select: { availableBalance: true },
-    })
+    const escrowCurrency = escrow.currency as Currency
+    if (escrowCurrency === 'LKR') {
+      const providerWallet = await tx.providerWallet.update({
+        where: { userId: identity.payoutUserId },
+        data: { availableBalance: { increment: netMajor } },
+        select: { availableBalance: true },
+      })
 
-    await tx.walletTransaction.create({
-      data: {
-        userId: identity.payoutUserId,
-        walletType: 'PROVIDER',
-        type: 'CREDIT',
-        amount: netMajor,
-        balanceBefore: providerWallet.availableBalance - netMajor,
-        balanceAfter: providerWallet.availableBalance,
-        reference: commissionCents > 0n
-          ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
-          : `Escrow release for job ${jobId}`,
-        referenceType: 'ESCROW_RELEASE',
-        referenceId: escrow.id,
-      },
-    })
+      await tx.walletTransaction.create({
+        data: {
+          userId: identity.payoutUserId,
+          walletType: 'PROVIDER',
+          type: 'CREDIT',
+          amount: netMajor,
+          balanceBefore: providerWallet.availableBalance - netMajor,
+          balanceAfter: providerWallet.availableBalance,
+          reference: commissionCents > 0n
+            ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+            : `Escrow release for job ${jobId}`,
+          referenceType: 'ESCROW_RELEASE',
+          referenceId: escrow.id,
+        },
+      })
+    }
 
     await tx.jobWorkspace.updateMany({
       where: { jobId, progressStatus: { not: 'COMPLETED' } },
@@ -868,6 +904,8 @@ export async function completeAndReleaseEscrow(
           jobAmount: escrow.amount,
           commissionRate: rate,
           commissionAmount: commissionCents,
+          currency: escrowCurrency,
+          countryCode: job.countryCode || 'LK',
           status: 'PENDING',
         },
       })

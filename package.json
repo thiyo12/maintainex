@@ -9,6 +9,7 @@
     ]
   },
   "scripts": {
+    "test": "vitest",
     "dev": "next dev",
     "dev:mobile": "cd apps/mobile && npx expo start",
     "dev:all": "bash dev.sh local",

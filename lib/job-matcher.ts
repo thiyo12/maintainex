@@ -23,9 +23,11 @@ export interface MatchedTasker {
  * Called when a new job is posted.
  * Finds the best taskers and sends notifications in waves.
  */
-export async function matchJobToTaskers(jobId: string): Promise<{ matched: number; totalCandidates: number }> {
+export async function matchJobToTaskers(jobId: string, countryCode?: string): Promise<{ matched: number; totalCandidates: number }> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job || job.status !== 'OPEN') return { matched: 0, totalCandidates: 0 }
+
+  const jobCountry = countryCode || job.countryCode || 'LK'
 
   const category = await prisma.category.findUnique({ where: { id: job.categoryId } })
   if (!category) return { matched: 0, totalCandidates: 0 }
@@ -33,9 +35,9 @@ export async function matchJobToTaskers(jobId: string): Promise<{ matched: numbe
   const radiusKm = await getSetting('matching.radius_km', 50)
   const maxActiveJobs = await getSetting('matching.max_active_jobs', 3)
 
-  // 1. Get all candidate taskers for this category
+  // 1. Get all candidate taskers for this category — country-filtered at DB level
   const allProfiles = await prisma.taskerProfile.findMany({
-    where: { isOnline: true },
+    where: { isOnline: true, countryCode: jobCountry },
     include: { user: { select: { id: true, name: true, pushToken: true, isSuspended: true } } },
   })
 

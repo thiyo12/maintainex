@@ -90,6 +90,7 @@ type WalletUpdate = {
   entryType: 'CREDIT' | 'DEBIT';
   accountType: string;
   accountId: string;
+  currency: Currency;
 };
 
 async function resolveWalletId(client: PrismaTxClient, update: WalletUpdate): Promise<string> {
@@ -181,7 +182,7 @@ export async function postLedgerTransaction(
         const key = `${entry.accountType}:${entry.accountId}:${entry.entryType}`;
         const previous = walletUpdates.get(key);
         if (previous) previous.amount += entry.amount;
-        else walletUpdates.set(key, { ...entry });
+        else walletUpdates.set(key, { ...entry, currency });
       }
     }
 
@@ -189,17 +190,18 @@ export async function postLedgerTransaction(
       const walletId = await resolveWalletId(client, update);
       const delta = update.amount;
       const walletType = update.accountType === 'CUSTOMER_WALLET' ? 'CUSTOMER' : 'PROVIDER';
+      const walletCurrency = update.currency;
 
       if (update.entryType === 'CREDIT') {
         await client.$executeRawUnsafe(
-          `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "version", "createdAt", "updatedAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 0, 1, now(), now())
-           ON CONFLICT ("walletType", "walletId")
+          `INSERT INTO "WalletBalance" ("id", "walletId", "walletType", "balance", "availableBalance", "pendingBalance", "currency", "version", "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 0, $5, 1, now(), now())
+           ON CONFLICT ("walletType", "walletId", "currency")
            DO UPDATE SET "balance" = "WalletBalance"."balance" + $3,
                          "availableBalance" = "WalletBalance"."availableBalance" + $4,
                          "version" = "WalletBalance"."version" + 1,
                          "updatedAt" = now()`,
-          walletId, walletType, delta, delta
+          walletId, walletType, delta, delta, walletCurrency
         );
       } else {
         const affected = await client.$executeRawUnsafe(
@@ -208,9 +210,9 @@ export async function postLedgerTransaction(
                "availableBalance" = "availableBalance" - $4,
                "version" = "version" + 1,
                "updatedAt" = now()
-           WHERE "walletType" = $2 AND "walletId" = $1
+           WHERE "walletType" = $2 AND "walletId" = $1 AND "currency" = $5
              AND "balance" >= $3 AND "availableBalance" >= $4`,
-          walletId, walletType, delta, delta
+          walletId, walletType, delta, delta, walletCurrency
         );
         if (affected === 0) throw new Error('INSUFFICIENT_FUNDS');
       }
@@ -278,6 +280,7 @@ export async function reverseLedgerTransaction(
       referenceType: 'REVERSAL',
       referenceId: originalGroupId,
       idempotencyKey: `reversal:${originalGroupId}`,
+      currency: (originalEntries[0]?.currency as Currency) || 'LKR',
       description: `Reversal of ${originalGroupId}: ${reason}`,
       createdBy,
     }, tx);
@@ -291,7 +294,8 @@ export async function postWalletCredit(
   referenceType: string,
   referenceId: string,
   idempotencyKey: string,
-  createdBy: string
+  createdBy: string,
+  currency?: Currency
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
@@ -301,6 +305,7 @@ export async function postWalletCredit(
     referenceType,
     referenceId,
     idempotencyKey,
+    currency,
     description: `Wallet credit: ${referenceType}`,
     createdBy,
   });
@@ -313,7 +318,8 @@ export async function postWalletDebit(
   referenceType: string,
   referenceId: string,
   idempotencyKey: string,
-  createdBy: string
+  createdBy: string,
+  currency?: Currency
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
@@ -323,6 +329,7 @@ export async function postWalletDebit(
     referenceType,
     referenceId,
     idempotencyKey,
+    currency,
     description: `Wallet debit: ${referenceType}`,
     createdBy,
   });
@@ -332,7 +339,8 @@ export async function postEscrowDeposit(
   escrowId: string,
   customerId: string,
   amount: bigint,
-  idempotencyKey: string
+  idempotencyKey: string,
+  currency?: Currency
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
@@ -342,6 +350,7 @@ export async function postEscrowDeposit(
     referenceType: 'ESCROW_DEPOSIT',
     referenceId: escrowId,
     idempotencyKey,
+    currency,
     description: 'Escrow deposit for job',
     createdBy: 'system',
   });
@@ -352,7 +361,8 @@ export async function postEscrowRelease(
   providerId: string,
   amount: bigint,
   commission: bigint,
-  idempotencyKey: string
+  idempotencyKey: string,
+  currency?: Currency
 ): Promise<PostedLedgerTransaction> {
   const providerAmount = amount - commission;
   const entries: LedgerEntry[] = [
@@ -367,6 +377,7 @@ export async function postEscrowRelease(
     referenceType: 'ESCROW_RELEASE',
     referenceId: escrowId,
     idempotencyKey,
+    currency,
     description: 'Escrow release with commission',
     createdBy: 'system',
   });
@@ -376,7 +387,8 @@ export async function postEscrowRefund(
   escrowId: string,
   customerId: string,
   amount: bigint,
-  idempotencyKey: string
+  idempotencyKey: string,
+  currency?: Currency
 ): Promise<PostedLedgerTransaction> {
   return postLedgerTransaction({
     entries: [
@@ -386,6 +398,7 @@ export async function postEscrowRefund(
     referenceType: 'ESCROW_REFUND',
     referenceId: escrowId,
     idempotencyKey,
+    currency,
     description: 'Escrow refund',
     createdBy: 'system',
   });

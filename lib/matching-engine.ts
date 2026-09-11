@@ -21,10 +21,12 @@ export interface MatchedProvider {
   }
 }
 
-export async function matchProvidersForJob(jobId: string): Promise<MatchedProvider[]> {
+export async function matchProvidersForJob(jobId: string, countryCode?: string): Promise<MatchedProvider[]> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return []
   if (job.status !== 'OPEN') return []
+
+  const jobCountry = countryCode || job.countryCode || 'LK'
 
   const category = await prisma.category.findUnique({ where: { id: job.categoryId } })
   if (!category) return []
@@ -37,6 +39,7 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     prisma.taskerProfile.findMany({
       where: {
         isOnline: true,
+        countryCode: jobCountry,
       },
       include: {
         user: { select: { id: true, name: true } },
@@ -45,6 +48,7 @@ export async function matchProvidersForJob(jobId: string): Promise<MatchedProvid
     prisma.companyProfile.findMany({
       where: {
         isVerified: true,
+        countryCode: jobCountry,
       },
       include: {
         user: { select: { id: true, name: true } },

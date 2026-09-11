@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { formatWhatsAppPhone } from '@/lib/phone'
 
 interface WhatsAppMessage {
   phone: string
@@ -18,7 +19,7 @@ export async function sendWhatsAppMessage(data: WhatsAppMessage): Promise<WhatsA
   const { phone, message, customerId, templateName } = data
   
   try {
-    const formattedPhone = formatSriLankaPhone(phone)
+    const formattedPhone = formatWhatsAppPhone(phone)
     
     const result = await sendViaWhatsAppAPI({
       phone: formattedPhone,
@@ -59,20 +60,6 @@ export async function sendWhatsAppMessage(data: WhatsAppMessage): Promise<WhatsA
       error: error.message,
     }
   }
-}
-
-function formatSriLankaPhone(phone: string): string {
-  let formatted = phone.replace(/[^0-9]/g, '')
-  
-  if (formatted.startsWith('0')) {
-    formatted = '94' + formatted.substring(1)
-  }
-  
-  if (!formatted.startsWith('94')) {
-    formatted = '94' + formatted
-  }
-  
-  return formatted + '@c.us'
 }
 
 async function sendViaWhatsAppAPI(data: { phone: string; message: string }): Promise<WhatsAppResult> {

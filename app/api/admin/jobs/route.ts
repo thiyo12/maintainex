@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
 
 interface UnifiedJob {
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
     const where: any = {}
     if (status && status !== 'ALL') where.status = status
 
+    const countryFilter = getCountryFilter(session)
+    const v2Where = { ...where, ...countryFilter }
+
     // Query both V1 and V2 in parallel
     const [v1Jobs, v1Total, v2Jobs, v2Total] = await Promise.all([
       prisma.jobPosting.findMany({
@@ -57,10 +61,10 @@ export async function GET(request: NextRequest) {
       }),
       prisma.jobPosting.count({ where }),
       prisma.marketplaceJob.findMany({
-        where,
+        where: v2Where,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.marketplaceJob.count({ where }),
+      prisma.marketplaceJob.count({ where: v2Where }),
     ])
 
     const totalCombined = v1Total + v2Total
@@ -184,6 +188,17 @@ export async function PATCH(request: NextRequest) {
       if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
+
+      if (session.role !== 'SUPER_ADMIN') {
+        const countryFilter = getCountryFilter(session)
+        if (countryFilter.id === '__NONE__') {
+          return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+        }
+        if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(job.countryCode || 'LK')) {
+          return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
+        }
+      }
+
       try {
         const updated = await transitionMarketplaceJob(
           { jobId, actorId: session.adminUserId, actorType: 'STAFF' },

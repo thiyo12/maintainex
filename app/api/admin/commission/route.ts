@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
 
@@ -25,7 +26,12 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
 
-    const where: any = {}
+    const countryFilter = getCountryFilter(session)
+    if (countryFilter.id === '__NONE__') {
+      return NextResponse.json({ settlements: [], summary: { pendingCommission: 0, pendingJobAmount: 0, pendingCount: 0, settledCommission: 0, settledCount: 0 }, pagination: { page, limit, total: 0, pages: 0 } })
+    }
+
+    const where: any = { ...countryFilter }
     if (status && status !== 'ALL' && status !== '') where.status = status
 
     const [settlements, total] = await Promise.all([
@@ -38,14 +44,16 @@ export async function GET(request: NextRequest) {
       prisma.commissionSettlement.count({ where }),
     ])
 
+    const summaryWhere = { ...countryFilter, status: 'PENDING' }
     const summary = await prisma.commissionSettlement.aggregate({
-      where: { status: 'PENDING' },
+      where: summaryWhere,
       _sum: { commissionAmount: true, jobAmount: true },
       _count: true,
     })
 
+    const settledSummaryWhere = { ...countryFilter, status: 'SETTLED' }
     const settledSummary = await prisma.commissionSettlement.aggregate({
-      where: { status: 'SETTLED' },
+      where: settledSummaryWhere,
       _sum: { commissionAmount: true },
       _count: true,
     })
@@ -87,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     const pendingSettlements = await prisma.commissionSettlement.findMany({
-      where: { providerId, status: 'PENDING' },
+      where: { providerId, status: 'PENDING', ...getCountryFilter(session) },
       orderBy: { createdAt: 'asc' },
     })
 
@@ -142,6 +150,16 @@ export async function PUT(request: NextRequest) {
     })
     if (!settlement) {
       return NextResponse.json({ error: 'Settlement not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN') {
+      const countryFilter = getCountryFilter(session)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(settlement.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: settlement belongs to a different country' }, { status: 403 })
+      }
     }
 
     if (settlement.status === 'SETTLED') {

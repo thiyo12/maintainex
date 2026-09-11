@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
 
@@ -18,7 +19,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
-    const where: any = {}
+    const countryFilter = getCountryFilter(session)
+
+    const where: any = { ...countryFilter }
     if (status && status !== 'ALL') {
       where.status = status
     }
@@ -122,6 +125,16 @@ export async function PATCH(request: NextRequest) {
 
     if (!settlement) {
       return NextResponse.json({ error: 'Settlement not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN') {
+      const countryFilter = getCountryFilter(session)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(settlement.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     let updateData: any = {}

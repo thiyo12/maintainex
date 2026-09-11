@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
+import { getCountryFilter } from '@/lib/admin-rbac'
 import { transitionCompanyVerification } from '@/lib/phase6/kyc-writer'
 import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 
@@ -44,10 +45,21 @@ export async function PATCH(
 
     const company = await prisma.companyProfile.findUnique({
       where: { id: companyId },
-      select: { id: true, companyName: true, verificationStatus: true },
+      select: { id: true, companyName: true, verificationStatus: true, countryCode: true },
     })
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 })
+    }
+
+    if (adminUser.role !== 'SUPER_ADMIN') {
+      const adminSession = { role: adminUser.role, assignedCountries: (principal as any).assignedCountries || [] }
+      const countryFilter = getCountryFilter(adminSession as any)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(company.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: company belongs to a different country' }, { status: 403 })
+      }
     }
 
     const result = await transitionCompanyVerification(prisma, {

@@ -6,6 +6,9 @@ import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Wallet } from '../../../lib/api-v2'
+import { formatCurrency, getCurrencyForCountry } from '../../../lib/currency-format'
+import { Currency } from '../../../lib/money'
+import { useCountry } from '../../../lib/country'
 
 const PRESETS = [500, 1000, 2500, 5000, 10000, 25000]
 
@@ -18,6 +21,8 @@ const METHODS = [
 export default function TopUpScreen() {
   const colors = useColors()
   const router = useRouter()
+  const { selectedCountry } = useCountry()
+  const currency: Currency = getCurrencyForCountry(selectedCountry?.code || 'LK')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('payhere')
   const [loading, setLoading] = useState(false)
@@ -27,7 +32,7 @@ export default function TopUpScreen() {
   const handleTopUp = async () => {
     const amt = parseFloat(amount)
     if (!amt || amt < 100) {
-      Alert.alert('Minimum top-up is LKR 100')
+      Alert.alert(`Minimum top-up is ${formatCurrency(BigInt(10000), currency)}`)
       return
     }
     if (method === 'bank_transfer') {
@@ -62,7 +67,7 @@ export default function TopUpScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView>
         <View style={styles.section}>
-          <Text style={styles.sLabel}>Select Amount (LKR)</Text>
+          <Text style={styles.sLabel}>Select Amount ({currency})</Text>
           <View style={styles.presets}>
             {PRESETS.map(p => (
               <TouchableOpacity
@@ -123,7 +128,7 @@ export default function TopUpScreen() {
           >
             <Ionicons name="lock-closed-outline" size={18} color="#111827" />
             <Text style={styles.btnTxt}>
-              {loading ? 'Processing...' : `Add LKR ${numAmt ? numAmt.toLocaleString() : '0'} to Wallet`}
+              {loading ? 'Processing...' : `Add ${formatCurrency(BigInt(Math.round(numAmt * 100)), currency)} to Wallet`}
             </Text>
           </TouchableOpacity>
           <Text style={styles.feeNote}>
@@ -139,7 +144,7 @@ export default function TopUpScreen() {
               Bank Transfer Details
             </Text>
             <Text style={{ fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 16 }}>
-              Transfer LKR {numAmt.toLocaleString()} to this account and use your phone number as reference.
+              Transfer {formatCurrency(BigInt(Math.round(numAmt * 100)), currency)} to this account and use your phone number as reference.
             </Text>
             {[
               ['Bank', "People's Bank"],
