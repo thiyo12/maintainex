@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 import { createAuditLog, getIp } from '@/lib/admin-rbac'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
@@ -24,6 +25,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20')
     const skip = (page - 1) * limit
 
+    const countryFilter = getCountryFilter(session)
+
     if (referenceNumber) {
       const payment = await prisma.commissionPayment.findUnique({
         where: { referenceNumber },
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
               commissionRate: true,
               commissionOwed: true,
               status: true,
+              countryCode: true,
             }
           }
         }
@@ -46,10 +50,16 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Reference not found' }, { status: 404 })
       }
 
+      if (session.role !== 'SUPER_ADMIN' && countryFilter.countryCode) {
+        if (!countryFilter.countryCode.in?.includes(payment.weeklySettlement?.countryCode || 'LK')) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+
       return NextResponse.json({ payment })
     }
 
-    const where: any = {}
+    const where: any = { ...countryFilter }
     if (status) where.status = status
 
     const payments = await prisma.commissionPayment.findMany({
@@ -112,6 +122,7 @@ export async function PATCH(request: NextRequest) {
             providerId: true,
             commissionPaid: true,
             status: true,
+            countryCode: true,
           }
         }
       }
@@ -119,6 +130,16 @@ export async function PATCH(request: NextRequest) {
 
     if (!payment) {
       return NextResponse.json({ error: 'Commission payment not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN') {
+      const countryFilter = getCountryFilter(session)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(payment.weeklySettlement?.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     if (payment.status === 'CONFIRMED') {

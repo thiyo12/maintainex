@@ -98,6 +98,14 @@ export async function POST(request: NextRequest) {
 
     const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
     const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
+
+    if (finalCountryCode !== user.countryCode) {
+      return NextResponse.json({
+        error: 'Country mismatch: you cannot create jobs in a different country',
+        code: 'COUNTRY_MISMATCH',
+      }, { status: 403 })
+    }
+
     const validMaterialHandling = ['tasker_brings', 'customer_provides', 'quote_both']
     const finalMaterialHandling = validMaterialHandling.includes(materialHandling) ? materialHandling : 'tasker_brings'
 

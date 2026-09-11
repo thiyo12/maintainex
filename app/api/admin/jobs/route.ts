@@ -188,6 +188,17 @@ export async function PATCH(request: NextRequest) {
       if (!job) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
+
+      if (session.role !== 'SUPER_ADMIN') {
+        const countryFilter = getCountryFilter(session)
+        if (countryFilter.id === '__NONE__') {
+          return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+        }
+        if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(job.countryCode || 'LK')) {
+          return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
+        }
+      }
+
       try {
         const updated = await transitionMarketplaceJob(
           { jobId, actorId: session.adminUserId, actorType: 'STAFF' },

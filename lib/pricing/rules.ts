@@ -28,7 +28,7 @@ export async function resolvePricingConfig(
   if (!cfg) return { ...DEFAULT_CONFIG, countryCode }
 
   return {
-    countryCode,
+    countryCode: cfg.countryCode,
     defaultCurrency: cfg.defaultCurrency ?? 'LKR',
     pricingVersion: cfg.pricingVersion ?? 'v1',
     commissionRateBps: cfg.commissionRateBps ?? 1000,

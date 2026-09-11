@@ -92,6 +92,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Dispute not found' }, { status: 404 })
     }
 
+    if (session.role !== 'SUPER_ADMIN') {
+      const countryFilter = getCountryFilter(session)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(dispute.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: dispute belongs to a different country' }, { status: 403 })
+      }
+    }
+
     const marketplaceJob = await prisma.marketplaceJob.findUnique({
       where: { id: dispute.jobId },
       select: { id: true, status: true },

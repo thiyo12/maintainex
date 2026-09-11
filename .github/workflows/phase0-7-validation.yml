@@ -139,6 +139,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+      - name: Negative security tests (Part W)
+        run: npx vitest run tests/phase8/negative-security.test.ts --reporter=verbose 2>&1 | tee /tmp/security-tests.txt
+        if: always()
+
+      - name: Upload security test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-test-diagnostics
+          path: /tmp/security-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Canonical financial flow integration tests (PostgreSQL)
         run: npx vitest run tests/phase8/postgresql-integration.test.ts --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
         if: always()

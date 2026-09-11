@@ -119,11 +119,21 @@ export async function PATCH(request: NextRequest) {
 
     const document = await prisma.identityDocument.findUnique({
       where: { id: documentId },
-      select: { userId: true },
+      select: { userId: true, countryCode: true },
     })
 
     if (!document) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
+
+    if (session.role !== 'SUPER_ADMIN') {
+      const countryFilter = getCountryFilter(session)
+      if (countryFilter.id === '__NONE__') {
+        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+      }
+      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(document.countryCode || 'LK')) {
+        return NextResponse.json({ error: 'Forbidden: document belongs to a different country' }, { status: 403 })
+      }
     }
 
     const action = status === 'APPROVED' ? 'APPROVE' : 'REJECT'

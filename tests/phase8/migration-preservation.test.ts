@@ -90,4 +90,61 @@ describe.skipIf(!isDB)('Phase 8 — Migration Preservation', () => {
     expect(job!.budgetAmount).toBe(10000n)
     expect(job!.status).toBe('OPEN')
   })
+
+  it('WalletBalance unique constraint enforces (walletType, walletId, currency)', async () => {
+    await expect(
+      prisma.walletBalance.create({
+        data: { walletId, walletType: 'CUSTOMER', balance: 0n, availableBalance: 0n, pendingBalance: 0n, currency: 'LKR' },
+      })
+    ).rejects.toThrow()
+  })
+
+  it('FinancialLedger.currency defaults to LKR for new entries', async () => {
+    const entry = await prisma.financialLedger.create({
+      data: {
+        accountId: 'test-account',
+        accountType: 'TEST',
+        entryType: 'CREDIT',
+        amount: 100n,
+        referenceType: 'TEST',
+        referenceId: `${PREFIX}-test-ref`,
+        idempotencyKey: `${PREFIX}-test-ledger-${Date.now()}`,
+        createdBy: 'SYSTEM',
+      },
+    })
+    expect(entry.currency).toBe('LKR')
+    await prisma.financialLedger.delete({ where: { id: entry.id } })
+  })
+
+  it('CommissionSettlement.currency and countryCode default correctly', async () => {
+    const settlement = await prisma.commissionSettlement.create({
+      data: {
+        jobId: `${PREFIX}-test-job`,
+        escrowId: `${PREFIX}-test-escrow`,
+        providerId: userId,
+        customerId: userId,
+        jobAmount: 10000n,
+        commissionRate: 10.0,
+        commissionAmount: 1000n,
+        status: 'PENDING',
+      },
+    })
+    expect(settlement.currency).toBe('LKR')
+    expect(settlement.countryCode).toBe('LK')
+    await prisma.commissionSettlement.delete({ where: { id: settlement.id } })
+  })
+
+  it('Payout.currency and countryCode default correctly', async () => {
+    const payout = await prisma.payout.create({
+      data: {
+        userId,
+        amount: 5000n,
+        source: 'WITHDRAWAL',
+        status: 'PENDING',
+      },
+    })
+    expect(payout.currency).toBe('LKR')
+    expect(payout.countryCode).toBe('LK')
+    await prisma.payout.delete({ where: { id: payout.id } })
+  })
 })

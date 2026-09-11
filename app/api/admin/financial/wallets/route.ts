@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { getCountryFilter } from '@/lib/admin-rbac'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
 
@@ -16,12 +17,17 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
+    const countryFilter = getCountryFilter(session)
+    const userCountryWhere = session.role === 'SUPER_ADMIN' ? {} : countryFilter
+
     let providerWallets: any[] = []
     let customerWallets: any[] = []
     let transactions: any[] = []
 
     if (type === 'providers') {
+      const scopedUserIds = userCountryWhere.id === '__NONE__' ? ['__NONE__'] : (await prisma.user.findMany({ where: userCountryWhere, select: { id: true } })).map(u => u.id)
       const wallets = await prisma.providerWallet.findMany({
+        where: { userId: { in: scopedUserIds } },
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit
@@ -39,7 +45,9 @@ export async function GET(request: NextRequest) {
         user: userMap.get(w.userId) || null
       }))
     } else if (type === 'customers') {
+      const scopedUserIds = userCountryWhere.id === '__NONE__' ? ['__NONE__'] : (await prisma.user.findMany({ where: userCountryWhere, select: { id: true } })).map(u => u.id)
       const wallets = await prisma.customerWallet.findMany({
+        where: { userId: { in: scopedUserIds } },
         orderBy: { updatedAt: 'desc' },
         skip,
         take: limit
@@ -57,7 +65,9 @@ export async function GET(request: NextRequest) {
         user: userMap.get(w.userId) || null
       }))
     } else if (type === 'transactions') {
+      const scopedUserIds = userCountryWhere.id === '__NONE__' ? ['__NONE__'] : (await prisma.user.findMany({ where: userCountryWhere, select: { id: true } })).map(u => u.id)
       const txns = await prisma.walletTransaction.findMany({
+        where: { userId: { in: scopedUserIds } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit
@@ -104,10 +114,21 @@ export async function PATCH(request: NextRequest) {
       const isFrozen = action === 'FREEZE'
 
       const providerWallet = await prisma.providerWallet.findUnique({
-        where: { id: walletId }
+        where: { id: walletId },
+        select: { id: true, userId: true },
       })
 
       if (providerWallet) {
+        if (session.role !== 'SUPER_ADMIN') {
+          const countryFilter = getCountryFilter(session)
+          if (countryFilter.id === '__NONE__') {
+            return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+          }
+          const walletUser = await prisma.user.findUnique({ where: { id: providerWallet.userId }, select: { countryCode: true } })
+          if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(walletUser?.countryCode || 'LK')) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+          }
+        }
         const updated = await prisma.providerWallet.update({
           where: { id: walletId },
           data: { isFrozen }
@@ -116,10 +137,21 @@ export async function PATCH(request: NextRequest) {
       }
 
       const customerWallet = await prisma.customerWallet.findUnique({
-        where: { id: walletId }
+        where: { id: walletId },
+        select: { id: true, userId: true },
       })
 
       if (customerWallet) {
+        if (session.role !== 'SUPER_ADMIN') {
+          const countryFilter = getCountryFilter(session)
+          if (countryFilter.id === '__NONE__') {
+            return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
+          }
+          const walletUser = await prisma.user.findUnique({ where: { id: customerWallet.userId }, select: { countryCode: true } })
+          if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(walletUser?.countryCode || 'LK')) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+          }
+        }
         const updated = await prisma.customerWallet.update({
           where: { id: walletId },
           data: { isFrozen }
