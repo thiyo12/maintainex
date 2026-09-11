@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { requestPayout } from '@/lib/payout-engine'
-import { getCurrencyForCountry } from '@/lib/money'
 import type { Currency } from '@/lib/money'
 
 function parseMajorAmountToMinor(value: unknown): bigint | null {
@@ -47,12 +46,28 @@ export async function POST(request: NextRequest) {
     }
 
     const wallet = await prisma.providerWallet.findUnique({ where: { userId: user.id } })
-    const userCurrency: Currency = (wallet?.currency as Currency) || getCurrencyForCountry(user.countryCode || 'LK')
+    if (!wallet) {
+      return NextResponse.json({ error: 'Provider wallet not found', code: 'WALLET_NOT_FOUND' }, { status: 404 })
+    }
 
-    if (userCurrency === 'CAD') {
+    const requestedCurrency: Currency = typeof body.currency === 'string' && body.currency === 'CAD'
+      ? 'CAD'
+      : 'LKR'
+
+    if (requestedCurrency === 'CAD') {
       return NextResponse.json({
         error: 'CAD withdrawals are not yet supported',
         code: 'CAD_WITHDRAWAL_NOT_SUPPORTED',
+      }, { status: 400 })
+    }
+
+    const canonicalBalance = await prisma.walletBalance.findFirst({
+      where: { walletId: wallet.id, walletType: 'PROVIDER', currency: 'LKR' },
+    })
+    if (!canonicalBalance) {
+      return NextResponse.json({
+        error: 'No canonical LKR balance found',
+        code: 'LKR_BALANCE_NOT_FOUND',
       }, { status: 400 })
     }
 
@@ -63,7 +78,7 @@ export async function POST(request: NextRequest) {
       bankDetails,
       idempotencyKey,
       user.id,
-      userCurrency,
+      'LKR',
     )
 
     if (!result.ok) {

@@ -95,33 +95,87 @@ jobs:
 
       - name: Verify Phase 8 indexes exist in PostgreSQL
         run: |
-          psql "$DATABASE_URL" -c "\di *countryCode*" || true
+          psql "$DATABASE_URL" -c "\di *countryCode*"
 
       - name: TypeScript
         run: npx tsc --noEmit
 
-      - name: Prisma schema integrity tests
-        run: npx vitest run tests/phase0 --reporter=verbose
+      - name: Schema integrity tests
+        run: npx vitest run tests/phase0 --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
+        if: always()
 
-      - name: Phase 8 unit tests
-        run: npx vitest run tests/phase8 --reporter=verbose
-
-      - name: Phase 0-7 regression tests
-        shell: bash
-        run: |
-          set -o pipefail
-          npx vitest run tests --reporter=verbose 2>&1 | tee vitest-output.txt
-
-      - name: Upload test diagnostics
+      - name: Upload schema test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase0-7-vitest-output
-          path: vitest-output.txt
+          name: schema-test-diagnostics
+          path: /tmp/schema-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Migration preservation tests
+        run: npx vitest run tests/phase8/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
+        if: always()
+
+      - name: Upload migration test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-test-diagnostics
+          path: /tmp/migration-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Country engine invariant tests
+        run: npx vitest run tests/phase8/country-engine-invariants.test.ts tests/phase8/matching-isolation.test.ts tests/phase8/admin-country-rbac.test.ts tests/phase8/quote-country-eligibility.test.ts --reporter=verbose 2>&1 | tee /tmp/invariant-tests.txt
+        if: always()
+
+      - name: Upload invariant test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: invariant-test-diagnostics
+          path: /tmp/invariant-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Canonical financial flow integration tests (PostgreSQL)
+        run: npx vitest run tests/phase8/postgresql-integration.test.ts --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
+        if: always()
+
+      - name: Upload financial flow test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-flow-test-diagnostics
+          path: /tmp/financial-flow-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
+      - name: Phase 0-7 regression tests
+        run: npx vitest run tests --reporter=verbose 2>&1 | tee /tmp/regression-tests.txt
+        if: always()
+
+      - name: Upload regression test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-test-diagnostics
+          path: /tmp/regression-tests.txt
           if-no-files-found: ignore
           retention-days: 3
 
       - name: Production build
         env:
           NODE_ENV: production
-        run: npm run build
+        run: npm run build 2>&1 | tee /tmp/build-output.txt
+        if: always()
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: /tmp/build-output.txt
+          if-no-files-found: ignore
+          retention-days: 3

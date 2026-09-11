@@ -80,7 +80,7 @@ export async function requestPayout(
     return { ok: false, error: 'Withdrawal amount is outside the supported safe range', code: 'INVALID_AMOUNT' }
   }
 
-  const payloadHash = `${userId}:${amountCents.toString()}:${method}`
+  const payloadHash = `${userId}:${amountCents.toString()}:${method}:${currency}`
   const existing = await readCompletedIdempotency(idempotencyKey)
   if (existing) {
     if (existing.payloadHash === payloadHash) {
@@ -92,6 +92,9 @@ export async function requestPayout(
   const wallet = await prisma.providerWallet.findUnique({ where: { userId } })
   if (!wallet) return { ok: false, error: 'Provider wallet not found', code: 'WALLET_NOT_FOUND' }
   if (wallet.isFrozen) return { ok: false, error: 'Wallet is frozen', code: 'WALLET_FROZEN' }
+
+  const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { countryCode: true } })
+  const payoutCountry = userRecord?.countryCode || (currency === 'CAD' ? 'CA' : 'LK')
 
   try {
     const payout = await prisma.$transaction(async (tx) => {
@@ -121,6 +124,7 @@ export async function requestPayout(
           method,
           bankDetails,
           currency,
+          countryCode: payoutCountry,
           description: `Withdrawal request for ${safeMajorAmount(amountCents).toFixed(2)} ${currency}`,
         },
       })
