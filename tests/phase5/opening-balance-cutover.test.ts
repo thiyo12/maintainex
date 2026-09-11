@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@prisma/client';
-import { assertNotProductionDb } from '../test-guard';
+import { requiresPostgres } from '../test-guard';
 
 const prisma = new PrismaClient();
-assertNotProductionDb();
 
-describe('Phase 5D — Opening Balance Cutover', () => {
+describe.skipIf(!requiresPostgres())('Phase 5D — Opening Balance Cutover', () => {
   const prefix = `cutover-${Date.now()}`;
   const customerWalletId = `${prefix}-cust-wallet`;
   const providerWalletId = `${prefix}-prov-wallet`;

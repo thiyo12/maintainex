@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { completeAndReleaseEscrow } from '@/lib/domain/job-lifecycle'
 import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { auditEscrowRelease } from '@/lib/financial-audit'
 
 export async function POST(
   request: NextRequest,
@@ -15,6 +17,9 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
+    const rateLimitResponse = await requireFinancialRateLimit(request, 'release-escrow')
+    if (rateLimitResponse) return rateLimitResponse
+
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
@@ -23,6 +28,17 @@ export async function POST(
       job.id,
       { releaseMode: 'CUSTOMER_APPROVAL' }
     )
+
+    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
+    auditEscrowRelease({
+      jobId: job.id,
+      escrowId: escrow?.id ?? job.id,
+      actorId: user.id,
+      amount: escrow?.totalAmount ?? escrow?.amount ?? 0n,
+      commission: result.commission,
+      netAmount: result.netAmount,
+      currency: escrow?.currency ?? 'LKR',
+    })
 
     notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
     notifyJobCompleted(job.id, job.customerId, job.title)

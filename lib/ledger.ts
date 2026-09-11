@@ -408,16 +408,20 @@ export async function getLedgerBalance(
   accountId: string,
   accountType: string
 ): Promise<{ credits: bigint; debits: bigint; balance: bigint }> {
-  const entries = await prisma.financialLedger.findMany({
-    where: { accountId, accountType },
-    select: { entryType: true, amount: true },
-  });
-  let credits = 0n;
-  let debits = 0n;
-  for (const entry of entries) {
-    if (entry.entryType === 'CREDIT') credits += entry.amount;
-    else debits += entry.amount;
-  }
+  const [creditResult, debitResult] = await Promise.all([
+    prisma.financialLedger.aggregate({
+      _sum: { amount: true },
+      where: { accountId, accountType, entryType: 'CREDIT' },
+    }),
+    prisma.financialLedger.aggregate({
+      _sum: { amount: true },
+      where: { accountId, accountType, entryType: 'DEBIT' },
+    }),
+  ]);
+
+  const credits = creditResult._sum.amount ?? 0n;
+  const debits = debitResult._sum.amount ?? 0n;
+
   return { credits, debits, balance: credits - debits };
 }
 

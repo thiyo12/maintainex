@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.5 — TaskerProfile isVerified Sync', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.5 — TaskerProfile isVerified Sync', () => {
   let userId: string
   let taskerProfileId: string
   let docId: string

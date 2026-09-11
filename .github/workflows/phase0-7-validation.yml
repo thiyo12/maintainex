@@ -1,10 +1,11 @@
-name: Phase 0-7 + Phase 8 Validation
+name: Phase 0-9 Validation
 
 on:
   push:
     branches:
       - phase0-7-integration-fix
       - phase8-country-engine
+      - phase9-production-readiness
   pull_request:
     branches:
       - main
@@ -143,6 +144,19 @@ jobs:
         run: npx vitest run tests/phase8/negative-security.test.ts --reporter=verbose 2>&1 | tee /tmp/security-tests.txt
         if: always()
 
+      - name: Phase 9 security tests
+        run: npx vitest run tests/phase9/ --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+        if: always()
+
+      - name: Upload Phase 9 security test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase9-security-test-diagnostics
+          path: /tmp/phase9-security-tests.txt
+          if-no-files-found: ignore
+          retention-days: 3
+
       - name: Upload security test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -192,3 +206,96 @@ jobs:
           path: /tmp/build-output.txt
           if-no-files-found: ignore
           retention-days: 3
+
+      - name: Docker build
+        run: |
+          docker build \
+            -t maintainex:phase9-ci-${GITHUB_SHA} \
+            .
+        if: always()
+
+      - name: Docker container start
+        run: |
+          docker run -d \
+            --name phase9-ci-test \
+            --add-host=host.docker.internal:host-gateway \
+            -p 3199:3000 \
+            -e DATABASE_URL="postgresql://maintainex:maintainex_ci@host.docker.internal:5432/maintainex_test_phase07_ci" \
+            -e NEXTAUTH_URL="http://localhost:3199" \
+            -e NEXTAUTH_SECRET="phase07-ci-nextauth-secret-0123456789" \
+            -e MARKETPLACE_JWT_SECRET="phase07-ci-marketplace-jwt-secret-01234567890123456789" \
+            -e JWT_SECRET="phase07-ci-jwt-secret-01234567890123456789" \
+            -e JWT_REFRESH_SECRET="phase07-ci-refresh-secret-0123456789012345" \
+            -e PASSWORD_PEPPER="phase07-ci-pepper-012345678901234567890" \
+            -e CRON_SECRET="phase07-ci-cron-secret-012345678901234567" \
+            -e INTERNAL_SYNC_SECRET="phase07-ci-sync-secret-01234567890123456" \
+            -e ALLOW_TEST_OTP="true" \
+            -e CLOUDINARY_CLOUD_NAME="test" \
+            -e CLOUDINARY_API_KEY="test" \
+            -e CLOUDINARY_API_SECRET="test" \
+            -e NODE_ENV="production" \
+            maintainex:phase9-ci-${GITHUB_SHA}
+          echo "Waiting 10s for container startup (prisma migrate deploy + next start)..."
+          sleep 10
+          RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
+          echo "Container running: $RUNNING"
+          if [ "$RUNNING" != "true" ]; then
+            echo "FAIL: Container exited during startup"
+            docker logs phase9-ci-test 2>&1 || true
+            exit 1
+          fi
+          echo "Container is alive. Startup logs:"
+          docker logs phase9-ci-test 2>&1 | tail -20 || true
+        if: always()
+
+      - name: Docker health check
+        run: |
+          echo "Waiting for Next.js to finish booting after prisma migrate..."
+          for i in 1 2 3 4 5 6 7 8; do
+            RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
+            if [ "$RUNNING" != "true" ]; then
+              echo "FAIL: Container died during startup"
+              docker logs phase9-ci-test 2>&1 | tail -40 || true
+              exit 1
+            fi
+            HTTP_CODE=$(curl -s -o /tmp/health-response.json -w "%{http_code}" http://localhost:3199/api/health 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "Health check PASSED (HTTP $HTTP_CODE)"
+              cat /tmp/health-response.json
+              exit 0
+            fi
+            echo "Attempt $i: HTTP $HTTP_CODE, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check FAILED after 8 attempts"
+          docker logs phase9-ci-test 2>&1 | tail -50 || true
+          exit 1
+        if: always()
+
+      - name: Verify non-root user
+        run: |
+          RUNNING=$(docker inspect -f '{{.State.Running}}' phase9-ci-test 2>/dev/null || echo "false")
+          if [ "$RUNNING" != "true" ]; then
+            echo "FAIL: Container is not running, cannot check UID"
+            docker logs phase9-ci-test 2>&1 | tail -20 || true
+            exit 1
+          fi
+          UID_VALUE=$(docker exec phase9-ci-test id -u 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "FAIL: docker exec id -u failed: $UID_VALUE"
+            exit 1
+          fi
+          echo "Container UID: $UID_VALUE"
+          if [ "$UID_VALUE" = "0" ]; then
+            echo "FAIL: Container is running as root (UID 0)"
+            exit 1
+          fi
+          echo "PASS: Container running as non-root (UID $UID_VALUE)"
+        if: always()
+
+      - name: Docker cleanup
+        if: always()
+        run: |
+          docker stop phase9-ci-test 2>/dev/null || true
+          docker rm phase9-ci-test 2>/dev/null || true
+          docker rmi maintainex:phase9-ci-${GITHUB_SHA} 2>/dev/null || true

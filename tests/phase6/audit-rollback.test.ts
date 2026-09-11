@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { transferOwnership } from '@/lib/phase6/company-ownership'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.4 — Audit Failure Rollback', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.4 — Audit Failure Rollback', () => {
   let companyId: string
   let ownerUserId: string
   let targetUserId: string

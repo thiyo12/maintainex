@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '15')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
     const skip = (page - 1) * limit
 
     const where: any = {}
@@ -43,10 +43,20 @@ export async function GET(request: NextRequest) {
     const countryFilter = getCountryFilter(session)
     const v2Where = { ...where, ...countryFilter }
 
-    // Query both V1 and V2 in parallel
+    // V1 JobPosting has no countryCode — filter through customer.countryCode for non-SUPER_ADMIN
+    let v1Where: any = where
+    if (session.role !== 'SUPER_ADMIN') {
+      if (session.assignedCountries.length === 0) {
+        v1Where = { id: '__NONE__' }
+      } else {
+        v1Where = { ...where, customer: { countryCode: { in: session.assignedCountries } } }
+      }
+    }
+
+    // Query both V1 and V2 in parallel with DB-level pagination
     const [v1Jobs, v1Total, v2Jobs, v2Total] = await Promise.all([
       prisma.jobPosting.findMany({
-        where,
+        where: v1Where,
         include: {
           customer: {
             select: {
@@ -58,11 +68,15 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
       }),
-      prisma.jobPosting.count({ where }),
+      prisma.jobPosting.count({ where: v1Where }),
       prisma.marketplaceJob.findMany({
         where: v2Where,
         orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
       }),
       prisma.marketplaceJob.count({ where: v2Where }),
     ])
@@ -142,21 +156,15 @@ export async function GET(request: NextRequest) {
     // Sort combined by createdAt desc
     unifiedJobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-    // Paginate the combined result
+    // Paginate the combined result (bounded by 2*limit since each source returns at most `limit` items)
     const paginatedJobs = unifiedJobs.slice(skip, skip + limit)
 
     return NextResponse.json({
       jobs: paginatedJobs,
-      pagination: {
-        page,
-        limit,
-        total: totalCombined,
-        pages: Math.ceil(totalCombined / limit),
-      },
-      summary: {
-        totalV1: v1Total,
-        totalV2: v2Total,
-      },
+      total: totalCombined,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCombined / limit),
     })
   } catch (error) {
     console.error('Jobs GET error:', error)

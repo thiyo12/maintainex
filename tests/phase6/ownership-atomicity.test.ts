@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { transferOwnership } from '@/lib/phase6/company-ownership'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.3 — Ownership Transfer Atomicity', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.3 — Ownership Transfer Atomicity', () => {
   let companyId: string
   let ownerUserId: string
   let targetUserId: string

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { releaseEscrow, refundEscrow } from '@/lib/domain/job-lifecycle'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 
 function serializeEscrow<T extends { amount: bigint; serviceFee: bigint; totalAmount: bigint }>(escrow: T) {
   return {
@@ -49,6 +50,9 @@ export async function PATCH(request: NextRequest) {
     if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const rateLimitResponse = await requireFinancialRateLimit(request, 'admin-escrow')
+    if (rateLimitResponse) return rateLimitResponse
 
     const body = await request.json()
     const escrowId = typeof body.escrowId === 'string' ? body.escrowId.trim() : ''

@@ -5,9 +5,7 @@ import {
   readCanonicalCustomerBalance,
   reconcileWalletBalance,
 } from '@/lib/financial-read';
-import { assertNotProductionDb } from '../test-guard';
-
-assertNotProductionDb()
+import { requiresPostgres } from '../test-guard';
 
 const testPrefix = `read-mig-${Date.now()}`
 const testProviderUserId = `${testPrefix}-prov`
@@ -15,7 +13,7 @@ const testCustomerUserId = `${testPrefix}-cust`
 let testProviderWalletId: string
 let testCustomerWalletId: string
 
-describe('Phase 5D — Canonical Financial Read Migration', () => {
+describe.skipIf(!requiresPostgres())('Phase 5D — Canonical Financial Read Migration', () => {
   beforeAll(async () => {
     await prisma.user.createMany({
       data: [

@@ -14,10 +14,11 @@ import {
   acceptCompanyInvite,
   cancelInvite,
 } from '@/lib/phase6/invitation'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6 — Company Membership', () => {
+describe.skipIf(!requiresPostgres())('Phase 6 — Company Membership', () => {
   let companyId: string
   let ownerUserId: string
   let workerUserId: string

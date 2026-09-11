@@ -6,6 +6,7 @@ import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
 import { findCandidates } from '@/lib/matching'
 import { validateQuotePrice } from '@/lib/pricing/engine'
+import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 
 function parsePositiveMinorUnits(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value > 0n ? value : null
@@ -26,6 +27,13 @@ export async function POST(request: NextRequest) {
     if (user.identityStatus !== 'VERIFIED') {
       return NextResponse.json({ error: 'Identity must be verified before submitting quotes' }, { status: 403 })
     }
+
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'QUOTE_CREATE',
+      keyPrefix: 'quote_create',
+      identifier: user.id,
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
 
     const body = await request.json()
     const { jobId, providerType, estimatedCompletionTime, message, attachments, companyId } = body

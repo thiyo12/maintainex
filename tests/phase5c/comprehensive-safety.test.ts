@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { postLedgerTransaction, getLedgerBalance } from '../../lib/ledger'
-import { assertNotProductionDb, isPostgres } from '../test-guard'
+import { isPostgres, requiresPostgres } from '../test-guard'
 
-assertNotProductionDb()
 const prisma = new PrismaClient()
 const PREFIX = `phase5c-${Date.now()}`
 
@@ -25,7 +24,7 @@ function totals(entries: Array<{ entryType: string; amount: bigint }>) {
   return { credits, debits }
 }
 
-describe('Phase 5C.1 — Comprehensive Ledger Safety Tests', () => {
+describe.skipIf(!requiresPostgres())('Phase 5C.1 — Comprehensive Ledger Safety Tests', () => {
   const customerA = `${PREFIX}-customer-a`
   const customerB = `${PREFIX}-customer-b`
   const providerA = `${PREFIX}-provider-a`

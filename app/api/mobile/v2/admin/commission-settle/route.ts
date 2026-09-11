@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { auditCommissionSettlement } from '@/lib/financial-audit'
 
 function serializeSettlement<T extends { jobAmount: bigint; commissionAmount: bigint }>(settlement: T) {
   return {
@@ -48,6 +50,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const rateLimitResponse = await requireFinancialRateLimit(request, 'commission-settle')
+    if (rateLimitResponse) return rateLimitResponse
+
     const body = await request.json()
     const settlementId = typeof body.settlementId === 'string' ? body.settlementId.trim() : ''
     if (!settlementId) {
@@ -71,6 +76,14 @@ export async function POST(request: NextRequest) {
     }
 
     const updated = await prisma.commissionSettlement.findUniqueOrThrow({ where: { id: settlementId } })
+
+    auditCommissionSettlement({
+      settlementId: updated.id,
+      actorId: user.id,
+      amount: updated.commissionAmount,
+      currency: 'LKR',
+    })
+
     return NextResponse.json({ settlement: serializeSettlement(updated) })
   } catch (error) {
     console.error('Settle commission error:', error)

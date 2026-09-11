@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { hasCompanyPermission } from '@/lib/phase6/rbac'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.4 — Company Quote Cross-Company Isolation', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.4 — Company Quote Cross-Company Isolation', () => {
   let companyAId: string
   let companyBId: string
   let ownerAId: string

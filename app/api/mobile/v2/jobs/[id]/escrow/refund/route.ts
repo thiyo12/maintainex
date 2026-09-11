@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { refundEscrow } from '@/lib/domain/job-lifecycle'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { auditEscrowRefund } from '@/lib/financial-audit'
 
 export async function POST(
   _request: NextRequest,
@@ -14,6 +16,9 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
+    const rateLimitResponse = await requireFinancialRateLimit(_request, 'escrow-refund')
+    if (rateLimitResponse) return rateLimitResponse
+
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (job.customerId !== user.id) return NextResponse.json({ error: 'Only the customer can refund escrow' }, { status: 403 })
@@ -22,6 +27,15 @@ export async function POST(
       { jobId: id, actorId: user.id, actorType: 'CUSTOMER' },
       id
     )
+
+    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
+    auditEscrowRefund({
+      jobId: id,
+      escrowId: escrow?.id ?? id,
+      actorId: user.id,
+      refundAmount: result.refundAmount,
+      currency: escrow?.currency ?? 'LKR',
+    })
 
     return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })
   } catch (error) {

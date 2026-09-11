@@ -6,6 +6,7 @@ import { calculatePrice } from '@/lib/pricing/engine'
 import { getSetting } from '@/lib/settings'
 import { notifyTaskerAssigned } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
+import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -25,6 +26,13 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
+
+    const rateLimit = await checkRateLimit(request, {
+      policyName: 'JOB_CREATE',
+      keyPrefix: 'job_create',
+      identifier: user.id,
+    })
+    if (!rateLimit.allowed) return rateLimit.response!
 
     const body = await request.json()
     let {

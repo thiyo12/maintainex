@@ -93,7 +93,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
   })
 
   it('ledger credit uses parameterized atomic upsert', () => {
-    expect(ledger).toContain('ON CONFLICT ("walletType", "walletId")')
+    expect(ledger).toContain('ON CONFLICT ("walletType", "walletId", "currency")')
     expect(ledger).toContain('"balance" = "WalletBalance"."balance" + $3')
     expect(ledger).toContain('"availableBalance" = "WalletBalance"."availableBalance" + $4')
     expect(ledger).toContain('randomUUID')

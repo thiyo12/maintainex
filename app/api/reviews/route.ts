@@ -9,7 +9,13 @@ function sanitizeString(str: string): string {
 export async function GET() {
   try {
     const reviews = await prisma.review.findMany({
-      include: {
+      where: { status: 'APPROVED' },
+      select: {
+        id: true,
+        rating: true,
+        comment: true,
+        customerName: true,
+        createdAt: true,
         service: {
           select: {
             id: true,
@@ -18,7 +24,8 @@ export async function GET() {
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: 50
     })
 
     return NextResponse.json(reviews)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
+import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 
 function accountBlocked(user: any): NextResponse | null {
   if (!user.isActive) {
@@ -38,6 +39,13 @@ async function buildPhoneVerificationAuthResponse(request: NextRequest, userId: 
 
 export async function POST(request: NextRequest) {
   try {
+    const ipLimit = await checkRateLimit(request, {
+      policyName: 'OTP_VERIFY',
+      keyPrefix: 'otp_verify',
+      identifier: ipKey(request),
+    })
+    if (!ipLimit.allowed) return ipLimit.response!
+
     const body = await request.json()
     const email = typeof body.email === 'string' ? body.email.trim() : ''
     const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
@@ -60,7 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Invalid or expired OTP.' }, { status: 400 })
     }
 
     const blocked = accountBlocked(user)

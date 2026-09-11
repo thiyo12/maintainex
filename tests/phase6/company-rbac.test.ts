@@ -13,10 +13,11 @@ import {
   COMPANY_ROLES,
   COMPANY_PERMISSIONS,
 } from '@/lib/phase6/rbac'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6 — Company RBAC', () => {
+describe.skipIf(!requiresPostgres())('Phase 6 — Company RBAC', () => {
   describe('Role validation', () => {
     it('accepts valid company roles', () => {
       expect(isValidCompanyRole('COMPANY_OWNER')).toBe(true)

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { requestPayout } from '@/lib/payout-engine'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
+import { auditPayoutRequest } from '@/lib/financial-audit'
 import type { Currency } from '@/lib/money'
 
 function parseMajorAmountToMinor(value: unknown): bigint | null {
@@ -27,6 +29,9 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
+
+    const rateLimitResponse = await requireFinancialRateLimit(request, 'withdraw')
+    if (rateLimitResponse) return rateLimitResponse
 
     const body = await request.json()
     const amountCents = parseMajorAmountToMinor(body.amount)
@@ -93,6 +98,14 @@ export async function POST(request: NextRequest) {
 
     const payout = await prisma.payout.findUnique({ where: { id: result.payoutId } })
     if (!payout) return NextResponse.json({ error: 'Payout not found after reservation' }, { status: 500 })
+
+    auditPayoutRequest({
+      payoutId: payout.id,
+      actorId: user.id,
+      amount: payout.amount,
+      currency: payout.currency,
+      method,
+    })
 
     return NextResponse.json({
       id: payout.id,

@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { acceptCompanyInvite, createCompanyInvite } from '@/lib/phase6/invitation'
 import { getUserCompanyRole, canRemoveMemberSafe } from '@/lib/phase6/company-ownership'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.1 — Removed Member Reactivation', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.1 — Removed Member Reactivation', () => {
   let companyId: string
   let ownerUserId: string
   let memberUserId: string

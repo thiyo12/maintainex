@@ -2,10 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
+import { requiresPostgres } from '../test-guard'
 
 const prisma = new PrismaClient()
 
-describe('Phase 6.2 — Worker Assignment with JobWorkspace', () => {
+describe.skipIf(!requiresPostgres())('Phase 6.2 — Worker Assignment with JobWorkspace', () => {
   let companyId: string
   let ownerUserId: string
   let workerUserId: string
