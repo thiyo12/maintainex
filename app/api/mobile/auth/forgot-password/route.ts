@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 
 // TESTING ONLY — replace with real OTP provider before production launch
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    const { allowed } = checkRateLimit(ip, 3)
-    if (!allowed) {
-      return NextResponse.json({ error: 'Too many requests. Try again later.' }, { status: 429 })
-    }
+    const ipLimit = await checkRateLimit(request, {
+      policyName: 'PASSWORD_RESET',
+      keyPrefix: 'password_reset',
+      identifier: ipKey(request),
+    })
+    if (!ipLimit.allowed) return ipLimit.response!
 
     const { email } = await request.json()
 

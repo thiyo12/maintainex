@@ -43,10 +43,20 @@ export async function GET(request: NextRequest) {
     const countryFilter = getCountryFilter(session)
     const v2Where = { ...where, ...countryFilter }
 
+    // V1 JobPosting has no countryCode — filter through customer.countryCode for non-SUPER_ADMIN
+    let v1Where: any = where
+    if (session.role !== 'SUPER_ADMIN') {
+      if (session.assignedCountries.length === 0) {
+        v1Where = { id: '__NONE__' }
+      } else {
+        v1Where = { ...where, customer: { countryCode: { in: session.assignedCountries } } }
+      }
+    }
+
     // Query both V1 and V2 in parallel with DB-level pagination
     const [v1Jobs, v1Total, v2Jobs, v2Total] = await Promise.all([
       prisma.jobPosting.findMany({
-        where,
+        where: v1Where,
         include: {
           customer: {
             select: {
@@ -61,7 +71,7 @@ export async function GET(request: NextRequest) {
         take: limit,
         skip,
       }),
-      prisma.jobPosting.count({ where }),
+      prisma.jobPosting.count({ where: v1Where }),
       prisma.marketplaceJob.findMany({
         where: v2Where,
         orderBy: { createdAt: 'desc' },
