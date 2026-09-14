@@ -376,7 +376,25 @@ function CompanyPageContent() {
                                 </button>
                               </>
                             )}
-                            {!company.isBanned && (
+                            {!company.isBanned && !company.isSuspended && (
+                              <button
+                                onClick={() => setConfirmAction({ userId: company.id, action: 'suspend', label: 'Suspend' })}
+                                className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
+                                title="Suspend"
+                              >
+                                <FiClock size={16} />
+                              </button>
+                            )}
+                            {company.isSuspended && (
+                              <button
+                                onClick={() => setConfirmAction({ userId: company.id, action: 'unsuspend', label: 'Unsuspend' })}
+                                className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                                title="Unsuspend"
+                              >
+                                <FiUserCheck size={16} />
+                              </button>
+                            )}
+                            {!company.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'ban', label: 'Ban' })}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -587,7 +605,7 @@ function CompanyPageContent() {
               <p className="text-gray-400 text-sm mb-4">
                 Are you sure you want to {confirmAction.action.replace('_', ' ')} this company?
               </p>
-              {(confirmAction.action === 'ban' || confirmAction.action === 'reject_company') && (
+              {(confirmAction.action === 'ban' || confirmAction.action === 'reject_company' || confirmAction.action === 'suspend') && (
                 <div className="mb-4">
                   <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (optional)</label>
                   <textarea
@@ -610,7 +628,7 @@ function CompanyPageContent() {
                   onClick={handleAction}
                   disabled={actionLoading === confirmAction.userId}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    confirmAction.action === 'ban' || confirmAction.action === 'reject_company'
+                    confirmAction.action === 'ban' || confirmAction.action === 'reject_company' || confirmAction.action === 'suspend'
                       ? 'bg-red-500 hover:bg-red-600 text-white'
                       : 'bg-green-500 hover:bg-green-600 text-[#0B0C12]'
                   } disabled:opacity-50`}
