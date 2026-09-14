@@ -57,3 +57,4 @@ logs/
 
 # Agent reference (contains infra details, never commit)
 AGENTS.md
+prisma/schema.prisma.local.bak
