@@ -143,7 +143,7 @@ export default function V2JobDetailScreen() {
   const handleDepositEscrow = async () => {
     if (!job) return
     setActionLoading('escrow')
-    try { await v2JobActions.depositEscrow(id, job.budgetAmount); Alert.alert(t('jobDetail.escrowDeposited'), t('jobDetail.escrowDepositedDesc')); loadJob() }
+    try { await v2JobActions.depositEscrow(id, job.budgetAmount ?? 0); Alert.alert(t('jobDetail.escrowDeposited'), t('jobDetail.escrowDepositedDesc')); loadJob() }
     catch (e: any) { Alert.alert(t('common.error'), e.message) }
     finally { setActionLoading('') }
   }
@@ -253,7 +253,7 @@ export default function V2JobDetailScreen() {
           <View style={[styles.infoCard, { backgroundColor: colors.white }]}>
             <Wallet size={20} color={colors.amber} weight="fill" />
             <Text style={styles.infoLabel}>Budget</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>LKR {job.budgetAmount}</Text>
+            <Text style={[styles.infoValue, { color: colors.ink }]}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={[styles.infoSub, { color: colors.muted }]}>{job.budgetType}</Text>
           </View>
           {job.locationName && (
@@ -473,6 +473,17 @@ export default function V2JobDetailScreen() {
         {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
             <Text style={styles.disputeBtnText}>Raise a Dispute</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* ─── Job PIN ─── */}
+        {(job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
+          <TouchableOpacity
+            style={[styles.disputeBtn, { borderColor: colors.amber }]}
+            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
+          >
+            <ShieldCheck size={16} color={colors.amber} />
+            <Text style={[styles.disputeBtnText, { color: colors.amber, marginLeft: 8 }]}>Job Verification PIN</Text>
           </TouchableOpacity>
         )}
 

@@ -219,7 +219,7 @@ export async function createBookNowJob(input: BookNowInput) {
   })
 
   return {
-    job: { ...result.job, budgetAmount: result.job.budgetAmount.toString() },
+    job: { ...result.job, budgetAmount: result.job.budgetAmount?.toString() ?? null },
     quote: { ...result.quote, price: result.quote.price.toString() },
     notifiedCount: 1,
   }

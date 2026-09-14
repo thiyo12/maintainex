@@ -181,7 +181,8 @@ export async function POST(request: NextRequest) {
         const job = completedJobs[i]
         const provider = users[(i + 2) % users.length]
         const status = statuses[i % statuses.length]
-        const amount = job.budgetAmount
+        const amount = job.budgetAmount ?? 0n
+        if (amount === 0n) continue
         const serviceFee = BigInt(Math.floor(Number(amount) * 0.1))
         const now = new Date()
         await prisma.jobEscrow.create({

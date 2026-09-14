@@ -126,7 +126,7 @@ export default function V2BrowseJobsScreen() {
               >
                 <View style={styles.cardHeader}>
                   <View style={styles.budgetBadge}>
-                    <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount}</Text>
+                    <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
                   </View>
                   {dist != null && (
                     <View style={styles.distanceBadge}>

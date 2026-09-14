@@ -79,7 +79,7 @@ export default function V2MyJobsScreen() {
               <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
               <View style={styles.cardFooter}>
                 <View style={styles.budgetPill}>
-                  <Text style={styles.budgetText}>LKR {job.budgetAmount}</Text>
+                  <Text style={styles.budgetText}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
                 </View>
                 <Text style={styles.jobDate}>{new Date(job.createdAt).toLocaleDateString()}</Text>
               </View>

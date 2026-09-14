@@ -112,7 +112,7 @@ describe.skipIf(!requiresPostgres())('Phase 5C.1 — Comprehensive Ledger Safety
     })).rejects.toThrow('forced_rollback')
 
     expect(await prisma.financialLedger.count({ where: { referenceId } })).toBe(0)
-    expect(await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey: key } })).toBeNull()
+    expect(await prisma.idempotencyRecord.findFirst({ where: { idempotencyKey: key } })).toBeNull()
   })
 
   it('escrow row and ledger commit atomically in one transaction', async () => {

@@ -148,6 +148,7 @@ export async function requestPayout(
           operation: 'PAYOUT_REQUEST',
           status: 'COMPLETED',
           metadata: JSON.stringify({ payoutId: created.id, status: 'RESERVED', payloadHash }),
+          requestFingerprint: payloadHash,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       })
@@ -213,6 +214,7 @@ async function transitionPayout(
         operation,
         status: 'COMPLETED',
         metadata: JSON.stringify({ payoutId, status: targetStatus }),
+        requestFingerprint: `${operation}:${payoutId}:${targetStatus}`,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     })
@@ -293,6 +295,7 @@ export async function markSucceeded(
           operation: 'PAYOUT_SUCCEEDED',
           status: 'COMPLETED',
           metadata: JSON.stringify({ payoutId, status: 'SUCCEEDED', providerRef }),
+          requestFingerprint: `PAYOUT_SUCCEEDED:${payoutId}:${providerRef || ''}`,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       })
@@ -369,6 +372,7 @@ async function restoreReservedPayout(
           operation: targetStatus === 'FAILED' ? 'PAYOUT_FAILED' : 'PAYOUT_CANCEL',
           status: 'COMPLETED',
           metadata: JSON.stringify({ payoutId, status: targetStatus }),
+          requestFingerprint: `${targetStatus === 'FAILED' ? 'PAYOUT_FAILED' : 'PAYOUT_CANCEL'}:${payoutId}`,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       })

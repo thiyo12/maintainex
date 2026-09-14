@@ -146,6 +146,7 @@ export async function postLedgerTransaction(
         operation: input.referenceType,
         status: 'PENDING',
         metadata: fingerprint,
+        requestFingerprint: fingerprint,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       },
     });
@@ -219,10 +220,15 @@ export async function postLedgerTransaction(
     }
 
     const result: PostedLedgerTransaction = { id: transactionId, entries: createdEntries };
-    await client.idempotencyRecord.update({
+    const idemRecord = await client.idempotencyRecord.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
-      data: { status: 'COMPLETED', resultPayload: serializeBigInt(result) },
     });
+    if (idemRecord) {
+      await client.idempotencyRecord.update({
+        where: { id: idemRecord.id },
+        data: { status: 'COMPLETED', resultPayload: serializeBigInt(result) },
+      });
+    }
     return result;
   };
 

@@ -246,7 +246,7 @@ export default function V2ProviderManageJobScreen() {
             <View style={styles.detailRow}>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t('jobDetail.budget')}</Text>
-                <Text style={styles.detailValue}>LKR {job.budgetAmount}</Text>
+                <Text style={styles.detailValue}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
               </View>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t('jobs.details')}</Text>
@@ -446,6 +446,36 @@ export default function V2ProviderManageJobScreen() {
             <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
           </TouchableOpacity>
         )}
+
+        {/* Action shortcuts for active jobs */}
+        {workspace?.progressStatus === 'IN_PROGRESS' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('jobDetail.whatsIncluded')}</Text>
+            <View style={styles.shortcutsRow}>
+              <TouchableOpacity
+                style={styles.shortcutBtn}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/inspection` as any)}
+              >
+                <Ionicons name="search-outline" size={20} color={colors.amberDark} />
+                <Text style={styles.shortcutText}>{t('inspection.title')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shortcutBtn}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/evidence` as any)}
+              >
+                <Ionicons name="camera-outline" size={20} color={colors.amberDark} />
+                <Text style={styles.shortcutText}>{t('evidence.title')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shortcutBtn}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/change-order` as any)}
+              >
+                <Ionicons name="document-text-outline" size={20} color={colors.amberDark} />
+                <Text style={styles.shortcutText}>{t('changeOrder.title')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </ScrollView>
       <NewChatModal
         visible={!!msgRecipient}
@@ -545,6 +575,14 @@ const makeStyles = (colors: any) => StyleSheet.create({
 
   disputeBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 12 },
   disputeBtnText: { fontSize: 13, color: colors.muted, fontWeight: '600', textDecorationLine: 'underline' },
+
+  shortcutsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  shortcutBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.white, paddingVertical: 12, paddingHorizontal: 16,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+  },
+  shortcutText: { fontSize: 13, fontWeight: '600', color: colors.ink },
 
   waitingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amberBg, borderRadius: 12, padding: 16 },
   waitingText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amberDark },

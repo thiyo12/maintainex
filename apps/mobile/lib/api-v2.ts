@@ -25,7 +25,7 @@ export interface V2Job {
   categoryId: string
   photos: string[]
   budgetType: string
-  budgetAmount: number
+  budgetAmount: number | null
   areaId: string | null
   postalCode: string | null
   preferredDate: string | null
@@ -123,6 +123,19 @@ export const v2JobActions = {
     v2Request<{ otp: string | null }>(`/api/mobile/v2/jobs/${jobId}/otp`),
   verifyOtp: (jobId: string, otp: string) =>
     v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/otp/verify`, { method: 'POST', body: JSON.stringify({ otp }) }),
+
+  getPinState: (jobId: string) =>
+    v2Request<{ pinState: { hasActivePin: boolean; version: number | null; locked: boolean; lastSuccessfulUseAt: string | null } }>(`/api/mobile/v2/jobs/${jobId}/pin`),
+  generatePin: (jobId: string) =>
+    v2Request<{ success: boolean; pin: string; version: number }>(`/api/mobile/v2/jobs/${jobId}/pin`, { method: 'POST' }),
+  rotatePin: (jobId: string) =>
+    v2Request<{ success: boolean; pin: string; version: number }>(`/api/mobile/v2/jobs/${jobId}/pin/rotate`, { method: 'POST' }),
+  revokePin: (jobId: string) =>
+    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/pin/revoke`, { method: 'POST' }),
+  verifyPin: (jobId: string, pin: string, purpose: string) =>
+    v2Request<{ success: boolean; purpose: string }>(`/api/mobile/v2/jobs/${jobId}/pin/verify`, { method: 'POST', body: JSON.stringify({ pin, purpose }) }),
+  getCustomerStatus: (jobId: string) =>
+    v2Request<{ status: any }>(`/api/mobile/v2/jobs/${jobId}/customer-status`),
 }
 
 export const v2Match = {
@@ -476,4 +489,94 @@ export const v2CustomJobs = {
     }),
   list: () =>
     v2Request<{ requests: CustomJobRequest[] }>('/api/mobile/v2/custom-jobs'),
+}
+
+export interface InspectionInput {
+  inspectionFeeCents?: number
+  currency?: string
+  companyId?: string
+}
+
+export const v2Inspection = {
+  create: (jobId: string, data?: InspectionInput) =>
+    v2Request<{ success: boolean; inspectionId: string }>(
+      `/api/mobile/v2/jobs/${jobId}/inspection`,
+      { method: 'POST', body: JSON.stringify(data || {}) },
+    ),
+}
+
+export interface EvidenceInput {
+  inspectionId?: string
+  evidenceType: string
+  url?: string
+  description?: string
+  mimeType?: string
+}
+
+export const v2Evidence = {
+  create: (jobId: string, data: EvidenceInput) =>
+    v2Request<{ success: boolean; evidenceId: string }>(
+      `/api/mobile/v2/jobs/${jobId}/evidence`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+}
+
+export interface ChangeOrderInput {
+  baseQuoteId: string
+  reason: string
+  amountDeltaCents: number | bigint | string
+  scopeDelta?: string
+  lineItems?: Array<{
+    type: string
+    description: string
+    quantity: number
+    unit: string
+    unitAmountCents?: number | bigint | string
+    totalAmountCents?: number | bigint | string
+    currency: string
+  }>
+  companyId?: string
+  status?: string
+}
+
+export const v2ChangeOrder = {
+  create: (jobId: string, data: ChangeOrderInput) =>
+    v2Request<{ success: boolean; changeOrderId: string }>(
+      `/api/mobile/v2/jobs/${jobId}/change-orders`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+}
+
+export interface TaskerProfileResult {
+  id: string
+  userId: string
+  bio: string | null
+  hourlyRate: number | null
+  skills: string[]
+  serviceAreas: string[]
+  rating: number | null
+  completedJobs: number
+  isVerified: boolean
+  isOnline: boolean
+  latitude: number | null
+  longitude: number | null
+  profileImage: string | null
+  user: {
+    id: string
+    name: string | null
+    phone: string | null
+    email: string | null
+    nickname: string | null
+    identityStatus: string
+  }
+}
+
+export const v2TaskerProfile = {
+  get: () =>
+    v2Request<TaskerProfileResult>('/api/mobile/taskers/profile'),
+  update: (data: Record<string, any>) =>
+    v2Request<{ success: boolean }>('/api/mobile/taskers/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 }

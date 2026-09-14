@@ -237,6 +237,8 @@ describe('Phase 7 — Matching Engine Scoring', () => {
         availability: 100,
         travel: 100,
         experience: 100,
+        fairness: 0,
+        preferredSkill: 0,
       }
       const total = computeTotalScore(components, DEFAULT_WEIGHTS)
       expect(total).toBe(100)
@@ -250,6 +252,8 @@ describe('Phase 7 — Matching Engine Scoring', () => {
         availability: 0,
         travel: 0,
         experience: 0,
+        fairness: 0,
+        preferredSkill: 0,
       }
       const total = computeTotalScore(components, DEFAULT_WEIGHTS)
       expect(total).toBe(0)
@@ -263,8 +267,10 @@ describe('Phase 7 — Matching Engine Scoring', () => {
         availability: 0,
         travel: 0,
         experience: 0,
+        fairness: 0,
+        preferredSkill: 0,
       }
-      const total = computeTotalScore(components, { capability: 30, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0 })
+      const total = computeTotalScore(components, { capability: 30, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0, fairness: 0, preferredSkill: 0 })
       expect(total).toBe(30)
     })
 
@@ -276,8 +282,10 @@ describe('Phase 7 — Matching Engine Scoring', () => {
         availability: 0,
         travel: 0,
         experience: 0,
+        fairness: 0,
+        preferredSkill: 0,
       }
-      const total = computeTotalScore(components, { capability: 30, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0 })
+      const total = computeTotalScore(components, { capability: 30, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0, fairness: 0, preferredSkill: 0 })
       expect(total).toBe(15)
     })
   })
@@ -288,12 +296,12 @@ describe('Phase 7 — Matching Engine Scoring', () => {
     })
 
     it('sum!=100 returns false', () => {
-      const bad = { capability: 30, reliability: 20, reputation: 20, availability: 15, travel: 10, experience: 10 }
+      const bad = { capability: 30, reliability: 20, reputation: 20, availability: 15, travel: 10, experience: 10, fairness: 0, preferredSkill: 0 }
       expect(validateWeights(bad)).toBe(false)
     })
 
     it('sum=101 returns false', () => {
-      const bad = { capability: 31, reliability: 20, reputation: 20, availability: 15, travel: 10, experience: 5 }
+      const bad = { capability: 31, reliability: 20, reputation: 20, availability: 15, travel: 10, experience: 5, fairness: 0, preferredSkill: 0 }
       expect(validateWeights(bad)).toBe(false)
     })
 
@@ -308,17 +316,17 @@ describe('Phase 7 — Matching Engine Scoring', () => {
     })
 
     it('all zeros sum=0 returns false', () => {
-      const zeros = { capability: 0, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0 }
+      const zeros = { capability: 0, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0, fairness: 0, preferredSkill: 0 }
       expect(validateWeights(zeros)).toBe(false)
     })
 
     it('boundary weight=100 with rest=0 returns true (sum=100)', () => {
-      const one = { capability: 100, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0 }
+      const one = { capability: 100, reliability: 0, reputation: 0, availability: 0, travel: 0, experience: 0, fairness: 0, preferredSkill: 0 }
       expect(validateWeights(one)).toBe(true)
     })
 
     it('valid alternative distribution returns true', () => {
-      const weights = { capability: 25, reliability: 25, reputation: 25, availability: 15, travel: 5, experience: 5 }
+      const weights = { capability: 25, reliability: 25, reputation: 25, availability: 15, travel: 5, experience: 5, fairness: 0, preferredSkill: 0 }
       expect(validateWeights(weights)).toBe(true)
     })
   })

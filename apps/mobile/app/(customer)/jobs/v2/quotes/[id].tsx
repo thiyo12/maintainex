@@ -232,7 +232,7 @@ export default function V2QuotesScreen() {
                     </View>
                   ) : null}
                 </View>
-                <Text style={styles.budget}>LKR {job.budgetAmount.toLocaleString()}</Text>
+                <Text style={styles.budget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
               </View>
               <View style={styles.validityRow}>
                 <Timer size={15} color={colors.accent} weight="fill" />

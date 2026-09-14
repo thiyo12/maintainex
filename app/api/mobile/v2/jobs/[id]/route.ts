@@ -37,9 +37,11 @@ export async function GET(
       select: { id: true, name: true, phone: true, email: true },
     })
 
-    const quotes = isOwner || isQuoter
+    const quotes = isOwner
       ? await prisma.jobQuote.findMany({ where: { jobId: job.id }, orderBy: { price: 'asc' } })
-      : []
+      : isQuoter
+        ? await prisma.jobQuote.findMany({ where: { jobId: job.id, providerId: user.id }, orderBy: { price: 'asc' } })
+        : []
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
     const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
@@ -99,7 +101,7 @@ export async function GET(
     return NextResponse.json({
       job: {
         ...job,
-        budgetAmount: Number(job.budgetAmount),
+        budgetAmount: job.budgetAmount != null ? Number(job.budgetAmount) : null,
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
         smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
         notifiedCount: job.notifiedCount,

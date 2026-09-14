@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     for (const job of completedJobs) {
       const cat = job.categoryId || 'other'
       if (!byCategory[cat]) byCategory[cat] = { prices: [], sum: 0 }
-      const amt = Number(job.budgetAmount)
+      const amt = Number(job.budgetAmount ?? 0n)
+      if (amt === 0) continue
       byCategory[cat].prices.push(amt)
       byCategory[cat].sum += amt
     }

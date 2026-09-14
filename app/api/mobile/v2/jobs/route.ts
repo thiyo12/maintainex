@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
     if (typeof targetTaskerId === 'string') targetTaskerId = sanitize(targetTaskerId, 80)
 
     const budgetMinor = parseBigIntInput(budgetAmount)
-    if (!title || !description || !categoryId || !budgetType || budgetMinor === null) {
-      return NextResponse.json({ error: 'Missing or invalid required fields: title, description, categoryId, budgetType, budgetAmount' }, { status: 400 })
+    if (!title || !description || !categoryId || !budgetType) {
+      return NextResponse.json({ error: 'Missing or invalid required fields: title, description, categoryId, budgetType' }, { status: 400 })
     }
 
     const validBudgetTypes = ['FIXED', 'HOURLY', 'NEGOTIABLE', 'REQUEST_QUOTES']
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      job: { ...job, budgetAmount: job.budgetAmount.toString() },
+      job: { ...job, budgetAmount: job.budgetAmount?.toString() ?? null },
       notifiedCount,
       conversationId,
       estimatedResponseTime: '5-30 minutes',
@@ -314,7 +314,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       jobs: jobs.map((job) => ({
         ...job,
-        budgetAmount: job.budgetAmount.toString(),
+        budgetAmount: job.budgetAmount?.toString() ?? null,
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
         smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
       })),

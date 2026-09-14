@@ -52,8 +52,8 @@ export async function getBIOverview(): Promise<BIOverview> {
     prisma.marketplaceJob.findMany({ select: { customerId: true }, distinct: ['customerId'] }),
   ])
 
-  const totalRevenue = completedJobs.reduce((s, j) => s + Number(j.budgetAmount), 0) / 100
-  const monthlyRevenue = recentJobs.filter(j => j.status === 'COMPLETED').reduce((s, j) => s + Number(j.budgetAmount), 0) / 100
+  const totalRevenue = completedJobs.reduce((s, j) => s + Number(j.budgetAmount ?? 0n), 0) / 100
+  const monthlyRevenue = recentJobs.filter(j => j.status === 'COMPLETED').reduce((s, j) => s + Number(j.budgetAmount ?? 0n), 0) / 100
   const activeJobs = allJobs.filter(j => j.status === 'OPEN' || j.status === 'IN_PROGRESS').length
   const completedCount = completedJobs.length
   const totalJobs = allJobs.length
@@ -126,7 +126,7 @@ export async function getRegionAnalytics(): Promise<RegionAnalytics[]> {
   for (const j of jobs) {
     if (!j.areaId) continue
     if (!byArea[j.areaId]) byArea[j.areaId] = { budgets: [], count: 0 }
-    byArea[j.areaId].budgets.push(Number(j.budgetAmount) / 100)
+    byArea[j.areaId].budgets.push(Number(j.budgetAmount ?? 0n) / 100)
     byArea[j.areaId].count++
   }
 
@@ -162,7 +162,7 @@ export async function getTrendData(months: number = 6): Promise<TrendData[]> {
     results.push({
       period,
       jobs: jobs.length,
-      revenue: Math.round(completedJobs.reduce((s, j) => s + Number(j.budgetAmount), 0) / 100),
+      revenue: Math.round(completedJobs.reduce((s, j) => s + Number(j.budgetAmount ?? 0n), 0) / 100),
       newProviders: 0,
       newCustomers: 0,
     })

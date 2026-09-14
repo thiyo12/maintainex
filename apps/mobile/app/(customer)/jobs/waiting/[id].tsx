@@ -88,7 +88,7 @@ export default function WaitingScreen() {
         id: j.id,
         title: j.title,
         status: j.status,
-        budgetAmount: Number(j.budgetAmount),
+        budgetAmount: j.budgetAmount != null ? Number(j.budgetAmount) : null,
         notifiedCount: j.notifiedCount || 0,
         smartBooking: j.smartBooking,
         quotes: j.quotes || [],

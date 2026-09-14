@@ -17,6 +17,8 @@ function makeCandidate(overrides: Partial<MatchCandidate> & { providerId: string
     availability: 50,
     travel: 50,
     experience: 50,
+    fairness: 0,
+    preferredSkill: 0,
   }
   return {
     providerType: 'INDIVIDUAL',
@@ -43,8 +45,8 @@ describe('Phase 7 — Matching Engine Ranking', () => {
 
   it('tie broken by capability (higher first)', () => {
     const candidates = [
-      makeCandidate({ providerId: 'a', score: 70, components: { capability: 40, reliability: 50, reputation: 50, availability: 50, travel: 50, experience: 50 } }),
-      makeCandidate({ providerId: 'b', score: 70, components: { capability: 90, reliability: 50, reputation: 50, availability: 50, travel: 50, experience: 50 } }),
+      makeCandidate({ providerId: 'a', score: 70, components: { capability: 40, reliability: 50, reputation: 50, availability: 50, travel: 50, experience: 50, fairness: 0, preferredSkill: 0 } }),
+      makeCandidate({ providerId: 'b', score: 70, components: { capability: 90, reliability: 50, reputation: 50, availability: 50, travel: 50, experience: 50, fairness: 0, preferredSkill: 0 } }),
     ]
     const ranked = rankCandidates(candidates)
     expect(ranked[0].providerId).toBe('b')
@@ -53,8 +55,8 @@ describe('Phase 7 — Matching Engine Ranking', () => {
 
   it('tie broken by reliability if capability equal', () => {
     const candidates = [
-      makeCandidate({ providerId: 'a', score: 70, components: { capability: 80, reliability: 30, reputation: 50, availability: 50, travel: 50, experience: 50 } }),
-      makeCandidate({ providerId: 'b', score: 70, components: { capability: 80, reliability: 90, reputation: 50, availability: 50, travel: 50, experience: 50 } }),
+      makeCandidate({ providerId: 'a', score: 70, components: { capability: 80, reliability: 30, reputation: 50, availability: 50, travel: 50, experience: 50, fairness: 0, preferredSkill: 0 } }),
+      makeCandidate({ providerId: 'b', score: 70, components: { capability: 80, reliability: 90, reputation: 50, availability: 50, travel: 50, experience: 50, fairness: 0, preferredSkill: 0 } }),
     ]
     const ranked = rankCandidates(candidates)
     expect(ranked[0].providerId).toBe('b')
@@ -63,8 +65,8 @@ describe('Phase 7 — Matching Engine Ranking', () => {
 
   it('tie broken by providerId lexicographically if all components equal', () => {
     const candidates = [
-      makeCandidate({ providerId: 'charlie', score: 70, components: { capability: 80, reliability: 60, reputation: 50, availability: 50, travel: 50, experience: 50 } }),
-      makeCandidate({ providerId: 'alpha', score: 70, components: { capability: 80, reliability: 60, reputation: 50, availability: 50, travel: 50, experience: 50 } }),
+      makeCandidate({ providerId: 'charlie', score: 70, components: { capability: 80, reliability: 60, reputation: 50, availability: 50, travel: 50, experience: 50, fairness: 0, preferredSkill: 0 } }),
+      makeCandidate({ providerId: 'alpha', score: 70, components: { capability: 80, reliability: 60, reputation: 50, availability: 50, travel: 50, experience: 50, fairness: 0, preferredSkill: 0 } }),
     ]
     const ranked = rankCandidates(candidates)
     expect(ranked[0].providerId).toBe('alpha')
