@@ -5,15 +5,7 @@
 -- No data is deleted. No monetary values are altered.
 
 -- =============================================
--- 1. Extend CompanySpecialty — add professionId
--- =============================================
-ALTER TABLE "CompanySpecialty" ADD COLUMN "professionId" TEXT;
-ALTER TABLE "CompanySpecialty" ADD CONSTRAINT "CompanySpecialty_professionId_fkey"
-  FOREIGN KEY ("professionId") REFERENCES "Profession"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-CREATE INDEX "CompanySpecialty_professionId_idx" ON "CompanySpecialty"("professionId");
-
--- =============================================
--- 2. Profession — global taxonomy
+-- 1. Profession — global taxonomy
 -- =============================================
 CREATE TABLE "Profession" (
   "id" TEXT NOT NULL,
@@ -50,6 +42,14 @@ CREATE TABLE "ProfessionSkill" (
 );
 CREATE UNIQUE INDEX "ProfessionSkill_professionId_slug_key" ON "ProfessionSkill"("professionId", "slug");
 CREATE INDEX "ProfessionSkill_professionId_idx" ON "ProfessionSkill"("professionId");
+
+-- =============================================
+-- 2b. Extend CompanySpecialty — add professionId
+-- =============================================
+ALTER TABLE "CompanySpecialty" ADD COLUMN "professionId" TEXT;
+ALTER TABLE "CompanySpecialty" ADD CONSTRAINT "CompanySpecialty_professionId_fkey"
+  FOREIGN KEY ("professionId") REFERENCES "Profession"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+CREATE INDEX "CompanySpecialty_professionId_idx" ON "CompanySpecialty"("professionId");
 
 -- =============================================
 -- 4. TaskerProfession — tasker → profession capability

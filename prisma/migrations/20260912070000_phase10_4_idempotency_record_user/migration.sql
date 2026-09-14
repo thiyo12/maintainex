@@ -1,4 +1,5 @@
 -- DropExistingUniqueIndex:IdempotencyRecord.idempotencyKey
+ALTER TABLE "IdempotencyRecord" DROP CONSTRAINT IF EXISTS "IdempotencyRecord_idempotencyKey_key";
 DROP INDEX IF EXISTS "IdempotencyRecord_idempotencyKey_key";
 
 -- AlterTable: Add userId column with default
