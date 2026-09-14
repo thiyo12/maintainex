@@ -36,7 +36,7 @@ export async function DELETE(
     return NextResponse.json({ success: true, message: 'Service deleted successfully' })
   } catch (error: any) {
     console.error('Delete service error:', error)
-    return NextResponse.json({ error: 'Failed to delete service', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to delete service' }, { status: 500 })
   }
 }
 
@@ -132,6 +132,6 @@ export async function PATCH(
     })
   } catch (error: any) {
     console.error('Update service error:', error)
-    return NextResponse.json({ error: 'Failed to update service', details: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to update service' }, { status: 500 })
   }
 }

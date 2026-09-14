@@ -50,11 +50,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(invoices)
   } catch (error) {
-    console.error('!!! Invoices fetch error:', error)
-    return NextResponse.json({ 
-      error: 'Failed to fetch invoices', 
-      details: error instanceof Error ? error.message : String(error) 
-    }, { status: 500 })
+    console.error('Invoices fetch error:', error)
+    return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
   }
 }
 

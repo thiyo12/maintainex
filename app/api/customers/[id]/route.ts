@@ -125,6 +125,22 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied to this customer' }, { status: 403 })
     }
 
+    const FULL_PII_ROLES = ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT', 'FINANCE']
+    const hasFullPii = FULL_PII_ROLES.includes(session.role)
+
+    const sanitizedCustomer = {
+      ...customer,
+      user: hasFullPii ? customer.user : {
+        id: customer.user.id,
+        name: customer.user.name,
+        role: customer.user.role,
+        isActive: customer.user.isActive,
+        createdAt: customer.user.createdAt,
+        updatedAt: customer.user.updatedAt,
+      },
+      addresses: hasFullPii ? customer.addresses : [],
+    }
+
     await createAuditLog({
       action: 'VIEW',
       category: 'CUSTOMER',
@@ -141,7 +157,7 @@ export async function GET(
     })
 
     return NextResponse.json({
-      ...customer,
+      ...sanitizedCustomer,
       recentBookings,
     })
   } catch (error) {

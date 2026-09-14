@@ -57,10 +57,8 @@ export async function POST(request: NextRequest) {
       count: Number(result[0]?.count || 0)
     })
   } catch (error) {
-    return NextResponse.json({
-      error: 'Failed to setup',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    console.error('Industry init error:', error)
+    return NextResponse.json({ error: 'Failed to setup' }, { status: 500 })
   }
 }
 

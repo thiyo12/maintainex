@@ -36,7 +36,6 @@ export async function registerForPushNotifications() {
 
     const tokenData = await Notifications.getExpoPushTokenAsync()
     const token = tokenData.data
-    console.log('[push] token:', token.substring(0, 20) + '...')
 
     await api.registerPush(token)
     registered = true

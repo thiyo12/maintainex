@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT']
 
@@ -115,8 +116,12 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    // If confirmed and action is BAN, ban the user
+    // If confirmed and action is BAN, verify the role has ban permission
     if (status === 'CONFIRMED' && action === 'BAN') {
+      const perms = ROLE_PERMISSIONS[session.role as keyof typeof ROLE_PERMISSIONS] || []
+      if (!perms.includes('cheating:action')) {
+        return NextResponse.json({ error: 'Insufficient permissions for ban action' }, { status: 403 })
+      }
       await prisma.user.update({
         where: { id: report.againstUserId },
         data: {

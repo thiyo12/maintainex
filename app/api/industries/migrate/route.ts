@@ -80,8 +80,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Migration error:', error)
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Migration failed' 
-    }, { status: 500 })
+    return NextResponse.json({ error: 'Migration failed' }, { status: 500 })
   }
 }
