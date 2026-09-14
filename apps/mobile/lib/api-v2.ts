@@ -117,13 +117,6 @@ export const v2JobActions = {
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
   dispute: (jobId: string) =>
     v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action: 'DISPUTE' }) }),
-  generateOtp: (jobId: string) =>
-    v2Request<{ otp: string }>(`/api/mobile/v2/jobs/${jobId}/otp`, { method: 'POST' }),
-  getOtp: (jobId: string) =>
-    v2Request<{ otp: string | null }>(`/api/mobile/v2/jobs/${jobId}/otp`),
-  verifyOtp: (jobId: string, otp: string) =>
-    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/otp/verify`, { method: 'POST', body: JSON.stringify({ otp }) }),
-
   getPinState: (jobId: string) =>
     v2Request<{ pinState: { hasActivePin: boolean; version: number | null; locked: boolean; lastSuccessfulUseAt: string | null } }>(`/api/mobile/v2/jobs/${jobId}/pin`),
   generatePin: (jobId: string) =>

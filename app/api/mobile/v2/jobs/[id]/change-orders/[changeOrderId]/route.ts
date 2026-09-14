@@ -115,9 +115,11 @@ export async function GET(
 
     const { id: jobId, changeOrderId } = await params
 
-    const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { customerId: true, assignedProviderId: true } })
+    const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { customerId: true } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    if (job.customerId !== user.id && job.assignedProviderId !== user.id) {
+    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' }, select: { providerId: true } })
+    const isProvider = acceptedQuote?.providerId === user.id
+    if (job.customerId !== user.id && !isProvider) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 

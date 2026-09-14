@@ -24,7 +24,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
       await prisma.commissionSettlement.deleteMany({ where: { jobId: jid } })
       await prisma.financialLedger.deleteMany({ where: { referenceId: jid } })
       await prisma.jobEscrow.deleteMany({ where: { jobId: jid } })
-      await prisma.jobOtp.deleteMany({ where: { jobId: jid } })
+      await prisma.jobVerificationPin.deleteMany({ where: { jobId: jid } })
       await prisma.jobWorkspace.deleteMany({ where: { jobId: jid } })
       await prisma.jobQuote.deleteMany({ where: { jobId: jid } })
       await prisma.marketplaceJob.deleteMany({ where: { id: jid } })
@@ -168,17 +168,14 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const fundedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
     expect(fundedJob?.status).toBe('IN_PROGRESS')
 
-    const { verifyOtpAndStartJob } = await import('@/lib/domain/job-lifecycle')
-    await prisma.jobOtp.create({ data: { jobId: bookResult.job.id, otp: '1234' } })
+    const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+    const pinResult = await generateJobPin(bookResult.job.id, customerUserId)
+    expect(pinResult.pin).toMatch(/^\d{6}$/)
 
-    const wsAfterOtp = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
-    expect(wsAfterOtp?.progressStatus).toBe('ACCEPTED')
+    const wsAfterPin = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
+    expect(wsAfterPin?.progressStatus).toBe('ACCEPTED')
 
-    await verifyOtpAndStartJob(
-      { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
-      bookResult.job.id,
-      '1234'
-    )
+    await verifyJobPin(bookResult.job.id, individualProviderUserId, pinResult.pin, 'WORK_START')
 
     const wsAfterStart = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAfterStart?.progressStatus).toBe('IN_PROGRESS')
@@ -242,7 +239,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: bookResult.job.id } })
     expect(quote?.providerType).toBe('COMPANY')
 
-    const { acceptJobQuote, fundEscrow, verifyOtpAndStartJob, transitionJobWorkspace, completeAndReleaseEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { acceptJobQuote, fundEscrow, transitionJobWorkspace, completeAndReleaseEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
 
     await acceptJobQuote(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
@@ -264,16 +261,14 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const fundedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
     expect(fundedJob?.status).toBe('IN_PROGRESS')
 
-    await prisma.jobOtp.create({ data: { jobId: bookResult.job.id, otp: '5678' } })
+    const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+    const pinResult = await generateJobPin(bookResult.job.id, customerUserId)
+    expect(pinResult.pin).toMatch(/^\d{6}$/)
 
-    await verifyOtpAndStartJob(
-      { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
-      bookResult.job.id,
-      '5678'
-    )
+    await verifyJobPin(bookResult.job.id, companyUserId, pinResult.pin, 'WORK_START')
 
-    const wsAfterOtp = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
-    expect(wsAfterOtp?.progressStatus).toBe('IN_PROGRESS')
+    const wsAfterPin = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
+    expect(wsAfterPin?.progressStatus).toBe('IN_PROGRESS')
 
     const resolvedActorType = await resolveProviderActor(bookResult.job.id, companyUserId)
     expect(resolvedActorType).toBe('COMPANY')

@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -2275,16 +2275,6 @@ model CommissionSettlement {
   @@index([countryCode])
 }
 
-model JobOtp {
-  id          String    @id @default(cuid())
-  jobId       String    @unique
-  otp         String // 4-digit code
-  generatedAt DateTime  @default(now())
-  verifiedAt  DateTime?
-
-  @@index([jobId])
-}
-
 model ProviderWallet {
   id               String   @id @default(cuid())
   userId           String   @unique
@@ -2651,7 +2641,7 @@ model RealEstateListing {
 
   // Media
   photos    String? // JSON array
-  amenities String? // JSON array stored as string (SQLite)
+  amenities String? // JSON array stored as string
   videoUrl  String?
 
   // Seller info

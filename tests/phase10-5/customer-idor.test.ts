@@ -237,7 +237,7 @@ describe('Phase 10.5 — IDOR Protection', () => {
 
       const { approveChangeOrder } = await import('@/lib/domain/change-order')
       await expect(
-        approveChangeOrder({ jobId: jobBId, actorId: customerAId, actorType: 'CUSTOMER' }, co.id, 'idempotency-key-idor')
+        approveChangeOrder(prisma, co.id, customerAId, 'idempotency-key-idor')
       ).rejects.toThrow()
 
       await prisma.jobChangeOrder.delete({ where: { id: co.id } })

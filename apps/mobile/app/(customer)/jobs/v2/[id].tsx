@@ -77,8 +77,6 @@ export default function V2JobDetailScreen() {
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
   const [msgPrefill, setMsgPrefill] = useState('')
   const [bargainPrice, setBargainPrice] = useState('')
-  const [otpInput, setOtpInput] = useState('')
-  const [otpError, setOtpError] = useState('')
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -152,14 +150,6 @@ export default function V2JobDetailScreen() {
     setActionLoading('address')
     try { await v2JobActions.shareAddress(id, { street: addressStreet, building: addressBuilding, apartment: addressApartment, landmark: addressLandmark }); Alert.alert(t('common.done'), t('jobDetail.addressShared')); loadJob(); setShowAddressForm(false) }
     catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
-  }
-
-  const handleVerifyOtp = async () => {
-    if (!otpInput || otpInput.length !== 4) { setOtpError(t('errors.enterCode')); return }
-    setOtpError(''); setActionLoading('otp')
-    try { await v2JobActions.verifyOtp(id, otpInput); Alert.alert(t('jobDetail.confirmedStart'), t('jobDetail.confirmedStartDesc')); setOtpInput(''); loadJob() }
-    catch (e: any) { setOtpError(e.message || '') }
     finally { setActionLoading('') }
   }
 
@@ -432,17 +422,15 @@ export default function V2JobDetailScreen() {
         )}
 
         {workspace?.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
-          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
+          <TouchableOpacity
+            style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}
+            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
+          >
             <ShieldCheck size={28} color={colors.amber} weight="fill" />
             <Text style={styles.actionCardTitle}>Confirm Arrival</Text>
-            <Text style={styles.actionCardDesc}>Enter the 4-digit code from your hero</Text>
-            <TextInput
-              style={[styles.otpInput, { backgroundColor: colors.white, color: colors.ink, borderColor: otpError ? colors.error : colors.amber }, otpError && { borderColor: colors.error }]}
-              value={otpInput} onChangeText={(t) => { setOtpInput(t.replace(/\D/g, '').slice(0, 4)); setOtpError('') }}
-              placeholder="0000" placeholderTextColor={colors.muted} keyboardType="number-pad" maxLength={4} />
-            {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
-            <ActionBtn label="Confirm" loadingKey="otp" onPress={handleVerifyOtp} />
-          </View>
+            <Text style={styles.actionCardDesc}>Enter the verification PIN from your hero</Text>
+            <ActionBtn label="Verify PIN" loadingKey="" onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)} />
+          </TouchableOpacity>
         )}
 
         {workspace?.progressStatus === 'COMPLETION_REQUESTED' && (
@@ -645,9 +633,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
 
   actionBtn: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: 16, alignItems: 'center', justifyContent: 'center', minWidth: 120, marginTop: 8 },
   actionBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium },
-
-  otpInput: { width: '80%', borderWidth: 2, borderRadius: 16, padding: 16, fontSize: 28, fontFamily: fonts.headingBold, textAlign: 'center', letterSpacing: 8, marginBottom: 8 },
-  otpError: { fontSize: 13, fontFamily: fonts.body, color: colors.error, marginBottom: 8 },
 
   escrowCard: { borderRadius: 24, marginHorizontal: 16, marginBottom: 12, padding: 20, borderWidth: 1.5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   escrowHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },

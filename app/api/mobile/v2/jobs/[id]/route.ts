@@ -122,3 +122,84 @@ export async function GET(
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
+
+const UPDATABLE_FIELDS = [
+  'title',
+  'description',
+  'preferredDate',
+  'preferredTimeSlot',
+  'urgency',
+  'estimatedDuration',
+  'workersCount',
+  'postalCode',
+  'addressStreet',
+  'addressBuilding',
+  'addressApartment',
+  'addressLandmark',
+]
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const user = await authenticateRequest(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const job = await prisma.marketplaceJob.findUnique({ where: { id } })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+    const isOwner = job.customerId === user.id
+    let isAssignedProvider = false
+    if (!isOwner) {
+      const acceptedQuote = await prisma.jobQuote.findFirst({
+        where: { jobId: job.id, providerId: user.id, status: 'ACCEPTED' },
+      })
+      isAssignedProvider = !!acceptedQuote
+    }
+
+    if (!isOwner && !isAssignedProvider) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (!['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+      return NextResponse.json(
+        { error: 'Job cannot be updated in its current status' },
+        { status: 400 }
+      )
+    }
+
+    const body = await request.json()
+    const data: Record<string, any> = {}
+
+    for (const key of UPDATABLE_FIELDS) {
+      if (key in body) {
+        data[key] = body[key]
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+
+    if (data.preferredDate) {
+      data.preferredDate = new Date(data.preferredDate)
+    }
+
+    const updated = await prisma.marketplaceJob.update({
+      where: { id },
+      data,
+    })
+
+    return NextResponse.json({
+      job: {
+        ...updated,
+        budgetAmount: updated.budgetAmount != null ? Number(updated.budgetAmount) : null,
+      },
+    })
+  } catch (error) {
+    console.error('PATCH job error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}

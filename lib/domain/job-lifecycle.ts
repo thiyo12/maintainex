@@ -698,42 +698,6 @@ export async function expirePendingEscrow(
   return { jobId: escrow.jobId, reverted: true }
 }
 
-export async function verifyOtpAndStartJob(
-  ctx: TransitionContext,
-  jobId: string,
-  otp: string
-): Promise<{ success: boolean }> {
-  return prisma.$transaction(async (tx) => {
-    const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
-    if (!job) throw new Error('Job not found')
-    if (job.customerId !== ctx.actorId) throw new Error('Only the customer can verify OTP')
-    if (job.status !== 'IN_PROGRESS') throw new Error('Job is not in IN_PROGRESS status')
-
-    const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
-    if (!workspace) throw new Error('Workspace not found')
-    if (workspace.progressStatus !== 'ACCEPTED') throw new Error('Job already started')
-
-    const otpRecord = await tx.jobOtp.findUnique({ where: { jobId } })
-    if (!otpRecord) throw new Error('No OTP generated')
-    if (otpRecord.verifiedAt) throw new Error('OTP already used')
-    if (otpRecord.otp !== otp) throw new Error('Invalid OTP')
-
-    const otpClaimed = await tx.jobOtp.updateMany({
-      where: { id: otpRecord.id, verifiedAt: null },
-      data: { verifiedAt: new Date() },
-    })
-    if (otpClaimed.count !== 1) throw new Error('OTP already used')
-
-    const wsClaimed = await tx.jobWorkspace.updateMany({
-      where: { jobId, progressStatus: 'ACCEPTED' },
-      data: { progressStatus: 'IN_PROGRESS', updatedAt: new Date() },
-    })
-    if (wsClaimed.count !== 1) throw new Error('Workspace state changed')
-
-    return { success: true }
-  })
-}
-
 export type ReleaseMode = 'CUSTOMER_APPROVAL' | 'AUTO_RELEASE' | 'ADMIN_RESOLUTION'
 
 export async function completeAndReleaseEscrow(
