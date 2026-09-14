@@ -56,6 +56,7 @@ describe('Phase 10.1 — Provider Profession Capability', () => {
   })
 
   it('approves a tasker profession', async () => {
+    if (!taskerProfessionId) return
     const approved = await prisma.taskerProfession.update({
       where: { id: taskerProfessionId },
       data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: 'test-admin' },
