@@ -4,10 +4,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ShieldCheck, ArrowLeft, Lock } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../lib/ThemeContext'
-import { fonts } from '../../../../lib/fonts'
-import { v2JobActions } from '../../../../lib/api-v2'
-import PinInput from '../../../../components/ui/PinInput'
+import { useColors } from '../../../../../../lib/ThemeContext'
+import { fonts } from '../../../../../../lib/fonts'
+import { v2JobActions } from '../../../../../../lib/api-v2'
+import PinInput from '../../../../../../components/ui/PinInput'
 
 export default function ProviderPinVerifyScreen() {
   const { t } = useTranslation()

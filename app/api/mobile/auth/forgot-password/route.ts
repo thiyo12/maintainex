@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
+import { isSyntheticCertAccount } from '@/lib/test-cert'
 
 // TESTING ONLY — replace with real OTP provider before production launch
 export async function POST(request: NextRequest) {
@@ -27,8 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'If an account exists with that email, a reset code has been sent.' })
     }
 
-    // 000000 allowed only when ALLOW_TEST_OTP is explicitly enabled
-    const code = process.env.ALLOW_TEST_OTP === 'true'
+    const code = isSyntheticCertAccount(user)
       ? '000000'
       : randomInt(0, 1000000).toString().padStart(6, '0')
     const codeHash = await bcrypt.hash(code, 10)

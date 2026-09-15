@@ -1713,5 +1713,7 @@ const si: Record<string, any> = {
     noAcceptedQuote: 'මෙම රැකියාව සඳහා පිළිගත් මිල ගණන් නැත',
   },
 }
+}
 
 export default si
+

@@ -4,9 +4,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../lib/ThemeContext'
-import { fonts } from '../../../../lib/fonts'
-import { v2JobActions } from '../../../../lib/api-v2'
+import { useColors } from '../../../../../lib/ThemeContext'
+import { fonts } from '../../../../../lib/fonts'
+import { v2JobActions } from '../../../../../lib/api-v2'
 import * as Clipboard from 'expo-clipboard'
 
 export default function JobPinScreen() {

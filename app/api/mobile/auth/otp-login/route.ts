@@ -5,6 +5,7 @@ import { randomInt } from 'crypto'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
+import { isTestOtpAllowed, isSyntheticCertAccount } from '@/lib/test-cert'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: reason }, { status: 429 })
       }
 
-      const otp = process.env.ALLOW_TEST_OTP === 'true'
+      const otp = isSyntheticCertAccount(user)
         ? '000000'
         : randomInt(0, 1000000).toString().padStart(6, '0')
       const codeHash = await bcrypt.hash(otp, 10)
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many wrong attempts. Request a new code.' }, { status: 429 })
     }
 
-    if (code === '000000' && process.env.ALLOW_TEST_OTP === 'true') {
+    if (isTestOtpAllowed(user, code)) {
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     } else {
       const isValid = await bcrypt.compare(code, otpRecord.codeHash)

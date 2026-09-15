@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { sendOtpEmail } from '@/lib/email'
+import { CERT_TAG } from '@/lib/test-cert'
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const otp = process.env.ALLOW_TEST_OTP === 'true'
+    const isCertRegistration = process.env.ALLOW_TEST_OTP === 'true' && email && email.endsWith('@maintainex-test.lk')
+    const otp = isCertRegistration
       ? '000000'
       : randomInt(0, 1000000).toString().padStart(6, '0')
     const codeHash = await bcrypt.hash(otp, 10)
