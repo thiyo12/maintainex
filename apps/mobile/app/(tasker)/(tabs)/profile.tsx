@@ -279,6 +279,16 @@ export default function TaskerProfile() {
           <View style={styles.section}>
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+              onPress={() => router.push('/(tasker)/readiness' as any)}
+            >
+              <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#D97706" />
+              </View>
+              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('readiness.title')}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/(tasker)/(tabs)/earnings')}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#D1FAE5' }]}>

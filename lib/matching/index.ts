@@ -1,24 +1,20 @@
 import { PrismaClient } from '@prisma/client'
-import { checkIndividualProviderEligibility, checkCompanyEligibility } from '@/lib/phase6/provider-eligibility'
 import {
   MatchingInput, MatchResult, MatchCandidate, ExcludedProvider,
   MatchingConfig, ScoreComponents, MatchExclusionReason,
+  EligibilityResult, ProviderType,
 } from './types'
-import {
-  DEFAULT_WEIGHTS, MATCHING_SCORE_VERSION, validateWeights,
-  computeCapabilityScore, computeReliabilityScore, computeReputationScore,
-  computeExperienceScore, computeTotalScore,
-} from './scoring'
-import { rankCandidates } from './ranking'
+import { resolveMatchingConfig, DEFAULT_WEIGHTS } from './config'
+import { evaluateEligibility, mapEligibilityToExclusionReason } from './eligibility'
+import { scoreCandidate, getFairnessSignals, getFairnessSignalsBatch, rankCandidates } from './ranking'
+import { computeTotalScore, MATCHING_SCORE_VERSION } from './scoring'
 import { buildExplanationReasons } from './explanations'
 
 const NEUTRAL_SCORE = 50
 
-const DEFAULT_CONFIG: MatchingConfig = {
-  countryCode: 'GLOBAL',
-  matchingVersion: MATCHING_SCORE_VERSION,
-  weights: { ...DEFAULT_WEIGHTS },
-}
+// =============================================
+// BACKWARD-COMPATIBLE EXPORTS
+// =============================================
 
 export interface JobRequirements {
   categorySlug: string
@@ -108,33 +104,17 @@ export function hasCompanySpecialtyCapability(
   )
 }
 
-export async function resolveMatchingConfig(
-  client: PrismaClient,
-  countryCode: string,
-): Promise<MatchingConfig> {
-  const row = await client.marketConfig.findUnique({ where: { countryCode } }).catch(() => null)
-  const globalRow = countryCode !== 'GLOBAL'
-    ? await client.marketConfig.findUnique({ where: { countryCode: 'GLOBAL' } }).catch(() => null)
-    : null
-  const cfg = row || globalRow
-  if (!cfg) return { ...DEFAULT_CONFIG, countryCode }
+// Re-export resolveMatchingConfig from config module
+export { resolveMatchingConfig }
 
-  const weights: ScoreComponents = {
-    capability: cfg.weightCapability,
-    reliability: cfg.weightReliability,
-    reputation: cfg.weightReputation,
-    availability: cfg.weightAvailability,
-    travel: cfg.weightTravel,
-    experience: cfg.weightExperience,
-  }
+// =============================================
+// CANONICAL MATCHING ENGINE (Phase 10.2)
+// =============================================
 
-  return {
-    countryCode,
-    matchingVersion: cfg.matchingVersion || MATCHING_SCORE_VERSION,
-    weights: validateWeights(weights) ? weights : { ...DEFAULT_WEIGHTS },
-  }
-}
-
+/**
+ * Canonical findCandidates — uses eligibility engine + fair ranking.
+ * Backward-compatible: returns same MatchResult shape.
+ */
 export async function findCandidates(
   client: PrismaClient,
   input: MatchingInput,
@@ -145,13 +125,32 @@ export async function findCandidates(
 
   const job = await client.marketplaceJob.findUnique({
     where: { id: input.jobId },
-    select: { categoryId: true, serviceTemplateId: true, templateJobId: true },
+    select: {
+      categoryId: true, serviceTemplateId: true, templateJobId: true,
+      latitude: true, longitude: true, urgency: true, countryCode: true,
+    },
   })
   if (!job) return emptyResult(input.jobId, config.matchingVersion)
 
   const jobReqs = await resolveJobRequirements(client, job.categoryId, job.serviceTemplateId, job.templateJobId)
   if (!jobReqs) return emptyResult(input.jobId, config.matchingVersion)
 
+  // =============================================
+  // Phase 1: Collect eligible providers (eligibility evaluation)
+  // =============================================
+  interface EligibleIndividual {
+    profile: { userId: string; rating: number | null; completedJobs: number | null; compositeScore: number | null; latitude: number | null; longitude: number | null; user: { createdAt: Date; isSuspended: boolean; isBanned: boolean } }
+    eligibility: EligibilityResult
+  }
+  interface EligibleCompany {
+    company: { id: string; userId: string; rating: number | null; completedProjects: number | null; latitude: number | null; longitude: number | null; user: { createdAt: Date; isSuspended: boolean; isBanned: boolean } }
+    eligibility: EligibilityResult
+  }
+
+  const eligibleIndividuals: EligibleIndividual[] = []
+  const eligibleCompanies: EligibleCompany[] = []
+
+  // INDIVIDUAL PROVIDERS
   const individualProfiles = await client.taskerProfile.findMany({
     where: {
       verificationStatus: 'VERIFIED',
@@ -179,51 +178,28 @@ export async function findCandidates(
       continue
     }
 
-    if (profile.user.identityStatus !== 'VERIFIED') {
-      excluded.push({ providerId: profile.userId, providerType: 'INDIVIDUAL', reason: 'IDENTITY_NOT_VERIFIED' })
-      continue
-    }
-
-    const eligibility = await checkIndividualProviderEligibility(profile.userId)
-    if (!eligibility.eligible) {
-      excluded.push({
-        providerId: profile.userId,
-        providerType: 'INDIVIDUAL',
-        reason: mapEligibilityReason(eligibility.reasons[0]),
-        detail: eligibility.reasons.join('; '),
-      })
-      continue
-    }
-
-    const legacySkills = parseSkills(profile.skills)
-    const hasRelational = profile.taskerSkills.some((skill) =>
-      skill.job.categoryId === jobReqs.categoryId || jobReqs.templateJobIds.includes(skill.jobId)
-    )
-    const hasLegacy = hasCapabilityMatch(legacySkills, jobReqs)
-
-    if (!hasRelational && !hasLegacy) {
-      excluded.push({
-        providerId: profile.userId,
-        providerType: 'INDIVIDUAL',
-        reason: 'CAPABILITY_MISMATCH',
-        detail: `Provider capabilities do not match category slug=${jobReqs.categorySlug}`,
-      })
-      continue
-    }
-
-    const components = scoreIndividual(profile, jobReqs, hasRelational)
-    candidates.push({
-      providerId: profile.userId,
+    const eligibility = await evaluateEligibility({
       providerType: 'INDIVIDUAL',
-      userId: profile.userId,
-      score: computeTotalScore(components, config.weights),
-      rank: 0,
-      scoreVersion: config.matchingVersion,
-      components,
-      reasons: buildExplanationReasons(components, 'INDIVIDUAL'),
+      providerId: profile.userId,
+      job: input,
+      client,
     })
+
+    if (!eligibility.eligible) {
+      const failedGate = eligibility.gates.find(g => !g.passed)
+      excluded.push({
+        providerId: profile.userId,
+        providerType: 'INDIVIDUAL',
+        reason: failedGate ? mapEligibilityToExclusionReason(failedGate) : 'CAPABILITY_MISMATCH',
+        detail: failedGate?.reason || 'Eligibility check failed',
+      })
+      continue
+    }
+
+    eligibleIndividuals.push({ profile, eligibility })
   }
 
+  // COMPANY PROVIDERS
   const companies = await client.companyProfile.findMany({
     where: {
       verificationStatus: 'VERIFIED',
@@ -231,7 +207,7 @@ export async function findCandidates(
       user: input.countryCode ? { countryCode: input.countryCode } : undefined,
     },
     include: {
-      user: { select: { id: true, isSuspended: true, isBanned: true, countryCode: true } },
+      user: { select: { id: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
       specialties: { select: { categoryId: true, jobId: true } },
     },
   })
@@ -246,32 +222,109 @@ export async function findCandidates(
       continue
     }
 
-    const eligibility = await checkCompanyEligibility(company.id)
+    const eligibility = await evaluateEligibility({
+      providerType: 'COMPANY',
+      providerId: company.id,
+      job: input,
+      client,
+    })
+
     if (!eligibility.eligible) {
+      const failedGate = eligibility.gates.find(g => !g.passed)
       excluded.push({
         providerId: company.id,
         providerType: 'COMPANY',
-        reason: mapCompanyEligibilityReason(eligibility.reasons[0]),
-        detail: eligibility.reasons.join('; '),
+        reason: failedGate ? mapEligibilityToExclusionReason(failedGate) : 'CAPABILITY_MISMATCH',
+        detail: failedGate?.reason || 'Eligibility check failed',
       })
       continue
     }
 
-    const legacyServices = parseSkills(company.services)
-    const hasSpecialty = hasCompanySpecialtyCapability(company.specialties, jobReqs)
-    const hasLegacy = hasCapabilityMatch(legacyServices, jobReqs)
+    eligibleCompanies.push({ company, eligibility })
+  }
 
-    if (!hasSpecialty && !hasLegacy) {
-      excluded.push({
-        providerId: company.id,
-        providerType: 'COMPANY',
-        reason: 'CAPABILITY_MISMATCH',
-        detail: `Company capabilities do not match category slug=${jobReqs.categorySlug}`,
-      })
-      continue
+  // =============================================
+  // Phase 2: Batch fairness signals (O(1) queries)
+  // =============================================
+  const allProviderKeys: Array<{ providerId: string; providerType: ProviderType }> = [
+    ...eligibleIndividuals.map(e => ({ providerId: e.profile.userId, providerType: 'INDIVIDUAL' as const })),
+    ...eligibleCompanies.map(e => ({ providerId: e.company.id, providerType: 'COMPANY' as const })),
+  ]
+  const fairnessBatch = await getFairnessSignalsBatch(client, allProviderKeys)
+
+  // =============================================
+  // Phase 3: Score candidates
+  // =============================================
+  for (const { profile, eligibility } of eligibleIndividuals) {
+    const fairness = fairnessBatch.get(profile.userId) || {
+      opportunitiesLast7Days: 0, opportunitiesLast30Days: 0, jobsWonLast7Days: 0,
+      jobsWonLast30Days: 0, daysSinceLastOpportunity: 999, daysSinceLastCompletedJob: 999,
     }
 
-    const components = scoreCompany(company, jobReqs, hasSpecialty)
+    const components = scoreCandidate(
+      {
+        providerId: profile.userId,
+        providerType: 'INDIVIDUAL',
+        eligibility,
+        profileData: {
+          rating: profile.rating || 0,
+          completedJobs: profile.completedJobs || 0,
+          compositeScore: profile.compositeScore || 50,
+          createdAt: profile.user?.createdAt || new Date(),
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+        },
+        jobData: {
+          latitude: job.latitude,
+          longitude: job.longitude,
+          urgency: (job.urgency?.toUpperCase() || 'NORMAL') as any,
+        },
+        fairness,
+      },
+      config,
+    )
+
+    candidates.push({
+      providerId: profile.userId,
+      providerType: 'INDIVIDUAL',
+      userId: profile.userId,
+      score: computeTotalScore(components, config.weights),
+      rank: 0,
+      scoreVersion: config.matchingVersion,
+      components,
+      reasons: buildExplanationReasons(components, 'INDIVIDUAL'),
+    })
+  }
+
+  for (const { company, eligibility } of eligibleCompanies) {
+    const fairness = fairnessBatch.get(company.id) || {
+      opportunitiesLast7Days: 0, opportunitiesLast30Days: 0, jobsWonLast7Days: 0,
+      jobsWonLast30Days: 0, daysSinceLastOpportunity: 999, daysSinceLastCompletedJob: 999,
+    }
+
+    const components = scoreCandidate(
+      {
+        providerId: company.id,
+        providerType: 'COMPANY',
+        eligibility,
+        profileData: {
+          rating: company.rating || 0,
+          completedJobs: company.completedProjects || 0,
+          compositeScore: 50,
+          createdAt: company.user?.createdAt || new Date(),
+          latitude: company.latitude,
+          longitude: company.longitude,
+        },
+        jobData: {
+          latitude: job.latitude,
+          longitude: job.longitude,
+          urgency: (job.urgency?.toUpperCase() || 'NORMAL') as any,
+        },
+        fairness,
+      },
+      config,
+    )
+
     candidates.push({
       providerId: company.id,
       providerType: 'COMPANY',
@@ -294,29 +347,173 @@ export async function findCandidates(
   }
 }
 
-function scoreIndividual(profile: any, jobReqs: JobRequirements, exactRelationalMatch: boolean): ScoreComponents {
-  const completedJobs = profile.completedJobs || 0
-  return {
-    capability: exactRelationalMatch ? 100 : computeCapabilityScore(parseSkills(profile.skills), jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
-    reliability: computeReliabilityScore(completedJobs, 0),
-    reputation: computeReputationScore(profile.rating || 0, completedJobs),
-    availability: NEUTRAL_SCORE,
-    travel: NEUTRAL_SCORE,
-    experience: computeExperienceScore(completedJobs, 0),
+// =============================================
+// NEW CANONICAL API (Phase 10.2)
+// =============================================
+
+/**
+ * Evaluate a single provider's eligibility for a job.
+ */
+export async function evaluateTaskerEligibility(
+  client: PrismaClient,
+  taskerId: string,
+  jobId: string,
+): Promise<EligibilityResult> {
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true },
+  })
+  if (!job) {
+    return {
+      eligible: false,
+      gates: [{ gate: 'JOB_EXISTS', passed: false, reason: 'Job not found' }],
+      matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [],
+      jurisdictionPassed: false, serviceAreaPassed: false, availabilityPassed: false,
+    }
   }
+
+  return evaluateEligibility({
+    providerType: 'INDIVIDUAL',
+    providerId: taskerId,
+    job: {
+      jobId,
+      categoryId: job.categoryId,
+      serviceTemplateId: job.serviceTemplateId || undefined,
+      jobMode: 'QUOTE',
+      urgency: 'NORMAL',
+      countryCode: job.countryCode,
+    },
+    client,
+  })
 }
 
-function scoreCompany(company: any, jobReqs: JobRequirements, exactRelationalMatch: boolean): ScoreComponents {
-  const completedProjects = company.completedProjects || 0
-  return {
-    capability: exactRelationalMatch ? 100 : computeCapabilityScore(parseSkills(company.services), jobReqs.categorySlug, jobReqs.serviceTemplateSlug || undefined),
-    reliability: computeReliabilityScore(completedProjects, 0),
-    reputation: computeReputationScore(company.rating || 0, completedProjects),
-    availability: NEUTRAL_SCORE,
-    travel: NEUTRAL_SCORE,
-    experience: computeExperienceScore(completedProjects, 0),
+/**
+ * Evaluate a single company's eligibility for a job.
+ */
+export async function evaluateCompanyEligibility(
+  client: PrismaClient,
+  companyId: string,
+  jobId: string,
+): Promise<EligibilityResult> {
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true },
+  })
+  if (!job) {
+    return {
+      eligible: false,
+      gates: [{ gate: 'JOB_EXISTS', passed: false, reason: 'Job not found' }],
+      matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [],
+      jurisdictionPassed: false, serviceAreaPassed: false, availabilityPassed: false,
+    }
   }
+
+  return evaluateEligibility({
+    providerType: 'COMPANY',
+    providerId: companyId,
+    job: {
+      jobId,
+      categoryId: job.categoryId,
+      serviceTemplateId: job.serviceTemplateId || undefined,
+      jobMode: 'QUOTE',
+      urgency: 'NORMAL',
+      countryCode: job.countryCode,
+    },
+    client,
+  })
 }
+
+/**
+ * Get eligible taskers for a job (pre-filtered by eligibility).
+ */
+export async function getEligibleTaskers(
+  client: PrismaClient,
+  jobId: string,
+): Promise<Array<{ providerId: string; eligibility: EligibilityResult }>> {
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+  })
+  if (!job) return []
+
+  const profiles = await client.taskerProfile.findMany({
+    where: {
+      verificationStatus: 'VERIFIED',
+      isVerified: true,
+      user: job.countryCode ? { countryCode: job.countryCode } : undefined,
+    },
+    select: { userId: true },
+  })
+
+  const results: Array<{ providerId: string; eligibility: EligibilityResult }> = []
+  for (const profile of profiles) {
+    const eligibility = await evaluateEligibility({
+      providerType: 'INDIVIDUAL',
+      providerId: profile.userId,
+      job: {
+        jobId,
+        categoryId: job.categoryId,
+        serviceTemplateId: job.serviceTemplateId || undefined,
+        jobMode: 'QUOTE',
+        urgency: 'NORMAL',
+        countryCode: job.countryCode,
+      },
+      client,
+    })
+    if (eligibility.eligible) {
+      results.push({ providerId: profile.userId, eligibility })
+    }
+  }
+  return results
+}
+
+/**
+ * Get eligible companies for a job (pre-filtered by eligibility).
+ */
+export async function getEligibleCompanies(
+  client: PrismaClient,
+  jobId: string,
+): Promise<Array<{ companyId: string; eligibility: EligibilityResult }>> {
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+  })
+  if (!job) return []
+
+  const companies = await client.companyProfile.findMany({
+    where: {
+      verificationStatus: 'VERIFIED',
+      isVerified: true,
+      user: job.countryCode ? { countryCode: job.countryCode } : undefined,
+    },
+    select: { id: true },
+  })
+
+  const results: Array<{ companyId: string; eligibility: EligibilityResult }> = []
+  for (const company of companies) {
+    const eligibility = await evaluateEligibility({
+      providerType: 'COMPANY',
+      providerId: company.id,
+      job: {
+        jobId,
+        categoryId: job.categoryId,
+        serviceTemplateId: job.serviceTemplateId || undefined,
+        jobMode: 'QUOTE',
+        urgency: 'NORMAL',
+        countryCode: job.countryCode,
+      },
+      client,
+    })
+    if (eligibility.eligible) {
+      results.push({ companyId: company.id, eligibility })
+    }
+  }
+  return results
+}
+
+// =============================================
+// HELPERS
+// =============================================
 
 function emptyResult(jobId: string, scoreVersion: string): MatchResult {
   return { jobId, candidates: [], excluded: [], scoreVersion, generatedAt: new Date() }
@@ -332,28 +529,11 @@ function parseSkills(skillsJson: string | null): string[] {
   }
 }
 
-function mapEligibilityReason(reason: string): MatchExclusionReason {
-  if (reason.includes('suspended')) return 'PROVIDER_SUSPENDED'
-  if (reason.includes('banned')) return 'PROVIDER_BANNED'
-  if (reason.includes('profile not found')) return 'NO_PROVIDER_PROFILE'
-  if (reason.includes('not found')) return 'PROVIDER_NOT_FOUND'
-  if (reason.includes('verification')) return 'PROVIDER_VERIFICATION_NOT_APPROVED'
-  if (reason.includes('capabilities')) return 'NO_SERVICE_CAPABILITIES'
-  if (reason.includes('capability') || reason.includes('lacks')) return 'CAPABILITY_MISMATCH'
-  if (reason.includes('Identity')) return 'IDENTITY_NOT_VERIFIED'
-  return 'PROVIDER_NOT_FOUND'
-}
+// =============================================
+// RE-EXPORTS
+// =============================================
 
-function mapCompanyEligibilityReason(reason: string): MatchExclusionReason {
-  if (reason.includes('suspended')) return 'COMPANY_OWNER_SUSPENDED'
-  if (reason.includes('banned')) return 'COMPANY_OWNER_BANNED'
-  if (reason.includes('verification')) return 'COMPANY_NOT_VERIFIED'
-  if (reason.includes('capabilities')) return 'NO_SERVICE_CAPABILITIES'
-  if (reason.includes('owner')) return 'NO_ACTIVE_COMPANY_OWNER'
-  if (reason.includes('subscription')) return 'COMPANY_SUBSCRIPTION_CANCELLED'
-  if (reason.includes('not found')) return 'PROVIDER_NOT_FOUND'
-  return 'PROVIDER_NOT_FOUND'
-}
-
-export type { MatchResult, MatchCandidate, ExcludedProvider, MatchingConfig }
+export type { MatchResult, MatchCandidate, ExcludedProvider, MatchingConfig, EligibilityResult }
 export { MATCHING_SCORE_VERSION }
+export { evaluateEligibility, mapEligibilityToExclusionReason } from './eligibility'
+export { createMatchingWave, expireOpportunities, advanceMatchingWave, respondToOpportunity, shouldStopWaves } from './waves'

@@ -1,5 +1,10 @@
 import { RateLimitStore, RateLimitResult } from './store'
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __rateLimitCleanup: ReturnType<typeof setInterval> | undefined
+}
+
 interface WindowEntry {
   count: number
   windowStart: number

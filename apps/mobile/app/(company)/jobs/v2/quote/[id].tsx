@@ -87,7 +87,7 @@ export default function CompanySubmitQuoteScreen() {
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
-            <Text style={styles.previewBudget}>LKR {job.budgetAmount}</Text>
+            <Text style={styles.previewBudget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={styles.previewType}>{job.budgetType}</Text>
           </View>
         </View>

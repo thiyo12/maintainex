@@ -110,7 +110,7 @@ export default function CompanyManageJobScreen() {
           </View>
           <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
           <View style={styles.jobMeta}>
-            <Text style={styles.budget}>LKR {job.budgetAmount}</Text>
+            <Text style={styles.budget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={styles.budgetType}>{job.budgetType}</Text>
           </View>
           {job.locationName && (

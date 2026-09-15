@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED — Simplified matcher used by find-tasker route.
+ * Use canonical `lib/matching/index.ts` → findCandidates() instead.
+ *保留 for backward compatibility with find-tasker route only.
+ * @deprecated since Phase 10.2
+ */
 import { prisma } from './prisma'
 import { getSetting } from './settings'
 import { haversineKm } from './distance'

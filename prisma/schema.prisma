@@ -53,7 +53,9 @@ model User {
   adminFlags         AdminFlag[]
   offerBookings      OfferBooking[]
   payoutRequests     PayoutRequest[]
-   customJobRequests  CustomJobRequest[]
+  customJobRequests  CustomJobRequest[]
+  verificationPins   JobVerificationPin[]
+  workerAssignments  CompanyJobAssignment[]
 
   @@index([countryCode])
 }
@@ -1158,6 +1160,11 @@ model ServiceTemplate {
   countryCode            String       @default("LK")
   isActive               Boolean      @default(true)
   sortOrder              Int          @default(0)
+  // Phase 10.3 — Pricing intelligence
+  pricingMode            String       @default("SMART_QUOTE") // INSTANT_PRICE, SMART_QUOTE, INSPECTION_FIRST
+  benchmarkEligible      Boolean      @default(true)
+  instantPriceCents      BigInt?      // Fixed price in minor units (only for INSTANT_PRICE)
+  inspectionFeeCents     BigInt?      // Inspection/call-out fee in minor units (only for INSPECTION_FIRST)
   createdAt              DateTime     @default(now())
 
   @@index([jobCategoryId])
@@ -1170,20 +1177,20 @@ model ServiceTemplate {
 // Admin reviews these; if enough customers request the same job it can be
 // added as a TemplateJob/ServiceTemplate so taskers can then handle it.
 model CustomJobRequest {
-  id            String       @id @default(cuid())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title         String
-  description   String
-  categoryId    String?
-  cityName      String?
-  budgetMin     Float?
-  budgetMax     Float?
-  status        String       @default("PENDING") // PENDING | APPROVED | DECLINED | CONVERTED
-  adminNote     String?      // admin feedback
-  convertedJobId String?     // TemplateJob id if admin converted it into a listing
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  categoryId     String?
+  cityName       String?
+  budgetMin      Float?
+  budgetMax      Float?
+  status         String   @default("PENDING") // PENDING | APPROVED | DECLINED | CONVERTED
+  adminNote      String? // admin feedback
+  convertedJobId String? // TemplateJob id if admin converted it into a listing
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -1208,15 +1215,305 @@ model TaskerSkill {
 }
 
 model CompanySpecialty {
-  id         String         @id @default(cuid())
-  companyId  String
-  company    CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  categoryId String?
-  jobId      String?
+  id           String         @id @default(cuid())
+  companyId    String
+  company      CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  jobId        String?
+  professionId String?
+  profession   Profession?    @relation(fields: [professionId], references: [id], onDelete: Restrict)
 
   @@index([companyId])
   @@index([categoryId])
   @@index([jobId])
+  @@index([professionId])
+}
+
+// ============================================
+// PROFESSION & SKILL TAXONOMY
+// ============================================
+
+model Profession {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  i18nKey     String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  skills                   ProfessionSkill[]
+  taskerProfessions        TaskerProfession[]
+  companyProfessions       CompanyProfession[]
+  serviceRequirements      ServiceProfessionRequirement[]
+  jurisdictionRequirements ProfessionJurisdictionRequirement[]
+  companySpecialties       CompanySpecialty[]
+}
+
+model ProfessionSkill {
+  id           String   @id @default(cuid())
+  professionId String
+  slug         String
+  i18nKey      String
+  description  String?
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profession               Profession                          @relation(fields: [professionId], references: [id], onDelete: Restrict)
+  taskerSkills             TaskerProfessionSkill[]
+  companySkills            CompanyProfessionSkill[]
+  serviceSkillRequirements ServiceSkillRequirement[]
+  jurisdictionRequirements ProfessionJurisdictionRequirement[]
+
+  @@unique([professionId, slug])
+  @@index([professionId])
+}
+
+model TaskerProfession {
+  id              String    @id @default(cuid())
+  taskerProfileId String
+  professionId    String
+  status          String    @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
+  approvedAt      DateTime?
+  approvedBy      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  taskerProfile TaskerProfile           @relation(fields: [taskerProfileId], references: [id], onDelete: Cascade)
+  profession    Profession              @relation(fields: [professionId], references: [id], onDelete: Restrict)
+  skills        TaskerProfessionSkill[]
+
+  @@unique([taskerProfileId, professionId])
+  @@index([taskerProfileId])
+  @@index([professionId])
+  @@index([status])
+}
+
+model TaskerProfessionSkill {
+  id                 String   @id @default(cuid())
+  taskerProfessionId String
+  professionSkillId  String
+  createdAt          DateTime @default(now())
+
+  taskerProfession TaskerProfession @relation(fields: [taskerProfessionId], references: [id], onDelete: Cascade)
+  professionSkill  ProfessionSkill  @relation(fields: [professionSkillId], references: [id], onDelete: Restrict)
+
+  @@unique([taskerProfessionId, professionSkillId])
+  @@index([taskerProfessionId])
+  @@index([professionSkillId])
+}
+
+model CompanyProfession {
+  id               String    @id @default(cuid())
+  companyProfileId String
+  professionId     String
+  status           String    @default("PENDING") // PENDING, APPROVED, REJECTED, SUSPENDED
+  approvedAt       DateTime?
+  approvedBy       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  companyProfile CompanyProfile           @relation(fields: [companyProfileId], references: [id], onDelete: Cascade)
+  profession     Profession               @relation(fields: [professionId], references: [id], onDelete: Restrict)
+  skills         CompanyProfessionSkill[]
+
+  @@unique([companyProfileId, professionId])
+  @@index([companyProfileId])
+  @@index([professionId])
+  @@index([status])
+}
+
+model CompanyProfessionSkill {
+  id                  String   @id @default(cuid())
+  companyProfessionId String
+  professionSkillId   String
+  createdAt           DateTime @default(now())
+
+  companyProfession CompanyProfession @relation(fields: [companyProfessionId], references: [id], onDelete: Cascade)
+  professionSkill   ProfessionSkill   @relation(fields: [professionSkillId], references: [id], onDelete: Restrict)
+
+  @@unique([companyProfessionId, professionSkillId])
+  @@index([companyProfessionId])
+  @@index([professionSkillId])
+}
+
+model ServiceProfessionRequirement {
+  id                 String   @id @default(cuid())
+  serviceTemplateId  String
+  professionId       String
+  alternativeGroupId String?
+  createdAt          DateTime @default(now())
+
+  profession        Profession                @relation(fields: [professionId], references: [id], onDelete: Restrict)
+  skillRequirements ServiceSkillRequirement[]
+
+  @@unique([serviceTemplateId, professionId])
+  @@index([serviceTemplateId])
+  @@index([professionId])
+  @@index([alternativeGroupId])
+}
+
+model ServiceSkillRequirement {
+  id                     String   @id @default(cuid())
+  serviceProfessionReqId String
+  professionSkillId      String
+  requirementMode        String   @default("REQUIRED_ALL") // REQUIRED_ALL, REQUIRED_ANY_OF, PREFERRED
+  createdAt              DateTime @default(now())
+
+  serviceProfessionRequirement ServiceProfessionRequirement @relation(fields: [serviceProfessionReqId], references: [id], onDelete: Cascade)
+  professionSkill              ProfessionSkill              @relation(fields: [professionSkillId], references: [id], onDelete: Restrict)
+
+  @@unique([serviceProfessionReqId, professionSkillId])
+  @@index([serviceProfessionReqId])
+  @@index([professionSkillId])
+  @@index([requirementMode])
+}
+
+model ProfessionSubmission {
+  id                    String    @id @default(cuid())
+  submittedById         String
+  requestedName         String
+  description           String?
+  suggestedServices     String?
+  status                String    @default("SUBMITTED") // SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED, DUPLICATE
+  canonicalProfessionId String?
+  reviewedBy            String?
+  reviewedAt            DateTime?
+  reviewNote            String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([status])
+  @@index([submittedById])
+}
+
+model ProfessionJurisdictionRequirement {
+  id                 String    @id @default(cuid())
+  countryCode        String
+  province           String?
+  professionId       String
+  skillId            String?
+  credentialRequired Boolean   @default(false)
+  credentialType     String?
+  effectiveFrom      DateTime?
+  effectiveTo        DateTime?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  profession Profession       @relation(fields: [professionId], references: [id], onDelete: Restrict)
+  skill      ProfessionSkill? @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  @@unique([countryCode, province, professionId, skillId])
+  @@index([countryCode])
+  @@index([professionId])
+}
+
+// ============================================
+// PROVIDER OPPORTUNITY (Phase 10.2)
+// ============================================
+
+model ProviderOpportunity {
+  id              String    @id @default(cuid())
+  jobId           String
+  taskerId        String?
+  companyId       String?
+  providerType    String    // INDIVIDUAL, COMPANY
+  waveNumber      Int       @default(1)
+  status          String    @default("PENDING") // PENDING, SENT, VIEWED, ACCEPTED, DECLINED, EXPIRED, WITHDRAWN, CANCELLED
+  sentAt          DateTime?
+  expiresAt       DateTime?
+  respondedAt     DateTime?
+  response        String?   // ACCEPTED, DECLINED
+  rankAtSend      Int?
+  scoreSnapshot   Float?
+  eligibilitySnapshot String? // JSON: eligibility gates that passed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([jobId, taskerId])
+  @@unique([jobId, companyId])
+  @@index([jobId])
+  @@index([taskerId, sentAt])
+  @@index([companyId, sentAt])
+  @@index([status])
+  @@index([waveNumber])
+}
+
+// ============================================
+// PHASE 10.3 — PRICING INTELLIGENCE
+// ============================================
+
+model PriceBenchmark {
+  id                    String   @id @default(cuid())
+  serviceTemplateId     String
+  countryCode           String
+  region                String?  // Province/state (e.g. "Northern Province", "Ontario")
+  city                  String?  // City/district (e.g. "Jaffna", "Toronto")
+  currency              String   // ISO 4217
+  pricingMode           String   // INSTANT_PRICE, SMART_QUOTE, INSPECTION_FIRST
+
+  // Statistical data
+  sampleSize            Int      @default(0)
+  medianAmountCents     BigInt   @default(0)
+  lowerPercentileCents  BigInt   @default(0) // P25
+  upperPercentileCents  BigInt   @default(0) // P75
+  minimumObservedCents  BigInt?
+  maximumObservedCents  BigInt?
+
+  // Source & provenance
+  sourceType            String   // MAINTAINEX_COMPLETED_JOBS, MANUAL_MARKET_RESEARCH, PUBLIC_PROVIDER_PRICE, PARTNER_DATA, ADMIN_ESTIMATE, OTHER
+  sourceReference       String?  // Research batch ID, dataset reference, admin note
+  methodologyNote       String?  // How the benchmark was calculated
+
+  // Geography level (derived at creation: CITY > PROVINCE > COUNTRY)
+  geographyLevel        String   @default("COUNTRY") // CITY, PROVINCE, COUNTRY
+
+  // Lifecycle
+  status                String   @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, PUBLISHED, SUPERSEDED
+  version               Int      @default(1)
+  effectiveFrom         DateTime?
+  effectiveTo           DateTime? // null = currently active
+  createdBy             String?
+  submittedBy           String?
+  submittedAt           DateTime?
+  approvedBy            String?
+  approvedAt            DateTime?
+  publishedAt           DateTime?
+  supersededBy          String?  // ID of the version that replaced this one
+  supersededFromId      String?  // ID of the benchmark this one superseded
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([serviceTemplateId, countryCode, region, city, version])
+  @@index([serviceTemplateId])
+  @@index([countryCode, region, city])
+  @@index([status])
+  @@index([effectiveFrom, effectiveTo])
+  @@index([currency])
+}
+
+model QuoteLineItem {
+  id            String   @id @default(cuid())
+  quoteId       String
+  quote         JobQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  type          String   // LABOUR, MATERIALS, CALL_OUT, DIAGNOSIS, TRAVEL, EQUIPMENT, PERMIT, OTHER, TAX, PLATFORM_SERVICE_CHARGE
+  description   String
+  quantity      Float    @default(1)
+  unit          String?  // hour, item, km, etc.
+  unitAmountCents BigInt  // Price per unit in minor units
+  totalAmountCents BigInt // quantity * unitAmountCents (server-validated)
+  currency      String   // ISO 4217, must match quote currency
+  sortOrder     Int      @default(0)
+  metadata      String?  // JSON for extra data
+  createdAt     DateTime @default(now())
+
+  @@index([quoteId])
+  @@index([type])
 }
 
 // ============================================
@@ -1266,14 +1563,15 @@ model TaskerProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bids            Bid[]
-  assignments     Assignment[]
-  reviews         TaskerReview[]
-  taskerSkills    TaskerSkill[]
-  bookings        Booking[]
-  matchQueue      JobMatchQueue[]
-  offerMatchQueue OfferMatchQueue[]
-  enrollments     OfferEnrollment[]
+  bids              Bid[]
+  assignments       Assignment[]
+  reviews           TaskerReview[]
+  taskerSkills      TaskerSkill[]
+  taskerProfessions TaskerProfession[]
+  bookings          Booking[]
+  matchQueue        JobMatchQueue[]
+  offerMatchQueue   OfferMatchQueue[]
+  enrollments       OfferEnrollment[]
 
   @@index([isOnline])
   @@index([isVerified])
@@ -1491,12 +1789,14 @@ model CompanyProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contracts     Contract[]
-  teamMembers   TeamMember[]
-  specialties   CompanySpecialty[]
-  invites       TeamInvite[]
-  subscriptions CompanySubscription[]
-  auditLogs     CompanyAuditLog[]
+  contracts          Contract[]
+  teamMembers        TeamMember[]
+  specialties        CompanySpecialty[]
+  companyProfessions CompanyProfession[]
+  invites            TeamInvite[]
+  subscriptions      CompanySubscription[]
+  auditLogs          CompanyAuditLog[]
+  jobAssignments     CompanyJobAssignment[]
 
   @@index([isVerified])
   @@index([rating])
@@ -1583,23 +1883,23 @@ model CompanySubscription {
 }
 
 model Certification {
-  id               String    @id @default(cuid())
-  holderType       String    // INDIVIDUAL, COMPANY
-  holderId         String    // userId for INDIVIDUAL, companyProfile id for COMPANY
-  certificationType String   // ELECTRICAL, PLUMBING, GAS, STRUCTURAL, GENERAL, etc.
-  name             String    // Display name of the certification
-  issuer           String?   // Issuing authority
-  referenceNumber  String?   // Certificate/license number
-  issuedDate       DateTime?
-  expiryDate       DateTime?
-  verificationStatus String @default("PENDING") // PENDING, VERIFIED, REJECTED, EXPIRED
-  verificationNote String?
-  verifiedBy       String?   // Admin userId who verified
-  verifiedAt       DateTime?
-  documentUrl      String?   // Supporting document URL
-  isActive         Boolean   @default(true)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  holderType         String // INDIVIDUAL, COMPANY
+  holderId           String // userId for INDIVIDUAL, companyProfile id for COMPANY
+  certificationType  String // ELECTRICAL, PLUMBING, GAS, STRUCTURAL, GENERAL, etc.
+  name               String // Display name of the certification
+  issuer             String? // Issuing authority
+  referenceNumber    String? // Certificate/license number
+  issuedDate         DateTime?
+  expiryDate         DateTime?
+  verificationStatus String    @default("PENDING") // PENDING, VERIFIED, REJECTED, EXPIRED
+  verificationNote   String?
+  verifiedBy         String? // Admin userId who verified
+  verifiedAt         DateTime?
+  documentUrl        String? // Supporting document URL
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([holderType, holderId])
   @@index([verificationStatus])
@@ -1610,15 +1910,15 @@ model CompanyAuditLog {
   id          String         @id @default(cuid())
   companyId   String
   company     CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  actorId     String   // userId of the actor
-  actorRole   String   // Role of the actor at the time of action
-  action      String   // COMPANY_CREATE, OWNERSHIP_TRANSFER, MEMBER_INVITE, MEMBER_ACCEPT, MEMBER_REMOVE, ROLE_CHANGE, SUSPENSION, KYC_SUBMIT, KYC_APPROVE, KYC_REJECT, CERTIFICATION_ADD, CERTIFICATION_VERIFY
-  targetType  String?  // TeamMember, Certification, IdentityDocument, CompanyProfile
-  targetId    String?  // ID of the target entity
-  description String?  // Human-readable description
-  metadata    String?  // JSON string for additional data
+  actorId     String // userId of the actor
+  actorRole   String // Role of the actor at the time of action
+  action      String // COMPANY_CREATE, OWNERSHIP_TRANSFER, MEMBER_INVITE, MEMBER_ACCEPT, MEMBER_REMOVE, ROLE_CHANGE, SUSPENSION, KYC_SUBMIT, KYC_APPROVE, KYC_REJECT, CERTIFICATION_ADD, CERTIFICATION_VERIFY
+  targetType  String? // TeamMember, Certification, IdentityDocument, CompanyProfile
+  targetId    String? // ID of the target entity
+  description String? // Human-readable description
+  metadata    String? // JSON string for additional data
   ipAddress   String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime       @default(now())
 
   @@index([companyId])
   @@index([actorId])
@@ -1627,22 +1927,22 @@ model CompanyAuditLog {
 }
 
 model ProviderDocument {
-  id           String    @id @default(cuid())
-  providerType String    // INDIVIDUAL, COMPANY
-  providerId   String    // userId for INDIVIDUAL, companyProfile id for COMPANY
-  documentType String    // BUSINESS_REG, TAX_ID, STAFF_PROOF, EXPERIENCE_PROOF, DRIVING_LICENSE, INSURANCE, OTHER
-  fileName     String
-  fileUrl      String    // Cloudinary or storage URL
-  fileSize     Int?      // bytes
-  mimeType     String?
-  verificationStatus String @default("PENDING") // PENDING, APPROVED, REJECTED
+  id                 String    @id @default(cuid())
+  providerType       String // INDIVIDUAL, COMPANY
+  providerId         String // userId for INDIVIDUAL, companyProfile id for COMPANY
+  documentType       String // BUSINESS_REG, TAX_ID, STAFF_PROOF, EXPERIENCE_PROOF, DRIVING_LICENSE, INSURANCE, OTHER
+  fileName           String
+  fileUrl            String // Cloudinary or storage URL
+  fileSize           Int? // bytes
+  mimeType           String?
+  verificationStatus String    @default("PENDING") // PENDING, APPROVED, REJECTED
   verificationNote   String?
-  verifiedBy   String?
-  verifiedAt   DateTime?
-  isPublic     Boolean   @default(false) // Should always be false for identity docs
-  uploadedBy   String    // userId who uploaded
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  isPublic           Boolean   @default(false) // Should always be false for identity docs
+  uploadedBy         String // userId who uploaded
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([providerType, providerId])
   @@index([verificationStatus])
@@ -1844,7 +2144,7 @@ model MarketplaceJob {
   targetTaskerId    String?
   photos            String
   budgetType        String // FIXED, HOURLY, NEGOTIABLE, REQUEST_QUOTES
-  budgetAmount      BigInt
+  budgetAmount      BigInt?
   areaId            String?
   postalCode        String?
   preferredDate     DateTime?
@@ -1870,10 +2170,21 @@ model MarketplaceJob {
   waveSentAt        DateTime?
   notifiedCount     Int       @default(0) // Number of taskers notified (uber-style blast)
   smartBookingJson  String? // JSON-encoded smart booking answers / estimate / timeSlot / paymentMethod / locationText
+  // Phase 10.4 — Inspection + Change Order lifecycle
+  requiresInspection Boolean   @default(false)
+  approvedQuoteId    String?
+  approvedQuoteVersion Int?
+  finalAuthorizedAmountCents BigInt?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  matchQueue JobMatchQueue[]
+  matchQueue        JobMatchQueue[]
+  inspections       JobInspection[]
+  changeOrders      JobChangeOrder[]
+  evidenceRecords   JobEvidence[]
+  riskEvents        MarketplaceRiskEvent[]
+  verificationPins  JobVerificationPin[]
+  assignments       CompanyJobAssignment[]
 
   @@index([customerId])
   @@index([categoryId])
@@ -1884,7 +2195,7 @@ model MarketplaceJob {
 }
 
 model JobQuote {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   jobId        String
   providerId   String
   providerType String // INDIVIDUAL, COMPANY
@@ -1895,13 +2206,26 @@ model JobQuote {
   estimatedCompletionTime String
   message                 String?
   attachments             String
-  status                  String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, WITHDRAWN
+  status                  String   @default("PENDING") // PENDING, ACCEPTED, REJECTED, WITHDRAWN, SUPERSEDED
+  // Phase 10.3 — Quote intelligence
+  currency                String   @default("LKR")
+  subtotalCents           BigInt?  // Sum of line items before tax/fees
+  taxCents                BigInt?  // Tax amount
+  totalCents              BigInt?  // Server-calculated total (subtotal + tax)
+  benchmarkClassification String?  // VERY_LOW, BELOW_TYPICAL, TYPICAL, ABOVE_TYPICAL, VERY_HIGH, INSUFFICIENT_DATA
+  benchmarkId             String?  // Reference to PriceBenchmark used for classification
+  revisionNumber          Int      @default(1)
+  parentQuoteId           String?  // Previous revision's quote ID (for revision chain)
+  revisionReason          String?  // Why revision was created
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+
+  lineItems QuoteLineItem[]
 
   @@index([jobId])
   @@index([providerId])
   @@index([status])
+  @@index([parentQuoteId])
 }
 
 model JobEscrow {
@@ -1951,16 +2275,6 @@ model CommissionSettlement {
   @@index([countryCode])
 }
 
-model JobOtp {
-  id          String    @id @default(cuid())
-  jobId       String    @unique
-  otp         String // 4-digit code
-  generatedAt DateTime  @default(now())
-  verifiedAt  DateTime?
-
-  @@index([jobId])
-}
-
 model ProviderWallet {
   id               String   @id @default(cuid())
   userId           String   @unique
@@ -2004,12 +2318,12 @@ model WalletTransaction {
 }
 
 model JobWorkspace {
-  id                      String    @id @default(cuid())
-  jobId                   String    @unique
-  progressStatus          String    @default("ACCEPTED") // ACCEPTED, IN_PROGRESS, WAITING_CUSTOMER, COMPLETION_REQUESTED, COMPLETED, DISPUTED
-  completionRequestedAt   DateTime?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  jobId                 String    @unique
+  progressStatus        String    @default("ACCEPTED") // ACCEPTED, IN_PROGRESS, WAITING_CUSTOMER, COMPLETION_REQUESTED, COMPLETED, DISPUTED
+  completionRequestedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([jobId])
 }
@@ -2045,20 +2359,20 @@ model ProviderReview {
 }
 
 model IdentityDocument {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  docType    String // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
-  side       String // FRONT or BACK
-  imageUrl   String
-  fullName   String? // "Full name exactly as on the ID" captured at submission
-  status     String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  reviewNote String?
-  reviewedBy String?
-  reviewedAt DateTime?
-  countryCode String   @default("LK")
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  docType     String // PASSPORT, NATIONAL_ID, DRIVERS_LICENSE
+  side        String // FRONT or BACK
+  imageUrl    String
+  fullName    String? // "Full name exactly as on the ID" captured at submission
+  status      String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewNote  String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  countryCode String    @default("LK")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -2229,15 +2543,15 @@ model PlatformSettings {
 model PriceSnapshot {
   id                String   @id @default(cuid())
   jobId             String
-  pricingVersion    String   // e.g. "v1"
+  pricingVersion    String // e.g. "v1"
   currency          String   @default("LKR")
-  baseAmount        BigInt   // service base in minor units
+  baseAmount        BigInt // service base in minor units
   urgencyAmount     BigInt   @default(0) // urgency surcharge
   serviceModifiers  BigInt   @default(0) // other modifiers
-  platformFeeBps    Int      // commission basis points at time of quote
-  platformFeeAmount BigInt   // commission amount in minor units
-  providerGross     BigInt   // base + urgency + modifiers
-  customerTotal     BigInt   // providerGross + platformFeeAmount
+  platformFeeBps    Int // commission basis points at time of quote
+  platformFeeAmount BigInt // commission amount in minor units
+  providerGross     BigInt // base + urgency + modifiers
+  customerTotal     BigInt // providerGross + platformFeeAmount
   ruleIds           String   @default("[]") // JSON array of applied rule IDs
   createdAt         DateTime @default(now())
 
@@ -2246,28 +2560,48 @@ model PriceSnapshot {
 
 // Phase 7 — Configurable matching/pricing market settings (country-neutral)
 model MarketConfig {
-  id                 String  @id @default(cuid())
-  countryCode        String  @unique // "GLOBAL" for defaults, "LK", "CA" etc.
-  defaultCurrency    String  @default("LKR")
-  matchingVersion    String  @default("v1")
-  pricingVersion     String  @default("v1")
+  id                   String   @id @default(cuid())
+  countryCode          String   @unique // "GLOBAL" for defaults, "LK", "CA" etc.
+  defaultCurrency      String   @default("LKR")
+  matchingVersion      String   @default("v1")
+  pricingVersion       String   @default("v1")
   // Matching weights (must sum to 100)
-  weightCapability   Int     @default(30)
-  weightReliability  Int     @default(20)
-  weightReputation   Int     @default(20)
-  weightAvailability Int     @default(15)
-  weightTravel       Int     @default(10)
-  weightExperience   Int     @default(5)
+  weightCapability     Int      @default(30)
+  weightReliability    Int      @default(20)
+  weightReputation     Int      @default(20)
+  weightAvailability   Int      @default(15)
+  weightTravel         Int      @default(10)
+  weightExperience     Int      @default(5)
+  // Fair opportunity weights (Phase 10.2)
+  weightFairness       Int      @default(10)
+  weightPreferredSkill Int      @default(5)
+  // Wave configuration (Phase 10.2)
+  wave1Size            Int      @default(3)
+  wave2Size            Int      @default(5)
+  wave3Size            Int      @default(8)
+  wave1ExpiryMinutes   Int      @default(15)
+  wave2ExpiryMinutes   Int      @default(15)
+  wave3ExpiryMinutes   Int      @default(30)
+  // New provider configuration (Phase 10.2)
+  newProviderBaseline  Float    @default(50)
+  maxOpportunityBoost  Float    @default(15)
   // Pricing modifiers (basis points, 100 = 1%)
-  urgentModifierBps  Int     @default(2500)  // 25%
-  emergencyModifierBps Int   @default(5000)  // 50%
-  urgencyCapBps      Int     @default(10000) // max 100% surge
+  urgentModifierBps    Int      @default(2500) // 25%
+  emergencyModifierBps Int      @default(5000) // 50%
+  urgencyCapBps        Int      @default(10000) // max 100% surge
   // Platform commission
-  commissionRateBps  Int     @default(1000)  // 10%
-  minJobAmountCents  BigInt  @default(500)
-  maxJobAmountCents  BigInt  @default(10000000)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  commissionRateBps    Int      @default(1000) // 10%
+  minJobAmountCents    BigInt   @default(500)
+  maxJobAmountCents    BigInt   @default(10000000)
+  // Phase 10.3 — Benchmark configuration
+  minBenchmarkSample       Int      @default(5)   // Minimum jobs for statistical benchmark
+  benchmarkPercentileLow   Int      @default(25)  // P25 lower bound
+  benchmarkPercentileHigh  Int      @default(75)  // P75 upper bound
+  benchmarkOutlierIqrMult  Float    @default(1.5) // IQR multiplier for outlier detection
+  benchmarkFallbackEnabled Boolean  @default(true) // Enable geographic fallback
+  benchmarkResearchIntervalMonths Int @default(3) // Quarterly research cycle
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model RealEstateListing {
@@ -2307,7 +2641,7 @@ model RealEstateListing {
 
   // Media
   photos    String? // JSON array
-  amenities String? // JSON array stored as string (SQLite)
+  amenities String? // JSON array stored as string
   videoUrl  String?
 
   // Seller info
@@ -2819,16 +3153,150 @@ model FinancialLedger {
 }
 
 model IdempotencyRecord {
-  id             String    @id @default(cuid())
-  idempotencyKey String    @unique
-  operation      String
-  status         String    @default("PENDING")
-  metadata       String?
-  resultPayload  String?
-  expiresAt      DateTime
-  createdAt      DateTime  @default(now())
+  id                String   @id @default(cuid())
+  idempotencyKey    String   @unique
+  userId            String?
+  operation         String
+  status            String   @default("PENDING")
+  metadata          String?
+  resultPayload     String?
+  requestFingerprint String?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
 
   @@index([idempotencyKey])
+  @@index([userId, operation])
+}
+
+// Phase 10.4 — Inspection lifecycle
+model JobInspection {
+  id                  String    @id @default(cuid())
+  jobId               String
+  job                 MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  providerType        String    // INDIVIDUAL, COMPANY
+  taskerId            String?
+  companyId           String?
+  status              String    @default("REQUESTED") // REQUESTED, SCHEDULED, EN_ROUTE, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED, NO_SHOW, DISPUTED
+  scheduledAt         DateTime?
+  scheduledWindowStart String?  // e.g. "2026-09-15T09:00:00Z"
+  scheduledWindowEnd  String?
+  arrivedAt           DateTime?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  inspectionFeeCents  BigInt?
+  currency            String    @default("LKR")
+  diagnosisSummary    String?   // Provider submits after inspection
+  scopeSummary        String?   // Recommended work scope
+  materialsSummary    String?   // Materials required
+  estimatedDuration   String?   // Estimated repair duration
+  risksAndLimitations String?
+  customerNotes       String?
+  providerNotes       String?
+  verifiedByCustomer  Boolean   @default(false)
+  verifiedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  evidence            JobEvidence[]
+
+  @@index([jobId])
+  @@index([taskerId])
+  @@index([companyId])
+  @@index([status])
+  @@index([providerType])
+}
+
+// Phase 10.4 — Change order lifecycle
+model JobChangeOrder {
+  id                    String    @id @default(cuid())
+  jobId                 String
+  job                   MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  baseQuoteId           String
+  providerType          String    // INDIVIDUAL, COMPANY
+  taskerId              String?
+  companyId             String?
+  reason                String
+  scopeDelta            String?   // Description of additional work
+  amountDeltaCents      BigInt    // Positive = additional cost
+  currency              String    @default("LKR")
+  status                String    @default("DRAFT") // DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED
+  createdBy             String    // userId who created (provider)
+  createdAt             DateTime  @default(now())
+  submittedAt           DateTime?
+  customerDecisionAt    DateTime?
+  approvedByCustomerId  String?
+  rejectedAt            DateTime?
+  cancelledAt           DateTime?
+  rejectionReason       String?
+  revisionNumber        Int       @default(1)
+
+  lineItems             JobChangeOrderLineItem[]
+
+  @@index([jobId])
+  @@index([baseQuoteId])
+  @@index([taskerId])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdBy])
+}
+
+// Phase 10.4 — Change order line items (itemized deltas)
+model JobChangeOrderLineItem {
+  id                String    @id @default(cuid())
+  changeOrderId     String
+  changeOrder       JobChangeOrder @relation(fields: [changeOrderId], references: [id], onDelete: Cascade)
+  type              String    // LABOUR, MATERIALS, TAX, INSPECTION_FEE, OTHER
+  description       String
+  quantity          Float     @default(1)
+  unit              String?
+  unitAmountCents   BigInt
+  totalAmountCents  BigInt
+  currency          String    @default("LKR")
+  sortOrder         Int       @default(0)
+  createdAt         DateTime  @default(now())
+
+  @@index([changeOrderId])
+}
+
+// Phase 10.4 — Evidence attached to inspections or jobs
+model JobEvidence {
+  id            String    @id @default(cuid())
+  jobId         String
+  job           MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inspectionId  String?
+  inspection    JobInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  uploaderId    String    // userId of provider or customer
+  uploaderType  String    // CUSTOMER, PROVIDER
+  evidenceType  String    // PHOTO, VIDEO, NOTE, MEASUREMENT, DIAGNOSTIC
+  url           String?
+  description   String?
+  mimeType      String?
+  createdAt     DateTime  @default(now())
+
+  @@index([jobId])
+  @@index([inspectionId])
+  @@index([uploaderId])
+}
+
+// Phase 10.4 — Anti-bypass risk events
+model MarketplaceRiskEvent {
+  id            String    @id @default(cuid())
+  jobId         String?
+  job           MarketplaceJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  actorUserId   String    // User who triggered the event
+  eventType     String    // CONTACT_SHARE_ATTEMPT, OFF_PLATFORM_PAYMENT_LANGUAGE, PREMATURE_CONTACT_ACCESS, REPEATED_CANCELLATION_AFTER_MATCH, ABNORMAL_PRICE_ESCALATION
+  severity      String    @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  metadata      String?   // JSON metadata (context, patterns detected)
+  createdAt     DateTime  @default(now())
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  resolution    String?   // CONFIRMED, DISMISSED, ESCALATED, NO_ACTION
+
+  @@index([jobId])
+  @@index([actorUserId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([createdAt])
 }
 
 model WalletBalance {
@@ -2846,4 +3314,62 @@ model WalletBalance {
   @@unique([walletType, walletId, currency])
   @@index([walletId])
   @@index([walletType])
+}
+
+model JobVerificationPin {
+  id                  String    @id @default(cuid())
+  jobId               String
+  customerId          String
+  pinHash             String    // bcrypt hash via hashPassword() (SHA-256+pepper+bcrypt)
+  status              String    @default("ACTIVE") // ACTIVE, ROTATED, REVOKED
+  version             Int       @default(1)
+  failedAttempts      Int       @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  rotatedAt           DateTime?
+  revokedAt           DateTime?
+  lastSuccessfulUseAt DateTime?
+
+  // Phase 10.5 closure: per-purpose verification timestamps (atomic consumption)
+  arrivalVerifiedAt     DateTime?
+  workStartVerifiedAt   DateTime?
+  completionVerifiedAt  DateTime?
+
+  job      MarketplaceJob @relation(fields: [jobId], references: [id])
+  customer User           @relation(fields: [customerId], references: [id])
+
+  @@unique([jobId, version])
+  @@index([jobId])
+  @@index([customerId])
+}
+
+// Phase 10.7 — Company Workforce: formal job assignment tracking
+model CompanyJobAssignment {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       CompanyProfile @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobId         String
+  job           MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  workerUserId  String
+  worker        User     @relation(fields: [workerUserId], references: [id], onDelete: Cascade)
+  assignedBy    String   // userId of actor who made the assignment
+  status        String   @default("ASSIGNED") // ASSIGNED, ACCEPTED, IN_PROGRESS, COMPLETED, REJECTED, REVOKED
+  assignedAt    DateTime @default(now())
+  acceptedAt    DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  rejectedAt    DateTime?
+  revokedAt     DateTime?
+  revokedReason String?
+  rejectReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([jobId, workerUserId])
+  @@index([companyId])
+  @@index([workerUserId])
+  @@index([jobId])
+  @@index([status])
 }

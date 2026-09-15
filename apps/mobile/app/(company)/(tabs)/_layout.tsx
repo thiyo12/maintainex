@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
 import { colors } from '../../../lib/design'
-import { SquaresFour, FileText, ChatCircleDots, Flag, Users, CurrencyCircleDollar, User } from 'phosphor-react-native'
+import { SquaresFour, FileText, ChatCircleDots, Flag, Users, CurrencyCircleDollar, User, Truck } from 'phosphor-react-native'
 
 const tabConfigs = [
   { name: 'index', key: 'company.dashboard', icon: SquaresFour },
@@ -12,6 +12,7 @@ const tabConfigs = [
   { name: 'inbox', key: 'company.inbox', icon: ChatCircleDots },
   { name: 'milestones-list', key: 'company.milestones', icon: Flag },
   { name: 'team', key: 'company.team', icon: Users },
+  { name: 'dispatch', key: 'company.workforce.dispatch', icon: Truck },
   { name: 'earnings-list', key: 'company.earnings', icon: CurrencyCircleDollar },
   { name: 'profile', key: 'company.profile', icon: User },
 ]

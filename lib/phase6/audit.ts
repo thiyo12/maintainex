@@ -25,6 +25,11 @@ export type CompanyAuditAction =
   | 'DOCUMENT_VERIFY'
   | 'QUOTE_SUBMIT'
   | 'WORKER_ASSIGN'
+  | 'WORKER_REASSIGN'
+  | 'WORKER_REVOKE'
+  | 'ASSIGNMENT_ACCEPT'
+  | 'ASSIGNMENT_REJECT'
+  | 'ASSIGNMENT_COMPLETE'
 
 export interface AuditLogParams {
   companyId: string

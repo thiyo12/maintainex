@@ -44,6 +44,8 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
+    const isCustomer = user.role === 'CUSTOMER'
+
     const mapped = jobs.map(j => ({
       id: j.id,
       title: j.title,
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
       status: j.status,
       scheduledDate: j.scheduledDate?.toISOString(),
       createdAt: j.createdAt.toISOString(),
-      customer: j.customer,
+      customer: isCustomer ? j.customer : { ...j.customer, phone: null },
       bids: j.bids.map(b => ({
         id: b.id,
         jobId: b.jobId,

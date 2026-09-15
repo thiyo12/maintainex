@@ -67,9 +67,23 @@ const NAVIGATION: NavItem[] = [
   { name: 'Cheating Reports', href: '/admin/cheating', icon: FiAlertTriangle, permission: 'cheating:view', badge: 'Reports', badgeColor: 'red' },
   { name: 'Wishlist', href: '/admin/wishlist', icon: FiGrid, permission: 'wishlist:view' },
   {
+    name: 'Trust & Safety', href: '/admin/trust-safety', icon: FiShield, permission: 'credentials:read',
+    children: [
+      { name: 'Credentials', href: '/admin/trust-safety/credentials', icon: FiFileText, permission: 'credentials:read' },
+      { name: 'Risk Events', href: '/admin/trust-safety/risk-events', icon: FiAlertTriangle, permission: 'risk_events:read' },
+    ]
+  },
+  {
+    name: 'Pricing & Config', href: '/admin/pricing', icon: FiDollarSign, permission: 'market_config:read',
+    children: [
+      { name: 'Market Config', href: '/admin/pricing/market-config', icon: FiSettings, permission: 'market_config:read' },
+    ]
+  },
+  {
     name: 'Analytics', href: '/admin/analytics', icon: FiBarChart2, permission: 'analytics:view',
     children: [
       { name: 'Overview', href: '/admin/analytics', icon: FiBarChart2, permission: 'analytics:view' },
+      { name: 'Audit Log', href: '/admin/analytics/audit', icon: FiFileText, permission: 'audit:read' },
       { name: 'Security Logs', href: '/admin/analytics/security', icon: FiShield, permission: 'security:view' },
       { name: 'Security Monitor', href: '/admin/analytics/security-monitor', icon: FiShield, permission: 'security:view' },
     ]

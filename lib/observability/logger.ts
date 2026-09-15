@@ -41,7 +41,7 @@ function enrichContext(context?: LogContext): Record<string, unknown> {
   return redactObject(merged) as Record<string, unknown>
 }
 
-const isDev = ENVIRONMENT !== 'production'
+const isDev = ENVIRONMENT === 'development'
 
 const transport = isDev
   ? { target: 'pino-pretty', options: { colorize: true, translateTime: 'SYS:standard', ignore: 'pid,hostname' } }

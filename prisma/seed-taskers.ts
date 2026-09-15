@@ -114,9 +114,9 @@ async function main() {
   console.log(`\n✅ Done. Created: ${created}, Skipped: ${skipped}`)
 
   if (created > 0) {
-    console.log('\n📋 Tasker login credentials:')
+    console.log('\nTasker login credentials:')
     for (const t of TASKERS) {
-      console.log(`  ${t.email} / ${t.password}  — ${t.name} (${t.categorySlug})`)
+      console.log(`  ${t.email} — ${t.name} (${t.categorySlug})`)
     }
   }
 }

@@ -32,6 +32,11 @@ export function buildExplanationReasons(
   else if (components.experience >= 30) reasons.push('Some relevant experience')
   else reasons.push('Limited relevant experience')
 
+  if (components.fairness >= 70) reasons.push('Under-served provider — fairness boost')
+  else if (components.fairness <= 30) reasons.push('Recently active — lower fairness priority')
+
+  if (components.preferredSkill >= 70) reasons.push('Has preferred skills for this service')
+
   if (providerType === 'COMPANY') reasons.push('Company provider with team capacity')
   return reasons
 }

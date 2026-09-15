@@ -120,6 +120,14 @@ export async function GET(
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const job = await prisma.marketplaceJob.findUnique({ where: { id }, select: { customerId: true } })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId: id, status: 'ACCEPTED' }, select: { providerId: true } })
+    const isProvider = acceptedQuote?.providerId === user.id
+    if (job.customerId !== user.id && !isProvider) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const [customerReview, providerReview] = await Promise.all([
       prisma.jobReview.findMany({ where: { jobId: id } }),
       prisma.providerReview.findMany({ where: { jobId: id } }),

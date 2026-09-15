@@ -115,7 +115,7 @@ export async function checkWorkerEligibility(
   if (requiredJobId) {
     const job = await prisma.marketplaceJob.findUnique({
       where: { id: requiredJobId },
-      select: { categoryId: true, serviceTemplateId: true },
+      select: { categoryId: true, serviceTemplateId: true, preferredDate: true, preferredTimeSlot: true },
     })
     if (!job) {
       reasons.push('Job not found')
@@ -159,6 +159,24 @@ export async function checkWorkerEligibility(
           } else {
             reasons.push('Worker lacks required capability for this job')
           }
+        }
+      }
+
+      if (job.preferredDate) {
+        const conflictingAssignments = await prisma.companyJobAssignment.findMany({
+          where: {
+            workerUserId: userId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+            jobId: { not: requiredJobId },
+            job: {
+              preferredDate: job.preferredDate,
+              preferredTimeSlot: job.preferredTimeSlot || undefined,
+            },
+          },
+          select: { id: true, jobId: true },
+        })
+        if (conflictingAssignments.length > 0) {
+          reasons.push('Worker has a scheduling conflict with another assignment on the same date/time')
         }
       }
     }

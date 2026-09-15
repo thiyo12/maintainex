@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED — Legacy matching engine with 0 callers (dead code).
+ * Use canonical `lib/matching/index.ts` instead.
+ *保留 for reference only. Do NOT call from new code.
+ * @deprecated since Phase 10.2 — scheduled for removal
+ */
 import { prisma } from './prisma'
 import { getLocationName } from './locations'
 import { jsonArrayContains, safeParseJsonArr } from './db-utils'

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 import { sendOtpEmail } from '@/lib/email'
+import { isSyntheticCertAccount } from '@/lib/test-cert'
 export async function POST(request: NextRequest) {
   try {
     const ipLimit = await checkRateLimit(request, {
@@ -24,8 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    // 000000 allowed only when ALLOW_TEST_OTP is explicitly enabled
-    const code = process.env.ALLOW_TEST_OTP === 'true'
+    const code = isSyntheticCertAccount(user)
       ? '000000'
       : randomInt(0, 1000000).toString().padStart(6, '0')
     const codeHash = await bcrypt.hash(code, 10)

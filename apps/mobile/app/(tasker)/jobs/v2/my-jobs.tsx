@@ -189,7 +189,7 @@ export default function V2ProviderMyJobsScreen() {
           <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
           <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
           <View style={styles.cardFooter}>
-            <Text style={styles.jobBudget}>LKR {job.budgetAmount}</Text>
+            <Text style={styles.jobBudget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             {job.myQuote ? (
               <View style={styles.myQuotePill}>
                 <Text style={styles.myQuoteText}>{t('quotes.yourQuote')}: LKR {job.myQuote.price}</Text>

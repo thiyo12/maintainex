@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Modal } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Modal, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -41,21 +41,33 @@ export default function TopUpScreen() {
     }
     setLoading(true)
     try {
-      const res = await v2Wallet.topUp(amt)
-      if (res.success) {
-        Alert.alert('Success', 'Wallet topped up successfully!')
-      }
-    } catch (e: any) {
-      const msg = e.message || ''
-      if (msg.includes('coming soon') || msg.includes('not yet')) {
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/v2/wallet/topup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await (await import('../../../lib/api')).getAuthToken()}`,
+        },
+        body: JSON.stringify({ amount: amt }),
+      })
+      const data = await res.json()
+      if (data.success && data.paymentUrl) {
+        await Linking.openURL(data.paymentUrl)
         Alert.alert(
-          'Coming Soon',
-          'Online wallet top-up is not yet available. Please use Direct Bank Transfer or contact support.',
-          [{ text: 'OK', onPress: () => router.back() }]
+          'Payment Processing',
+          'Complete your payment in the browser. Your wallet will be updated automatically after confirmation.',
+          [{ text: 'OK' }]
+        )
+      } else if (data.code === 'PAYHERE_NOT_CONFIGURED') {
+        Alert.alert(
+          'Payment Gateway Setup',
+          'Online payments are being configured. Please use Direct Bank Transfer for now.',
+          [{ text: 'OK', onPress: () => setMethod('bank_transfer'), setShowBank(true) }]
         )
       } else {
-        Alert.alert('Error', msg || 'Failed to initiate payment')
+        Alert.alert('Error', data.error || 'Failed to initiate payment')
       }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to initiate payment')
     } finally {
       setLoading(false)
     }

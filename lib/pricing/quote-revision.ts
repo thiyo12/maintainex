@@ -1,0 +1,132 @@
+import { PrismaClient } from '@prisma/client'
+
+/**
+ * Create a new revision of an existing quote.
+ * The original quote becomes SUPERSEDED, the new one starts as PENDING.
+ * Once a quote is ACCEPTED, it cannot be revised — requires customer approval flow.
+ */
+export async function createQuoteRevision(
+  client: PrismaClient,
+  params: {
+    originalQuoteId: string
+    providerId: string
+    price: bigint
+    estimatedCompletionTime: string
+    message?: string
+    attachments?: string
+    revisionReason: string
+    currency?: string
+    subtotalCents?: bigint
+    taxCents?: bigint
+    totalCents?: bigint
+    benchmarkClassification?: string
+    benchmarkId?: string
+  },
+): Promise<{ success: boolean; newQuoteId?: string; error?: string }> {
+  // Fetch original quote
+  const original = await client.jobQuote.findUnique({
+    where: { id: params.originalQuoteId },
+  })
+
+  if (!original) return { success: false, error: 'Original quote not found' }
+  if (original.providerId !== params.providerId) return { success: false, error: 'Not your quote' }
+  if (original.status === 'ACCEPTED') return { success: false, error: 'Cannot revise an accepted quote' }
+  if (original.status === 'REJECTED') return { success: false, error: 'Cannot revise a rejected quote' }
+  if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
+  if (original.status === 'SUPERSEDED') return { success: false, error: 'Cannot revise a superseded quote' }
+
+  const newRevisionNumber = original.revisionNumber + 1
+
+  // Mark original as SUPERSEDED
+  await client.jobQuote.update({
+    where: { id: params.originalQuoteId },
+    data: { status: 'SUPERSEDED' },
+  })
+
+  // Create new revision
+  const newQuote = await client.jobQuote.create({
+    data: {
+      jobId: original.jobId,
+      providerId: params.providerId,
+      providerType: original.providerType,
+      price: params.price,
+      actorUserId: original.actorUserId,
+      actorRole: original.actorRole,
+      estimatedCompletionTime: params.estimatedCompletionTime,
+      message: params.message ?? original.message,
+      attachments: params.attachments ?? original.attachments,
+      status: 'PENDING',
+      currency: params.currency ?? original.currency,
+      subtotalCents: params.subtotalCents ?? null,
+      taxCents: params.taxCents ?? null,
+      totalCents: params.totalCents ?? null,
+      benchmarkClassification: params.benchmarkClassification ?? null,
+      benchmarkId: params.benchmarkId ?? null,
+      revisionNumber: newRevisionNumber,
+      parentQuoteId: params.originalQuoteId,
+      revisionReason: params.revisionReason,
+    },
+  })
+
+  return { success: true, newQuoteId: newQuote.id }
+}
+
+/**
+ * Get the full revision history for a quote chain.
+ * Traverses parentQuoteId links to find the original.
+ */
+export async function getQuoteRevisionHistory(
+  client: PrismaClient,
+  quoteId: string,
+): Promise<Array<{ id: string; revisionNumber: number; status: string; price: bigint; createdAt: Date; revisionReason: string | null }>> {
+  // Find the root quote (traverse parent links)
+  const initial = await client.jobQuote.findUnique({ where: { id: quoteId } })
+  if (!initial) return []
+
+  let rootId: string = initial.id
+  let currentParentId: string | null = initial.parentQuoteId
+
+  while (currentParentId) {
+    const parent = await client.jobQuote.findUnique({ where: { id: currentParentId } })
+    if (!parent) break
+    rootId = parent.id
+    currentParentId = parent.parentQuoteId
+  }
+
+  // Now walk forward through the chain
+  const history: Array<{ id: string; revisionNumber: number; status: string; price: bigint; createdAt: Date; revisionReason: string | null }> = []
+  let chainId: string | null = rootId
+
+  while (chainId) {
+    const quote = await client.jobQuote.findUnique({ where: { id: chainId } })
+    if (!quote) break
+    history.push({
+      id: quote.id,
+      revisionNumber: quote.revisionNumber,
+      status: quote.status,
+      price: quote.price,
+      createdAt: quote.createdAt,
+      revisionReason: quote.revisionReason,
+    })
+    const childResult: { id: string } | null = await client.jobQuote.findFirst({ where: { parentQuoteId: chainId } })
+    chainId = childResult?.id ?? null
+  }
+
+  return history
+}
+
+/**
+ * Check if a quote is the latest revision in its chain.
+ */
+export async function isLatestRevision(
+  client: PrismaClient,
+  quoteId: string,
+): Promise<boolean> {
+  const quote = await client.jobQuote.findUnique({ where: { id: quoteId } })
+  if (!quote) return false
+
+  const newer = await client.jobQuote.findFirst({
+    where: { parentQuoteId: quoteId },
+  })
+  return !newer
+}

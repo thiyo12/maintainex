@@ -31,6 +31,15 @@ export type SecurityEventType =
   | 'credential_stuffing_detected'
   | 'bot_detected'
   | 'ai_boundary_exceeded'
+  | 'job_pin_generated'
+  | 'job_pin_rotated'
+  | 'job_pin_revoked'
+  | 'job_pin_verify_success'
+  | 'job_pin_verify_failure'
+  | 'job_pin_lockout'
+  | 'job_pin_arrival_verified'
+  | 'job_pin_work_start_verified'
+  | 'job_pin_completion_verified'
 
 export type RiskLevel = 'info' | 'low' | 'medium' | 'high' | 'critical'
 
@@ -78,6 +87,15 @@ const RISK_LEVEL_MAP: Record<SecurityEventType, RiskLevel> = {
   credential_stuffing_detected: 'critical',
   bot_detected: 'medium',
   ai_boundary_exceeded: 'high',
+  job_pin_generated: 'info',
+  job_pin_rotated: 'info',
+  job_pin_revoked: 'info',
+  job_pin_verify_success: 'info',
+  job_pin_verify_failure: 'low',
+  job_pin_lockout: 'medium',
+  job_pin_arrival_verified: 'info',
+  job_pin_work_start_verified: 'info',
+  job_pin_completion_verified: 'info',
 }
 
 export function emitSecurityEvent(event: Omit<SecurityEvent, 'timestamp' | 'riskLevel'>): void {

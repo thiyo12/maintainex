@@ -127,6 +127,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           operation: 'PROPERTY_BOOST',
           status: 'COMPLETED',
           metadata: JSON.stringify({ boostId: boost.id, payloadHash, expiresAt: expiresAt.toISOString() }),
+          requestFingerprint: payloadHash,
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         },
       })

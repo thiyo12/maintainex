@@ -36,7 +36,7 @@ export default function JobCompleteScreen() {
           title: v2.title,
           description: v2.description,
           category: v2.categoryId,
-          budget: v2.budgetAmount,
+          budget: v2.budgetAmount ?? null,
           location: v2.locationName || '',
           status: v2.status,
           scheduledDate: v2.preferredDate || undefined,

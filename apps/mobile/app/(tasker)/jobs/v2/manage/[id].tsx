@@ -40,8 +40,6 @@ export default function V2ProviderManageJobScreen() {
   const [reviewExp, setReviewExp] = useState('5')
   const [reviewComment, setReviewComment] = useState('')
 
-  const [generatedOtp, setGeneratedOtp] = useState('')
-  const [otpLoading, setOtpLoading] = useState(false)
   const [locationSharing, setLocationSharing] = useState(false)
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
 
@@ -140,19 +138,6 @@ export default function V2ProviderManageJobScreen() {
     finally { setActionLoading('') }
   }
 
-  const handleGenerateOtp = async () => {
-    setOtpLoading(true)
-    setGeneratedOtp('')
-    try {
-      const res = await v2JobActions.generateOtp(id)
-      setGeneratedOtp(res.otp)
-    } catch (e: any) {
-      Alert.alert(t('common.error'), e.message || t('common.error'))
-    } finally {
-      setOtpLoading(false)
-    }
-  }
-
   const handleSubmitReview = async () => {
     setActionLoading('review')
     try {
@@ -246,7 +231,7 @@ export default function V2ProviderManageJobScreen() {
             <View style={styles.detailRow}>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t('jobDetail.budget')}</Text>
-                <Text style={styles.detailValue}>LKR {job.budgetAmount}</Text>
+                <Text style={styles.detailValue}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
               </View>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>{t('jobs.details')}</Text>
@@ -349,29 +334,14 @@ export default function V2ProviderManageJobScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && !generatedOtp && (
+              {workspace.progressStatus === 'ACCEPTED' && (
                 <TouchableOpacity
-                  style={[styles.otpGenBtn, otpLoading && styles.btnDisabled]}
-                  onPress={handleGenerateOtp}
-                  disabled={otpLoading}
+                  style={[styles.verifyPinBtn]}
+                  onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
                 >
-                  {otpLoading ? (
-                    <ActivityIndicator color={colors.ink} />
-                  ) : (
-                    <>
-                      <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
-                      <Text style={styles.otpGenText}>{t('jobDetail.confirmArrivalDesc')}</Text>
-                    </>
-                  )}
+                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
+                  <Text style={styles.verifyPinText}>{t('jobDetail.confirmArrivalDesc')}</Text>
                 </TouchableOpacity>
-              )}
-              {workspace.progressStatus === 'ACCEPTED' && generatedOtp && (
-                <View style={styles.otpDisplay}>
-                  <Ionicons name="lock-closed-outline" size={24} color={colors.amberDark} />
-                  <Text style={styles.otpDisplayLabel}>{t('jobDetail.enterCode')}</Text>
-                  <Text style={styles.otpCode}>{generatedOtp}</Text>
-                  <Text style={styles.otpDisplayHint}>{t('jobDetail.confirmStart')}</Text>
-                </View>
               )}
               {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
                 <View style={styles.waitingCard}>
@@ -446,6 +416,36 @@ export default function V2ProviderManageJobScreen() {
             <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
           </TouchableOpacity>
         )}
+
+        {/* Action shortcuts for active jobs */}
+        {workspace?.progressStatus === 'IN_PROGRESS' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('jobDetail.whatsIncluded')}</Text>
+            <View style={styles.shortcutsRow}>
+              <TouchableOpacity
+                style={styles.shortcutBtn}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/inspection` as any)}
+              >
+                <Ionicons name="search-outline" size={20} color={colors.amberDark} />
+                <Text style={styles.shortcutText}>{t('inspection.title')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shortcutBtn}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/evidence` as any)}
+              >
+                <Ionicons name="camera-outline" size={20} color={colors.amberDark} />
+                <Text style={styles.shortcutText}>{t('evidence.title')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shortcutBtn}
+                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/change-order` as any)}
+              >
+                <Ionicons name="document-text-outline" size={20} color={colors.amberDark} />
+                <Text style={styles.shortcutText}>{t('changeOrder.title')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </ScrollView>
       <NewChatModal
         visible={!!msgRecipient}
@@ -511,15 +511,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
   },
   progressBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
-  otpGenBtn: {
+  verifyPinBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
   },
-  otpGenText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
-  otpDisplay: { alignItems: 'center', padding: 20, backgroundColor: colors.amberBg, borderRadius: 16, borderWidth: 2, borderColor: colors.amber, marginBottom: 8 },
-  otpDisplayLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginBottom: 12 },
-  otpCode: { fontSize: 40, fontFamily: fonts.headingBold, color: colors.ink, letterSpacing: 12, marginBottom: 8 },
-  otpDisplayHint: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, textAlign: 'center' },
+  verifyPinText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
 
   scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 1 },
   scheduleText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1 },
@@ -545,6 +541,14 @@ const makeStyles = (colors: any) => StyleSheet.create({
 
   disputeBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 12 },
   disputeBtnText: { fontSize: 13, color: colors.muted, fontWeight: '600', textDecorationLine: 'underline' },
+
+  shortcutsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  shortcutBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.white, paddingVertical: 12, paddingHorizontal: 16,
+    borderRadius: 12, borderWidth: 1, borderColor: colors.border,
+  },
+  shortcutText: { fontSize: 13, fontWeight: '600', color: colors.ink },
 
   waitingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amberBg, borderRadius: 12, padding: 16 },
   waitingText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amberDark },

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { revokeAllUserSessions } from '@/lib/auth/sessions'
 import { hashPassword } from '@/lib/security/password'
+import { isTestOtpAllowed } from '@/lib/test-cert'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Account is not eligible for password reset' }, { status: 403 })
     }
 
-    if (code !== '000000' || process.env.ALLOW_TEST_OTP !== 'true') {
+    if (!isTestOtpAllowed(user, code)) {
       const otpRecord = await prisma.oTP.findFirst({
         where: {
           userId: user.id,

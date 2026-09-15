@@ -108,7 +108,7 @@ export default function CompanyBrowseJobsScreen() {
             >
               <View style={styles.cardHeader}>
                 <View style={styles.budgetBadge}>
-                  <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount}</Text>
+                  <Text style={styles.budgetBadgeText}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
                 </View>
                 <Text style={styles.budgetType}>{job.budgetType}</Text>
               </View>

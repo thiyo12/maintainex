@@ -35,6 +35,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
+    const isOwner = user.id === job.customerId
+
     return NextResponse.json({
       id: job.id,
       title: job.title,
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       status: job.status,
       scheduledDate: job.scheduledDate?.toISOString(),
       createdAt: job.createdAt.toISOString(),
-      customer: job.customer,
+      customer: isOwner ? job.customer : { ...job.customer, phone: null },
       bids: job.bids.map(b => ({
         id: b.id,
         jobId: b.jobId,

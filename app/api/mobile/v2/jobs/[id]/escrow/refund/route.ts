@@ -40,6 +40,6 @@ export async function POST(
     return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })
   } catch (error) {
     console.error('Refund escrow error:', error)
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Server error' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to process refund' }, { status: 500 })
   }
 }

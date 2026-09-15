@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAdminSession } from '@/lib/admin-auth'
+import { ROLE_PERMISSIONS } from '@/lib/admin-types'
+
+const SETTINGS_ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'FINANCE'] as const
 
 const DEFAULT_SETTINGS: Record<string, { value: string; type: string; label: string; description: string; groupName: string }> = {
   commissionRate: { value: '10', type: 'number', label: 'Commission Rate (%)', description: 'Platform commission percentage charged per completed job', groupName: 'billing' },
@@ -29,6 +32,10 @@ export async function GET(request: NextRequest) {
     const session = await getAdminSession(request)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!(SETTINGS_ALLOWED_ROLES as readonly string[]).includes(session.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Fetch all settings from DB

@@ -22,7 +22,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
       await prisma.commissionSettlement.deleteMany({ where: { jobId: jid } })
       await prisma.financialLedger.deleteMany({ where: { referenceId: jid } })
       await prisma.jobEscrow.deleteMany({ where: { jobId: jid } })
-      await prisma.jobOtp.deleteMany({ where: { jobId: jid } })
+      await prisma.jobVerificationPin.deleteMany({ where: { jobId: jid } })
       await prisma.jobWorkspace.deleteMany({ where: { jobId: jid } })
       await prisma.jobQuote.deleteMany({ where: { jobId: jid } })
       await prisma.marketplaceJob.deleteMany({ where: { id: jid } })

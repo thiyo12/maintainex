@@ -3,11 +3,11 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bell, Star, CheckCircle, MapPin, ArrowRight, Timer, Wallet, Lightning, Coffee } from 'phosphor-react-native'
+import { Bell, Star, CheckCircle, MapPin, ArrowRight, Timer, Wallet, Lightning, Coffee, AlertTriangle } from 'phosphor-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useAuth } from '../../../lib/auth'
 import { taskers, earnings, notifications } from '../../../lib/api'
-import { v2Jobs } from '../../../lib/api-v2'
+import { v2Jobs, v2Identity } from '../../../lib/api-v2'
 import { on } from '../../../lib/events'
 import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
 import { categoryIcon } from '../../../lib/categoryVisuals'
@@ -36,6 +36,7 @@ export default function TaskerDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [readinessComplete, setReadinessComplete] = useState(true)
 
   const lastPollRef = useRef<string>(new Date().toISOString())
   const pollIntervalRef = useRef<ReturnType<typeof setInterval>>()
@@ -58,6 +59,16 @@ export default function TaskerDashboard() {
       if (profileRes.status === 'fulfilled') {
         setProfile(profileRes.value)
         if (typeof profileRes.value.isOnline === 'boolean') setIsOnline(profileRes.value.isOnline)
+        const p = profileRes.value as any
+        const hasProfession = !!p.taskerProfile?.professionId
+        const hasSkills = Array.isArray(p.taskerProfile?.skills) && p.taskerProfile.skills.length > 0
+        const hasArea = !!p.areaId
+        setReadinessComplete(hasProfession && hasSkills && hasArea)
+      }
+      const idRes = await Promise.allSettled([v2Identity.getStatus()])
+      if (idRes[0].status === 'fulfilled') {
+        const idStatus = (idRes[0] as any).value?.identityStatus
+        if (idStatus !== 'VERIFIED' && idStatus !== 'APPROVED') setReadinessComplete(false)
       }
       notifications.unreadCount().then((r: any) => setUnreadCount(r.count || 0)).catch(() => {})
     } catch {
@@ -192,6 +203,22 @@ export default function TaskerDashboard() {
             </View>
           </LinearGradient>
         </PressableScale>
+
+        {/* ═══ Readiness banner ═══ */}
+        {!loading && !readinessComplete && (
+          <AnimatedEntry delay={60}>
+            <PressableScale onPress={() => router.push('/(tasker)/readiness' as any)} scaleTo={0.98}>
+              <View style={styles.readinessBanner}>
+                <AlertTriangle size={20} color="#D97706" weight="fill" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.readinessTitle}>{t('readiness.notReady')}</Text>
+                  <Text style={styles.readinessSub}>{t('readiness.completeSetup')}</Text>
+                </View>
+                <ArrowRight size={16} color="#D97706" weight="bold" />
+              </View>
+            </PressableScale>
+          </AnimatedEntry>
+        )}
 
         {/* ═══ Earnings card ═══ */}
         <AnimatedEntry delay={80}>
@@ -399,4 +426,11 @@ const styles = StyleSheet.create({
 
   feedEmpty: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
   feedEmptyText: { ...typography.bodyMuted },
+
+  readinessBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg,
+    backgroundColor: '#FFFBEB', borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#FDE68A',
+  },
+  readinessTitle: { fontSize: 14, fontWeight: '700', color: '#92400E' },
+  readinessSub: { fontSize: 12, color: '#B45309', marginTop: 2 },
 })

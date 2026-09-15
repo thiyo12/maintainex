@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED — Wave matcher used by cron matching-waves.
+ * Use canonical `lib/matching/index.ts` → createMatchingWave() instead.
+ *保留 for backward compatibility with cron job only.
+ * @deprecated since Phase 10.2
+ */
 import { prisma } from './prisma'
 import { getSetting } from './settings'
 import { haversineKm } from './distance'

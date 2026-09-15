@@ -28,6 +28,12 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'settings:view', 'settings:edit',
     'security:view', 'security:audit',
     'wishlist:view', 'wishlist:manage',
+    'professions:read', 'professions:write',
+    'credentials:read', 'credentials:write',
+    'risk_events:read', 'risk_events:resolve',
+    'pricing_config:read', 'pricing_config:write',
+    'market_config:read', 'market_config:write',
+    'audit:read',
   ],
   MANAGER: [
     'dashboard:view',
@@ -40,6 +46,10 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'queue:view', 'queue:manage', 'queue:assign',
     'analytics:view',
     'wishlist:view', 'wishlist:manage',
+    'professions:read', 'professions:write',
+    'credentials:read', 'credentials:write',
+    'risk_events:read', 'risk_events:resolve',
+    'audit:read',
   ],
   FINANCE: [
     'dashboard:view',
@@ -50,6 +60,9 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'wallets:view', 'wallets:manage',
     'queue:view',
     'analytics:view',
+    'pricing_config:read', 'pricing_config:write',
+    'market_config:read', 'market_config:write',
+    'audit:read',
   ],
   USER_MANAGEMENT: [
     'dashboard:view',
@@ -59,6 +72,10 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'kyc:view', 'kyc:approve', 'kyc:reject',
     'cheating:view', 'cheating:action',
     'queue:view',
+    'professions:read', 'professions:write',
+    'credentials:read', 'credentials:write',
+    'risk_events:read', 'risk_events:resolve',
+    'audit:read',
   ],
   SUPPORT: [
     'dashboard:view',
@@ -70,12 +87,15 @@ export const ROLE_PERMISSIONS: Record<AdminRole, string[]> = {
     'support:view', 'support:respond',
     'kyc:view',
     'queue:view',
+    'risk_events:read',
+    'audit:read',
   ],
   TECHNICAL: [
     'dashboard:view',
     'security:view', 'security:audit',
     'queue:view',
     'analytics:view',
+    'audit:read',
   ],
 }
 
@@ -98,6 +118,12 @@ export type AuditAction =
   | 'COMMISSION_PAYMENT_CONFIRM'
   | 'PAYOUT_PROCESS' | 'PAYOUT_REJECT'
   | 'JOB_FLAG' | 'JOB_ASSIGN'
+  | 'CREDENTIAL_APPROVE' | 'CREDENTIAL_REJECT' | 'CREDENTIAL_EXPIRE' | 'CREDENTIAL_REVOKE'
+  | 'PROFESSION_APPROVE' | 'PROFESSION_REJECT' | 'PROFESSION_DEACTIVATE'
+  | 'RISK_EVENT_REVIEW' | 'RISK_EVENT_RESOLVE' | 'RISK_EVENT_DISMISS' | 'RISK_EVENT_ESCALATE'
+  | 'PRICING_CONFIG_UPDATE' | 'MARKET_CONFIG_UPDATE'
+  | 'PROVIDER_SUSPEND' | 'PROVIDER_REACTIVATE'
+  | 'COMPANY_SUSPEND' | 'COMPANY_REACTIVATE'
 
 export interface AdminSession {
   id: string

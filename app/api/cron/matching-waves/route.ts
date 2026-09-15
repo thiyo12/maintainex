@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSetting } from '@/lib/settings'
-import { sendMatchWave } from '@/lib/job-matcher'
+import { resolveMatchingConfig } from '@/lib/matching'
+import { expireOpportunities, advanceMatchingWave, shouldStopWaves } from '@/lib/matching/waves'
+import { findCandidates } from '@/lib/matching'
+import { createMatchingWave } from '@/lib/matching/waves'
 import { createNotification } from '@/lib/notifications'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  // Verify cron secret
   if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
   const authHeader = request.headers.get('authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -15,77 +16,74 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const wave1Wait = await getSetting('matching.wave1_wait_min', 15)
-    const wave2Wait = await getSetting('matching.wave2_wait_min', 15)
-    const wave3Wait = await getSetting('matching.wave3_wait_min', 15)
+    // Step 1: Expire stale opportunities
+    const expiredJobIds = await expireOpportunities(prisma)
 
-    // Wave 2: jobs in wave 1 with no accept yet
-    const wave1Jobs = await prisma.marketplaceJob.findMany({
-      where: {
-        status: 'OPEN',
-        currentWave: 1,
-        waveSentAt: { lte: new Date(Date.now() - wave1Wait * 60 * 1000) },
-      },
-    })
+    let advanced = 0
+    let waved = 0
+    let expired = 0
 
-    for (const job of wave1Jobs) {
-      const hasAccepted = await prisma.jobMatchQueue.findFirst({
-        where: { jobId: job.id, status: 'accepted' },
-      })
-      if (!hasAccepted) {
-        await sendMatchWave(job.id, 2)
-      }
-    }
+    // Step 2: For each expired job, try to advance to next wave
+    for (const jobId of expiredJobIds) {
+      const config = await resolveMatchingConfig(prisma, 'GLOBAL')
+      const shouldStop = await shouldStopWaves(prisma, jobId)
 
-    // Wave 3: jobs in wave 2 with no accept
-    const wave2Jobs = await prisma.marketplaceJob.findMany({
-      where: {
-        status: 'OPEN',
-        currentWave: 2,
-        waveSentAt: { lte: new Date(Date.now() - wave2Wait * 60 * 1000) },
-      },
-    })
-
-    for (const job of wave2Jobs) {
-      const hasAccepted = await prisma.jobMatchQueue.findFirst({
-        where: { jobId: job.id, status: 'accepted' },
-      })
-      if (!hasAccepted) {
-        await sendMatchWave(job.id, 3)
-      }
-    }
-
-    // No match: jobs in wave 3 that expired
-    const expiredJobs = await prisma.marketplaceJob.findMany({
-      where: {
-        status: 'OPEN',
-        currentWave: 3,
-        waveSentAt: { lte: new Date(Date.now() - wave3Wait * 60 * 1000) },
-      },
-    })
-
-    for (const job of expiredJobs) {
-      const hasAccepted = await prisma.jobMatchQueue.findFirst({
-        where: { jobId: job.id, status: 'accepted' },
-      })
-      if (!hasAccepted) {
-        await createNotification({
-          userId: job.customerId,
-          title: 'No taskers available right now',
-          body: 'Try expanding your search or check back later. Your job is still posted.',
+      if (shouldStop.stop) {
+        // Notify customer no providers available
+        const job = await prisma.marketplaceJob.findUnique({
+          where: { id: jobId },
+          select: { customerId: true },
         })
-        await prisma.marketplaceJob.update({
-          where: { id: job.id },
-          data: { currentWave: 0 },
-        })
+        if (job) {
+          await createNotification({
+            userId: job.customerId,
+            title: 'No taskers available right now',
+            body: 'Try expanding your search or check back later. Your job is still posted.',
+          })
+        }
+        expired++
+        continue
+      }
+
+      const result = await advanceMatchingWave(prisma, jobId, config)
+      if (!result.advanced) continue
+
+      advanced++
+
+      // Find candidates for next wave and create opportunities
+      const job = await prisma.marketplaceJob.findUnique({
+        where: { id: jobId },
+        select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+      })
+      if (!job) continue
+
+      const matchResult = await findCandidates(prisma, {
+        jobId,
+        categoryId: job.categoryId,
+        serviceTemplateId: job.serviceTemplateId || undefined,
+        countryCode: job.countryCode || 'GLOBAL',
+        jobMode: 'QUOTE',
+        urgency: 'NORMAL',
+      })
+
+      if (matchResult.candidates.length > 0) {
+        await createMatchingWave(
+          prisma,
+          jobId,
+          result.waveNumber,
+          matchResult.candidates.slice(0, 10),
+          config,
+        )
+        waved++
       }
     }
 
     return NextResponse.json({
       success: true,
-      wave2: wave1Jobs.length,
-      wave3: wave2Jobs.length,
-      expired: expiredJobs.length,
+      expiredJobs: expiredJobIds.length,
+      advanced,
+      waved,
+      expired,
     })
   } catch (error) {
     console.error('[CRON] Wave matching error:', error)

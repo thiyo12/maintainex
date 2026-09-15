@@ -89,7 +89,7 @@ export default function CompanyMyQuotesScreen() {
                 </View>
                 <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
                 <View style={styles.cardFooter}>
-                  <Text style={styles.budget}>LKR {job.budgetAmount}</Text>
+                  <Text style={styles.budget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
                   <Text style={styles.meta}>{t('jobs.posted')} {new Date(job.createdAt).toLocaleDateString()}</Text>
                 </View>
               </TouchableOpacity>

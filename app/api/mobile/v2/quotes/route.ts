@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    const priceCheck = validateQuotePrice(priceMinor, job.budgetAmount)
+    const priceCheck = job.budgetAmount != null ? validateQuotePrice(priceMinor, job.budgetAmount) : { valid: true }
     if (!priceCheck.valid) {
       return NextResponse.json({ error: priceCheck.error }, { status: 400 })
     }

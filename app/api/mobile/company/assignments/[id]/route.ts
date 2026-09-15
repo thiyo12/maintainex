@@ -1,0 +1,144 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { prisma } from '@/lib/prisma'
+import {
+  workerAcceptAssignment,
+  workerRejectAssignment,
+  revokeAssignment,
+  completeAssignment,
+} from '@/lib/domain/company-job-assignment'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const user = await authenticateMarketplaceUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const assignment = await prisma.companyJobAssignment.findUnique({
+      where: { id },
+      include: {
+        job: { select: { id: true, title: true, status: true, createdAt: true } },
+        worker: { select: { id: true, name: true, email: true, phone: true } },
+        company: { select: { id: true, companyName: true, userId: true } },
+      },
+    })
+
+    if (!assignment) {
+      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
+
+    if (assignment.workerUserId !== user.id && assignment.company.userId !== user.id) {
+      const membership = await prisma.teamMember.findFirst({
+        where: { companyId: assignment.companyId, userId: user.id, status: 'ACTIVE' },
+      })
+      if (!membership) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+    }
+
+    return NextResponse.json({
+      id: assignment.id,
+      jobId: assignment.jobId,
+      workerUserId: assignment.workerUserId,
+      assignedBy: assignment.assignedBy,
+      status: assignment.status,
+      assignedAt: assignment.assignedAt.toISOString(),
+      acceptedAt: assignment.acceptedAt?.toISOString() || null,
+      startedAt: assignment.startedAt?.toISOString() || null,
+      completedAt: assignment.completedAt?.toISOString() || null,
+      rejectedAt: assignment.rejectedAt?.toISOString() || null,
+      revokedAt: assignment.revokedAt?.toISOString() || null,
+      revokedReason: assignment.revokedReason,
+      rejectReason: assignment.rejectReason,
+      job: assignment.job,
+      worker: assignment.worker,
+      company: assignment.company,
+    })
+  } catch (error) {
+    console.error('Get assignment error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const user = await authenticateMarketplaceUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+
+    const body = await request.json()
+    const { action, reason } = body
+
+    if (!action || !['accept', 'reject', 'revoke', 'complete'].includes(action)) {
+      return NextResponse.json({ error: 'action must be one of: accept, reject, revoke, complete' }, { status: 400 })
+    }
+
+    const assignment = await prisma.companyJobAssignment.findUnique({ where: { id } })
+    if (!assignment) {
+      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
+
+    let result
+
+    switch (action) {
+      case 'accept': {
+        if (assignment.workerUserId !== user.id) {
+          return NextResponse.json({ error: 'Only the assigned worker can accept' }, { status: 403 })
+        }
+        result = await workerAcceptAssignment(id, user.id)
+        break
+      }
+
+      case 'reject': {
+        if (assignment.workerUserId !== user.id) {
+          return NextResponse.json({ error: 'Only the assigned worker can reject' }, { status: 403 })
+        }
+        result = await workerRejectAssignment(id, user.id, reason)
+        break
+      }
+
+      case 'revoke': {
+        const { context, error } = await resolveCompanyContext(
+          user.id, assignment.companyId, 'workers:assign'
+        )
+        if (error) return error
+        result = await revokeAssignment(id, assignment.companyId, user.id, context!.role, reason)
+        break
+      }
+
+      case 'complete': {
+        const { context, error } = await resolveCompanyContext(
+          user.id, assignment.companyId, 'jobs:manage'
+        )
+        if (error) return error
+        result = await completeAssignment(id, assignment.companyId)
+        break
+      }
+
+      default:
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true, assignmentId: id })
+  } catch (error) {
+    console.error('Assignment action error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}

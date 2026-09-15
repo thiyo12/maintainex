@@ -141,7 +141,7 @@ export async function getProviderScheduleRecommendations(providerId: string): Pr
       jobId: j.id,
       title: j.title,
       distance: haversineKm(provider.latitude!, provider.longitude!, j.latitude!, j.longitude!),
-      estimatedEarning: Number(j.budgetAmount) / 100,
+      estimatedEarning: Number(j.budgetAmount ?? 0n) / 100,
     }))
     .filter(j => j.distance <= 30)
     .sort((a, b) => a.distance - b.distance)

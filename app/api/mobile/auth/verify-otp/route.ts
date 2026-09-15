@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
+import { isTestOtpAllowed } from '@/lib/test-cert'
 
 function accountBlocked(user: any): NextResponse | null {
   if (!user.isActive) {
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many wrong attempts. Request a new code.' }, { status: 429 })
     }
 
-    const testOtpAllowed = code === '000000' && process.env.ALLOW_TEST_OTP === 'true'
+    const testOtpAllowed = isTestOtpAllowed(user, code)
     if (!testOtpAllowed) {
       const isValid = await bcrypt.compare(code, otpRecord.codeHash)
       if (!isValid) {

@@ -36,7 +36,7 @@ export const setAuthToken = async (token: string | null) => {
       await SecureStore.deleteItemAsync('auth_token')
     }
   } catch (e) {
-    console.error('Failed to persist auth token:', e)
+    console.error('Failed to persist auth token')
   }
 }
 
