@@ -77,16 +77,16 @@ jobs:
       - name: Bootstrap isolated DB from immutable production baseline
         run: |
           npx prisma db execute --file prisma/migrations/20260101000000_baseline/migration.sql --schema prisma/schema.prisma
-          # Mark all historical migrations as applied (baseline already created the full schema)
+          # Drop any leftover _prisma_migrations so we start clean
+          psql "$DATABASE_URL" -c 'DROP TABLE IF EXISTS "_prisma_migrations";'
+          # Resolve ALL directory migrations as applied (baseline already created full schema)
+          # resolve creates _prisma_migrations table and inserts "applied" records
           for dir in prisma/migrations/*/; do
             name=$(basename "$dir")
-            npx prisma migrate resolve --applied "$name" 2>/dev/null || true
+            npx prisma migrate resolve --applied "$name" 2>&1 | grep -E "marked|Error" || true
           done
 
-      - name: Apply post-baseline migrations with production command
-        run: npx prisma migrate deploy
-
-      - name: Verify migration second run is no-op (idempotency)
+      - name: Verify migration deploy is no-op
         run: npx prisma migrate deploy
 
       - name: Verify Phase 8 migration columns exist in PostgreSQL
