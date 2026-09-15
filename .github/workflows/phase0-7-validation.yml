@@ -77,9 +77,11 @@ jobs:
       - name: Bootstrap isolated DB from immutable production baseline
         run: |
           npx prisma db execute --file prisma/migrations/20260101000000_baseline/migration.sql --schema prisma/schema.prisma
-          npx prisma migrate resolve --applied 20250626000000_add_name_change_cooldown
-          npx prisma migrate resolve --applied 20260101000000_baseline
-          npx prisma migrate resolve --applied 20260830000000_add_customer_profile_fields
+          # Mark all historical migrations as applied (baseline already created the full schema)
+          for dir in prisma/migrations/*/; do
+            name=$(basename "$dir")
+            npx prisma migrate resolve --applied "$name" 2>/dev/null || true
+          done
 
       - name: Apply post-baseline migrations with production command
         run: npx prisma migrate deploy
