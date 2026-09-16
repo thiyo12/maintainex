@@ -1,185 +1,96 @@
 import { useState } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet, ScrollView,
-} from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { colors } from '../../lib/colors'
-import PressScale from '../../components/find/PressScale'
-import { useTranslation } from 'react-i18next'
+import { v3 } from '../../theme/v3/tokens'
+import AuthShell from '../../components/v3/AuthShell'
+import V3NavBar from '../../components/v3/V3NavBar'
+import V3RoleCard from '../../components/v3/V3RoleCard'
+import V3Button from '../../components/v3/V3Button'
 
 export default function RoleSelectScreen() {
   const router = useRouter()
-  const { t } = useTranslation()
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<'CUSTOMER' | 'TASKER' | null>(null)
 
-  const roles = [
-    {
-      id: 'CUSTOMER',
-      icon: 'hand-left-outline' as const,
-      title: t('auth.roleSelect.iNeedWork'),
-      subtitle: t('auth.roleSelect.iNeedWorkDesc'),
-      color: colors.customerAccent,
-    },
-    {
-      id: 'TASKER',
-      icon: 'construct-outline' as const,
-      title: t('auth.roleSelect.iAmTasker'),
-      subtitle: t('auth.roleSelect.iAmTaskerDesc'),
-      color: colors.taskerAccent,
-    },
-    {
-      id: 'COMPANY',
-      icon: 'business-outline' as const,
-      title: t('auth.roleSelect.weAreCompany'),
-      subtitle: t('auth.roleSelect.weAreCompanyDesc'),
-      color: colors.companyAccent,
-    },
-  ]
+  const handleContinue = () => {
+    if (!selected) return
+    router.push({ pathname: '/(auth)/register', params: { role: selected } })
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>{t('auth.roleSelect.back')}</Text>
-      </TouchableOpacity>
+    <AuthShell bg={v3.colors.canvas}>
+      <V3NavBar title="Select role" onBack={() => router.back()} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.heading}>{t('auth.roleSelect.title')}</Text>
-        <Text style={styles.subtitle}>{t('auth.roleSelect.subtitle')}</Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>How will you use MaintainEX?</Text>
+        <Text style={styles.subtitle}>You can switch later from your profile.</Text>
 
-        <View style={styles.cardList}>
-          {roles.map((role) => {
-            const isSelected = selected === role.id
-            return (
-              <PressScale key={role.id} onPress={() => setSelected(role.id)}>
-                <View style={[
-                  styles.card,
-                  isSelected && { borderColor: role.color, borderWidth: 2 },
-                ]}>
-                  <View style={styles.cardContent}>
-                    <View style={styles.cardLeft}>
-                      <Ionicons name={role.icon} size={32} color={role.color} style={{ marginRight: 16 }} />
-                      <View style={styles.cardText}>
-                        <Text style={styles.cardTitle}>{role.title}</Text>
-                        <Text style={styles.cardSubtitle}>{role.subtitle}</Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.arrow, isSelected && { color: role.color }]}>
-                      ›
-                    </Text>
-                  </View>
-                </View>
-              </PressScale>
-            )
-          })}
+        <View style={styles.roles}>
+          <V3RoleCard
+            icon={<Text style={{ fontSize: 18 }}>👤</Text>}
+            iconBg={v3.colors.amberSoft}
+            title="I need services"
+            subtitle="Post jobs and book trusted professionals."
+            badge="Customer"
+            badgeColor={v3.colors.amberDark}
+            badgeBg={v3.colors.amberSoft}
+            selected={selected === 'CUSTOMER'}
+            onPress={() => setSelected('CUSTOMER')}
+          />
+          <V3RoleCard
+            icon={<Text style={{ fontSize: 18 }}>🛠</Text>}
+            iconBg={v3.colors.infoSoft}
+            title="I offer services"
+            subtitle="Earn with your skills as a tasker."
+            badge="Tasker"
+            badgeColor={v3.colors.info}
+            badgeBg={v3.colors.infoSoft}
+            selected={selected === 'TASKER'}
+            onPress={() => setSelected('TASKER')}
+          />
+          <V3RoleCard
+            icon={<Text style={{ fontSize: 18 }}>🏢</Text>}
+            iconBg={v3.colors.surfaceGray}
+            title="I manage a team"
+            subtitle="Assign jobs and grow your business."
+            badge="Coming soon"
+            badgeColor={v3.colors.textMuted}
+            badgeBg={v3.colors.surfaceGray}
+            disabled
+          />
         </View>
 
-        <TouchableOpacity
-          style={[styles.continueButton, !selected && styles.continueButtonDisabled]}
-          onPress={() => {
-            if (selected) {
-              router.push({ pathname: '/(auth)/register', params: { role: selected } })
-            }
-          }}
+        <V3Button
+          label="Continue"
+          onPress={handleContinue}
           disabled={!selected}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.continueText, !selected && styles.continueTextDisabled]}>
-            {t('auth.roleSelect.continue')}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+        />
+      </View>
+    </AuthShell>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  content: {
     flex: 1,
-    backgroundColor: colors.background,
+    padding: 18,
+    gap: 0,
   },
-  backButton: {
-    paddingHorizontal: 32,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  backText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  scrollContent: {
-    paddingHorizontal: 32,
-    paddingTop: 24,
-    paddingBottom: 48,
-  },
-  heading: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.dark,
-    marginBottom: 8,
+  title: {
+    fontSize: 24,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: v3.colors.textPrimary,
+    marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
-    color: colors.gray,
-    marginBottom: 32,
+    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textSecondary,
+    marginBottom: 20,
   },
-  cardList: {
-    gap: 16,
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: colors.lightGray,
-    padding: 20,
-  },
-  cardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  roles: {
     flex: 1,
-  },
-  cardText: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.dark,
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: colors.gray,
-  },
-  arrow: {
-    fontSize: 24,
-    color: colors.gray,
-    fontWeight: '300',
-    marginLeft: 12,
-  },
-  continueButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 40,
-  },
-  continueButtonDisabled: {
-    backgroundColor: colors.lightGray,
-  },
-  continueText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.white,
-  },
-  continueTextDisabled: {
-    color: colors.gray,
+    gap: 12,
   },
 })

@@ -1,98 +1,113 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
-import { useTranslation } from 'react-i18next'
-import { spacing, borderRadius } from '../../lib/tokens'
+import { v3 } from '../../theme/v3/tokens'
+import AuthShell from '../../components/v3/AuthShell'
+import V3NavBar from '../../components/v3/V3NavBar'
+import V3RoleCard from '../../components/v3/V3RoleCard'
+import V3Button from '../../components/v3/V3Button'
 
 export default function RoleSwitchScreen() {
-  const { target } = useLocalSearchParams<{ target: string }>()
+  const { target } = useLocalSearchParams<{ target?: string }>()
   const { user, switchRole } = useAuth()
   const router = useRouter()
-  const { t } = useTranslation()
   const [switching, setSwitching] = useState(false)
 
-  const ROLE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
-    TASKER: { icon: 'construct-outline', label: t('auth.roleSwitch.workAsTasker'), desc: t('auth.roleSwitch.workAsTaskerDesc') },
-    CUSTOMER: { icon: 'person-outline', label: t('auth.roleSwitch.hireProfessional'), desc: t('auth.roleSwitch.hireProfessionalDesc') },
-  }
-
-  const targetRole = target === 'TASKER' ? 'TASKER' : 'CUSTOMER'
-  const info = ROLE_INFO[targetRole]
-  if (!info) return null
+  const currentRole = user?.role || 'CUSTOMER'
+  const [selected, setSelected] = useState<'CUSTOMER' | 'TASKER' | null>(
+    target === 'TASKER' ? 'TASKER' : target === 'CUSTOMER' ? 'CUSTOMER' : null
+  )
 
   const handleSwitch = async () => {
+    if (!selected || selected === currentRole) return
     setSwitching(true)
     try {
-      await switchRole(targetRole)
-      if (targetRole === 'TASKER') router.replace('/(tasker)')
+      await switchRole(selected)
+      if (selected === 'TASKER') router.replace('/(tasker)')
       else router.replace('/(customer)')
-    } catch {
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to switch role')
       setSwitching(false)
     }
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.back}>
-        <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-      </TouchableOpacity>
+    <AuthShell bg={v3.colors.canvas}>
+      <V3NavBar title="Switch role" onBack={() => router.back()} />
 
       <View style={styles.content}>
-        <View style={styles.iconWrap}>
-          <Ionicons name={info.icon as any} size={40} color="#F5A623" />
-        </View>
-        <Text style={styles.heading}>{t('auth.roleSwitch.switchTo')}</Text>
-        <Text style={styles.roleName}>{info.label}</Text>
-        <Text style={styles.desc}>{info.desc}</Text>
+        <Text style={styles.title}>Switch your account mode</Text>
+        <Text style={styles.subtitle}>You can change roles anytime.</Text>
 
-        <View style={styles.oldRole}>
-          <Ionicons name="swap-horizontal" size={16} color="#B3B3B3" />
-          <Text style={styles.oldRoleText}>
-            {t('auth.roleSwitch.currently')}<Text style={styles.bold}>{user?.role === 'TASKER' ? t('auth.roleSwitch.workAsTasker') : t('auth.roleSwitch.hireProfessional')}</Text>
-          </Text>
+        <View style={styles.roles}>
+          <V3RoleCard
+            icon={<Text style={{ fontSize: 18 }}>👤</Text>}
+            iconBg={v3.colors.amberSoft}
+            title="Customer mode"
+            subtitle="Browse services and book taskers."
+            badge={currentRole === 'CUSTOMER' ? 'Current' : 'Customer'}
+            badgeColor={currentRole === 'CUSTOMER' ? v3.colors.success : v3.colors.amberDark}
+            badgeBg={currentRole === 'CUSTOMER' ? '#E8FAF0' : v3.colors.amberSoft}
+            selected={selected === 'CUSTOMER'}
+            onPress={() => setSelected('CUSTOMER')}
+          />
+          <V3RoleCard
+            icon={<Text style={{ fontSize: 18 }}>🛠</Text>}
+            iconBg={v3.colors.infoSoft}
+            title="Tasker mode"
+            subtitle="Find work and earn with your skills."
+            badge={currentRole === 'TASKER' ? 'Current' : 'Tasker'}
+            badgeColor={currentRole === 'TASKER' ? v3.colors.success : v3.colors.info}
+            badgeBg={currentRole === 'TASKER' ? '#E8FAF0' : v3.colors.infoSoft}
+            selected={selected === 'TASKER'}
+            onPress={() => setSelected('TASKER')}
+          />
+          <V3RoleCard
+            icon={<Text style={{ fontSize: 18 }}>🏢</Text>}
+            iconBg={v3.colors.surfaceGray}
+            title="Company mode"
+            subtitle="Manage team and dispatch jobs."
+            badge="Coming soon"
+            badgeColor={v3.colors.textMuted}
+            badgeBg={v3.colors.surfaceGray}
+            disabled
+          />
         </View>
 
-        <View style={styles.note}>
-          <Ionicons name="information-circle-outline" size={16} color="#F5A623" />
-          <Text style={styles.noteText}>
-            {t('auth.roleSwitch.dataPreserved')}
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.switchBtn, switching && styles.switchBtnDisabled]}
+        <V3Button
+          label="Switch role"
           onPress={handleSwitch}
-          disabled={switching}
-          activeOpacity={0.8}
-        >
-          {switching ? (
-            <ActivityIndicator color="#111" />
-          ) : (
-            <Text style={styles.switchBtnText}>{t('auth.roleSwitch.confirmSwitch')}</Text>
-          )}
-        </TouchableOpacity>
+          loading={switching}
+          disabled={!selected || selected === currentRole}
+        />
       </View>
-    </SafeAreaView>
+    </AuthShell>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FAFAFA' },
-  back: { padding: spacing.lg },
-  content: { flex: 1, paddingHorizontal: spacing.xxl, justifyContent: 'center', alignItems: 'center' },
-  iconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.lg },
-  heading: { fontSize: 16, color: '#6B6B6B', marginBottom: 4 },
-  roleName: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', marginBottom: spacing.sm },
-  desc: { fontSize: 14, color: '#6B6B6B', textAlign: 'center', lineHeight: 20, marginBottom: spacing.xxl },
-  oldRole: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.lg },
-  oldRoleText: { fontSize: 13, color: '#B3B3B3' },
-  bold: { fontWeight: '700', color: '#6B6B6B' },
-  note: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#FFFBEB', padding: spacing.md, borderRadius: borderRadius.md, marginBottom: spacing.xxl, width: '100%' },
-  noteText: { fontSize: 13, color: '#92400E', flex: 1, lineHeight: 18 },
-  switchBtn: { backgroundColor: '#F5A623', paddingVertical: 16, borderRadius: borderRadius.lg, alignItems: 'center', width: '100%' },
-  switchBtnDisabled: { opacity: 0.6 },
-  switchBtnText: { fontSize: 16, fontWeight: '700', color: '#111' },
+  content: {
+    flex: 1,
+    padding: 18,
+    gap: 0,
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: v3.colors.textPrimary,
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textSecondary,
+    marginBottom: 20,
+  },
+  roles: {
+    flex: 1,
+    gap: 12,
+  },
 })
