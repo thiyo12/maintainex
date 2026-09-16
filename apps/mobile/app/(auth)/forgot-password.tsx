@@ -1,126 +1,105 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  View, Text, TextInput, StyleSheet,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { EnvelopeSimple, ArrowRight, CaretLeft } from 'phosphor-react-native'
 import { auth } from '../../lib/api'
-import { useColors } from '../../lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '../../lib/fonts'
-import { fontSizes } from '../../lib/tokens'
-import { spacing, borderRadius } from '../../lib/tokens'
+import { v3 } from '../../theme/v3/tokens'
+import AuthShell from '../../components/v3/AuthShell'
+import V3NavBar from '../../components/v3/V3NavBar'
+import V3ListRow from '../../components/v3/V3ListRow'
+import V3Button from '../../components/v3/V3Button'
 
 export default function ForgotPasswordScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { t } = useTranslation()
-
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
 
   const handleSend = async () => {
-    if (!email.trim()) {
-      Alert.alert(t('common.error'), t('errors.fillAllFields'))
+    if (!phone.trim()) {
+      Alert.alert('Error', 'Please enter your mobile number')
       return
     }
-
     setLoading(true)
     try {
-      await auth.forgotPassword({ email: email.trim().toLowerCase() })
-      setSent(true)
+      await auth.forgotPassword({ email: phone.trim() })
+      router.push({
+        pathname: '/(auth)/reset-password',
+        params: { phone: phone.trim() },
+      })
     } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || t('errors.generic'))
+      Alert.alert('Error', err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
   }
 
-  if (sent) {
-    return (
-      <KeyboardAvoidingView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={styles.centerContent}>
-          <Text style={[styles.title, { color: colors.ink }]}>{t('auth.forgotPassword.checkEmail')}</Text>
-          <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-            {t('auth.forgotPassword.codeSentTo')} {email}
-          </Text>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.primary }]}
-            onPress={() => router.push({ pathname: '/(auth)/reset-password', params: { email } })}
-          >
-            <Text style={styles.buttonText}>{t('auth.forgotPassword.enterCode')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSent(false)} style={styles.linkButton}>
-            <Text style={[styles.linkText, { color: colors.primary }]}>{t('auth.forgotPassword.tryDifferentEmail')}</Text>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
-    )
-  }
-
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <CaretLeft size={20} color={colors.ink} weight="bold" />
-      </TouchableOpacity>
+    <AuthShell bg={v3.colors.canvas}>
+      <V3NavBar
+        title="Reset access"
+        onBack={() => router.back()}
+      />
 
-      <Text style={[styles.title, { color: colors.ink }]}>{t('auth.forgotPassword.title')}</Text>
-      <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        {t('auth.forgotPassword.description')}
-      </Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>Forgot your password?</Text>
+        <Text style={styles.subtitle}>
+          Enter the mobile number on your MaintainEX account.
+        </Text>
 
-      <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <EnvelopeSimple size={18} color={colors.muted} weight="regular" style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, { color: colors.ink }]}
-          value={email}
-          onChangeText={setEmail}
-          placeholder={t('auth.register.emailPlaceholder')}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          placeholderTextColor={colors.muted}
-        />
+        <View style={styles.rows}>
+          <V3ListRow
+            number={1}
+            title="Mobile number"
+            subtitle={phone ? `+94 ${phone}` : '+94 77 123 4567'}
+          />
+          <V3ListRow
+            number={2}
+            title="Verification"
+            subtitle="We will send a one-time code"
+          />
+        </View>
+
+        <View style={styles.bottom}>
+          <V3Button
+            label="Send verification code"
+            onPress={handleSend}
+            loading={loading}
+            disabled={!phone.trim()}
+          />
+        </View>
       </View>
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: colors.primary }, (!email || loading) && { opacity: 0.5 }]}
-        onPress={handleSend}
-        disabled={!email || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <View style={styles.buttonInner}>
-            <Text style={styles.buttonText}>{t('auth.forgotPassword.sendCode')}</Text>
-            <ArrowRight size={18} color="#FFFFFF" weight="bold" />
-          </View>
-        )}
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+    </AuthShell>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, padding: spacing.xxxl, paddingTop: 60 },
-  backButton: { marginBottom: spacing.xxxl, width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  title: { fontSize: fontSizes.h1, fontFamily: fonts.headingBold, marginBottom: spacing.sm },
-  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, marginBottom: spacing.xxxxl, lineHeight: 24 },
-  centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.md, borderWidth: 1.5, marginBottom: spacing.xl, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  inputIcon: { paddingLeft: 16 },
-  input: { flex: 1, padding: 15, fontSize: fontSizes.body, fontFamily: fonts.body },
-  button: { paddingVertical: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center' },
-  buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  buttonText: { fontSize: fontSizes.h3, fontFamily: fonts.button, color: '#FFFFFF' },
-  linkButton: { marginTop: spacing.lg },
-  linkText: { fontSize: fontSizes.bodySmall, fontFamily: fonts.label },
+const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+    padding: 18,
+    gap: 0,
+  },
+  title: {
+    fontSize: 25,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: v3.colors.textPrimary,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 10.2,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textSecondary,
+    marginBottom: 20,
+  },
+  rows: {
+    gap: 10,
+  },
+  bottom: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 16,
+  },
 })

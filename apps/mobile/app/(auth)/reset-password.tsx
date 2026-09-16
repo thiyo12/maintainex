@@ -1,191 +1,175 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
+  View, Text, TextInput, StyleSheet,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Lock, Eye, EyeSlash } from 'phosphor-react-native'
 import { auth } from '../../lib/api'
-import { useAuth } from '../../lib/auth'
-import { useColors } from '../../lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '../../lib/fonts'
-import { fontSizes } from '../../lib/tokens'
-import { spacing, borderRadius } from '../../lib/tokens'
+import { v3 } from '../../theme/v3/tokens'
+import AuthShell from '../../components/v3/AuthShell'
+import V3NavBar from '../../components/v3/V3NavBar'
+import V3ListRow from '../../components/v3/V3ListRow'
+import V3Button from '../../components/v3/V3Button'
 
 export default function ResetPasswordScreen() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { email } = useLocalSearchParams<{ email: string }>()
-  const { t } = useTranslation()
-
-  const [code, setCode] = useState<string[]>(Array(6).fill(''))
+  const { phone } = useLocalSearchParams<{ phone?: string }>()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [resendTimer, setResendTimer] = useState(60)
-  const inputRefs = useRef<(TextInput | null)[]>([])
 
-  useEffect(() => {
-    if (resendTimer <= 0) return
-    const interval = setInterval(() => setResendTimer((t) => t - 1), 1000)
-    return () => clearInterval(interval)
-  }, [resendTimer])
-
-  const handleResend = async () => {
-    setResendTimer(60)
-    try {
-      await auth.forgotPassword({ email: email || '' })
-    } catch {}
-  }
-
-  const handleCodeChange = (text: string, index: number) => {
-    const digit = text.replace(/\D/g, '').slice(-1)
-    const newCodes = [...code]
-    newCodes[index] = digit
-    setCode(newCodes)
-    if (digit && index < 5) {
-      inputRefs.current[index + 1]?.focus()
-    }
-  }
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && !code[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
-  }
+  const canSubmit = newPassword.length >= 6 && confirmPassword.length >= 6 && newPassword === confirmPassword
 
   const handleReset = async () => {
-    const codeStr = code.join('')
-    if (codeStr.length < 6) {
-      Alert.alert(t('common.error'), t('errors.enterCompleteCode'))
-      return
-    }
-    if (!newPassword || newPassword.length < 6) {
-      Alert.alert(t('common.error'), t('errors.passwordMinLength'))
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      Alert.alert(t('common.error'), t('errors.passwordsDoNotMatch'))
-      return
+    if (!canSubmit) {
+      if (newPassword.length < 6) {
+        Alert.alert('Error', 'Password must be at least 6 characters')
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        Alert.alert('Error', 'Passwords do not match')
+        return
+      }
     }
 
     setLoading(true)
     try {
-      await auth.resetPassword({ email: email || '', code: codeStr, newPassword })
-      Alert.alert(t('auth.resetPassword.success'), t('auth.resetPassword.successMessage'), [
+      await auth.resetPassword({
+        email: phone || '',
+        code: '',
+        newPassword,
+      })
+      Alert.alert('Success', 'Your password has been reset', [
         { text: 'OK', onPress: () => router.replace('/(auth)/login') },
       ])
     } catch (err: any) {
-      Alert.alert(t('common.error'), err.message || t('errors.invalidCode'))
+      Alert.alert('Error', err.message || 'Failed to reset password')
     } finally {
       setLoading(false)
     }
   }
 
-  const allFilled = code.every((c) => c !== '')
+  const maskedPw = (len: number) => '•'.repeat(Math.min(len, 12))
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={[styles.backText, { color: colors.primary }]}>{'\u2190'} {t('common.back')}</Text>
-      </TouchableOpacity>
+    <AuthShell bg={v3.colors.canvas}>
+      <V3NavBar
+        title="New password"
+        onBack={() => router.back()}
+      />
 
-      <Text style={[styles.title, { color: colors.ink }]}>{t('auth.resetPassword.title')}</Text>
-      <Text style={[styles.subtitle, { color: colors.inkLight }]}>
-        {t('auth.resetPassword.description')} {email}
-      </Text>
-
-      <View style={styles.codeRow}>
-        {code.map((digit, i) => (
-          <TextInput
-            key={i}
-            ref={(ref) => { inputRefs.current[i] = ref }}
-            style={[
-              styles.codeBox,
-              {
-                borderColor: digit ? colors.primary : colors.border,
-                backgroundColor: digit ? colors.primaryLight : colors.surface,
-                color: colors.ink,
-              },
-            ]}
-            value={digit}
-            onChangeText={(t) => handleCodeChange(t, i)}
-            onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
-            keyboardType="number-pad"
-            maxLength={1}
-            selectionColor={colors.primary}
-          />
-        ))}
-      </View>
-
-      <TouchableOpacity onPress={handleResend} disabled={resendTimer > 0} style={styles.resendButton}>
-        <Text style={[styles.resendText, { color: colors.primary }, resendTimer > 0 && { color: colors.muted }]}>
-          {resendTimer > 0 ? `${t('auth.otp.resendIn')}${resendTimer}s` : t('auth.otp.resend')}
+      <View style={styles.content}>
+        <Text style={styles.title}>Create a new password.</Text>
+        <Text style={styles.subtitle}>
+          Use a strong password you have not used before.
         </Text>
-      </TouchableOpacity>
 
-      <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Lock size={18} color={colors.muted} weight="regular" style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, { color: colors.ink }]}
-          value={newPassword}
-          onChangeText={setNewPassword}
-          placeholder={t('auth.register.passwordPlaceholder')}
-          secureTextEntry={!showPw}
-          placeholderTextColor={colors.muted}
-        />
-        <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn}>
-          {showPw ? <EyeSlash size={18} color={colors.muted} /> : <Eye size={18} color={colors.muted} />}
-        </TouchableOpacity>
+        <View style={styles.fields}>
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>New password</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder="Enter new password"
+                placeholderTextColor={v3.colors.textPlaceholder}
+                secureTextEntry
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>Confirm password</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="Confirm password"
+                placeholderTextColor={v3.colors.textPlaceholder}
+                secureTextEntry
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.rows}>
+          <V3ListRow
+            number={3}
+            title="Security"
+            subtitle="All other sessions can be signed out"
+          />
+        </View>
+
+        <View style={styles.bottom}>
+          <V3Button
+            label="Save new password"
+            onPress={handleReset}
+            loading={loading}
+            disabled={!canSubmit}
+          />
+        </View>
       </View>
-
-      <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Lock size={18} color={colors.muted} weight="regular" style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, { color: colors.ink }]}
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          placeholder={t('auth.register.confirmPasswordPlaceholder')}
-          secureTextEntry={!showPw}
-          placeholderTextColor={colors.muted}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: colors.primary }, (!allFilled || !newPassword || !confirmPassword || loading) && { opacity: 0.5 }]}
-        onPress={handleReset}
-        disabled={!allFilled || !newPassword || !confirmPassword || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <Text style={styles.buttonText}>{t('auth.resetPassword.button')}</Text>
-        )}
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+    </AuthShell>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, padding: spacing.xxxl, paddingTop: 60 },
-  backButton: { marginBottom: spacing.xxxl },
-  backText: { fontSize: fontSizes.body, fontFamily: fonts.label },
-  title: { fontSize: fontSizes.h1, fontFamily: fonts.headingBold, marginBottom: spacing.sm },
-  subtitle: { fontSize: fontSizes.bodySmall, fontFamily: fonts.body, marginBottom: spacing.sm, lineHeight: 24 },
-  codeRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.lg },
-  codeBox: { width: 48, height: 56, borderRadius: borderRadius.md, borderWidth: 1.5, textAlign: 'center', fontSize: fontSizes.h2, fontFamily: fonts.headingBold },
-  resendButton: { alignItems: 'center', marginBottom: spacing.xxxxl },
-  resendText: { fontSize: fontSizes.bodySmall, fontFamily: fonts.label },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: borderRadius.md, borderWidth: 1.5, marginBottom: 12 },
-  inputIcon: { paddingLeft: 16 },
-  input: { flex: 1, padding: 15, fontSize: fontSizes.body, fontFamily: fonts.body },
-  eyeBtn: { paddingRight: 16 },
-  button: { paddingVertical: spacing.lg, borderRadius: borderRadius.lg, alignItems: 'center', marginTop: spacing.md },
-  buttonText: { fontSize: fontSizes.h3, fontFamily: fonts.button, color: '#FFFFFF' },
+const styles = StyleSheet.create({
+  content: {
+    flex: 1,
+    padding: 18,
+    gap: 0,
+  },
+  title: {
+    fontSize: 25,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: v3.colors.textPrimary,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 10.2,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textSecondary,
+    marginBottom: 20,
+  },
+  fields: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  fieldWrap: {
+    gap: 6,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontFamily: 'Outfit_700Bold',
+    fontWeight: '800',
+    color: '#4F4F4F',
+    marginLeft: 2,
+  },
+  inputRow: {
+    height: v3.components.input.height,
+    borderRadius: v3.components.input.borderRadius,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  input: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textPrimary,
+  },
+  rows: {
+    gap: 10,
+  },
+  bottom: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 16,
+  },
 })
