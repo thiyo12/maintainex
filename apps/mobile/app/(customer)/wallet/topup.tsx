@@ -61,7 +61,7 @@ export default function TopUpScreen() {
         Alert.alert(
           'Payment Gateway Setup',
           'Online payments are being configured. Please use Direct Bank Transfer for now.',
-          [{ text: 'OK', onPress: () => setMethod('bank_transfer'), setShowBank(true) }]
+          [{ text: 'OK', onPress: () => { setMethod('bank_transfer'); setShowBank(true) } }]
         )
       } else {
         Alert.alert('Error', data.error || 'Failed to initiate payment')

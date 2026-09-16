@@ -3373,3 +3373,24 @@ model CompanyJobAssignment {
   @@index([jobId])
   @@index([status])
 }
+
+model PaymentIntent {
+  id              String    @id @default(cuid())
+  jobId           String
+  customerId      String
+  escrowId        String
+  merchantOrderId String    @unique
+  paymentId       String?
+  amount          BigInt
+  currency        String    @default("LKR")
+  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED
+  gatewayResponse String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  paidAt          DateTime?
+
+  @@index([jobId])
+  @@index([customerId])
+  @@index([status])
+  @@index([merchantOrderId])
+}

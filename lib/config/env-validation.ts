@@ -64,6 +64,13 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
   return { valid: true, errors: [] }
 }
 
+export function getPayHereConfig(): { merchantId: string; merchantSecret: string; sandbox: boolean } | null {
+  const merchantId = process.env.PAYHERE_MERCHANT_ID
+  const merchantSecret = process.env.PAYHERE_MERCHANT_SECRET
+  if (!merchantId || !merchantSecret) return null
+  return { merchantId, merchantSecret, sandbox: process.env.PAYHERE_SANDBOX !== 'false' }
+}
+
 let validated = false
 
 export function ensureSecretsValidated() {
