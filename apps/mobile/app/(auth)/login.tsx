@@ -1,60 +1,37 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
-  Animated, Image,
+  ScrollView, ActivityIndicator, Alert, Image,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { CaretLeft, ArrowRight, EnvelopeSimple } from 'phosphor-react-native'
 import { useAuth } from '../../lib/auth'
+import { v3 } from '../../theme/v3/tokens'
 import CountryPicker, { COUNTRIES, Country } from '../../components/ui/CountryPicker'
-import OtpInput from '../../components/ui/OtpInput'
-import PressableScale from '../../components/ui/PressableScale'
+import V3Button from '../../components/v3/V3Button'
 
 export default function LoginScreen() {
   const router = useRouter()
-  const { sendLoginOtp, otpLogin } = useAuth()
+  const { sendLoginOtp } = useAuth()
   const [country, setCountry] = useState<Country>(COUNTRIES[0])
   const [phone, setPhone] = useState('')
-  const [codeSent, setCodeSent] = useState(false)
   const [sending, setSending] = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  const [resendTimer, setResendTimer] = useState(0)
-  const [otpError, setOtpError] = useState('')
-  const [maskedPhone, setMaskedPhone] = useState('')
-  const slideAnim = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    if (resendTimer <= 0) return
-    const interval = setInterval(() => setResendTimer((v) => v - 1), 1000)
-    return () => clearInterval(interval)
-  }, [resendTimer])
 
   const fullPhone = `${country.dial}${phone}`
+  const phoneDigits = phone.replace(/\D/g, '')
+  const canSend = phoneDigits.length >= 7
 
-  const maskPhone = (num: string) => {
-    const d = num.replace(/\D/g, '')
-    if (d.length < 4) return num
-    const prefix = d.slice(0, 3)
-    const suffix = d.slice(-2)
-    const middle = 'X'.repeat(Math.max(0, d.length - 5))
-    return `+${prefix} ${middle} ${suffix}`
-  }
-
-  const handleSendCode = async () => {
-    const digits = phone.replace(/\D/g, '')
-    if (digits.length < 7) {
-      Alert.alert('Error', 'Enter a valid phone number')
-      return
-    }
+  const handleContinue = async () => {
+    if (!canSend) return
     setSending(true)
     try {
       await sendLoginOtp(fullPhone)
-      setMaskedPhone(maskPhone(fullPhone))
-      setCodeSent(true)
-      setResendTimer(60)
-      setOtpError('')
-      Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
+      router.push({
+        pathname: '/(auth)/otp',
+        params: {
+          phone: fullPhone,
+          maskedPhone: maskPhone(fullPhone),
+        },
+      })
     } catch (err: any) {
       let message = err?.message || 'Something went wrong'
       try { message = JSON.parse(message).error || message } catch {}
@@ -64,209 +41,216 @@ export default function LoginScreen() {
     }
   }
 
-  const handleResend = () => {
-    setResendTimer(60)
-    handleSendCode()
+  const maskPhone = (num: string) => {
+    const d = num.replace(/\D/g, '')
+    if (d.length < 6) return num
+    const prefix = d.slice(0, d.length - 4)
+    const suffix = d.slice(-2)
+    return `${prefix}•••${suffix}`
   }
-
-  const handleVerify = async (code: string) => {
-    setVerifying(true)
-    setOtpError('')
-    try {
-      const user = await otpLogin(fullPhone, code)
-      if (user.role === 'TASKER') router.replace('/(tasker)')
-      else if (user.role === 'COMPANY') router.replace('/(company)')
-      else router.replace('/(customer)')
-    } catch (err: any) {
-      let message = err?.message || 'Invalid code'
-      try { message = JSON.parse(message).error || message } catch {}
-      setOtpError(message)
-    } finally {
-      setVerifying(false)
-    }
-  }
-
-  const goBack = () => {
-    if (codeSent) {
-      Animated.timing(slideAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
-        setCodeSent(false)
-        setOtpError('')
-      })
-    } else {
-      router.back()
-    }
-  }
-
-  const phoneDigits = phone.replace(/\D/g, '')
-  const canSend = phoneDigits.length >= 7
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <CaretLeft size={20} color="#FFFFFF" weight="bold" />
-        </TouchableOpacity>
+    <View style={styles.container}>
+      {/* Black header band */}
+      <View style={styles.header}>
+        <View style={styles.markWrap}>
+          <Image source={require('../../assets/logo.png')} style={styles.mark} resizeMode="contain" />
+        </View>
+        <Text style={styles.brand}>MΛINTΛINEX</Text>
+      </View>
 
-        {!codeSent ? (
-          <View style={styles.stepContainer}>
-            <View style={styles.logoSection}>
-              <View style={styles.logoBox}>
-                <Image source={require('../../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-              </View>
-            </View>
+      {/* White card */}
+      <View style={styles.card}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.subtitle}>Use your mobile number to continue.</Text>
 
-            <Text style={styles.title}>Welcome back</Text>
-            <Text style={styles.subtitle}>Sign in to your account</Text>
-
-            <View style={styles.phoneRow}>
-              <CountryPicker selected={country} onChange={setCountry} />
-              <TextInput
-                style={styles.phoneInput}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder={country.code === 'LK' ? '771 234 567' : '416 234 5678'}
-                placeholderTextColor="#6B6B6B"
-                keyboardType="phone-pad"
-                maxLength={15}
-              />
-            </View>
-
-            <PressableScale
-              scaleTo={0.97}
-              onPress={handleSendCode}
-              disabled={!canSend || sending}
-              style={[styles.pillButton, !canSend && styles.pillButtonDisabled]}
-            >
-              {sending ? (
-                <ActivityIndicator color="#0D0D0D" />
-              ) : (
-                <View style={styles.pillRow}>
-                  <Text style={styles.pillText}>Send Code</Text>
-                  <ArrowRight size={20} color="#0D0D0D" weight="bold" />
-                </View>
-              )}
-            </PressableScale>
-
-            <Text style={styles.hint}>We'll send a 6-digit verification code</Text>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity style={styles.emailRow}>
-              <EnvelopeSimple size={18} color="#6B6B6B" weight="regular" />
-              <Text style={styles.emailText}>Continue with email</Text>
-            </TouchableOpacity>
-
-            <View style={styles.footerRow}>
-              <Text style={styles.footerLabel}>New to MΛINTΛINEX? </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/welcome')}>
-                <Text style={styles.footerLink}>Create account</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <Animated.View style={[styles.stepContainer, { opacity: slideAnim, transform: [{ translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] }]}>
-            <Text style={styles.title}>Enter the code</Text>
-            <View style={styles.codeInfo}>
-              <Text style={styles.subtitle}>Sent to {maskedPhone} </Text>
-              <TouchableOpacity onPress={goBack}>
-                <Text style={styles.wrongNumber}>Wrong number?</Text>
-              </TouchableOpacity>
-            </View>
-
-            <OtpInput
-              onComplete={handleVerify}
-              error={otpError}
-              loading={verifying}
+          <Text style={styles.label}>Mobile number</Text>
+          <View style={styles.phoneRow}>
+            <CountryPicker selected={country} onChange={setCountry} />
+            <TextInput
+              style={styles.phoneInput}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder={country.code === 'LK' ? '77 123 4567' : '416 234 5678'}
+              placeholderTextColor={v3.colors.textPlaceholder}
+              keyboardType="phone-pad"
+              maxLength={15}
             />
+          </View>
 
-            <View style={styles.resendRow}>
-              {resendTimer > 0 ? (
-                <Text style={styles.resendDisabled}>Resend in {resendTimer}s</Text>
-              ) : (
-                <TouchableOpacity onPress={handleResend}>
-                  <Text style={styles.resendActive}>Resend code</Text>
-                </TouchableOpacity>
-              )}
+          <V3Button
+            label="Continue"
+            onPress={handleContinue}
+            loading={sending}
+            disabled={!canSend}
+          />
+
+          <Text style={styles.orText}>or</Text>
+
+          {/* Social login — visually disabled */}
+          <TouchableOpacity
+            style={styles.socialBtn}
+            disabled
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel="Continue with Apple or Google — coming soon"
+          >
+            <Text style={styles.socialBtnText}>Continue with Apple / Google</Text>
+            <View style={styles.comingSoonBadge}>
+              <Text style={styles.comingSoonText}>Coming soon</Text>
             </View>
-          </Animated.View>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerLabel}>New to MaintainEX?</Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+              <Text style={styles.footerLink}>Create an account</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.legal}>By continuing you agree to Terms & Privacy.</Text>
+        </ScrollView>
+      </View>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  scrollContent: { padding: 24, paddingTop: 60, flexGrow: 1 },
-  backButton: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#1C1C1C',
-    justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2E2E2E',
+  container: { flex: 1, backgroundColor: v3.colors.paper },
+  header: {
+    height: 275,
+    backgroundColor: v3.colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+  },
+  markWrap: { marginBottom: 16 },
+  mark: { width: 60, height: 60 },
+  brand: {
+    fontSize: 17,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: v3.colors.paper,
+    letterSpacing: 0.8,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: v3.colors.paper,
+    borderTopLeftRadius: v3.radius.xxl,
+    borderTopRightRadius: v3.radius.xxl,
+    marginTop: -30,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingTop: 28,
+    gap: 0,
+  },
+  title: {
+    fontSize: 26,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: v3.colors.textPrimary,
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textSecondary,
     marginBottom: 24,
   },
-
-  logoSection: { alignItems: 'center', marginBottom: 28 },
-  logoBox: {
-    width: 72, height: 72, borderRadius: 18,
-    backgroundColor: 'rgba(245,166,35,0.08)',
-    borderWidth: 1.5, borderColor: '#F5A623',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35, shadowRadius: 18, elevation: 8,
+  label: {
+    fontSize: 10,
+    fontFamily: 'Outfit_700Bold',
+    fontWeight: '800',
+    color: '#4F4F4F',
+    marginBottom: 6,
   },
-  logo: { width: 48, height: 48 },
-
-  stepContainer: { flex: 1 },
-  title: { fontSize: 28, fontFamily: 'Outfit_700Bold', color: '#FFFFFF', marginBottom: 8 },
-  subtitle: { fontSize: 15, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', marginBottom: 32 },
-
   phoneRow: {
-    flexDirection: 'row', height: 56, borderRadius: 16,
-    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
-    overflow: 'hidden', marginBottom: 24,
+    flexDirection: 'row',
+    height: v3.components.input.height,
+    borderRadius: v3.components.input.borderRadius,
+    backgroundColor: '#F7F7F7',
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    overflow: 'hidden',
+    marginBottom: 20,
   },
   phoneInput: {
-    flex: 1, paddingHorizontal: 16, fontSize: 16, fontFamily: 'Outfit_500Medium',
-    color: '#FFFFFF',
+    flex: 1,
+    paddingHorizontal: 14,
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textPrimary,
   },
-
-  pillButton: {
-    height: 56, borderRadius: 16, backgroundColor: '#F5A623',
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 12, elevation: 4,
+  orText: {
+    fontSize: 10,
+    fontFamily: 'Outfit_700Bold',
+    fontWeight: '700',
+    color: v3.colors.textSecondary,
+    textAlign: 'center',
+    marginVertical: 16,
   },
-  pillButtonDisabled: { backgroundColor: '#2E2E2E', shadowOpacity: 0 },
-  pillRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pillText: { fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
-
-  hint: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#6B6B6B', textAlign: 'center', marginTop: 12 },
-
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 28, gap: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#2E2E2E' },
-  dividerText: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#6B6B6B' },
-
-  emailRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14, borderRadius: 16,
-    backgroundColor: '#1C1C1C', borderWidth: 1, borderColor: '#2E2E2E',
+  socialBtn: {
+    height: v3.components.ctaSmall.height,
+    borderRadius: v3.components.ctaSmall.borderRadius,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    backgroundColor: v3.colors.paper,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.5,
   },
-  emailText: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#B3B3B3' },
-
-  footerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
-  footerLabel: { fontSize: 14, fontFamily: 'Outfit_400Regular', color: '#B3B3B3' },
-  footerLink: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
-
-  codeInfo: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 },
-  wrongNumber: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
-
-  resendRow: { alignItems: 'center', marginTop: 8 },
-  resendDisabled: { fontSize: 14, fontFamily: 'Outfit_400Regular', color: '#6B6B6B' },
-  resendActive: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
+  socialBtnText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_700Bold',
+    fontWeight: '750',
+    color: v3.colors.textPrimary,
+  },
+  comingSoonBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 12,
+    backgroundColor: v3.colors.amberSoft,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  comingSoonText: {
+    fontSize: 8,
+    fontFamily: 'Outfit_700Bold',
+    fontWeight: '800',
+    color: v3.colors.amberDark,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 28,
+    gap: 4,
+  },
+  footerLabel: {
+    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '650',
+    color: v3.colors.textSecondary,
+  },
+  footerLink: {
+    fontSize: 12,
+    fontFamily: 'Outfit_800ExtraBold',
+    fontWeight: '850',
+    color: v3.colors.textPrimary,
+  },
+  legal: {
+    fontSize: 9,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: v3.colors.textMuted,
+    textAlign: 'center',
+    marginTop: 16,
+  },
 })
