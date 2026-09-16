@@ -1,36 +1,54 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../lib/auth'
-import { View, Image, StyleSheet, Animated } from 'react-native'
+import { View, Image, StyleSheet, Animated, Dimensions, Text } from 'react-native'
+
+const { width: SCREEN_W } = Dimensions.get('window')
 
 export default function EntryScreen() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const [authReady, setAuthReady] = useState(false)
+  const [animDone, setAnimDone] = useState(false)
 
-  const logoScale = useRef(new Animated.Value(0.85)).current
-  const logoOp = useRef(new Animated.Value(0)).current
-  const titleOp = useRef(new Animated.Value(0)).current
-  const titleY = useRef(new Animated.Value(16)).current
-  const subOp = useRef(new Animated.Value(0)).current
+  const markScale = useRef(new Animated.Value(0.92)).current
+  const markOp = useRef(new Animated.Value(0)).current
+  const markScaleMid = useRef(new Animated.Value(1)).current
+  const wordmarkOp = useRef(new Animated.Value(0)).current
+  const wordmarkY = useRef(new Animated.Value(12)).current
+  const taglineOp = useRef(new Animated.Value(0)).current
   const fadeOut = useRef(new Animated.Value(1)).current
 
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
-        Animated.spring(logoScale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
-        Animated.timing(logoOp, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(markOp, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(markScale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
       ]),
+      Animated.delay(100),
       Animated.parallel([
-        Animated.timing(titleOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(markScaleMid, { toValue: 0.82, duration: 300, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(wordmarkOp, { toValue: 1, duration: 350, useNativeDriver: true }),
+          Animated.timing(wordmarkY, { toValue: 0, duration: 350, useNativeDriver: true }),
+        ]),
+        Animated.delay(100),
+        Animated.timing(taglineOp, { toValue: 1, duration: 300, useNativeDriver: true }),
       ]),
-      Animated.delay(200),
-      Animated.timing(subOp, { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start()
+      Animated.delay(800),
+    ]).start(() => setAnimDone(true))
+  }, [])
+
+  useEffect(() => {
+    if (isLoading) return
+    setAuthReady(true)
+  }, [isLoading])
+
+  useEffect(() => {
+    if (!animDone || !authReady) return
 
     const timer = setTimeout(() => {
-      Animated.timing(fadeOut, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
-        if (isLoading) return
+      Animated.timing(fadeOut, { toValue: 0, duration: 350, useNativeDriver: true }).start(() => {
         if (isAuthenticated) {
           if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
           else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
@@ -41,25 +59,28 @@ export default function EntryScreen() {
           router.replace('/(auth)/welcome')
         }
       })
-    }, 5000)
+    }, 400)
 
     return () => clearTimeout(timer)
-  }, [isAuthenticated, isLoading, user, router])
+  }, [animDone, authReady, isAuthenticated, user, router])
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeOut }]}>
       <View style={styles.center}>
-        <Animated.View style={[styles.logoWrap, { opacity: logoOp, transform: [{ scale: logoScale }] }]}>
-          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+        <Animated.View style={[
+          styles.markWrap,
+          { opacity: markOp, transform: [{ scale: Animated.multiply(markScale, markScaleMid) }] },
+        ]}>
+          <Image source={require('../assets/logo.png')} style={styles.mark} resizeMode="contain" />
         </Animated.View>
 
-        <Animated.Text style={[styles.title, { opacity: titleOp, transform: [{ translateY: titleY }] }]}>
-          MΛINTΛINEX
-        </Animated.Text>
+        <Animated.View style={[styles.wordmarkWrap, { opacity: wordmarkOp, transform: [{ translateY: wordmarkY }] }]}>
+          <Text style={styles.wordmark}>MΛINTΛINEX</Text>
+        </Animated.View>
 
-        <Animated.Text style={[styles.sub, { opacity: subOp }]}>
-          FIND WORK · BUILD TRUST
-        </Animated.Text>
+        <Animated.View style={[styles.taglineWrap, { opacity: taglineOp }]}>
+          <Text style={styles.tagline}>One place to get things done.</Text>
+        </Animated.View>
       </View>
     </Animated.View>
   )
@@ -67,17 +88,30 @@ export default function EntryScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center',
+    flex: 1,
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   center: { alignItems: 'center' },
-  logoWrap: { marginBottom: 0 },
-  logo: { width: 140, height: 140 },
-  title: {
-    fontSize: 22, fontFamily: 'Outfit_800ExtraBold', color: '#FFFFFF',
-    letterSpacing: 5, marginBottom: 2,
+  markWrap: { marginBottom: 24 },
+  mark: { width: 100, height: 100 },
+  wordmarkWrap: { marginTop: 8 },
+  wordmark: {
+    fontSize: 28,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+    textAlign: 'center',
   },
-  sub: {
-    fontSize: 10, fontFamily: 'Outfit_600SemiBold', color: 'rgba(255,255,255,0.25)',
-    letterSpacing: 2.5, marginTop: 2,
+  taglineWrap: { marginTop: 10 },
+  tagline: {
+    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '650',
+    color: '#BDBDBD',
+    letterSpacing: 0.6,
+    textAlign: 'center',
   },
 })

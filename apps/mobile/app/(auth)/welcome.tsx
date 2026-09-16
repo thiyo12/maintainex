@@ -1,152 +1,170 @@
 import { useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Animated } from 'react-native'
+import { View, Text, StyleSheet, Animated, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { User, Wrench, ArrowRight } from 'phosphor-react-native'
-import PressableScale from '../../components/ui/PressableScale'
+import { v3 } from '../../theme/v3/tokens'
 
 export default function WelcomeScreen() {
   const router = useRouter()
-  const titleOp = useRef(new Animated.Value(0)).current
-  const titleY = useRef(new Animated.Value(14)).current
-  const cardsOp = useRef(new Animated.Value(0)).current
-  const cardsY = useRef(new Animated.Value(20)).current
-  const footerOp = useRef(new Animated.Value(0)).current
+  const markOp = useRef(new Animated.Value(0)).current
+  const markScale = useRef(new Animated.Value(0.9)).current
+  const textOp = useRef(new Animated.Value(0)).current
+  const textY = useRef(new Animated.Value(16)).current
+  const heroOp = useRef(new Animated.Value(0)).current
+  const heroY = useRef(new Animated.Value(20)).current
+  const btnsOp = useRef(new Animated.Value(0)).current
+  const btnsY = useRef(new Animated.Value(14)).current
 
   useEffect(() => {
     Animated.sequence([
       Animated.parallel([
-        Animated.timing(titleOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(markOp, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(markScale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(cardsOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(cardsY, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(textOp, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(textY, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]),
+      Animated.delay(100),
+      Animated.parallel([
+        Animated.timing(heroOp, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(heroY, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]),
       Animated.delay(150),
-      Animated.timing(footerOp, { toValue: 1, duration: 300, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(btnsOp, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(btnsY, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]),
     ]).start()
   }, [])
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.topSection}>
-        <Animated.Text style={[styles.heading, { opacity: titleOp, transform: [{ translateY: titleY }] }]}>
-          What are you{'\n'}looking for?
-        </Animated.Text>
-        <Animated.Text style={[styles.headingSub, { opacity: titleOp, transform: [{ translateY: titleY }] }]}>
-          Choose how you want to use MΛINTΛINEX
-        </Animated.Text>
+      <View style={styles.topArea}>
+        <Animated.View style={[styles.markWrap, { opacity: markOp, transform: [{ scale: markScale }] }]}>
+          <Image source={require('../../assets/logo.png')} style={styles.mark} resizeMode="contain" />
+        </Animated.View>
+
+        <Animated.View style={[styles.brandWrap, { opacity: textOp, transform: [{ translateY: textY }] }]}>
+          <Text style={styles.brand}>MΛINTΛINEX</Text>
+        </Animated.View>
       </View>
 
-      <Animated.View style={[styles.cardsSection, { opacity: cardsOp, transform: [{ translateY: cardsY }] }]}>
-        <PressableScale
-          scaleTo={0.97}
-          onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'CUSTOMER' } })}
-        >
-          <View style={styles.findCard}>
-            <View style={styles.findIconCircle}>
-              <User size={24} color="#0D0D0D" weight="fill" />
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.findTitle}>Find a service</Text>
-              <Text style={styles.findSub}>Book trusted professionals for cleaning, repairs, home maintenance and more.</Text>
-            </View>
-            <ArrowRight size={20} color="#0D0D0D" weight="bold" />
-          </View>
-        </PressableScale>
+      <View style={styles.midArea}>
+        <Animated.View style={[styles.heroWrap, { opacity: heroOp, transform: [{ translateY: heroY }] }]}>
+          <Text style={styles.heroLine1}>Get things done,</Text>
+          <Text style={styles.heroLine2}>without the runaround.</Text>
+          <Text style={styles.heroSub}>Book trusted people, get quotes fast, and find places to rent.</Text>
+        </Animated.View>
+      </View>
 
-        <PressableScale
-          scaleTo={0.97}
-          onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'TASKER' } })}
-        >
-          <View style={styles.offerCard}>
-            <View style={styles.offerIconCircle}>
-              <Wrench size={24} color="#F5A623" weight="fill" />
-            </View>
-            <View style={styles.cardContent}>
-              <Text style={styles.offerTitle}>Offer a service</Text>
-              <Text style={styles.offerSub}>Earn money with your skills. Set your own hours and grow your business.</Text>
-            </View>
-            <ArrowRight size={20} color="#F5A623" weight="bold" />
-          </View>
-        </PressableScale>
-      </Animated.View>
+      <Animated.View style={[styles.btnArea, { opacity: btnsOp, transform: [{ translateY: btnsY }] }]}>
+        <Animated.View style={[styles.btnPrimary, { opacity: btnsOp }]}>
+          <Text
+            style={styles.btnPrimaryText}
+            onPress={() => router.push('/(auth)/register')}
+          >
+            Continue
+          </Text>
+        </Animated.View>
 
-      <Animated.View style={[styles.footer, { opacity: footerOp }]}>
-        <View style={styles.signInRow}>
-          <Text style={styles.signInLabel}>Already have an account? </Text>
-          <PressableScale onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.signInLink}>Sign In</Text>
-          </PressableScale>
-        </View>
-
-        <View style={styles.termsRow}>
-          <Text style={styles.termsText}>By continuing, you agree to our </Text>
-          <Text style={styles.termsLink}>Terms of Service</Text>
-        </View>
+        <Animated.View style={[styles.btnSecondary, { opacity: btnsOp }]}>
+          <Text
+            style={styles.btnSecondaryText}
+            onPress={() => router.push('/(auth)/login')}
+          >
+            I already have an account
+          </Text>
+        </Animated.View>
       </Animated.View>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D', paddingHorizontal: 24 },
-
-  topSection: {
-    flex: 2, justifyContent: 'flex-end', paddingBottom: 12,
+  container: {
+    flex: 1,
+    backgroundColor: '#000000',
+    paddingHorizontal: 24,
   },
-  heading: {
-    fontSize: 30, fontFamily: 'Outfit_800ExtraBold', color: '#FFFFFF',
-    lineHeight: 36, marginBottom: 8,
+  topArea: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
   },
-  headingSub: {
-    fontSize: 15, fontFamily: 'Outfit_400Regular', color: '#B3B3B3',
+  markWrap: {},
+  mark: { width: 60, height: 60 },
+  brandWrap: { marginTop: 16 },
+  brand: {
+    fontSize: 23,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.8,
+    textAlign: 'center',
   },
-
-  cardsSection: {
-    flex: 5, justifyContent: 'center', gap: 24,
+  midArea: {
+    flex: 4,
+    justifyContent: 'center',
+    paddingBottom: 20,
   },
-
-  findCard: {
-    flexDirection: 'row', alignItems: 'center', padding: 18,
-    backgroundColor: '#F5A623', borderRadius: 20,
-    shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 14, elevation: 6,
+  heroWrap: {},
+  heroLine1: {
+    fontSize: 30,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0,
   },
-  findIconCircle: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: 'rgba(13,13,13,0.15)',
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
+  heroLine2: {
+    fontSize: 30,
+    fontFamily: 'Outfit_900Black',
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0,
+    marginTop: 4,
   },
-  cardContent: { flex: 1 },
-  findTitle: { fontSize: 18, fontFamily: 'Outfit_700Bold', color: '#0D0D0D', marginBottom: 3 },
-  findSub: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: 'rgba(13,13,13,0.6)', lineHeight: 18 },
-
-  offerCard: {
-    flexDirection: 'row', alignItems: 'center', padding: 18,
-    backgroundColor: '#1C1C1C', borderWidth: 1.5, borderColor: '#2E2E2E',
-    borderRadius: 20,
+  heroSub: {
+    fontSize: 11.5,
+    fontFamily: 'Outfit_500Medium',
+    fontWeight: '600',
+    color: '#B9B9B9',
+    marginTop: 14,
+    lineHeight: 18,
   },
-  offerIconCircle: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: 'rgba(245,166,35,0.12)',
-    justifyContent: 'center', alignItems: 'center', marginRight: 14,
+  btnArea: {
+    flex: 2,
+    justifyContent: 'flex-end',
+    paddingBottom: 24,
+    gap: 14,
   },
-  offerTitle: { fontSize: 18, fontFamily: 'Outfit_700Bold', color: '#FFFFFF', marginBottom: 3 },
-  offerSub: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', lineHeight: 18 },
-
-  footer: {
-    flex: 1, justifyContent: 'flex-end', paddingBottom: 12, alignItems: 'center',
+  btnPrimary: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  signInRow: {
-    flexDirection: 'row', alignItems: 'center', marginBottom: 16,
+  btnPrimaryText: {
+    fontSize: 13.5,
+    fontFamily: 'Outfit_800ExtraBold',
+    fontWeight: '850',
+    color: '#000000',
   },
-  signInLabel: { fontSize: 15, fontFamily: 'Outfit_400Regular', color: '#B3B3B3' },
-  signInLink: { fontSize: 15, fontFamily: 'Outfit_700Bold', color: '#F5A623' },
-
-  termsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
-  termsText: { fontSize: 12, fontFamily: 'Outfit_400Regular', color: '#6B6B6B' },
-  termsLink: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
+  btnSecondary: {
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnSecondaryText: {
+    fontSize: 13.5,
+    fontFamily: 'Outfit_800ExtraBold',
+    fontWeight: '850',
+    color: '#FFFFFF',
+  },
 })
