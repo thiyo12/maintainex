@@ -13,8 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../../lib/auth'
 import { auth, upload } from '../../../lib/api'
 import { v3 } from '../../../theme/v3/tokens'
-import { tierById } from '../../../lib/tiers'
-import { useColors } from '../../../lib/ThemeContext'
+import { useTheme } from '../../../lib/ThemeContext'
 
 import V3CustomerBottomNav from '../../../components/v3/V3CustomerBottomNav'
 import V3TierBadge from '../../../components/v3/V3TierBadge'
@@ -45,7 +44,7 @@ function SectionLabel({ label }: { label: string }) {
 export default function AccountScreen() {
   const router = useRouter()
   const { t } = useTranslation()
-  const colors = useColors()
+  const { isDark, toggleTheme } = useTheme()
   const { user, logout, refreshUser } = useAuth()
   const [deleting, setDeleting] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -118,7 +117,6 @@ export default function AccountScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* ═══ Profile Header ═══ */}
         <View style={styles.profileHeader}>
           <TouchableOpacity onPress={pickProfilePhoto} activeOpacity={0.7} style={styles.avatarWrap}>
             <AvatarCircle uri={(user as any)?.profileImage || (user as any)?.avatar} name={user?.name} size={76} />
@@ -131,12 +129,10 @@ export default function AccountScreen() {
           {user?.phone ? <Text style={styles.sub}>{user.phone}</Text> : null}
         </View>
 
-        {/* ═══ Tier Badge ═══ */}
         <View style={styles.tierSection}>
           <V3TierBadge tierLevel={(user as any)?.tierLevel} />
         </View>
 
-        {/* ═══ My Account ═══ */}
         <SectionLabel label="My Account" />
         <View style={styles.section}>
           <MenuRow icon={ChatText} label={t('account.messages')} color={v3.colors.info} onPress={() => router.push('/(chat)' as any)} />
@@ -147,7 +143,6 @@ export default function AccountScreen() {
           <MenuRow icon={Crown} label={t('account.membership')} onPress={() => router.push('/settings/membership')} />
         </View>
 
-        {/* ═══ Services ═══ */}
         <SectionLabel label="Services" />
         <View style={styles.section}>
           <MenuRow icon={ClipboardText} label={t('account.myJobs')} onPress={() => router.push('/(customer)/(tabs)/activity' as any)} />
@@ -155,7 +150,6 @@ export default function AccountScreen() {
           <MenuRow icon={Wrench} label={t('account.becomeTasker')} onPress={handleBecomeTasker} />
         </View>
 
-        {/* ═══ Support ═══ */}
         <SectionLabel label="Support" />
         <View style={styles.section}>
           <MenuRow icon={Question} label={t('account.help')} onPress={() => router.push('/settings/help')} />
@@ -174,17 +168,16 @@ export default function AccountScreen() {
             </View>
             <Text style={styles.menuLabel}>{t('account.darkMode')}</Text>
             <Switch
-              value={colors.isDark}
-              onValueChange={() => colors.toggleTheme()}
+              value={isDark}
+              onValueChange={toggleTheme}
               trackColor={{ false: v3.colors.line, true: v3.colors.ink }}
               thumbColor={v3.colors.paper}
             />
           </View>
         </View>
 
-        {/* ═══ Earn with MX ═══ */}
         {user?.role === 'CUSTOMER' ? (
-          <TouchableOpacity onPress={() => router.push('/wallet/index' as any)} activeOpacity={0.7} style={styles.earnCard}>
+          <TouchableOpacity onPress={() => router.push('/(customer)/wallet' as any)} activeOpacity={0.7} style={styles.earnCard}>
             <View style={styles.earnIconBox}>
               <Wallet size={22} color={v3.colors.paper} weight="fill" />
             </View>
@@ -196,7 +189,6 @@ export default function AccountScreen() {
           </TouchableOpacity>
         ) : null}
 
-        {/* ═══ Danger Zone ═══ */}
         <SectionLabel label="Account" />
         <View style={styles.dangerRow}>
           {deleting ? (
@@ -214,7 +206,6 @@ export default function AccountScreen() {
         </View>
 
         <Text style={styles.version}>MaintainEX v1.0.0</Text>
-
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -234,7 +225,6 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: v3.colors.canvas },
   scroll: { paddingBottom: 20, paddingHorizontal: 18, paddingTop: 8 },
-
   profileHeader: { alignItems: 'center', paddingTop: 8, paddingBottom: 16, gap: 2 },
   avatarWrap: { position: 'relative' },
   avatarBadge: {
@@ -244,16 +234,12 @@ const styles = StyleSheet.create({
   },
   name: { fontSize: 24, fontFamily: 'Outfit_900Black', color: v3.colors.textPrimary, marginTop: 8 },
   sub: { fontSize: 13, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted },
-
   tierSection: { alignItems: 'center', marginBottom: 16 },
-
   sectionLabel: {
     fontSize: 11, fontFamily: 'Outfit_700Bold', textTransform: 'uppercase', letterSpacing: 0.8,
     color: v3.colors.textMuted, marginBottom: 8, marginTop: 16,
   },
-
   section: { gap: 8 },
-
   menuRow: {
     flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: v3.radius.lg,
     backgroundColor: v3.colors.surfaceWhite, borderWidth: 1, borderColor: v3.colors.line,
@@ -262,7 +248,6 @@ const styles = StyleSheet.create({
   menuLabel: { fontSize: 14, fontFamily: 'Outfit_500Medium', color: v3.colors.textPrimary, flex: 1 },
   badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: v3.colors.error, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginRight: 4 },
   badgeText: { fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
-
   earnCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: v3.colors.ink, borderRadius: v3.radius.lg,
@@ -276,13 +261,11 @@ const styles = StyleSheet.create({
   earnBody: { flex: 1, marginLeft: 12 },
   earnTitle: { fontSize: 15, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
   earnSub: { fontSize: 11, fontFamily: 'Outfit_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-
   dangerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     padding: 14, borderRadius: v3.radius.lg, borderWidth: 1, borderColor: v3.colors.error + '44',
     backgroundColor: v3.colors.surfaceWhite, marginBottom: 8,
   },
   dangerText: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.error },
-
   version: { textAlign: 'center', fontSize: 11, fontFamily: 'Outfit_400Regular', color: v3.colors.textLight, marginTop: 20 },
 })
