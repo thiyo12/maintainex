@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react'
 import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { User, Envelope, Phone, Briefcase, CalendarBlank } from 'phosphor-react-native'
 import { useAuth } from '../../../../lib/auth'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
+import { fonts } from '../../../../lib/fonts'
 
 export default function MyProfileScreen() {
   const colors = useColors()
@@ -31,11 +32,11 @@ export default function MyProfileScreen() {
     t('profile.company')
 
   const fields = [
-    { label: t('profile.fullName'), value: user.name, icon: 'person-outline' as const },
-    { label: t('profile.email'), value: user.email, icon: 'mail-outline' as const },
-    { label: t('profile.phone'), value: user.phone || 'Not set', icon: 'call-outline' as const },
-    { label: t('profile.role'), value: roleLabel, icon: 'briefcase-outline' as const },
-    { label: t('profile.memberSince'), value: memberSince, icon: 'calendar-outline' as const },
+    { label: t('profile.fullName'), value: user.name, Icon: User },
+    { label: t('profile.email'), value: user.email, Icon: Envelope },
+    { label: t('profile.phone'), value: user.phone || 'Not set', Icon: Phone },
+    { label: t('profile.role'), value: roleLabel, Icon: Briefcase },
+    { label: t('profile.memberSince'), value: memberSince, Icon: CalendarBlank },
   ]
 
   return (
@@ -55,7 +56,7 @@ export default function MyProfileScreen() {
           <View style={styles.card}>
             {fields.map((f, i) => (
               <View key={f.label} style={[styles.row, i === fields.length - 1 && { borderBottomWidth: 0 }]}>
-                <Ionicons name={f.icon} size={20} color={colors.customerAccent} />
+                <f.Icon size={20} color="#F5A623" weight="fill" />
                 <View style={styles.fieldContent}>
                   <Text style={styles.fieldLabel}>{f.label}</Text>
                   <Text style={styles.fieldValue}>{f.value}</Text>
@@ -70,28 +71,28 @@ export default function MyProfileScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  heading: { fontSize: 28, fontFamily: 'Outfit_900Black', color: '#FFFFFF', paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
   avatarSection: { alignItems: 'center', marginBottom: 24 },
   avatar: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: colors.customerAccent,
+    width: 80, height: 80, borderRadius: 40, backgroundColor: '#F5A623',
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  avatarText: { fontSize: 32, fontWeight: '700', color: colors.white },
-  userName: { fontSize: 20, fontWeight: '800', color: colors.dark },
-  userRole: { fontSize: 13, color: colors.gray, marginTop: 2, textTransform: 'capitalize' },
+  avatarText: { fontSize: 32, fontFamily: 'Outfit_700Bold', color: '#FFFFFF' },
+  userName: { fontSize: 20, fontFamily: 'Outfit_900Black', color: '#FFFFFF' },
+  userRole: { fontSize: 13, color: '#6F6B6B', marginTop: 2, fontFamily: 'Outfit_500Medium', textTransform: 'capitalize' },
   card: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 4, marginBottom: 24,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 4, marginBottom: 24,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: colors.lightGray,
+    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
   },
   fieldContent: { flex: 1 },
-  fieldLabel: { fontSize: 12, fontWeight: '600', color: colors.gray, textTransform: 'uppercase' },
-  fieldValue: { fontSize: 15, fontWeight: '600', color: colors.dark, marginTop: 2 },
+  fieldLabel: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: '#6F6B6B', textTransform: 'uppercase' },
+  fieldValue: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF', marginTop: 2 },
 })

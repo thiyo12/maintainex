@@ -4,12 +4,14 @@ import { CaretRight } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../../lib/auth'
-import { colors, spacing, radius, typography } from '../../../lib/design'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { tierById, nextTier, TIERS } from '../../../lib/tiers'
 
 export default function MembershipScreen() {
   const { t } = useTranslation()
   const { user } = useAuth()
+  const colors = useColors()
 
   const tier = tierById((user as any)?.tierLevel)
   const TierIcon = tier.icon
@@ -22,7 +24,7 @@ export default function MembershipScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <LinearGradient colors={[tier.color, colors.surfaceHigh]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+      <LinearGradient colors={[tier.color, '#2E2E2E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
         <View style={styles.heroIconBox}>
           <TierIcon size={34} color="#FFFFFF" weight="fill" />
         </View>
@@ -80,34 +82,34 @@ export default function MembershipScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, paddingBottom: spacing.xxl },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  content: { padding: 16, paddingBottom: 40 },
 
-  hero: { borderRadius: radius.lg, padding: spacing.lg, alignItems: 'center', marginBottom: spacing.md },
-  heroIconBox: { width: 68, height: 68, borderRadius: radius.lg, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
-  heroLabel: { ...typography.caption, color: 'rgba(255,255,255,0.85)' },
-  heroTitle: { ...typography.h2, color: '#FFFFFF', marginTop: 2 },
-  heroDesc: { ...typography.bodyMuted, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 4 },
+  hero: { borderRadius: 18, padding: 18, alignItems: 'center', marginBottom: 16 },
+  heroIconBox: { width: 68, height: 68, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  heroLabel: { fontFamily: 'Outfit_700Bold', fontSize: 11, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: 0.8 },
+  heroTitle: { fontFamily: 'Outfit_900Black', fontSize: 22, color: '#FFFFFF', marginTop: 2 },
+  heroDesc: { fontFamily: 'Outfit_500Medium', fontSize: 13, color: 'rgba(255,255,255,0.85)', textAlign: 'center', marginTop: 4 },
 
-  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.lg, marginBottom: spacing.md },
-  cardTitle: { ...typography.caption, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'Outfit_600SemiBold' },
-  nextName: { ...typography.h3, marginTop: 4, marginBottom: spacing.md },
+  card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E', borderRadius: 12, padding: 18, marginBottom: 16 },
+  cardTitle: { fontFamily: 'Outfit_600SemiBold', fontSize: 11, color: '#6F6B6B', textTransform: 'uppercase', letterSpacing: 1 },
+  nextName: { fontFamily: 'Outfit_900Black', fontSize: 20, marginTop: 4, marginBottom: 16, color: '#FFFFFF' },
 
-  progressBlock: { marginBottom: spacing.md },
-  progressLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 6 },
-  progressTrack: { height: 8, borderRadius: 4, backgroundColor: colors.surfaceHigh, overflow: 'hidden' },
+  progressBlock: { marginBottom: 16 },
+  progressLabel: { fontFamily: 'Outfit_700Bold', fontSize: 11, color: '#6F6B6B', marginBottom: 6 },
+  progressTrack: { height: 8, borderRadius: 4, backgroundColor: '#2E2E2E', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
 
-  sectionTitle: { ...typography.h3, fontSize: 18, marginTop: spacing.sm, marginBottom: 4 },
-  sectionSub: { ...typography.bodyMuted, fontSize: 14, marginBottom: spacing.md },
+  sectionTitle: { fontFamily: 'Outfit_900Black', fontSize: 18, color: '#FFFFFF', marginTop: 14, marginBottom: 4 },
+  sectionSub: { fontFamily: 'Outfit_500Medium', fontSize: 14, color: '#6F6B6B', marginBottom: 16 },
 
   tierList: { gap: 8 },
   tierRow: {
-    flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E',
   },
   tierRowIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  tierRowBody: { flex: 1, marginLeft: spacing.md },
-  tierRowName: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 15 },
-  tierRowDesc: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  tierRowBody: { flex: 1, marginLeft: 16 },
+  tierRowName: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: '#FFFFFF' },
+  tierRowDesc: { fontFamily: 'Outfit_700Bold', fontSize: 11, color: '#6F6B6B', marginTop: 2 },
 })

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Wallet, PlusCircle, ArrowUp, Receipt, ArrowDownLeft, ArrowUpCircle, TrendingDown, ArrowRightLeft } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
@@ -11,11 +11,11 @@ import { formatCurrency, getCurrencyForCountry } from '../../../lib/currency-for
 import { Currency } from '../../../lib/money'
 import { useCountry } from '../../../lib/country'
 
-const TX_ICONS: Record<string, { name: string; bg: string }> = {
-  ESCROW_RELEASE:  { name: 'lock-closed-outline', bg: '#FEF3C7' },
-  ESCROW_REFUND:   { name: 'return-down-back-outline', bg: '#DBEAFE' },
-  WITHDRAWAL:      { name: 'arrow-up-circle-outline', bg: '#DBEAFE' },
-  SERVICE_FEE:     { name: 'trending-down-outline', bg: '#FEE2E2' },
+const TX_ICONS: Record<string, { icon: any; bg: string }> = {
+  ESCROW_RELEASE:  { icon: ArrowDownLeft, bg: '#FEF3C7' },
+  ESCROW_REFUND:   { icon: ArrowRightLeft, bg: '#DBEAFE' },
+  WITHDRAWAL:      { icon: ArrowUpCircle, bg: '#DBEAFE' },
+  SERVICE_FEE:     { icon: TrendingDown, bg: '#FEE2E2' },
 }
 
 const TX_LABELS: Record<string, string> = {
@@ -61,7 +61,7 @@ export default function CustomerWalletScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: colors.muted, fontFamily: fonts.body }}>{t('common.loading')}</Text>
+          <Text style={{ color: '#6F6B6B', fontFamily: fonts.body }}>{t('common.loading')}</Text>
         </View>
       </SafeAreaView>
     )
@@ -71,7 +71,7 @@ export default function CustomerWalletScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchWallet() }} tintColor={colors.amber} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchWallet() }} tintColor={'#F5A623'} />
         }
       >
         <Animated.View style={[styles.balanceCard, { opacity: fadeAnim }]}>
@@ -84,7 +84,7 @@ export default function CustomerWalletScreen() {
           </View>
           <View style={styles.actionRow}>
             <TouchableOpacity style={[styles.actionBtn, styles.addBtn]} onPress={() => router.push('/(customer)/wallet/topup')} activeOpacity={0.8}>
-              <Ionicons name="add-circle-outline" size={16} color="#111827" />
+              <PlusCircle size={16} color="#111827" weight="bold" />
               <Text style={styles.addTxt}>Add Money</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -92,7 +92,7 @@ export default function CustomerWalletScreen() {
               onPress={() => router.push('/(tasker)/wallet/withdraw' as any)}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-up-circle-outline" size={16} color="#FFFFFF" />
+              <ArrowUpCircle size={16} color="#FFFFFF" weight="bold" />
               <Text style={styles.withdrawTxt}>Withdraw</Text>
             </TouchableOpacity>
           </View>
@@ -102,19 +102,19 @@ export default function CustomerWalletScreen() {
 
         {transactions.length === 0 && (
           <View style={styles.emptyTx}>
-            <Ionicons name="receipt-outline" size={40} color={colors.muted} />
-            <Text style={{ color: colors.muted, fontFamily: fonts.body, marginTop: 12 }}>
+            <Receipt size={40} color={'#6F6B6B'} weight="bold" />
+            <Text style={{ color: '#6F6B6B', fontFamily: fonts.body, marginTop: 12 }}>
               No transactions yet
             </Text>
           </View>
         )}
 
         {transactions.map((tx: any) => {
-          const icon = TX_ICONS[tx.referenceType as string] || { name: 'swap-horizontal-outline', bg: colors.surface || colors.amberBg }
+          const txIcon = TX_ICONS[tx.referenceType as string] || { icon: ArrowRightLeft, bg: '#FFFFFF' }
           return (
             <View key={tx.id} style={styles.txCard}>
-              <View style={[styles.txIcon, { backgroundColor: icon.bg }]}>
-                <Ionicons name={icon.name as any} size={18} color={colors.ink} />
+              <View style={[styles.txIcon, { backgroundColor: txIcon.bg }]}>
+                <txIcon.icon size={18} color={'#FFFFFF'} weight="bold" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.txTitle}>{TX_LABELS[tx.referenceType as string] || tx.referenceType}</Text>
@@ -125,7 +125,7 @@ export default function CustomerWalletScreen() {
                   })}
                 </Text>
               </View>
-              <Text style={[styles.txAmt, { color: tx.type === 'CREDIT' ? '#22C55E' : colors.ink }]}>
+              <Text style={[styles.txAmt, { color: tx.type === 'CREDIT' ? '#22C55E' : '#FFFFFF' }]}>
                 {tx.type === 'CREDIT' ? '+' : '-'}{formatCurrency(BigInt(tx.amount), currency)}
               </Text>
             </View>
@@ -138,7 +138,7 @@ export default function CustomerWalletScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: colors.surface },
   balanceCard: {
     margin: 16, borderRadius: 22, overflow: 'hidden',
     backgroundColor: '#0D0D0D',
@@ -155,7 +155,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     fontSize: 38, fontFamily: fonts.heading,
     color: '#FFFFFF', letterSpacing: -1, marginVertical: 4,
   },
-  balanceCurr: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
+  balanceCurr: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#F5A623' },
   escrowRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     marginTop: 4, paddingTop: 12,
@@ -168,7 +168,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center', gap: 6,
     paddingVertical: 11, borderRadius: 12,
   },
-  addBtn: { backgroundColor: colors.amber },
+  addBtn: { backgroundColor: '#F5A623' },
   withdrawBtn: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
@@ -177,11 +177,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   withdrawTxt: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
   sectionTitle: {
     fontSize: 14, fontFamily: fonts.headingBold,
-    color: colors.ink, paddingHorizontal: 16,
+    color: '#FFFFFF', paddingHorizontal: 16,
     paddingTop: 8, paddingBottom: 10,
   },
   txCard: {
-    backgroundColor: colors.white, marginHorizontal: 16,
+    backgroundColor: '#FFFFFF', marginHorizontal: 16,
     marginBottom: 8, borderRadius: 14, padding: 14,
     flexDirection: 'row', alignItems: 'center', gap: 12,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
@@ -191,8 +191,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
     width: 38, height: 38, borderRadius: 11,
     justifyContent: 'center', alignItems: 'center',
   },
-  txTitle: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
-  txSub: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 1 },
+  txTitle: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  txSub: { fontSize: 11, fontFamily: fonts.body, color: '#6F6B6B', marginTop: 1 },
   txAmt: { fontSize: 15, fontFamily: fonts.heading, letterSpacing: -0.3 },
   emptyTx: { alignItems: 'center', paddingVertical: 40 },
 })

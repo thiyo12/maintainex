@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, Alert, Switch, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Alert, Switch, ActivityIndicator, TouchableOpacity } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -14,7 +14,7 @@ import { useAuth } from '../../../lib/auth'
 import { auth, upload } from '../../../lib/api'
 import { v3 } from '../../../theme/v3/tokens'
 import { tierById } from '../../../lib/tiers'
-import { useTheme } from '../../../lib/ThemeContext'
+import { useColors } from '../../../lib/ThemeContext'
 
 import V3CustomerBottomNav from '../../../components/v3/V3CustomerBottomNav'
 import V3TierBadge from '../../../components/v3/V3TierBadge'
@@ -45,7 +45,7 @@ function SectionLabel({ label }: { label: string }) {
 export default function AccountScreen() {
   const router = useRouter()
   const { t } = useTranslation()
-  const theme = useTheme()
+  const colors = useColors()
   const { user, logout, refreshUser } = useAuth()
   const [deleting, setDeleting] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -174,8 +174,8 @@ export default function AccountScreen() {
             </View>
             <Text style={styles.menuLabel}>{t('account.darkMode')}</Text>
             <Switch
-              value={theme.isDark}
-              onValueChange={() => theme.toggleTheme()}
+              value={colors.isDark}
+              onValueChange={() => colors.toggleTheme()}
               trackColor={{ false: v3.colors.line, true: v3.colors.ink }}
               thumbColor={v3.colors.paper}
             />

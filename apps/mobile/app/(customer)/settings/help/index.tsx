@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretUp, CaretDown, Envelope, Phone } from 'phosphor-react-native'
 import { useColors } from '../../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { fonts } from '../../../../lib/fonts'
 
 export default function HelpScreen() {
   const { t } = useTranslation()
@@ -42,11 +43,11 @@ export default function HelpScreen() {
                 <View key={i} style={[styles.faqItem, i === faqs.length - 1 && { borderBottomWidth: 0 }]}>
                   <TouchableOpacity style={styles.faqHeader} onPress={() => toggle(i)} activeOpacity={0.7}>
                     <Text style={styles.faqQuestion}>{faq.q}</Text>
-                    <Ionicons
-                      name={isOpen ? 'chevron-up' : 'chevron-down'}
-                      size={18}
-                      color={colors.gray}
-                    />
+                    {isOpen ? (
+                      <CaretUp size={18} color="#6F6B6B" weight="fill" />
+                    ) : (
+                      <CaretDown size={18} color="#6F6B6B" weight="fill" />
+                    )}
                   </TouchableOpacity>
                   {isOpen && (
                     <Text style={styles.faqAnswer}>{faq.a}</Text>
@@ -59,11 +60,11 @@ export default function HelpScreen() {
           <Text style={styles.sectionTitle}>{t('profile.contactUs')}</Text>
           <View style={styles.card}>
             <View style={styles.contactRow}>
-              <Ionicons name="mail-outline" size={20} color={colors.customerAccent} />
+              <Envelope size={20} color="#F5A623" weight="fill" />
               <Text style={styles.contactText}>  support@maintainex.com</Text>
             </View>
             <View style={[styles.contactRow, { borderBottomWidth: 0 }]}>
-              <Ionicons name="call-outline" size={20} color={colors.customerAccent} />
+              <Phone size={20} color="#F5A623" weight="fill" />
               <Text style={styles.contactText}>  +94 11 234 5678</Text>
             </View>
           </View>
@@ -74,29 +75,29 @@ export default function HelpScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  heading: { fontSize: 28, fontFamily: 'Outfit_900Black', color: '#FFFFFF', paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.gray, marginBottom: 10, marginTop: 8, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: '#6F6B6B', marginBottom: 10, marginTop: 8, textTransform: 'uppercase' },
   card: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 4, marginBottom: 20,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 4, marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   faqItem: {
-    borderBottomWidth: 1, borderBottomColor: colors.lightGray,
+    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
     paddingHorizontal: 16,
   },
   faqHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 16,
   },
-  faqQuestion: { fontSize: 15, fontWeight: '600', color: colors.dark, flex: 1, paddingRight: 12 },
-  faqAnswer: { fontSize: 13, color: colors.gray, lineHeight: 20, paddingBottom: 16 },
+  faqQuestion: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF', flex: 1, paddingRight: 12 },
+  faqAnswer: { fontSize: 13, color: '#6F6B6B', fontFamily: 'Outfit_500Medium', lineHeight: 20, paddingBottom: 16 },
   contactRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: colors.lightGray,
+    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
   },
-  contactText: { fontSize: 15, fontWeight: '500', color: colors.dark },
+  contactText: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#FFFFFF' },
 })

@@ -2,10 +2,10 @@ import { useState, useRef, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { PaperPlaneRight, CaretLeft, DotsThreeVertical, Image as ImageIcon, XCircle, Info, Lock, ShieldCheck, Wrench, CaretRight, Clock, WarningCircle, Check, User } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { conversations, auth, resolveImageUri } from '../../lib/api'
-import { useTheme } from '../../lib/ThemeContext'
+import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 
 const CLOSED_STATUSES = ['COMPLETED', 'CANCELLED', 'REJECTED']
@@ -24,8 +24,7 @@ function detectWarnings(text: string): string[] {
 
 export default function ChatDetailScreen() {
   const { t } = useTranslation()
-  const { colors } = useTheme()
-  const styles = makeStyles(colors)
+  const colors = useColors()
   const router = useRouter()
   const { id, status, testMsg, testUser } = useLocalSearchParams()
   const isDemo = (id as string || '').startsWith('demo_')
@@ -161,29 +160,29 @@ export default function ChatDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.topBar, { borderBottomColor: colors.border, backgroundColor: colors.white }]}>
+      <View style={[styles.topBar, { borderBottomColor: '#2E2E2E', backgroundColor: '#FFFFFF' }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.ink} />
+          <CaretLeft size={22} color='#FFFFFF' weight='bold' />
         </TouchableOpacity>
         <View style={styles.topInfo}>
           {otherAvatar ? (
             <Image source={{ uri: otherAvatar }} style={styles.avatarImg} />
           ) : (
-            <View style={[styles.avatarSmall, { backgroundColor: colors.amber }]}>
+            <View style={[styles.avatarSmall, { backgroundColor: '#F5A623' }]}>
               <Text style={[styles.avatarText, { color: '#111827' }]}>{otherName[0]?.toUpperCase() || '?'}</Text>
             </View>
           )}
           <View>
-            <Text style={[styles.chatName, { color: colors.ink }]}>{otherName}</Text>
+            <Text style={[styles.chatName, { color: '#FFFFFF' }]}>{otherName}</Text>
             {job ? (
-              <Text style={[styles.chatJobSub, { color: colors.muted }]} numberOfLines={1}>
+              <Text style={[styles.chatJobSub, { color: '#6F6B6B' }]} numberOfLines={1}>
                 {job.title} • {job.ref}
               </Text>
             ) : null}
           </View>
         </View>
         <TouchableOpacity onPress={() => router.push(`/(customer)/find/tasker-profile/${otherUser?.id || ''}`)}>
-          <Ionicons name="person-circle-outline" size={24} color={colors.muted} />
+          <User size={24} color='#6F6B6B' />
         </TouchableOpacity>
       </View>
 
@@ -194,7 +193,7 @@ export default function ChatDetailScreen() {
       >
         {loading ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={colors.amber} />
+            <ActivityIndicator size="large" color='#F5A623' />
           </View>
         ) : (
           <FlatList
@@ -207,37 +206,37 @@ export default function ChatDetailScreen() {
               <View>
                 {isClosed ? (
                   <View style={[styles.closedBanner, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
-                    <Ionicons name="lock-closed" size={16} color="#DC2626" />
+                    <Lock size={16} color="#DC2626" />
                     <Text style={[styles.safetyText, { color: '#991B1B' }]}>{t('chat.conversationClosed')}</Text>
                   </View>
                 ) : null}
-                <View style={[styles.safetyBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
-                  <Ionicons name="shield-checkmark" size={16} color={colors.amber} />
-                  <Text style={[styles.safetyText, { color: colors.ink }]}>{t('chat.safetyMessage')}</Text>
+                <View style={[styles.safetyBanner, { backgroundColor: 'rgba(245,166,35,0.08)', borderColor: 'rgba(245,166,35,0.19)' }]}>
+                  <ShieldCheck size={16} color='#F5A623' />
+                  <Text style={[styles.safetyText, { color: '#FFFFFF' }]}>{t('chat.safetyMessage')}</Text>
                 </View>
                 {job?.categoryName || job?.photos?.length ? (
                   <TouchableOpacity
-                    style={[styles.jobCard, { backgroundColor: colors.white, borderColor: colors.border }]}
+                    style={[styles.jobCard, { backgroundColor: '#FFFFFF', borderColor: '#2E2E2E' }]}
                     onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}
                   >
                     {job.photos?.length ? (
                       <Image source={{ uri: resolveImageUri(job.photos[0]) }} style={styles.jobCardImg} />
                     ) : (
-                      <View style={[styles.jobCardImg, styles.jobCardImgPlaceholder, { backgroundColor: colors.amberBg }]}>
-                        <Ionicons name="build-outline" size={20} color={colors.amber} />
+                      <View style={[styles.jobCardImg, styles.jobCardImgPlaceholder, { backgroundColor: '#FFF1D2' }]}>
+                        <Wrench size={20} color='#F5A623' />
                       </View>
                     )}
                     <View style={styles.jobCardBody}>
-                      <Text style={[styles.jobCardCat, { color: colors.amberDark }]} numberOfLines={1}>
+                      <Text style={[styles.jobCardCat, { color: '#D4900A' }]} numberOfLines={1}>
                         {job.categoryName || 'Maintenance job'}
                       </Text>
-                      <Text style={[styles.jobCardTitle, { color: colors.ink }]} numberOfLines={2}>{job.title}</Text>
-                      <Text style={[styles.jobCardMeta, { color: colors.muted }]}>
+                      <Text style={[styles.jobCardTitle, { color: '#FFFFFF' }]} numberOfLines={2}>{job.title}</Text>
+                      <Text style={[styles.jobCardMeta, { color: '#6F6B6B' }]}>
                         {job.ref}
                         {job.aiEstimate?.priceRange ? ` • Estimate Rs ${job.aiEstimate.priceRange.min?.toLocaleString?.()} – ${job.aiEstimate.priceRange.max?.toLocaleString?.()}` : (job.budgetAmount ? ` • Budget Rs ${Number(job.budgetAmount).toLocaleString()}` : '')}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+                    <CaretRight size={18} color='#6F6B6B' />
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -250,30 +249,30 @@ export default function ChatDetailScreen() {
                 <View>
                   {showDate && (
                     <View style={styles.dateSep}>
-                      <Text style={[styles.dateSepText, { color: colors.muted }]}>{formatDate(item.createdAt || item.updatedAt)}</Text>
+                      <Text style={[styles.dateSepText, { color: '#6F6B6B' }]}>{formatDate(item.createdAt || item.updatedAt)}</Text>
                     </View>
                   )}
                   {flagged && !isUser && (
-                    <View style={[styles.flagBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
-                      <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
-                      <Text style={[styles.flagBannerText, { color: colors.ink }]}>Reminder: all payments must go through MΛINTΛINEX</Text>
+                    <View style={[styles.flagBanner, { backgroundColor: 'rgba(245,166,35,0.08)', borderColor: 'rgba(245,166,35,0.19)' }]}>
+                      <ShieldCheck size={12} color='#F5A623' />
+                      <Text style={[styles.flagBannerText, { color: '#FFFFFF' }]}>Reminder: all payments must go through MΛINTΛINEX</Text>
                     </View>
                   )}
                   <View style={[styles.messageWrap, { maxWidth: '78%' }, isUser ? styles.messageSent : styles.messageReceived]}>
-                    <View style={[styles.messageBubble, isUser ? { backgroundColor: colors.amber, borderBottomRightRadius: 4 } : { backgroundColor: colors.white, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: colors.border }]}>
-                      <Text style={[styles.messageText, { color: isUser ? '#111827' : colors.ink }]}>{item.text}</Text>
+                    <View style={[styles.messageBubble, isUser ? { backgroundColor: '#F5A623', borderBottomRightRadius: 4 } : { backgroundColor: '#FFFFFF', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2E2E2E' }]}>
+                      <Text style={[styles.messageText, { color: isUser ? '#111827' : '#FFFFFF' }]}>{item.text}</Text>
                     </View>
                     <View style={[styles.messageFooter, isUser ? styles.footerSent : styles.footerReceived]}>
-                      <Text style={[styles.messageTime, { color: colors.muted }]}>{formatTime(item.createdAt || item.updatedAt)}</Text>
+                      <Text style={[styles.messageTime, { color: '#6F6B6B' }]}>{formatTime(item.createdAt || item.updatedAt)}</Text>
                       {isUser && (
                         item.status === 'sending' ? (
-                          <Ionicons name="time-outline" size={11} color={colors.muted} />
+                          <Clock size={11} color='#6F6B6B' />
                         ) : item.status === 'failed' ? (
                           <TouchableOpacity onPress={() => retrySend(item)}>
-                            <Ionicons name="alert-circle" size={11} color="#EF4444" />
+                            <WarningCircle size={11} color="#EF4444" />
                           </TouchableOpacity>
                         ) : (
-                          <Ionicons name="checkmark" size={11} color={colors.muted} />
+                          <Check size={11} color='#6F6B6B' />
                         )
                       )}
                     </View>
@@ -285,35 +284,35 @@ export default function ChatDetailScreen() {
         )}
 
         {isClosed ? (
-          <View style={[styles.closedInputBar, { borderTopColor: colors.border, backgroundColor: '#FEF2F2' }]}>
-            <Ionicons name="lock-closed" size={14} color="#DC2626" />
+          <View style={[styles.closedInputBar, { borderTopColor: '#2E2E2E', backgroundColor: '#FEF2F2' }]}>
+            <Lock size={14} color="#DC2626" />
             <Text style={[styles.closedInputText, { color: '#991B1B' }]}>{t('chat.conversationClosed')}</Text>
           </View>
         ) : (
-          <View style={[styles.inputBar, { borderTopColor: colors.border, backgroundColor: colors.white }]}>
+          <View style={[styles.inputBar, { borderTopColor: '#2E2E2E', backgroundColor: '#FFFFFF' }]}>
             {preWarn.length > 0 && (
-              <View style={[styles.flagBanner, { backgroundColor: colors.amber + '15', borderColor: colors.amber + '30' }]}>
-                <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
-                <Text style={[styles.flagBannerText, { color: colors.ink }]}>{preWarn.join(' · ')}</Text>
+              <View style={[styles.flagBanner, { backgroundColor: 'rgba(245,166,35,0.08)', borderColor: 'rgba(245,166,35,0.19)' }]}>
+                <ShieldCheck size={12} color='#F5A623' />
+                <Text style={[styles.flagBannerText, { color: '#FFFFFF' }]}>{preWarn.join(' · ')}</Text>
               </View>
             )}
-            <View style={[styles.inputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.inputWrap, { backgroundColor: '#FFFFFF', borderColor: '#2E2E2E' }]}>
               <TextInput
-                style={[styles.input, { color: colors.ink }]}
+                style={[styles.input, { color: '#FFFFFF' }]}
                 value={inputText}
                 onChangeText={(t) => { setInputText(t); setPreWarn(detectWarnings(t)) }}
                 placeholder={t('chat.inputPlaceholder')}
-                placeholderTextColor={colors.muted}
+                placeholderTextColor='#6F6B6B'
                 multiline
               />
             </View>
             <TouchableOpacity
-              style={[styles.sendBtn, { backgroundColor: inputText.trim() ? colors.amber : colors.border }]}
+              style={[styles.sendBtn, { backgroundColor: inputText.trim() ? '#F5A623' : '#2E2E2E' }]}
               onPress={sendMessage}
               disabled={!inputText.trim() || sending}
               activeOpacity={0.7}
             >
-              <Ionicons name="send" size={16} color={inputText.trim() ? '#111827' : colors.muted} />
+              <PaperPlaneRight size={16} color={inputText.trim() ? '#111827' : '#6F6B6B'} />
             </TouchableOpacity>
           </View>
         )}
@@ -322,8 +321,8 @@ export default function ChatDetailScreen() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

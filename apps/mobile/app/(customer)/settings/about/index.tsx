@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Hammer, Globe, Envelope, Shield, Link } from 'phosphor-react-native'
 import { useColors } from '../../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
+import { fonts } from '../../../../lib/fonts'
 
 export default function AboutScreen() {
   const { t } = useTranslation()
@@ -25,7 +26,7 @@ export default function AboutScreen() {
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.brandCard}>
             <View style={styles.iconWrap}>
-              <Ionicons name="hammer" size={36} color={colors.white} />
+              <Hammer size={36} color="#FFFFFF" weight="fill" />
             </View>
             <Text style={styles.appName}>MΛINTΛINEX</Text>
             <Text style={styles.version}>Version 1.0.0</Text>
@@ -41,17 +42,17 @@ export default function AboutScreen() {
 
           <View style={styles.card}>
             <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://maintainex.com')}>
-              <Ionicons name="globe-outline" size={20} color={colors.customerAccent} />
+              <Globe size={20} color="#F5A623" weight="fill" />
               <Text style={styles.linkText}>  www.maintainex.com</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.linkRow, { borderBottomWidth: 0 }]} onPress={() => Linking.openURL('mailto:hello@maintainex.com')}>
-              <Ionicons name="mail-outline" size={20} color={colors.customerAccent} />
+              <Envelope size={20} color="#F5A623" weight="fill" />
               <Text style={styles.linkText}>  hello@maintainex.com</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.policyBtn} onPress={() => router.push('/settings/terms')}>
-            <Ionicons name="shield-outline" size={18} color={colors.customerAccent} />
+            <Shield size={18} color="#F5A623" weight="fill" />
             <Text style={styles.policyBtnText}>  Privacy Policy</Text>
           </TouchableOpacity>
 
@@ -59,7 +60,7 @@ export default function AboutScreen() {
             style={styles.creditRow}
             onPress={() => Linking.openURL('https://instagram.com/thiyothman')}
           >
-            <Ionicons name="logo-instagram" size={12} color={colors.gray} />
+            <Link size={12} color="#6F6B6B" weight="fill" />
             <Text style={styles.creditText}>
               Design & Developed by <Text style={styles.creditName}>Thiyoth</Text> · @thiyothman
             </Text>
@@ -71,41 +72,41 @@ export default function AboutScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  heading: { fontSize: 28, fontFamily: 'Outfit_900Black', color: '#FFFFFF', paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
   brandCard: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 28,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 28,
     alignItems: 'center', marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   iconWrap: {
-    width: 72, height: 72, borderRadius: 20, backgroundColor: colors.customerAccent,
+    width: 72, height: 72, borderRadius: 20, backgroundColor: '#F5A623',
     justifyContent: 'center', alignItems: 'center', marginBottom: 14,
   },
-  appName: { fontSize: 22, fontWeight: '800', color: colors.dark },
-  version: { fontSize: 13, color: colors.gray, marginTop: 4 },
+  appName: { fontSize: 22, fontFamily: 'Outfit_900Black', color: '#FFFFFF' },
+  version: { fontSize: 13, color: '#6F6B6B', marginTop: 4, fontFamily: 'Outfit_500Medium' },
   card: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  description: { fontSize: 14, color: colors.darkMid, lineHeight: 22 },
+  description: { fontSize: 14, color: '#6F6B6B', fontFamily: 'Outfit_500Medium', lineHeight: 22 },
   linkRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.lightGray,
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
   },
-  linkText: { fontSize: 15, fontWeight: '600', color: colors.customerAccent },
+  linkText: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
   policyBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     paddingVertical: 14, marginBottom: 24,
   },
-  policyBtnText: { fontSize: 14, fontWeight: '600', color: colors.customerAccent },
+  policyBtnText: { fontSize: 14, fontFamily: 'Outfit_600SemiBold', color: '#F5A623' },
   creditRow: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
     gap: 4, paddingVertical: 12, marginBottom: 20,
   },
-  creditText: { fontSize: 11, color: colors.gray },
-  creditName: { color: colors.customerAccent, fontWeight: '700' },
+  creditText: { fontSize: 11, color: '#6F6B6B', fontFamily: 'Outfit_500Medium' },
+  creditName: { color: '#F5A623', fontFamily: 'Outfit_700Bold' },
 })

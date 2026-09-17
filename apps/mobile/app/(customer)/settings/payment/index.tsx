@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Animated } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CreditCard, Wallet, Link, PlusCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
+import { fonts } from '../../../../lib/fonts'
 
 export default function PaymentScreen() {
   const colors = useColors()
@@ -18,10 +19,10 @@ export default function PaymentScreen() {
   }, [])
 
   const methods = [
-    { name: t('payment.methodVisa'), icon: 'card-outline' as const },
-    { name: t('payment.methodMastercard'), icon: 'card-outline' as const },
-    { name: t('payment.methodPayHere'), icon: 'wallet-outline' as const },
-    { name: t('payment.methodStripe'), icon: 'link-outline' as const },
+    { name: t('payment.methodVisa'), icon: CreditCard },
+    { name: t('payment.methodMastercard'), icon: CreditCard },
+    { name: t('payment.methodPayHere'), icon: Wallet },
+    { name: t('payment.methodStripe'), icon: Link },
   ]
 
   return (
@@ -31,7 +32,7 @@ export default function PaymentScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
           <View style={styles.infoCard}>
-            <Ionicons name="wallet-outline" size={40} color={colors.gray} />
+            <Wallet size={40} color={'#6F6B6B'} weight="bold" />
             <Text style={styles.infoTitle}>{t('profile.noPaymentMethods')}</Text>
             <Text style={styles.infoSub}>
               {t('profile.addPaymentMethod')}
@@ -42,18 +43,21 @@ export default function PaymentScreen() {
             style={styles.addBtn}
             onPress={() => Alert.alert(t('payment.comingSoon'), t('payment.comingSoonDesc'))}
           >
-            <Ionicons name="add-circle-outline" size={20} color={colors.white} />
+            <PlusCircle size={20} color={'#FFFFFF'} weight="bold" />
             <Text style={styles.addBtnText}>  {t('common.add')}</Text>
           </TouchableOpacity>
 
           <Text style={styles.sectionTitle}>{t('profile.payment')}</Text>
           <View style={styles.card}>
-            {methods.map((m, i) => (
-              <View key={m.name} style={[styles.row, i === methods.length - 1 && { borderBottomWidth: 0 }]}>
-                <Ionicons name={m.icon} size={20} color={colors.customerAccent} />
-                <Text style={styles.methodName}>{m.name}</Text>
-              </View>
-            ))}
+            {methods.map((m, i) => {
+              const MethodIcon = m.icon
+              return (
+                <View key={m.name} style={[styles.row, i === methods.length - 1 && { borderBottomWidth: 0 }]}>
+                  <MethodIcon size={20} color={'#F5A623'} weight="bold" />
+                  <Text style={styles.methodName}>{m.name}</Text>
+                </View>
+              )
+            })}
           </View>
         </ScrollView>
       </Animated.View>
@@ -62,32 +66,32 @@ export default function PaymentScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.dark, paddingHorizontal: 24, marginBottom: 16 },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF', paddingHorizontal: 24, marginBottom: 16 },
   scroll: { paddingHorizontal: 24 },
   infoCard: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 32,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 32,
     alignItems: 'center', marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
-  infoTitle: { fontSize: 17, fontWeight: '700', color: colors.dark, marginTop: 12 },
-  infoSub: { fontSize: 13, color: colors.gray, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  infoTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: '#FFFFFF', marginTop: 12 },
+  infoSub: { fontSize: 13, color: '#6F6B6B', textAlign: 'center', marginTop: 6, lineHeight: 18 },
   addBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    backgroundColor: colors.customerAccent, paddingVertical: 14, borderRadius: 14, marginBottom: 24,
+    backgroundColor: '#F5A623', paddingVertical: 14, borderRadius: 14, marginBottom: 24,
   },
-  addBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.gray, marginBottom: 10, textTransform: 'uppercase' },
+  addBtnText: { fontSize: 16, fontFamily: fonts.headingBold, color: '#FFFFFF' },
+  sectionTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: '#6F6B6B', marginBottom: 10, textTransform: 'uppercase' },
   card: {
-    backgroundColor: colors.white, borderRadius: 14, padding: 4, marginBottom: 20,
+    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 4, marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
   },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: colors.lightGray,
+    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
   },
-  methodName: { fontSize: 15, fontWeight: '600', color: colors.dark },
+  methodName: { fontSize: 15, fontFamily: fonts.bodySemiBold, color: '#FFFFFF' },
 })
