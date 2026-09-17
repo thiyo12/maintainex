@@ -3,7 +3,6 @@ import { View, Text, StyleSheet } from 'react-native'
 import LottieView from 'lottie-react-native'
 import { Icon } from 'phosphor-react-native'
 import PressableScale from './PressableScale'
-import { colors, radius, spacing, typography } from '../../lib/design'
 
 interface Props {
   lottieUrl?: string | null
@@ -40,7 +39,7 @@ export default function EmptyState({
       <View style={styles.animBox}>
         {!loaded || failed ? (
           <View style={styles.fallback}>
-            {FallbackIcon ? <FallbackIcon size={iconSize} color={colors.textMuted} weight="duotone" /> : null}
+            {FallbackIcon ? <FallbackIcon size={iconSize} color="#6F6B6B" weight="duotone" /> : null}
           </View>
         ) : null}
         {lottieUrl && !failed ? (
@@ -68,18 +67,18 @@ export default function EmptyState({
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.sm },
-  animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  wrap: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24, gap: 8 },
+  animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   fallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   lottie: { width: 140, height: 140 },
-  title: { ...typography.h3, textAlign: 'center' },
-  subtitle: { ...typography.bodyMuted, textAlign: 'center' },
-  ctaWrap: { marginTop: spacing.md, alignSelf: 'stretch', alignItems: 'center' },
+  title: { fontSize: 20, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF', textAlign: 'center' },
+  subtitle: { fontSize: 16, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', textAlign: 'center' },
+  ctaWrap: { marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
   cta: {
-    backgroundColor: colors.accent,
+    backgroundColor: '#F5A623',
     paddingVertical: 14,
-    paddingHorizontal: spacing.xl,
-    borderRadius: radius.full,
+    paddingHorizontal: 32,
+    borderRadius: 9999,
   },
-  ctaText: { ...typography.body, fontFamily: 'Outfit_700Bold', color: colors.background },
+  ctaText: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
 })

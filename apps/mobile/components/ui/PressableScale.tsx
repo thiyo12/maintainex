@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react'
 import { Pressable, StyleProp, ViewStyle } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
-import { animations } from '../../lib/design'
 
 interface Props {
   children: React.ReactNode
@@ -13,6 +12,8 @@ interface Props {
   disabled?: boolean
   activeOpacity?: never
 }
+
+const SPRING_CONFIG = { damping: 20, stiffness: 300 }
 
 export default function PressableScale({
   children,
@@ -33,11 +34,11 @@ export default function PressableScale({
 
   const onPressIn = useCallback(() => {
     if (disabledRef.current) return
-    scale.value = withSpring(scaleTo, animations.spring)
+    scale.value = withSpring(scaleTo, SPRING_CONFIG)
   }, [scale, scaleTo])
 
   const onPressOut = useCallback(() => {
-    scale.value = withSpring(1, animations.spring)
+    scale.value = withSpring(1, SPRING_CONFIG)
   }, [scale])
 
   return (

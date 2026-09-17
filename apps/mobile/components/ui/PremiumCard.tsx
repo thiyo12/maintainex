@@ -1,7 +1,6 @@
 import React from 'react'
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native'
 import PressableScale from './PressableScale'
-import { colors, radius, shadows } from '../../lib/design'
 
 interface Props {
   children: React.ReactNode
@@ -10,7 +9,7 @@ interface Props {
   glowColor?: string
 }
 
-export default function PremiumCard({ children, style, onPress, glowColor = colors.accent }: Props) {
+export default function PremiumCard({ children, style, onPress, glowColor = '#F5A623' }: Props) {
   const content = (
     <View style={[styles.glass, style]}>{children}</View>
   )
@@ -27,19 +26,23 @@ export default function PremiumCard({ children, style, onPress, glowColor = colo
 
 const styles = StyleSheet.create({
   glow: {
-    borderRadius: radius.md,
-    shadowColor: colors.accent,
+    borderRadius: 16,
+    shadowColor: '#F5A623',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 6,
   },
   glass: {
-    borderRadius: radius.md,
+    borderRadius: 16,
     backgroundColor: 'rgba(30,32,48,0.55)',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#2E2E2E',
     overflow: 'hidden',
-    ...shadows.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
 })

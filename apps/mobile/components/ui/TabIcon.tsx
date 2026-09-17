@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'
 import { View, Text } from 'react-native'
 import { Icon } from 'phosphor-react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
-import { colors, animations } from '../../lib/design'
 
 interface Props {
   icon: Icon
@@ -15,14 +14,14 @@ interface Props {
 export default function TabIcon({
   icon: IconComponent,
   focused,
-  activeColor = colors.accent,
-  inactiveColor = colors.textMuted,
+  activeColor = '#F5A623',
+  inactiveColor = '#6F6B6B',
   badge = 0,
 }: Props) {
   const scale = useSharedValue(1)
 
   useEffect(() => {
-    scale.value = withSpring(focused ? 1.18 : 1, animations.spring)
+    scale.value = withSpring(focused ? 1.18 : 1, { damping: 20, stiffness: 300 })
   }, [focused, scale])
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -47,7 +46,7 @@ export default function TabIcon({
           minWidth: 16,
           height: 16,
           borderRadius: 8,
-          backgroundColor: colors.error,
+          backgroundColor: '#E11900',
           justifyContent: 'center',
           alignItems: 'center',
           paddingHorizontal: 4,

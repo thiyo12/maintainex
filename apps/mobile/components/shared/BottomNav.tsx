@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
 import { useTranslation } from 'react-i18next'
-import { colors, typography, shadows, animations } from '../../lib/design'
 
 type Role = 'tasker' | 'company'
 
@@ -13,6 +12,8 @@ interface Props {
   onPress: (tab: string) => void
   unreadMessages?: number
 }
+
+const SPRING_CONFIG = { damping: 20, stiffness: 300 }
 
 function TabButton({
   icon,
@@ -32,7 +33,7 @@ function TabButton({
   const scale = useSharedValue(1)
 
   useEffect(() => {
-    scale.value = withSpring(isActive ? 1.18 : 1, animations.spring)
+    scale.value = withSpring(isActive ? 1.18 : 1, SPRING_CONFIG)
   }, [isActive, scale])
 
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }))
@@ -40,8 +41,8 @@ function TabButton({
   if (isFab) {
     return (
       <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={styles.fabWrap}>
-        <View style={[styles.fab, { shadowColor: colors.accent }]}>
-          <Ionicons name="add" size={26} color={colors.background} />
+        <View style={[styles.fab, { shadowColor: '#F5A623' }]}>
+          <Ionicons name="add" size={26} color="#0D0D0D" />
         </View>
       </TouchableOpacity>
     )
@@ -56,11 +57,11 @@ function TabButton({
     >
       <View style={{ position: 'relative' }}>
         <Animated.View style={animatedStyle}>
-          <Ionicons name={icon as any} size={22} color={isActive ? colors.accent : colors.textSecondary} />
+          <Ionicons name={icon as any} size={22} color={isActive ? '#F5A623' : '#B3B3B3'} />
         </Animated.View>
         {unread && <View style={styles.pip} />}
       </View>
-      <Text style={[styles.label, { color: isActive ? colors.accent : colors.textSecondary }]} numberOfLines={1}>
+      <Text style={[styles.label, { color: isActive ? '#F5A623' : '#B3B3B3' }]} numberOfLines={1}>
         {label}
       </Text>
       {isActive ? <View style={styles.underline} /> : null}
@@ -90,7 +91,7 @@ export default function BottomNav({ role, active, onPress, unreadMessages = 0 }:
   const tabs = role === 'tasker' ? TASKER_TABS : COMPANY_TABS
 
   return (
-    <View style={[styles.bar, shadows.card]}>
+    <View style={[styles.bar, styles.shadow]}>
       {tabs.map(tab => (
         <TabButton
           key={tab.id}
@@ -113,9 +114,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 10,
     paddingHorizontal: 6,
-    backgroundColor: colors.background,
+    backgroundColor: '#0D0D0D',
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#2E2E2E',
+  },
+  shadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   tab: {
     flex: 1,
@@ -128,11 +136,11 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: colors.accent,
+    backgroundColor: '#F5A623',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: -20,
-    shadowColor: colors.accent,
+    shadowColor: '#F5A623',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
     shadowRadius: 12,
@@ -145,10 +153,10 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: colors.error,
+    backgroundColor: '#E11900',
     borderWidth: 1.5,
-    borderColor: colors.background,
+    borderColor: '#0D0D0D',
   },
-  underline: { width: 18, height: 3, borderRadius: 2, backgroundColor: colors.accent, position: 'absolute', bottom: -2 },
-  label: { ...typography.caption, fontFamily: 'Outfit_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.4 },
+  underline: { width: 18, height: 3, borderRadius: 2, backgroundColor: '#F5A623', position: 'absolute', bottom: -2 },
+  label: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.4 },
 })

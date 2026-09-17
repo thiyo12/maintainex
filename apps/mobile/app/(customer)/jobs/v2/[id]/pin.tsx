@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
+import { CaretLeft, ShieldCheck, ShieldSlash, ArrowsClockwise, Copy, CheckCircle, WarningCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
@@ -123,22 +123,29 @@ export default function JobPinScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>{t('jobPin.title')}</Text>
-        <Text style={styles.subtitle}>{t('jobPin.description')}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <CaretLeft size={20} color={colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.ink }]}>{t('jobPin.title')}</Text>
+        <View style={styles.backBtn} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={[styles.subtitle, { color: colors.muted }]}>{t('jobPin.description')}</Text>
 
         {generatedPin && (
-          <View style={styles.pinReveal}>
-            <Text style={styles.pinLabel}>{t('jobPin.yourPin')}</Text>
-            <Text style={styles.pinValue}>{generatedPin}</Text>
-            <Text style={styles.pinWarning}>{t('jobPin.saveWarning')}</Text>
-            <TouchableOpacity style={styles.copyBtn} onPress={handleCopyPin}>
+          <View style={[styles.pinReveal, { backgroundColor: colors.white, borderColor: colors.amber }]}>
+            <Text style={[styles.pinLabel, { color: colors.muted }]}>{t('jobPin.yourPin')}</Text>
+            <Text style={[styles.pinValue, { color: colors.amber }]}>{generatedPin}</Text>
+            <Text style={[styles.pinWarning, { color: colors.error }]}>{t('jobPin.saveWarning')}</Text>
+            <TouchableOpacity style={[styles.copyBtn, { backgroundColor: colors.surface }]} onPress={handleCopyPin}>
               {copied ? (
                 <CheckCircle size={18} color={colors.success} />
               ) : (
                 <Copy size={18} color={colors.amber} />
               )}
-              <Text style={[styles.copyText, copied && { color: colors.success }]}>
+              <Text style={[styles.copyText, { color: copied ? colors.success : colors.amber }]}>
                 {copied ? t('jobPin.copied') : t('jobPin.copy')}
               </Text>
             </TouchableOpacity>
@@ -146,24 +153,24 @@ export default function JobPinScreen() {
         )}
 
         {pinState?.hasActivePin && !generatedPin && (
-          <View style={styles.stateCard}>
+          <View style={[styles.stateCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
             <ShieldCheck size={24} color={colors.success} />
             <View style={styles.stateInfo}>
-              <Text style={styles.stateLabel}>{t('jobPin.activePin')}</Text>
-              <Text style={styles.stateDetail}>{t('jobPin.version', { n: pinState.version })}</Text>
+              <Text style={[styles.stateLabel, { color: colors.ink }]}>{t('jobPin.activePin')}</Text>
+              <Text style={[styles.stateDetail, { color: colors.muted }]}>{t('jobPin.version', { n: pinState.version })}</Text>
               {pinState.lastSuccessfulUseAt && (
-                <Text style={styles.stateDetail}>{t('jobPin.lastUsed', { time: new Date(pinState.lastSuccessfulUseAt).toLocaleString() })}</Text>
+                <Text style={[styles.stateDetail, { color: colors.muted }]}>{t('jobPin.lastUsed', { time: new Date(pinState.lastSuccessfulUseAt).toLocaleString() })}</Text>
               )}
             </View>
           </View>
         )}
 
         {pinState?.locked && (
-          <View style={[styles.stateCard, { borderColor: colors.error }]}>
+          <View style={[styles.stateCard, { backgroundColor: colors.white, borderColor: colors.error }]}>
             <WarningCircle size={24} color={colors.error} />
             <View style={styles.stateInfo}>
               <Text style={[styles.stateLabel, { color: colors.error }]}>{t('jobPin.locked')}</Text>
-              <Text style={styles.stateDetail}>{t('jobPin.lockedBody')}</Text>
+              <Text style={[styles.stateDetail, { color: colors.muted }]}>{t('jobPin.lockedBody')}</Text>
             </View>
           </View>
         )}
@@ -171,15 +178,20 @@ export default function JobPinScreen() {
         {!pinState?.hasActivePin && !generatedPin && (
           <View style={styles.emptyState}>
             <ShieldSlash size={48} color={colors.muted} />
-            <Text style={styles.emptyTitle}>{t('jobPin.noPin')}</Text>
-            <Text style={styles.emptySubtitle}>{t('jobPin.noPinBody')}</Text>
+            <Text style={[styles.emptyTitle, { color: colors.ink }]}>{t('jobPin.noPin')}</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.muted }]}>{t('jobPin.noPinBody')}</Text>
           </View>
         )}
+
+        <View style={styles.safetyCard}>
+          <Text style={[styles.safetyTitle, { color: colors.ink }]}>Safety</Text>
+          <Text style={[styles.safetyBody, { color: colors.muted }]}>Do not share the PIN over the phone. Only share it in person at the job site.</Text>
+        </View>
 
         <View style={styles.actions}>
           {!pinState?.hasActivePin && !generatedPin && (
             <TouchableOpacity
-              style={[styles.actionBtn, styles.primaryBtn]}
+              style={[styles.actionBtn, styles.primaryBtn, { backgroundColor: colors.amber }]}
               onPress={handleGenerate}
               disabled={!!actionLoading}
             >
@@ -197,7 +209,7 @@ export default function JobPinScreen() {
           {pinState?.hasActivePin && (
             <>
               <TouchableOpacity
-                style={[styles.actionBtn, styles.secondaryBtn]}
+                style={[styles.actionBtn, styles.secondaryBtn, { borderColor: colors.amber }]}
                 onPress={handleRotate}
                 disabled={!!actionLoading}
               >
@@ -206,13 +218,13 @@ export default function JobPinScreen() {
                 ) : (
                   <>
                     <ArrowsClockwise size={20} color={colors.amber} />
-                    <Text style={styles.secondaryBtnText}>{t('jobPin.rotate')}</Text>
+                    <Text style={[styles.secondaryBtnText, { color: colors.amber }]}>{t('jobPin.rotate')}</Text>
                   </>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.actionBtn, styles.dangerBtn]}
+                style={[styles.actionBtn, styles.dangerBtn, { borderColor: colors.error }]}
                 onPress={handleRevoke}
                 disabled={!!actionLoading}
               >
@@ -221,7 +233,7 @@ export default function JobPinScreen() {
                 ) : (
                   <>
                     <ShieldSlash size={20} color={colors.error} />
-                    <Text style={styles.dangerBtnText}>{t('jobPin.revoke')}</Text>
+                    <Text style={[styles.dangerBtnText, { color: colors.error }]}>{t('jobPin.revoke')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -236,40 +248,48 @@ export default function JobPinScreen() {
 function makeStyles(colors: any) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
+    backBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { fontSize: 17, fontFamily: fonts.headingBold },
     scroll: { padding: 20 },
-    title: { fontSize: 24, fontFamily: fonts.bold, color: colors.text, marginBottom: 8 },
-    subtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginBottom: 24, lineHeight: 20 },
+    subtitle: { fontSize: 14, fontFamily: fonts.body, marginBottom: 24, lineHeight: 20 },
     pinReveal: {
-      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 24,
       alignItems: 'center',
       marginBottom: 24,
       borderWidth: 1,
-      borderColor: colors.amber,
     },
-    pinLabel: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginBottom: 8 },
-    pinValue: { fontSize: 48, fontFamily: fonts.bold, color: colors.amber, letterSpacing: 8, marginBottom: 8 },
-    pinWarning: { fontSize: 12, fontFamily: fonts.regular, color: colors.error, textAlign: 'center', marginBottom: 16 },
-    copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.surface },
-    copyText: { fontSize: 14, fontFamily: fonts.medium, color: colors.amber },
+    pinLabel: { fontSize: 14, fontFamily: fonts.body, marginBottom: 8 },
+    pinValue: { fontSize: 48, fontFamily: fonts.heading, letterSpacing: 8, marginBottom: 8 },
+    pinWarning: { fontSize: 12, fontFamily: fonts.body, textAlign: 'center', marginBottom: 16 },
+    copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
+    copyText: { fontSize: 14, fontFamily: fonts.bodyMedium },
     stateCard: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      backgroundColor: colors.card,
       borderRadius: 12,
       padding: 16,
       marginBottom: 16,
       borderWidth: 1,
-      borderColor: colors.border,
     },
     stateInfo: { flex: 1 },
-    stateLabel: { fontSize: 16, fontFamily: fonts.semibold, color: colors.text },
-    stateDetail: { fontSize: 12, fontFamily: fonts.regular, color: colors.muted, marginTop: 2 },
+    stateLabel: { fontSize: 16, fontFamily: fonts.bodySemiBold },
+    stateDetail: { fontSize: 12, fontFamily: fonts.body, marginTop: 2 },
     emptyState: { alignItems: 'center', paddingVertical: 40, marginBottom: 24 },
-    emptyTitle: { fontSize: 18, fontFamily: fonts.semibold, color: colors.text, marginTop: 16 },
-    emptySubtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginTop: 8, textAlign: 'center' },
+    emptyTitle: { fontSize: 18, fontFamily: fonts.bodySemiBold, marginTop: 16 },
+    emptySubtitle: { fontSize: 14, fontFamily: fonts.body, marginTop: 8, textAlign: 'center' },
+    safetyCard: {
+      backgroundColor: '#FFF2D6',
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.amber,
+    },
+    safetyTitle: { fontSize: 12, fontFamily: fonts.headingBold, marginBottom: 4 },
+    safetyBody: { fontSize: 11, fontFamily: fonts.body, lineHeight: 16 },
     actions: { gap: 12 },
     actionBtn: {
       flexDirection: 'row',
@@ -279,11 +299,11 @@ function makeStyles(colors: any) {
       paddingVertical: 16,
       borderRadius: 12,
     },
-    primaryBtn: { backgroundColor: colors.amber },
-    primaryBtnText: { fontSize: 16, fontFamily: fonts.semibold, color: '#000' },
-    secondaryBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.amber },
-    secondaryBtnText: { fontSize: 16, fontFamily: fonts.semibold, color: colors.amber },
-    dangerBtn: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.error },
-    dangerBtnText: { fontSize: 16, fontFamily: fonts.semibold, color: colors.error },
+    primaryBtn: {},
+    primaryBtnText: { fontSize: 16, fontFamily: fonts.bodySemiBold, color: '#000' },
+    secondaryBtn: { backgroundColor: 'transparent', borderWidth: 1 },
+    secondaryBtnText: { fontSize: 16, fontFamily: fonts.bodySemiBold },
+    dangerBtn: { backgroundColor: 'transparent', borderWidth: 1 },
+    dangerBtnText: { fontSize: 16, fontFamily: fonts.bodySemiBold },
   })
 }

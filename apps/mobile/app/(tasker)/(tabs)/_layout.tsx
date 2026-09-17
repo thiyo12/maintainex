@@ -3,20 +3,19 @@ import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
-import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
-import { Compass, Briefcase, User } from 'phosphor-react-native'
+import { House, Briefcase, CurrencyCircleDollar, User } from 'phosphor-react-native'
 
 const tabConfigs = [
-  { name: 'index', key: 'tasker.browse', icon: Compass },
+  { name: 'index', key: 'tasker.browse', icon: House },
   { name: 'my-jobs', key: 'tasker.myJobs', icon: Briefcase },
+  { name: 'earnings', key: 'tasker.earnings', icon: CurrencyCircleDollar },
   { name: 'profile', key: 'tasker.profile', icon: User },
 ]
 
 export default function TaskerTabs() {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
-  const colors = useColors()
   const bottomPad = Math.max(insets.bottom, 4)
 
   return (
@@ -53,7 +52,6 @@ export default function TaskerTabs() {
           }}
         />
       ))}
-      <Tabs.Screen name="earnings" options={{ href: null }} />
     </Tabs>
   )
 }

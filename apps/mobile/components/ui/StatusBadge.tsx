@@ -1,7 +1,6 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { colors, radius, typography } from '../../lib/design'
 
 type Status =
   | 'OPEN'
@@ -19,18 +18,18 @@ type Status =
   | string
 
 const META: Record<string, { i18nKey?: string; text?: string; bg: string; fg: string }> = {
-  OPEN: { i18nKey: 'jobs.status.open', fg: colors.textPrimary, bg: colors.surfaceHigh },
-  QUOTE_ACCEPTED: { i18nKey: 'jobs.status.accepted', fg: colors.accent, bg: colors.accentSoft },
-  PENDING_PAYMENT: { text: 'Payment Pending', fg: colors.info, bg: colors.info + '18' },
-  IN_PROGRESS: { i18nKey: 'jobs.status.inProgress', fg: colors.info, bg: colors.info + '18' },
-  COMPLETED: { i18nKey: 'jobs.status.completed', fg: colors.success, bg: colors.successSoft },
-  CANCELLED: { i18nKey: 'jobs.status.cancelled', fg: colors.textSecondary, bg: colors.surfaceHigh },
-  ESCROW_DEPOSITED: { text: 'Funded', fg: colors.info, bg: colors.info + '18' },
-  FAILED: { i18nKey: 'jobs.status.cancelled', fg: colors.error, bg: colors.errorSoft },
-  EN_ROUTE: { text: 'On the way', fg: colors.accent, bg: colors.accentSoft },
-  ARRIVED: { text: 'Arrived', fg: colors.accent, bg: colors.accentSoft },
-  WORKING: { text: 'Working', fg: colors.accent, bg: colors.accentSoft },
-  REVIEW: { text: 'In Review', fg: colors.info, bg: colors.info + '18' },
+  OPEN: { i18nKey: 'jobs.status.open', fg: '#FFFFFF', bg: '#2E2E2E' },
+  QUOTE_ACCEPTED: { i18nKey: 'jobs.status.accepted', fg: '#F5A623', bg: '#FDE8B3' },
+  PENDING_PAYMENT: { text: 'Payment Pending', fg: '#3B82F6', bg: '#3B82F618' },
+  IN_PROGRESS: { i18nKey: 'jobs.status.inProgress', fg: '#3B82F6', bg: '#3B82F618' },
+  COMPLETED: { i18nKey: 'jobs.status.completed', fg: '#22C55E', bg: '#0A2E1A' },
+  CANCELLED: { i18nKey: 'jobs.status.cancelled', fg: '#B3B3B3', bg: '#2E2E2E' },
+  ESCROW_DEPOSITED: { text: 'Funded', fg: '#3B82F6', bg: '#3B82F618' },
+  FAILED: { i18nKey: 'jobs.status.cancelled', fg: '#EF4444', bg: '#2E0A0A' },
+  EN_ROUTE: { text: 'On the way', fg: '#F5A623', bg: '#FDE8B3' },
+  ARRIVED: { text: 'Arrived', fg: '#F5A623', bg: '#FDE8B3' },
+  WORKING: { text: 'Working', fg: '#F5A623', bg: '#FDE8B3' },
+  REVIEW: { text: 'In Review', fg: '#3B82F6', bg: '#3B82F618' },
 }
 
 interface Props {
@@ -40,7 +39,7 @@ interface Props {
 
 export default function StatusBadge({ status, label }: Props) {
   const { t } = useTranslation()
-  const meta = META[status?.toUpperCase?.()] || { fg: colors.textSecondary, bg: colors.surfaceHigh }
+  const meta = META[status?.toUpperCase?.()] || { fg: '#B3B3B3', bg: '#2E2E2E' }
   const text =
     label ||
     (meta.i18nKey ? t(meta.i18nKey) : meta.text) ||
@@ -64,8 +63,8 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: radius.full,
+    borderRadius: 9999,
   },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  text: { ...typography.caption, fontFamily: 'Outfit_600SemiBold', color: colors.textPrimary },
+  text: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF' },
 })

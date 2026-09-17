@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'
 import { View, StyleSheet, StyleProp, ViewStyle, Dimensions } from 'react-native'
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, interpolate } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
-import { colors, radius } from '../../lib/design'
 
 interface Props {
   width?: number | `${number}%`
@@ -11,7 +10,7 @@ interface Props {
   style?: StyleProp<ViewStyle>
 }
 
-export default function Skeleton({ width = '100%', height = 18, radius: r = radius.sm, style }: Props) {
+export default function Skeleton({ width = '100%', height = 18, radius: r = 8, style }: Props) {
   const progress = useSharedValue(0)
   const screenWidth = Dimensions.get('window').width
 
@@ -31,7 +30,7 @@ export default function Skeleton({ width = '100%', height = 18, radius: r = radi
   return (
     <View
       style={[
-        { width: width as any, height, borderRadius: r, backgroundColor: colors.surface, overflow: 'hidden' },
+        { width: width as any, height, borderRadius: r, backgroundColor: '#1C1C1C', overflow: 'hidden' },
         style,
       ]}
     >

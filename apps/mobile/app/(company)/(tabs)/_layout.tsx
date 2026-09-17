@@ -3,25 +3,20 @@ import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
-import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
-import { SquaresFour, FileText, ChatCircleDots, Flag, Users, CurrencyCircleDollar, User, Truck } from 'phosphor-react-native'
+import { House, Truck, Users, ChatCircleDots, User } from 'phosphor-react-native'
 
 const tabConfigs = [
-  { name: 'index', key: 'company.dashboard', icon: SquaresFour },
-  { name: 'contracts-list', key: 'company.contracts', icon: FileText },
-  { name: 'inbox', key: 'company.inbox', icon: ChatCircleDots },
-  { name: 'milestones-list', key: 'company.milestones', icon: Flag },
-  { name: 'team', key: 'company.team', icon: Users },
+  { name: 'index', key: 'company.dashboard', icon: House },
   { name: 'dispatch', key: 'company.workforce.dispatch', icon: Truck },
-  { name: 'earnings-list', key: 'company.earnings', icon: CurrencyCircleDollar },
+  { name: 'team', key: 'company.team', icon: Users },
+  { name: 'inbox', key: 'company.inbox', icon: ChatCircleDots },
   { name: 'profile', key: 'company.profile', icon: User },
 ]
 
 export default function CompanyTabs() {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
-  const colors = useColors()
   const bottomPad = Math.max(insets.bottom, 4)
 
   return (
@@ -58,6 +53,9 @@ export default function CompanyTabs() {
           }}
         />
       ))}
+      <Tabs.Screen name="contracts-list" options={{ href: null }} />
+      <Tabs.Screen name="milestones-list" options={{ href: null }} />
+      <Tabs.Screen name="earnings-list" options={{ href: null }} />
     </Tabs>
   )
 }
