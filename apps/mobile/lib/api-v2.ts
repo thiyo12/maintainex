@@ -2,7 +2,7 @@ import { getAuthToken } from './api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
-async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -23,6 +23,7 @@ export interface V2Job {
   title: string
   description: string
   categoryId: string
+  categoryName?: string | null
   photos: string[]
   budgetType: string
   budgetAmount: number | null
@@ -42,9 +43,17 @@ export interface V2Job {
   customer?: any
   locationName?: string | null
   quotes?: V2Quote[]
+  acceptedQuote?: V2Quote | null
   escrow?: any
   workspace?: any
   reviews?: any
+  smartBooking?: any
+  smartBookingJson?: any
+  provider?: any
+  providerId?: string | null
+  latitude?: number | null
+  longitude?: number | null
+  urgency?: string | null
 }
 
 export interface V2Quote {
@@ -200,8 +209,6 @@ export const v2Identity = {
     }),
 }
 
-// Offer Program API — for managing promotional offers that taskers/companies can opt into
-// TODO: Replace with dedicated endpoints (/api/mobile/v2/offer-templates, /api/mobile/offer-enrollments, /api/mobile/offer-bookings)
 export const offerProgram = {
   listTemplates: () =>
     v2Request<{ offers: any[] }>('/api/mobile/v2/jobs?category=offers'),
@@ -350,7 +357,14 @@ export const v2SmartBooking = {
     v2Request<SmartTemplate[]>(
       `/api/mobile/v2/service-templates${jobCategoryId ? `?jobCategoryId=${encodeURIComponent(jobCategoryId)}` : ''}`
     ),
-  priceEstimate: (data: { templateId: string; answers: Record<string, any>; countryCode?: string; urgency?: string }) =>
+  priceEstimate: (data: {
+    templateId: string
+    answers: Record<string, any>
+    countryCode?: string
+    urgency?: string
+    city?: string
+    scheduledFor?: 'today' | 'tomorrow' | 'this_week' | 'flexible'
+  }) =>
     v2Request<SmartPriceEstimate>('/api/mobile/v2/price-estimate', {
       method: 'POST',
       body: JSON.stringify(data),
