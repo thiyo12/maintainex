@@ -1,0 +1,34 @@
+name: Phase 11 Known Fixes
+
+on:
+  push:
+    branches:
+      - phase11-v3-exact-ui
+    paths:
+      - scripts/phase11_known_fixes.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply-known-fixes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: phase11-v3-exact-ui
+          fetch-depth: 0
+      - name: Apply deterministic fixes
+        run: python3 scripts/phase11_known_fixes.py
+      - name: Commit fixes
+        run: |
+          if git diff --quiet; then
+            echo "No deterministic fixes required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/mobile
+          git commit -m "fix(p11): apply deterministic TypeScript and runtime fixes"
+          git push origin HEAD:phase11-v3-exact-ui
