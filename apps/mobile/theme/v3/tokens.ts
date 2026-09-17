@@ -15,9 +15,11 @@ export const v3 = {
     amberBg: '#FFF8E8',
 
     success: '#06C167',
+    successSoft: '#E7F8EF',
     info: '#276EF1',
     infoSoft: '#EAF0FF',
     error: '#E11900',
+    errorSoft: '#FFF0ED',
 
     textPrimary: '#000000',
     textSecondary: '#6F6F6F',
@@ -38,9 +40,9 @@ export const v3 = {
     h3: { fontSize: 26, fontWeight: '900' as const, fontFamily: 'Outfit_900Black' },
     h4: { fontSize: 25, fontWeight: '900' as const, fontFamily: 'Outfit_900Black' },
     h5: { fontSize: 24, fontWeight: '900' as const, fontFamily: 'Outfit_900Black' },
-    title: { fontSize: 17, fontWeight: '850' as const, fontFamily: 'Outfit_800ExtraBold' },
+    title: { fontSize: 17, fontWeight: '800' as const, fontFamily: 'Outfit_800ExtraBold' },
     subtitle: { fontSize: 11, fontWeight: '600' as const, fontFamily: 'Outfit_500Medium' },
-    bodyLarge: { fontSize: 13.5, fontWeight: '850' as const, fontFamily: 'Outfit_800ExtraBold' },
+    bodyLarge: { fontSize: 13.5, fontWeight: '800' as const, fontFamily: 'Outfit_800ExtraBold' },
     body: { fontSize: 12, fontWeight: '600' as const, fontFamily: 'Outfit_500Medium' },
     bodyBold: { fontSize: 12, fontWeight: '800' as const, fontFamily: 'Outfit_700Bold' },
     caption: { fontSize: 11, fontWeight: '600' as const, fontFamily: 'Outfit_500Medium' },
