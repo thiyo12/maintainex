@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Linking } from 'react-native'
+import { View, Text, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { v3 } from '../../theme/v3/tokens'

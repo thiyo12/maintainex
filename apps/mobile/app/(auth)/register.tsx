@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Image,
+  View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, Alert,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { User, Wrench, Buildings } from 'phosphor-react-native'
 import { useAuth } from '../../lib/auth'
 import { v3 } from '../../theme/v3/tokens'
 import AuthShell from '../../components/v3/AuthShell'
@@ -101,7 +102,7 @@ export default function RegisterScreen() {
 
           <View style={styles.roles}>
             <V3RoleCard
-              icon={<Text style={{ fontSize: 18 }}>👤</Text>}
+              icon={<User size={18} color={v3.colors.amberDark} weight="fill" />}
               iconBg={v3.colors.amberSoft}
               title="I need services"
               subtitle="Post jobs and book trusted professionals."
@@ -112,7 +113,7 @@ export default function RegisterScreen() {
               onPress={() => setRole('CUSTOMER')}
             />
             <V3RoleCard
-              icon={<Text style={{ fontSize: 18 }}>🛠</Text>}
+              icon={<Wrench size={18} color={v3.colors.info} weight="fill" />}
               iconBg={v3.colors.infoSoft}
               title="I offer services"
               subtitle="Earn with your skills as a tasker."
@@ -123,7 +124,7 @@ export default function RegisterScreen() {
               onPress={() => setRole('TASKER')}
             />
             <V3RoleCard
-              icon={<Text style={{ fontSize: 18 }}>🏢</Text>}
+              icon={<Buildings size={18} color={v3.colors.textMuted} weight="fill" />}
               iconBg={v3.colors.surfaceGray}
               title="I manage a team"
               subtitle="Assign jobs and grow your business."

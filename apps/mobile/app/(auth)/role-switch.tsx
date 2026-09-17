@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, StyleSheet, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { User, Wrench, Buildings } from 'phosphor-react-native'
 import { useAuth } from '../../lib/auth'
 import { v3 } from '../../theme/v3/tokens'
 import AuthShell from '../../components/v3/AuthShell'
@@ -42,7 +43,7 @@ export default function RoleSwitchScreen() {
 
         <View style={styles.roles}>
           <V3RoleCard
-            icon={<Text style={{ fontSize: 18 }}>👤</Text>}
+            icon={<User size={18} color={v3.colors.amberDark} weight="fill" />}
             iconBg={v3.colors.amberSoft}
             title="Customer mode"
             subtitle="Browse services and book taskers."
@@ -53,7 +54,7 @@ export default function RoleSwitchScreen() {
             onPress={() => setSelected('CUSTOMER')}
           />
           <V3RoleCard
-            icon={<Text style={{ fontSize: 18 }}>🛠</Text>}
+            icon={<Wrench size={18} color={v3.colors.info} weight="fill" />}
             iconBg={v3.colors.infoSoft}
             title="Tasker mode"
             subtitle="Find work and earn with your skills."
@@ -64,7 +65,7 @@ export default function RoleSwitchScreen() {
             onPress={() => setSelected('TASKER')}
           />
           <V3RoleCard
-            icon={<Text style={{ fontSize: 18 }}>🏢</Text>}
+            icon={<Buildings size={18} color={v3.colors.textMuted} weight="fill" />}
             iconBg={v3.colors.surfaceGray}
             title="Company mode"
             subtitle="Manage team and dispatch jobs."

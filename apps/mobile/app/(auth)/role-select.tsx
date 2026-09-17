@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
+import { User, Wrench, Buildings } from 'phosphor-react-native'
 import { v3 } from '../../theme/v3/tokens'
 import AuthShell from '../../components/v3/AuthShell'
 import V3NavBar from '../../components/v3/V3NavBar'
@@ -26,7 +27,7 @@ export default function RoleSelectScreen() {
 
         <View style={styles.roles}>
           <V3RoleCard
-            icon={<Text style={{ fontSize: 18 }}>👤</Text>}
+            icon={<User size={18} color={v3.colors.amberDark} weight="fill" />}
             iconBg={v3.colors.amberSoft}
             title="I need services"
             subtitle="Post jobs and book trusted professionals."
@@ -37,7 +38,7 @@ export default function RoleSelectScreen() {
             onPress={() => setSelected('CUSTOMER')}
           />
           <V3RoleCard
-            icon={<Text style={{ fontSize: 18 }}>🛠</Text>}
+            icon={<Wrench size={18} color={v3.colors.info} weight="fill" />}
             iconBg={v3.colors.infoSoft}
             title="I offer services"
             subtitle="Earn with your skills as a tasker."
@@ -48,7 +49,7 @@ export default function RoleSelectScreen() {
             onPress={() => setSelected('TASKER')}
           />
           <V3RoleCard
-            icon={<Text style={{ fontSize: 18 }}>🏢</Text>}
+            icon={<Buildings size={18} color={v3.colors.textMuted} weight="fill" />}
             iconBg={v3.colors.surfaceGray}
             title="I manage a team"
             subtitle="Assign jobs and grow your business."
