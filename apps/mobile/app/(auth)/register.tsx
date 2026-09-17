@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert,
-} from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
-import { User, Wrench, Buildings } from 'phosphor-react-native'
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { User, Wrench } from 'phosphor-react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+
 import { useAuth } from '../../lib/auth'
 import { v3 } from '../../theme/v3/tokens'
 import AuthShell from '../../components/v3/AuthShell'
@@ -32,57 +30,59 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
   const [verifying, setVerifying] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
 
   const fullPhone = `${country.dial}${phone.replace(/\D/g, '')}`
   const phoneDigits = phone.replace(/\D/g, '')
-  const canStep2 = name.length >= 2 && phoneDigits.length >= 7
+  const canDetails = name.trim().length >= 2 && phoneDigits.length >= 7
 
   const goBack = () => {
-    if (step === 2 && !paramRole) {
-      setStep(1)
-    } else if (step === 3) {
+    if (step === 2 && !paramRole) setStep(1)
+    else if (step === 3) {
       setStep(2)
       setOtpError('')
-    } else {
-      router.back()
-    }
+      setOtpCode('')
+    } else router.back()
   }
 
   const handleSendCode = async () => {
-    if (!canStep2) return
+    if (!canDetails || !role) return
     setLoading(true)
     try {
       const res = await register({
-        name,
+        name: name.trim(),
         phone: fullPhone,
-        email: email || undefined,
-        role: role === 'TASKER' ? 'TASKER' : 'CUSTOMER',
+        email: email.trim() || undefined,
+        role,
       })
       if (res.requiresVerification) {
         setStep(3)
         setOtpError('')
+        setOtpCode('')
+      } else if (res?.token && res?.user) {
+        if (res.user.role === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
+        else router.replace('/(customer)')
+      } else {
+        setStep(3)
       }
     } catch (err: any) {
       let message = err?.message || 'Registration failed'
       try { message = JSON.parse(message).error || message } catch {}
-      Alert.alert('Error', message)
+      Alert.alert('Unable to create account', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleVerifyOtp = async (code: string) => {
+  const handleVerifyOtp = async (code = otpCode) => {
+    if (code.length !== 6) return
     setVerifying(true)
     setOtpError('')
     try {
       const user = await verifyRegisterOtp(fullPhone, code, 'PHONE_VERIFICATION')
-      if (user?.role === 'TASKER') {
-        router.replace('/(auth)/onboarding/tasker-services')
-      } else if (user?.role === 'COMPANY') {
-        router.replace('/(auth)/onboarding/company-setup')
-      } else {
-        router.replace('/(customer)')
-      }
+      if (user?.role === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
+      else if (user?.role === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
+      else router.replace('/(customer)')
     } catch (err: any) {
       let message = err?.message || 'Invalid code'
       try { message = JSON.parse(message).error || message } catch {}
@@ -123,98 +123,72 @@ export default function RegisterScreen() {
               selected={role === 'TASKER'}
               onPress={() => setRole('TASKER')}
             />
-            <V3RoleCard
-              icon={<Buildings size={18} color={v3.colors.textMuted} weight="fill" />}
-              iconBg={v3.colors.surfaceGray}
-              title="I manage a team"
-              subtitle="Assign jobs and grow your business."
-              badge="Coming soon"
-              badgeColor={v3.colors.textMuted}
-              badgeBg={v3.colors.surfaceGray}
-              disabled
-            />
           </View>
 
-          <V3Button
-            label="Continue"
-            onPress={() => setStep(2)}
-            disabled={!role}
-          />
+          <V3Button label="Continue" onPress={() => setStep(2)} disabled={!role} />
         </View>
       ) : step === 2 ? (
-        <ScrollView contentContainerStyle={styles.step2} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={styles.step2} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <V3NavBar title="Your details" onBack={goBack} />
-
           <View style={styles.step2Content}>
-            <Text style={styles.title}>Your details</Text>
-            <Text style={styles.subtitle}>We only ask for what is needed.</Text>
+            <Text style={styles.detailsTitle}>Your details</Text>
+            <Text style={styles.detailsSubtitle}>We only ask for what is needed.</Text>
 
-            <V3Input
-              label="Full name"
-              placeholder="Kamal Perera"
-              value={name}
-              onChangeText={setName}
-            />
-            <View style={{ height: 14 }} />
-            <V3Input
-              label="Mobile number"
-              placeholder="77 123 4567"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
-            {role === 'TASKER' && (
-              <>
-                <View style={{ height: 14 }} />
-                <V3Input
-                  label="Email"
-                  placeholder="kamal@email.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                />
-                <Text style={styles.optionalHint}>optional for customers</Text>
-              </>
-            )}
+            <V3Input label="Full name" placeholder="Kamal Perera" value={name} onChangeText={setName} />
+            <View style={styles.spacer} />
 
-            <View style={{ height: 16 }} />
-            <V3InfoBanner
-              title="Your account starts with verification"
-              subtitle="Phone verification helps taskers trust requests."
-            />
+            <Text style={styles.fieldLabel}>Mobile number</Text>
+            <View style={styles.phoneRow}>
+              <CountryPicker selected={country} onChange={setCountry} />
+              <V3Input
+                containerStyle={styles.phoneInputContainer}
+                placeholder="77 123 4567"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+
+            <View style={styles.spacer} />
+            <View style={styles.emailLabelRow}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              {role === 'CUSTOMER' ? <Text style={styles.optionalHint}>optional for customers</Text> : null}
+            </View>
+            <V3Input placeholder="kamal@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+
+            <View style={{ height: 18 }} />
+            <V3InfoBanner title="Your account starts with verification" subtitle="Phone verification helps taskers trust requests." />
           </View>
 
           <View style={styles.step2Bottom}>
-            <V3Button
-              label="Send verification code"
-              onPress={handleSendCode}
-              loading={loading}
-              disabled={!canStep2}
-            />
+            <V3Button label="Send verification code" onPress={handleSendCode} loading={loading} disabled={!canDetails || !role} />
           </View>
         </ScrollView>
       ) : (
         <View style={styles.step3}>
           <V3NavBar title="Verify your number" onBack={goBack} />
-
           <View style={styles.step3Content}>
-            <Text style={styles.title}>Verify your number</Text>
-            <Text style={styles.subtitle}>
-              We sent a 6-digit code to {fullPhone}
-            </Text>
+            <Text style={styles.verifyTitle}>Verify your number</Text>
+            <Text style={styles.verifySubtitle}>We sent a 6-digit code to {maskPhone(fullPhone)}</Text>
 
+            <Text style={styles.enterCode}>Enter code</Text>
             <View style={styles.otpWrap}>
               <V3OTPInput
                 size="compact"
+                autoSubmit={false}
+                onChangeCode={setOtpCode}
                 onComplete={handleVerifyOtp}
                 error={otpError}
                 loading={verifying}
               />
             </View>
 
-            <TouchableOpacity onPress={goBack}>
-              <Text style={styles.wrongNumber}>Wrong number?</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={goBack}><Text style={styles.resend}>Wrong number? Change it</Text></TouchableOpacity>
+            {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
+
+            <View style={styles.verifyBottom}>
+              <V3Button label="Verify & create account" onPress={() => handleVerifyOtp()} loading={verifying} disabled={otpCode.length !== 6} />
+            </View>
           </View>
         </View>
       )}
@@ -222,75 +196,38 @@ export default function RegisterScreen() {
   )
 }
 
+function maskPhone(num: string) {
+  const digits = num.replace(/\D/g, '')
+  if (digits.length < 6) return num
+  return `+${digits.slice(0, Math.max(2, digits.length - 7))} ${digits.slice(-7, -4)}•••${digits.slice(-4)}`
+}
+
 const styles = StyleSheet.create({
-  step1: {
-    flex: 1,
-    padding: 18,
-    gap: 0,
-  },
-  brand: {
-    fontSize: 13,
-    fontFamily: 'Outfit_900Black',
-    fontWeight: '900',
-    color: v3.colors.textPrimary,
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 27,
-    fontFamily: 'Outfit_900Black',
-    fontWeight: '900',
-    color: v3.colors.textPrimary,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 11,
-    fontFamily: 'Outfit_500Medium',
-    fontWeight: '600',
-    color: v3.colors.textSecondary,
-    marginBottom: 20,
-  },
-  roles: {
-    flex: 1,
-    gap: 12,
-    marginBottom: 16,
-  },
-  step2: {
-    padding: 0,
-    flexGrow: 1,
-  },
-  step2Content: {
-    padding: 18,
-    gap: 0,
-  },
-  step2Bottom: {
-    padding: 18,
-    paddingBottom: 24,
-  },
-  optionalHint: {
-    fontSize: 9,
-    fontFamily: 'Outfit_500Medium',
-    fontWeight: '650',
-    color: v3.colors.textMuted,
-    marginTop: 4,
-    marginLeft: 2,
-  },
-  step3: {
-    flex: 1,
-  },
-  step3Content: {
-    padding: 24,
-    gap: 0,
-  },
-  otpWrap: {
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  wrongNumber: {
-    fontSize: 12,
-    fontFamily: 'Outfit_700Bold',
-    fontWeight: '700',
-    color: v3.colors.textSecondary,
-    textAlign: 'center',
-  },
+  step1: { flex: 1, padding: 18 },
+  brand: { fontSize: 13, fontFamily: 'Outfit_900Black', color: v3.colors.ink, letterSpacing: 0.8, marginBottom: 32 },
+  title: { fontSize: 27, fontFamily: 'Outfit_900Black', color: v3.colors.ink, marginBottom: 6 },
+  subtitle: { fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary, marginBottom: 20 },
+  roles: { flex: 1, gap: 12, marginBottom: 16 },
+
+  step2: { flexGrow: 1 },
+  step2Content: { paddingHorizontal: 18, paddingTop: 8 },
+  detailsTitle: { fontSize: 24, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  detailsSubtitle: { marginTop: 3, marginBottom: 22, fontSize: 10.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  spacer: { height: 14 },
+  fieldLabel: { fontSize: 10, fontFamily: 'Outfit_700Bold', color: '#4F4F4F', marginBottom: 6 },
+  emailLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  optionalHint: { fontSize: 9, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textMuted, marginBottom: 6 },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  phoneInputContainer: { flex: 1 },
+  step2Bottom: { paddingHorizontal: 18, paddingTop: 24, paddingBottom: 24 },
+
+  step3: { flex: 1 },
+  step3Content: { flex: 1, paddingHorizontal: 24, paddingTop: 10 },
+  verifyTitle: { fontSize: 24, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  verifySubtitle: { marginTop: 3, fontSize: 10.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  enterCode: { marginTop: 52, textAlign: 'center', fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  otpWrap: { alignItems: 'center', marginTop: 18 },
+  resend: { marginTop: 24, textAlign: 'center', fontSize: 10, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  otpError: { marginTop: 8, textAlign: 'center', fontSize: 9.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.error },
+  verifyBottom: { flex: 1, justifyContent: 'flex-end', paddingBottom: 16 },
 })
