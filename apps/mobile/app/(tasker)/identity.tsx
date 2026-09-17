@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { X, CheckCircle, Camera, Image, CreditCard, Globe, Car } from 'phosphor-react-native'
+import { X, CheckCircle, Camera, Image as ImageIcon, CreditCard, Globe, Car } from 'phosphor-react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
@@ -186,7 +186,7 @@ export default function IdentityVerificationScreen() {
                 <Text style={styles.imageBtnText}>{t('verify.camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage('FRONT')} activeOpacity={0.7}>
-                <Image size={24} color="#F5A623" weight="regular" />
+                <ImageIcon size={24} color="#F5A623" weight="regular" />
                 <Text style={styles.imageBtnText}>{t('verify.gallery')}</Text>
               </TouchableOpacity>
             </View>
@@ -214,7 +214,7 @@ export default function IdentityVerificationScreen() {
                 <Text style={styles.imageBtnText}>{t('verify.camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage('BACK')} activeOpacity={0.7}>
-                <Image size={24} color="#F5A623" weight="regular" />
+                <ImageIcon size={24} color="#F5A623" weight="regular" />
                 <Text style={styles.imageBtnText}>{t('verify.gallery')}</Text>
               </TouchableOpacity>
             </View>
