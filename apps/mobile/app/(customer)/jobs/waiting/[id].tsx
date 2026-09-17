@@ -29,7 +29,7 @@ interface JobData {
   id: string
   title: string
   status: string
-  budgetAmount: number
+  budgetAmount: number | null
   notifiedCount: number
   smartBooking: any
   quotes: QuoteItem[]
@@ -217,9 +217,9 @@ export default function WaitingScreen() {
           </View>
         ) : (
           <>
-            {job.quotes.map((q) => (
+            {(job?.quotes || []).map((q) => (
               <TouchableOpacity key={q.id} style={[styles.quoteCard, { backgroundColor: colors.white, borderColor: colors.border }]}
-                onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job.id}?highlight=${q.id}`)}>
+                onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job?.id || jobId}?highlight=${q.id}`)}>
                 <View style={styles.quoteTop}>
                   <View style={styles.quoteAvatar}>
                     <Text style={[styles.quoteAvatarText, { color: colors.amberDark }]}>
@@ -268,7 +268,7 @@ export default function WaitingScreen() {
 
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.amber }]}
-            onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job.id}`)}>
+            onPress={() => router.push(`/(customer)/jobs/v2/quotes/${job?.id || jobId}`)}>
             <ArrowRight size={18} color="#111827" weight="bold" />
             <Text style={styles.primaryBtnTextDark}>{quoteCount > 0 ? `Review ${quoteCount} quote${quoteCount > 1 ? 's' : ''}` : 'Go to quotes'}</Text>
           </TouchableOpacity>

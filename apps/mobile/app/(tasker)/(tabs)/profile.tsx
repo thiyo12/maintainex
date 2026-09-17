@@ -17,7 +17,7 @@ import {
   UserCircle,
   SignOut,
   CreditCard,
-  Ribbon,
+  Medal,
   Shield,
 } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
@@ -277,7 +277,7 @@ export default function TaskerProfile() {
               <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
                   {v.icon === 'card' && <CreditCard size={16} color={v.done ? '#059669' : colors.amberDark} />}
-                  {v.icon === 'ribbon' && <Ribbon size={16} color={v.done ? '#059669' : colors.amberDark} />}
+                  {v.icon === 'ribbon' && <Medal size={16} color={v.done ? '#059669' : colors.amberDark} />}
                   {v.icon === 'shield' && <Shield size={16} color={v.done ? '#059669' : colors.amberDark} />}
                 </View>
                 <View style={styles.verifText}>

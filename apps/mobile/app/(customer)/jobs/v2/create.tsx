@@ -1,4 +1,4 @@
-import { Component, useState, useEffect, useRef } from 'react'
+import React, { Component, useState, useEffect, useRef } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Animated, useWindowDimensions, Image,
 } from 'react-native'
@@ -12,7 +12,7 @@ class ErrorBoundary extends Component<{ children: any }, { error: Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
   componentDidCatch(error: Error, info: any) {
     const stack = info?.componentStack || ''
-    const lines = stack.split('\n').filter(l => l.trim()).slice(0, 5)
+    const lines = stack.split('\n').filter((l: string) => l.trim()).slice(0, 5)
     Alert.alert('Error', (error?.message || String(error)) + '\n\nIn:\n' + lines.join('\n'))
   }
   render() {
@@ -66,7 +66,7 @@ const FALLBACK_CATEGORIES: Category[] = [
   { id: 'cmtilkh6t00dd9z5qzge5lmnv', slug: 'curtains-blinds-and-upholstery', name: 'Curtains, Blinds and Upholstery' },
 ]
 
-const CAT_ICONS: Record<string, (props: any) => JSX.Element> = {
+const CAT_ICONS: Record<string, React.ComponentType<any>> = {
   'electrical-works': Lightning,
   plumbing: Drop,
   'ac-and-refrigeration': Snowflake,
@@ -93,7 +93,7 @@ const CAT_ICONS: Record<string, (props: any) => JSX.Element> = {
   'curtains-blinds-and-upholstery': TShirt,
 }
 
-function categoryIcon(name?: string): (props: any) => JSX.Element {
+function categoryIcon(name?: string): React.ComponentType<any> {
   if (!name) return WrenchFallback
   const key = name.toLowerCase()
   for (const [slug, icon] of Object.entries(CAT_ICONS)) {

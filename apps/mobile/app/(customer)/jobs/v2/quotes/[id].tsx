@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { ReanimatedSwipeable } from 'react-native-gesture-handler/ReanimatedSwipeable'
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable'
 
 import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '../../../../../lib/api-v2'
 import { translateJobStatus } from '../../../../../lib/i18n'

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Calendar, MapPin, ChatCircleDots, Check, Navigation, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText } from 'phosphor-react-native'
+import { Calendar, MapPin, ChatCircleDots, Check, NavigationArrow, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
@@ -318,8 +318,8 @@ export default function V2ProviderManageJobScreen() {
                   style={styles.navBtn}
                   onPress={startLocationSharing}
                 >
-                  <Navigation size={20} color={colors.ink} />
-                  <Text style={styles.navBtnText}>{t('tracking.startNavigation')}</Text>
+                  <NavigationArrow size={20} color={colors.ink} />
+                  <Text style={styles.navBtnText}>{t('tracking.startNavigationArrow')}</Text>
                 </TouchableOpacity>
               )}
               {locationSharing && (

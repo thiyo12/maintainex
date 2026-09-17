@@ -146,8 +146,9 @@ export default function LiveTrackingScreen() {
 
   useEffect(() => {
     if (!providerCoord) return
-    Animated.timing(animCoord, {
-      toValue: { latitude: providerCoord.latitude, longitude: providerCoord.longitude },
+    animCoord.timing({
+      latitude: providerCoord.latitude,
+      longitude: providerCoord.longitude,
       duration: 1500,
       useNativeDriver: false,
     }).start()

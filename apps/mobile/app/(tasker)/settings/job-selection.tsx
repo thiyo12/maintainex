@@ -41,8 +41,8 @@ export default function JobSelectionScreen() {
   const load = async () => {
     setLoading(true)
     try {
-      const res = await skillsApi.list()
-      setCats(res.categories || [])
+      const res: any = await skillsApi.list()
+      setCats(Array.isArray(res) ? res : (res?.categories || []))
     } catch {
       Alert.alert('Error', 'Could not load services.')
     } finally {

@@ -92,7 +92,7 @@ export default function AISearchBar({
   const [correctedQuery, setCorrectedQuery] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isDisposedRef = useRef(false)
 
   useEffect(() => { return () => { isDisposedRef.current = true } }, [])
@@ -129,7 +129,23 @@ export default function AISearchBar({
         taskers.list(`category=${encodeURIComponent(key)}`)
           .then((list) => {
             if (isDisposedRef.current) return
-            const real = (list || []).slice(0, 3)
+            const real: TaskerResult[] = (list || []).slice(0, 3).map((item: any) => ({
+              id: item.id,
+              userId: item.userId || item.user?.id || item.id,
+              bio: item.bio || '',
+              hourlyRate: Number(item.hourlyRate || 0),
+              skills: Array.isArray(item.skills) ? item.skills : [],
+              rating: Number(item.rating || 0),
+              completedJobs: Number(item.completedJobs || 0),
+              isVerified: !!item.isVerified,
+              isOnline: !!item.isOnline,
+              user: {
+                id: item.user?.id || item.userId || item.id,
+                name: item.user?.name || item.name || 'Tasker',
+                phone: item.user?.phone || '',
+                email: item.user?.email || '',
+              },
+            }))
             setTaskerResults(real.length > 0 ? real : SAMPLE_TASKER_RESULTS)
           })
           .catch(() => { if (!isDisposedRef.current) setTaskerResults([]) })
