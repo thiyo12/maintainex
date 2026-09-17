@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
+    fontWeight: '800',
     color: v3.colors.textPrimary,
   },
   subtitle: {
