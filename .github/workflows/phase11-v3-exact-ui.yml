@@ -1,0 +1,42 @@
+name: Phase 11 V3 Exact UI
+
+on:
+  push:
+    branches:
+      - phase11-v3-exact-ui
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/phase11-v3-exact-ui.yml'
+
+jobs:
+  mobile-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Expo export
+        env:
+          EXPO_PUBLIC_API_URL: https://maintainex.lk
+        run: npx expo export --platform web --output-dir dist-ci
