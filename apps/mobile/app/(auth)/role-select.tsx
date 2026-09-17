@@ -1,97 +1,69 @@
-import { useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Buildings, CaretRight, House, Wrench } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
-import { User, Wrench, Buildings } from 'phosphor-react-native'
+
 import { v3 } from '../../theme/v3/tokens'
 import AuthShell from '../../components/v3/AuthShell'
 import V3NavBar from '../../components/v3/V3NavBar'
-import V3RoleCard from '../../components/v3/V3RoleCard'
-import V3Button from '../../components/v3/V3Button'
 
 export default function RoleSelectScreen() {
   const router = useRouter()
-  const [selected, setSelected] = useState<'CUSTOMER' | 'TASKER' | null>(null)
-
-  const handleContinue = () => {
-    if (!selected) return
-    router.push({ pathname: '/(auth)/register', params: { role: selected } })
-  }
 
   return (
     <AuthShell bg={v3.colors.canvas}>
-      <V3NavBar title="Select role" onBack={() => router.back()} />
-
+      <V3NavBar title="Choose your experience" onBack={() => router.back()} />
       <View style={styles.content}>
         <Text style={styles.title}>How will you use MaintainEX?</Text>
-        <Text style={styles.subtitle}>You can switch later from your profile.</Text>
+        <Text style={styles.subtitle}>You can switch later from Account.</Text>
 
-        <View style={styles.roles}>
-          <V3RoleCard
-            icon={<User size={18} color={v3.colors.amberDark} weight="fill" />}
-            iconBg={v3.colors.amberSoft}
-            title="I need services"
-            subtitle="Post jobs and book trusted professionals."
-            badge="Customer"
-            badgeColor={v3.colors.amberDark}
-            badgeBg={v3.colors.amberSoft}
-            selected={selected === 'CUSTOMER'}
-            onPress={() => setSelected('CUSTOMER')}
-          />
-          <V3RoleCard
-            icon={<Wrench size={18} color={v3.colors.info} weight="fill" />}
-            iconBg={v3.colors.infoSoft}
-            title="I offer services"
-            subtitle="Earn with your skills as a tasker."
-            badge="Tasker"
-            badgeColor={v3.colors.info}
-            badgeBg={v3.colors.infoSoft}
-            selected={selected === 'TASKER'}
-            onPress={() => setSelected('TASKER')}
-          />
-          <V3RoleCard
-            icon={<Buildings size={18} color={v3.colors.textMuted} weight="fill" />}
-            iconBg={v3.colors.surfaceGray}
-            title="I manage a team"
-            subtitle="Assign jobs and grow your business."
-            badge="Coming soon"
-            badgeColor={v3.colors.textMuted}
-            badgeBg={v3.colors.surfaceGray}
-            disabled
-          />
-        </View>
-
-        <V3Button
-          label="Continue"
-          onPress={handleContinue}
-          disabled={!selected}
+        <RoleRow
+          icon={<House size={22} color={v3.colors.ink} weight="bold" />}
+          title="I need something done"
+          subtitle="Post jobs, compare offers, hire taskers"
+          onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'CUSTOMER' } } as any)}
         />
+        <RoleRow
+          icon={<Wrench size={21} color={v3.colors.ink} weight="bold" />}
+          title="I want to earn"
+          subtitle="Find jobs and send quotes"
+          onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'TASKER' } } as any)}
+        />
+        <RoleRow
+          icon={<Buildings size={21} color={v3.colors.textMuted} weight="bold" />}
+          title="I run a company"
+          subtitle="Manage teams, dispatch and contracts · registration unavailable"
+          disabled
+        />
+
+        <Text style={styles.companyNote}>Existing company accounts can sign in normally. New company self-registration is disabled until the company onboarding backend is available.</Text>
       </View>
     </AuthShell>
   )
 }
 
+function RoleRow({ icon, title, subtitle, onPress, disabled = false }: { icon: React.ReactNode; title: string; subtitle: string; onPress?: () => void; disabled?: boolean }) {
+  return (
+    <TouchableOpacity style={[styles.row, disabled && styles.rowDisabled]} onPress={onPress} disabled={disabled} activeOpacity={0.72}>
+      <View style={styles.iconCircle}>{icon}</View>
+      <View style={styles.copy}>
+        <Text style={[styles.rowTitle, disabled && styles.disabledText]}>{title}</Text>
+        <Text style={styles.rowSubtitle}>{subtitle}</Text>
+      </View>
+      <CaretRight size={20} color={disabled ? v3.colors.textMuted : v3.colors.ink} />
+    </TouchableOpacity>
+  )
+}
+
 const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    padding: 18,
-    gap: 0,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: 'Outfit_900Black',
-    fontWeight: '900',
-    color: v3.colors.textPrimary,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 11,
-    fontFamily: 'Outfit_500Medium',
-    fontWeight: '600',
-    color: v3.colors.textSecondary,
-    marginBottom: 20,
-  },
-  roles: {
-    flex: 1,
-    gap: 12,
-  },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
+  title: { fontSize: 26, lineHeight: 31, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  subtitle: { marginTop: 6, marginBottom: 24, fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  row: { minHeight: 84, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, paddingHorizontal: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowDisabled: { opacity: 0.56 },
+  iconCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
+  copy: { flex: 1 },
+  rowTitle: { fontSize: 14, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  rowSubtitle: { marginTop: 4, fontSize: 10.5, lineHeight: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  disabledText: { color: v3.colors.textSecondary },
+  companyNote: { marginTop: 2, fontSize: 9, lineHeight: 14, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted },
 })
