@@ -1,9 +1,7 @@
-import { View, Text, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { Flame, Clock, ArrowRight } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import PressScale from './PressScale'
 import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
 
 interface Props {
   name: string
@@ -21,11 +19,11 @@ export default function JobCard({ name, description, priceMin, priceMax, typical
   const { t } = useTranslation()
   const styles = makeStyles(colors)
   return (
-    <PressScale onPress={onPress}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.card, { backgroundColor: colors.white }, isPopular && { borderColor: colors.amber, borderWidth: 1 }]}>
         {isPopular && (
           <View style={[styles.badge, { backgroundColor: colors.amber }]}>
-            <Ionicons name="flame" size={10} color="#fff" />
+            <Flame size={10} color="#fff" weight="fill" />
             <Text style={[styles.badgeText, { color: colors.white }]}>{t('home.hotOffersList.featured')}</Text>
           </View>
         )}
@@ -36,16 +34,16 @@ export default function JobCard({ name, description, priceMin, priceMax, typical
         <Text style={[styles.desc, { color: colors.muted }]} numberOfLines={2}>{description}</Text>
         <View style={styles.footer}>
           <View style={styles.meta}>
-            <Ionicons name="time-outline" size={14} color={colors.muted} />
+            <Clock size={13} color={colors.muted} weight="regular" />
             <Text style={[styles.metaText, { color: colors.muted }]}>{typicalDurationMinutes} min</Text>
           </View>
           <View style={styles.meta}>
-            <Ionicons name="cog-outline" size={14} color={colorHex} />
+            <ArrowRight size={13} color={colorHex} weight="bold" />
             <Text style={[styles.metaText, { color: colorHex }]}>{t('components.viewDetails')}</Text>
           </View>
         </View>
       </View>
-    </PressScale>
+    </TouchableOpacity>
   )
 }
 

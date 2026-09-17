@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Star, Briefcase, MapPin, ChatCircleText } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import PressScale from './PressScale'
 import { useColors } from '../../lib/ThemeContext'
 
 interface Props {
@@ -22,29 +21,29 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
   const { t } = useTranslation()
   const styles = makeStyles(colors)
   return (
-    <PressScale onPress={onPress}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.card, { backgroundColor: colors.surface }]}>
         <View style={styles.top}>
           <View style={[styles.avatar, { backgroundColor: colors.border }]}>
-            <Ionicons name="person" size={24} color={colors.white} />
+            <Text style={{ fontSize: 18, fontFamily: 'Outfit_700Bold', color: colors.white }}>{name?.charAt(0)?.toUpperCase() || 'T'}</Text>
           </View>
           <View style={styles.info}>
             <View style={styles.nameRow}>
               <Text style={[styles.name, { color: colors.ink }]}>{name}</Text>
-              {isVerified && <Ionicons name="checkmark-circle" size={16} color={colors.amber} />}
+              {isVerified && <Star size={14} color={colors.amber} weight="fill" />}
             </View>
             <View style={styles.stats}>
               <View style={styles.stat}>
-                <Ionicons name="star" size={13} color={colors.amber} />
+                <Star size={12} color={colors.amber} weight="fill" />
                 <Text style={[styles.statText, { color: colors.muted }]}>{rating.toFixed(1)}</Text>
               </View>
               <View style={styles.stat}>
-                <Ionicons name="briefcase" size={13} color={colors.muted} />
+                <Briefcase size={12} color={colors.muted} />
                 <Text style={[styles.statText, { color: colors.muted }]}>{completedJobs}{t('customer.jobs')}</Text>
               </View>
               {distance !== undefined && (
                 <View style={styles.stat}>
-                  <Ionicons name="location" size={13} color={colors.muted} />
+                  <MapPin size={12} color={colors.muted} />
                   <Text style={[styles.statText, { color: colors.muted }]}>{distance.toFixed(1)} km</Text>
                 </View>
               )}
@@ -70,13 +69,13 @@ export default function TaskerCard({ name, rating, completedJobs, isVerified, is
             <Text style={[styles.statusText, { color: colors.muted }]}>{isOnline ? t('common.online') : t('common.offline')}</Text>
             {onMessage && (
               <TouchableOpacity onPress={onMessage} hitSlop={8} style={[styles.messageBtn, { backgroundColor: colors.border }]}>
-                <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
+                <ChatCircleText size={14} color={colors.amberDark} weight="fill" />
               </TouchableOpacity>
             )}
           </View>
         </View>
       </View>
-    </PressScale>
+    </TouchableOpacity>
   )
 }
 

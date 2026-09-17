@@ -1,35 +1,34 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native'
+import { MagnifyingGlass, SlidersHorizontal } from 'phosphor-react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import * as Location from 'expo-location'
-import { useColors } from '../../../../lib/ThemeContext'
+import Animated, { FadeInUp } from 'react-native-reanimated'
+
 import { templateJobs, findTasker } from '../../../../lib/api'
 import { useCountry } from '../../../../lib/country'
-import TaskerCard from '../../../../components/find/TaskerCard'
-import PostJobBanner from '../../../../components/find/PostJobBanner'
-import SkeletonLoader from '../../../../components/find/SkeletonLoader'
-import EmptyState from '../../../../components/find/EmptyState'
-import NewChatModal from '@/components/chat/NewChatModal'
+import { v3 } from '../../../../theme/v3/tokens'
 import { buildSampleTaskers } from '../../../../lib/sampleTaskers'
 
-export default function FindTaskerList() {
-  const colors = useColors()
+import V3SearchBar from '../../../../components/v3/V3SearchBar'
+import V3ProviderCard from '../../../../components/v3/V3ProviderCard'
+import NewChatModal from '@/components/chat/NewChatModal'
+
+export default function TaskerResults() {
   const { t } = useTranslation()
-  const styles = makeStyles(colors)
   const { jobId } = useLocalSearchParams<{ jobId: string }>()
   const [job, setJob] = useState<any>(null)
   const [taskers, setTaskers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
   const [chatRecipient, setChatRecipient] = useState<any>(null)
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null)
   const { selectedCountry } = useCountry()
   const router = useRouter()
 
-  const fetch = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       let coordsLocal = coords
       if (!coordsLocal) {
@@ -50,6 +49,7 @@ export default function FindTaskerList() {
         console.error('Failed to load job', e)
       }
       if (jobData) setJob(jobData)
+
       let taskerData: any[] = []
       try {
         taskerData = await findTasker.search({
@@ -70,121 +70,164 @@ export default function FindTaskerList() {
     }
   }, [jobId, selectedCountry, coords])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const onRefresh = () => {
     setRefreshing(true)
-    fetch()
+    fetchData()
   }
 
-  const avgPrice = job ? Math.round((job.priceMin + job.priceMax) / 2) : 0
-
   return (
-    <View style={styles.container}>
-      {job && (
-        <View style={styles.jobSummary}>
-          <View style={styles.jobInfo}>
-            <Text style={styles.jobName}>{job.name}</Text>
-            <Text style={styles.jobPrice}>Rs {avgPrice.toLocaleString()} est.</Text>
-          </View>
-          <TouchableOpacity style={styles.viewToggle} onPress={() => setViewMode(v => v === 'list' ? 'map' : 'list')}>
-            <Ionicons name={viewMode === 'list' ? 'map' : 'list'} size={18} color={colors.primary} />
-            <Text style={styles.viewToggleText}>{viewMode === 'list' ? t('tracking.title') : t('common.search')}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* ═══ Header ═══ */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Available taskers</Text>
+        {job ? (
+          <Text style={styles.subtitle}>{job.name} — {taskers.length} found</Text>
+        ) : null}
+      </View>
 
-      {job && (
-        <PostJobBanner
-          onPress={() =>
-            router.push({
-              pathname: '/(customer)/jobs/v2/create',
-              params: { categoryId: job.categoryId, templateJobId: jobId, title: job.name },
-            })
-          }
-        />
-      )}
+      <View style={styles.searchWrap}>
+        <V3SearchBar placeholder="Search taskers..." onPress={() => {}} />
+      </View>
 
+      {/* ═══ Filter Pills ═══ */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity style={[styles.filterPill, styles.filterActive]} activeOpacity={0.7}>
+          <Text style={[styles.filterText, styles.filterTextActive]}>Recommended</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterPill} activeOpacity={0.7}>
+          <Text style={styles.filterText}>Available now</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ═══ Tasker List ═══ */}
       {loading ? (
-        <SkeletonLoader count={5} height={110} />
+        <View style={styles.list}>
+          {[0, 1, 2].map(i => (
+            <View key={i} style={styles.skeletonCard} />
+          ))}
+        </View>
       ) : taskers.length === 0 ? (
-        <EmptyState icon="shield-checkmark-outline" title={t('common.noResults')} subtitle={t('customer.noResults')} />
-      ) : viewMode === 'list' ? (
+        <View style={styles.emptyWrap}>
+          <Text style={styles.emptyText}>No taskers found nearby</Text>
+          <Text style={styles.emptySub}>Try adjusting your search or check back later</Text>
+        </View>
+      ) : (
         <FlatList
           data={taskers}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <TaskerCard
-              name={item.name}
-              rating={item.rating}
-              completedJobs={item.completedJobs}
-              isVerified={item.isVerified}
-              isOnline={item.isOnline}
-              distance={item.distance}
-              hourlyRate={item.hourlyRate}
-              skills={item.skills}
-              onPress={() => router.push(`/(customer)/find/tasker-profile/${item.id}?jobId=${jobId}` as any)}
-              onMessage={() =>
-                item.id.startsWith('sample-tasker-')
-                  ? router.push(`/(chat)/demo_${Date.now()}?testMsg=${encodeURIComponent(`Hi ${item.name}, are you available for this job?`)}&testUser=${encodeURIComponent(item.name)}` as any)
-                  : setChatRecipient({ id: item.userId, name: item.name })
-              }
-            />
+          renderItem={({ item, index }) => (
+            <Animated.View entering={FadeInUp.delay(index * 50).springify().damping(20).stiffness(300)} style={styles.cardWrap}>
+              <V3ProviderCard
+                name={item.name || 'Tasker'}
+                rating={item.rating || 0}
+                completedJobs={item.completedJobs || 0}
+                isVerified={!!item.isVerified}
+                skills={item.skills}
+                onPress={() => router.push(`/(customer)/find/tasker-profile/${item.id}?jobId=${jobId}` as any)}
+              />
+            </Animated.View>
           )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={v3.colors.ink} />}
         />
-      ) : (
-        <View style={styles.mapPlaceholder}>
-          <Ionicons name="map" size={64} color="#D1D5DB" />
-            <Text style={styles.mapText}>{t('tracking.title')}</Text>
-            <Text style={styles.mapSubtext}>{t('customer.taskersNearby', { n: taskers.length })}</Text>
-            <TouchableOpacity style={styles.switchToList} onPress={() => setViewMode('list')}>
-              <Ionicons name="list" size={16} color="#fff" />
-              <Text style={styles.switchToListText}>{t('common.search')}</Text>
-          </TouchableOpacity>
-        </View>
       )}
+
       <NewChatModal
         visible={!!chatRecipient}
         onClose={() => setChatRecipient(null)}
         recipient={chatRecipient}
       />
-    </View>
+    </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  jobSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+
+  header: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  jobInfo: {},
-  jobName: { fontSize: 15, fontWeight: '600', color: '#1F2937' },
-  jobPrice: { fontSize: 13, color: '#059669', marginTop: 2 },
-  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 8, backgroundColor: colors.primary + '15', borderRadius: 8 },
-  viewToggleText: { fontSize: 13, fontWeight: '600', color: colors.primary },
-  list: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 32 },
-  mapPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  mapText: { fontSize: 16, fontWeight: '600', color: '#B3B3B3', marginTop: 12 },
-  mapSubtext: { fontSize: 13, color: '#D1D5DB', marginTop: 4 },
-  switchToList: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 16,
-    gap: 6,
+  title: {
+    fontSize: 26,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.textPrimary,
   },
-  switchToListText: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  subtitle: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: v3.colors.textMuted,
+    marginTop: 2,
+  },
+
+  searchWrap: {
+    paddingHorizontal: 18,
+    marginBottom: 8,
+  },
+
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 18,
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: v3.radius.full,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    backgroundColor: v3.colors.surfaceWhite,
+  },
+  filterActive: {
+    backgroundColor: v3.colors.ink,
+    borderColor: v3.colors.ink,
+  },
+  filterText: {
+    fontSize: 11,
+    fontFamily: 'Outfit_600SemiBold',
+    color: v3.colors.textMuted,
+  },
+  filterTextActive: {
+    color: v3.colors.paper,
+  },
+
+  list: {
+    paddingHorizontal: 18,
+    paddingBottom: 100,
+  },
+  cardWrap: {
+    marginBottom: 12,
+  },
+
+  skeletonCard: {
+    height: 120,
+    borderRadius: v3.radius.lg,
+    backgroundColor: v3.colors.surfaceGray,
+    marginBottom: 12,
+    marginHorizontal: 18,
+  },
+
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontFamily: 'Outfit_700Bold',
+    color: v3.colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptySub: {
+    fontSize: 13,
+    fontFamily: 'Outfit_500Medium',
+    color: v3.colors.textMuted,
+    textAlign: 'center',
+  },
 })

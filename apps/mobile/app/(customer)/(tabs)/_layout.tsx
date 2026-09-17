@@ -1,24 +1,12 @@
 import { Tabs } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { Platform } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { House, ClockCounterClockwise, Bell, User } from 'phosphor-react-native'
+import { View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import TabIcon from '../../../components/ui/TabIcon'
 import { notifications } from '../../../lib/api'
-import { colors, typography } from '../../../lib/design'
-
-const tabConfigs = [
-  { name: 'index', key: 'customer.home', tabIcon: House },
-  { name: 'activity', key: 'customer.activity', tabIcon: ClockCounterClockwise },
-  { name: 'notifications', key: 'customer.notifications', tabIcon: Bell, badge: true },
-  { name: 'account', key: 'customer.account', tabIcon: User },
-]
+import { v3 } from '../../../theme/v3/tokens'
 
 export default function TabsLayout() {
-  const insets = useSafeAreaInsets()
   const { t } = useTranslation()
-  const bottomPad = Math.max(insets.bottom, 4)
   const [unread, setUnread] = useState(0)
 
   useEffect(() => {
@@ -37,36 +25,13 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: colors.background,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          height: 60 + bottomPad,
-          paddingBottom: bottomPad,
-          paddingTop: 6,
-          ...Platform.select({
-            ios: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-            default: { elevation: 8 },
-          }),
-        },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
-        tabBarShowLabel: true,
+        tabBarStyle: { display: 'none' },
+        tabBarShowLabel: false,
       }}
     >
-      {tabConfigs.map((tab) => (
-        <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
-          options={{
-            title: t(tab.key),
-            tabBarIcon: ({ focused }) => (
-              <TabIcon icon={tab.tabIcon} focused={focused} badge={tab.badge ? unread : 0} />
-            ),
-          }}
-        />
-      ))}
+      <Tabs.Screen name="index" options={{ title: t('customer.home') }} />
+      <Tabs.Screen name="activity" options={{ title: t('customer.activity') }} />
+      <Tabs.Screen name="account" options={{ title: t('customer.account') }} />
     </Tabs>
   )
 }

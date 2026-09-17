@@ -1,14 +1,13 @@
-import { View, Text, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { CaretRight, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import PressScale from './PressScale'
 import { useColors } from '../../lib/ThemeContext'
 import { getCategoryI18nKey } from '../../lib/categories'
 
 interface Props {
   id?: string
   name: string
-  iconName: keyof typeof Ionicons.glyphMap
+  iconName?: string
   colorHex: string
   jobCount: number
   onPress: () => void
@@ -17,20 +16,20 @@ interface Props {
 export default function CategoryCard({ id, name, iconName, colorHex, jobCount, onPress }: Props) {
   const colors = useColors()
   const { t } = useTranslation()
-    const styles = makeStyles(colors)
+  const styles = makeStyles(colors)
   return (
-    <PressScale onPress={onPress}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.card, { backgroundColor: colors.surface, borderLeftColor: colorHex }]}>
         <View style={[styles.iconWrap, { backgroundColor: colorHex + '20' }]}>
-          <Ionicons name={iconName as any} size={24} color={colorHex} />
+          <Wrench size={22} color={colorHex} weight="fill" />
         </View>
         <View style={styles.content}>
           <Text style={[styles.name, { color: colors.ink }]}>{t(getCategoryI18nKey({ id: id || name }))}</Text>
           <Text style={[styles.count, { color: colors.muted }]}>{t('components.jobsAvailable', { n: jobCount })}</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+        <CaretRight size={16} color={colors.muted} weight="bold" />
       </View>
-    </PressScale>
+    </TouchableOpacity>
   )
 }
 

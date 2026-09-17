@@ -1,31 +1,31 @@
 import { useState, useEffect, useCallback } from 'react'
-import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native'
+import { CaretRight, Flame } from 'phosphor-react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useColors } from '../../../lib/ThemeContext'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
+import Animated, { FadeInUp } from 'react-native-reanimated'
+
 import { jobCategories, templateJobs } from '../../../lib/api'
 import { useCountry } from '../../../lib/country'
-import JobCard from '../../../components/find/JobCard'
-import PostJobBanner from '../../../components/find/PostJobBanner'
-import SkeletonLoader from '../../../components/find/SkeletonLoader'
-import EmptyState from '../../../components/find/EmptyState'
-import { useTranslation } from 'react-i18next'
-import AISearchBar from '../../../components/shared/AISearchBar'
+import { v3 } from '../../../theme/v3/tokens'
+import { categoryVisualBySlug } from '../../../lib/categoryVisuals'
 
-export default function JobList() {
+import V3SearchBar from '../../../components/v3/V3SearchBar'
+import V3SectionHeader from '../../../components/v3/V3SectionHeader'
+import V3JobRow from '../../../components/v3/V3JobRow'
+
+export default function ServiceCategory() {
   const { t } = useTranslation()
-  const colors = useColors()
-    const styles = makeStyles(colors)
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>()
   const [category, setCategory] = useState<any>(null)
   const [jobs, setJobs] = useState<any[]>([])
-  const [filtered, setFiltered] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const { selectedCountry } = useCountry()
   const router = useRouter()
 
-  const fetch = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [catData, jobsData] = await Promise.all([
         jobCategories.get(categoryId!),
@@ -33,7 +33,6 @@ export default function JobList() {
       ])
       setCategory(catData)
       setJobs(jobsData)
-      setFiltered(jobsData)
     } catch (e) {
       console.error('Failed to load jobs', e)
     } finally {
@@ -42,94 +41,101 @@ export default function JobList() {
     }
   }, [categoryId, selectedCountry])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => { fetchData() }, [fetchData])
 
   const onRefresh = () => {
     setRefreshing(true)
-    fetch()
+    fetchData()
   }
 
-  const popular = filtered.filter(j => j.isPopular)
-  const regular = filtered.filter(j => !j.isPopular)
+  const popular = jobs.filter(j => j.isPopular)
+  const regular = jobs.filter(j => !j.isPopular)
+
+  const vis = category ? categoryVisualBySlug(category.slug || category.id) : null
+  const Icon = vis?.icon
 
   return (
-    <View style={styles.container}>
-      {category && (
-        <View style={styles.header}>
-          <View style={[styles.iconWrap, { backgroundColor: category.colorHex + '20' }]}>
-            <Ionicons name={category.iconName as any} size={28} color={category.colorHex} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* ═══ Header ═══ */}
+      <View style={styles.header}>
+        {Icon ? (
+          <View style={styles.iconWrap}>
+            <Icon size={22} color={v3.colors.ink} weight="fill" />
           </View>
-          <Text style={styles.title}>{category.name}</Text>
-          <Text style={styles.subtitle}>{jobs.length} services available</Text>
-        </View>
-      )}
+        ) : null}
+        <Text style={styles.title}>{category?.name || 'Service'}</Text>
+        <Text style={styles.subtitle}>{jobs.length} services available</Text>
+      </View>
 
-      <AISearchBar
-        placeholder={t('find.search')}
-        onCategorySelect={(catId) => {
-          router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } })
-        }}
-        onJobSelect={(jobId) => {
-          router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } })
-        }}
-        onTaskerSelect={(taskerId) => {
-          router.push(`/(customer)/find/tasker-profile/${taskerId}`)
-        }}
-        onPostJob={(query) => {
-          router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } })
-        }}
-      />
+      <View style={styles.searchWrap}>
+        <V3SearchBar placeholder="Search services..." onPress={() => {}} />
+      </View>
 
-      {loading ? (
-        <SkeletonLoader count={6} height={120} />
-      ) : (
-        <>
-          <PostJobBanner
-            onPress={() =>
-              router.push({
-                pathname: '/(customer)/jobs/v2/create',
-                params: {
-                  categoryId,
-                  templateJobId: filtered[0]?.id || '',
-                  title: filtered[0]?.name || '',
-                },
-              })
-            }
-          />
-          {filtered.length === 0 ? (
-            <EmptyState icon="search-outline" title={t('common.noResults')} subtitle={t('components.adjustSearch')} />
-          ) : (
-            <FlatList
-              data={[...popular, ...regular]}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <JobCard
-                  name={item.name}
-                  description={item.description}
-                  priceMin={item.priceMin}
-                  priceMax={item.priceMax}
-                  typicalDurationMinutes={item.typicalDurationMinutes}
-                  isPopular={item.isPopular}
-                  colorHex={category?.colorHex || colors.primary}
-                  onPress={() => router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId: item.id } })}
-                />
-              )}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      <FlatList
+        data={[...popular, ...regular]}
+        keyExtractor={item => item.id}
+        renderItem={({ item, index }) => (
+          <Animated.View entering={FadeInUp.delay(index * 40).springify().damping(20).stiffness(300)} style={styles.jobWrap}>
+            <V3JobRow
+              name={item.name}
+              description={item.description}
+              priceMin={item.priceMin}
+              priceMax={item.priceMax}
+              durationMinutes={item.typicalDurationMinutes}
+              isPopular={item.isPopular}
+              onPress={() => router.push({ pathname: '/(customer)/find/job/[jobId]', params: { jobId: item.id } } as any)}
             />
-          )}
-        </>
-      )}
-    </View>
+          </Animated.View>
+        )}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={v3.colors.ink} />}
+      />
+    </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { alignItems: 'center', paddingTop: 20, paddingBottom: 8, paddingHorizontal: 16 },
-  iconWrap: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.ink },
-  subtitle: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  list: { paddingHorizontal: 16, paddingBottom: 32 },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+
+  header: {
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: 8,
+    paddingHorizontal: 18,
+  },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: v3.colors.surfaceGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 22,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.textPrimary,
+  },
+  subtitle: {
+    fontSize: 13,
+    fontFamily: 'Outfit_500Medium',
+    color: v3.colors.textMuted,
+    marginTop: 2,
+  },
+
+  searchWrap: {
+    paddingHorizontal: 18,
+    marginBottom: 4,
+  },
+
+  list: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 100,
+  },
+  jobWrap: {
+    marginBottom: 10,
+  },
 })
