@@ -1,5 +1,4 @@
 import { useEffect, useState, Component, ReactNode } from 'react'
-import { Text } from 'react-native'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
@@ -52,20 +51,30 @@ async function registerForPushNotifications() {
   }
 }
 
-SplashScreen.preventAutoHideAsync()
+SplashScreen.preventAutoHideAsync().catch(() => {})
 
-class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
-  state = { error: null }
-  static getDerivedStateFromError(error: any) { return { error } }
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
   render() {
     if (this.state.error) {
-      const { View, Text, TouchableOpacity, StyleSheet } = require('react-native')
+      const { View, Text, TouchableOpacity } = require('react-native')
       return (
         <View style={ebStyles.container}>
           <Text style={ebStyles.title}>Something went wrong</Text>
-          <Text style={ebStyles.msg}>{String(this.state.error?.message || this.state.error)}</Text>
-          <TouchableOpacity style={ebStyles.btn} onPress={() => { this.setState({ error: null }); require('expo-router').router.replace('/') }}>
-            <Text style={ebStyles.btnText}>Restart App</Text>
+          <Text style={ebStyles.msg}>{this.state.error.message || String(this.state.error)}</Text>
+          <TouchableOpacity
+            style={ebStyles.btn}
+            onPress={() => {
+              this.setState({ error: null })
+              require('expo-router').router.replace('/')
+            }}
+          >
+            <Text style={ebStyles.btnText}>Restart app</Text>
           </TouchableOpacity>
         </View>
       )
@@ -75,11 +84,11 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
 }
 
 const ebStyles = {
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D0D0D', padding: 24 },
-  title: { fontSize: 20, fontWeight: 'bold' as const, color: '#fff', marginBottom: 12 },
-  msg: { fontSize: 14, color: '#999', textAlign: 'center' as const, marginBottom: 24 },
-  btn: { backgroundColor: '#F5A623', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
-  btnText: { fontSize: 16, fontWeight: 'bold' as const, color: '#0D0D0D' },
+  container: { flex: 1, justifyContent: 'center' as const, alignItems: 'center' as const, backgroundColor: '#F7F7F7', padding: 24 },
+  title: { fontSize: 20, fontFamily: 'Outfit_700Bold', color: '#000000', marginBottom: 12 },
+  msg: { fontSize: 14, fontFamily: 'Outfit_400Regular', color: '#6F6F6F', textAlign: 'center' as const, marginBottom: 24 },
+  btn: { backgroundColor: '#000000', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16 },
+  btnText: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: '#FFFFFF' },
 }
 
 export default function RootLayout() {
@@ -97,7 +106,7 @@ export default function RootLayout() {
         if (saved && saved !== 'en') await i18next.changeLanguage(saved)
       } catch {}
       setI18nReady(true)
-      SplashScreen.hideAsync()
+      SplashScreen.hideAsync().catch(() => {})
       registerForPushNotifications()
     })()
   }, [])
@@ -106,30 +115,27 @@ export default function RootLayout() {
     return <LoadingScreen />
   }
 
-  if (!Text.defaultProps) Text.defaultProps = {} as any
-  Text.defaultProps.style = { fontFamily: 'Outfit_400Regular' }
-
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#F7F7F7' }}>
-    <ErrorBoundary>
-    <ThemeProvider>
-      <AuthProvider>
-        <CountryProvider>
-        <I18nextProvider i18n={i18next}>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(customer)" />
-          <Stack.Screen name="(tasker)" />
-          <Stack.Screen name="(company)" />
-          <Stack.Screen name="(chat)" />
-        </Stack>
-      </I18nextProvider>
-      </CountryProvider>
-    </AuthProvider>
-    </ThemeProvider>
-    </ErrorBoundary>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <AuthProvider>
+            <CountryProvider>
+              <I18nextProvider i18n={i18next}>
+                <StatusBar style="dark" />
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(customer)" />
+                  <Stack.Screen name="(tasker)" />
+                  <Stack.Screen name="(company)" />
+                  <Stack.Screen name="(chat)" />
+                </Stack>
+              </I18nextProvider>
+            </CountryProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   )
 }
