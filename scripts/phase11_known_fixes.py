@@ -8,119 +8,80 @@ def read(rel: str) -> str:
     return (ROOT / rel).read_text(encoding='utf-8')
 
 
-def write(rel: str, text: str) -> None:
-    (ROOT / rel).write_text(text, encoding='utf-8')
+def brace_depths(text: str) -> list[int]:
+    """Return brace depth at the start of each 1-based source line.
+
+    Braces inside strings and // comments are ignored. Locale files do not use
+    regex literals for their values, so this is sufficient to diagnose object
+    nesting without changing source.
+    """
+    depths = []
+    depth = 0
+    quote = None
+    escape = False
+    i = 0
+    at_line_start = True
+    while i < len(text):
+        ch = text[i]
+        if at_line_start:
+            depths.append(depth)
+            at_line_start = False
+        if quote:
+            if escape:
+                escape = False
+            elif ch == '\\':
+                escape = True
+            elif ch == quote:
+                quote = None
+        else:
+            if ch in ("'", '"', '`'):
+                quote = ch
+            elif ch == '/' and i + 1 < len(text) and text[i + 1] == '/':
+                # Skip to newline.
+                nl = text.find('\n', i)
+                if nl == -1:
+                    break
+                i = nl - 1
+            elif ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+        if ch == '\n':
+            at_line_start = True
+        i += 1
+    return depths
 
 
-def replace_exact(rel: str, old: str, new: str) -> None:
+def diagnose(rel: str) -> None:
     text = read(rel)
-    if old not in text:
-        raise RuntimeError(f'Expected text not found in {rel}: {old[:160]!r}')
-    write(rel, text.replace(old, new, 1))
-
-
-def top_level_chunks(lines: list[str]) -> list[tuple[str, int, int]]:
-    prop_re = re.compile(r"^  ['\"]?([A-Za-z0-9_]+)['\"]?:")
-    starts: list[tuple[str, int]] = []
-    for i, line in enumerate(lines):
+    lines = text.splitlines()
+    depths = brace_depths(text)
+    profile_lines = []
+    actual_root_keys = []
+    prop_re = re.compile(r"^\s*['\"]?([A-Za-z0-9_]+)['\"]?:")
+    for idx, line in enumerate(lines):
+        depth = depths[idx] if idx < len(depths) else None
+        if 'profile' in line.lower():
+            profile_lines.append((idx + 1, depth, line))
         m = prop_re.match(line)
-        if m:
-            starts.append((m.group(1), i))
-    chunks: list[tuple[str, int, int]] = []
-    for idx, (key, start) in enumerate(starts):
-        end = starts[idx + 1][1] if idx + 1 < len(starts) else len(lines) - 1
-        chunks.append((key, start, end))
-    return chunks
+        # Root locale object properties are encountered at brace depth 1.
+        if m and depth == 1:
+            actual_root_keys.append((m.group(1), idx + 1, line))
+    dupes = {}
+    for key, lineno, line in actual_root_keys:
+        dupes.setdefault(key, []).append(lineno)
+    dupes = {k: v for k, v in dupes.items() if len(v) > 1}
+    print(rel, 'profile lines with actual brace depth:', profile_lines)
+    print(rel, 'actual root duplicate keys:', dupes)
+    # Show nearby root-key sequence around the reported locale failure region.
+    print(rel, 'root keys 850-1060:', [(k, n) for k, n, _ in actual_root_keys if 850 <= n <= 1060])
 
-
-def first_level_properties(object_chunk: list[str]) -> list[tuple[str, list[str]]]:
-    prop_re = re.compile(r"^    ['\"]?([A-Za-z0-9_]+)['\"]?:")
-    starts: list[tuple[str, int]] = []
-    for i, line in enumerate(object_chunk[1:], start=1):
-        m = prop_re.match(line)
-        if m:
-            starts.append((m.group(1), i))
-    props: list[tuple[str, list[str]]] = []
-    for idx, (key, start) in enumerate(starts):
-        end = starts[idx + 1][1] if idx + 1 < len(starts) else len(object_chunk)
-        chunk = object_chunk[start:end]
-        while chunk and chunk[-1] in ('  },\n', '}\n'):
-            chunk = chunk[:-1]
-        props.append((key, chunk))
-    return props
-
-
-def merge_duplicate_root_object(rel: str, target_key: str) -> None:
-    lines = read(rel).splitlines(keepends=True)
-    chunks = top_level_chunks(lines)
-    matches = [(start, end) for key, start, end in chunks if key == target_key]
-    print(rel, 'root', target_key, 'occurrences', [(s + 1, e) for s, e in matches])
-    print(rel, 'ALL profile lines', [(i + 1, line.rstrip()) for i, line in enumerate(lines) if re.search(r"profile", line, re.I)])
-    if len(matches) <= 1:
-        if not matches:
-            return
-        start, end = matches[0]
-        obj = lines[start:end]
-        props = first_level_properties(obj)
-        seen: set[str] = set()
-        rebuilt = [f'  {target_key}: {{\n']
-        changed = False
-        for key, chunk in props:
-            if key in seen:
-                changed = True
-                continue
-            seen.add(key)
-            rebuilt.extend(chunk)
-        rebuilt.append('  },\n')
-        if changed:
-            write(rel, ''.join(lines[:start] + rebuilt + lines[end:]))
-        return
-
-    ordered_keys: list[str] = []
-    merged: dict[str, list[str]] = {}
-    for start, end in matches:
-        for key, chunk in first_level_properties(lines[start:end]):
-            if key not in merged:
-                ordered_keys.append(key)
-                merged[key] = chunk
-
-    rebuilt = [f'  {target_key}: {{\n']
-    for key in ordered_keys:
-        rebuilt.extend(merged[key])
-    rebuilt.append('  },\n')
-
-    first_start, first_end = matches[0]
-    new_lines = lines[:]
-    for start, end in reversed(matches[1:]):
-        del new_lines[start:end]
-    new_lines[first_start:first_end] = rebuilt
-    write(rel, ''.join(new_lines))
-
-
-rel = 'apps/mobile/app/(customer)/tracking/[id].tsx'
-text = read(rel)
-if "    animCoord.timing({\n      latitude: providerCoord.latitude,\n      longitude: providerCoord.longitude,\n      duration: 1500,\n      useNativeDriver: false,\n    }).start()" in text:
-    replace_exact(
-        rel,
-        "    animCoord.timing({\n      latitude: providerCoord.latitude,\n      longitude: providerCoord.longitude,\n      duration: 1500,\n      useNativeDriver: false,\n    }).start()",
-        "    animCoord.timing({\n      latitude: providerCoord.latitude,\n      longitude: providerCoord.longitude,\n      duration: 1500,\n      useNativeDriver: false,\n    } as any).start()",
-    )
 
 for rel in [
     'apps/mobile/lib/i18n/locales/en.ts',
     'apps/mobile/lib/i18n/locales/ta.ts',
     'apps/mobile/lib/i18n/locales/si.ts',
 ]:
-    merge_duplicate_root_object(rel, 'profile')
+    diagnose(rel)
 
-for rel in [
-    'apps/mobile/lib/i18n/locales/en.ts',
-    'apps/mobile/lib/i18n/locales/ta.ts',
-    'apps/mobile/lib/i18n/locales/si.ts',
-]:
-    lines = read(rel).splitlines(keepends=True)
-    keys = [key for key, _, _ in top_level_chunks(lines)]
-    dupes = sorted({key for key in keys if keys.count(key) > 1})
-    print(rel, 'root dupes', dupes)
-
-print('Phase 11 locale diagnostics complete.')
+print('Phase 11 structural locale diagnostics complete.')
