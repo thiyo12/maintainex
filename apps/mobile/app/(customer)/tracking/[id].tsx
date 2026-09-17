@@ -151,7 +151,7 @@ export default function LiveTrackingScreen() {
       longitude: providerCoord.longitude,
       duration: 1500,
       useNativeDriver: false,
-    }).start()
+    } as any).start()
   }, [providerCoord, animCoord])
 
   const reg = useMemo(() => {

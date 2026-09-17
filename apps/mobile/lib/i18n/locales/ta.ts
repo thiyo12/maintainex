@@ -1105,7 +1105,6 @@ const ta: Record<string, any> = {
     noPaymentMethods: 'கட்டண முறைகள் இல்லை',
     addPaymentMethod: 'தொடங்க ஒன்றை சேர்க்கவும்',
     jobUpdates: 'வேலை புதுப்பிப்புகள்',
-    messages: 'செய்திகள்',
     promotions: 'விளம்பரங்கள்',
     faq: 'அடிக்கடி கேட்கப்படும் கேள்விகள்',
     contactUs: 'எங்களை தொடர்பு கொள்ள',

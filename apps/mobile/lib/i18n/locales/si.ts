@@ -1105,7 +1105,6 @@ const si: Record<string, any> = {
     noPaymentMethods: 'ගෙවීම් ක්‍රම නැත',
     addPaymentMethod: 'ආරම්භ කිරීමට එකක් එක් කරන්න',
     jobUpdates: 'රැකියා යාවත්කාල කිරීම්',
-    messages: 'පණිවිඩ',
     promotions: 'ප්‍රවර්ධන',
     faq: 'නිතර අසන පැණ',
     contactUs: 'අප අමතන්න',

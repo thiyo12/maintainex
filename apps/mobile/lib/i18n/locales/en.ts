@@ -1108,7 +1108,6 @@ const en = {
     noPaymentMethods: 'No payment methods',
     addPaymentMethod: 'Add one to get started',
     jobUpdates: 'Job Updates',
-    messages: 'Messages',
     promotions: 'Promotions',
     faq: 'Frequently Asked Questions',
     contactUs: 'Contact Us',
