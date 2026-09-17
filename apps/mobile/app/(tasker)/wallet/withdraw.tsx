@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Building, DeviceMobile, Globe, ArrowUpCircle } from 'phosphor-react-native'
+import { Building, DeviceMobile, Globe, ArrowCircleUp } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Wallet } from '../../../lib/api-v2'
@@ -98,7 +98,7 @@ export default function WithdrawScreen() {
             disabled={loading || !amount || numAmt < 500 || numAmt > available}
             activeOpacity={0.8}
           >
-            <ArrowUpCircle size={18} color="#111827" />
+            <ArrowCircleUp size={18} color="#111827" />
             <Text style={styles.btnTxt}>
               {loading ? 'Processing...' : `Withdraw ${formatCurrency(BigInt(Math.round(numAmt * 100)), currency)}`}
             </Text>
