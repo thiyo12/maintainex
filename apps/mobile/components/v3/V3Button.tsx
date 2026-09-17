@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13.5,
     fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
+    fontWeight: '800',
     letterSpacing: 0,
   },
 })
