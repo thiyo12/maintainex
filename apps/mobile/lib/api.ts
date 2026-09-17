@@ -1,5 +1,4 @@
 import * as SecureStore from 'expo-secure-store'
-import { Platform } from 'react-native'
 import {
   AuthResponse,
   Booking,
@@ -19,9 +18,9 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
 
-export function resolveImageUri(uri?: string | null): string | null {
-  if (!uri) return null
-  if (uri.startsWith('/api/mobile/files/')) return null // legacy, not publicly readable
+export function resolveImageUri(uri?: string | null): string | undefined {
+  if (!uri) return undefined
+  if (uri.startsWith('/api/mobile/files/')) return undefined // legacy, not publicly readable
   return uri.startsWith('http') ? uri : `${API_URL}${uri}`
 }
 
@@ -35,7 +34,7 @@ export const setAuthToken = async (token: string | null) => {
     } else {
       await SecureStore.deleteItemAsync('auth_token')
     }
-  } catch (e) {
+  } catch {
     console.error('Failed to persist auth token')
   }
 }
@@ -46,19 +45,14 @@ export const getAuthToken = async (): Promise<string | null> => {
   return authToken
 }
 
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   }
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
+  if (token) headers['Authorization'] = `Bearer ${token}`
 
   const res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
@@ -71,6 +65,15 @@ async function request<T>(
   }
 
   return res.json()
+}
+
+export async function getActiveCompanyId(): Promise<string | null> {
+  try {
+    const payload: any = await request('/api/mobile/company/profile')
+    return payload?.company?.id || payload?.id || payload?.companyId || null
+  } catch {
+    return null
+  }
 }
 
 // Auth
@@ -311,12 +314,12 @@ export const serviceCategories = {
 
 export const realEstate = {
   list: (params?: { type?: string; status?: string; country?: string; [key: string]: any }) =>
-    request<any[]>(`/api/properties?${new URLSearchParams(params || {}).toString()}`),
+    request<any>(`/api/properties?${new URLSearchParams(params || {}).toString()}`),
 
   get: (id: string) =>
     request<any>(`/api/properties/${id}`),
 
-  create: (data: any) => request<any>(`/api/properties`, {
+  create: (data: any) => request<any>('/api/properties', {
     method: 'POST', body: JSON.stringify(data),
   }),
 
@@ -341,14 +344,14 @@ export const realEstate = {
     method: 'POST',
   }),
 
-  favorites: () => request<any>(`/api/properties/favorites`),
+  favorites: () => request<any>('/api/properties/favorites'),
 
   inquiry: (id: string, data: { type?: string; message?: string }) =>
     request<any>(`/api/properties/${id}/inquiry`, {
       method: 'POST', body: JSON.stringify(data),
     }),
 
-  priceEstimate: (data: any) => request<any>(`/api/properties/price-estimate`, {
+  priceEstimate: (data: any) => request<any>('/api/properties/price-estimate', {
     method: 'POST', body: JSON.stringify(data),
   }),
 
