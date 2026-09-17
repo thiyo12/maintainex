@@ -4,6 +4,7 @@ export type TierId = 'EXPLORER' | 'REGULAR' | 'PREMIUM' | 'ELITE'
 
 export interface Tier {
   id: TierId
+  label: string
   minJobs: number
   minSpent: number
   icon: Icon
@@ -11,10 +12,10 @@ export interface Tier {
 }
 
 export const TIERS: Tier[] = [
-  { id: 'EXPLORER', minJobs: 0, minSpent: 0, icon: Sparkle, color: '#6B7280' },
-  { id: 'REGULAR', minJobs: 3, minSpent: 0, icon: Star, color: '#10B981' },
-  { id: 'PREMIUM', minJobs: 10, minSpent: 50000, icon: Crown, color: '#F59E0B' },
-  { id: 'ELITE', minJobs: 25, minSpent: 150000, icon: Trophy, color: '#8B5CF6' },
+  { id: 'EXPLORER', label: 'Explorer', minJobs: 0, minSpent: 0, icon: Sparkle, color: '#6B7280' },
+  { id: 'REGULAR', label: 'Regular', minJobs: 3, minSpent: 0, icon: Star, color: '#10B981' },
+  { id: 'PREMIUM', label: 'Premium', minJobs: 10, minSpent: 50000, icon: Crown, color: '#F59E0B' },
+  { id: 'ELITE', label: 'Elite', minJobs: 25, minSpent: 150000, icon: Trophy, color: '#8B5CF6' },
 ]
 
 export function getTier(completedJobs: number, totalSpent: number): TierId {
