@@ -1,7 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native'
-import { House, Compass, Plus, ClockCounterClockwise, User } from 'phosphor-react-native'
+import { House, MagnifyingGlass, Plus, ClockCounterClockwise, User } from 'phosphor-react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useTranslation } from 'react-i18next'
 import { v3 } from '../../theme/v3/tokens'
 
 interface TabItem {
@@ -18,56 +17,52 @@ interface Props {
 
 const tabs: TabItem[] = [
   { key: 'home', icon: House, label: 'Home' },
-  { key: 'explore', icon: Compass, label: 'Explore' },
+  { key: 'explore', icon: MagnifyingGlass, label: 'Explore' },
   { key: 'activity', icon: ClockCounterClockwise, label: 'Activity' },
   { key: 'account', icon: User, label: 'Account' },
 ]
 
 export default function V3CustomerBottomNav({ activeTab, onTabPress, onPostJob }: Props) {
   const insets = useSafeAreaInsets()
-  const { t } = useTranslation()
-  const bottomPad = Math.max(insets.bottom, 4)
+  const bottomPad = Math.max(insets.bottom, 6)
+
+  const renderTab = (tab: TabItem) => {
+    const focused = activeTab === tab.key
+    const Icon = tab.icon
+    return (
+      <TouchableOpacity key={tab.key} style={styles.tab} onPress={() => onTabPress(tab.key)} activeOpacity={0.72}>
+        <Icon size={20} color={focused ? v3.colors.ink : '#8A8A8A'} weight={focused ? 'bold' : 'regular'} />
+        <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
+      </TouchableOpacity>
+    )
+  }
 
   return (
     <View style={[styles.container, { paddingBottom: bottomPad }]}>
-      {tabs.slice(0, 2).map((tab) => {
-        const focused = activeTab === tab.key
-        const Icon = tab.icon
-        return (
-          <TouchableOpacity key={tab.key} style={styles.tab} onPress={() => onTabPress(tab.key)} activeOpacity={0.7}>
-            <Icon size={22} color={focused ? v3.colors.ink : v3.colors.textMuted} weight={focused ? 'fill' : 'regular'} />
-            <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        )
-      })}
+      {tabs.slice(0, 2).map(renderTab)}
 
-      <TouchableOpacity style={styles.fab} onPress={onPostJob} activeOpacity={0.8}>
-        <Plus size={24} color={v3.colors.paper} weight="bold" />
+      <TouchableOpacity style={styles.postTab} onPress={onPostJob} activeOpacity={0.82}>
+        <View style={styles.fab}>
+          <Plus size={22} color={v3.colors.paper} weight="bold" />
+        </View>
+        <Text style={styles.label}>Post</Text>
       </TouchableOpacity>
 
-      {tabs.slice(2).map((tab) => {
-        const focused = activeTab === tab.key
-        const Icon = tab.icon
-        return (
-          <TouchableOpacity key={tab.key} style={styles.tab} onPress={() => onTabPress(tab.key)} activeOpacity={0.7}>
-            <Icon size={22} color={focused ? v3.colors.ink : v3.colors.textMuted} weight={focused ? 'fill' : 'regular'} />
-            <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        )
-      })}
+      {tabs.slice(2).map(renderTab)}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
+    minHeight: 78,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: v3.colors.paper,
     borderTopWidth: 1,
     borderTopColor: v3.colors.line,
-    paddingTop: 8,
-    paddingHorizontal: 4,
+    paddingTop: 10,
+    paddingHorizontal: 3,
     ...Platform.select({
       ios: { position: 'absolute', bottom: 0, left: 0, right: 0 },
       default: { elevation: 8 },
@@ -75,31 +70,33 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    minHeight: 54,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
+    justifyContent: 'flex-start',
+    gap: 7,
+  },
+  postTab: {
+    flex: 1,
+    minHeight: 62,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   label: {
-    fontSize: 10,
-    fontFamily: 'Outfit_500Medium',
-    color: v3.colors.textMuted,
+    fontSize: 9,
+    fontFamily: 'Outfit_700Bold',
+    color: '#8A8A8A',
   },
   labelActive: {
     color: v3.colors.ink,
-    fontFamily: 'Outfit_700Bold',
   },
   fab: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: v3.colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -20,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
-      default: { elevation: 6 },
-    }),
+    marginTop: -17,
+    marginBottom: 5,
   },
-
 })
