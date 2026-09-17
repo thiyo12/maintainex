@@ -7,6 +7,7 @@ import { useAuth } from '../../lib/auth'
 import { v3 } from '../../theme/v3/tokens'
 import V3NavBar from '../../components/v3/V3NavBar'
 import V3OTPInput from '../../components/v3/V3OTPInput'
+import V3Button from '../../components/v3/V3Button'
 
 export default function OtpScreen() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function OtpScreen() {
   }>()
   const { otpLogin, sendLoginOtp } = useAuth()
 
+  const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [resending, setResending] = useState(false)
   const [resendTimer, setResendTimer] = useState(60)
@@ -32,17 +34,15 @@ export default function OtpScreen() {
     return () => clearInterval(interval)
   }, [resendTimer])
 
-  const handleVerify = async (code: string) => {
+  const handleVerify = async (candidate = code) => {
+    if (candidate.length !== 6) return
     if (!target) {
       setOtpError('Verification destination is missing. Go back and request a new code.')
       return
     }
 
     if (isReset) {
-      router.push({
-        pathname: '/(auth)/reset-password',
-        params: { email: target, code },
-      } as any)
+      router.push({ pathname: '/(auth)/reset-password', params: { email: target, code: candidate } } as any)
       return
     }
 
@@ -50,7 +50,7 @@ export default function OtpScreen() {
     setVerifying(true)
     setOtpError('')
     try {
-      const user = await otpLogin(phone, code)
+      const user = await otpLogin(phone, candidate)
       if (user.role === 'TASKER') router.replace('/(tasker)')
       else if (user.role === 'COMPANY') router.replace('/(company)')
       else router.replace('/(customer)')
@@ -58,6 +58,7 @@ export default function OtpScreen() {
       let message = err?.message || 'Invalid code'
       try { message = JSON.parse(message).error || message } catch {}
       setOtpError(message)
+      setCode('')
     } finally {
       setVerifying(false)
     }
@@ -67,6 +68,7 @@ export default function OtpScreen() {
     if (!target || resendTimer > 0 || resending) return
     setResending(true)
     setOtpError('')
+    setCode('')
     try {
       if (isReset) await auth.forgotPassword({ email: target })
       else if (phone) await sendLoginOtp(phone)
@@ -83,14 +85,22 @@ export default function OtpScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <V3NavBar title="Verify number" onBack={() => router.back()} />
-
       <View style={styles.content}>
         <Text style={styles.heading}>Enter the code</Text>
         <Text style={styles.subtitle}>Sent to {maskedPhone || target || 'your account'}</Text>
 
         <View style={styles.otpWrap}>
-          <V3OTPInput size="standard" onComplete={handleVerify} error={otpError} loading={verifying} />
+          <V3OTPInput
+            size="standard"
+            autoSubmit={false}
+            onChangeCode={setCode}
+            onComplete={handleVerify}
+            error={otpError}
+            loading={verifying}
+          />
         </View>
+
+        <V3Button label="Verify" onPress={() => handleVerify()} loading={verifying} disabled={code.length !== 6} />
 
         <View style={styles.resendRow}>
           {resendTimer > 0 ? (
@@ -111,8 +121,8 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
   heading: { fontSize: 28, fontFamily: 'Outfit_900Black', color: v3.colors.ink, marginBottom: 8 },
   subtitle: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary, marginBottom: 32 },
-  otpWrap: { alignItems: 'center', marginBottom: 32 },
-  resendRow: { alignItems: 'center', marginTop: 16 },
+  otpWrap: { alignItems: 'center', marginBottom: 28 },
+  resendRow: { alignItems: 'center', marginTop: 22 },
   resendDisabled: { fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
   resendActive: { fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
 })
