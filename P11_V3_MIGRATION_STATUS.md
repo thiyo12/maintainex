@@ -42,24 +42,32 @@
 - `components/find/JobCard.tsx` — Ionicons → Phosphor
 - `components/find/TaskerCard.tsx` — Ionicons → Phosphor
 
-### B4: Post Job + Matching + Quotes — IN PROGRESS
-- ✅ Ionicons → Phosphor in confirm/[id].tsx (Lock, CheckCircle, Check)
-- ✅ Ionicons → Phosphor in jobs/v2/index.tsx (ClipboardText — was runtime bug, no import)
-- ✅ Legacy colors.cream → colors.surface in confirm/[id].tsx + index.tsx
-- ✅ Legacy colors.primaryDark → colors.ink in confirm/[id].tsx
-- ✅ Ionicons in B4 scope (jobs/v2/) = 0
+## B4: Post Job + Matching + Quotes — CODE COMPLETE
+
+### B4 Verification
 - ✅ B4-introduced TypeScript errors = 0
-- ✅ All 5 B4 files verified: create.tsx, [id].tsx, index.tsx, confirm/[id].tsx, quotes/[id].tsx
+- ✅ Ionicons in B4 scope = 0
+- ✅ lib/design imports in B4 scope = 0
+- ✅ Legacy colors imports in B4 scope = 0
+- ✅ Emoji icons in B4 scope = 0
+
+### B4 Files Rewritten (5)
+- `jobs/v2/create.tsx` — Full V3.3 Post Job wizard (step badge, black CTAs, card rx=18, progressive disclosure)
+- `jobs/v2/index.tsx` — V3.3 My Jobs (filter pills, numbered job list items, status pills)
+- `jobs/v2/[id].tsx` — V3.3 Job Detail (professional card, details card, quote cards, action cards, modals)
+- `jobs/v2/confirm/[id].tsx` — V3.3 Confirm Booking (provider card, schedule, escrow dark card, 4-step tracker)
+- `jobs/v2/quotes/[id].tsx` — V3.3 Quotes (sort pills, quote cards with swipe, countdown, profile/accept actions)
+
 ### B5: Payment + Active Job Lifecycle — PENDING
-### B6: Tasker Dashboard — PENDING
-### B7: Real Estate Marketplace — PENDING
-### B8: Messaging — PENDING
-### B9: Wallet + Finance — PENDING
-### B10: Admin Panel — PENDING
-### B11: Settings + Profile — PENDING
-### B12: Notifications — PENDING
-### B13: Onboarding + Help — PENDING
-### B14: Final QA + Polish — PENDING
+### B6: Account + Wallet + Settings + Chat — PENDING
+### B7: Property — PENDING
+### B8: Tasker Shell + Setup + Profile — PENDING
+### B9: Tasker Work + Earnings — PENDING
+### B10: Company Operations — PENDING
+### B11: Company Finance/Contracts/Profile — PENDING
+### B12: Shared Runtime States — PENDING
+### B13: Legacy UI Removal — PENDING
+### B14: Final Regression + Visual QA — PENDING
 
 ### Visual Device QA
 Deferred to B14 if simulator/device unavailable.

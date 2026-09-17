@@ -572,11 +572,11 @@ function CreateJobScreenInner() {
       <SafeAreaView style={styles.container}>
         <View style={styles.successWrap}>
           <View style={styles.successIcon}>
-            <CheckCircle size={46} color={colors.amber} weight="fill" />
+            <CheckCircle size={46} color={colors.success} weight="fill" />
           </View>
-          <Text style={[styles.successTitle, { color: colors.ink }]}>Your job is posted!</Text>
-          <Text style={[styles.successSub, { color: colors.muted }]}>We're notifying taskers near you now.</Text>
-          <Text style={[styles.successSupport, { color: colors.muted }]}>
+          <Text style={styles.successTitle}>Your job is posted!</Text>
+          <Text style={styles.successSub}>We're notifying taskers near you now.</Text>
+          <Text style={styles.successSupport}>
             Hold tight — nearby taskers are being notified. We'll show you their quotes shortly.
           </Text>
         </View>
@@ -588,7 +588,7 @@ function CreateJobScreenInner() {
     return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
   }
 
-  const StepIcon = stepMeta[step].icon
+  const stepGroup = step < 2 ? 1 : step < 4 ? 2 : 3
   const catRows = (() => {
     const items = categories.length > 0 ? categories : FALLBACK_CATEGORIES
     const mid = Math.ceil(items.length / 2)
@@ -598,33 +598,30 @@ function CreateJobScreenInner() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => (step === 1 && enteredPreselected) ? router.back() : step > 0 ? setStep(step - 1) : router.back()} style={styles.backBtn}>
+        <TouchableOpacity
+          onPress={() => (step === 1 && enteredPreselected) ? router.back() : step > 0 ? setStep(step - 1) : router.back()}
+          style={styles.backBtnCircle}
+        >
           {step > 0 ? <CaretLeft size={20} color={colors.ink} weight="bold" /> : <X size={20} color={colors.ink} weight="regular" />}
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.ink }]}>Post a Job</Text>
-        <View style={styles.backBtn} />
+        <Text style={styles.headerTitle}>Post a job</Text>
+        <View style={styles.backBtnCircle} />
       </View>
 
-      <View style={styles.progressRow}>
-        {stepMeta.map((_, i) => (
-          <View key={i} style={styles.progressWrap}>
-            <View style={[styles.progressDot, i === step && styles.progressDotActive, i < step && styles.progressDotDone]}>
-              <Text style={styles.progressDotText}>{i < step ? '✓' : i === step ? '●' : '○'}</Text>
-            </View>
-            {i < stepMeta.length - 1 && <View style={[styles.progressLine, i < step && styles.progressLineDone]} />}
-          </View>
-        ))}
+      <View style={styles.stepBadgeWrap}>
+        <View style={styles.stepBadge}>
+          <Text style={styles.stepBadgeText}>STEP {stepGroup} OF 3</Text>
+        </View>
       </View>
 
       <Animated.ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}
         style={{ transform: [{ translateY: slideAnim }] }}>
-        <StepIcon size={32} color={colors.amber} weight="fill" style={{ marginBottom: 12 }} />
-        <Text style={[styles.sectionTitle, { color: colors.ink }]}>{stepMeta[step].title}</Text>
-        <Text style={[styles.sectionSub, { color: colors.muted }]}>{stepMeta[step].sub}</Text>
+
+        <Text style={styles.stepTitle}>{stepMeta[step].title}</Text>
+        <Text style={styles.stepSub}>{stepMeta[step].sub}</Text>
 
         {step === 0 && (
           <View style={styles.stepContent}>
-            <Text style={styles.stepHint}>Step 1 — pick your category. Step 2 — pick the sub-category you need.</Text>
             <View style={styles.catGrid}>
               {catRows.map((row, ri) => (
                 <ScrollView
@@ -647,9 +644,9 @@ function CreateJobScreenInner() {
                       >
                         <LinearGradient colors={visual.gradient} style={[styles.catCircle, { width: catTileW - 24, height: catTileW - 24 }, active && styles.catCircleActive]}>
                           <visual.icon size={26} color="rgba(255,255,255,0.95)" weight="fill" />
-                          {active && <SealCheck size={18} color="#111827" weight="fill" style={styles.catCheck} />}
+                          {active && <SealCheck size={18} color="#000000" weight="fill" style={styles.catCheck} />}
                         </LinearGradient>
-                        <Text style={[styles.catCircleName, { color: active ? colors.amberDark : colors.ink }]} numberOfLines={2}>{cat.name}</Text>
+                        <Text style={[styles.catCircleName, active && styles.catCircleNameActive]} numberOfLines={2}>{cat.name}</Text>
                       </TouchableOpacity>
                     )
                   })}
@@ -657,37 +654,35 @@ function CreateJobScreenInner() {
               ))}
             </View>
 
-            {/* ═══ Custom job ═══ */}
             <View style={[
               styles.customJobCard,
               (showCustomJob || customThanks) && { flexDirection: 'column', alignItems: 'stretch' },
-              { backgroundColor: colors.white, borderColor: colors.border },
             ]}>
               {customThanks ? (
                 <>
                   <View style={styles.customThanksIcon}>
-                    <CheckCircle size={30} color={colors.amber} weight="fill" />
+                    <CheckCircle size={30} color={colors.success} weight="fill" />
                   </View>
-                  <Text style={[styles.customThanksTitle, { color: colors.ink }]}>Request received!</Text>
-                  <Text style={[styles.customThanksSub, { color: colors.muted }]}>
+                  <Text style={styles.customThanksTitle}>Request received!</Text>
+                  <Text style={styles.customThanksSub}>
                     Our team will review it. If enough people ask for the same job, we'll add it to the app and match you with a tasker.
                   </Text>
                   <TouchableOpacity
-                    style={[styles.customDoneBtn, { backgroundColor: colors.amber }]}
+                    style={styles.ctaBtn}
                     onPress={() => { setShowCustomJob(false); setCustomThanks(false); setCustomTitle(''); setCustomDesc(''); setCustomBudget('') }}
                   >
-                    <Text style={styles.customDoneBtnText}>Done</Text>
+                    <Text style={styles.ctaBtnText}>Done</Text>
                   </TouchableOpacity>
                 </>
               ) : showCustomJob ? (
                 <>
-                  <Text style={[styles.customJobTitle, { color: colors.ink }]}>Request a custom job</Text>
-                  <Text style={[styles.customJobSub, { color: colors.muted }]}>
+                  <Text style={styles.customJobTitle}>Request a custom job</Text>
+                  <Text style={styles.customJobSub}>
                     Don't see your job listed? Tell us what you need and our team will review it.
                   </Text>
                   <Text style={styles.inputLabel}>What do you need?</Text>
                   <TextInput
-                    style={[styles.customInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
+                    style={styles.customInput}
                     value={customTitle}
                     onChangeText={setCustomTitle}
                     placeholder="e.g., Fix my balcony railing"
@@ -695,7 +690,7 @@ function CreateJobScreenInner() {
                   />
                   <Text style={styles.inputLabel}>Describe it (optional)</Text>
                   <TextInput
-                    style={[styles.customInput, styles.customInputArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
+                    style={[styles.customInput, styles.customInputArea]}
                     value={customDesc}
                     onChangeText={setCustomDesc}
                     placeholder="Add details about the job..."
@@ -704,7 +699,7 @@ function CreateJobScreenInner() {
                   />
                   <Text style={styles.inputLabel}>Approximate budget (optional)</Text>
                   <TextInput
-                    style={[styles.customInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
+                    style={styles.customInput}
                     value={customBudget}
                     onChangeText={setCustomBudget}
                     placeholder="LKR"
@@ -712,28 +707,28 @@ function CreateJobScreenInner() {
                     keyboardType="number-pad"
                   />
                   <TouchableOpacity
-                    style={[styles.customSubmitBtn, { backgroundColor: colors.amber }, customSubmitting && { opacity: 0.6 }]}
+                    style={[styles.ctaBtn, customSubmitting && { opacity: 0.6 }]}
                     onPress={submitCustomJob}
                     disabled={customSubmitting}
                   >
                     {customSubmitting ? (
-                      <ActivityIndicator color="#111827" />
+                      <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.customSubmitBtnText}>Submit request</Text>
+                      <Text style={styles.ctaBtnText}>Submit request</Text>
                     )}
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setShowCustomJob(false)} style={{ alignSelf: 'center', paddingVertical: 8 }}>
-                    <Text style={[styles.customCancel, { color: colors.muted }]}>Cancel</Text>
+                    <Text style={styles.customCancel}>Cancel</Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
                   <View style={styles.customJobIcon}>
-                    <Sparkle size={22} color={colors.amberDark} weight="fill" />
+                    <Sparkle size={22} color={colors.amber} weight="fill" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.customJobTitle, { color: colors.ink }]}>Can't find your job?</Text>
-                    <Text style={[styles.customJobSub, { color: colors.muted }]}>
+                    <Text style={styles.customJobTitle}>Can't find your job?</Text>
+                    <Text style={styles.customJobSub}>
                       Request a custom job — we'll add it if others want it too.
                     </Text>
                   </View>
@@ -748,27 +743,26 @@ function CreateJobScreenInner() {
 
         {step === 1 && (
           <View style={styles.stepContent}>
-            <Text style={styles.stepHint}>Choose the exact service you need under {selectedCategory?.name || 'this category'}.</Text>
             {templatesLoading ? (
               <ActivityIndicator size="small" color={colors.amber} style={{ marginVertical: 24 }} />
             ) : templates.length === 0 ? (
-              <Text style={[styles.fieldHint, { color: colors.muted }]}>No services available for this category yet.</Text>
+              <Text style={styles.fieldHint}>No services available for this category yet.</Text>
             ) : (
               templates.map((tp) => {
                 const active = selectedTemplate?.id === tp.id
                 return (
                   <TouchableOpacity
                     key={tp.id}
-                    style={[styles.serviceOption, { backgroundColor: colors.white, borderColor: active ? colors.amber : colors.border }, active && styles.serviceOptionActive]}
+                    style={[styles.serviceOption, active && styles.serviceOptionActive]}
                     onPress={() => { setSelectedTemplate(tp); setShowErrors(false); setStep(2) }}
                     activeOpacity={0.8}
                   >
-                    <View style={[styles.serviceOptionIcon, { backgroundColor: colors.amber + '18' }]}>
-                      <Sparkle size={20} color={colors.amberDark} weight="fill" />
+                    <View style={styles.serviceOptionIcon}>
+                      <Sparkle size={20} color={colors.amber} weight="fill" />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.serviceOptionName, { color: colors.ink }]} numberOfLines={1}>{tp.name}</Text>
-                      <Text style={[styles.serviceOptionDesc, { color: colors.muted }]} numberOfLines={1}>{tp.description}</Text>
+                      <Text style={styles.serviceOptionName} numberOfLines={1}>{tp.name}</Text>
+                      <Text style={styles.serviceOptionDesc} numberOfLines={1}>{tp.description}</Text>
                     </View>
                     <View style={[styles.serviceOptionRadio, active && styles.serviceOptionRadioActive]}>
                       {active && <View style={styles.serviceOptionRadioInner} />}
@@ -777,14 +771,13 @@ function CreateJobScreenInner() {
                 )
               })
             )}
-            {showErrors && !selectedTemplate && <Text style={[styles.fieldHint, { color: '#EF4444' }]}>Please select a service</Text>}
-            <TouchableOpacity style={[styles.nextBtn, (!selectedTemplate) && styles.btnDisabled]}
+            {showErrors && !selectedTemplate && <Text style={styles.errorHint}>Please select a service</Text>}
+            <TouchableOpacity style={[styles.ctaBtn, (!selectedTemplate) && styles.ctaBtnDisabled]}
               onPress={() => {
                 if (!selectedTemplate) { setShowErrors(true); Alert.alert('Missing fields', 'Please select a service'); return }
                 setShowErrors(false); setStep(2)
               }}>
-              <ArrowRight size={18} color="#111827" weight="bold" />
-              <Text style={styles.btnText}>Next: Where should we go?</Text>
+              <Text style={styles.ctaBtnText}>Next: Where should we go?</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -811,26 +804,26 @@ function CreateJobScreenInner() {
                 </MapView>
                 <TouchableOpacity style={styles.overlayLocBtn} onPress={useMyLocation} disabled={pinLocating}>
                   {pinLocating ? (
-                    <ActivityIndicator color={colors.amberDark} size="small" />
+                    <ActivityIndicator color={colors.amber} size="small" />
                   ) : (
                     <>
-                      <NavigationArrow size={16} color={colors.amberDark} weight="fill" />
-                      <Text style={[styles.overlayLocText, { color: colors.amberDark }]}>Use my location</Text>
+                      <NavigationArrow size={16} color={colors.amber} weight="fill" />
+                      <Text style={styles.overlayLocText}>Use my location</Text>
                     </>
                   )}
                 </TouchableOpacity>
                 {!coords && !pinLocating && (
                   <View style={styles.mapHint} pointerEvents="none">
                     <MapPin size={14} color={colors.muted} weight="fill" />
-                    <Text style={[styles.mapHintText, { color: colors.muted }]}>Move the map to drop a pin</Text>
+                    <Text style={styles.mapHintText}>Move the map to drop a pin</Text>
                   </View>
                 )}
               </View>
-              <Text style={[styles.mapCaption, { color: colors.muted }]}>
+              <Text style={styles.mapCaption}>
                 Drag the map to place the exact service pin{coords ? ` · ${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}` : ''}
               </Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.white, borderColor: colors.border, marginTop: 8 }]}>
-                <TextInput style={[styles.input, styles.textAreaSmall, { color: colors.ink }]} value={address} onChangeText={setAddress}
+              <View style={styles.inputWrap}>
+                <TextInput style={[styles.input, styles.textAreaSmall]} value={address} onChangeText={setAddress}
                   placeholder="Address from the pin — edit if needed" placeholderTextColor={colors.muted} multiline />
               </View>
             </View>
@@ -844,7 +837,7 @@ function CreateJobScreenInner() {
                 </TouchableOpacity>
               ))}
             </View>
-            {showErrors && !selectedCountry && <Text style={[styles.fieldHint, { color: '#EF4444' }]}>Please select a country</Text>}
+            {showErrors && !selectedCountry && <Text style={styles.errorHint}>Please select a country</Text>}
             {selectedCountry && <>
               <Text style={styles.label}>State / Province <Text style={styles.requiredDot}>*</Text></Text>
               <View style={styles.pillsWrap}>{(selectedCountry.states || []).map((s) => (
@@ -862,7 +855,7 @@ function CreateJobScreenInner() {
                   <Text style={[styles.pillText, selectedCity?.id === c.id && styles.pillTextActive]}>{c.name}</Text>
                 </TouchableOpacity>
               ))}</View>
-              {showErrors && !selectedCity && <Text style={[styles.fieldHint, { color: '#EF4444' }]}>Please select a city</Text>}
+              {showErrors && !selectedCity && <Text style={styles.errorHint}>Please select a city</Text>}
             </>}
             {selectedCity && (selectedCity.areas || []).length > 0 && <>
               <Text style={styles.label}>Area</Text>
@@ -873,7 +866,7 @@ function CreateJobScreenInner() {
                 </TouchableOpacity>
               ))}</View>
             </>}
-            <TouchableOpacity style={[styles.nextBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.btnDisabled]}
+            <TouchableOpacity style={[styles.ctaBtn, (!selectedCountry || !selectedState || !selectedCity) && styles.ctaBtnDisabled]}
               onPress={() => {
                 const missing: string[] = []
                 if (!selectedCountry) missing.push('Country')
@@ -882,8 +875,7 @@ function CreateJobScreenInner() {
                 if (missing.length > 0) { setShowErrors(true); Alert.alert('Missing fields', `Please select: ${missing.join(', ')}`); return }
                 setShowErrors(false); setStep(3)
               }}>
-              <ArrowRight size={18} color="#111827" weight="bold" />
-              <Text style={styles.btnText}>Next</Text>
+              <Text style={styles.ctaBtnText}>Next</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -897,9 +889,12 @@ function CreateJobScreenInner() {
                 { key: 'urgent', label: 'Urgent' },
                 { key: 'emergency', label: 'Emergency' },
               ].map((u) => (
-                <TouchableOpacity key={u.key} style={[styles.urgencyChip, { backgroundColor: colors.white, borderColor: colors.border }, urgency === u.key && styles.urgencyChipActive]}
+                <TouchableOpacity key={u.key} style={[styles.urgencyChip, urgency === u.key && styles.urgencyChipActive]}
                   onPress={() => setUrgency(u.key)}>
-                  <Text style={[styles.urgencyText, { color: urgency === u.key ? colors.amberDark : colors.muted }]}>{u.label}</Text>
+                  {u.key === 'emergency' && <Lightning size={14} color={urgency === u.key ? '#000000' : colors.muted} weight={urgency === u.key ? 'fill' : 'regular'} />}
+                  {u.key === 'urgent' && <ClockAfternoon size={14} color={urgency === u.key ? '#000000' : colors.muted} weight={urgency === u.key ? 'fill' : 'regular'} />}
+                  {u.key === 'normal' && <Snowflake size={14} color={urgency === u.key ? '#000000' : colors.muted} weight={urgency === u.key ? 'fill' : 'regular'} />}
+                  <Text style={[styles.urgencyText, urgency === u.key && styles.urgencyTextActive]}>{u.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -917,25 +912,25 @@ function CreateJobScreenInner() {
                   const isActive = preferredDate === dateStr
                   return (
                     <TouchableOpacity key={opt.key}
-                      style={[styles.dateChip, { backgroundColor: colors.white, borderColor: colors.border }, isActive && styles.dateChipActive]}
+                      style={[styles.dateChip, isActive && styles.dateChipActive]}
                       onPress={() => setPreferredDate(isActive ? '' : dateStr)}>
-                      <Text style={[styles.dateChipLabel, { color: isActive ? colors.amberDark : colors.ink }]}>{opt.label}</Text>
-                      <Text style={[styles.dateChipDate, { color: isActive ? colors.amberDark : colors.muted }]}>
+                      <Text style={[styles.dateChipLabel, isActive && styles.dateChipLabelActive]}>{opt.label}</Text>
+                      <Text style={[styles.dateChipDate, isActive && styles.dateChipDateActive]}>
                         {opt.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                       </Text>
                     </TouchableOpacity>
                   )
                 })}
-                <TouchableOpacity style={[styles.dateChip, { backgroundColor: colors.white, borderColor: colors.border }, showDatePicker && styles.dateChipActive]}
+                <TouchableOpacity style={[styles.dateChip, showDatePicker && styles.dateChipActive]}
                   onPress={() => setShowDatePicker(!showDatePicker)}>
-                  <CalendarBlank size={18} color={colors.ink} />
-                  <Text style={[styles.dateChipLabel, { color: colors.ink }]}>Pick a Date</Text>
+                  <CalendarBlank size={18} color={showDatePicker ? '#000000' : colors.muted} />
+                  <Text style={[styles.dateChipLabel, showDatePicker && styles.dateChipLabelActive]}>Pick a Date</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
             {showDatePicker && (
-              <View style={[styles.datePickerModal, { backgroundColor: colors.white, borderColor: colors.border }]}>
-                <Text style={[styles.datePickerTitle, { color: colors.ink }]}>Select a date</Text>
+              <View style={styles.datePickerModal}>
+                <Text style={styles.datePickerTitle}>Select a date</Text>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                   {['01','02','03','04','05','06','07'].map(day => {
                     const d = new Date()
@@ -944,23 +939,23 @@ function CreateJobScreenInner() {
                     const isActive = preferredDate === dateStr
                     return (
                       <TouchableOpacity key={day}
-                        style={[styles.dateModalDay, { backgroundColor: isActive ? colors.amber : colors.surface, borderColor: isActive ? colors.amber : colors.border }]}
+                        style={[styles.dateModalDay, isActive && styles.dateModalDayActive]}
                         onPress={() => { setPreferredDate(dateStr); setShowDatePicker(false) }}>
-                        <Text style={[styles.dateModalDayName, { color: isActive ? '#111827' : colors.muted }]}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
-                        <Text style={[styles.dateModalDayNum, { color: isActive ? '#111827' : colors.ink }]}>{d.getDate()}</Text>
-                        <Text style={[styles.dateModalDayMonth, { color: isActive ? '#111827' : colors.muted }]}>{d.toLocaleDateString('en-US', { month: 'short' })}</Text>
+                        <Text style={[styles.dateModalDayName, isActive && styles.dateModalDayTextActive]}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</Text>
+                        <Text style={[styles.dateModalDayNum, isActive && styles.dateModalDayTextActive]}>{d.getDate()}</Text>
+                        <Text style={[styles.dateModalDayMonth, isActive && styles.dateModalDayTextActive]}>{d.toLocaleDateString('en-US', { month: 'short' })}</Text>
                       </TouchableOpacity>
                     )
                   })}
                 </View>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.datePickerClose}>
-                  <Text style={{ color: colors.amberDark, fontFamily: fonts.bodySemiBold }}>Done</Text>
+                  <Text style={styles.datePickerCloseText}>Done</Text>
                 </TouchableOpacity>
               </View>
             )}
             {preferredDate && (
-              <View style={[styles.selectedDateBadge, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-                <Text style={[styles.selectedDateText, { color: colors.amberDark }]}>
+              <View style={styles.selectedDateBadge}>
+                <Text style={styles.selectedDateText}>
                   {new Date(preferredDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                   <Text onPress={() => setPreferredDate('')} style={{ color: colors.muted }}>  ✕</Text>
                 </Text>
@@ -974,19 +969,18 @@ function CreateJobScreenInner() {
                   const isActive = preferredTimeSlot === slot
                   return (
                     <TouchableOpacity key={slot}
-                      style={[styles.timeChip, { backgroundColor: colors.white, borderColor: colors.border }, isActive && styles.timeChipActive]}
+                      style={[styles.timeChip, isActive && styles.timeChipActive]}
                       onPress={() => setPreferredTimeSlot(isActive ? '' : slot)}>
-                      <ClockAfternoon size={15} color={isActive ? colors.amberDark : colors.muted} weight={isActive ? 'fill' : 'regular'} />
-                      <Text style={[styles.timeChipText, { color: isActive ? colors.amberDark : colors.muted }]}>{slot}</Text>
+                      <ClockAfternoon size={15} color={isActive ? '#000000' : colors.muted} weight={isActive ? 'fill' : 'regular'} />
+                      <Text style={[styles.timeChipText, isActive && styles.timeChipTextActive]}>{slot}</Text>
                     </TouchableOpacity>
                   )
                 })}
               </View>
             </ScrollView>
 
-            <TouchableOpacity style={styles.nextBtn} onPress={() => { setShowErrors(false); setStep(4) }}>
-              <ArrowRight size={18} color="#111827" weight="bold" />
-              <Text style={styles.btnText}>Next: Photos & Notes</Text>
+            <TouchableOpacity style={styles.ctaBtn} onPress={() => { setShowErrors(false); setStep(4) }}>
+              <Text style={styles.ctaBtnText}>Next: Photos & Notes</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -994,9 +988,9 @@ function CreateJobScreenInner() {
         {step === 4 && (
           <View style={styles.stepContent}>
             {taskerId ? (
-              <View style={[styles.taskerChip, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-                <UserCircle size={20} color={colors.amberDark} weight="fill" />
-                <Text style={[styles.taskerChipText, { color: colors.amberDark }]}>
+              <View style={styles.taskerChip}>
+                <UserCircle size={20} color={colors.amber} weight="fill" />
+                <Text style={styles.taskerChipText}>
                   Booking {taskerName || 'your selected tasker'} directly
                 </Text>
               </View>
@@ -1013,13 +1007,13 @@ function CreateJobScreenInner() {
                 </View>
               ))}
               {photos.length < 5 && (
-                <TouchableOpacity style={[styles.photoAdd, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={pickPhotos} disabled={photoUploading}>
+                <TouchableOpacity style={styles.photoAdd} onPress={pickPhotos} disabled={photoUploading}>
                   {photoUploading ? (
                     <ActivityIndicator size="small" color={colors.amber} />
                   ) : (
                     <>
-                      <Camera size={24} color={colors.amberDark} weight="fill" />
-                      <Text style={[styles.photoAddText, { color: colors.muted }]}>Add</Text>
+                      <Camera size={24} color={colors.amber} weight="fill" />
+                      <Text style={styles.photoAddText}>Add</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1027,9 +1021,9 @@ function CreateJobScreenInner() {
             </View>
 
             <Text style={styles.label}>Notes <Text style={{ color: colors.muted, fontSize: 12 }}>(optional)</Text></Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.white, borderColor: colors.border }]}>
+            <View style={styles.inputWrap}>
               <TextInput
-                style={[styles.input, styles.notesInput, { color: colors.ink }]}
+                style={[styles.input, styles.notesInput]}
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="e.g., master bedroom air conditioner stopped cooling yesterday"
@@ -1038,9 +1032,8 @@ function CreateJobScreenInner() {
               />
             </View>
 
-            <TouchableOpacity style={styles.nextBtn} onPress={() => { setShowErrors(false); setStep(5) }}>
-              <ArrowRight size={18} color="#111827" weight="bold" />
-              <Text style={styles.btnText}>Review & Post</Text>
+            <TouchableOpacity style={styles.ctaBtn} onPress={() => { setShowErrors(false); setStep(5) }}>
+              <Text style={styles.ctaBtnText}>Review & Post</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1048,14 +1041,14 @@ function CreateJobScreenInner() {
         {step === 5 && (
           <View style={styles.stepContent}>
             {taskerId ? (
-              <View style={[styles.taskerChip, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-                <UserCircle size={20} color={colors.amberDark} weight="fill" />
-                <Text style={[styles.taskerChipText, { color: colors.amberDark }]}>
+              <View style={styles.taskerChip}>
+                <UserCircle size={20} color={colors.amber} weight="fill" />
+                <Text style={styles.taskerChipText}>
                   Booking {taskerName || 'your selected tasker'} directly — they'll be notified to quote.
                 </Text>
               </View>
             ) : null}
-            <View style={[styles.reviewCard, { backgroundColor: colors.white, borderColor: colors.border }]}>
+            <View style={styles.reviewCard}>
               {[
                 { icon: Clipboard, label: 'Service', value: selectedTemplate ? `${selectedTemplate.jobCategory?.name || ''} — ${selectedTemplate.name}` : '' },
                 { icon: Sparkle, label: 'Details', value: (() => { const lines = flattenAnswers(selectedTemplate, answers); return lines.length > 0 ? lines.join('\n') : selectedTemplate?.description || '' })() },
@@ -1066,11 +1059,11 @@ function CreateJobScreenInner() {
               ].map((item, i) => {
                 const RIcon = item.icon
                 return (
-                  <View key={i} style={[styles.reviewItem, i < 5 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
-                    <RIcon size={18} color={colors.amberDark} weight="fill" />
+                  <View key={i} style={[styles.reviewItem, i < 5 && styles.reviewItemBorder]}>
+                    <RIcon size={18} color={colors.amber} weight="fill" />
                     <View style={{ marginLeft: 10, flex: 1 }}>
-                      <Text style={[styles.reviewItemLabel, { color: colors.muted }]}>{item.label}</Text>
-                      <Text style={[styles.reviewItemValue, { color: colors.ink }]}>{item.value}</Text>
+                      <Text style={styles.reviewItemLabel}>{item.label}</Text>
+                      <Text style={styles.reviewItemValue}>{item.value}</Text>
                     </View>
                   </View>
                 )
@@ -1080,27 +1073,27 @@ function CreateJobScreenInner() {
             {estimateLoading ? (
               <View style={{ alignItems: 'center', paddingVertical: 20 }}>
                 <ActivityIndicator size="small" color={colors.amber} />
-                <Text style={[styles.fieldHint, { color: colors.muted, marginTop: 10 }]}>Estimating your price…</Text>
+                <Text style={[styles.fieldHint, { marginTop: 10 }]}>Estimating your price…</Text>
               </View>
             ) : estimate ? (
-              <Reanimated.View entering={FadeInRight.duration(300)} style={[styles.pricingCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
-                <Text style={[styles.pricingLabel, { color: colors.ink }]}>Estimated Price</Text>
+              <Reanimated.View entering={FadeInRight.duration(300)} style={styles.pricingCard}>
+                <Text style={styles.pricingLabel}>Estimated Price</Text>
                 <CountUpRange
                   min={estimate.priceRange.min}
                   max={estimate.priceRange.max}
                   symbol={estimate.symbol}
-                  style={[styles.pricingRange, { color: colors.amberDark }]}
+                  style={styles.pricingRange}
                 />
-                <Text style={[styles.pricingConfidence, { color: colors.muted }]}>
+                <Text style={styles.pricingConfidence}>
                   Est. {Math.round(estimate.timeEstimateMinutes)} min · {estimate.confidence} confidence
                 </Text>
               </Reanimated.View>
             ) : null}
 
             <Text style={styles.label}>Your Budget (LKR) <Text style={{ color: colors.muted, fontSize: 12 }}>(optional — defaults to estimate)</Text></Text>
-            <View style={[styles.inputWrap, { backgroundColor: colors.white, borderColor: colors.border }]}>
+            <View style={styles.inputWrap}>
               <TextInput
-                style={[styles.input, { color: colors.ink }]}
+                style={styles.input}
                 value={budgetAmount}
                 onChangeText={setBudgetAmount}
                 placeholder="Enter max budget"
@@ -1112,29 +1105,29 @@ function CreateJobScreenInner() {
             <Text style={styles.label}>Payment Method</Text>
             <View style={styles.paymentRow}>
               <TouchableOpacity
-                style={[styles.paymentCard, { backgroundColor: colors.white, borderColor: colors.border }, paymentMethod === 'DIGITAL' && styles.paymentCardActive]}
+                style={[styles.paymentCard, paymentMethod === 'DIGITAL' && styles.paymentCardActive]}
                 onPress={() => setPaymentMethod('DIGITAL')}>
-                <Wallet size={22} color={paymentMethod === 'DIGITAL' ? colors.amberDark : colors.muted} weight={paymentMethod === 'DIGITAL' ? 'fill' : 'regular'} />
-                <Text style={[styles.paymentTitle, { color: colors.ink }]}>Digital (Wallet)</Text>
-                <Text style={[styles.paymentTag, { color: colors.amberDark }]}>Recommended</Text>
+                <Wallet size={22} color={paymentMethod === 'DIGITAL' ? '#000000' : colors.muted} weight={paymentMethod === 'DIGITAL' ? 'fill' : 'regular'} />
+                <Text style={[styles.paymentTitle, paymentMethod === 'DIGITAL' && styles.paymentTitleActive]}>Digital (Wallet)</Text>
+                <Text style={[styles.paymentTag, paymentMethod === 'DIGITAL' && styles.paymentTagActive]}>Recommended</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.paymentCard, { backgroundColor: colors.white, borderColor: colors.border }, paymentMethod === 'CASH' && styles.paymentCardActive]}
+                style={[styles.paymentCard, paymentMethod === 'CASH' && styles.paymentCardActive]}
                 onPress={() => setPaymentMethod('CASH')}>
-                <Money size={22} color={paymentMethod === 'CASH' ? colors.amberDark : colors.muted} weight={paymentMethod === 'CASH' ? 'fill' : 'regular'} />
-                <Text style={[styles.paymentTitle, { color: colors.ink }]}>Cash</Text>
-                <Text style={[styles.paymentTag, { color: colors.muted }]}>10% commission applies</Text>
+                <Money size={22} color={paymentMethod === 'CASH' ? '#000000' : colors.muted} weight={paymentMethod === 'CASH' ? 'fill' : 'regular'} />
+                <Text style={[styles.paymentTitle, paymentMethod === 'CASH' && styles.paymentTitleActive]}>Cash</Text>
+                <Text style={[styles.paymentTag, paymentMethod === 'CASH' ? styles.paymentTagActive : { color: colors.muted }]}>10% commission applies</Text>
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={[styles.submitBtn, submitting && styles.btnDisabled]}
+            <TouchableOpacity style={[styles.ctaBtn, styles.submitBtn, submitting && styles.ctaBtnDisabled]}
               onPress={handleSubmit} disabled={submitting}>
-              {submitting ? <ActivityIndicator color="#111827" /> : <>
-                <CheckCircle size={20} color="#111827" weight="fill" />
-                <Text style={styles.submitText}>Post Job</Text>
+              {submitting ? <ActivityIndicator color="#FFFFFF" /> : <>
+                <CheckCircle size={20} color="#FFFFFF" weight="fill" />
+                <Text style={styles.ctaBtnText}>Post Job</Text>
               </>}
             </TouchableOpacity>
-            <Text style={[styles.fieldHint, { color: colors.muted, textAlign: 'center', marginTop: 12 }]}>
+            <Text style={[styles.fieldHint, { textAlign: 'center', marginTop: 12 }]}>
               We'll notify all nearby matching taskers instantly — no need to wait.
             </Text>
           </View>
@@ -1147,183 +1140,171 @@ function CreateJobScreenInner() {
 
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+
   successWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  successIcon: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.amberBg, borderWidth: 1.5, borderColor: colors.amber, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  successTitle: { fontSize: 22, fontFamily: fonts.headingBold, textAlign: 'center', marginBottom: 8 },
-  successSub: { fontSize: 15, fontFamily: fonts.bodyMedium, textAlign: 'center', marginBottom: 6 },
-  successSupport: { fontSize: 13, fontFamily: fonts.body, textAlign: 'center', lineHeight: 19, marginTop: 4 },
+  successIcon: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(34,197,94,0.15)', borderWidth: 1.5, borderColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  successTitle: { fontSize: 22, fontFamily: fonts.headingBold, color: colors.ink, textAlign: 'center', marginBottom: 8 },
+  successSub: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, textAlign: 'center', marginBottom: 6 },
+  successSupport: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 19, marginTop: 4 },
+
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  backBtn: { width: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontFamily: fonts.headingBold },
+  backBtnCircle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: colors.ink },
+
+  stepBadgeWrap: { paddingHorizontal: 20, paddingBottom: 4 },
+  stepBadge: { alignSelf: 'flex-start', backgroundColor: '#FFF2D6', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
+  stepBadgeText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: '#9A6000', letterSpacing: 0.5 },
+
   scroll: { padding: 20, paddingBottom: 40 },
-  sectionTitle: { fontSize: 24, fontFamily: fonts.heading, marginBottom: 4 },
-  sectionSub: { fontSize: 14, fontFamily: fonts.body, marginBottom: 24, lineHeight: 20 },
+  stepTitle: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink, marginBottom: 4, marginTop: 8 },
+  stepSub: { fontSize: 12, fontFamily: fonts.body, color: '#5B5B5B', marginBottom: 24 },
   label: { fontSize: 14, fontFamily: fonts.bodyMedium, marginBottom: 8, marginTop: 16, color: colors.ink },
   stepContent: {},
 
-  progressRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 20 },
-  progressWrap: { flexDirection: 'row', alignItems: 'center' },
-  progressDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' },
-  progressDotActive: { borderColor: colors.amber, backgroundColor: colors.amber },
-  progressDotDone: { borderColor: colors.success, backgroundColor: colors.success },
-  progressDotText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#fff' },
-  progressLine: { width: 32, height: 2, backgroundColor: colors.border, marginHorizontal: 4 },
-  progressLineDone: { backgroundColor: colors.success },
-
   pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 100, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border },
-  pillActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  pill: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border },
+  pillActive: { borderColor: colors.amber, backgroundColor: 'rgba(245,166,35,0.12)' },
   pillText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
-  pillTextActive: { color: colors.amberDark },
+  pillTextActive: { color: colors.amber },
 
   catGrid: { marginTop: 4 },
   catRow: { alignItems: 'flex-start', paddingBottom: 6 },
   catCircle: { borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
   catCircleActive: { borderWidth: 3, borderColor: colors.amber },
-  catCircleName: { fontSize: 12, fontFamily: fonts.bodySemiBold, textAlign: 'center' },
+  catCircleName: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted, textAlign: 'center' },
+  catCircleNameActive: { color: colors.amber },
   catCheck: { position: 'absolute', right: 6, top: 6 },
-  stepHint: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginBottom: 4 },
 
   serviceOption: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     padding: 14, borderRadius: 16, borderWidth: 1.5, marginBottom: 10,
+    backgroundColor: colors.surface, borderColor: colors.border,
   },
-  serviceOptionActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  serviceOptionIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  serviceOptionName: { fontSize: 15, fontFamily: fonts.bodySemiBold },
-  serviceOptionDesc: { fontSize: 12, fontFamily: fonts.body, marginTop: 2 },
+  serviceOptionActive: { borderColor: colors.amber, backgroundColor: 'rgba(245,166,35,0.12)' },
+  serviceOptionIcon: { width: 42, height: 42, borderRadius: 12, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(245,166,35,0.12)' },
+  serviceOptionName: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
+  serviceOptionDesc: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
   serviceOptionRadio: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border,
     justifyContent: 'center', alignItems: 'center',
   },
   serviceOptionRadioActive: { borderColor: colors.amber, backgroundColor: colors.amber },
-  serviceOptionRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
+  serviceOptionRadioInner: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#000000' },
 
   customJobCard: {
     marginTop: 24, borderRadius: 18, borderWidth: 1.5, padding: 16,
     flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: colors.surface, borderColor: colors.border,
   },
   customJobIcon: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.amberBg,
+    width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(245,166,35,0.12)',
     justifyContent: 'center', alignItems: 'center',
   },
-  customJobTitle: { fontSize: 15, fontFamily: fonts.bodySemiBold },
-  customJobSub: { fontSize: 12, fontFamily: fonts.body, marginTop: 2, lineHeight: 17 },
+  customJobTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
+  customJobSub: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2, lineHeight: 17 },
   customJobCta: {
-    backgroundColor: colors.amber, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 100,
+    backgroundColor: colors.amber, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12,
   },
-  customJobCtaText: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: '#111827' },
-  customThanksIcon: { alignSelf: 'center', width: 56, height: 56, borderRadius: 28, backgroundColor: colors.amberBg, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  customThanksTitle: { fontSize: 18, fontFamily: fonts.headingBold, textAlign: 'center', marginBottom: 6 },
-  customThanksSub: { fontSize: 13, fontFamily: fonts.body, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
-  customDoneBtn: { alignSelf: 'center', paddingHorizontal: 32, paddingVertical: 12, borderRadius: 100 },
-  customDoneBtnText: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: '#111827' },
+  customJobCtaText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#000000' },
+  customThanksIcon: { alignSelf: 'center', width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(34,197,94,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+  customThanksTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, textAlign: 'center', marginBottom: 6 },
+  customThanksSub: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
   inputLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, marginBottom: 6, marginTop: 10, color: colors.ink },
   customInput: {
     borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: fonts.body,
+    backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink,
   },
   customInputArea: { minHeight: 84, textAlignVertical: 'top' },
-  customSubmitBtn: {
-    marginTop: 14, borderRadius: 100, paddingVertical: 14, alignItems: 'center',
-  },
-  customSubmitBtnText: { fontSize: 15, fontFamily: fonts.bodySemiBold, color: '#111827' },
-  customCancel: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  customCancel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
 
-  useLocationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, borderColor: colors.amber, backgroundColor: colors.amberBg, marginBottom: 6, marginTop: 4 },
-  useLocationText: { fontSize: 14, fontFamily: fonts.bodySemiBold },
-
-  mapCard: { borderRadius: 20, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', backgroundColor: colors.white, marginBottom: 4 },
+  mapCard: { borderRadius: 20, borderWidth: 1, borderColor: colors.border, overflow: 'hidden', backgroundColor: colors.surface, marginBottom: 4 },
   mapWrap: { height: 220, borderRadius: 20, overflow: 'hidden' },
   overlayLocBtn: {
     position: 'absolute', top: 12, right: 12, zIndex: 5,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.white, paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: 100, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4,
   },
-  overlayLocText: { fontSize: 12, fontFamily: fonts.bodySemiBold },
+  overlayLocText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.amber },
   mapHint: {
     position: 'absolute', bottom: 12, left: 12, zIndex: 5,
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 100,
   },
-  mapHintText: { fontSize: 12, fontFamily: fonts.bodySemiBold },
-  mapCaption: { fontSize: 12, fontFamily: fonts.body, paddingHorizontal: 4, paddingTop: 10 },
+  mapHintText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted },
+  mapCaption: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, paddingHorizontal: 4, paddingTop: 10 },
 
-  serviceCard: { borderRadius: 18, padding: 18, borderWidth: 1.5, marginBottom: 14 },
-  serviceName: { fontSize: 17, fontFamily: fonts.heading, marginBottom: 4 },
-  serviceDesc: { fontSize: 13, fontFamily: fonts.body, lineHeight: 19 },
-
-  questionBlock: { borderRadius: 18, padding: 16, borderWidth: 1.5, marginBottom: 12 },
-  questionLabel: { fontSize: 14, fontFamily: fonts.bodySemiBold, marginBottom: 10 },
-  optWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 100, borderWidth: 1.5 },
-  optChipActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  optText: { fontSize: 13, fontFamily: fonts.bodyMedium },
-
-  autoSummary: { borderRadius: 18, padding: 16, borderWidth: 1.5, marginTop: 4 },
-  autoTitle: { fontSize: 15, fontFamily: fonts.bodySemiBold, marginBottom: 4 },
-  autoDesc: { fontSize: 13, fontFamily: fonts.body, lineHeight: 19 },
-
-  inputWrap: { borderRadius: 18, borderWidth: 1.5, overflow: 'hidden' },
-  input: { padding: 16, fontSize: 15, fontFamily: fonts.body },
+  inputWrap: { borderRadius: 16, borderWidth: 1.5, overflow: 'hidden', backgroundColor: colors.surface, borderColor: colors.border },
+  input: { padding: 16, fontSize: 15, fontFamily: fonts.body, color: colors.ink },
   textAreaSmall: { height: 80, textAlignVertical: 'top' },
 
   urgencyRow: { flexDirection: 'row', gap: 8 },
-  urgencyChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5 },
-  urgencyChipActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  urgencyText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  urgencyChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, backgroundColor: colors.surface, borderColor: colors.border },
+  urgencyChipActive: { borderColor: colors.amber, backgroundColor: 'rgba(245,166,35,0.12)' },
+  urgencyText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted },
+  urgencyTextActive: { color: '#000000' },
 
-  dateChip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', minWidth: 100 },
-  dateChipActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  dateChipLabel: { fontSize: 13, fontFamily: fonts.bodySemiBold, marginBottom: 2 },
-  dateChipDate: { fontSize: 11, fontFamily: fonts.body },
-  selectedDateBadge: { borderRadius: 12, padding: 12, borderWidth: 1, marginTop: 8, marginBottom: 4 },
-  selectedDateText: { fontSize: 13, fontFamily: fonts.bodyMedium },
+  dateChip: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', minWidth: 100, backgroundColor: colors.surface, borderColor: colors.border },
+  dateChipActive: { borderColor: colors.amber, backgroundColor: 'rgba(245,166,35,0.12)' },
+  dateChipLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.muted, marginBottom: 2 },
+  dateChipLabelActive: { color: '#000000' },
+  dateChipDate: { fontSize: 11, fontFamily: fonts.body, color: colors.muted },
+  dateChipDateActive: { color: '#000000' },
+  selectedDateBadge: { borderRadius: 12, padding: 12, borderWidth: 1, marginTop: 8, marginBottom: 4, backgroundColor: 'rgba(245,166,35,0.08)', borderColor: colors.amber },
+  selectedDateText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.amber },
 
-  timeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5 },
-  timeChipActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  timeChipText: { fontSize: 12, fontFamily: fonts.bodyMedium },
+  timeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, backgroundColor: colors.surface, borderColor: colors.border },
+  timeChipActive: { borderColor: colors.amber, backgroundColor: 'rgba(245,166,35,0.12)' },
+  timeChipText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted },
+  timeChipTextActive: { color: '#000000' },
 
-  datePickerModal: { borderRadius: 20, padding: 20, borderWidth: 1.5, marginTop: 8, marginBottom: 8 },
-  datePickerTitle: { fontSize: 16, fontFamily: fonts.heading, marginBottom: 16 },
-  dateModalDay: { alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1.5, minWidth: 42 },
-  dateModalDayName: { fontSize: 10, fontFamily: fonts.bodyMedium },
-  dateModalDayNum: { fontSize: 18, fontFamily: fonts.heading, marginVertical: 2 },
-  dateModalDayMonth: { fontSize: 10, fontFamily: fonts.body },
+  datePickerModal: { borderRadius: 20, padding: 20, borderWidth: 1.5, marginTop: 8, marginBottom: 8, backgroundColor: colors.surface, borderColor: colors.border },
+  datePickerTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 16 },
+  dateModalDay: { alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1.5, minWidth: 42, backgroundColor: colors.surface, borderColor: colors.border },
+  dateModalDayActive: { backgroundColor: colors.amber, borderColor: colors.amber },
+  dateModalDayName: { fontSize: 10, fontFamily: fonts.bodyMedium, color: colors.muted },
+  dateModalDayNum: { fontSize: 18, fontFamily: fonts.bodyMedium, color: colors.ink, marginVertical: 2 },
+  dateModalDayMonth: { fontSize: 10, fontFamily: fonts.body, color: colors.muted },
+  dateModalDayTextActive: { color: '#000000' },
   datePickerClose: { alignItems: 'center', paddingVertical: 10 },
+  datePickerCloseText: { color: colors.amber, fontFamily: fonts.bodyMedium },
 
-  pricingCard: { borderRadius: 24, padding: 24, alignItems: 'center', borderWidth: 1.5, marginTop: 16 },
-  pricingLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, marginBottom: 4 },
-  pricingRange: { fontSize: 30, fontFamily: fonts.heading, color: colors.amberDark, marginBottom: 6 },
-  pricingConfidence: { fontSize: 12, fontFamily: fonts.body },
+  pricingCard: { borderRadius: 20, padding: 24, alignItems: 'center', borderWidth: 1.5, marginTop: 16, backgroundColor: 'rgba(245,166,35,0.08)', borderColor: colors.amber },
+  pricingLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 4 },
+  pricingRange: { fontSize: 30, fontFamily: fonts.heading, color: colors.amber, marginBottom: 6 },
+  pricingConfidence: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
 
-  reviewCard: { borderRadius: 20, padding: 4, borderWidth: 1.5, overflow: 'hidden' },
+  reviewCard: { borderRadius: 16, padding: 4, borderWidth: 1.5, overflow: 'hidden', backgroundColor: colors.surface, borderColor: colors.border },
   reviewItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14 },
-  reviewItemLabel: { fontSize: 11, fontFamily: fonts.body, textTransform: 'uppercase', letterSpacing: 0.5 },
-  reviewItemValue: { fontSize: 15, fontFamily: fonts.bodyMedium, marginTop: 1 },
+  reviewItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  reviewItemLabel: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  reviewItemValue: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink, marginTop: 1 },
 
   paymentRow: { flexDirection: 'row', gap: 10 },
-  paymentCard: { flex: 1, borderRadius: 18, borderWidth: 1.5, padding: 16, alignItems: 'center', gap: 6 },
-  paymentCardActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  paymentTitle: { fontSize: 14, fontFamily: fonts.bodySemiBold },
+  paymentCard: { flex: 1, borderRadius: 16, borderWidth: 1.5, padding: 16, alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderColor: colors.border },
+  paymentCardActive: { borderColor: colors.amber, backgroundColor: 'rgba(245,166,35,0.12)' },
+  paymentTitle: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.muted },
+  paymentTitleActive: { color: '#000000' },
   paymentTag: { fontSize: 11, fontFamily: fonts.body, textAlign: 'center' },
+  paymentTagActive: { color: '#000000' },
 
-  nextBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 100, marginTop: 28 },
-  btnText: { fontSize: 17, fontFamily: fonts.bodySemiBold, color: '#111827' },
-  btnDisabled: { opacity: 0.4 },
+  ctaBtn: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#000000', borderRadius: 16, marginTop: 28 },
+  ctaBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  ctaBtnDisabled: { opacity: 0.4 },
 
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amber, paddingVertical: 18, borderRadius: 100, marginTop: 20 },
-  submitText: { fontSize: 17, fontFamily: fonts.bodySemiBold, color: '#111827' },
-  fieldHint: { fontSize: 11, fontFamily: fonts.body, marginTop: 2 },
-  requiredDot: { color: '#EF4444', fontSize: 14, fontFamily: fonts.bodyMedium },
+  submitBtn: { height: 58, marginTop: 20 },
 
-  taskerChip: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 14, borderWidth: 1.5, marginBottom: 10 },
-  taskerChipText: { fontSize: 13, fontFamily: fonts.bodySemiBold, flex: 1 },
+  errorHint: { fontSize: 11, fontFamily: fonts.body, color: colors.red, marginTop: 2 },
+  fieldHint: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
+  requiredDot: { color: colors.red, fontSize: 14, fontFamily: fonts.bodyMedium },
+
+  taskerChip: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 14, borderWidth: 1.5, marginBottom: 10, backgroundColor: 'rgba(245,166,35,0.08)', borderColor: colors.amber },
+  taskerChipText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.amber, flex: 1 },
   photoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   photoCell: { width: 84, height: 84, borderRadius: 14, overflow: 'hidden' },
   photoThumb: { width: '100%', height: '100%' },
   photoRemove: { position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' },
-  photoAdd: { width: 84, height: 84, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  photoAddText: { fontSize: 11, fontFamily: fonts.bodyMedium },
+  photoAdd: { width: 84, height: 84, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 2, backgroundColor: colors.surface, borderColor: colors.border },
+  photoAddText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.muted },
   notesInput: { minHeight: 110, textAlignVertical: 'top' },
 })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench } from 'phosphor-react-native'
@@ -8,7 +8,8 @@ import { ReanimatedSwipeable } from 'react-native-gesture-handler/ReanimatedSwip
 
 import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '../../../../../lib/api-v2'
 import { translateJobStatus } from '../../../../../lib/i18n'
-import { colors, spacing, radius, typography, shadows } from '../../../../../lib/design'
+import { useColors } from '../../../../../lib/ThemeContext'
+import { fonts } from '../../../../../lib/fonts'
 import { CATEGORY_VISUALS, categoryIcon } from '../../../../../lib/categoryVisuals'
 
 import AvatarCircle from '../../../../../components/ui/AvatarCircle'
@@ -18,6 +19,8 @@ import AnimatedEntry from '../../../../../components/ui/AnimatedEntry'
 import Skeleton from '../../../../../components/ui/Skeleton'
 
 const VALIDITY_MS = 2 * 60 * 60 * 1000
+
+type SortKey = 'recommended' | 'lowest' | 'fastest'
 
 function useCountdown(target: number | null) {
   const [now, setNow] = useState(Date.now())
@@ -36,21 +39,16 @@ function useCountdown(target: number | null) {
 }
 
 function QuoteCardItem({
-  q, bestMatch, loading, onAccept, onViewProfile, onDismiss,
+  q, bestMatch, loading, onAccept, onViewProfile, onDismiss, colors, styles,
 }: {
-  q: V2Quote
-  bestMatch: boolean
-  loading: boolean
-  onAccept: () => void
-  onViewProfile: () => void
-  onDismiss: () => void
+  q: V2Quote; bestMatch: boolean; loading: boolean; onAccept: () => void;
+  onViewProfile: () => void; onDismiss: () => void; colors: any; styles: any
 }) {
   const { t } = useTranslation()
   const provider = q.provider
   const image = provider?.avatar || provider?.profileImage
   const rating = q.providerRating ?? provider?.rating
   const completed = q.completedJobs ?? provider?.completedJobs
-  const visual = CATEGORY_VISUALS.find(v => v.id === provider?.categories?.[0]) || null
 
   return (
     <ReanimatedSwipeable
@@ -60,17 +58,17 @@ function QuoteCardItem({
       renderRightActions={() => (
         <PressableScale onPress={onDismiss} scaleTo={0.96} style={styles.dismissWrap}>
           <View style={styles.dismissBtn}>
-            <XCircle size={22} color={colors.textPrimary} weight="fill" />
+            <XCircle size={22} color="#FFFFFF" weight="fill" />
             <Text style={styles.dismissText}>{t('ui.dismiss')}</Text>
           </View>
         </PressableScale>
       )}
     >
-      <AnimatedEntry delay={q.completedJobs === undefined ? 0 : 0}>
+      <AnimatedEntry delay={0}>
         <View style={styles.quoteCard}>
           {bestMatch ? (
             <View style={styles.bestMatchTag}>
-              <CheckCircle size={14} color={colors.background} weight="fill" />
+              <CheckCircle size={12} color="#000000" weight="fill" />
               <Text style={styles.bestMatchText}>{t('ui.bestMatch')}</Text>
             </View>
           ) : null}
@@ -80,41 +78,39 @@ function QuoteCardItem({
             <View style={styles.providerInfo}>
               <Text style={styles.providerName} numberOfLines={1}>{provider?.name || t('quotes.provider')}</Text>
               <View style={styles.ratingRow}>
-                <Star size={14} color={colors.accent} weight="fill" />
+                <Star size={14} color={colors.amber} weight="fill" />
                 <Text style={styles.ratingText}>{rating ? rating.toFixed(1) : '—'}</Text>
                 {completed > 0 ? <Text style={styles.jobsText}>({completed} jobs)</Text> : null}
               </View>
             </View>
-            <Text style={styles.price}>{q.price.toLocaleString()}</Text>
-            <Text style={styles.priceCur}>LKR</Text>
+            <View style={styles.priceWrap}>
+              <Text style={styles.priceCur}>LKR</Text>
+              <Text style={styles.price}>{q.price.toLocaleString()}</Text>
+            </View>
           </View>
 
           {q.message ? <Text style={styles.message} numberOfLines={3}>{q.message}</Text> : null}
 
           <View style={styles.metaRow}>
             <View style={styles.metaPill}>
-              <Timer size={14} color={colors.accent} weight="fill" />
+              <Timer size={14} color={colors.amber} weight="fill" />
               <Text style={styles.metaText}>{q.estimatedCompletionTime || t('quotes.today')}</Text>
             </View>
             <View style={styles.metaPill}>
-              <User size={14} color={colors.accent} weight="fill" />
+              <User size={14} color={colors.amber} weight="fill" />
               <Text style={styles.metaText}>{q.providerType === 'COMPANY' ? t('customer.company') : t('ui.independentPro')}</Text>
             </View>
           </View>
 
           <View style={styles.actions}>
-            <PressableScale onPress={onViewProfile} scaleTo={0.97} style={styles.profileBtnPress}>
-              <View style={styles.profileBtn}>
-                <User size={16} color={colors.accent} weight="fill" />
-                <Text style={styles.profileBtnText}>{t('quotes.viewProfile')}</Text>
-              </View>
-            </PressableScale>
-            <PressableScale onPress={onAccept} scaleTo={0.97} style={styles.acceptBtnPress} disabled={loading}>
-              <View style={styles.acceptBtn}>
-                {loading ? <View style={styles.miniSpinner} /> : null}
-                <Text style={styles.acceptBtnText}>{loading ? 'Holding…' : t('quotes.accept')}</Text>
-              </View>
-            </PressableScale>
+            <TouchableOpacity style={styles.profileBtn} onPress={onViewProfile} activeOpacity={0.7}>
+              <User size={16} color={colors.amber} weight="fill" />
+              <Text style={styles.profileBtnText}>{t('quotes.viewProfile')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.acceptBtn, loading && { opacity: 0.6 }]} onPress={onAccept} disabled={loading} activeOpacity={0.7}>
+              {loading ? <View style={styles.miniSpinner} /> : null}
+              <Text style={styles.acceptBtnText}>{loading ? 'Holding…' : t('quotes.accept')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </AnimatedEntry>
@@ -125,6 +121,8 @@ function QuoteCardItem({
 export default function V2QuotesScreen() {
   const { t } = useTranslation()
   const router = useRouter()
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const { id } = useLocalSearchParams<{ id: string }>()
   const [job, setJob] = useState<V2Job | null>(null)
   const [quotes, setQuotes] = useState<V2Quote[]>([])
@@ -132,6 +130,7 @@ export default function V2QuotesScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy] = useState<SortKey>('recommended')
 
   const loadData = useCallback(async () => {
     try {
@@ -173,10 +172,14 @@ export default function V2QuotesScreen() {
   }, [liveQuotes])
   const countdown = useCountdown(expiresAt)
 
-  const sorted = useMemo(
-    () => [...liveQuotes].sort((a, b) => (b.providerRating ?? 0) - (a.providerRating ?? 0)),
-    [liveQuotes]
-  )
+  const sorted = useMemo(() => {
+    const list = [...liveQuotes]
+    switch (sortBy) {
+      case 'lowest': return list.sort((a, b) => a.price - b.price)
+      case 'fastest': return list.sort((a, b) => (a.estimatedCompletionTime || '').localeCompare(b.estimatedCompletionTime || ''))
+      default: return list.sort((a, b) => (b.providerRating ?? 0) - (a.providerRating ?? 0))
+    }
+  }, [liveQuotes, sortBy])
 
   const handleAccept = async (quoteId: string) => {
     setActionLoading(quoteId)
@@ -192,20 +195,24 @@ export default function V2QuotesScreen() {
     }
   }
 
-  const activeVisual = CATEGORY_VISUALS.find(v => v.id === job?.categoryId) || null
+  const sortOptions: { key: SortKey; label: string }[] = [
+    { key: 'recommended', label: 'Recommended' },
+    { key: 'lowest', label: 'Lowest price' },
+    { key: 'fastest', label: 'Fastest' },
+  ]
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <PressableScale onPress={() => router.back()} scaleTo={0.92} style={styles.backPress}>
-          <View style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <View style={styles.backCircle}>
             <Text style={styles.backChevron}>‹</Text>
           </View>
-        </PressableScale>
-        <Text style={styles.headerTitle}>Quotes</Text>
-        <View style={styles.countPill}>
-          <Text style={styles.countText}>{sorted.length}</Text>
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>{sorted.length} quotes arrived</Text>
         </View>
+        <View style={styles.headerRight} />
       </View>
 
       {loading ? (
@@ -216,34 +223,20 @@ export default function V2QuotesScreen() {
         </View>
       ) : (
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
-          {job && (
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryTop}>
-                <View style={styles.summaryIcon}>
-                  {activeVisual?.lottie ? null : null}
-                  {(() => { const I = categoryIcon(job.categoryId); return <I size={22} color={colors.accent} weight="fill" /> })()}
-                </View>
-                <View style={styles.summaryInfo}>
-                  <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                  {job.locationName ? (
-                    <View style={styles.locRow}>
-                      <MapPin size={12} color={colors.textSecondary} weight="fill" />
-                      <Text style={styles.locText}>{job.locationName}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                <Text style={styles.budget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
-              </View>
-              <View style={styles.validityRow}>
-                <Timer size={15} color={colors.accent} weight="fill" />
-                <Text style={styles.validityText}>
-                  {countdown === 'EXPIRED'
-                    ? t('ui.expired')
-                    : countdown === 'LOGOUT' ? '' : t('ui.validCountdown', { time: countdown })}
-                </Text>
-              </View>
-            </View>
-          )}
+          <Text style={styles.listSubtitle}>Compare price, trust and arrival — no hidden details.</Text>
+
+          <View style={styles.sortRow}>
+            {sortOptions.map(opt => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.sortPill, sortBy === opt.key && styles.sortPillActive]}
+                onPress={() => setSortBy(opt.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.sortPillText, sortBy === opt.key && styles.sortPillTextActive]}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {sorted.length === 0 ? (
             <EmptyState
@@ -256,11 +249,7 @@ export default function V2QuotesScreen() {
             />
           ) : (
             <>
-              <View style={styles.listHead}>
-                <Text style={styles.listTitle}>{t('ui.prosSent', { n: sorted.length })}</Text>
-                <Text style={styles.listHint}>{t('ui.swipeHint')}</Text>
-              </View>
-              {sorted.map((q, i) => (
+              {sorted.map((q) => (
                 <QuoteCardItem
                   key={q.id}
                   q={q}
@@ -269,6 +258,8 @@ export default function V2QuotesScreen() {
                   onAccept={() => handleAccept(q.id)}
                   onViewProfile={() => q.providerId ? router.push(`/(customer)/find/tasker-profile/${q.providerId}` as any) : undefined}
                   onDismiss={() => setDismissed(prev => new Set(prev).add(q.id))}
+                  colors={colors}
+                  styles={styles}
                 />
               ))}
               <View style={styles.swipeHint}>
@@ -282,101 +273,86 @@ export default function V2QuotesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    paddingHorizontal: 16, paddingVertical: 12,
   },
-  backPress: { borderRadius: radius.full },
-  backBtn: {
-    width: 42, height: 42, borderRadius: radius.full, backgroundColor: colors.surface,
+  backBtn: { borderRadius: 9999 },
+  backCircle: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
   },
-  backChevron: { color: colors.textPrimary, fontSize: 26, lineHeight: 28, fontFamily: 'Outfit_500Medium' },
-  headerTitle: { ...typography.h3, fontSize: 18 },
-  countPill: {
-    minWidth: 34, height: 34, paddingHorizontal: 10, borderRadius: radius.full,
-    backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center',
-  },
-  countText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_700Bold' },
+  backChevron: { color: colors.ink, fontSize: 26, lineHeight: 28, fontFamily: 'Outfit_500Medium' },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  headerTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink },
+  headerRight: { width: 42 },
 
   list: { flex: 1 },
-  listContent: { padding: spacing.md, paddingBottom: spacing.xl },
+  listContent: { padding: 16, paddingBottom: 32 },
+  listSubtitle: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 12, lineHeight: 18 },
 
-  summaryCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, ...shadows.card,
+  sortRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  sortPill: {
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
-  summaryTop: { flexDirection: 'row', alignItems: 'center' },
-  summaryIcon: {
-    width: 46, height: 46, borderRadius: radius.sm * 1.5, backgroundColor: colors.accentSoft,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  summaryInfo: { flex: 1, marginLeft: spacing.md },
-  jobTitle: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 16 },
-  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  locText: { ...typography.caption, color: colors.textSecondary },
-  budget: { ...typography.body, color: colors.accent, fontFamily: 'Outfit_700Bold', fontSize: 16 },
-  validityRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 0.5, borderTopColor: colors.border,
-  },
-  validityText: { ...typography.caption, color: colors.textSecondary, fontFamily: 'Outfit_600SemiBold' },
-
-  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  listTitle: { ...typography.body, fontFamily: 'Outfit_600SemiBold', fontSize: 15 },
-  listHint: { ...typography.caption, color: colors.textMuted },
+  sortPillActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  sortPillText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted },
+  sortPillTextActive: { color: '#FFFFFF' },
 
   quoteCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md,
+    backgroundColor: colors.surface, borderRadius: 20, padding: 18, marginBottom: 14,
     borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
   },
   bestMatchTag: {
     position: 'absolute', top: 0, right: 0,
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: colors.accent, paddingHorizontal: 10, paddingVertical: 4,
-    borderBottomLeftRadius: radius.sm,
+    backgroundColor: colors.amber, paddingHorizontal: 10, paddingVertical: 4,
+    borderBottomLeftRadius: 14,
   },
-  bestMatchText: { ...typography.caption, color: colors.background, fontFamily: 'Outfit_700Bold', fontSize: 10, letterSpacing: 0.4 },
+  bestMatchText: { fontSize: 10, fontFamily: fonts.bodyMedium, color: '#000000', letterSpacing: 0.4 },
   providerRow: { flexDirection: 'row', alignItems: 'center' },
-  providerInfo: { flex: 1, marginLeft: spacing.md },
-  providerName: { ...typography.body, fontFamily: 'Outfit_600SemiBold', fontSize: 16 },
+  providerInfo: { flex: 1, marginLeft: 12 },
+  providerName: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  ratingText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
-  jobsText: { ...typography.caption, color: colors.textSecondary },
-  price: { ...typography.h3, color: colors.accent, fontSize: 22, fontFamily: 'Outfit_700Bold' },
-  priceCur: { ...typography.caption, color: colors.textSecondary, position: 'absolute', bottom: 0, right: 1 },
-  message: { ...typography.body, color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: spacing.md },
-  metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  metaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.full, backgroundColor: colors.surfaceHigh },
-  metaText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  profileBtnPress: { flex: 1, borderRadius: radius.full },
+  ratingText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.amber },
+  jobsText: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
+  priceWrap: { alignItems: 'flex-end' },
+  price: { fontSize: 20, fontFamily: fonts.heading, color: colors.ink, letterSpacing: -0.3 },
+  priceCur: { fontSize: 11, fontFamily: fonts.body, color: colors.muted },
+  message: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, lineHeight: 20, marginTop: 12 },
+  metaRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  metaPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10,
+    borderRadius: 9999, backgroundColor: '#2E2E2E',
+  },
+  metaText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   profileBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 13, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border,
-    backgroundColor: colors.surfaceHigh,
+    paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: '#2E2E2E',
   },
-  profileBtnText: { ...typography.body, color: colors.accent, fontFamily: 'Outfit_600SemiBold', fontSize: 14 },
-  acceptBtnPress: { flex: 1.4, borderRadius: radius.full },
+  profileBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
   acceptBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.accent, paddingVertical: 13, borderRadius: radius.full,
-    shadowColor: colors.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
+    flex: 1.4, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 16,
+    shadowColor: colors.amber, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
   },
-  acceptBtnText: { ...typography.body, color: colors.background, fontFamily: 'Outfit_700Bold', fontSize: 15 },
-  miniSpinner: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: colors.background, borderTopColor: 'transparent' },
+  acceptBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#111827' },
+  miniSpinner: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#111827', borderTopColor: 'transparent' },
 
-  dismissWrap: { width: 100, borderRadius: radius.lg, marginBottom: spacing.md },
+  dismissWrap: { width: 100, borderRadius: 20, marginBottom: 14 },
   dismissBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: colors.error, borderRadius: radius.lg, marginLeft: spacing.sm,
+    backgroundColor: '#E11900', borderRadius: 20, marginLeft: 8,
   },
-  dismissText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
+  dismissText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
 
-  swipeHint: { alignItems: 'center', marginTop: spacing.sm },
-  swipeHintText: { ...typography.caption, color: colors.textMuted },
+  swipeHint: { alignItems: 'center', marginTop: 8 },
+  swipeHintText: { fontSize: 11, fontFamily: fonts.body, color: '#6B6B6B' },
 
-  skeletonWrap: { padding: spacing.md, gap: spacing.md },
+  skeletonWrap: { padding: 16, gap: 12 },
 })
