@@ -1,22 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native'
-import { CaretRight, Flame } from 'phosphor-react-native'
+import { useCallback, useEffect, useState } from 'react'
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { CaretLeft, CaretRight, DotsThree } from 'phosphor-react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useTranslation } from 'react-i18next'
-import Animated, { FadeInUp } from 'react-native-reanimated'
 
 import { jobCategories, templateJobs } from '../../../lib/api'
 import { useCountry } from '../../../lib/country'
 import { v3 } from '../../../theme/v3/tokens'
-import { categoryVisualBySlug } from '../../../lib/categoryVisuals'
-
-import V3SearchBar from '../../../components/v3/V3SearchBar'
-import V3SectionHeader from '../../../components/v3/V3SectionHeader'
-import V3JobRow from '../../../components/v3/V3JobRow'
 
 export default function ServiceCategory() {
-  const { t } = useTranslation()
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>()
   const [category, setCategory] = useState<any>(null)
   const [jobs, setJobs] = useState<any[]>([])
@@ -32,9 +24,9 @@ export default function ServiceCategory() {
         templateJobs.listByCategory(categoryId!, selectedCountry?.code),
       ])
       setCategory(catData)
-      setJobs(jobsData)
+      setJobs(Array.isArray(jobsData) ? jobsData : [])
     } catch (e) {
-      console.error('Failed to load jobs', e)
+      console.error('Failed to load services', e)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -43,99 +35,86 @@ export default function ServiceCategory() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const onRefresh = () => {
-    setRefreshing(true)
-    fetchData()
-  }
-
-  const popular = jobs.filter(j => j.isPopular)
-  const regular = jobs.filter(j => !j.isPopular)
-
-  const vis = category ? categoryVisualBySlug(category.slug || category.id) : null
-  const Icon = vis?.icon
+  const visible = jobs.slice(0, 6)
+  const categoryName = category?.name || 'Service'
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* ═══ Header ═══ */}
       <View style={styles.header}>
-        {Icon ? (
-          <View style={styles.iconWrap}>
-            <Icon size={22} color={v3.colors.ink} weight="fill" />
-          </View>
-        ) : null}
-        <Text style={styles.title}>{category?.name || 'Service'}</Text>
-        <Text style={styles.subtitle}>{jobs.length} services available</Text>
+        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()} hitSlop={10}>
+          <CaretLeft size={20} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle} numberOfLines={1}>{categoryName}</Text>
+        <View style={styles.headerButtonRight}><DotsThree size={17} color={v3.colors.ink} weight="bold" /></View>
       </View>
 
-      <View style={styles.searchWrap}>
-        <V3SearchBar placeholder="Search services..." onPress={() => {}} />
-      </View>
-
-      <FlatList
-        data={[...popular, ...regular]}
-        keyExtractor={item => item.id}
-        renderItem={({ item, index }) => (
-          <Animated.View entering={FadeInUp.delay(index * 40).springify().damping(20).stiffness(300)} style={styles.jobWrap}>
-            <V3JobRow
-              name={item.name}
-              description={item.description}
-              priceMin={item.priceMin}
-              priceMax={item.priceMax}
-              durationMinutes={item.typicalDurationMinutes}
-              isPopular={item.isPopular}
-              onPress={() => router.push({ pathname: '/(customer)/find/job/[jobId]', params: { jobId: item.id } } as any)}
-            />
-          </Animated.View>
-        )}
-        contentContainerStyle={styles.list}
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={v3.colors.ink} />}
-      />
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData() }} tintColor={v3.colors.ink} />}
+      >
+        <Text style={styles.eyebrow}>POPULAR NEAR YOU</Text>
+        <Text style={styles.title}>What needs fixing?</Text>
+        <Text style={styles.subtitle}>Choose a common task or describe your own.</Text>
+
+        <View style={styles.list}>
+          {loading ? [0, 1, 2, 3, 4, 5].map(i => <View key={i} style={[styles.row, styles.skeleton]} />) : visible.map((item: any, index: number) => (
+            <TouchableOpacity
+              key={item.id || String(index)}
+              style={styles.row}
+              onPress={() => router.push({ pathname: '/(customer)/find/job/[jobId]', params: { jobId: item.id } } as any)}
+              activeOpacity={0.72}
+            >
+              <View style={styles.numberCircle}><Text style={styles.numberText}>{index + 1}</Text></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle} numberOfLines={1}>{item.name || item.title || `Service ${index + 1}`}</Text>
+                <Text style={styles.rowSub} numberOfLines={1}>
+                  {item.nearbyTaskerCount ? `${item.nearbyTaskerCount} taskers nearby` : item.isPopular ? 'Popular with nearby taskers' : item.priceMin && item.priceMax ? `LKR ${Number(item.priceMin).toLocaleString()}–${Number(item.priceMax).toLocaleString()}` : 'Get a detailed quote'}
+                </Text>
+              </View>
+              <CaretRight size={16} color={v3.colors.ink} />
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => router.push({ pathname: '/(customer)/jobs/v2/create', params: { categoryId: categoryId!, categoryName } } as any)}
+            activeOpacity={0.72}
+          >
+            <View style={styles.numberCircle}><Text style={styles.numberText}>{Math.min(visible.length + 1, 7)}</Text></View>
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Something else</Text>
+              <Text style={styles.rowSub}>Describe it in your own words</Text>
+            </View>
+            <CaretRight size={16} color={v3.colors.ink} />
+          </TouchableOpacity>
+
+          {!loading && jobs.length === 0 ? (
+            <Text style={styles.empty}>No templates are available for this category yet. You can still post a custom request.</Text>
+          ) : null}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: v3.colors.canvas },
-
-  header: {
-    alignItems: 'center',
-    paddingTop: 16,
-    paddingBottom: 8,
-    paddingHorizontal: 18,
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: v3.colors.surfaceGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 22,
-    fontFamily: 'Outfit_900Black',
-    color: v3.colors.textPrimary,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontFamily: 'Outfit_500Medium',
-    color: v3.colors.textMuted,
-    marginTop: 2,
-  },
-
-  searchWrap: {
-    paddingHorizontal: 18,
-    marginBottom: 4,
-  },
-
-  list: {
-    paddingHorizontal: 18,
-    paddingTop: 8,
-    paddingBottom: 100,
-  },
-  jobWrap: {
-    marginBottom: 10,
-  },
+  header: { height: 52, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerButton: { width: 36, height: 36, alignItems: 'flex-start', justifyContent: 'center' },
+  headerButtonRight: { width: 36, height: 36, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, marginHorizontal: 8, textAlign: 'center', fontSize: 13, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  scroll: { paddingHorizontal: 18, paddingBottom: 40 },
+  eyebrow: { marginTop: 8, fontSize: 8.4, fontFamily: 'Outfit_900Black', color: v3.colors.amberDark, letterSpacing: 0.45 },
+  title: { marginTop: 8, fontSize: 25, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  subtitle: { marginTop: 8, fontSize: 10.2, lineHeight: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  list: { marginTop: 22 },
+  row: { minHeight: 64, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, marginBottom: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  skeleton: { backgroundColor: '#EEEEEE' },
+  numberCircle: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#F1F1F1', alignItems: 'center', justifyContent: 'center' },
+  numberText: { fontSize: 10, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  rowCopy: { flex: 1 },
+  rowTitle: { fontSize: 11.2, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  rowSub: { marginTop: 3, fontSize: 8.8, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  empty: { marginTop: 8, fontSize: 10.5, lineHeight: 16, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textMuted, textAlign: 'center' },
 })
