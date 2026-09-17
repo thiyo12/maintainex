@@ -35,8 +35,8 @@ export default function RealEstateList() {
       if (activePurpose !== 'all') params.purpose = activePurpose
       if (search) params.q = search
       params.sortBy = sortBy
-      const res = await realEstate.list(params)
-      const data = res?.data || res || []
+      const res: any = await realEstate.list(params)
+      const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []
       setProperties(data)
     } catch (e) {
       console.error('Load real estate error:', e)
@@ -44,14 +44,14 @@ export default function RealEstateList() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [activeCountry, activePurpose, sortBy])
+  }, [activeCountry, activePurpose, search, sortBy])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
     const timer = setTimeout(() => load(), 500)
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, load])
 
   const filtered = properties
 
@@ -79,7 +79,6 @@ export default function RealEstateList() {
         </TouchableOpacity>
       </View>
 
-      {/* Country Tabs */}
       <View style={styles.countryRow}>
         {COUNTRY_FILTERS.map(c => (
           <TouchableOpacity key={c.code} style={[styles.countryTab, activeCountry === c.code && { backgroundColor: colors.amber }]} onPress={() => setActiveCountry(c.code)}>
@@ -88,13 +87,11 @@ export default function RealEstateList() {
         ))}
       </View>
 
-      {/* Search */}
       <View style={[styles.searchBar, { backgroundColor: colors.white, borderColor: colors.border }]}>
         <MagnifyingGlass size={16} color={colors.muted} weight="regular" />
         <TextInput style={[styles.searchInput, { color: colors.ink }]} placeholder="Search properties..." placeholderTextColor={colors.muted} value={search} onChangeText={setSearch} />
       </View>
 
-      {/* Purpose Filters */}
       <View style={styles.filterRow}>
         {PURPOSE_FILTERS.map(f => (
           <TouchableOpacity key={f} style={[styles.filterChip, activePurpose === f && { backgroundColor: colors.amber, borderColor: colors.amber }]} onPress={() => setActivePurpose(f)}>
@@ -105,7 +102,6 @@ export default function RealEstateList() {
         ))}
       </View>
 
-      {/* Sort */}
       <View style={styles.sortRow}>
         <TouchableOpacity style={[styles.sortBtn, sortBy === 'newest' && { borderBottomColor: colors.amber }]} onPress={() => setSortBy('newest')}>
           <Text style={[styles.sortText, { color: sortBy === 'newest' ? colors.ink : colors.muted }]}>Newest</Text>
