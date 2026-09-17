@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { View, Text, StyleSheet, Animated, Image } from 'react-native'
+import { View, Text, StyleSheet, Animated, Image, TouchableOpacity } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { v3 } from '../../theme/v3/tokens'
 
 export default function WelcomeScreen() {
   const router = useRouter()
@@ -36,13 +35,13 @@ export default function WelcomeScreen() {
         Animated.timing(btnsY, { toValue: 0, duration: 350, useNativeDriver: true }),
       ]),
     ]).start()
-  }, [])
+  }, [btnsOp, btnsY, heroOp, heroY, markOp, markScale, textOp, textY])
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.topArea}>
         <Animated.View style={[styles.markWrap, { opacity: markOp, transform: [{ scale: markScale }] }]}>
-          <Image source={require('../../assets/logo.png')} style={styles.mark} resizeMode="contain" />
+          <Image source={require('../../assets/logo.png')} style={{ width: 60, height: 60 }} resizeMode="contain" />
         </Animated.View>
 
         <Animated.View style={[styles.brandWrap, { opacity: textOp, transform: [{ translateY: textY }] }]}>
@@ -59,23 +58,13 @@ export default function WelcomeScreen() {
       </View>
 
       <Animated.View style={[styles.btnArea, { opacity: btnsOp, transform: [{ translateY: btnsY }] }]}>
-        <Animated.View style={[styles.btnPrimary, { opacity: btnsOp }]}>
-          <Text
-            style={styles.btnPrimaryText}
-            onPress={() => router.push('/(auth)/register')}
-          >
-            Continue
-          </Text>
-        </Animated.View>
+        <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/(auth)/register')} activeOpacity={0.85}>
+          <Text style={styles.btnPrimaryText}>Continue</Text>
+        </TouchableOpacity>
 
-        <Animated.View style={[styles.btnSecondary, { opacity: btnsOp }]}>
-          <Text
-            style={styles.btnSecondaryText}
-            onPress={() => router.push('/(auth)/login')}
-          >
-            I already have an account
-          </Text>
-        </Animated.View>
+        <TouchableOpacity style={styles.btnSecondary} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
+          <Text style={styles.btnSecondaryText}>I already have an account</Text>
+        </TouchableOpacity>
       </Animated.View>
     </SafeAreaView>
   )
@@ -94,7 +83,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   markWrap: {},
-  mark: { width: 60, height: 60 },
   brandWrap: { marginTop: 16 },
   brand: {
     fontSize: 23,
@@ -149,7 +137,7 @@ const styles = StyleSheet.create({
   btnPrimaryText: {
     fontSize: 13.5,
     fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
+    fontWeight: '800',
     color: '#000000',
   },
   btnSecondary: {
@@ -164,7 +152,7 @@ const styles = StyleSheet.create({
   btnSecondaryText: {
     fontSize: 13.5,
     fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
 })
