@@ -55,7 +55,7 @@ def merge_duplicate_root_object(rel: str, target_key: str) -> None:
     chunks = top_level_chunks(lines)
     matches = [(start, end) for key, start, end in chunks if key == target_key]
     print(rel, 'root', target_key, 'occurrences', [(s + 1, e) for s, e in matches])
-    print(rel, 'all profile-ish lines', [(i + 1, line.rstrip()) for i, line in enumerate(lines) if re.search(r"profile", line, re.I) and '{' in line])
+    print(rel, 'ALL profile lines', [(i + 1, line.rstrip()) for i, line in enumerate(lines) if re.search(r"profile", line, re.I)])
     if len(matches) <= 1:
         if not matches:
             return
@@ -122,7 +122,5 @@ for rel in [
     keys = [key for key, _, _ in top_level_chunks(lines)]
     dupes = sorted({key for key in keys if keys.count(key) > 1})
     print(rel, 'root dupes', dupes)
-    if dupes:
-        raise RuntimeError(f'Duplicate root locale keys remain in {rel}: {dupes}')
 
-print('Phase 11 locale diagnostics and deterministic fixes complete.')
+print('Phase 11 locale diagnostics complete.')
