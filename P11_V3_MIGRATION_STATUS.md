@@ -43,6 +43,13 @@
 - `components/find/TaskerCard.tsx` — Ionicons → Phosphor
 
 ### B4: Post Job + Matching + Quotes — IN PROGRESS
+- ✅ Ionicons → Phosphor in confirm/[id].tsx (Lock, CheckCircle, Check)
+- ✅ Ionicons → Phosphor in jobs/v2/index.tsx (ClipboardText — was runtime bug, no import)
+- ✅ Legacy colors.cream → colors.surface in confirm/[id].tsx + index.tsx
+- ✅ Legacy colors.primaryDark → colors.ink in confirm/[id].tsx
+- ✅ Ionicons in B4 scope (jobs/v2/) = 0
+- ✅ B4-introduced TypeScript errors = 0
+- ✅ All 5 B4 files verified: create.tsx, [id].tsx, index.tsx, confirm/[id].tsx, quotes/[id].tsx
 ### B5: Payment + Active Job Lifecycle — PENDING
 ### B6: Tasker Dashboard — PENDING
 ### B7: Real Estate Marketplace — PENDING

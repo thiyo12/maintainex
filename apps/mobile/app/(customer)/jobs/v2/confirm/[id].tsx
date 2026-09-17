@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Lock, CheckCircle, Check } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
@@ -156,7 +156,7 @@ export default function V2ConfirmBookingScreen() {
         {/* Payment Freeze Card */}
         <View style={styles.freezeCard}>
           <View style={styles.freezeIconWrap}>
-            <Ionicons name="lock-closed-outline" size={28} color={colors.ink} />
+            <Lock size={28} color={colors.ink} weight="regular" />
           </View>
           <Text style={styles.freezeLabel}>{t('wallet.balance')}</Text>
           <Text style={styles.freezeAmount}>
@@ -180,7 +180,7 @@ export default function V2ConfirmBookingScreen() {
           )}
           {escrow && escrow.status === 'PROTECTED' && (
             <View style={styles.frozenBadge}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <CheckCircle size={18} color={colors.success} weight="fill" />
               <Text style={styles.frozenBadgeText}>{t('booking.paymentSecured')}</Text>
             </View>
           )}
@@ -194,7 +194,7 @@ export default function V2ConfirmBookingScreen() {
               <View style={styles.stepLeft}>
                 <View style={[styles.stepDot, step.done && styles.stepDotDone]}>
                   {step.done ? (
-                    <Ionicons name="checkmark" size={14} color={colors.white} />
+                    <Check size={14} color={colors.white} weight="bold" />
                   ) : (
                     <Text style={styles.stepNum}>{i + 1}</Text>
                   )}
@@ -213,7 +213,7 @@ export default function V2ConfirmBookingScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: colors.surface },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   backText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.amber },
   headerTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
@@ -225,7 +225,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   providerInfo: { flex: 1, marginLeft: 12 },
   providerName: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },
   providerType: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
-  providerPrice: { fontSize: 18, fontFamily: fonts.heading, color: colors.primaryDark },
+  providerPrice: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink },
 
   jobSection: { marginTop: 16 },
   jobTitle: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.ink },

@@ -6,6 +6,7 @@ import { useColors } from '../../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../../lib/i18n'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
+import { ClipboardText } from 'phosphor-react-native'
 
 export default function V2MyJobsScreen() {
   const { t } = useTranslation()
@@ -54,7 +55,7 @@ export default function V2MyJobsScreen() {
         <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="clipboard-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
+          <ClipboardText size={48} color={colors.muted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>{t('marketplace.noJobs')}</Text>
           <Text style={styles.emptySub}>{t('marketplace.noJobsDesc')}</Text>
           <TouchableOpacity onPress={() => router.push('/(customer)/jobs/v2/create')} style={styles.emptyBtn}>
@@ -92,8 +93,8 @@ export default function V2MyJobsScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: colors.surface },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: colors.surface },
   greeting: { fontSize: 22, fontWeight: '800', color: colors.ink },
   subtitle: { fontSize: 13, color: colors.muted, marginTop: 2 },
   createBtn: { backgroundColor: colors.amber, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 },
