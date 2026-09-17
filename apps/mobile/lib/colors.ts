@@ -36,6 +36,17 @@ export const lightColors = {
   error:      '#E11900',
   dark:       '#000000',
   darkMid:    '#6F6F6F',
+
+  // Temporary compatibility aliases while the remaining legacy routes are
+  // migrated to theme/v3/tokens. They intentionally resolve to the V3.3
+  // light palette so old call sites cannot re-introduce the dark UI.
+  accent:      '#F5A623',
+  primaryLight:'#FFF1D2',
+  text:        '#000000',
+  textPrimary: '#000000',
+  textSecondary:'#6F6F6F',
+  textMuted:   '#8A8A8A',
+  inkLight:    '#6F6F6F',
 }
 
 export const darkColors = {
@@ -76,6 +87,14 @@ export const darkColors = {
   error:      '#EF4444',
   dark:       '#FFFFFF',
   darkMid:    '#6B6B6B',
+
+  accent:      '#F5A623',
+  primaryLight:'rgba(245,166,35,0.14)',
+  text:        '#FFFFFF',
+  textPrimary: '#FFFFFF',
+  textSecondary:'#B3B3B3',
+  textMuted:   '#B3B3B3',
+  inkLight:    '#B3B3B3',
 }
 
 export const colors = lightColors
