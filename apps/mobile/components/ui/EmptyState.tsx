@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native'
 import LottieView from 'lottie-react-native'
 import { Icon } from 'phosphor-react-native'
 import PressableScale from './PressableScale'
+import { v3 } from '../../theme/v3/tokens'
 
 interface Props {
   lottieUrl?: string | null
@@ -23,23 +24,26 @@ export default function EmptyState({
   FallbackIcon,
   iconSize = 64,
 }: Props) {
-  const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     if (!lottieUrl) return
     setFailed(false)
-    setLoaded(false)
-    const timeout = setTimeout(() => setFailed(true), 4000)
+    // Remote Lottie failures are not reported consistently on every native
+    // platform. Fall back after a bounded load window rather than leaving an
+    // empty box forever.
+    const timeout = setTimeout(() => setFailed(true), 8000)
     return () => clearTimeout(timeout)
   }, [lottieUrl])
+
+  const showFallback = !lottieUrl || failed
 
   return (
     <View style={styles.wrap}>
       <View style={styles.animBox}>
-        {!loaded || failed ? (
-          <View style={styles.fallback}>
-            {FallbackIcon ? <FallbackIcon size={iconSize} color="#6F6B6B" weight="duotone" /> : null}
+        {showFallback ? (
+          <View style={[StyleSheet.absoluteFill, styles.fallback]}>
+            {FallbackIcon ? <FallbackIcon size={iconSize} color={v3.colors.textMuted} weight="duotone" /> : null}
           </View>
         ) : null}
         {lottieUrl && !failed ? (
@@ -49,7 +53,6 @@ export default function EmptyState({
             autoPlay
             loop
             speed={1}
-            onLoad={() => setLoaded(true)}
           />
         ) : null}
       </View>
@@ -69,16 +72,16 @@ export default function EmptyState({
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24, gap: 8 },
   animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  fallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  fallback: { alignItems: 'center', justifyContent: 'center' },
   lottie: { width: 140, height: 140 },
-  title: { fontSize: 20, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF', textAlign: 'center' },
-  subtitle: { fontSize: 16, fontFamily: 'Outfit_400Regular', color: '#B3B3B3', textAlign: 'center' },
+  title: { fontSize: 20, fontFamily: 'Outfit_700Bold', color: v3.colors.textPrimary, textAlign: 'center' },
+  subtitle: { fontSize: 16, fontFamily: 'Outfit_400Regular', color: v3.colors.textSecondary, textAlign: 'center' },
   ctaWrap: { marginTop: 16, alignSelf: 'stretch', alignItems: 'center' },
   cta: {
-    backgroundColor: '#F5A623',
+    backgroundColor: v3.colors.ink,
     paddingVertical: 14,
     paddingHorizontal: 32,
-    borderRadius: 9999,
+    borderRadius: v3.radius.full,
   },
-  ctaText: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
+  ctaText: { fontSize: 16, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
 })
