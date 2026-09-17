@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { View, Text, TextInput, StyleSheet, Animated } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, StyleSheet, TextInput, View } from 'react-native'
 import { v3 } from '../../theme/v3/tokens'
 
 type Size = 'standard' | 'compact'
@@ -8,6 +8,8 @@ interface Props {
   size?: Size
   length?: number
   onComplete: (code: string) => void
+  onChangeCode?: (code: string) => void
+  autoSubmit?: boolean
   error?: string
   loading?: boolean
   autoFocus?: boolean
@@ -22,6 +24,8 @@ export default function V3OTPInput({
   size = 'standard',
   length = 6,
   onComplete,
+  onChangeCode,
+  autoSubmit = true,
   error,
   loading,
   autoFocus = true,
@@ -33,53 +37,50 @@ export default function V3OTPInput({
   const s = SIZES[size]
 
   useEffect(() => {
-    if (error) {
-      Animated.sequence([
-        Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
-        Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-      ]).start(() => {
-        setValues(Array(length).fill(''))
-        inputRefs.current[0]?.focus()
-      })
-    }
-  }, [error])
+    if (!error) return
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start(() => {
+      const empty = Array(length).fill('')
+      setValues(empty)
+      onChangeCode?.('')
+      inputRefs.current[0]?.focus()
+    })
+  }, [error, length, onChangeCode, shakeAnim])
+
+  const publish = (next: string[]) => {
+    const code = next.join('')
+    onChangeCode?.(code)
+    if (autoSubmit && next.every(Boolean) && code.length === length) onComplete(code)
+  }
 
   const handleChange = (text: string, index: number) => {
-    if (text.length > 1) {
-      const pasted = text.slice(0, length).split('')
-      const newValues = [...values]
-      pasted.forEach((char, i) => { if (i < length) newValues[i] = char })
-      setValues(newValues)
+    const digits = text.replace(/\D/g, '')
+    if (digits.length > 1) {
+      const pasted = digits.slice(0, length).split('')
+      const next = Array(length).fill('')
+      pasted.forEach((char, i) => { next[i] = char })
+      setValues(next)
+      publish(next)
       const nextIdx = Math.min(pasted.length, length - 1)
       inputRefs.current[nextIdx]?.focus()
-      if (pasted.length >= length) onComplete(newValues.join(''))
       return
     }
 
-    const newValues = [...values]
-    newValues[index] = text
-    setValues(newValues)
-
-    if (text && index < length - 1) {
-      inputRefs.current[index + 1]?.focus()
-    }
-
-    if (newValues.every(v => v) && newValues.join('').length === length) {
-      onComplete(newValues.join(''))
-    }
+    const next = [...values]
+    next[index] = digits
+    setValues(next)
+    publish(next)
+    if (digits && index < length - 1) inputRefs.current[index + 1]?.focus()
   }
 
   const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !values[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
+    if (e.nativeEvent.key === 'Backspace' && !values[index] && index > 0) inputRefs.current[index - 1]?.focus()
   }
-
-  const isActive = (i: number) => i === focused
-  const isFilled = (i: number) => !!values[i]
 
   return (
     <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
@@ -89,13 +90,9 @@ export default function V3OTPInput({
             key={i}
             style={[
               styles.box,
-              {
-                width: s.width,
-                height: s.height,
-                borderRadius: s.borderRadius,
-              },
-              isActive(i) && styles.boxActive,
-              isFilled(i) && styles.boxFilled,
+              { width: s.width, height: s.height, borderRadius: s.borderRadius },
+              i === focused && styles.boxActive,
+              !!values[i] && styles.boxFilled,
               error && styles.boxError,
             ]}
           >
@@ -108,7 +105,7 @@ export default function V3OTPInput({
               onFocus={() => setFocused(i)}
               onBlur={() => setFocused(-1)}
               keyboardType="number-pad"
-              maxLength={size === 'compact' ? 1 : 2}
+              maxLength={length}
               autoFocus={autoFocus && i === 0}
               editable={!loading}
               selectTextOnFocus
@@ -121,26 +118,10 @@ export default function V3OTPInput({
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  box: {
-    borderWidth: 1.5,
-    borderColor: v3.colors.line,
-    backgroundColor: v3.colors.paper,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  row: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  box: { borderWidth: 1.5, borderColor: v3.colors.line, backgroundColor: v3.colors.paper, alignItems: 'center', justifyContent: 'center' },
   boxActive: { borderColor: v3.colors.ink },
   boxFilled: { borderColor: v3.colors.ink },
   boxError: { borderColor: v3.colors.error },
-  digit: {
-    fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
-    color: v3.colors.textPrimary,
-    textAlign: 'center',
-    paddingVertical: 0,
-  },
+  digit: { fontFamily: 'Outfit_800ExtraBold', color: v3.colors.textPrimary, textAlign: 'center', paddingVertical: 0 },
 })
