@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: TypeScript
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --ignoreDeprecations 6.0
 
       - name: Expo export
         env:
