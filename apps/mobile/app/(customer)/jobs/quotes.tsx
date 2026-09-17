@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next'
 
 import { jobs } from '../../../lib/api'
 import type { JobPosting } from '../../../lib/types'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'
 import PressableScale from '../../../components/ui/PressableScale'
@@ -17,6 +18,8 @@ import Skeleton from '../../../components/ui/Skeleton'
 
 export default function QuotesScreen() {
   const { t } = useTranslation()
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { jobId } = useLocalSearchParams<{ jobId?: string }>()
   const [job, setJob] = useState<JobPosting | null>(null)
@@ -62,13 +65,13 @@ export default function QuotesScreen() {
             <View style={styles.summaryCard}>
               <View style={styles.summaryTop}>
                 <View style={styles.summaryIcon}>
-                  <ChatDots size={22} color={colors.accent} weight="fill" />
+                  <ChatDots size={22} color={colors.amber} weight="fill" />
                 </View>
                 <View style={styles.summaryInfo}>
                   <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
                   {job.location ? (
                     <View style={styles.locRow}>
-                      <MapPin size={12} color={colors.textSecondary} weight="fill" />
+                      <MapPin size={12} color={colors.muted} weight="fill" />
                       <Text style={styles.locText}>{job.location}</Text>
                     </View>
                   ) : null}
@@ -76,7 +79,7 @@ export default function QuotesScreen() {
                 {budget > 0 ? <Text style={styles.budget}>LKR {budget.toLocaleString()}</Text> : null}
               </View>
               <View style={styles.validityRow}>
-                <Timer size={15} color={colors.accent} weight="fill" />
+                <Timer size={15} color={colors.amber} weight="fill" />
                 <Text style={styles.validityText}>{t('ui.reviewOffers')}</Text>
               </View>
             </View>
@@ -103,7 +106,7 @@ export default function QuotesScreen() {
                       <View style={styles.providerInfo}>
                         <Text style={styles.providerName} numberOfLines={1}>{name}</Text>
                         <View style={styles.ratingRow}>
-                          <Star size={13} color={colors.accent} weight="fill" />
+                          <Star size={13} color={colors.amber} weight="fill" />
                           <Text style={styles.ratingText}>{tasker?.rating ? tasker.rating.toFixed(1) : '—'}</Text>
                           <Text style={styles.skillText} numberOfLines={1}>{tasker?.skills?.[0] || ''}</Text>
                         </View>
@@ -118,7 +121,7 @@ export default function QuotesScreen() {
 
                     <View style={styles.metaRow}>
                       <View style={styles.metaPill}>
-                        <Timer size={13} color={colors.accent} weight="fill" />
+                        <Timer size={13} color={colors.amber} weight="fill" />
                         <Text style={styles.metaText}>{t('ui.estAsQuoted')}</Text>
                       </View>
                     </View>
@@ -156,79 +159,80 @@ export default function QuotesScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    paddingHorizontal: 12, paddingVertical: 8,
   },
-  backPress: { borderRadius: radius.full },
+  backPress: { borderRadius: 9999 },
   backBtn: {
-    width: 42, height: 42, borderRadius: radius.full, backgroundColor: colors.surface,
+    width: 42, height: 42, borderRadius: 9999, backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
   },
-  backChevron: { color: colors.textPrimary, fontSize: 26, lineHeight: 28, fontFamily: 'Outfit_500Medium' },
-  headerTitle: { ...typography.h3, fontSize: 18 },
+  backChevron: { color: colors.ink, fontSize: 26, lineHeight: 28, fontFamily: fonts.body },
+  headerTitle: { fontFamily: fonts.heading, fontSize: 18 },
   countPill: {
-    minWidth: 34, height: 34, paddingHorizontal: 10, borderRadius: radius.full,
-    backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center',
+    minWidth: 34, height: 34, paddingHorizontal: 10, borderRadius: 9999,
+    backgroundColor: colors.amberBg, alignItems: 'center', justifyContent: 'center',
   },
-  countText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_700Bold' },
+  countText: { color: colors.amber, fontFamily: fonts.bodyMedium, fontSize: 13 },
 
   list: { flex: 1 },
-  listContent: { padding: spacing.md, paddingBottom: spacing.xl },
+  listContent: { padding: 12, paddingBottom: 32 },
 
   summaryCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.lg,
-    borderWidth: 1, borderColor: colors.border, ...shadows.card,
+    backgroundColor: colors.surface, borderRadius: 16, padding: 12, marginBottom: 16,
+    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   summaryTop: { flexDirection: 'row', alignItems: 'center' },
   summaryIcon: {
-    width: 46, height: 46, borderRadius: radius.sm * 1.5, backgroundColor: colors.accentSoft,
+    width: 46, height: 46, borderRadius: 21, backgroundColor: colors.amberBg,
     alignItems: 'center', justifyContent: 'center',
   },
-  summaryInfo: { flex: 1, marginLeft: spacing.md },
-  jobTitle: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 16 },
+  summaryInfo: { flex: 1, marginLeft: 12 },
+  jobTitle: { fontFamily: fonts.bodyMedium, fontSize: 16 },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  locText: { ...typography.caption, color: colors.textSecondary },
-  budget: { ...typography.body, color: colors.accent, fontFamily: 'Outfit_700Bold', fontSize: 16 },
+  locText: { fontFamily: fonts.bodyLight, fontSize: 12, color: colors.muted },
+  budget: { fontFamily: fonts.bodyMedium, color: colors.amber, fontSize: 16 },
   validityRow: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 0.5, borderTopColor: colors.border,
+    marginTop: 12, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: colors.border,
   },
-  validityText: { ...typography.caption, color: colors.textSecondary, fontFamily: 'Outfit_600SemiBold' },
+  validityText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },
 
   offerCard: {
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md,
+    backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 12,
     borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
   },
   providerRow: { flexDirection: 'row', alignItems: 'center' },
-  providerInfo: { flex: 1, marginLeft: spacing.md },
-  providerName: { ...typography.body, fontFamily: 'Outfit_600SemiBold', fontSize: 16 },
+  providerInfo: { flex: 1, marginLeft: 12 },
+  providerName: { fontFamily: fonts.bodyMedium, fontSize: 16 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  ratingText: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
-  skillText: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
+  ratingText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.amber },
+  skillText: { fontFamily: fonts.bodyLight, fontSize: 12, color: colors.muted, flexShrink: 1 },
   priceBox: { alignItems: 'flex-end' },
-  price: { ...typography.h3, color: colors.accent, fontSize: 20, fontFamily: 'Outfit_700Bold' },
-  priceCur: { ...typography.caption, color: colors.textSecondary },
-  message: { ...typography.body, color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: spacing.md },
-  metaRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  metaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.full, backgroundColor: colors.surfaceHigh },
-  metaText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  profileBtnPress: { flex: 1, borderRadius: radius.full },
+  price: { fontFamily: fonts.bodyMedium, color: colors.amber, fontSize: 20 },
+  priceCur: { fontFamily: fonts.bodyLight, fontSize: 12, color: colors.muted },
+  message: { fontFamily: fonts.bodyLight, color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: 12 },
+  metaRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  metaPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 9999, backgroundColor: '#2E2E2E' },
+  metaText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  profileBtnPress: { flex: 1, borderRadius: 9999 },
   profileBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14,
-    borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surfaceHigh,
+    borderRadius: 9999, borderWidth: 1.5, borderColor: colors.border, backgroundColor: '#2E2E2E',
   },
-  profileBtnText: { ...typography.body, color: colors.accent, fontFamily: 'Outfit_600SemiBold', fontSize: 14 },
-  acceptBtnPress: { flex: 1, borderRadius: radius.full },
+  profileBtnText: { fontFamily: fonts.bodyMedium, color: colors.amber, fontSize: 14 },
+  acceptBtnPress: { flex: 1, borderRadius: 9999 },
   acceptBtn: {
-    alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: radius.full,
-    backgroundColor: colors.accent,
-    shadowColor: colors.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
+    alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 9999,
+    backgroundColor: colors.amber,
+    shadowColor: colors.amber, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
   },
-  acceptBtnText: { ...typography.body, color: colors.background, fontFamily: 'Outfit_700Bold', fontSize: 15 },
+  acceptBtnText: { fontFamily: fonts.bodyMedium, color: '#0D0D0D', fontSize: 15 },
 
-  skeletonWrap: { padding: spacing.md, gap: spacing.md },
+  skeletonWrap: { padding: 12, gap: 12 },
 })

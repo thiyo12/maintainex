@@ -5,13 +5,13 @@ import MapViewDirections from 'react-native-maps-directions'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet'
-import { ArrowLeft, Star, Check, ChatCircle, PaperPlaneTilt, Timer, Hash } from 'phosphor-react-native'
+import { ArrowLeft, Star, Check, ChatCircle, PaperPlaneTilt, Timer, Hash, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import Reanimated, { ZoomIn } from 'react-native-reanimated'
 
 import { useColors } from '../../../lib/ThemeContext'
 import { v2Jobs } from '../../../lib/api-v2'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
+import { fonts } from '../../../lib/fonts'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'
 import PressableScale from '../../../components/ui/PressableScale'
@@ -37,6 +37,7 @@ function distanceKm(a: { latitude: number; longitude: number }, b: { latitude: n
 export default function LiveTrackingScreen() {
   const { t } = useTranslation()
   const colors = useColors()
+  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const sheetRef = useRef<BottomSheet>(null)
@@ -194,7 +195,7 @@ export default function LiveTrackingScreen() {
           {providerCoord && (
             <AnimatedMarker coordinate={animCoord} anchor={{ x: 0.5, y: 0.5 }} title={provider?.name || t('tracking.provider')}>
               <View style={styles.taskerCircle}>
-                <Text style={styles.taskerEmoji}>🔧</Text>
+                <Wrench size={20} color="#0D0D0D" weight="bold" />
               </View>
             </AnimatedMarker>
           )}
@@ -317,7 +318,7 @@ export default function LiveTrackingScreen() {
           <View style={styles.actions}>
             <PressableScale onPress={() => setChatVisible(true)} scaleTo={0.97} style={styles.msgPress}>
               <View style={styles.msgBtn}>
-                <ChatCircle size={19} color={colors.accent} weight="fill" />
+                <ChatCircle size={19} color={colors.amber} weight="fill" />
                 <Text style={styles.msgText}>{t('ui.msgTasker')}</Text>
               </View>
             </PressableScale>
@@ -333,7 +334,7 @@ export default function LiveTrackingScreen() {
 
           {step < 2 ? (
             <View style={styles.waitCard}>
-              <Timer size={16} color={colors.accent} weight="fill" />
+              <Timer size={16} color={colors.amber} weight="fill" />
               <Text style={styles.waitText}>{t('ui.holdTight')}</Text>
             </View>
           ) : null}
@@ -353,15 +354,16 @@ export default function LiveTrackingScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, backgroundColor: colors.background },
   mapArea: { flex: 1 },
 
   customerMarker: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accent,
+    width: 32, height: 32, borderRadius: 16, backgroundColor: colors.amber,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: colors.ink, ...shadows.card,
+    borderWidth: 3, borderColor: colors.ink,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   destMarker: {
     backgroundColor: '#0D0D0D',
@@ -377,11 +379,10 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.3,
     shadowRadius: 4, elevation: 5,
   },
-  taskerEmoji: { color: '#000', fontSize: 20 },
   taskerMarker: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: colors.ink,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2.5, borderColor: colors.accent, overflow: 'hidden',
+    borderWidth: 2.5, borderColor: colors.amber, overflow: 'hidden',
   },
   taskerPulse: {
     position: 'absolute', width: 50, height: 50, borderRadius: 25,
@@ -390,90 +391,92 @@ const styles = StyleSheet.create({
 
   etaRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: colors.accentSoft, borderRadius: radius.md,
-    padding: spacing.md, marginBottom: spacing.lg,
+    backgroundColor: colors.amberBg, borderRadius: 15,
+    padding: 12, marginBottom: 16,
   },
   routeDotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
   routeDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#F5A623' },
-  distText: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_600SemiBold' },
+  distText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
 
   overlayTop: { position: 'absolute', top: 46, left: 0, right: 0, alignItems: 'center' },
   etaPill: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: colors.surface, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    borderWidth: 1, borderColor: colors.border, ...shadows.card,
+    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
   etaDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
-  etaText: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_600SemiBold' },
+  etaText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
   backPress: { position: 'absolute', left: 14, top: 0 },
   backBtn: {
     width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 1, borderColor: colors.border, ...shadows.card,
+    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
 
   sheetBg: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
-  sheetContent: { padding: spacing.lg, paddingTop: spacing.sm },
+  sheetContent: { padding: 16, paddingTop: 8 },
 
-  statusTitle: { ...typography.h3, fontSize: 22, marginBottom: spacing.lg },
+  statusTitle: { fontFamily: fonts.heading, fontSize: 22, marginBottom: 16 },
 
-  progressRow: { flexDirection: 'row', marginBottom: spacing.lg },
+  progressRow: { flexDirection: 'row', marginBottom: 16 },
   stepCol: { flex: 1, alignItems: 'center', position: 'relative' },
   dotWrap: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   dotActive: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: colors.accent,
+    width: 32, height: 32, borderRadius: 16, backgroundColor: colors.amber,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.accent, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.45, shadowRadius: 8, elevation: 5,
+    shadowColor: colors.amber, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.45, shadowRadius: 8, elevation: 5,
   },
   dotDone: {
     width: 26, height: 26, borderRadius: 13, backgroundColor: colors.success,
     alignItems: 'center', justifyContent: 'center', margin: 3,
   },
   dotIdle: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center', margin: 3 },
-  dotNum: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_700Bold' },
-  dotNumIdle: { ...typography.caption, color: colors.muted, fontFamily: 'Outfit_600SemiBold' },
-  stepLabel: { ...typography.caption, color: colors.muted, marginTop: 6, fontSize: 10, textAlign: 'center' },
-  stepLabelCurrent: { color: colors.accent, fontFamily: 'Outfit_700Bold' },
-  stepLabelDone: { color: colors.ink, fontFamily: 'Outfit_600SemiBold' },
+  dotNum: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
+  dotNumIdle: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.muted },
+  stepLabel: { fontFamily: fonts.bodyLight, fontSize: 10, color: colors.muted, marginTop: 6, textAlign: 'center' },
+  stepLabelCurrent: { color: colors.amber, fontFamily: fonts.bodyMedium },
+  stepLabelDone: { color: colors.ink, fontFamily: fonts.bodyMedium },
   connector: { position: 'absolute', top: 15, left: '50%', right: '-50%', height: 2, backgroundColor: colors.border },
-  connectorActive: { backgroundColor: colors.accent },
+  connectorActive: { backgroundColor: colors.amber },
 
   taskerCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.md,
-    borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg,
+    backgroundColor: colors.white, borderRadius: 16, padding: 12,
+    borderWidth: 1, borderColor: colors.border, marginBottom: 16,
   },
-  taskerInfo: { flex: 1, marginLeft: spacing.md },
-  taskerName: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 16 },
+  taskerInfo: { flex: 1, marginLeft: 12 },
+  taskerName: { fontFamily: fonts.bodyMedium, fontSize: 16 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  ratingText: { ...typography.caption, color: colors.amber, fontFamily: 'Outfit_600SemiBold' },
+  ratingText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.amber },
   refPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.surface,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9999, backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border,
   },
-  refText: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_600SemiBold' },
+  refText: { fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.ink },
 
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  msgPress: { flex: 1, borderRadius: radius.full },
+  actions: { flexDirection: 'row', gap: 8 },
+  msgPress: { flex: 1, borderRadius: 9999 },
   msgBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 16, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border,
+    paddingVertical: 16, borderRadius: 9999, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: colors.white,
   },
-  msgText: { ...typography.body, color: colors.accent, fontFamily: 'Outfit_600SemiBold', fontSize: 14 },
-  completePress: { flex: 1.3, borderRadius: radius.full },
+  msgText: { fontFamily: fonts.bodyMedium, color: colors.amber, fontSize: 14 },
+  completePress: { flex: 1.3, borderRadius: 9999 },
   completeBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    paddingVertical: 16, borderRadius: radius.full, backgroundColor: colors.accent,
-    shadowColor: colors.accent, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 7,
+    paddingVertical: 16, borderRadius: 9999, backgroundColor: colors.amber,
+    shadowColor: colors.amber, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 7,
   },
-  completeText: { ...typography.body, color: colors.ink, fontFamily: 'Outfit_700Bold', fontSize: 15 },
+  completeText: { fontFamily: fonts.bodyMedium, color: colors.ink, fontSize: 15 },
 
   waitCard: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: colors.accentSoft, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.lg,
+    backgroundColor: colors.amberBg, borderRadius: 15, padding: 12, marginTop: 16,
   },
-  waitText: { ...typography.caption, color: colors.ink, fontFamily: 'Outfit_500Medium', flex: 1 },
+  waitText: { fontFamily: fonts.body, fontSize: 12, color: colors.ink, flex: 1 },
 })

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Check } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 
 export default function JobPostedConfirmation() {
   const { t } = useTranslation()
@@ -38,7 +39,7 @@ export default function JobPostedConfirmation() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
-        <Ionicons name="checkmark" size={40} color={colors.white} />
+        <Check size={40} color="#FFFFFF" weight="bold" />
       </Animated.View>
       <Text style={styles.heading}>{t('postJob.postedSuccess')}</Text>
       <Text style={styles.subtitle}>{t('postJob.postedDesc')}</Text>
@@ -60,7 +61,7 @@ export default function JobPostedConfirmation() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#0D0D0D',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
@@ -69,40 +70,40 @@ const makeStyles = (colors: any) => StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.green,
+    backgroundColor: '#06C167',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: colors.green,
+    shadowColor: '#06C167',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
-  heading: { fontSize: 26, fontWeight: '800', color: colors.dark, textAlign: 'center', marginBottom: 12 },
-  subtitle: { fontSize: 15, color: colors.gray, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  heading: { fontSize: 26, fontFamily: fonts.heading, color: '#FFFFFF', textAlign: 'center', marginBottom: 12 },
+  subtitle: { fontSize: 15, color: '#6F6B6B', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
   counter: {
     fontSize: 56,
-    fontWeight: '800',
-    color: colors.customerAccent,
+    fontFamily: fonts.heading,
+    color: '#F5A623',
     marginBottom: 4,
   },
-  counterLabel: { fontSize: 14, color: colors.gray, fontWeight: '500', marginBottom: 48 },
+  counterLabel: { fontSize: 14, color: '#6F6B6B', fontFamily: fonts.bodyLight, marginBottom: 48 },
   buttons: { width: '100%', gap: 14 },
   primaryBtn: {
-    backgroundColor: colors.customerAccent,
+    backgroundColor: '#F5A623',
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
   },
-  primaryBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
+  primaryBtnText: { fontSize: 17, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
   outlineBtn: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: '#2E2E2E',
   },
-  outlineBtnText: { fontSize: 17, fontWeight: '700', color: colors.dark },
+  outlineBtnText: { fontSize: 17, fontFamily: fonts.bodyMedium, color: '#0D0D0D' },
 })

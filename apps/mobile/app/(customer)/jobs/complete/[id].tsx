@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Animated } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CheckCircle, Camera, Sparkle, Lock } from 'phosphor-react-native'
 import { useColors } from '../../../../lib/ThemeContext'
+import { fonts } from '../../../../lib/fonts'
 import { useTranslation } from 'react-i18next'
 import { jobs } from '../../../../lib/api'
 import { v2Jobs, v2JobActions } from '../../../../lib/api-v2'
@@ -80,7 +81,7 @@ export default function JobCompleteScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
+        <ActivityIndicator size="large" color="#F5A623" style={{ flex: 1 }} />
       </SafeAreaView>
     )
   }
@@ -89,7 +90,7 @@ export default function JobCompleteScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Text style={{ color: colors.red, textAlign: 'center' }}>{error}</Text>
+          <Text style={{ color: '#E11900', textAlign: 'center' }}>{error}</Text>
         </View>
       </SafeAreaView>
     )
@@ -113,7 +114,7 @@ export default function JobCompleteScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Ionicons name="checkmark-circle-outline" size={52} color={colors.green} style={{ marginBottom: 12 }} />
+          <CheckCircle size={52} color="#06C167" weight="fill" style={{ marginBottom: 12 }} />
           <Text style={styles.heading}>{t('jobComplete.jobInReview')}</Text>
           <Text style={styles.subtitle}>
             {t('jobComplete.jobInReviewDesc')}
@@ -145,7 +146,7 @@ export default function JobCompleteScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoRow}>
             {[1, 2, 3].map((_, i) => (
               <View key={i} style={styles.photoThumb}>
-                <Ionicons name="camera-outline" size={32} color={colors.gray} />
+                <Camera size={32} color="#6F6B6B" weight="regular" />
                 <Text style={styles.photoLabel}>{t('jobComplete.photo', { n: i + 1 })}</Text>
               </View>
             ))}
@@ -154,7 +155,7 @@ export default function JobCompleteScreen() {
 
         {confirmed ? (
           <View style={styles.confirmedBox}>
-            <Ionicons name="sparkles-outline" size={32} color={colors.green} style={{ marginBottom: 8 }} />
+            <Sparkle size={32} color="#06C167" weight="fill" style={{ marginBottom: 8 }} />
             <Text style={styles.confirmedText}>{t('jobComplete.completedTitle')}</Text>
             <Text style={styles.confirmedSub}>
               {t('jobComplete.completedDesc', { amount: ((job?.budget || 0) * 1.05).toLocaleString() })}
@@ -180,7 +181,7 @@ export default function JobCompleteScreen() {
             <Text style={styles.issueBtnText}>{t('jobComplete.reportIssue')}</Text>
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16 }}>
-            <Ionicons name="lock-closed-outline" size={14} color={colors.gray} />
+            <Lock size={14} color="#6F6B6B" weight="regular" />
             <Text style={[styles.escrowNote, { marginTop: 0 }]}>{t('jobComplete.escrowHeld')}</Text>
           </View>
         </View>
@@ -199,14 +200,14 @@ export default function JobCompleteScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   backBtn: { paddingHorizontal: 24, paddingTop: 8 },
-  backText: { fontSize: 16, color: colors.primary, fontWeight: '600' },
+  backText: { fontSize: 16, color: '#F5A623', fontFamily: fonts.body },
   header: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 16, paddingBottom: 20 },
-  heading: { fontSize: 24, fontWeight: '800', color: colors.dark, marginBottom: 8 },
-  subtitle: { fontSize: 14, color: colors.gray, textAlign: 'center', lineHeight: 20 },
+  heading: { fontSize: 24, fontFamily: fonts.heading, color: '#FFFFFF', marginBottom: 8 },
+  subtitle: { fontSize: 14, color: '#6F6B6B', textAlign: 'center', lineHeight: 20 },
   summaryCard: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
     padding: 16,
     borderRadius: 14,
@@ -217,77 +218,77 @@ const makeStyles = (colors: any) => StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  sumTitle: { fontSize: 17, fontWeight: '700', color: colors.dark, marginBottom: 12 },
+  sumTitle: { fontSize: 17, fontFamily: fonts.bodyMedium, color: '#0D0D0D', marginBottom: 12 },
   sumRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
+    borderBottomColor: '#2E2E2E',
   },
-  sumLabel: { fontSize: 14, color: colors.gray },
-  sumValue: { fontSize: 14, fontWeight: '600', color: colors.dark },
-  sumPrice: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  sumLabel: { fontSize: 14, color: '#6F6B6B' },
+  sumValue: { fontSize: 14, fontFamily: fonts.body, color: '#0D0D0D' },
+  sumPrice: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#F5A623' },
   photosSection: {
     marginHorizontal: 24,
     marginBottom: 16,
   },
-  photoSectionTitle: { fontSize: 14, fontWeight: '700', color: colors.dark, marginBottom: 10 },
+  photoSectionTitle: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#FFFFFF', marginBottom: 10 },
   photoRow: { gap: 10 },
   photoThumb: {
     width: 100,
     height: 100,
     borderRadius: 12,
-    backgroundColor: colors.lightGray,
+    backgroundColor: '#2E2E2E',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
-  photoLabel: { fontSize: 11, color: colors.gray, fontWeight: '500' },
+  photoLabel: { fontSize: 11, color: '#6F6B6B', fontFamily: fonts.bodyLight },
   confirmedBox: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#06C16720',
     marginHorizontal: 24,
     padding: 16,
     borderRadius: 14,
     alignItems: 'center',
     marginBottom: 16,
   },
-  confirmedText: { fontSize: 16, fontWeight: '700', color: colors.green, marginBottom: 4 },
-  confirmedSub: { fontSize: 13, color: colors.gray, textAlign: 'center' },
+  confirmedText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: '#06C167', marginBottom: 4 },
+  confirmedSub: { fontSize: 13, color: '#6F6B6B', textAlign: 'center' },
   actionSection: {
     marginHorizontal: 24,
     paddingBottom: 100,
     alignItems: 'center',
   },
-  actionTitle: { fontSize: 15, fontWeight: '600', color: colors.dark, marginBottom: 16 },
+  actionTitle: { fontSize: 15, fontFamily: fonts.body, color: '#FFFFFF', marginBottom: 16 },
   confirmBtn: {
     width: '100%',
-    backgroundColor: colors.green,
+    backgroundColor: '#06C167',
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
     marginBottom: 12,
   },
-  confirmBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  confirmBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
   issueBtn: {
     width: '100%',
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.red,
+    borderColor: '#E11900',
     marginBottom: 16,
   },
-  issueBtnText: { fontSize: 16, fontWeight: '600', color: colors.red },
-  escrowNote: { fontSize: 12, color: colors.gray, textAlign: 'center', lineHeight: 18 },
+  issueBtnText: { fontSize: 16, fontFamily: fonts.body, color: '#E11900' },
+  escrowNote: { fontSize: 12, color: '#6F6B6B', textAlign: 'center', lineHeight: 18 },
   nextBtn: {
-    backgroundColor: colors.customerAccent,
+    backgroundColor: '#F5A623',
     marginHorizontal: 24,
     marginBottom: 32,
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
   },
-  nextBtnText: { fontSize: 17, fontWeight: '700', color: colors.white },
+  nextBtnText: { fontSize: 17, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
 })

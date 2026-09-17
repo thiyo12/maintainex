@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, CheckCircle, Star } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2JobActions } from '../../../lib/api-v2'
@@ -53,7 +53,7 @@ export default function ConfirmCompleteScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Confirm Completion</Text>
         <View style={{ width: 40 }} />
@@ -65,7 +65,7 @@ export default function ConfirmCompleteScreen() {
           <Text style={styles.sub}>{jobTitle}</Text>
           <View style={[styles.row, { borderTopWidth: 0 }]}>
             <Text style={styles.rowL}>Tasker receives</Text>
-            <Text style={[styles.rowV, { color: '#10B981' }]}>{currency} {payout.toLocaleString()}</Text>
+            <Text style={[styles.rowV, { color: '#06C167' }]}>{currency} {payout.toLocaleString()}</Text>
           </View>
           <View style={styles.row}>
             <Text style={styles.rowL}>Platform fee</Text>
@@ -84,10 +84,10 @@ export default function ConfirmCompleteScreen() {
           <View style={styles.stars}>
             {[1, 2, 3, 4, 5].map(i => (
               <TouchableOpacity key={i} onPress={() => setRating(i)}>
-                <Ionicons
-                  name={i <= rating ? 'star' : 'star-outline'}
+                <Star
                   size={32}
                   color={i <= rating ? colors.amber : colors.border}
+                  weight={i <= rating ? 'fill' : 'regular'}
                   style={{ marginRight: 4 }}
                 />
               </TouchableOpacity>
@@ -101,7 +101,7 @@ export default function ConfirmCompleteScreen() {
           disabled={loading || rating === 0}
           activeOpacity={0.8}
         >
-          <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+          <CheckCircle size={20} color="#FFFFFF" />
           <Text style={styles.btnTxt}>
             {loading ? 'Releasing...' : 'Confirm & Release Payment'}
           </Text>
@@ -116,7 +116,7 @@ export default function ConfirmCompleteScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream, padding: 16 },
+  container: { flex: 1, backgroundColor: colors.surface, padding: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   backBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: colors.ink },
@@ -130,8 +130,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   totalL: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.ink },
   totalV: { fontSize: 18, fontFamily: fonts.heading, color: colors.amberDark },
   stars: { flexDirection: 'row', marginBottom: 14 },
-  btn: { backgroundColor: '#10B981', borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6, marginBottom: 10 },
+  btn: { backgroundColor: '#06C167', borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, shadowColor: '#06C167', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6, marginBottom: 10 },
   btnTxt: { fontSize: 15, fontFamily: fonts.headingBold, color: '#FFFFFF' },
   disputeBtn: { alignItems: 'center', padding: 12, marginBottom: 24 },
-  disputeTxt: { fontSize: 13, fontFamily: fonts.body, color: colors.error || '#EF4444' },
+  disputeTxt: { fontSize: 13, fontFamily: fonts.body, color: '#E11900' },
 })
