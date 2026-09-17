@@ -58,7 +58,26 @@
 - `jobs/v2/confirm/[id].tsx` — V3.3 Confirm Booking (provider card, schedule, escrow dark card, 4-step tracker)
 - `jobs/v2/quotes/[id].tsx` — V3.3 Quotes (sort pills, quote cards with swipe, countdown, profile/accept actions)
 
-### B5: Payment + Active Job Lifecycle — PENDING
+## B5: Payment + Active Job Lifecycle — CODE COMPLETE
+
+### B5 Verification
+- ✅ B5-introduced TypeScript errors = 0
+- ✅ Ionicons in B5 scope = 0
+- ✅ lib/design imports in B5 scope = 0
+- ✅ Emoji icons in B5 scope = 0
+
+### B5 Files Rewritten (10)
+- `payment/escrow-confirm.tsx` — V3.3 Secure Payment (CaretLeft, Lock, ShieldCheck)
+- `payment/confirm-complete.tsx` — V3.3 Inspect & Approve (CaretLeft, CheckCircle, Star)
+- `payment/dispute.tsx` — V3.3 Raise Dispute (CaretLeft, CheckCircle, WarningCircle, Flag)
+- `jobs/posted-confirm.tsx` — V3.3 Posted Confirmation (Check)
+- `jobs/complete/[id].tsx` — V3.3 Completion Review (CheckCircle, Camera, Sparkle, Lock)
+- `jobs/review/[id].tsx` — V3.3 Rating (Star fill/regular)
+- `jobs/receipt/[id].tsx` — V3.3 Receipt (FileText, CheckCircle, CreditCard, ShareNetwork)
+- `jobs/dispute/[id].tsx` — V3.3 Dispute (FileText, Lock, WarningCircle)
+- `jobs/quotes.tsx` — V3.3 Quotes legacy (lib/design.ts → useColors + V3 tokens)
+- `tracking/[id].tsx` — V3.3 Tasker En Route (lib/design.ts → useColors + V3 tokens, emoji → Wrench)
+
 ### B6: Account + Wallet + Settings + Chat — PENDING
 ### B7: Property — PENDING
 ### B8: Tasker Shell + Setup + Profile — PENDING
