@@ -190,13 +190,13 @@ export default function JobSelectionScreen() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  heading: { fontSize: 18, fontFamily: fonts.bodyBold, color: '#FFFFFF' },
+  heading: { fontSize: 18, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40 },
   subTitle: { fontSize: 13, fontFamily: fonts.body, color: '#6F6B6B', marginBottom: 16, lineHeight: 19 },
   catCard: { borderRadius: 16, padding: 14, marginBottom: 12 },
   catHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  catName: { fontSize: 15, fontFamily: fonts.bodyBold },
+  catName: { fontSize: 15, fontFamily: fonts.bodyMedium },
   emptyJobs: { fontSize: 12, fontFamily: fonts.body, paddingVertical: 8 },
   jobRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2E2E2E', marginTop: 4 },
   check: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#6F6B6B', alignItems: 'center', justifyContent: 'center', marginTop: 1, marginRight: 10 },
@@ -210,5 +210,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
   levelBtn: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
   levelText: { fontSize: 11, fontFamily: fonts.bodyMedium },
   saveBtn: { borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8 },
-  saveText: { fontSize: 15, fontFamily: fonts.bodyBold, color: '#0D0D0D' },
+  saveText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#0D0D0D' },
 })

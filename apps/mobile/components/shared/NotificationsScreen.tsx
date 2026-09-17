@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, BellSlash, Wrench, Wallet, ChatCircleDots, Bell } from 'phosphor-react-native'
 import { useColors } from '../../lib/ThemeContext'
 import { notifications } from '../../lib/api'
 import { useAuth } from '../../lib/auth'
@@ -46,13 +46,13 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
     switch (refType) {
       case 'JOB':
       case 'QUOTE':
-        return { icon: 'construct-outline', tint: colors.blue, bg: colors.blueBg }
+        return { icon: Wrench, tint: colors.blue, bg: colors.blueBg }
       case 'WALLET':
-        return { icon: 'wallet-outline', tint: colors.success, bg: colors.successBg }
+        return { icon: Wallet, tint: colors.success, bg: colors.successBg }
       case 'CHAT':
-        return { icon: 'chatbubble-ellipses-outline', tint: colors.purple, bg: colors.purpleBg }
+        return { icon: ChatCircleDots, tint: colors.purple, bg: colors.purpleBg }
       default:
-        return { icon: 'notifications-outline', tint: colors.amber, bg: colors.amberBg }
+        return { icon: Bell, tint: colors.amber, bg: colors.amberBg }
     }
   }
 
@@ -91,7 +91,7 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         {showBack ? (
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={colors.ink} />
+            <CaretLeft size={22} color={colors.ink} weight="bold" />
           </TouchableOpacity>
         ) : (
           <View style={{ width: 32 }} />
@@ -112,7 +112,7 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
         </View>
       ) : items.length === 0 ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 12 }}>
-          <Ionicons name="notifications-off-outline" size={48} color={colors.muted} />
+          <BellSlash size={48} color={colors.muted} />
           <Text style={[styles.emptyText, { color: colors.muted }]}>{t('common.noResults')}</Text>
         </View>
       ) : (
@@ -126,6 +126,7 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
             {items.map(item => {
               const refType = item.data?.referenceType
               const meta = typeMeta(refType)
+              const IconComponent = meta.icon
               return (
                 <TouchableOpacity
                   key={item.id}
@@ -134,7 +135,7 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
                   onPress={() => openItem(item)}
                 >
                   <View style={[styles.iconWrap, { backgroundColor: meta.bg }]}>
-                    <Ionicons name={meta.icon} size={18} color={meta.tint} />
+                    <IconComponent size={18} color={meta.tint} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={styles.cardTop}>

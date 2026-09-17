@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, TextInput, Modal, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { X } from 'phosphor-react-native'
 import { conversations } from '@/lib/api'
 import { useTheme } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
@@ -56,7 +56,7 @@ export default function NewChatModal({ visible, onClose, recipient, jobId, jobTi
               {jobTitle ? <Text style={[styles.sub, { color: colors.muted }]} numberOfLines={1}>{jobTitle}</Text> : null}
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <Ionicons name="close" size={22} color={colors.muted} />
+              <X size={22} color={colors.muted} />
             </TouchableOpacity>
           </View>
           <TextInput
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   headerLeft: { flex: 1, marginRight: 12 },
-  title: { fontSize: 17, fontFamily: fonts.bodyBold },
+  title: { fontSize: 17, fontFamily: fonts.bodyMedium },
   sub: { fontSize: 12, fontFamily: fonts.body, marginTop: 2 },
   input: {
     minHeight: 110,
@@ -114,5 +114,5 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
   },
-  sendText: { fontSize: 15, fontFamily: fonts.bodyBold, color: '#0D0D0D' },
+  sendText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#0D0D0D' },
 })

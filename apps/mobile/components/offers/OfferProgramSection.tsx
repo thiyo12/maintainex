@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Switch, StyleSheet, Animated, ActivityIndicator } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Tag, Lightning } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { offerProgram } from '../../lib/api-v2'
@@ -63,7 +63,7 @@ export default function OfferProgramSection({ variant, taskerId, companyId }: Pr
     <Animated.View style={[styles.container, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="pricetag-outline" size={14} color={colors.amberDark} />
+          <Tag size={14} color={colors.amberDark} />
           <Text style={[styles.title, { color: colors.ink }]}>{t('components.viewOffer')}</Text>
         </View>
         {toggling ? (
@@ -86,7 +86,7 @@ export default function OfferProgramSection({ variant, taskerId, companyId }: Pr
         <View style={styles.offersList}>
           {offers.map((offer: any) => (
             <View key={offer.id} style={[styles.offerItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Ionicons name="flash-outline" size={14} color={colors.amberDark} />
+              <Lightning size={14} color={colors.amberDark} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.offerName, { color: colors.ink }]}>{offer.title}</Text>
                 {offer.description ? (

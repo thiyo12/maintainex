@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Globe, MapPin, PaperPlaneRight } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
@@ -76,11 +76,11 @@ export default function JobCard({ title, category, budget, location, distance, u
 
         {location ? (
           <View style={styles.locRow}>
-            <Ionicons
-              name={isRemote ? 'globe-outline' : 'location-outline'}
-              size={12}
-              color={colors.muted}
-            />
+            {isRemote ? (
+              <Globe size={12} color={colors.muted} />
+            ) : (
+              <MapPin size={12} color={colors.muted} />
+            )}
             <Text style={[styles.location, { color: colors.muted }]}>
               {location}{distance && !isRemote ? ` · ${distance}` : ''}
             </Text>
@@ -100,7 +100,7 @@ export default function JobCard({ title, category, budget, location, distance, u
             onPress={onApply}
             activeOpacity={0.8}
           >
-            <Ionicons name="paper-plane-outline" size={12} color="#111827" />
+            <PaperPlaneRight size={12} color="#111827" />
             <Text style={styles.applyText}>{t('jobs.applyNow')}</Text>
           </TouchableOpacity>
         ) : null}

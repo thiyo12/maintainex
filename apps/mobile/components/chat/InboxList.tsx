@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { View, Text, TextInput, FlatList, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native'
 import { useRouter, useFocusEffect } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { MagnifyingGlass, ChatCircleDots } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { conversations, resolveImageUri } from '../../lib/api'
 import { useColors } from '../../lib/ThemeContext'
@@ -63,7 +63,7 @@ export default function InboxList({ onTotalUnread }: { onTotalUnread?: (n: numbe
   return (
     <View style={styles.wrap}>
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={colors.gray} style={{ marginRight: 10 }} />
+        <MagnifyingGlass size={18} color={colors.gray} />
         <TextInput
           style={styles.searchInput}
           placeholder={t('customer.searchMessages')}
@@ -117,7 +117,7 @@ export default function InboxList({ onTotalUnread }: { onTotalUnread?: (n: numbe
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.lightGray} style={{ marginBottom: 12 }} />
+              <ChatCircleDots size={48} color={colors.lightGray} />
               <Text style={styles.emptyTitle}>{t('chat.noConversations')}</Text>
               <Text style={styles.emptySub}>{t('customer.noMessages')}</Text>
             </View>
@@ -127,8 +127,6 @@ export default function InboxList({ onTotalUnread }: { onTotalUnread?: (n: numbe
     </View>
   )
 }
-
-// Re-fetch on focus and poll every 30s
 
 const makeStyles = (colors: any) => StyleSheet.create({
   wrap: { flex: 1 },
@@ -143,6 +141,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.lightGray,
     marginBottom: 12,
+    gap: 10,
   },
   searchInput: { flex: 1, fontSize: 15, color: colors.dark },
   conversationCard: {
@@ -188,7 +187,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   unreadText: { fontSize: 11, fontWeight: '700', color: colors.white },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty: { alignItems: 'center', paddingTop: 80 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.dark, marginBottom: 6 },
+  empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: colors.dark },
   emptySub: { fontSize: 13, color: colors.gray, textAlign: 'center', paddingHorizontal: 32 },
 })

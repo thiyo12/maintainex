@@ -367,7 +367,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   availCardOffline: { borderWidth: 1, borderColor: '#2E2E2E' },
   availLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   availDot: { width: 12, height: 12, borderRadius: 6 },
-  availTitle: { fontFamily: fonts.bodyBold, fontSize: 15 },
+  availTitle: { fontFamily: fonts.bodyMedium, fontSize: 15 },
   availSub: { fontFamily: fonts.body, marginTop: 2, fontSize: 12, color: '#6F6B6B' },
   availBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
   availBadgeOn: { backgroundColor: '#0D0D0D' },
@@ -400,7 +400,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: '#0D0D0D', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 999,
   },
-  activeCtaText: { fontFamily: fonts.bodyBold, color: '#FFFFFF', fontSize: 14 },
+  activeCtaText: { fontFamily: fonts.bodyMedium, color: '#FFFFFF', fontSize: 14 },
 
   idleCard: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24,

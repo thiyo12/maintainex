@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { View, TouchableOpacity, StyleSheet, Animated } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Star } from 'phosphor-react-native'
 
 interface Props {
   stars: number
@@ -42,10 +42,10 @@ export default function StarRating({ stars, size = 18, onRate, readonly = false,
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
         >
           <Animated.View style={[!readonly && { transform: [{ scale: animValues[i - 1] || 1 }] }]}>
-            <Ionicons
-              name="star"
+            <Star
               size={size}
               color={i <= stars ? (starColor || '#F5A623') : (emptyColor || '#E5E7EB')}
+              weight={i <= stars ? 'fill' : 'regular'}
             />
           </Animated.View>
         </TouchableOpacity>

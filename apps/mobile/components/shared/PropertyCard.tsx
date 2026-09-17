@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { Image as ImageIcon, House, Star, MapPin, Bed, Drop, Car } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useTheme } from '../../lib/ThemeContext'
 
@@ -45,10 +45,10 @@ export default function PropertyCard({ title, priceLkr, type, countryCode, bedro
       <View style={[styles.imageArea, { backgroundColor: colors.surface }]}>
         {hasPhoto ? (
           <View style={[styles.photoPlaceholder, { backgroundColor: colors.muted + '30' }]}>
-            <Ionicons name="image-outline" size={28} color={colors.muted} />
+            <ImageIcon size={28} color={colors.muted} />
           </View>
         ) : (
-          <Ionicons name="home-outline" size={28} color={colors.muted} />
+          <House size={28} color={colors.muted} />
         )}
 
         <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
@@ -57,7 +57,7 @@ export default function PropertyCard({ title, priceLkr, type, countryCode, bedro
 
         {isFeatured && (
           <View style={[styles.featuredBadge]}>
-            <Ionicons name="star" size={8} color="#F5A623" />
+            <Star size={8} color="#F5A623" weight="fill" />
             <Text style={styles.featuredBadgeText}>Featured</Text>
           </View>
         )}
@@ -77,7 +77,7 @@ export default function PropertyCard({ title, priceLkr, type, countryCode, bedro
 
         {location && (
           <View style={styles.locRow}>
-            <Ionicons name="location-outline" size={9} color={colors.muted} />
+            <MapPin size={9} color={colors.muted} />
             <Text style={[styles.locText, { color: colors.muted }]} numberOfLines={1}>{location}</Text>
           </View>
         )}
@@ -85,19 +85,19 @@ export default function PropertyCard({ title, priceLkr, type, countryCode, bedro
         <View style={styles.specs}>
           {bedrooms != null && (
             <View style={styles.spec}>
-              <Ionicons name="bed-outline" size={10} color={colors.muted} />
+              <Bed size={10} color={colors.muted} />
               <Text style={[styles.specText, { color: colors.muted }]}>{bedrooms}</Text>
             </View>
           )}
           {bathrooms != null && (
             <View style={styles.spec}>
-              <Ionicons name="water-outline" size={10} color={colors.muted} />
+              <Drop size={10} color={colors.muted} />
               <Text style={[styles.specText, { color: colors.muted }]}>{bathrooms}</Text>
             </View>
           )}
           {parking != null && (
             <View style={styles.spec}>
-              <Ionicons name="car-outline" size={10} color={colors.muted} />
+              <Car size={10} color={colors.muted} />
               <Text style={[styles.specText, { color: colors.muted }]}>{parking}</Text>
             </View>
           )}
