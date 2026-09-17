@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Users, User } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { v2Request } from '../../../lib/api-v2'
 import { getActiveCompanyId } from '../../../lib/api'
 
@@ -78,7 +79,7 @@ export default function CompanyDispatch() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.amber} />
+          <ActivityIndicator size="large" color={'#F5A623'} />
         </View>
       </SafeAreaView>
     )
@@ -116,7 +117,7 @@ export default function CompanyDispatch() {
       >
         {assignments.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={48} color={colors.muted} />
+            <Users size={48} color={'#6F6B6B'} />
             <Text style={styles.emptyText}>{t('company.workforce.noAssignments')}</Text>
             <Text style={styles.emptyDesc}>{t('company.workforce.noAssignmentsDesc')}</Text>
           </View>
@@ -139,7 +140,7 @@ export default function CompanyDispatch() {
                   </View>
                 </View>
                 <View style={styles.assignmentWorker}>
-                  <Ionicons name="person-outline" size={14} color={colors.muted} />
+                  <User size={14} color={'#6F6B6B'} />
                   <Text style={styles.workerName}>{a.worker?.name || 'Worker'}</Text>
                 </View>
                 <Text style={styles.assignmentDate}>
@@ -155,7 +156,7 @@ export default function CompanyDispatch() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -164,14 +165,14 @@ const makeStyles = (colors: any) => StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF' },
   addBtn: {
-    backgroundColor: colors.amber,
+    backgroundColor: '#F5A623',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
+  addBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 24,
@@ -182,18 +183,18 @@ const makeStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#2E2E2E',
   },
   filterChipActive: {
-    backgroundColor: colors.amber,
-    borderColor: colors.amber,
+    backgroundColor: '#F5A623',
+    borderColor: '#F5A623',
   },
-  filterText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  filterTextActive: { color: colors.white },
+  filterText: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: '#6F6B6B' },
+  filterTextActive: { color: '#FFFFFF' },
   assignmentCard: {
-    backgroundColor: colors.white,
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 24,
     padding: 14,
     borderRadius: 14,
@@ -210,17 +211,17 @@ const makeStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  jobTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, flex: 1 },
+  jobTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#FFFFFF', flex: 1 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
-  statusText: { fontSize: 11, fontWeight: '600' },
+  statusText: { fontSize: 11, fontFamily: fonts.bodySemiBold },
   assignmentWorker: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: 4,
   },
-  workerName: { fontSize: 13, color: colors.muted },
-  assignmentDate: { fontSize: 11, color: colors.muted },
+  workerName: { fontSize: 13, color: '#6F6B6B' },
+  assignmentDate: { fontSize: 11, color: '#6F6B6B' },
   emptyState: {
     alignItems: 'center',
     paddingTop: 60,
@@ -228,13 +229,13 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: colors.ink,
+    fontFamily: fonts.bodyMedium,
+    color: '#FFFFFF',
     marginTop: 16,
   },
   emptyDesc: {
     fontSize: 13,
-    color: colors.muted,
+    color: '#6F6B6B',
     marginTop: 8,
     textAlign: 'center',
   },

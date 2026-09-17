@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Funnel, MapPin, MagnifyingGlass } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
+import { fonts } from '../../../../lib/fonts'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
 import { getAuthToken } from '../../../../lib/api'
 
@@ -72,16 +73,16 @@ export default function CompanyBrowseJobsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('tasker.browse')}</Text>
         <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterArea(null)} activeOpacity={0.7}>
-          <Ionicons name={filterArea ? 'funnel' : 'funnel-outline'} size={20} color={colors.amber} />
+          <Funnel size={20} color={colors.amber} weight={filterArea ? 'fill' : 'regular'} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.locationBanner}>
-        <Ionicons name="location-outline" size={16} color={colors.amber} />
+        <MapPin size={16} color={colors.amber} />
         <Text style={styles.locationText}>{t('location.showing')} {filterCity || t('location.all')}</Text>
       </View>
 
@@ -89,7 +90,7 @@ export default function CompanyBrowseJobsScreen() {
         <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="search-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
+          <MagnifyingGlass size={48} color={colors.muted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>{t('jobs.noJobs')}</Text>
           <Text style={styles.emptySub}>{t('jobs.checkLater')}</Text>
         </View>
@@ -131,25 +132,25 @@ export default function CompanyBrowseJobsScreen() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  headerTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
   filterBtn: { backgroundColor: colors.white, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
   locationBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingBottom: 12 },
-  locationText: { fontSize: 13, color: colors.muted, fontWeight: '500' },
+  locationText: { fontSize: 13, color: colors.muted, fontFamily: fonts.body },
 
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 8 },
+  emptyTitle: { fontSize: 20, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 8 },
   emptySub: { fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 22 },
 
   list: { flex: 1, padding: 16, paddingTop: 4 },
   jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 18, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   budgetBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  budgetBadgeText: { fontSize: 14, fontWeight: '700', color: colors.amberDark },
-  budgetType: { fontSize: 12, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  jobTitle: { fontSize: 17, fontWeight: '700', color: colors.ink, marginBottom: 6 },
+  budgetBadgeText: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.amberDark },
+  budgetType: { fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  jobTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 6 },
   jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 20, marginBottom: 14 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   jobDate: { fontSize: 12, color: colors.muted },
   quoteBtn: { backgroundColor: colors.amber, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10 },
-  quoteBtnText: { fontSize: 13, fontWeight: '700', color: colors.ink },
+  quoteBtnText: { fontSize: 13, fontFamily: fonts.headingBold, color: colors.ink },
 })

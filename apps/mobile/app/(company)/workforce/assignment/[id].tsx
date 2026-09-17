@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Clock, CheckCircle, Play, Ribbon, XCircle, Prohibit } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useColors } from '../../../../lib/ThemeContext'
+import { fonts } from '../../../../lib/fonts'
 import { v2Request } from '../../../../lib/api-v2'
 
 interface AssignmentDetail {
@@ -27,12 +28,24 @@ interface AssignmentDetail {
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
-  ASSIGNED: { color: '#D97706', bg: '#FEF3C7', icon: 'time-outline' },
-  ACCEPTED: { color: '#2563EB', bg: '#DBEAFE', icon: 'checkmark-circle-outline' },
-  IN_PROGRESS: { color: '#059669', bg: '#D1FAE5', icon: 'play-circle-outline' },
-  COMPLETED: { color: '#4F46E5', bg: '#E0E7FF', icon: 'ribbon-outline' },
-  REJECTED: { color: '#DC2626', bg: '#FEE2E2', icon: 'close-circle-outline' },
-  REVOKED: { color: '#6B7280', bg: '#F3F4F6', icon: 'ban-outline' },
+  ASSIGNED: { color: '#D97706', bg: '#FEF3C7', icon: 'clock' },
+  ACCEPTED: { color: '#2563EB', bg: '#DBEAFE', icon: 'checkcircle' },
+  IN_PROGRESS: { color: '#059669', bg: '#D1FAE5', icon: 'play' },
+  COMPLETED: { color: '#4F46E5', bg: '#E0E7FF', icon: 'ribbon' },
+  REJECTED: { color: '#DC2626', bg: '#FEE2E2', icon: 'xcircle' },
+  REVOKED: { color: '#6B7280', bg: '#F3F4F6', icon: 'prohibit' },
+}
+
+const StatusIcon = ({ icon, color, size }: { icon: string; color: string; size: number }) => {
+  switch (icon) {
+    case 'clock': return <Clock size={size} color={color} />
+    case 'checkcircle': return <CheckCircle size={size} color={color} />
+    case 'play': return <Play size={size} color={color} />
+    case 'ribbon': return <Ribbon size={size} color={color} />
+    case 'xcircle': return <XCircle size={size} color={color} />
+    case 'prohibit': return <Prohibit size={size} color={color} />
+    default: return <Clock size={size} color={color} />
+  }
 }
 
 export default function AssignmentDetailScreen() {
@@ -98,7 +111,7 @@ export default function AssignmentDetailScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.statusBanner, { backgroundColor: statusConfig.bg }]}>
-          <Ionicons name={statusConfig.icon as any} size={20} color={statusConfig.color} />
+          <StatusIcon icon={statusConfig.icon} color={statusConfig.color} size={20} />
           <Text style={[styles.statusText, { color: statusConfig.color }]}>
             {t(`company.workforce.${assignment.status.toLowerCase()}`) || assignment.status}
           </Text>
@@ -205,16 +218,16 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
   },
-  statusText: { fontSize: 15, fontWeight: '700' },
+  statusText: { fontSize: 15, fontFamily: fonts.bodyMedium },
   card: {
     backgroundColor: colors.white,
     padding: 16,
     borderRadius: 14,
     marginBottom: 12,
   },
-  cardLabel: { fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', marginBottom: 4 },
-  cardValue: { fontSize: 16, fontWeight: '700', color: colors.ink },
-  cardMeta: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  cardLabel: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.muted, textTransform: 'uppercase', marginBottom: 4 },
+  cardValue: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
+  cardMeta: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
   timelineItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -222,9 +235,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  timelineLabel: { fontSize: 13, color: colors.muted },
-  timelineValue: { fontSize: 13, fontWeight: '600', color: colors.ink },
-  reasonText: { fontSize: 13, color: '#DC2626', marginTop: 8, fontStyle: 'italic' },
+  timelineLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted },
+  timelineValue: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
+  reasonText: { fontSize: 13, color: '#DC2626', marginTop: 8, fontFamily: fonts.body, fontStyle: 'italic' },
   actions: { marginTop: 8, gap: 10 },
   actionBtn: {
     paddingVertical: 14,
@@ -235,5 +248,5 @@ const makeStyles = (colors: any) => StyleSheet.create({
   rejectBtn: { backgroundColor: '#FEE2E2' },
   revokeBtn: { backgroundColor: '#F3F4F6' },
   completeBtn: { backgroundColor: '#059669' },
-  actionBtnText: { fontSize: 15, fontWeight: '700', color: colors.white },
+  actionBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.white },
 })

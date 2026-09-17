@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Star } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { company } from '../../../lib/api'
 
 export default function CompanyTeam() {
@@ -87,7 +88,7 @@ export default function CompanyTeam() {
                   <Text style={styles.memberRole}>{m.role}</Text>
                   {m.rating ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                      <Ionicons name="star" size={13} color="#F5A623" />
+                      <Star size={13} color="#F5A623" weight="fill" />
                       <Text style={[styles.memberRole, { marginTop: 0 }]}> {m.rating}</Text>
                     </View>
                   ) : null}
@@ -117,14 +118,14 @@ const makeStyles = (colors: any) => StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  heading: { fontSize: 28, fontWeight: '800', color: colors.ink },
+  heading: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink },
   addBtn: {
     backgroundColor: colors.amber,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  addBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
+  addBtnText: { fontSize: 14, fontFamily: fonts.headingBold, color: colors.white },
   summaryCard: {
     flexDirection: 'row',
     backgroundColor: colors.white,
@@ -140,7 +141,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     elevation: 2,
   },
   summaryStat: { alignItems: 'center' },
-  summaryValue: { fontSize: 20, fontWeight: '800', color: colors.ink },
+  summaryValue: { fontSize: 20, fontFamily: fonts.heading, color: colors.ink },
   summaryLabel: { fontSize: 11, color: colors.muted, marginTop: 2 },
   summaryDivider: { width: 1, backgroundColor: colors.border },
   memberCard: {
@@ -167,17 +168,17 @@ const makeStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: colors.white },
+  avatarText: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.white },
   onlineDot: {
     position: 'absolute', bottom: 0, right: 0,
     width: 14, height: 14, borderRadius: 7,
     backgroundColor: colors.success, borderWidth: 2, borderColor: colors.white,
   },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  memberName: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink },
   memberRole: { fontSize: 13, color: colors.muted, marginTop: 2 },
   memberMeta: { fontSize: 11, color: colors.muted, marginTop: 2 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 11, fontWeight: '600' },
+  statusText: { fontSize: 11, fontFamily: fonts.bodySemiBold },
   emptyText: { textAlign: 'center', color: colors.muted, marginTop: 40, fontSize: 14 },
 })

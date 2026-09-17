@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, PaperPlaneRight } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Team } from '../../../lib/api-v2'
@@ -50,7 +50,7 @@ export default function InviteTeamMember() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={24} color={colors.ink} />
+        <CaretLeft size={24} color={colors.ink} />
       </TouchableOpacity>
 
       <Text style={styles.title}>{t('company.inviteMember')}</Text>
@@ -113,7 +113,7 @@ export default function InviteTeamMember() {
           <ActivityIndicator color={colors.white} />
         ) : (
           <>
-            <Ionicons name="send-outline" size={18} color={colors.white} />
+            <PaperPlaneRight size={18} color={colors.white} />
             <Text style={styles.sendText}>{t('company.inviteMember')}</Text>
           </>
         )}

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CheckCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { v2Request } from '../../../lib/api-v2'
 import { getActiveCompanyId } from '../../../lib/api'
 
@@ -130,7 +131,7 @@ export default function AssignWorkerScreen() {
                 </View>
               </View>
               {selectedWorker === w.userId && (
-                <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
+                <CheckCircle size={22} color={colors.amber} weight="fill" />
               )}
             </TouchableOpacity>
           ))
@@ -155,8 +156,8 @@ export default function AssignWorkerScreen() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 24 },
-  sectionTitle: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 8, marginTop: 16 },
+  sectionTitle: { fontSize: 22, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 20 },
+  label: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 8, marginTop: 16 },
   optionCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -177,9 +178,9 @@ const makeStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: { fontSize: 16, fontWeight: '700', color: colors.white },
-  optionName: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  optionMeta: { fontSize: 12, color: colors.muted },
+  avatarText: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.white },
+  optionName: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
+  optionMeta: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
   assignBtn: {
     backgroundColor: colors.amber,
     paddingVertical: 14,
@@ -188,6 +189,6 @@ const makeStyles = (colors: any) => StyleSheet.create({
     marginTop: 24,
   },
   assignBtnDisabled: { opacity: 0.5 },
-  assignBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
-  emptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 20 },
+  assignBtnText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.white },
+  emptyText: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, textAlign: 'center', marginTop: 20 },
 })

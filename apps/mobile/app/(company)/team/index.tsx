@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import { UserPlus, Users, Star, CheckCircle, Trash, Clock } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Team } from '../../../lib/api-v2'
@@ -73,14 +73,14 @@ export default function TeamManagement() {
       <View style={styles.headerRow}>
         <Text style={styles.title}>{t('company.teamMembers')}</Text>
         <TouchableOpacity style={styles.inviteBtn} onPress={() => router.push('/(company)/team/invite')}>
-          <Ionicons name="person-add-outline" size={18} color={colors.white} />
+          <UserPlus size={18} color={colors.white} />
           <Text style={styles.inviteBtnText}>{t('company.inviteMember')}</Text>
         </TouchableOpacity>
       </View>
 
       {members.length === 0 && pendingInvites.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="people-outline" size={48} color={colors.muted} />
+          <Users size={48} color={colors.muted} />
           <Text style={styles.emptyTitle}>{t('common.noResults')}</Text>
           <Text style={styles.emptyDesc}>{t('company.inviteMember')}</Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push('/(company)/team/invite')}>
@@ -99,14 +99,14 @@ export default function TeamManagement() {
                 <Text style={styles.memberName}>{m.name}</Text>
                 <Text style={styles.memberRole}>{m.role}</Text>
                 <View style={styles.memberStats}>
-                  <Ionicons name="star" size={12} color={colors.amber} />
+                  <Star size={12} color={colors.amber} weight="fill" />
                   <Text style={styles.statText}>{m.rating.toFixed(1)}</Text>
-                  <Ionicons name="checkmark-circle-outline" size={12} color={colors.muted} />
+                  <CheckCircle size={12} color={colors.muted} />
                   <Text style={styles.statText}>{m.completedJobs} {t('customer.jobs')}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => handleRemove(m.id, m.name)} style={styles.removeBtn}>
-                <Ionicons name="trash-outline" size={18} color={colors.muted} />
+                <Trash size={18} color={colors.muted} />
               </TouchableOpacity>
             </View>
           ))}
@@ -116,7 +116,7 @@ export default function TeamManagement() {
               <Text style={styles.sectionTitle}>{t('tasker.pending')} {t('company.inviteMember')}</Text>
               {pendingInvites.map((inv) => (
                 <View key={inv.id} style={styles.inviteCard}>
-                  <Ionicons name="time-outline" size={20} color={colors.amber} />
+                  <Clock size={20} color={colors.amber} />
                   <View style={styles.inviteInfo}>
                     <Text style={styles.inviteName}>{inv.name}</Text>
                     <Text style={styles.inviteContact}>{inv.email || inv.phone}</Text>

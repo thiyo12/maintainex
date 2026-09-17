@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, PlusCircle, MapPin, ChatCircleText, Play, CheckCircle } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
@@ -92,11 +92,11 @@ export default function CompanyManageJobScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.ink} />
+            <CaretLeft size={24} color={colors.ink} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('company.manageJob')}</Text>
           <TouchableOpacity onPress={() => router.push('/(company)/jobs/v2/browse')} hitSlop={8}>
-            <Ionicons name="add-circle-outline" size={24} color={colors.companyAccent} />
+            <PlusCircle size={24} color={colors.companyAccent} />
           </TouchableOpacity>
         </View>
 
@@ -115,7 +115,7 @@ export default function CompanyManageJobScreen() {
           </View>
           {job.locationName && (
             <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={14} color={colors.muted} />
+              <MapPin size={14} color={colors.muted} />
               <Text style={styles.locationText}>{job.locationName}</Text>
             </View>
           )}
@@ -130,7 +130,7 @@ export default function CompanyManageJobScreen() {
               <Text style={styles.customerLabel}>{t('profile.customer')}</Text>
             </View>
             <TouchableOpacity style={styles.chatBtn} onPress={() => setChatVisible(true)}>
-              <Ionicons name="chatbubble-ellipses-outline" size={18} color="#FFFFFF" />
+              <ChatCircleText size={18} color="#FFFFFF" />
               <Text style={styles.chatBtnText}>{t('company.messageCustomer')}</Text>
             </TouchableOpacity>
           </View>
@@ -203,7 +203,7 @@ export default function CompanyManageJobScreen() {
                 onPress={() => handleUpdateProgress('IN_PROGRESS')}
                 disabled={actionLoading !== ''}
               >
-                <Ionicons name="play" size={18} color="#111827" />
+                <Play size={18} color="#111827" />
                 <Text style={styles.actionBtnText}>{t('booking.statusInProgress')}</Text>
               </TouchableOpacity>
             )}
@@ -213,7 +213,7 @@ export default function CompanyManageJobScreen() {
                 onPress={() => handleUpdateProgress('COMPLETION_REQUESTED')}
                 disabled={actionLoading !== ''}
               >
-                <Ionicons name="checkmark-done" size={18} color="#111827" />
+                <CheckCircle size={18} color="#111827" />
                 <Text style={styles.actionBtnText}>{t('tracking.confirmComplete')}</Text>
               </TouchableOpacity>
             )}
@@ -240,51 +240,51 @@ export default function CompanyManageJobScreen() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, fontFamily: fonts.heading },
+  headerTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink },
 
   jobCard: { backgroundColor: colors.white, marginHorizontal: 20, marginTop: 8, borderRadius: 16, padding: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   jobTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  jobTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, flex: 1, marginRight: 8, fontFamily: fonts.heading },
+  jobTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink, flex: 1, marginRight: 8 },
   openBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  openBadgeText: { fontSize: 11, fontWeight: '700', color: colors.amberDark },
+  openBadgeText: { fontSize: 11, fontFamily: fonts.headingBold, color: colors.amberDark },
   jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.65, lineHeight: 20, marginBottom: 12 },
   jobMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budget: { fontSize: 17, fontWeight: '800', color: colors.amberDark },
-  budgetType: { fontSize: 12, fontWeight: '600', color: colors.muted, textTransform: 'uppercase' },
+  budget: { fontSize: 17, fontFamily: fonts.heading, color: colors.amberDark },
+  budgetType: { fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.muted, textTransform: 'uppercase' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
   locationText: { fontSize: 13, color: colors.muted },
 
   customerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 20, marginTop: 12, borderRadius: 16, padding: 14 },
-  customerName: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  customerName: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink },
   customerLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
   chatBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.companyAccent, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
-  chatBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
+  chatBtnText: { fontSize: 12, fontFamily: fonts.headingBold, color: '#FFFFFF' },
 
   section: { marginHorizontal: 20, marginTop: 18 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, marginBottom: 10, fontFamily: fonts.heading },
+  sectionTitle: { fontSize: 16, fontFamily: fonts.heading, color: colors.ink, marginBottom: 10 },
 
   quoteCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16 },
   quoteRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  quoteLabel: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  quotePrice: { fontSize: 17, fontWeight: '800', color: colors.ink },
+  quoteLabel: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: colors.muted },
+  quotePrice: { fontSize: 17, fontFamily: fonts.heading, color: colors.ink },
   quoteValue: { fontSize: 13, color: colors.ink },
 
   statusPill: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, marginTop: 4 },
-  statusPillText: { fontSize: 12, fontWeight: '700' },
+  statusPillText: { fontSize: 12, fontFamily: fonts.headingBold },
 
   escrowCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16 },
   escrowHint: { fontSize: 12, color: colors.muted, marginTop: 8, lineHeight: 18 },
 
   emptyCard: { backgroundColor: colors.white, borderRadius: 16, padding: 20, alignItems: 'center' },
-  emptyTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, marginBottom: 4 },
+  emptyTitle: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 4 },
   emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 12 },
 
   browseBtn: { backgroundColor: colors.amber, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, alignSelf: 'center', marginTop: 6 },
-  browseBtnText: { fontSize: 14, fontWeight: '800', color: '#111827' },
+  browseBtnText: { fontSize: 14, fontFamily: fonts.heading, color: '#111827' },
 
   actions: { gap: 10 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amber, borderRadius: 14, paddingVertical: 15 },
   completeBtn: { backgroundColor: colors.success },
-  actionBtnText: { fontSize: 15, fontWeight: '800', color: '#111827' },
+  actionBtnText: { fontSize: 15, fontFamily: fonts.heading, color: '#111827' },
   btnDisabled: { opacity: 0.5 },
 })

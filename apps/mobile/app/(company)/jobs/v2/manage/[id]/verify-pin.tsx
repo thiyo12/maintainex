@@ -79,9 +79,9 @@ function makeStyles(colors: any) {
     container: { flex: 1, backgroundColor: colors.background },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
     backBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { fontSize: 18, fontFamily: fonts.semibold, color: colors.text },
+    headerTitle: { fontSize: 18, fontFamily: fonts.bodySemiBold, color: colors.text },
     content: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-    purpose: { fontSize: 20, fontFamily: fonts.bold, color: colors.text, marginTop: 16 },
-    subtitle: { fontSize: 14, fontFamily: fonts.regular, color: colors.muted, marginTop: 8, textAlign: 'center' },
+    purpose: { fontSize: 20, fontFamily: fonts.headingBold, color: colors.text, marginTop: 16 },
+    subtitle: { fontSize: 14, fontFamily: fonts.bodyLight, color: colors.muted, marginTop: 8, textAlign: 'center' },
   })
 }

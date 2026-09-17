@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, MagnifyingGlass, FileText } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
@@ -47,11 +47,11 @@ export default function CompanyMyQuotesScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color={colors.ink} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('company.myQuotes')}</Text>
         <TouchableOpacity onPress={() => router.push('/(company)/jobs/v2/browse')} hitSlop={8}>
-          <Ionicons name="search-outline" size={24} color={colors.companyAccent} />
+          <MagnifyingGlass size={24} color={colors.companyAccent} />
         </TouchableOpacity>
       </View>
 
@@ -59,7 +59,7 @@ export default function CompanyMyQuotesScreen() {
         <ActivityIndicator size="large" color={colors.companyAccent} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="document-text-outline" size={48} color={colors.muted} style={{ marginBottom: 12 }} />
+          <FileText size={48} color={colors.muted} style={{ marginBottom: 12 }} />
           <Text style={styles.emptyTitle}>{t('company.noQuotesYet')}</Text>
           <Text style={styles.emptyDesc}>{t('company.noQuotesYetDesc')}</Text>
           <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(company)/jobs/v2/browse')}>
@@ -104,19 +104,19 @@ export default function CompanyMyQuotesScreen() {
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, fontFamily: fonts.heading },
+  headerTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
+  emptyTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 6 },
   emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   browseBtn: { backgroundColor: colors.amber, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12 },
-  browseBtnText: { fontSize: 14, fontWeight: '800', color: '#111827' },
+  browseBtnText: { fontSize: 14, fontFamily: fonts.heading, color: '#111827' },
   jobCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  jobTitle: { fontSize: 16, fontWeight: '700', color: colors.ink, flex: 1, marginRight: 8, fontFamily: fonts.heading },
+  jobTitle: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink, flex: 1, marginRight: 8 },
   statusPill: { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  statusPillText: { fontSize: 11, fontWeight: '700' },
+  statusPillText: { fontSize: 11, fontFamily: fonts.headingBold },
   jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.6, lineHeight: 19, marginBottom: 12 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budget: { fontSize: 16, fontWeight: '800', color: colors.amberDark },
+  budget: { fontSize: 16, fontFamily: fonts.heading, color: colors.amberDark },
   meta: { fontSize: 12, color: colors.muted },
 })

@@ -170,7 +170,43 @@
 - `(tasker)/jobs/v2/manage/[id]/inspection.tsx` — V3.3 Inspection (Camera, Image, XCircle)
 - `(tasker)/jobs/v2/manage/[id]/change-order.tsx` — V3.3 Change Order (no Ionicons, minor cleanup)
 - `(tasker)/wallet/withdraw.tsx` — V3.3 Withdraw (Ionicons→Phosphor: Building, DeviceMobile, Globe, ArrowUpCircle)
-### B10: Company Operations — PENDING
+## B10: Company Operations — CODE COMPLETE
+
+### B10 Verification
+- ✅ B10-introduced TypeScript errors = 0
+- ✅ Ionicons in B10 scope = 0
+- ✅ lib/design imports in B10 scope = 0
+- ✅ Emoji icons in B10 scope = 0
+
+### B10 Files Rewritten (21)
+**Shell (2):**
+- `(company)/_layout.tsx` — V3.3 Company Root Stack (canvas #0D0D0D)
+- `(company)/(tabs)/_layout.tsx` — V3.3 Company Tab Bar (lib/design→useColors+fonts, 8 tabs)
+
+**Dashboard + Tabs (8):**
+- `(company)/(tabs)/index.tsx` — V3.3 Company Dashboard (Ionicons→Phosphor, emoji→Phosphor, useTheme→useColors)
+- `(company)/(tabs)/contracts-list.tsx` — V3.3 Contracts (fonts, V3 tokens)
+- `(company)/(tabs)/dispatch.tsx` — V3.3 Dispatch (Ionicons→Phosphor: Users, User)
+- `(company)/(tabs)/earnings-list.tsx` — V3.3 Earnings (Ionicons→Phosphor: Money)
+- `(company)/(tabs)/inbox.tsx` — V3.3 Inbox (fonts, V3 tokens)
+- `(company)/(tabs)/milestones-list.tsx` — V3.3 Milestones (fonts, V3 tokens)
+- `(company)/(tabs)/profile.tsx` — V3.3 Company Profile (15 Phosphor icons, animations, 30s polling)
+- `(company)/(tabs)/team.tsx` — V3.3 Team Overview (Ionicons→Phosphor: Star)
+
+**Jobs (5):**
+- `(company)/jobs/v2/browse.tsx` — V3.3 Browse Jobs (Ionicons→Phosphor: Funnel, MapPin, MagnifyingGlass)
+- `(company)/jobs/v2/manage/[id].tsx` — V3.3 Job Management (Ionicons→Phosphor: Play, CheckCircle, ChatCircleText)
+- `(company)/jobs/v2/manage/[id]/verify-pin.tsx` — Already Phosphor (font fix only)
+- `(company)/jobs/v2/my-quotes.tsx` — V3.3 My Quotes (Ionicons→Phosphor: MagnifyingGlass, FileText)
+- `(company)/jobs/v2/quote/[id].tsx` — V3.3 Submit Quote (Ionicons→Phosphor: CaretLeft)
+
+**Settings + Team + Workforce (6):**
+- `(company)/settings/edit-profile.tsx` — V3.3 Edit Profile (Ionicons→Phosphor: Camera)
+- `(company)/settings/subscription.tsx` — V3.3 Subscription (Ionicons→Phosphor: CheckCircle, Warning, Tag, Info)
+- `(company)/team/index.tsx` — V3.3 Team Management (Ionicons→Phosphor: UserPlus, Users, Star, Trash, Clock)
+- `(company)/team/invite.tsx` — V3.3 Invite Member (Ionicons→Phosphor: CaretLeft, PaperPlaneRight)
+- `(company)/workforce/assign.tsx` — V3.3 Assign Worker (Ionicons→Phosphor: CheckCircle)
+- `(company)/workforce/assignment/[id].tsx` — V3.3 Assignment Detail (Ionicons→Phosphor: Clock, CheckCircle, Play, Ribbon, XCircle, Prohibit)
 ### B11: Company Finance/Contracts/Profile — PENDING
 ### B12: Shared Runtime States — PENDING
 ### B13: Legacy UI Removal — PENDING

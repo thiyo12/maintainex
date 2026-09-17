@@ -2,7 +2,24 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
+import {
+  WarningCircle,
+  SquaresFour,
+  Briefcase,
+  ChatCircleText,
+  Star,
+  ShieldCheck,
+  CaretRight,
+  Bell,
+  UserCircle,
+  Buildings,
+  EnvelopeSimple,
+  Drop,
+  Lightning,
+  Snowflake,
+  Hammer,
+  Wrench,
+} from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { company, conversations, notifications, getAuthToken } from '../../../lib/api'
@@ -122,10 +139,10 @@ export default function CompanyProfile() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.error} style={{ marginBottom: 16 }} />
+          <WarningCircle size={48} color={colors.error} style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center', marginBottom: 20 }}>{error}</Text>
           <TouchableOpacity style={{ backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
-            <Text style={{ color: colors.ink, fontWeight: '700' }}>{t('common.retry')}</Text>
+            <Text style={{ color: colors.ink, fontFamily: fonts.headingBold }}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -151,9 +168,9 @@ export default function CompanyProfile() {
   }
 
   const activeJobs = [
-    { icon: 'water-outline', title: t('company.sampleJob1'), sub: t('company.sampleJobSub1'), status: 'open' as const },
-    { icon: 'snow-outline', title: t('company.sampleJob2'), sub: t('company.sampleJobSub2'), status: 'progress' as const },
-    { icon: 'flash-outline', title: t('company.sampleJob3'), sub: t('company.sampleJobSub3'), status: 'done' as const },
+    { Icon: Drop, title: t('company.sampleJob1'), sub: t('company.sampleJobSub1'), status: 'open' as const },
+    { Icon: Snowflake, title: t('company.sampleJob2'), sub: t('company.sampleJobSub2'), status: 'progress' as const },
+    { Icon: Lightning, title: t('company.sampleJob3'), sub: t('company.sampleJobSub3'), status: 'done' as const },
   ]
 
   const statusStyles: Record<string, { bg: string; text: string }> = {
@@ -173,15 +190,15 @@ export default function CompanyProfile() {
   ]
 
   const verifications = [
-    { icon: 'business-outline', title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: true },
-    { icon: 'mail-outline', title: t('company.verificationTitle2'), sub: t('company.verificationSub2'), done: true },
+    { Icon: Buildings, title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: true },
+    { Icon: EnvelopeSimple, title: t('company.verificationTitle2'), sub: t('company.verificationSub2'), done: true },
   ] as const
 
-  const jobIcons: Record<string, string> = {
-    [t('categories.plumbing')]: 'water-outline',
-    [t('categories.electrical')]: 'flash-outline',
-    [t('categories.acRepair')]: 'snow-outline',
-    [t('categories.generalRepairs')]: 'hammer-outline',
+  const jobIconComponents: Record<string, any> = {
+    [t('categories.plumbing')]: Drop,
+    [t('categories.electrical')]: Lightning,
+    [t('categories.acRepair')]: Snowflake,
+    [t('categories.generalRepairs')]: Hammer,
   }
 
   return (
@@ -211,23 +228,29 @@ export default function CompanyProfile() {
         <Animated.View style={[styles.card, sectionAnim2]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="apps-outline" size={14} color={colors.indigo} />
+              <SquaresFour size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
             <View style={styles.chipRow}>
-              {services.length > 0 ? services.map((s: string) => (
-                <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                  <Ionicons name={jobIcons[s] || 'construct-outline' as any} size={12} color={colors.amberDark} />
-                  <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
-                </Animated.View>
-              )) : (
+              {services.length > 0 ? services.map((s: string) => {
+                const IconComp = jobIconComponents[s] || Wrench
+                return (
+                  <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
+                    <IconComp size={12} color={colors.amberDark} />
+                    <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
+                  </Animated.View>
+                )
+              }) : (
                 <>
-                  {[t('categories.plumbing'), t('categories.electrical'), t('categories.acRepair'), t('categories.generalRepairs')].map((s) => (
-                    <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                      <Ionicons name={jobIcons[s] as any} size={12} color={colors.amberDark} />
-                      <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
-                    </Animated.View>
-                  ))}
+                  {[t('categories.plumbing'), t('categories.electrical'), t('categories.acRepair'), t('categories.generalRepairs')].map((s) => {
+                    const IconComp = jobIconComponents[s] || Wrench
+                    return (
+                      <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
+                        <IconComp size={12} color={colors.amberDark} />
+                        <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
+                      </Animated.View>
+                    )
+                  })}
                 </>
               )}
             </View>
@@ -237,7 +260,7 @@ export default function CompanyProfile() {
         <Animated.View style={[styles.card, sectionAnim3]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="briefcase-outline" size={14} color={colors.indigo} />
+              <Briefcase size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.activeJobs')}</Text>
             </View>
             {activeJobs.map((job, i) => {
@@ -245,7 +268,7 @@ export default function CompanyProfile() {
               return (
                 <View key={i} style={[styles.jobRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                   <View style={[styles.jobIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Ionicons name={job.icon as any} size={15} color={colors.amberDark} />
+                    <job.Icon size={15} color={colors.amberDark} />
                   </View>
                   <View style={styles.jobText}>
                     <Text style={[styles.jobTitle, { color: colors.ink }]}>{job.title}</Text>
@@ -263,7 +286,7 @@ export default function CompanyProfile() {
         <Animated.View style={[styles.card, sectionAnim4]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.indigo} />
+              <ChatCircleText size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
             {reviews.map((rev, i) => (
@@ -276,7 +299,7 @@ export default function CompanyProfile() {
                     <Text style={[styles.revName, { color: colors.ink }]}>{rev.name}</Text>
                     <View style={styles.revStars}>
                       {Array.from({ length: 5 }).map((_, si) => (
-                        <Ionicons key={si} name={si < rev.stars ? 'star' : 'star-outline'} size={11} color={colors.amber} />
+                        <Star key={si} size={11} color={colors.amber} weight={si < rev.stars ? 'fill' : 'regular'} />
                       ))}
                     </View>
                   </View>
@@ -290,13 +313,13 @@ export default function CompanyProfile() {
         <Animated.View style={[styles.card, sectionAnim5, { marginBottom: 24 }]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={colors.indigo} />
+              <ShieldCheck size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('verify.title')}</Text>
             </View>
             {verifications.map((v, i) => (
               <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
-                  <Ionicons name={v.icon as any} size={16} color={v.done ? '#059669' : colors.amberDark} />
+                  <v.Icon size={16} color={v.done ? '#059669' : colors.amberDark} />
                 </View>
                 <View style={styles.verifText}>
                   <Text style={[styles.verifTitle, { color: colors.ink }]}>{v.title}</Text>
@@ -317,7 +340,7 @@ export default function CompanyProfile() {
               onPress={() => router.push('/(chat)' as any)}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#2563EB" />
+                <ChatCircleText size={16} color="#2563EB" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.messages')}</Text>
               {unreadMsgs > 0 && (
@@ -325,14 +348,14 @@ export default function CompanyProfile() {
                   <Text style={styles.badgeText}>{unreadMsgs > 99 ? '99+' : unreadMsgs}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/notifications' as any)}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="notifications-outline" size={16} color="#D48900" />
+                <Bell size={16} color="#D48900" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.notifications')}</Text>
               {unreadNotifs > 0 && (
@@ -340,14 +363,14 @@ export default function CompanyProfile() {
                   <Text style={styles.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/settings/my-profile')}>
               <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
-                <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
+                <UserCircle size={16} color="#7C3AED" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.myProfile')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </Animated.View>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert,
 } from 'react-native'
-import { Ionicons } from '@expo/vector-icons'
+import { CheckCircle, Warning, Tag, Info } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Subscription } from '../../../lib/api-v2'
@@ -91,11 +91,11 @@ export default function SubscriptionScreen() {
 
       {/* Current Status */}
       <View style={styles.statusCard}>
-        <Ionicons
-          name={isSubscribed ? 'checkmark-circle' : 'alert-circle-outline'}
-          size={28}
-          color={isSubscribed ? colors.success : colors.muted}
-        />
+        {isSubscribed ? (
+          <CheckCircle size={28} color={colors.success} weight="fill" />
+        ) : (
+          <Warning size={28} color={colors.muted} />
+        )}
         <View style={styles.statusInfo}>
           <Text style={styles.statusTitle}>
             {status?.subscriptionStatus === 'TRIAL' ? t('subscription.trial') :
@@ -127,7 +127,7 @@ export default function SubscriptionScreen() {
       <Text style={styles.sectionTitle}>{t('subscription.availablePlans')}</Text>
       {plans.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="pricetag-outline" size={40} color={colors.muted} />
+          <Tag size={40} color={colors.muted} />
           <Text style={styles.emptyText}>{t('common.noResults')}</Text>
         </View>
       ) : (
@@ -142,7 +142,7 @@ export default function SubscriptionScreen() {
               <View style={styles.featuresList}>
                 {plan.features.map((f: string, i: number) => (
                   <View key={i} style={styles.featureRow}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                    <CheckCircle size={16} color={colors.success} weight="fill" />
                     <Text style={styles.featureText}>{f}</Text>
                   </View>
                 ))}
@@ -166,7 +166,7 @@ export default function SubscriptionScreen() {
       )}
 
       <View style={styles.infoBox}>
-        <Ionicons name="information-circle-outline" size={20} color={colors.amber} />
+        <Info size={20} color={colors.amber} />
         <Text style={styles.infoText}>
           {t('subscription.infoText', { commissionRate: status?.commissionRate ?? 15 })}
         </Text>

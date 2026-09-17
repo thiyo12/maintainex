@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
@@ -75,7 +75,7 @@ export default function CompanySubmitQuoteScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.ink} />
+            <CaretLeft size={24} color={colors.ink} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('quotes.yourQuote')}</Text>
           <View style={{ width: 40 }} />
@@ -166,35 +166,35 @@ const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   scroll: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  headerTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
 
   jobPreview: { backgroundColor: colors.amberBg, marginHorizontal: 20, marginTop: 8, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.amberLight },
   previewBadge: { alignSelf: 'flex-start', backgroundColor: colors.amber, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginBottom: 10 },
-  previewBadgeText: { fontSize: 11, fontWeight: '700', color: colors.ink },
-  previewTitle: { fontSize: 20, fontWeight: '700', color: colors.ink, marginBottom: 6 },
+  previewBadgeText: { fontSize: 11, fontFamily: fonts.headingBold, color: colors.ink },
+  previewTitle: { fontSize: 20, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 6 },
   previewDesc: { fontSize: 13, color: colors.ink, opacity: 0.7, lineHeight: 20, marginBottom: 12 },
   previewMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  previewBudget: { fontSize: 18, fontWeight: '800', color: colors.amberDark },
-  previewType: { fontSize: 12, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  previewBudget: { fontSize: 18, fontFamily: fonts.heading, color: colors.amberDark },
+  previewType: { fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   section: { padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', color: colors.ink, marginBottom: 6, marginTop: 16 },
+  sectionTitle: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 16 },
+  label: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: colors.ink, marginBottom: 6, marginTop: 16 },
 
   typeRow: { flexDirection: 'row', gap: 12 },
   typeBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
   typeBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  typeBtnText: { fontSize: 14, fontWeight: '600', color: colors.muted },
+  typeBtnText: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: colors.muted },
   typeBtnTextSelected: { color: colors.amberDark },
 
   priceInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  currencySign: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  priceInput: { flex: 1, fontSize: 24, fontWeight: '700', fontFamily: fonts.bodyMedium },
+  currencySign: { fontSize: 18, fontFamily: fonts.headingBold, color: colors.ink },
+  priceInput: { flex: 1, fontSize: 24, fontFamily: fonts.headingBold },
 
   input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 14, fontSize: 15, color: colors.ink, backgroundColor: colors.white, fontFamily: fonts.body },
   textArea: { height: 100, textAlignVertical: 'top' },
 
   submitBtn: { backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontSize: 18, fontWeight: '800', color: '#0D0D0D', fontFamily: fonts.bodyMedium },
+  submitBtnText: { fontSize: 18, fontFamily: fonts.heading, color: '#0D0D0D' },
 })
