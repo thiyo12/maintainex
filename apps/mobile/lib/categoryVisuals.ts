@@ -1,4 +1,4 @@
-import { Sparkle, Lightning, Drop, Snowflake, Palette, Laptop, Wrench, PaintBrush, Hammer, SquaresFour, Wall, House, Bug, Leaf, Lock, Truck, Car, Desktop, Gift, HandHeart, HouseSimple, Sun, Icon, FrameCorners, Shirt, Television } from 'phosphor-react-native'
+import { Sparkle, Lightning, Drop, Snowflake, Palette, Laptop, Wrench, PaintBrush, Hammer, SquaresFour, Wall, House, Bug, Leaf, Lock, Truck, Car, Desktop, Gift, HandHeart, HouseSimple, Sun, Icon, FrameCorners, TShirt, Television } from 'phosphor-react-native'
 
 export interface CategoryVisual {
   id: string
@@ -78,7 +78,7 @@ export const CATEGORY_SLUG_ICON: Record<string, Icon> = {
   'glass-and-aluminium': FrameCorners,
   'appliance-installation-and-repair': Television,
   'locksmith-services': Lock,
-  'curtains-blinds-and-upholstery': Shirt,
+  'curtains-blinds-and-upholstery': TShirt,
 }
 
 export const CATEGORY_SLUG_GRADIENT: Record<string, [string, string]> = {
