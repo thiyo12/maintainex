@@ -20,12 +20,7 @@ def replace_exact(rel: str, old: str, new: str) -> None:
 
 
 def top_level_chunks(lines: list[str]) -> list[tuple[str, int, int]]:
-    """Return (key, start, end-exclusive) for root object properties.
-
-    Locale files use two spaces for root properties. A chunk ends where the next
-    two-space property begins, so nested object closings cannot confuse us.
-    """
-    prop_re = re.compile(r'^  ([A-Za-z0-9_]+):')
+    prop_re = re.compile(r"^  ['\"]?([A-Za-z0-9_]+)['\"]?:")
     starts: list[tuple[str, int]] = []
     for i, line in enumerate(lines):
         m = prop_re.match(line)
@@ -39,8 +34,7 @@ def top_level_chunks(lines: list[str]) -> list[tuple[str, int, int]]:
 
 
 def first_level_properties(object_chunk: list[str]) -> list[tuple[str, list[str]]]:
-    """Extract direct properties from a `  key: { ... }` root object chunk."""
-    prop_re = re.compile(r'^    ([A-Za-z0-9_]+):')
+    prop_re = re.compile(r"^    ['\"]?([A-Za-z0-9_]+)['\"]?:")
     starts: list[tuple[str, int]] = []
     for i, line in enumerate(object_chunk[1:], start=1):
         m = prop_re.match(line)
@@ -50,8 +44,6 @@ def first_level_properties(object_chunk: list[str]) -> list[tuple[str, list[str]
     for idx, (key, start) in enumerate(starts):
         end = starts[idx + 1][1] if idx + 1 < len(starts) else len(object_chunk)
         chunk = object_chunk[start:end]
-        # The final property may include the root object's closing line. Remove it;
-        # we append one canonical root closing below.
         while chunk and chunk[-1] in ('  },\n', '}\n'):
             chunk = chunk[:-1]
         props.append((key, chunk))
@@ -62,9 +54,9 @@ def merge_duplicate_root_object(rel: str, target_key: str) -> None:
     lines = read(rel).splitlines(keepends=True)
     chunks = top_level_chunks(lines)
     matches = [(start, end) for key, start, end in chunks if key == target_key]
+    print(rel, 'root', target_key, 'occurrences', [(s + 1, e) for s, e in matches])
+    print(rel, 'all profile-ish lines', [(i + 1, line.rstrip()) for i, line in enumerate(lines) if re.search(r"profile", line, re.I) and '{' in line])
     if len(matches) <= 1:
-        # Still dedupe direct keys in the one object if a merge previously left
-        # duplicate first-level properties.
         if not matches:
             return
         start, end = matches[0]
@@ -97,19 +89,14 @@ def merge_duplicate_root_object(rel: str, target_key: str) -> None:
         rebuilt.extend(merged[key])
     rebuilt.append('  },\n')
 
-    # Remove duplicate chunks from last to first, then replace the original first
-    # location with the merged canonical block.
     first_start, first_end = matches[0]
     new_lines = lines[:]
     for start, end in reversed(matches[1:]):
         del new_lines[start:end]
-    # Recompute the first chunk boundary after deletes; its start is unchanged and
-    # its old end is still valid because all removed chunks were later in the file.
     new_lines[first_start:first_end] = rebuilt
     write(rel, ''.join(new_lines))
 
 
-# Current final TypeScript blockers.
 rel = 'apps/mobile/app/(customer)/tracking/[id].tsx'
 text = read(rel)
 if "    animCoord.timing({\n      latitude: providerCoord.latitude,\n      longitude: providerCoord.longitude,\n      duration: 1500,\n      useNativeDriver: false,\n    }).start()" in text:
@@ -119,8 +106,6 @@ if "    animCoord.timing({\n      latitude: providerCoord.latitude,\n      longi
         "    animCoord.timing({\n      latitude: providerCoord.latitude,\n      longitude: providerCoord.longitude,\n      duration: 1500,\n      useNativeDriver: false,\n    } as any).start()",
     )
 
-# Locale files accumulated duplicate root `profile` objects and duplicate direct
-# keys during prior merges. Canonicalize them deterministically.
 for rel in [
     'apps/mobile/lib/i18n/locales/en.ts',
     'apps/mobile/lib/i18n/locales/ta.ts',
@@ -128,8 +113,6 @@ for rel in [
 ]:
     merge_duplicate_root_object(rel, 'profile')
 
-# Assert the root locale objects now contain unique keys. This prevents us from
-# silently reintroducing TS1117 while fixing only the currently reported line.
 for rel in [
     'apps/mobile/lib/i18n/locales/en.ts',
     'apps/mobile/lib/i18n/locales/ta.ts',
@@ -138,7 +121,8 @@ for rel in [
     lines = read(rel).splitlines(keepends=True)
     keys = [key for key, _, _ in top_level_chunks(lines)]
     dupes = sorted({key for key in keys if keys.count(key) > 1})
+    print(rel, 'root dupes', dupes)
     if dupes:
         raise RuntimeError(f'Duplicate root locale keys remain in {rel}: {dupes}')
 
-print('Phase 11 stage-3 TypeScript fixes applied and locale root keys verified.')
+print('Phase 11 locale diagnostics and deterministic fixes complete.')
