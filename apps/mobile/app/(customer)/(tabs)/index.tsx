@@ -8,7 +8,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 
 import { useAuth } from '../../../lib/auth'
 import { v2Jobs, v2Quotes, v2Match } from '../../../lib/api-v2'
-import { taskers, notifications } from '../../../lib/api'
+import { taskers, notifications, realEstate } from '../../../lib/api'
 import { translateJobStatus } from '../../../lib/i18n'
 import { on, removedJobs, subscribe, getVersion } from '../../../lib/events'
 import { CATEGORY_FALLBACK, categoryVisualBySlug } from '../../../lib/categoryVisuals'
@@ -22,6 +22,7 @@ import V3ServiceCard from '../../../components/v3/V3ServiceCard'
 import V3ProviderCard from '../../../components/v3/V3ProviderCard'
 import V3SectionHeader from '../../../components/v3/V3SectionHeader'
 import V3TierBadge from '../../../components/v3/V3TierBadge'
+import V3PropertyPreviewCard from '../../../components/v3/V3PropertyPreviewCard'
 import AvatarCircle from '../../../components/ui/AvatarCircle'
 import Skeleton from '../../../components/ui/Skeleton'
 
@@ -41,6 +42,7 @@ export default function CustomerHome() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [homeCategories, setHomeCategories] = useState<any[]>([])
+  const [properties, setProperties] = useState<any[]>([])
 
   const userId = user?.id
 
@@ -75,11 +77,20 @@ export default function CustomerHome() {
     } catch {}
   }, [])
 
+  const loadProperties = useCallback(async () => {
+    try {
+      const data = await realEstate.list({ status: 'ACTIVE' })
+      const list = Array.isArray(data) ? data : []
+      setProperties(list.slice(0, 4))
+    } catch {}
+  }, [])
+
   const loadJobs = useCallback(async (refresh = false) => {
     try {
       if (refresh) setRefreshing(true)
       else setLoading(true)
       loadHomeCategories()
+      loadProperties()
       const res = await v2Jobs.list()
       const jobs = res.jobs || []
       setMyJobs(jobs)
@@ -117,7 +128,7 @@ export default function CustomerHome() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [userId, newJobId, loadHomeCategories])
+  }, [userId, newJobId, loadHomeCategories, loadProperties])
 
   useEffect(() => {
     const unsub = on('jobsChanged', () => setRefreshKey(k => k + 1))
@@ -280,6 +291,31 @@ export default function CustomerHome() {
           </>
         )}
 
+        {/* ═══ Property Preview ═══ */}
+        {properties.length > 0 && (
+          <>
+            <V3SectionHeader
+              title={t('home.realEstate')}
+              subtitle="Browse properties near you"
+              actionText="View all"
+              onAction={() => router.push('/real-estate' as any)}
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.propertiesScroll}>
+              {properties.map((p: any) => (
+                <V3PropertyPreviewCard
+                  key={p.id}
+                  title={p.title || p.name || 'Property'}
+                  price={p.price ? `LKR ${Number(p.price).toLocaleString()}` : p.rentPrice ? `LKR ${Number(p.rentPrice).toLocaleString()}/mo` : 'Price on request'}
+                  location={p.location || p.district || p.city || ''}
+                  imageUrl={p.images?.[0] || p.imageUrl}
+                  type={p.type || p.listingType}
+                  onPress={() => router.push(`/real-estate/${p.id}` as any)}
+                />
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         <View style={{ height: 120 }} />
       </ScrollView>
 
@@ -292,7 +328,6 @@ export default function CustomerHome() {
           else router.push(`/(customer)/(tabs)/${tab}` as any)
         }}
         onPostJob={() => router.push('/(customer)/jobs/v2/create' as any)}
-        unreadCount={unreadCount}
       />
     </SafeAreaView>
   )
@@ -390,6 +425,11 @@ const styles = StyleSheet.create({
   providersScroll: {
     paddingHorizontal: 18,
     gap: 12,
+  },
+
+  propertiesScroll: {
+    paddingHorizontal: 18,
+    gap: 10,
   },
 
   recentRow: {

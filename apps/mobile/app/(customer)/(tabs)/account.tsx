@@ -23,7 +23,7 @@ import LanguageSelector from '../../../components/ui/LanguageSelector'
 
 function MenuRow({ icon: Icon, label, onPress, color: accent, badge }: any) {
   return (
-    <View style={styles.menuRow}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.menuRow}>
       <View style={[styles.menuIconWrap, { backgroundColor: v3.colors.surfaceGray }]}>
         <Icon size={20} color={accent || v3.colors.ink} weight="fill" />
       </View>
@@ -34,7 +34,7 @@ function MenuRow({ icon: Icon, label, onPress, color: accent, badge }: any) {
         </View>
       ) : null}
       <CaretRight size={14} color={v3.colors.textMuted} weight="bold" />
-    </View>
+    </TouchableOpacity>
   )
 }
 
@@ -120,12 +120,12 @@ export default function AccountScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* ═══ Profile Header ═══ */}
         <View style={styles.profileHeader}>
-          <View style={styles.avatarWrap}>
+          <TouchableOpacity onPress={pickProfilePhoto} activeOpacity={0.7} style={styles.avatarWrap}>
             <AvatarCircle uri={(user as any)?.profileImage || (user as any)?.avatar} name={user?.name} size={76} />
             <View style={styles.avatarBadge}>
               {uploadingPhoto ? <ActivityIndicator size="small" color={v3.colors.ink} /> : <Camera size={14} color={v3.colors.ink} weight="fill" />}
             </View>
-          </View>
+          </TouchableOpacity>
           <Text style={styles.name}>{user?.name || 'User'}</Text>
           <Text style={styles.sub}>{user?.email || ''}</Text>
           {user?.phone ? <Text style={styles.sub}>{user.phone}</Text> : null}
@@ -184,7 +184,7 @@ export default function AccountScreen() {
 
         {/* ═══ Earn with MX ═══ */}
         {user?.role === 'CUSTOMER' ? (
-          <View style={styles.earnCard}>
+          <TouchableOpacity onPress={() => router.push('/wallet/index' as any)} activeOpacity={0.7} style={styles.earnCard}>
             <View style={styles.earnIconBox}>
               <Wallet size={22} color={v3.colors.paper} weight="fill" />
             </View>
@@ -193,7 +193,7 @@ export default function AccountScreen() {
               <Text style={styles.earnSub}>{t('account.earnWithMXSub')}</Text>
             </View>
             <CaretRight size={16} color={v3.colors.paper} weight="bold" />
-          </View>
+          </TouchableOpacity>
         ) : null}
 
         {/* ═══ Danger Zone ═══ */}

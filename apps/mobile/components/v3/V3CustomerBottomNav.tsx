@@ -14,7 +14,6 @@ interface Props {
   activeTab: string
   onTabPress: (tab: string) => void
   onPostJob: () => void
-  unreadCount?: number
 }
 
 const tabs: TabItem[] = [
@@ -24,7 +23,7 @@ const tabs: TabItem[] = [
   { key: 'account', icon: User, label: 'Account' },
 ]
 
-export default function V3CustomerBottomNav({ activeTab, onTabPress, onPostJob, unreadCount = 0 }: Props) {
+export default function V3CustomerBottomNav({ activeTab, onTabPress, onPostJob }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
@@ -49,13 +48,9 @@ export default function V3CustomerBottomNav({ activeTab, onTabPress, onPostJob, 
       {tabs.slice(2).map((tab) => {
         const focused = activeTab === tab.key
         const Icon = tab.icon
-        const showBadge = tab.key === 'activity' && unreadCount > 0
         return (
           <TouchableOpacity key={tab.key} style={styles.tab} onPress={() => onTabPress(tab.key)} activeOpacity={0.7}>
-            <View>
-              <Icon size={22} color={focused ? v3.colors.ink : v3.colors.textMuted} weight={focused ? 'fill' : 'regular'} />
-              {showBadge ? <View style={styles.badge} /> : null}
-            </View>
+            <Icon size={22} color={focused ? v3.colors.ink : v3.colors.textMuted} weight={focused ? 'fill' : 'regular'} />
             <Text style={[styles.label, focused && styles.labelActive]}>{tab.label}</Text>
           </TouchableOpacity>
         )
@@ -106,13 +101,5 @@ const styles = StyleSheet.create({
       default: { elevation: 6 },
     }),
   },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: v3.colors.error,
-  },
+
 })
