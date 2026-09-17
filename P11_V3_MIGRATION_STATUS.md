@@ -114,7 +114,20 @@
 - `(auth)/role-switch.tsx` — Already V3 (AuthShell, V3RoleCard, v3.tokens)
 - `(auth)/role-select.tsx` — Already V3 (AuthShell, V3RoleCard, v3.tokens)
 
-### B7: Property — PENDING
+## B7: Property — CODE COMPLETE
+
+### B7 Verification
+- ✅ B7-introduced TypeScript errors = 0
+- ✅ Ionicons in B7 scope = 0
+- ✅ lib/design imports in B7 scope = 0
+
+### B7 Files Rewritten (5)
+- `real-estate/index.tsx` — V3.3 Property Browse (CaretLeft, Heart, MagnifyingGlass, House, MapPin)
+- `real-estate/favorites.tsx` — V3.3 Saved Properties (CaretLeft, Heart)
+- `real-estate/[id].tsx` — V3.3 Property Detail (CaretLeft, Heart, Eye, Bed, Bathtub, Phone, ChatCircle)
+- `real-estate/upload.tsx` — V3.3 Create Listing (CaretLeft, Sparkle, Camera)
+- `real-estate/my-listings.tsx` — V3.3 My Listings (CaretLeft, Plus, House)
+
 ### B8: Tasker Shell + Setup + Profile — PENDING
 ### B9: Tasker Work + Earnings — PENDING
 ### B10: Company Operations — PENDING

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Heart, List, MagnifyingGlass, House, MapPin, PlusCircle } from 'phosphor-react-native'
 import { useTheme } from '../../lib/ThemeContext'
 import { useCountry } from '../../lib/country'
 import { realEstate } from '../../lib/api'
@@ -68,14 +68,14 @@ export default function RealEstateList() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back-outline" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} weight="regular" />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.ink }]}>Properties</Text>
         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/real-estate/favorites')}>
-          <Ionicons name="heart-outline" size={18} color={colors.ink} />
+          <Heart size={18} color={colors.ink} weight="regular" />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/real-estate/my-listings')}>
-          <Ionicons name="list-outline" size={18} color={colors.ink} />
+          <List size={18} color={colors.ink} weight="regular" />
         </TouchableOpacity>
       </View>
 
@@ -90,7 +90,7 @@ export default function RealEstateList() {
 
       {/* Search */}
       <View style={[styles.searchBar, { backgroundColor: colors.white, borderColor: colors.border }]}>
-        <Ionicons name="search-outline" size={16} color={colors.muted} />
+        <MagnifyingGlass size={16} color={colors.muted} weight="regular" />
         <TextInput style={[styles.searchInput, { color: colors.ink }]} placeholder="Search properties..." placeholderTextColor={colors.muted} value={search} onChangeText={setSearch} />
       </View>
 
@@ -141,7 +141,7 @@ export default function RealEstateList() {
                   {properties.filter((p: any) => p.isFeatured || p.boostTier).slice(0, 1).map((item: any) => (
                     <TouchableOpacity key={item.id} style={[styles.featuredCard, { backgroundColor: colors.surface }]} onPress={() => router.push(`/real-estate/${item.id}`)}>
                       <View style={[styles.featuredImage, { backgroundColor: colors.muted + '20' }]}>
-                        <Ionicons name="home" size={40} color={colors.muted} />
+                        <House size={40} color={colors.muted} weight="regular" />
                         <View style={[styles.featuredBgBadge, { backgroundColor: badge(item.purpose || 'sale').color }]}>
                           <Text style={styles.featuredBgBadgeText}>{badge(item.purpose || 'sale').label}</Text>
                         </View>
@@ -152,7 +152,7 @@ export default function RealEstateList() {
                         </Text>
                         <Text style={[styles.featuredName, { color: colors.ink }]} numberOfLines={1}>{item.title}</Text>
                         <View style={styles.featuredLocRow}>
-                          <Ionicons name="location-outline" size={12} color={colors.muted} />
+                          <MapPin size={12} color={colors.muted} weight="regular" />
                           <Text style={[styles.featuredLoc, { color: colors.muted }]} numberOfLines={1}>{item.city || item.district || ''}</Text>
                         </View>
                         <View style={styles.featuredSpecs}>
@@ -189,13 +189,13 @@ export default function RealEstateList() {
           )}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Ionicons name="home-outline" size={48} color={colors.muted} />
+              <House size={48} color={colors.muted} weight="regular" />
               <Text style={[styles.emptyText, { color: colors.muted }]}>No properties found</Text>
             </View>
           }
           ListFooterComponent={
             <TouchableOpacity style={[styles.listPropertyBtn, { backgroundColor: colors.amber }]} onPress={() => router.push('/real-estate/upload')}>
-              <Ionicons name="add-circle-outline" size={20} color="#111" />
+              <PlusCircle size={20} color="#111" weight="regular" />
               <Text style={styles.listPropertyBtnText}>List Your Property</Text>
             </TouchableOpacity>
           }

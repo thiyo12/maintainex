@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Heart, WarningCircle, House, Image, MapPin, Eye, Bed, Bathtub, ArrowsOutSimple, Car, CheckCircle, XCircle, Calendar, Phone, ChatCircle, CaretRight } from 'phosphor-react-native'
 import { useTheme } from '../../lib/ThemeContext'
 import { realEstate, conversations } from '../../lib/api'
 import { fonts } from '../../lib/fonts'
@@ -89,7 +89,7 @@ export default function PropertyDetail() {
   if (!property) {
     return (
       <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', gap: spacing.sm }]}>
-        <Ionicons name="alert-circle-outline" size={48} color={colors.muted} />
+        <WarningCircle size={48} color={colors.muted} weight="regular" />
         <Text style={[styles.sectionLabel, { color: colors.muted }]}>Property not found</Text>
         <TouchableOpacity onPress={() => router.back()} style={[styles.ctaBtn, { backgroundColor: colors.amber }]}>
           <Text style={styles.ctaText}>Go Back</Text>
@@ -109,11 +109,11 @@ export default function PropertyDetail() {
         <View style={[styles.imageHero, { backgroundColor: colors.surface }]}>
           {property.photos?.length > 0 ? (
             <View style={styles.imagePlaceholder}>
-              <Ionicons name="image-outline" size={48} color={colors.muted} />
+              <Image size={48} color={colors.muted} weight="regular" />
               <Text style={[styles.imageCount, { color: colors.muted }]}>{property.photos.length} photos</Text>
             </View>
           ) : (
-            <Ionicons name="home-outline" size={64} color={colors.muted} />
+            <House size={64} color={colors.muted} weight="regular" />
           )}
 
           {/* Badges */}
@@ -134,11 +134,11 @@ export default function PropertyDetail() {
           )}
 
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back-outline" size={22} color="#FFF" />
+            <CaretLeft size={22} color="#FFF" weight="regular" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.favBtn} onPress={handleFavorite}>
-            <Ionicons name={favorited ? 'heart' : 'heart-outline'} size={20} color={favorited ? '#EF4444' : '#FFF'} />
+            <Heart size={20} color={favorited ? '#EF4444' : '#FFF'} weight={favorited ? 'fill' : 'regular'} />
           </TouchableOpacity>
         </View>
 
@@ -154,7 +154,7 @@ export default function PropertyDetail() {
 
           {location ? (
             <View style={styles.locRow}>
-              <Ionicons name="location-outline" size={14} color={colors.muted} />
+              <MapPin size={14} color={colors.muted} weight="regular" />
               <Text style={[styles.locText, { color: colors.muted }]}>{location}</Text>
             </View>
           ) : null}
@@ -162,11 +162,11 @@ export default function PropertyDetail() {
           {/* View count */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Ionicons name="eye-outline" size={14} color={colors.muted} />
+              <Eye size={14} color={colors.muted} weight="regular" />
               <Text style={[styles.statText, { color: colors.muted }]}>{property.views || 0} views</Text>
             </View>
             <View style={styles.statItem}>
-              <Ionicons name="heart-outline" size={14} color={colors.muted} />
+              <Heart size={14} color={colors.muted} weight="regular" />
               <Text style={[styles.statText, { color: colors.muted }]}>{property.saves || 0} saves</Text>
             </View>
           </View>
@@ -175,42 +175,46 @@ export default function PropertyDetail() {
           <View style={[styles.specsGrid, { backgroundColor: colors.surface }]}>
             {property.bedrooms != null && (
               <View style={styles.specItem}>
-                <Ionicons name="bed-outline" size={18} color={colors.amber} />
+                <Bed size={18} color={colors.amber} weight="regular" />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.bedrooms}</Text>
                 <Text style={[styles.specLabel, { color: colors.muted }]}>Beds</Text>
               </View>
             )}
             {property.bathrooms != null && (
               <View style={styles.specItem}>
-                <Ionicons name="water-outline" size={18} color={colors.amber} />
+                <Bathtub size={18} color={colors.amber} weight="regular" />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.bathrooms}</Text>
                 <Text style={[styles.specLabel, { color: colors.muted }]}>Baths</Text>
               </View>
             )}
             {(property.areaSqft || property.propertySize) && (
               <View style={styles.specItem}>
-                <Ionicons name="resize-outline" size={18} color={colors.amber} />
+                <ArrowsOutSimple size={18} color={colors.amber} weight="regular" />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.areaSqft || property.propertySize}</Text>
                 <Text style={[styles.specLabel, { color: colors.muted }]}>Sqft</Text>
               </View>
             )}
             {property.parking != null && (
               <View style={styles.specItem}>
-                <Ionicons name="car-outline" size={18} color={colors.amber} />
+                <Car size={18} color={colors.amber} weight="regular" />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.parking}</Text>
                 <Text style={[styles.specLabel, { color: colors.muted }]}>Parking</Text>
               </View>
             )}
             {property.isFurnished !== undefined && (
               <View style={styles.specItem}>
-                <Ionicons name={property.isFurnished ? 'checkmark-circle-outline' : 'close-circle-outline'} size={18} color={property.isFurnished ? '#10B981' : colors.muted} />
+                {property.isFurnished ? (
+                  <CheckCircle size={18} color="#10B981" weight="regular" />
+                ) : (
+                  <XCircle size={18} color={colors.muted} weight="regular" />
+                )}
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.isFurnished ? 'Yes' : 'No'}</Text>
                 <Text style={[styles.specLabel, { color: colors.muted }]}>Furnished</Text>
               </View>
             )}
             {property.yearBuilt && (
               <View style={styles.specItem}>
-                <Ionicons name="calendar-outline" size={18} color={colors.amber} />
+                <Calendar size={18} color={colors.amber} weight="regular" />
                 <Text style={[styles.specValue, { color: colors.ink }]}>{property.yearBuilt}</Text>
                 <Text style={[styles.specLabel, { color: colors.muted }]}>Year</Text>
               </View>
@@ -232,7 +236,7 @@ export default function PropertyDetail() {
               <View style={styles.featureList}>
                 {property.amenities.map((f: string, i: number) => (
                   <View key={i} style={styles.featureRow}>
-                    <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                    <CheckCircle size={14} color="#10B981" weight="fill" />
                     <Text style={[styles.featureText, { color: colors.muted }]}>{f}</Text>
                   </View>
                 ))}
@@ -255,29 +259,29 @@ export default function PropertyDetail() {
               </View>
               {property.contactPhone && (
                 <TouchableOpacity style={[styles.sellerCallBtn, { backgroundColor: '#10B98120' }]} onPress={handleCall}>
-                  <Ionicons name="call" size={16} color="#10B981" />
+                  <Phone size={16} color="#10B981" weight="regular" />
                 </TouchableOpacity>
               )}
             </View>
 
             <TouchableOpacity style={[styles.contactAction, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleChat} disabled={contacting}>
-              {contacting ? <ActivityIndicator size="small" color={colors.amber} /> : <Ionicons name="chatbubble-outline" size={18} color={colors.amber} />}
+              {contacting ? <ActivityIndicator size="small" color={colors.amber} /> : <ChatCircle size={18} color={colors.amber} weight="regular" />}
               <Text style={[styles.contactActionText, { color: colors.ink }]}>Chat with Owner</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} weight="regular" />
             </TouchableOpacity>
 
             {property.contactPhone && (
               <TouchableOpacity style={[styles.contactAction, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleCall}>
-                <Ionicons name="call-outline" size={18} color="#10B981" />
+                <Phone size={18} color="#10B981" weight="regular" />
                 <Text style={[styles.contactActionText, { color: colors.ink }]}>Call {property.contactName || 'Owner'}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+                <CaretRight size={16} color={colors.muted} weight="regular" />
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={[styles.contactAction, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleRequestViewing}>
-              <Ionicons name="calendar-outline" size={18} color="#6366F1" />
+              <Calendar size={18} color="#6366F1" weight="regular" />
               <Text style={[styles.contactActionText, { color: colors.ink }]}>Request Viewing</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} weight="regular" />
             </TouchableOpacity>
           </View>
         </View>

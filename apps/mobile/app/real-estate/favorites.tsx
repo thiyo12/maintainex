@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Heart } from 'phosphor-react-native'
 import { useTheme } from '../../lib/ThemeContext'
 import { realEstate } from '../../lib/api'
 import PropertyCard from '../../components/shared/PropertyCard'
@@ -44,7 +44,7 @@ export default function FavoritesScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back-outline" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} weight="regular" />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.ink }]}>Saved Properties</Text>
       </View>
@@ -55,7 +55,7 @@ export default function FavoritesScreen() {
         </View>
       ) : favorites.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="heart-outline" size={48} color={colors.muted} />
+          <Heart size={48} color={colors.muted} weight="regular" />
           <Text style={[styles.emptyText, { color: colors.muted }]}>No saved properties yet</Text>
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={[styles.linkText, { color: colors.amber }]}>Browse Properties</Text>

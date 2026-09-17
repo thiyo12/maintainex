@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Switch, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Sparkle, Camera } from 'phosphor-react-native'
 import { useTheme } from '../../lib/ThemeContext'
 import { useCountry } from '../../lib/country'
 import { realEstate } from '../../lib/api'
@@ -109,7 +109,7 @@ export default function UploadProperty() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back-outline" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} weight="regular" />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.ink }]}>List Property</Text>
       </View>
@@ -182,7 +182,7 @@ export default function UploadProperty() {
 
         {/* AI Estimate */}
         <TouchableOpacity style={[styles.estimateBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleEstimate} disabled={estimating}>
-          {estimating ? <ActivityIndicator size="small" color={colors.amber} /> : <Ionicons name="sparkles" size={16} color={colors.amber} />}
+          {estimating ? <ActivityIndicator size="small" color={colors.amber} /> : <Sparkle size={16} color={colors.amber} weight="fill" />}
           <Text style={[styles.estimateBtnText, { color: colors.amber }]}>Check Market Price</Text>
         </TouchableOpacity>
 
@@ -202,7 +202,7 @@ export default function UploadProperty() {
         {/* Photos */}
         <Text style={[styles.sectionTitle, { color: colors.ink }]}>Photos (Up to 10)</Text>
         <TouchableOpacity style={[styles.photoUpload, { backgroundColor: colors.surface, borderColor: colors.border, borderStyle: 'dashed' }]}>
-          <Ionicons name="camera-outline" size={32} color={colors.muted} />
+          <Camera size={32} color={colors.muted} weight="regular" />
           <Text style={[styles.photoUploadText, { color: colors.muted }]}>Add property photos</Text>
           <Text style={[styles.photoUploadSub, { color: colors.muted }]}>Upload from gallery</Text>
         </TouchableOpacity>

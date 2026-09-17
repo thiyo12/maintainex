@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Plus, House } from 'phosphor-react-native'
 import { useTheme } from '../../lib/ThemeContext'
 import { realEstate } from '../../lib/api'
 import { fonts } from '../../lib/fonts'
@@ -90,11 +90,11 @@ export default function myListings() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back-outline" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} weight="regular" />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.ink }]}>My Listings</Text>
         <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.amber }]} onPress={() => router.push('/real-estate/upload')}>
-          <Ionicons name="add" size={20} color="#111" />
+          <Plus size={20} color="#111" weight="bold" />
         </TouchableOpacity>
       </View>
 
@@ -113,7 +113,7 @@ export default function myListings() {
         </View>
       ) : listings.length === 0 ? (
         <View style={styles.center}>
-          <Ionicons name="home-outline" size={48} color={colors.muted} />
+          <House size={48} color={colors.muted} weight="regular" />
           <Text style={[styles.emptyText, { color: colors.muted }]}>No listings found</Text>
           <TouchableOpacity style={[styles.createBtn, { backgroundColor: colors.amber }]} onPress={() => router.push('/real-estate/upload')}>
             <Text style={styles.createBtnText}>Create Listing</Text>
