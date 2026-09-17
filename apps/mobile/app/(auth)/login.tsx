@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, Image,
+  ScrollView, Alert, Image,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../lib/auth'
@@ -51,15 +51,13 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Black header band */}
       <View style={styles.header}>
         <View style={styles.markWrap}>
-          <Image source={require('../../assets/logo.png')} style={styles.mark} resizeMode="contain" />
+          <Image source={require('../../assets/logo.png')} style={{ width: 60, height: 60 }} resizeMode="contain" />
         </View>
         <Text style={styles.brand}>MΛINTΛINEX</Text>
       </View>
 
-      {/* White card */}
       <View style={styles.card}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -92,7 +90,6 @@ export default function LoginScreen() {
 
           <Text style={styles.orText}>or</Text>
 
-          {/* Social login — visually disabled */}
           <TouchableOpacity
             style={styles.socialBtn}
             disabled
@@ -129,7 +126,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
   markWrap: { marginBottom: 16 },
-  mark: { width: 60, height: 60 },
   brand: {
     fontSize: 17,
     fontFamily: 'Outfit_900Black',
@@ -174,7 +170,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     height: v3.components.input.height,
     borderRadius: v3.components.input.borderRadius,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: v3.colors.canvas,
     borderWidth: 1,
     borderColor: v3.colors.line,
     overflow: 'hidden',
@@ -209,7 +205,7 @@ const styles = StyleSheet.create({
   socialBtnText: {
     fontSize: 12,
     fontFamily: 'Outfit_700Bold',
-    fontWeight: '750',
+    fontWeight: '700',
     color: v3.colors.textPrimary,
   },
   comingSoonBadge: {
@@ -236,13 +232,13 @@ const styles = StyleSheet.create({
   footerLabel: {
     fontSize: 11,
     fontFamily: 'Outfit_500Medium',
-    fontWeight: '650',
+    fontWeight: '600',
     color: v3.colors.textSecondary,
   },
   footerLink: {
     fontSize: 12,
     fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
+    fontWeight: '800',
     color: v3.colors.textPrimary,
   },
   legal: {
