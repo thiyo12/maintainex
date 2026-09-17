@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Clock, CheckCircle, Play, Ribbon, XCircle, Prohibit } from 'phosphor-react-native'
+import { Clock, CheckCircle, Play, Trophy, XCircle, Prohibit } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useColors } from '../../../../lib/ThemeContext'
@@ -31,7 +31,7 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string }>
   ASSIGNED: { color: '#D97706', bg: '#FEF3C7', icon: 'clock' },
   ACCEPTED: { color: '#2563EB', bg: '#DBEAFE', icon: 'checkcircle' },
   IN_PROGRESS: { color: '#059669', bg: '#D1FAE5', icon: 'play' },
-  COMPLETED: { color: '#4F46E5', bg: '#E0E7FF', icon: 'ribbon' },
+  COMPLETED: { color: '#4F46E5', bg: '#E0E7FF', icon: 'trophy' },
   REJECTED: { color: '#DC2626', bg: '#FEE2E2', icon: 'xcircle' },
   REVOKED: { color: '#6B7280', bg: '#F3F4F6', icon: 'prohibit' },
 }
@@ -41,7 +41,7 @@ const StatusIcon = ({ icon, color, size }: { icon: string; color: string; size: 
     case 'clock': return <Clock size={size} color={color} />
     case 'checkcircle': return <CheckCircle size={size} color={color} />
     case 'play': return <Play size={size} color={color} />
-    case 'ribbon': return <Ribbon size={size} color={color} />
+    case 'trophy': return <Trophy size={size} color={color} />
     case 'xcircle': return <XCircle size={size} color={color} />
     case 'prohibit': return <Prohibit size={size} color={color} />
     default: return <Clock size={size} color={color} />
@@ -153,9 +153,7 @@ export default function AssignmentDetailScreen() {
               <Text style={styles.timelineValue}>{new Date(assignment.revokedAt).toLocaleString()}</Text>
             </View>
           )}
-          {assignment.revokedReason && (
-            <Text style={styles.reasonText}>Reason: {assignment.revokedReason}</Text>
-          )}
+          {assignment.revokedReason && <Text style={styles.reasonText}>Reason: {assignment.revokedReason}</Text>}
         </View>
 
         <View style={styles.actions}>
@@ -211,39 +209,20 @@ const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
   content: { padding: 24 },
   statusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 14, borderRadius: 12, marginBottom: 20,
   },
   statusText: { fontSize: 15, fontFamily: fonts.bodyMedium },
-  card: {
-    backgroundColor: colors.white,
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
+  card: { backgroundColor: colors.white, padding: 16, borderRadius: 14, marginBottom: 12 },
   cardLabel: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.muted, textTransform: 'uppercase', marginBottom: 4 },
   cardValue: { fontSize: 16, fontFamily: fonts.headingBold, color: colors.ink },
   cardMeta: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
-  timelineItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
+  timelineItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border },
   timelineLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.muted },
   timelineValue: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
   reasonText: { fontSize: 13, color: '#DC2626', marginTop: 8, fontFamily: fonts.body, fontStyle: 'italic' },
   actions: { marginTop: 8, gap: 10 },
-  actionBtn: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
+  actionBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   acceptBtn: { backgroundColor: colors.amber },
   rejectBtn: { backgroundColor: '#FEE2E2' },
   revokeBtn: { backgroundColor: '#F3F4F6' },
