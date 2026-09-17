@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontFamily: 'Outfit_800ExtraBold',
-    fontWeight: '850',
+    fontWeight: '800',
     color: v3.colors.textPrimary,
     textAlign: 'center',
   },
