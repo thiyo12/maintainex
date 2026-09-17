@@ -18,7 +18,7 @@ const KEY = 'app-theme-mode'
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const sys = useColorScheme()
-  const [mode, setModeState] = useState<ThemeMode>('dark')
+  const [mode, setModeState] = useState<ThemeMode>('light')
 
   useEffect(() => {
     AsyncStorage.getItem(KEY).then(v => {

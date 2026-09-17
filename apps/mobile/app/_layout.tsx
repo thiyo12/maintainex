@@ -110,13 +110,13 @@ export default function RootLayout() {
   Text.defaultProps.style = { fontFamily: 'Outfit_400Regular' }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0D0D0D' }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#F7F7F7' }}>
     <ErrorBoundary>
     <ThemeProvider>
       <AuthProvider>
         <CountryProvider>
         <I18nextProvider i18n={i18next}>
-          <StatusBar style="light" />
+          <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="(auth)" />
