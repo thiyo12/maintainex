@@ -3,14 +3,17 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Activi
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
-import { Ionicons } from '@expo/vector-icons'
+import { Lightning, ShieldCheck, X } from 'phosphor-react-native'
 import { v2Jobs, v2Quotes, v2Identity } from '../../../../../lib/api-v2'
-import { colors, spacing, radius, typography } from '../../../../../lib/design'
+import { useColors } from '../../../../../lib/ThemeContext'
+import { fonts } from '../../../../../lib/fonts'
 
 export default function V2SubmitQuoteScreen() {
   const { t } = useTranslation()
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const [job, setJob] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [identity, setIdentity] = useState<string | null>(null)
@@ -100,7 +103,7 @@ export default function V2SubmitQuoteScreen() {
         {job.smartBooking ? (
           <View style={styles.smartCard}>
             <View style={styles.smartHeader}>
-              <Ionicons name="flash-outline" size={18} color={colors.accent} />
+              <Lightning size={18} color={colors.accent} />
               <Text style={styles.smartHeaderText}>Smart booking details</Text>
             </View>
             {job.smartBooking.categoryName ? (
@@ -150,7 +153,7 @@ export default function V2SubmitQuoteScreen() {
             ) : (
               <>
                 <View style={styles.gateIconWrap}>
-                  <Ionicons name="shield-checkmark-outline" size={26} color={colors.accent} />
+                  <ShieldCheck size={26} color={colors.accent} />
                 </View>
                 <View style={styles.gateBadge}><Text style={styles.gateBadgeText}>{t('verify.gateBadge')}</Text></View>
                 <Text style={styles.gateTitle}>
@@ -249,20 +252,20 @@ export default function V2SubmitQuoteScreen() {
   )
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
 
   jobPreview: {
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    borderRadius: radius.lg,
-    padding: spacing.md,
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  previewBadge: { alignSelf: 'flex-start', backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.sm, marginBottom: 10 },
+  previewBadge: { alignSelf: 'flex-start', backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, marginBottom: 10 },
   previewBadgeText: { fontSize: 11, fontWeight: '700', color: colors.background },
   previewTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
   previewDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, marginBottom: 12 },
@@ -271,11 +274,11 @@ const styles = StyleSheet.create({
   previewType: { fontSize: 12, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   smartCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    borderRadius: radius.lg,
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: 12,
     backgroundColor: colors.surface,
-    padding: spacing.md,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -286,9 +289,9 @@ const styles = StyleSheet.create({
   smartValue: { fontSize: 13, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right', marginLeft: 12 },
 
   gateCard: {
-    margin: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
+    margin: 20,
+    padding: 20,
+    borderRadius: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -298,17 +301,17 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.accentSoft || colors.accentBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   gateBadge: {
     alignSelf: 'center',
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.accentSoft || colors.accentBg,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: radius.full,
+    borderRadius: 9999,
     marginBottom: 10,
   },
   gateBadgeText: { fontSize: 11, fontWeight: '700', color: colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -318,12 +321,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     paddingVertical: 14,
     paddingHorizontal: 28,
-    borderRadius: radius.md,
+    borderRadius: 8,
     alignItems: 'center',
   },
   gateBtnText: { fontSize: 15, fontWeight: '800', color: colors.background },
 
-  section: { padding: spacing.lg },
+  section: { padding: 20 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '600', color: colors.textSecondary, marginBottom: 6, marginTop: 16 },
 
@@ -331,13 +334,13 @@ const styles = StyleSheet.create({
   typeBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: radius.md,
+    borderRadius: 8,
     backgroundColor: colors.surfaceHigh,
     borderWidth: 1.5,
     borderColor: colors.border,
     alignItems: 'center',
   },
-  typeBtnSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  typeBtnSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft || colors.accentBg },
   typeBtnText: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
   typeBtnTextSelected: { color: colors.accent },
 
@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: 8,
     padding: 14,
     fontSize: 15,
     color: colors.textPrimary,
@@ -356,7 +359,7 @@ const styles = StyleSheet.create({
   },
   textArea: { height: 100, textAlignVertical: 'top' },
 
-  submitBtn: { backgroundColor: colors.accent, paddingVertical: 16, borderRadius: radius.md, alignItems: 'center', marginTop: 24 },
+  submitBtn: { backgroundColor: colors.accent, paddingVertical: 16, borderRadius: 8, alignItems: 'center', marginTop: 24 },
   btnDisabled: { opacity: 0.5 },
   submitBtnText: { fontSize: 18, fontWeight: '800', color: colors.background },
 })

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Warning, WarningCircle, EnvelopeSimple, Sun, Calendar, Checks } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../../lib/i18n'
 import { useColors } from '../../../../lib/ThemeContext'
@@ -105,13 +105,13 @@ export default function V2ProviderMyJobsScreen() {
       {/* Limit Banners */}
       {hasActiveJob && (
         <View style={styles.limitBanner}>
-          <Ionicons name="warning-outline" size={16} color="#fff" />
+          <Warning size={16} color="#fff" />
           <Text style={styles.limitBannerText}>{t('tasker.activeJobInProgress')}</Text>
         </View>
       )}
       {dailyLimitReached && !hasActiveJob && (
         <View style={[styles.limitBanner, { backgroundColor: colors.error }]}>
-          <Ionicons name="alert-circle-outline" size={16} color="#fff" />
+          <WarningCircle size={16} color="#fff" />
           <Text style={styles.limitBannerText}>{t('tasker.noMoreJobsToday')}</Text>
         </View>
       )}
@@ -120,7 +120,7 @@ export default function V2ProviderMyJobsScreen() {
         <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="mail-unread-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
+          <EnvelopeSimple size={48} color={colors.muted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>{t('jobs.noJobs')}</Text>
           <Text style={styles.emptySub}>{t('jobs.checkLater')}</Text>
           <TouchableOpacity onPress={() => router.push('/(tasker)/jobs/v2/browse')} style={styles.emptyBtn}>
@@ -137,7 +137,7 @@ export default function V2ProviderMyJobsScreen() {
           {todayJobs.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                <Ionicons name="sunny-outline" size={14} color={colors.amber} /> {t('tasker.todaysJobs')}
+                <Sun size={14} color={colors.amber} /> {t('tasker.todaysJobs')}
               </Text>
               {todayJobs.map((job) => renderJob(job))}
             </View>
@@ -147,7 +147,7 @@ export default function V2ProviderMyJobsScreen() {
           {scheduledJobs.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                <Ionicons name="calendar-outline" size={14} color={colors.ink} /> {t('tasker.scheduled')}
+                <Calendar size={14} color={colors.ink} /> {t('tasker.scheduled')}
               </Text>
               {scheduledJobs.map((job) => renderJob(job))}
             </View>
@@ -157,7 +157,7 @@ export default function V2ProviderMyJobsScreen() {
           {completedJobs.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                <Ionicons name="checkmark-done-outline" size={14} color={colors.success} /> {t('jobs.status.completed')} ({completedJobs.length})
+                <Checks size={14} color={colors.success} /> {t('jobs.status.completed')} ({completedJobs.length})
               </Text>
               {completedJobs.map((job) => renderJob(job))}
             </View>
@@ -178,7 +178,7 @@ export default function V2ProviderMyJobsScreen() {
           <View style={styles.cardTop}>
             {job.preferredDate && (
               <View style={styles.datePill}>
-                <Ionicons name="calendar-outline" size={11} color={colors.amberDark} />
+                <Calendar size={11} color={colors.amberDark} />
                 <Text style={styles.datePillText}>{job.preferredDate}{job.timeSlot ? ` ${job.timeSlot}` : ''}</Text>
               </View>
             )}

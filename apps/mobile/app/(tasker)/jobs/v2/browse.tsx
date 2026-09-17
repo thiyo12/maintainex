@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { MapPin, ClockAfternoon, Wallet } from 'phosphor-react-native'
+import { MapPin, ClockAfternoon, Wallet, Funnel, MagnifyingGlass } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
@@ -89,7 +88,7 @@ export default function V2BrowseJobsScreen() {
           <Text style={styles.headerSub}>{t('location.showing')} {filterCity || t('location.all')}</Text>
         </View>
         <TouchableOpacity style={styles.filterBtn} onPress={() => setFilterArea(null)} activeOpacity={0.7}>
-          <Ionicons name={filterArea ? 'funnel' : 'funnel-outline'} size={20} color={colors.amber} />
+          <Funnel size={20} color={colors.amber} weight={filterArea ? 'fill' : 'bold'} />
         </TouchableOpacity>
       </View>
 
@@ -97,7 +96,7 @@ export default function V2BrowseJobsScreen() {
         <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="search-outline" size={48} color={colors.muted} style={{ marginBottom: 16 }} />
+          <MagnifyingGlass size={48} color={colors.muted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>{t('jobs.noJobs')}</Text>
           <Text style={styles.emptySub}>{t('jobs.checkLater')}</Text>
         </View>

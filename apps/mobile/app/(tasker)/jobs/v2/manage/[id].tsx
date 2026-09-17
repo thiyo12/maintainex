@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Calendar, MapPin, ChatCircleDots, Check, Navigation, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
@@ -213,8 +213,8 @@ export default function V2ProviderManageJobScreen() {
         {/* Scheduled Date */}
         {job.preferredDate && (
           <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-            <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
-              <Ionicons name="calendar-outline" size={16} color={colors.amberDark} />
+            <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight || colors.amberBg }]}>
+              <Calendar size={16} color={colors.amberDark} />
               <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
                 {job.timeSlot
                   ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.timeSlot })
@@ -240,7 +240,7 @@ export default function V2ProviderManageJobScreen() {
             </View>
             {job.locationName && (
               <View style={styles.locationRow}>
-                <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginRight: 4 }} />
+                <MapPin size={14} color={colors.muted} style={{ marginRight: 4 }} />
                 <Text style={styles.detailLocation}>{job.locationName}</Text>
               </View>
             )}
@@ -249,7 +249,7 @@ export default function V2ProviderManageJobScreen() {
                 style={[styles.msgBtn, { backgroundColor: colors.amber }]}
                 onPress={() => setMsgRecipient({ id: job.customer!.id!, name: job.customer?.name || 'Customer' })}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.ink} />
+                <ChatCircleDots size={16} color={colors.ink} />
                 <Text style={styles.msgBtnText}>Message customer</Text>
               </TouchableOpacity>
             )}
@@ -267,7 +267,7 @@ export default function V2ProviderManageJobScreen() {
               </Text>
               {job.addressLandmark ? (
                 <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={14} color={colors.muted} style={{ marginRight: 4 }} />
+                  <MapPin size={14} color={colors.muted} style={{ marginRight: 4 }} />
                   <Text style={styles.addressLandmark}>{job.addressLandmark}</Text>
                 </View>
               ) : null}
@@ -301,7 +301,7 @@ export default function V2ProviderManageJobScreen() {
                   return (
                     <View key={step} style={styles.progressStep}>
                       <View style={[styles.progressDot, isDone && styles.progressDotDone]}>
-                        {isDone ? <Ionicons name="checkmark" size={16} color={colors.ink} /> : <Text style={styles.progressNum}>{i + 1}</Text>}
+                        {isDone ? <Check size={16} color={colors.ink} /> : <Text style={styles.progressNum}>{i + 1}</Text>}
                       </View>
                       <Text style={[styles.progressLabel, isDone && styles.progressLabelDone]}>
                         {step === 'COMPLETION_REQUESTED' ? t('tasker.reviews') : step === 'COMPLETED' ? t('common.done') : step.replace('_', ' ')}
@@ -318,13 +318,13 @@ export default function V2ProviderManageJobScreen() {
                   style={styles.navBtn}
                   onPress={startLocationSharing}
                 >
-                  <Ionicons name="navigate-outline" size={20} color={colors.ink} />
+                  <Navigation size={20} color={colors.ink} />
                   <Text style={styles.navBtnText}>{t('tracking.startNavigation')}</Text>
                 </TouchableOpacity>
               )}
               {locationSharing && (
                 <View style={styles.sharingActive}>
-                  <Ionicons name="radio-outline" size={18} color={colors.success} />
+                  <Radio size={18} color={colors.success} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.sharingActiveText}>{t('tracking.sharingLocation')}</Text>
                     <Text style={styles.sharingHint}>{t('tracking.keepOpenShare')}</Text>
@@ -339,13 +339,13 @@ export default function V2ProviderManageJobScreen() {
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
                 >
-                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
+                  <ShieldCheck size={20} color={colors.ink} />
                   <Text style={styles.verifyPinText}>{t('jobDetail.confirmArrivalDesc')}</Text>
                 </TouchableOpacity>
               )}
               {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
                 <View style={styles.waitingCard}>
-                  <Ionicons name="hourglass-outline" size={20} color={colors.amberDark} />
+                  <Hourglass size={20} color={colors.amberDark} />
                   <Text style={styles.waitingText}>{t('jobDetail.waitingForQuotes')}</Text>
                 </View>
               )}
@@ -356,7 +356,7 @@ export default function V2ProviderManageJobScreen() {
         {/* Mark Complete */}
         {workspace?.progressStatus === 'IN_PROGRESS' && (
           <View style={[styles.section, styles.highlightSection]}>
-            <Ionicons name="flag-outline" size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
+            <Flag size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
             <Text style={styles.highlightTitle}>{t('common.finish')}</Text>
             <Text style={styles.highlightDesc}>{t('jobDetail.confirmStart')}</Text>
             {ActionBtn({ label: t('common.done'), loadingKey: 'complete', onPress: handleMarkComplete })}
@@ -382,7 +382,7 @@ export default function V2ProviderManageJobScreen() {
         {job.status === 'COMPLETED' && reviews?.providerReviews?.length > 0 && (
           <View style={styles.section}>
             <View style={styles.reviewedCard}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <CheckCircle size={20} color={colors.success} />
               <Text style={styles.reviewedText}>{t('receipt.reviewSubmitted')}</Text>
             </View>
           </View>
@@ -391,7 +391,7 @@ export default function V2ProviderManageJobScreen() {
         {/* Start Next Job */}
         {job.status === 'COMPLETED' && nextJob && (
           <View style={[styles.section, styles.highlightSection]}>
-            <Ionicons name="arrow-forward-circle-outline" size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
+            <ArrowCircleRight size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
             <Text style={styles.highlightTitle}>{t('tasker.startNextJob')}</Text>
             <Text style={styles.highlightDesc}>{nextJob.title}</Text>
             {nextJob.preferredDate && (
@@ -426,21 +426,21 @@ export default function V2ProviderManageJobScreen() {
                 style={styles.shortcutBtn}
                 onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/inspection` as any)}
               >
-                <Ionicons name="search-outline" size={20} color={colors.amberDark} />
+                <MagnifyingGlass size={20} color={colors.amberDark} />
                 <Text style={styles.shortcutText}>{t('inspection.title')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.shortcutBtn}
                 onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/evidence` as any)}
               >
-                <Ionicons name="camera-outline" size={20} color={colors.amberDark} />
+                <Camera size={20} color={colors.amberDark} />
                 <Text style={styles.shortcutText}>{t('evidence.title')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.shortcutBtn}
                 onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/change-order` as any)}
               >
-                <Ionicons name="document-text-outline" size={20} color={colors.amberDark} />
+                <FileText size={20} color={colors.amberDark} />
                 <Text style={styles.shortcutText}>{t('changeOrder.title')}</Text>
               </TouchableOpacity>
             </View>
@@ -520,7 +520,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 1 },
   scheduleText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1 },
 
-  highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight, alignItems: 'center' },
+  highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight || colors.amberBg, alignItems: 'center' },
   highlightTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
   highlightDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
   startNextBtn: { backgroundColor: colors.amber, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
@@ -530,7 +530,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   actionBtnText: { fontSize: 15, fontWeight: '700' },
 
-  reviewSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight },
+  reviewSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight || colors.amberBg },
   reviewTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 12, textAlign: 'center' },
   reviewLabel: { fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 12, marginBottom: 4 },
   input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 14, color: colors.ink, backgroundColor: colors.white },

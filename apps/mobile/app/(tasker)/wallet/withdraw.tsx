@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Building, DeviceMobile, Globe, ArrowUpCircle } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Wallet } from '../../../lib/api-v2'
@@ -10,10 +10,10 @@ import { Currency } from '../../../lib/money'
 import { useCountry } from '../../../lib/country'
 
 const METHODS = [
-  { id: 'bank_transfer', label: 'Bank Transfer', sub: '2-3 business days', icon: 'business-outline' },
-  { id: 'ez_cash', label: 'eZ Cash', sub: 'Instant', icon: 'phone-portrait-outline' },
-  { id: 'dialog_genie', label: 'Dialog Genie', sub: 'Instant', icon: 'phone-portrait-outline' },
-  { id: 'paypal', label: 'PayPal', sub: '1-2 business days', icon: 'globe-outline' },
+  { id: 'bank_transfer', label: 'Bank Transfer', sub: '2-3 business days', Icon: Building },
+  { id: 'ez_cash', label: 'eZ Cash', sub: 'Instant', Icon: DeviceMobile },
+  { id: 'dialog_genie', label: 'Dialog Genie', sub: 'Instant', Icon: DeviceMobile },
+  { id: 'paypal', label: 'PayPal', sub: '1-2 business days', Icon: Globe },
 ]
 
 export default function WithdrawScreen() {
@@ -81,7 +81,7 @@ export default function WithdrawScreen() {
               activeOpacity={0.8}
             >
               <View style={styles.methodIcon}>
-                <Ionicons name={m.icon as any} size={20} color={colors.amberDark} />
+                <m.Icon size={20} color={colors.amberDark} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.methodLbl}>{m.label}</Text>
@@ -98,7 +98,7 @@ export default function WithdrawScreen() {
             disabled={loading || !amount || numAmt < 500 || numAmt > available}
             activeOpacity={0.8}
           >
-            <Ionicons name="arrow-up-circle-outline" size={18} color="#111827" />
+            <ArrowUpCircle size={18} color="#111827" />
             <Text style={styles.btnTxt}>
               {loading ? 'Processing...' : `Withdraw ${formatCurrency(BigInt(Math.round(numAmt * 100)), currency)}`}
             </Text>

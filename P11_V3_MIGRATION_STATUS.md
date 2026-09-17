@@ -152,7 +152,24 @@
 - `(tasker)/settings/edit-profile.tsx` — V3.3 Edit Profile (Ionicons→Phosphor: Shield)
 - `(tasker)/(tabs)/profile.tsx` — V3.3 Tasker Profile (Ionicons→Phosphor: 16 icons, unread badges, 30s polling)
 - `(tasker)/(tabs)/earnings.tsx` — V3.3 Earnings (Ionicons→Phosphor: CreditCard)
-### B9: Tasker Work + Earnings — PENDING
+## B9: Tasker Work + Earnings — CODE COMPLETE
+
+### B9 Verification
+- ✅ B9-introduced TypeScript errors = 0
+- ✅ Ionicons in B9 scope = 0
+- ✅ lib/design imports in B9 scope = 0
+
+### B9 Files Rewritten (10)
+- `(tasker)/(tabs)/my-jobs.tsx` — V3.3 My Jobs (lib/design→useColors+fonts, MapView, 12 Phosphor icons)
+- `(tasker)/jobs/v2/browse.tsx` — V3.3 Browse Jobs (Ionicons→Phosphor: Funnel, MagnifyingGlass)
+- `(tasker)/jobs/v2/my-jobs.tsx` — V3.3 Provider My Jobs (Ionicons→Phosphor: Warning, Sun, Calendar, Checks)
+- `(tasker)/jobs/v2/quote/[id].tsx` — V3.3 Submit Quote (lib/design→useColors+fonts, Lightning, ShieldCheck)
+- `(tasker)/jobs/v2/manage/[id].tsx` — V3.3 Job Management (13 Phosphor icons, full lifecycle)
+- `(tasker)/jobs/v2/manage/[id]/verify-pin.tsx` — Already V3 (Phosphor, no changes)
+- `(tasker)/jobs/v2/manage/[id]/evidence.tsx` — V3.3 Evidence Upload (Camera, Image, XCircle, Images)
+- `(tasker)/jobs/v2/manage/[id]/inspection.tsx` — V3.3 Inspection (Camera, Image, XCircle)
+- `(tasker)/jobs/v2/manage/[id]/change-order.tsx` — V3.3 Change Order (no Ionicons, minor cleanup)
+- `(tasker)/wallet/withdraw.tsx` — V3.3 Withdraw (Ionicons→Phosphor: Building, DeviceMobile, Globe, ArrowUpCircle)
 ### B10: Company Operations — PENDING
 ### B11: Company Finance/Contracts/Profile — PENDING
 ### B12: Shared Runtime States — PENDING

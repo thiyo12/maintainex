@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, Alert, Modal } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Warning, WarningCircle, EnvelopeSimple, Sun, Calendar, Checks, X, Map, Wrench, ChatCircleDots, Navigation } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps'
 import { translateJobStatus } from '../../../lib/i18n'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { v2Jobs, v2Quotes, v2JobActions } from '../../../lib/api-v2'
 import JobLifecycleTracker from '../../../components/ui/JobLifecycleTracker'
 import NewChatModal from '../../../components/chat/NewChatModal'
@@ -16,6 +17,8 @@ const getToday = () => new Date().toISOString().split('T')[0]
 export default function TaskerMyJobs() {
   const { t } = useTranslation()
   const router = useRouter()
+  const colors = useColors()
+  const styles = makeStyles(colors)
   const statusColors: Record<string, string> = {
     OPEN: colors.accent,
     QUOTE_ACCEPTED: '#8B5CF6',
@@ -121,13 +124,13 @@ export default function TaskerMyJobs() {
 
       {hasActiveJob && (
         <View style={styles.limitBanner}>
-          <Ionicons name="warning-outline" size={16} color="#fff" />
+          <Warning size={16} color="#fff" />
           <Text style={styles.limitBannerText}>{t('tasker.activeJobInProgress')}</Text>
         </View>
       )}
       {dailyLimitReached && !hasActiveJob && (
         <View style={[styles.limitBanner, { backgroundColor: colors.error }]}>
-          <Ionicons name="alert-circle-outline" size={16} color="#fff" />
+          <WarningCircle size={16} color="#fff" />
           <Text style={styles.limitBannerText}>{t('tasker.noMoreJobsToday')}</Text>
         </View>
       )}
@@ -136,7 +139,7 @@ export default function TaskerMyJobs() {
         <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 60 }} />
       ) : jobs.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="mail-unread-outline" size={48} color={colors.textMuted} style={{ marginBottom: 16 }} />
+          <EnvelopeSimple size={48} color={colors.textMuted} style={{ marginBottom: 16 }} />
           <Text style={styles.emptyTitle}>{t('jobs.noJobs')}</Text>
           <Text style={styles.emptySub}>{t('jobs.checkLater')}</Text>
           <TouchableOpacity onPress={() => router.push('/(tasker)/jobs/v2/browse')} style={styles.emptyBtn}>
@@ -152,7 +155,7 @@ export default function TaskerMyJobs() {
           {todayJobs.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                <Ionicons name="sunny-outline" size={14} color={colors.accent} /> {t('tasker.todaysJobs')}
+                <Sun size={14} color={colors.accent} /> {t('tasker.todaysJobs')}
               </Text>
               {todayJobs.map((job) => renderJob(job))}
             </View>
@@ -161,7 +164,7 @@ export default function TaskerMyJobs() {
           {scheduledJobs.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                <Ionicons name="calendar-outline" size={14} color={colors.accent} /> {t('tasker.scheduled')}
+                <Calendar size={14} color={colors.accent} /> {t('tasker.scheduled')}
               </Text>
               {scheduledJobs.map((job) => renderJob(job))}
             </View>
@@ -170,7 +173,7 @@ export default function TaskerMyJobs() {
           {completedJobs.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                <Ionicons name="checkmark-done-outline" size={14} color={colors.success} /> {t('jobs.status.completed')} ({completedJobs.length})
+                <Checks size={14} color={colors.success} /> {t('jobs.status.completed')} ({completedJobs.length})
               </Text>
               {completedJobs.map((job) => renderJob(job))}
             </View>
@@ -193,7 +196,7 @@ export default function TaskerMyJobs() {
             <View style={styles.modalHead}>
               <Text style={styles.modalTitle}>{t('tracking.jobLocation')}</Text>
               <TouchableOpacity onPress={() => setTrackJob(null)} hitSlop={10}>
-                <Ionicons name="close" size={22} color={colors.textPrimary} />
+                <X size={22} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
             {trackJob && hasCoords(trackJob) ? (
@@ -215,7 +218,7 @@ export default function TaskerMyJobs() {
               </MapView>
             ) : (
               <View style={styles.mapEmpty}>
-                <Ionicons name="map-outline" size={40} color={colors.textMuted} />
+                <Map size={40} color={colors.textMuted} />
                 <Text style={styles.mapEmptyText}>{t('tasker.noJobLocation')}</Text>
               </View>
             )}
@@ -238,7 +241,7 @@ export default function TaskerMyJobs() {
           <View style={styles.cardTop}>
             {job.preferredDate && (
               <View style={styles.datePill}>
-                <Ionicons name="calendar-outline" size={11} color={colors.accent} />
+                <Calendar size={11} color={colors.accent} />
                 <Text style={styles.datePillText}>{job.preferredDate}{job.timeSlot ? ` ${job.timeSlot}` : ''}</Text>
               </View>
             )}
@@ -265,7 +268,7 @@ export default function TaskerMyJobs() {
             </View>
             <View style={styles.actionsRow}>
               <TouchableOpacity style={styles.actionBtn} onPress={() => router.push(`/(tasker)/jobs/v2/manage/${job.id}`)}>
-                <Ionicons name="construct-outline" size={15} color={colors.accent} />
+                <Wrench size={15} color={colors.accent} />
                 <Text style={styles.actionText}>{t('tasker.manage')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -275,11 +278,11 @@ export default function TaskerMyJobs() {
                   setMsgRecipient({ id: job.customerId, name: job.customer?.name || t('jobDetail.provider') })
                 }}
               >
-                <Ionicons name="chatbubble-ellipses-outline" size={15} color={colors.accent} />
+                <ChatCircleDots size={15} color={colors.accent} />
                 <Text style={styles.actionText}>{t('tasker.messageCustomer')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionBtn} onPress={() => openTrack(job)}>
-                <Ionicons name="navigate-outline" size={15} color={colors.accent} />
+                <Navigation size={15} color={colors.accent} />
                 <Text style={styles.actionText}>{t('ui.track')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -301,55 +304,59 @@ export default function TaskerMyJobs() {
   }
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  headerTitle: { ...typography.h2, fontSize: 22 },
-  headerSub: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  browseBtn: { backgroundColor: colors.accent, paddingHorizontal: 18, paddingVertical: 10, borderRadius: radius.md },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
+  headerSub: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  browseBtn: { backgroundColor: colors.accent, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 8 },
   browseBtnText: { fontSize: 14, fontWeight: '700', color: colors.background },
 
-  limitBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EF4444', marginHorizontal: spacing.md, padding: 12, borderRadius: radius.md, marginBottom: 8 },
+  limitBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#EF4444', marginHorizontal: 16, padding: 12, borderRadius: 8, marginBottom: 8 },
   limitBannerText: { fontSize: 13, fontWeight: '600', color: '#fff', flex: 1 },
 
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  emptyTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: 8 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: colors.textPrimary, marginBottom: 8 },
   emptySub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
-  emptyBtn: { backgroundColor: colors.accent, paddingHorizontal: 28, paddingVertical: 14, borderRadius: radius.md },
+  emptyBtn: { backgroundColor: colors.accent, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 8 },
   emptyBtnText: { fontSize: 16, fontWeight: '700', color: colors.background },
 
-  list: { flex: 1, padding: spacing.md, paddingTop: 4 },
+  list: { flex: 1, padding: 16, paddingTop: 4 },
   section: { marginBottom: 20 },
-  sectionTitle: { ...typography.label, color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: 10 },
 
   jobCardWrap: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  jobCard: { padding: spacing.md },
+  jobCard: { padding: 16 },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' },
-  datePill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.sm },
+  datePill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accentSoft || colors.accentBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   datePillText: { fontSize: 10, fontWeight: '600', color: colors.accent },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
   statusText: { fontSize: 11, fontWeight: '700', color: '#fff' },
   jobTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 6 },
   jobDesc: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, marginBottom: 12 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   jobBudget: { fontSize: 15, fontWeight: '700', color: colors.accent },
-  myQuotePill: { backgroundColor: colors.successSoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
+  myQuotePill: { backgroundColor: colors.successSoft || '#D1FAE5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999 },
   myQuoteText: { fontSize: 12, fontWeight: '600', color: colors.success },
 
-  footerPad: { paddingHorizontal: spacing.md },
+  footerPad: { paddingHorizontal: 16 },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     flexWrap: 'wrap',
   },
   actionBtn: {
@@ -359,7 +366,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceHigh,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
@@ -367,18 +374,18 @@ const styles = StyleSheet.create({
   cancelBtn: { marginLeft: 'auto', padding: 8 },
   cancelText: { fontSize: 12, fontWeight: '600', color: colors.error, textDecorationLine: 'underline' },
 
-  modalWrap: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
+  modalWrap: { flex: 1, backgroundColor: colors.overlay || 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    paddingBottom: 32,
   },
-  modalHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  modalTitle: { ...typography.h3, color: colors.textPrimary },
-  map: { height: 260, borderRadius: radius.md, overflow: 'hidden' },
-  mapEmpty: { height: 220, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceHigh, gap: 8 },
+  modalHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
+  map: { height: 260, borderRadius: 8, overflow: 'hidden' },
+  mapEmpty: { height: 220, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceHigh, gap: 8 },
   mapEmptyText: { color: colors.textSecondary, fontSize: 13 },
-  modalSub: { color: colors.textSecondary, fontSize: 13, marginTop: spacing.md },
+  modalSub: { color: colors.textSecondary, fontSize: 13, marginTop: 16 },
 })

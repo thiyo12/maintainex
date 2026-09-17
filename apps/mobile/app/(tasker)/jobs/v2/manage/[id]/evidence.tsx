@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Camera, Image as ImageIcon, XCircle, Images } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../../lib/fonts'
@@ -85,11 +85,11 @@ export default function EvidenceScreen() {
         {/* Photo actions */}
         <View style={styles.photoRow}>
           <TouchableOpacity style={styles.addPhotoBtn} onPress={() => addPhoto(true)} activeOpacity={0.7}>
-            <Ionicons name="camera-outline" size={24} color={colors.amberDark} />
+            <Camera size={24} color={colors.amberDark} />
             <Text style={styles.addPhotoText}>{t('evidence.takePhoto')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addPhotoBtn} onPress={() => addPhoto(false)} activeOpacity={0.7}>
-            <Ionicons name="image-outline" size={24} color={colors.amberDark} />
+            <ImageIcon size={24} color={colors.amberDark} />
             <Text style={styles.addPhotoText}>{t('evidence.chooseFromLibrary')}</Text>
           </TouchableOpacity>
         </View>
@@ -111,7 +111,7 @@ export default function EvidenceScreen() {
                 <View key={i} style={styles.photoWrap}>
                   <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
                   <TouchableOpacity style={styles.removePhotoBtn} onPress={() => removePhoto(i)}>
-                    <Ionicons name="close-circle" size={20} color="#EF4444" />
+                    <XCircle size={20} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -121,7 +121,7 @@ export default function EvidenceScreen() {
 
         {photos.length === 0 && !uploading && (
           <View style={styles.emptyPhotos}>
-            <Ionicons name="images-outline" size={40} color={colors.muted} />
+            <Images size={40} color={colors.muted} />
             <Text style={styles.emptyPhotosText}>{t('evidence.photoCount', { n: 0 })}</Text>
           </View>
         )}
