@@ -14,7 +14,7 @@ import { v2Team } from '../../../lib/api-v2'
 import {
   CaretLeft, CaretRight, Check, CheckCircle, UserPlus, User, XCircle,
   Lightning, Drop, Snowflake, Palette, Hammer, Sparkle, Leaf, Package,
-  Bug, House, Layers, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
+  Bug, House, SquaresFour, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
 } from 'phosphor-react-native'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
@@ -26,23 +26,23 @@ interface Category {
 }
 
 const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
-  'Lightning': Lightning,
-  'Drop': Drop,
-  'Snowflake': Snowflake,
-  'Palette': Palette,
-  'Hammer': Hammer,
-  'Sparkle': Sparkle,
-  'Leaf': Leaf,
-  'Package': Package,
-  'Bug': Bug,
-  'House': House,
-  'Layers': Layers,
-  'GridFour': GridFour,
-  'Lock': Lock,
-  'Flower': Flower,
-  'Lightbulb': Lightbulb,
-  'Sun': Sun,
-  'Wrench': Wrench,
+  Lightning,
+  Drop,
+  Snowflake,
+  Palette,
+  Hammer,
+  Sparkle,
+  Leaf,
+  Package,
+  Bug,
+  House,
+  Layers: SquaresFour,
+  GridFour,
+  Lock,
+  Flower,
+  Lightbulb,
+  Sun,
+  Wrench,
 }
 
 const FALLBACK_CATEGORIES: Category[] = [
@@ -75,7 +75,7 @@ export default function CompanySetupOnboarding() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { t } = useTranslation()
-  const { user, refreshUser } = useAuth()
+  const { refreshUser } = useAuth()
   const [step, setStep] = useState(0)
 
   const [companyName, setCompanyName] = useState('')
@@ -281,14 +281,14 @@ export default function CompanySetupOnboarding() {
                 placeholder={t('auth.onboarding.memberName')}
                 placeholderTextColor={colors.muted}
                 value={newInvite.name}
-                onChangeText={(t) => setNewInvite({ ...newInvite, name: t })}
+                onChangeText={(value) => setNewInvite({ ...newInvite, name: value })}
               />
               <TextInput
                 style={styles.input}
                 placeholder={t('auth.onboarding.memberEmail')}
                 placeholderTextColor={colors.muted}
                 value={newInvite.email}
-                onChangeText={(t) => setNewInvite({ ...newInvite, email: t })}
+                onChangeText={(value) => setNewInvite({ ...newInvite, email: value })}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -297,7 +297,7 @@ export default function CompanySetupOnboarding() {
                 placeholder={t('auth.onboarding.memberPhone')}
                 placeholderTextColor={colors.muted}
                 value={newInvite.phone}
-                onChangeText={(t) => setNewInvite({ ...newInvite, phone: t })}
+                onChangeText={(value) => setNewInvite({ ...newInvite, phone: value })}
                 keyboardType="phone-pad"
               />
               <TouchableOpacity style={styles.addInviteBtn} onPress={addInvite}>
@@ -350,6 +350,8 @@ export default function CompanySetupOnboarding() {
             </View>
           </View>
         )
+      default:
+        return null
     }
   }
 
