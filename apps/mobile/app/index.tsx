@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../lib/auth'
-import { View, Image, StyleSheet, Animated, Dimensions, Text } from 'react-native'
-
-const { width: SCREEN_W } = Dimensions.get('window')
+import { View, Image, StyleSheet, Animated, Text } from 'react-native'
 
 export default function EntryScreen() {
   const { isAuthenticated, isLoading, user } = useAuth()
@@ -11,76 +9,80 @@ export default function EntryScreen() {
   const [authReady, setAuthReady] = useState(false)
   const [animDone, setAnimDone] = useState(false)
 
-  const markScale = useRef(new Animated.Value(0.92)).current
-  const markOp = useRef(new Animated.Value(0)).current
-  const markScaleMid = useRef(new Animated.Value(1)).current
-  const wordmarkOp = useRef(new Animated.Value(0)).current
-  const wordmarkY = useRef(new Animated.Value(12)).current
-  const taglineOp = useRef(new Animated.Value(0)).current
-  const fadeOut = useRef(new Animated.Value(1)).current
+  const sceneOpacity = useRef(new Animated.Value(1)).current
+  const markOpacity = useRef(new Animated.Value(0)).current
+  const markScale = useRef(new Animated.Value(1.34)).current
+  const wordmarkOpacity = useRef(new Animated.Value(0)).current
+  const wordmarkY = useRef(new Animated.Value(10)).current
+  const revealOpacity = useRef(new Animated.Value(0)).current
+  const finalTaglineOpacity = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
+    // Approved V3.3 splash sequence:
+    // Start = mark only → Reveal = wordmark + "Services. Property. Work."
+    // → Complete = "One place to get things done."
     Animated.sequence([
       Animated.parallel([
-        Animated.timing(markOp, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(markScale, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }),
+        Animated.timing(markOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.spring(markScale, {
+          toValue: 1.34,
+          friction: 7,
+          tension: 48,
+          useNativeDriver: true,
+        }),
       ]),
-      Animated.delay(100),
+      Animated.delay(260),
       Animated.parallel([
-        Animated.timing(markScaleMid, { toValue: 0.82, duration: 300, useNativeDriver: true }),
-        Animated.parallel([
-          Animated.timing(wordmarkOp, { toValue: 1, duration: 350, useNativeDriver: true }),
-          Animated.timing(wordmarkY, { toValue: 0, duration: 350, useNativeDriver: true }),
-        ]),
-        Animated.delay(100),
-        Animated.timing(taglineOp, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(markScale, { toValue: 1.16, duration: 260, useNativeDriver: true }),
+        Animated.timing(wordmarkOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+        Animated.timing(wordmarkY, { toValue: 0, duration: 260, useNativeDriver: true }),
+        Animated.timing(revealOpacity, { toValue: 1, duration: 260, useNativeDriver: true }),
       ]),
-      Animated.delay(800),
+      Animated.delay(420),
+      Animated.parallel([
+        Animated.timing(markScale, { toValue: 1, duration: 240, useNativeDriver: true }),
+        Animated.timing(revealOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(finalTaglineOpacity, { toValue: 1, duration: 260, delay: 100, useNativeDriver: true }),
+      ]),
+      Animated.delay(650),
     ]).start(() => setAnimDone(true))
-  }, [])
+  }, [finalTaglineOpacity, markOpacity, markScale, revealOpacity, wordmarkOpacity, wordmarkY])
 
   useEffect(() => {
-    if (isLoading) return
-    setAuthReady(true)
+    if (!isLoading) setAuthReady(true)
   }, [isLoading])
 
   useEffect(() => {
     if (!animDone || !authReady) return
 
-    const timer = setTimeout(() => {
-      Animated.timing(fadeOut, { toValue: 0, duration: 350, useNativeDriver: true }).start(() => {
-        if (isAuthenticated) {
-          if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
-          else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
-          else if (user?.role === 'TASKER') router.replace('/(tasker)')
-          else if (user?.role === 'COMPANY') router.replace('/(company)')
-          else router.replace('/(customer)')
-        } else {
-          router.replace('/(auth)/welcome')
-        }
-      })
-    }, 400)
-
-    return () => clearTimeout(timer)
-  }, [animDone, authReady, isAuthenticated, user, router])
+    Animated.timing(sceneOpacity, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => {
+      if (isAuthenticated) {
+        if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
+        else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
+        else if (user?.role === 'TASKER') router.replace('/(tasker)')
+        else if (user?.role === 'COMPANY') router.replace('/(company)')
+        else router.replace('/(customer)')
+      } else {
+        router.replace('/(auth)/welcome')
+      }
+    })
+  }, [animDone, authReady, isAuthenticated, router, sceneOpacity, user])
 
   return (
-    <Animated.View style={[styles.container, { opacity: fadeOut }]}>
-      <View style={styles.center}>
-        <Animated.View style={[
-          styles.markWrap,
-          { opacity: markOp, transform: [{ scale: Animated.multiply(markScale, markScaleMid) }] },
-        ]}>
+    <Animated.View style={[styles.container, { opacity: sceneOpacity }]}>
+      <View style={styles.stage}>
+        <Animated.View style={{ opacity: markOpacity, transform: [{ scale: markScale }] }}>
           <Image source={require('../assets/logo.png')} style={styles.mark} resizeMode="contain" />
         </Animated.View>
 
-        <Animated.View style={[styles.wordmarkWrap, { opacity: wordmarkOp, transform: [{ translateY: wordmarkY }] }]}>
+        <Animated.View style={[styles.wordmarkWrap, { opacity: wordmarkOpacity, transform: [{ translateY: wordmarkY }] }]}>
           <Text style={styles.wordmark}>MΛINTΛINEX</Text>
         </Animated.View>
 
-        <Animated.View style={[styles.taglineWrap, { opacity: taglineOp }]}>
-          <Text style={styles.tagline}>One place to get things done.</Text>
-        </Animated.View>
+        <View style={styles.taglineSlot}>
+          <Animated.Text style={[styles.revealTagline, { opacity: revealOpacity }]}>Services. Property. Work.</Animated.Text>
+          <Animated.Text style={[styles.finalTagline, { opacity: finalTaglineOpacity }]}>One place to get things done.</Animated.Text>
+        </View>
       </View>
     </Animated.View>
   )
@@ -90,26 +92,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-    justifyContent: 'center',
+  },
+  stage: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: '38%',
     alignItems: 'center',
   },
-  center: { alignItems: 'center' },
-  markWrap: { marginBottom: 24 },
-  mark: { width: 100, height: 100 },
-  wordmarkWrap: { marginTop: 8 },
+  mark: {
+    width: 112,
+    height: 60,
+  },
+  wordmarkWrap: {
+    marginTop: 22,
+  },
   wordmark: {
-    fontSize: 28,
+    fontSize: 27,
     fontFamily: 'Outfit_900Black',
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.8,
     textAlign: 'center',
   },
-  taglineWrap: { marginTop: 10 },
-  tagline: {
+  taglineSlot: {
+    height: 24,
+    marginTop: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revealTagline: {
+    position: 'absolute',
     fontSize: 11,
-    fontFamily: 'Outfit_500Medium',
-    fontWeight: '650',
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#BDBDBD',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  finalTagline: {
+    position: 'absolute',
+    fontSize: 11,
+    fontFamily: 'Outfit_600SemiBold',
     color: '#BDBDBD',
     letterSpacing: 0.6,
     textAlign: 'center',
