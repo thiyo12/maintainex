@@ -1,11 +1,11 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
 import { useAuth } from '../../../lib/auth'
+import { CaretLeft, UserCircle } from 'phosphor-react-native'
 
 export default function EditProfileOverview() {
   const router = useRouter()
@@ -25,14 +25,14 @@ export default function EditProfileOverview() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color={colors.ink} weight="bold" />
         </TouchableOpacity>
         <Text style={styles.title}>Edit Profile</Text>
         <View style={{ width: 24 }} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.infoCard}>
-          <Ionicons name="person-circle-outline" size={48} color={colors.amber} />
+          <UserCircle size={48} color={colors.amber} weight="fill" />
           <Text style={styles.infoText}>Manage your profile information</Text>
           <TouchableOpacity style={styles.button} onPress={() => router.push(route as any)}>
             <Text style={styles.buttonText}>Edit Your Profile</Text>

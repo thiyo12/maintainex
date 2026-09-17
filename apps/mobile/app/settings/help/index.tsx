@@ -1,10 +1,10 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
+import { CaretLeft } from 'phosphor-react-native'
 
 const faqs = [
   { q: 'How do I create an account?', a: 'Download the app and sign up with your email or phone number. Choose your role: Customer, Tasker, or Company.' },
@@ -24,7 +24,7 @@ export default function HelpScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color={colors.ink} weight="bold" />
         </TouchableOpacity>
         <Text style={styles.title}>Help & Support</Text>
         <View style={{ width: 24 }} />

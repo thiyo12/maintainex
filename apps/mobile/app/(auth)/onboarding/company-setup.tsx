@@ -4,7 +4,6 @@ import {
   ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../../lib/auth'
 import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
@@ -12,6 +11,11 @@ import { fonts } from '../../../lib/fonts'
 import { getCategoryI18nKey } from '../../../lib/categories'
 import { getAuthToken } from '../../../lib/api'
 import { v2Team } from '../../../lib/api-v2'
+import {
+  CaretLeft, CaretRight, Check, CheckCircle, UserPlus, User, XCircle,
+  Lightning, Drop, Snowflake, Palette, Hammer, Sparkle, Leaf, Package,
+  Bug, House, Layers, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
+} from 'phosphor-react-native'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -21,23 +25,43 @@ interface Category {
   iconName: string
 }
 
+const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
+  'Lightning': Lightning,
+  'Drop': Drop,
+  'Snowflake': Snowflake,
+  'Palette': Palette,
+  'Hammer': Hammer,
+  'Sparkle': Sparkle,
+  'Leaf': Leaf,
+  'Package': Package,
+  'Bug': Bug,
+  'House': House,
+  'Layers': Layers,
+  'GridFour': GridFour,
+  'Lock': Lock,
+  'Flower': Flower,
+  'Lightbulb': Lightbulb,
+  'Sun': Sun,
+  'Wrench': Wrench,
+}
+
 const FALLBACK_CATEGORIES: Category[] = [
-  { id: 'electrical', name: 'Electrical', iconName: 'flash-outline' },
-  { id: 'plumbing', name: 'Plumbing', iconName: 'water-outline' },
-  { id: 'ac', name: 'AC & Refrigeration', iconName: 'snow-outline' },
-  { id: 'painting', name: 'Painting', iconName: 'color-palette-outline' },
-  { id: 'carpentry', name: 'Carpentry', iconName: 'hammer-outline' },
-  { id: 'cleaning', name: 'Cleaning', iconName: 'sparkles-outline' },
-  { id: 'gardening', name: 'Gardening', iconName: 'leaf-outline' },
-  { id: 'moving', name: 'Moving', iconName: 'cube-outline' },
-  { id: 'pest-control', name: 'Pest Control', iconName: 'bug-outline' },
-  { id: 'roofing', name: 'Roofing', iconName: 'home-outline' },
-  { id: 'flooring', name: 'Flooring', iconName: 'layers-outline' },
-  { id: 'tiling', name: 'Tiling', iconName: 'grid-outline' },
-  { id: 'fencing', name: 'Fencing', iconName: 'lock-closed-outline' },
-  { id: 'landscaping', name: 'Landscaping', iconName: 'flower-outline' },
-  { id: 'home-automation', name: 'Home Automation', iconName: 'bulb-outline' },
-  { id: 'solar', name: 'Solar', iconName: 'sunny-outline' },
+  { id: 'electrical', name: 'Electrical', iconName: 'Lightning' },
+  { id: 'plumbing', name: 'Plumbing', iconName: 'Drop' },
+  { id: 'ac', name: 'AC & Refrigeration', iconName: 'Snowflake' },
+  { id: 'painting', name: 'Painting', iconName: 'Palette' },
+  { id: 'carpentry', name: 'Carpentry', iconName: 'Hammer' },
+  { id: 'cleaning', name: 'Cleaning', iconName: 'Sparkle' },
+  { id: 'gardening', name: 'Gardening', iconName: 'Leaf' },
+  { id: 'moving', name: 'Moving', iconName: 'Package' },
+  { id: 'pest-control', name: 'Pest Control', iconName: 'Bug' },
+  { id: 'roofing', name: 'Roofing', iconName: 'House' },
+  { id: 'flooring', name: 'Flooring', iconName: 'Layers' },
+  { id: 'tiling', name: 'Tiling', iconName: 'GridFour' },
+  { id: 'fencing', name: 'Fencing', iconName: 'Lock' },
+  { id: 'landscaping', name: 'Landscaping', iconName: 'Flower' },
+  { id: 'home-automation', name: 'Home Automation', iconName: 'Lightbulb' },
+  { id: 'solar', name: 'Solar', iconName: 'Sun' },
 ]
 
 interface InviteEntry {
@@ -86,7 +110,7 @@ export default function CompanySetupOnboarding() {
             data.map((c: any) => ({
               id: c.id,
               name: c.name,
-              iconName: c.iconName || 'construct-outline',
+              iconName: c.iconName || 'Wrench',
             }))
           )
         }
@@ -175,7 +199,7 @@ export default function CompanySetupOnboarding() {
         <TouchableOpacity key={i} style={styles.stepItem} onPress={() => i < step && setStep(i)} disabled={i > step}>
           <View style={[styles.stepDot, i === step && styles.stepDotActive, i < step && styles.stepDotDone]}>
             {i < step ? (
-              <Ionicons name="checkmark" size={14} color={colors.white} />
+              <Check size={14} color={colors.white} weight="bold" />
             ) : (
               <Text style={[styles.stepNum, i === step && styles.stepNumActive]}>{i + 1}</Text>
             )}
@@ -228,6 +252,7 @@ export default function CompanySetupOnboarding() {
               <View style={styles.grid}>
                 {categories.map((cat) => {
                   const selected = selectedIds.has(cat.id)
+                  const IconComponent = CATEGORY_ICON_MAP[cat.iconName] || Wrench
                   return (
                     <TouchableOpacity
                       key={cat.id}
@@ -235,7 +260,7 @@ export default function CompanySetupOnboarding() {
                       onPress={() => toggleCategory(cat.id)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name={cat.iconName as any} size={28} color={selected ? colors.amberDark : colors.ink} />
+                      <IconComponent size={28} color={selected ? colors.amberDark : colors.ink} weight="bold" />
                       <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{t(getCategoryI18nKey(cat))}</Text>
                     </TouchableOpacity>
                   )
@@ -276,20 +301,20 @@ export default function CompanySetupOnboarding() {
                 keyboardType="phone-pad"
               />
               <TouchableOpacity style={styles.addInviteBtn} onPress={addInvite}>
-                <Ionicons name="person-add-outline" size={18} color={colors.white} />
+                <UserPlus size={18} color={colors.white} weight="bold" />
                 <Text style={styles.addInviteText}>{t('auth.onboarding.addMember')}</Text>
               </TouchableOpacity>
             </View>
 
             {invites.map((inv, i) => (
               <View key={i} style={styles.inviteRow}>
-                <Ionicons name="person-outline" size={20} color={colors.amber} />
+                <User size={20} color={colors.amber} weight="bold" />
                 <View style={styles.inviteInfo}>
                   <Text style={styles.inviteName}>{inv.name}</Text>
                   <Text style={styles.inviteContact}>{inv.email || inv.phone}</Text>
                 </View>
                 <TouchableOpacity onPress={() => removeInvite(i)}>
-                  <Ionicons name="close-circle-outline" size={22} color={colors.muted} />
+                  <XCircle size={22} color={colors.muted} weight="bold" />
                 </TouchableOpacity>
               </View>
             ))}
@@ -335,7 +360,7 @@ export default function CompanySetupOnboarding() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color={colors.ink} weight="bold" />
         </TouchableOpacity>
 
         <Text style={styles.title}>{t('auth.onboarding.setupTitle')}</Text>
@@ -346,7 +371,7 @@ export default function CompanySetupOnboarding() {
         <View style={styles.navRow}>
           {step > 0 && (
             <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep(step - 1)}>
-              <Ionicons name="arrow-back" size={18} color={colors.ink} />
+              <CaretLeft size={18} color={colors.ink} weight="bold" />
               <Text style={styles.secondaryBtnText}>{t('common.back')}</Text>
             </TouchableOpacity>
           )}
@@ -357,7 +382,7 @@ export default function CompanySetupOnboarding() {
               disabled={step === 0 && !companyName}
             >
               <Text style={styles.primaryBtnText}>{t('common.continue')}</Text>
-              <Ionicons name="arrow-forward" size={18} color={colors.white} />
+              <CaretRight size={18} color={colors.white} weight="bold" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -370,7 +395,7 @@ export default function CompanySetupOnboarding() {
               ) : (
                 <>
                   <Text style={styles.primaryBtnText}>{t('common.finishSetup')}</Text>
-                  <Ionicons name="checkmark-circle-outline" size={18} color={colors.white} />
+                  <CheckCircle size={18} color={colors.white} weight="bold" />
                 </>
               )}
             </TouchableOpacity>

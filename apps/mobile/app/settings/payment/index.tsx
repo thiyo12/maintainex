@@ -1,10 +1,10 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
+import { CaretLeft, CreditCard, PlusCircle, Buildings } from 'phosphor-react-native'
 
 export default function PaymentSettingsScreen() {
   const router = useRouter()
@@ -15,7 +15,7 @@ export default function PaymentSettingsScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color={colors.ink} weight="bold" />
         </TouchableOpacity>
         <Text style={styles.title}>Payment Methods</Text>
         <View style={{ width: 24 }} />
@@ -24,7 +24,7 @@ export default function PaymentSettingsScreen() {
         <Text style={styles.sectionTitle}>Saved Payment Methods</Text>
         <View style={styles.card}>
           <View style={styles.cardRow}>
-            <Ionicons name="card-outline" size={20} color={colors.ink} />
+            <CreditCard size={20} color={colors.ink} weight="bold" />
             <View style={styles.cardInfo}>
               <Text style={styles.cardName}>Visa ending in 4242</Text>
               <Text style={styles.cardExpiry}>Expires 12/28</Text>
@@ -33,7 +33,7 @@ export default function PaymentSettingsScreen() {
         </View>
         <View style={styles.card}>
           <View style={styles.cardRow}>
-            <Ionicons name="card-outline" size={20} color={colors.ink} />
+            <CreditCard size={20} color={colors.ink} weight="bold" />
             <View style={styles.cardInfo}>
               <Text style={styles.cardName}>Mastercard ending in 8888</Text>
               <Text style={styles.cardExpiry}>Expires 06/27</Text>
@@ -41,13 +41,13 @@ export default function PaymentSettingsScreen() {
           </View>
         </View>
         <TouchableOpacity style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={20} color={colors.amber} />
+          <PlusCircle size={20} color={colors.amber} weight="bold" />
           <Text style={styles.addButtonText}>Add Payment Method</Text>
         </TouchableOpacity>
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Bank Account</Text>
         <View style={styles.card}>
           <View style={styles.cardRow}>
-            <Ionicons name="business-outline" size={20} color={colors.ink} />
+            <Buildings size={20} color={colors.ink} weight="bold" />
             <View style={styles.cardInfo}>
               <Text style={styles.cardName}>Bank of Ceylon</Text>
               <Text style={styles.cardExpiry}>Account ending in 1234</Text>

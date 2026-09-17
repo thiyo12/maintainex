@@ -207,10 +207,34 @@
 - `(company)/team/invite.tsx` — V3.3 Invite Member (Ionicons→Phosphor: CaretLeft, PaperPlaneRight)
 - `(company)/workforce/assign.tsx` — V3.3 Assign Worker (Ionicons→Phosphor: CheckCircle)
 - `(company)/workforce/assignment/[id].tsx` — V3.3 Assignment Detail (Ionicons→Phosphor: Clock, CheckCircle, Play, Ribbon, XCircle, Prohibit)
-### B11: Company Finance/Contracts/Profile — PENDING
-### B12: Shared Runtime States — PENDING
-### B13: Legacy UI Removal — PENDING
-### B14: Final Regression + Visual QA — PENDING
+## B11: Company Finance/Contracts/Profile — CODE COMPLETE (covered by B10)
+
+## B12: Shared Runtime States — CODE COMPLETE (no changes needed)
+
+## B13: Legacy UI Removal — CODE COMPLETE
+
+### B13 Verification
+- ✅ Ionicons in entire codebase (excl. lib/icons.ts) = 0
+- ✅ lib/design imports in entire codebase = 0
+- ✅ TypeScript errors introduced = 0
+
+### B13 Files Cleaned (9)
+**Auth Onboarding (2):**
+- `(auth)/onboarding/company-setup.tsx` — Ionicons→Phosphor (category icon map, setup flow)
+- `(auth)/onboarding/tasker-services.tsx` — Ionicons→Phosphor (category icon map, services)
+
+**Customer (1):**
+- `(customer)/booking/confirmed.tsx` — Ionicons→Phosphor (checkmark, calendar, map, chat)
+
+**Legacy Global Settings (6):**
+- `app/settings/about/index.tsx` — Ionicons→Phosphor
+- `app/settings/edit-profile/index.tsx` — Ionicons→Phosphor
+- `app/settings/help/index.tsx` — Ionicons→Phosphor
+- `app/settings/notifications/index.tsx` — Ionicons→Phosphor (settings icon map)
+- `app/settings/payment/index.tsx` — Ionicons→Phosphor
+- `app/settings/terms/index.tsx` — Ionicons→Phosphor
+
+## B14: Final Regression + Visual QA — PENDING
 
 ### Visual Device QA
 Deferred to B14 if simulator/device unavailable.

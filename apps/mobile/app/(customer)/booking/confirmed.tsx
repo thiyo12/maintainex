@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Animated, ActivityIndicator } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { bookings } from '../../../lib/api'
 import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import type { Booking } from '../../../lib/types'
+import { Check, Calendar, MapPin, Map, ChatCircleDots } from 'phosphor-react-native'
 
 export default function BookingConfirmedScreen() {
   const { t } = useTranslation()
@@ -47,7 +47,7 @@ export default function BookingConfirmedScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View style={[styles.circle, { transform: [{ scale: scaleAnim }] }]}>
-        <Ionicons name="checkmark" size={36} color={colors.white} />
+        <Check size={36} color={colors.white} weight="bold" />
       </Animated.View>
       <Text style={styles.heading}>{t('booking.confirmed')}</Text>
       <Text style={styles.subheading}>{t('booking.paymentSecured')}</Text>
@@ -56,11 +56,11 @@ export default function BookingConfirmedScreen() {
         <Text style={styles.sumLabel}>{booking?.serviceName || t('receipt.service')}</Text>
         <Text style={styles.sumValue}>{booking?.customerName || ''}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-          <Ionicons name="calendar-outline" size={16} color={colors.gray} />
+          <Calendar size={16} color={colors.gray} weight="bold" />
           <Text style={styles.sumValue}> {booking?.date ? new Date(booking.date).toLocaleDateString() : t('common.today')} at {booking?.time || ''}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-          <Ionicons name="location-outline" size={16} color={colors.gray} />
+          <MapPin size={16} color={colors.gray} weight="bold" />
           <Text style={styles.sumValue}> {booking?.district || ''}</Text>
         </View>
         <Text style={styles.totalAmount}>LKR {(booking?.price || 0).toLocaleString()}</Text>
@@ -70,7 +70,7 @@ export default function BookingConfirmedScreen() {
         {steps.map((s, i) => (
           <View key={i} style={styles.trackerStep}>
             <View style={[styles.trackerDot, s.filled && styles.trackerDotFilled]}>
-              {s.filled ? <Ionicons name="checkmark" size={14} color={colors.white} /> : <Text style={styles.trackerNum}>{i + 1}</Text>}
+              {s.filled ? <Check size={14} color={colors.white} weight="bold" /> : <Text style={styles.trackerNum}>{i + 1}</Text>}
             </View>
             <Text style={[styles.trackerLabel, s.filled && styles.trackerLabelFilled]}>{s.label}</Text>
             {i < steps.length - 1 ? <View style={[styles.trackerLine, s.filled && styles.trackerLineFilled]} /> : null}
@@ -80,11 +80,11 @@ export default function BookingConfirmedScreen() {
 
       <View style={styles.buttons}>
         <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(customer)/tracking/${bookingId || 1}`)}>
-          <Ionicons name="map" size={18} color={colors.white} style={{ marginRight: 6 }} />
+          <Map size={18} color={colors.white} weight="bold" style={{ marginRight: 6 }} />
           <Text style={styles.mapBtnText}>{t('booking.trackOnMap')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.chatBtn} onPress={() => router.push(`/(chat)/${bookingId || 1}`)}>
-          <Ionicons name="chatbubble-ellipses" size={18} color={colors.dark} style={{ marginRight: 6 }} />
+          <ChatCircleDots size={18} color={colors.dark} weight="bold" style={{ marginRight: 6 }} />
           <Text style={styles.chatBtnText}>{t('booking.chatWithWorker')}</Text>
         </TouchableOpacity>
       </View>

@@ -1,11 +1,25 @@
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '../../../lib/ThemeContext'
 import { useAuth } from '../../../lib/auth'
 import { fonts } from '../../../lib/fonts'
 import { useTranslation } from 'react-i18next'
+import {
+  CaretLeft, CaretRight, SignOut, User, Bell, CreditCard,
+  MapPin, Question, Info, FileText, Star,
+} from 'phosphor-react-native'
+
+const SETTINGS_ICON_MAP: Record<string, React.ComponentType<any>> = {
+  'User': User,
+  'Bell': Bell,
+  'CreditCard': CreditCard,
+  'MapPin': MapPin,
+  'Question': Question,
+  'Info': Info,
+  'FileText': FileText,
+  'Star': Star,
+}
 
 export default function SettingsScreen() {
   const { t } = useTranslation()
@@ -15,16 +29,16 @@ export default function SettingsScreen() {
   const { user, logout } = useAuth()
 
   const settingsItems = [
-    { icon: 'person-outline', label: t('profile.edit'), route: '/settings/edit-profile' },
-    { icon: 'notifications-outline', label: t('profile.notifications'), route: '/notifications' },
-    { icon: 'card-outline', label: t('profile.payment'), route: '/settings/payment' },
-    { icon: 'location-outline', label: t('profile.savedAddresses'), route: '/settings/addresses' },
-    { icon: 'help-circle-outline', label: t('profile.helpSupport'), route: '/settings/help' },
-    { icon: 'information-circle-outline', label: t('profile.aboutApp'), route: '/settings/about' },
-    { icon: 'document-text-outline', label: t('profile.termsPrivacy'), route: '/settings/terms' },
+    { icon: 'User', label: t('profile.edit'), route: '/settings/edit-profile' },
+    { icon: 'Bell', label: t('profile.notifications'), route: '/notifications' },
+    { icon: 'CreditCard', label: t('profile.payment'), route: '/settings/payment' },
+    { icon: 'MapPin', label: t('profile.savedAddresses'), route: '/settings/addresses' },
+    { icon: 'Question', label: t('profile.helpSupport'), route: '/settings/help' },
+    { icon: 'Info', label: t('profile.aboutApp'), route: '/settings/about' },
+    { icon: 'FileText', label: t('profile.termsPrivacy'), route: '/settings/terms' },
   ]
 
-  const roleSettings = user?.role === 'COMPANY' ? [{ icon: 'star-outline', label: t('company.subscription'), route: '/(company)/settings/subscription' }] : []
+  const roleSettings = user?.role === 'COMPANY' ? [{ icon: 'Star', label: t('company.subscription'), route: '/(company)/settings/subscription' }] : []
 
   const allItems = [...roleSettings, ...settingsItems]
 
@@ -32,7 +46,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.ink} />
+          <CaretLeft size={22} color={colors.ink} weight="bold" />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.ink }]}>{t('settings.title')}</Text>
         <View style={{ width: 32 }} />
@@ -40,26 +54,29 @@ export default function SettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.muted }]}>{t('profile.account')}</Text>
-          {allItems.map((item, i) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
-              onPress={() => router.push(item.route as any)}
-            >
-              <View style={[styles.iconWrap, { backgroundColor: colors.amberLight }]}>
-                <Ionicons name={item.icon as any} size={16} color={colors.amberDark} />
-              </View>
-              <Text style={[styles.rowLabel, { color: colors.ink }]}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </TouchableOpacity>
-          ))}
+          {allItems.map((item, i) => {
+            const IconComponent = SETTINGS_ICON_MAP[item.icon] || Info
+            return (
+              <TouchableOpacity
+                key={item.label}
+                style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+                onPress={() => router.push(item.route as any)}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: colors.amberLight }]}>
+                  <IconComponent size={16} color={colors.amberDark} weight="bold" />
+                </View>
+                <Text style={[styles.rowLabel, { color: colors.ink }]}>{item.label}</Text>
+                <CaretRight size={16} color={colors.muted} weight="bold" />
+              </TouchableOpacity>
+            )
+          })}
         </View>
 
         <TouchableOpacity
           style={[styles.logoutBtn, { borderColor: colors.border }]}
           onPress={async () => { await logout(); router.replace('/(auth)/welcome') }}
         >
-          <Ionicons name="log-out-outline" size={16} color="#EF4444" />
+          <SignOut size={16} color="#EF4444" weight="bold" />
           <Text style={styles.logoutText}>{t('profile.logout')}</Text>
         </TouchableOpacity>
 
