@@ -9,16 +9,16 @@ export default function CompanyLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: '#0D0D0D' },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="team/index" options={{ headerShown: true, headerTitle: t('company.team'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: '#0D0D0D' } }} />
-      <Stack.Screen name="team/invite" options={{ headerShown: true, headerTitle: t('company.inviteMember'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: '#0D0D0D' } }} />
-      <Stack.Screen name="workforce/assign" options={{ headerShown: true, headerTitle: t('company.workforce.assignWorker'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: '#0D0D0D' } }} />
-      <Stack.Screen name="workforce/assignment/[id]" options={{ headerShown: true, headerTitle: t('company.workforce.assignments'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: '#0D0D0D' } }} />
-      <Stack.Screen name="settings/edit-profile" options={{ headerShown: true, headerTitle: t('company.editProfile'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: '#FFFFFF' } }} />
-      <Stack.Screen name="settings/subscription" options={{ headerShown: true, headerTitle: t('company.subscription'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: '#0D0D0D' } }} />
+      <Stack.Screen name="team/index" options={{ headerShown: true, headerTitle: t('company.team'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="team/invite" options={{ headerShown: true, headerTitle: t('company.inviteMember'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="workforce/assign" options={{ headerShown: true, headerTitle: t('company.workforce.assignWorker'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="workforce/assignment/[id]" options={{ headerShown: true, headerTitle: t('company.workforce.assignments'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="settings/edit-profile" options={{ headerShown: true, headerTitle: t('company.editProfile'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
+      <Stack.Screen name="settings/subscription" options={{ headerShown: true, headerTitle: t('company.subscription'), headerBackTitle: t('common.back'), headerTintColor: colors.amber, headerStyle: { backgroundColor: colors.white } }} />
     </Stack>
   )
 }

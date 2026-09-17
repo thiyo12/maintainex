@@ -23,9 +23,9 @@ export default function TaskerTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#0D0D0D',
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: '#2E2E2E',
+          borderTopColor: '#E5E5E5',
           height: 56 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 6,
@@ -35,8 +35,8 @@ export default function TaskerTabs() {
           }),
         },
         tabBarActiveTintColor: '#F5A623',
-        tabBarInactiveTintColor: '#6F6B6B',
-        tabBarLabelStyle: { fontSize: 11, fontFamily: fonts.bodySemiBold, color: '#6F6B6B' },
+        tabBarInactiveTintColor: '#8A8A8A',
+        tabBarLabelStyle: { fontSize: 11, fontFamily: fonts.bodySemiBold, color: '#8A8A8A' },
         tabBarShowLabel: true,
       }}
     >
