@@ -2,6 +2,7 @@ import React from 'react'
 import { View, Image, Text, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { SealCheck } from 'phosphor-react-native'
+import { v3 } from '../../theme/v3/tokens'
 
 interface Props {
   uri?: string | null
@@ -26,44 +27,54 @@ export default function AvatarCircle({
   return (
     <View style={{ width: size, height: size }}>
       {uri ? (
-        <Image
-          source={{ uri }}
-          style={{ width: size, height: size, borderRadius: rad }}
-          resizeMode="cover"
-        />
+        <Image source={{ uri }} style={{ width: size, height: size, borderRadius: rad }} resizeMode="cover" />
       ) : (
         <LinearGradient
-          colors={['#A86D00', '#F5A623']}
+          colors={['#E7E7E7', '#D5D5D5']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ width: size, height: size, borderRadius: rad, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Text style={[styles.initial, { fontSize: size * 0.42, color: '#0D0D0D' }]}>{initial}</Text>
+          <Text style={[styles.initial, { fontSize: size * 0.42 }]}>{initial}</Text>
         </LinearGradient>
       )}
 
-      {showOnline && (
-        <View style={[styles.onlineDot, { width: size * 0.24, height: size * 0.24, borderRadius: size * 0.12, right: 0, bottom: 0, borderColor: '#0D0D0D' }]} />
-      )}
-      {showVerified && verified && (
-        <View style={[styles.verifiedBadge, { left: 0, bottom: 0 }]}>
-          <SealCheck size={size * 0.26} color="#F5A623" weight="fill" />
+      {showOnline ? (
+        <View
+          style={[
+            styles.onlineDot,
+            {
+              width: size * 0.24,
+              height: size * 0.24,
+              borderRadius: size * 0.12,
+              right: 0,
+              bottom: 0,
+            },
+          ]}
+        />
+      ) : null}
+      {showVerified && verified ? (
+        <View style={styles.verifiedBadge}>
+          <SealCheck size={size * 0.28} color={v3.colors.success} weight="fill" />
         </View>
-      )}
+      ) : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  initial: { fontSize: 20, fontFamily: 'Outfit_700Bold' },
+  initial: { fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
   onlineDot: {
     position: 'absolute',
-    backgroundColor: '#22C55E',
+    backgroundColor: v3.colors.success,
     borderWidth: 2,
+    borderColor: v3.colors.paper,
   },
   verifiedBadge: {
     position: 'absolute',
+    left: 0,
+    bottom: 0,
     borderRadius: 9999,
-    backgroundColor: '#0D0D0D',
+    backgroundColor: v3.colors.paper,
   },
 })
