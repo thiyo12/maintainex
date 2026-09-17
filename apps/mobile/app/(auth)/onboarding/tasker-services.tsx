@@ -11,9 +11,9 @@ import { fonts } from '../../../lib/fonts'
 import { getCategoryI18nKey } from '../../../lib/categories'
 import { getAuthToken } from '../../../lib/api'
 import {
-  CaretLeft, CaretRight, CheckCircle, Circle,
+  CaretLeft, CaretRight, CheckCircle,
   Lightning, Drop, Snowflake, Palette, Hammer, Sparkle, Leaf, Package,
-  Bug, House, Layers, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
+  Bug, House, SquaresFour, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
 } from 'phosphor-react-native'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
@@ -25,23 +25,23 @@ interface Category {
 }
 
 const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
-  'Lightning': Lightning,
-  'Drop': Drop,
-  'Snowflake': Snowflake,
-  'Palette': Palette,
-  'Hammer': Hammer,
-  'Sparkle': Sparkle,
-  'Leaf': Leaf,
-  'Package': Package,
-  'Bug': Bug,
-  'House': House,
-  'Layers': Layers,
-  'GridFour': GridFour,
-  'Lock': Lock,
-  'Flower': Flower,
-  'Lightbulb': Lightbulb,
-  'Sun': Sun,
-  'Wrench': Wrench,
+  Lightning,
+  Drop,
+  Snowflake,
+  Palette,
+  Hammer,
+  Sparkle,
+  Leaf,
+  Package,
+  Bug,
+  House,
+  Layers: SquaresFour,
+  GridFour,
+  Lock,
+  Flower,
+  Lightbulb,
+  Sun,
+  Wrench,
 }
 
 const FALLBACK_CATEGORIES: Category[] = [
@@ -163,9 +163,7 @@ export default function TaskerServicesOnboarding() {
       </TouchableOpacity>
 
       <Text style={styles.title}>{t('auth.onboarding.selectServices')}</Text>
-      <Text style={styles.subtitle}>
-        {t('auth.onboarding.selectServicesDesc')}
-      </Text>
+      <Text style={styles.subtitle}>{t('auth.onboarding.selectServicesDesc')}</Text>
 
       {needsPhone && (
         <View style={styles.phoneCard}>
@@ -190,7 +188,7 @@ export default function TaskerServicesOnboarding() {
         {allrounder ? (
           <CheckCircle size={24} color={colors.amber} weight="fill" />
         ) : (
-          <Circle size={24} color={colors.muted} weight="bold" />
+          <View style={styles.selectionCircle} />
         )}
         <View style={styles.allrounderTextWrap}>
           <Text style={styles.allrounderLabel}>{t('auth.onboarding.allrounder')}</Text>
@@ -254,6 +252,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     marginBottom: 20, borderWidth: 2, borderColor: colors.border,
   },
   allrounderCardActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  selectionCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.muted },
   allrounderTextWrap: { flex: 1 },
   allrounderLabel: { fontSize: 17, fontFamily: fonts.bodyMedium, color: colors.ink },
   allrounderDesc: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
