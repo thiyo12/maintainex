@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { X, CheckCircle, Camera, Image, CreditCard, Globe, Car } from 'phosphor-react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
@@ -15,9 +15,9 @@ export default function IdentityVerificationScreen() {
   const router = useRouter()
   const { t } = useTranslation()
   const DOC_TYPES = [
-    { key: 'NATIONAL_ID', label: t('verify.nationalIdCard'), icon: 'id-card-outline' },
-    { key: 'PASSPORT', label: t('verify.passport'), icon: 'earth-outline' },
-    { key: 'DRIVERS_LICENSE', label: t('verify.driversLicense'), icon: 'car-outline' },
+    { key: 'NATIONAL_ID', label: t('verify.nationalIdCard'), Icon: CreditCard },
+    { key: 'PASSPORT', label: t('verify.passport'), Icon: Globe },
+    { key: 'DRIVERS_LICENSE', label: t('verify.driversLicense'), Icon: Car },
   ]
   const [loading, setLoading] = useState(true)
   const [docType, setDocType] = useState<string | null>(null)
@@ -114,7 +114,7 @@ export default function IdentityVerificationScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
+        <ActivityIndicator size="large" color="#F5A623" style={{ marginTop: 60 }} />
       </SafeAreaView>
     )
   }
@@ -124,7 +124,7 @@ export default function IdentityVerificationScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="close" size={24} color={colors.ink} />
+            <X size={24} color="#FFFFFF" weight="bold" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('verify.title')}</Text>
           <View style={{ width: 24 }} />
@@ -139,7 +139,7 @@ export default function IdentityVerificationScreen() {
             value={fullName}
             onChangeText={setFullName}
             placeholder={t('verify.fullNamePlaceholder')}
-            placeholderTextColor={colors.muted}
+            placeholderTextColor="#6F6B6B"
             autoCapitalize="words"
             autoCorrect={false}
           />
@@ -148,18 +148,21 @@ export default function IdentityVerificationScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('verify.selectDocumentType')}</Text>
-          {DOC_TYPES.map((dt) => (
-            <TouchableOpacity
-              key={dt.key}
-              style={[styles.docOption, docType === dt.key && styles.docOptionSelected]}
-              onPress={() => setDocType(dt.key)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name={dt.icon as any} size={22} color={docType === dt.key ? colors.amber : colors.muted} />
-              <Text style={[styles.docLabel, docType === dt.key && styles.docLabelSelected]}>{dt.label}</Text>
-              {docType === dt.key && <Ionicons name="checkmark-circle" size={20} color={colors.amber} />}
-            </TouchableOpacity>
-          ))}
+          {DOC_TYPES.map((dt) => {
+            const isSelected = docType === dt.key
+            return (
+              <TouchableOpacity
+                key={dt.key}
+                style={[styles.docOption, isSelected && styles.docOptionSelected]}
+                onPress={() => setDocType(dt.key)}
+                activeOpacity={0.7}
+              >
+                <dt.Icon size={22} color={isSelected ? '#F5A623' : '#6F6B6B'} weight={isSelected ? 'fill' : 'regular'} />
+                <Text style={[styles.docLabel, isSelected && styles.docLabelSelected]}>{dt.label}</Text>
+                {isSelected && <CheckCircle size={20} color="#F5A623" weight="fill" />}
+              </TouchableOpacity>
+            )
+          })}
         </View>
 
         <View style={styles.section}>
@@ -168,22 +171,22 @@ export default function IdentityVerificationScreen() {
             <View style={styles.previewWrap}>
               <Image source={{ uri: frontUri }} style={styles.preview} resizeMode="cover" />
               <TouchableOpacity style={styles.retakeBtn} onPress={() => setFrontUri(null)}>
-                <Ionicons name="close-circle" size={22} color="#EF4444" />
+                <X size={22} color="#EF4444" weight="bold" />
               </TouchableOpacity>
             </View>
           ) : uploadingFront ? (
             <View style={styles.uploadingBox}>
-              <ActivityIndicator size="small" color={colors.amber} />
+              <ActivityIndicator size="small" color="#F5A623" />
               <Text style={styles.uploadingText}>{t('verify.uploading')}</Text>
             </View>
           ) : (
             <View style={styles.imageActions}>
               <TouchableOpacity style={styles.imageBtn} onPress={() => takePhoto('FRONT')} activeOpacity={0.7}>
-                <Ionicons name="camera-outline" size={24} color={colors.amber} />
+                <Camera size={24} color="#F5A623" weight="regular" />
                 <Text style={styles.imageBtnText}>{t('verify.camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage('FRONT')} activeOpacity={0.7}>
-                <Ionicons name="image-outline" size={24} color={colors.amber} />
+                <Image size={24} color="#F5A623" weight="regular" />
                 <Text style={styles.imageBtnText}>{t('verify.gallery')}</Text>
               </TouchableOpacity>
             </View>
@@ -196,22 +199,22 @@ export default function IdentityVerificationScreen() {
             <View style={styles.previewWrap}>
               <Image source={{ uri: backUri }} style={styles.preview} resizeMode="cover" />
               <TouchableOpacity style={styles.retakeBtn} onPress={() => setBackUri(null)}>
-                <Ionicons name="close-circle" size={22} color="#EF4444" />
+                <X size={22} color="#EF4444" weight="bold" />
               </TouchableOpacity>
             </View>
           ) : uploadingBack ? (
             <View style={styles.uploadingBox}>
-              <ActivityIndicator size="small" color={colors.amber} />
+              <ActivityIndicator size="small" color="#F5A623" />
               <Text style={styles.uploadingText}>{t('verify.uploading')}</Text>
             </View>
           ) : (
             <View style={styles.imageActions}>
               <TouchableOpacity style={styles.imageBtn} onPress={() => takePhoto('BACK')} activeOpacity={0.7}>
-                <Ionicons name="camera-outline" size={24} color={colors.amber} />
+                <Camera size={24} color="#F5A623" weight="regular" />
                 <Text style={styles.imageBtnText}>{t('verify.camera')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.imageBtn} onPress={() => pickImage('BACK')} activeOpacity={0.7}>
-                <Ionicons name="image-outline" size={24} color={colors.amber} />
+                <Image size={24} color="#F5A623" weight="regular" />
                 <Text style={styles.imageBtnText}>{t('verify.gallery')}</Text>
               </TouchableOpacity>
             </View>
@@ -227,7 +230,7 @@ export default function IdentityVerificationScreen() {
           activeOpacity={0.7}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color={colors.white} />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.submitBtnText}>{t('verify.submit')}</Text>
           )}
@@ -240,38 +243,38 @@ export default function IdentityVerificationScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  subtitle: { fontSize: 14, color: colors.muted, paddingHorizontal: 20, marginBottom: 24, lineHeight: 20 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  subtitle: { fontSize: 14, color: '#6F6B6B', paddingHorizontal: 20, marginBottom: 24, lineHeight: 20 },
   section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.ink, marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 12 },
   nameInput: {
-    backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 15,
-    color: colors.ink, borderWidth: 1.5, borderColor: colors.border, marginBottom: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, fontSize: 15,
+    color: '#FFFFFF', borderWidth: 1.5, borderColor: '#2E2E2E', marginBottom: 8,
   },
   docOption: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
     padding: 16, borderRadius: 12, marginBottom: 8,
-    borderWidth: 1.5, borderColor: colors.border,
+    borderWidth: 1.5, borderColor: '#2E2E2E',
   },
-  docOptionSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  docLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: colors.ink, marginLeft: 12 },
-  docLabelSelected: { color: colors.amberDark },
+  docOptionSelected: { borderColor: '#F5A623', backgroundColor: '#FFF1D2' },
+  docLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#FFFFFF', marginLeft: 12 },
+  docLabelSelected: { color: '#D4900A' },
   imageActions: { flexDirection: 'row', gap: 12 },
   imageBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.white, padding: 16, borderRadius: 12, gap: 8,
-    borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed',
+    backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, gap: 8,
+    borderWidth: 1.5, borderColor: '#2E2E2E', borderStyle: 'dashed',
   },
-  imageBtnText: { fontSize: 15, fontWeight: '600', color: colors.ink },
+  imageBtnText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
   previewWrap: { position: 'relative' },
-  preview: { width: '100%', height: 180, borderRadius: 12, backgroundColor: colors.lightGray },
-  retakeBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: colors.white, borderRadius: 12, padding: 2 },
-  uploadingBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white, padding: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.border, gap: 10 },
-  uploadingText: { fontSize: 14, color: colors.muted },
-  note: { fontSize: 12, color: colors.muted, paddingHorizontal: 20, marginBottom: 16, lineHeight: 18, fontStyle: 'italic' },
-  submitBtn: { backgroundColor: colors.amber, marginHorizontal: 20, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
+  preview: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#2E2E2E' },
+  retakeBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 2 },
+  uploadingBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', padding: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#2E2E2E', gap: 10 },
+  uploadingText: { fontSize: 14, color: '#6F6B6B' },
+  note: { fontSize: 12, color: '#6F6B6B', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18, fontStyle: 'italic' },
+  submitBtn: { backgroundColor: '#F5A623', marginHorizontal: 20, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  submitBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 })

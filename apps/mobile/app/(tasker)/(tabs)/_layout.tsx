@@ -3,7 +3,8 @@ import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
-import { colors } from '../../../lib/design'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { Compass, Briefcase, User } from 'phosphor-react-native'
 
 const tabConfigs = [
@@ -15,6 +16,7 @@ const tabConfigs = [
 export default function TaskerTabs() {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const colors = useColors()
   const bottomPad = Math.max(insets.bottom, 4)
 
   return (
@@ -22,9 +24,9 @@ export default function TaskerTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: colors.background,
+          backgroundColor: '#0D0D0D',
           borderTopWidth: 1,
-          borderTopColor: colors.border,
+          borderTopColor: '#2E2E2E',
           height: 56 + bottomPad,
           paddingBottom: bottomPad,
           paddingTop: 6,
@@ -33,9 +35,9 @@ export default function TaskerTabs() {
             default: { elevation: 8 },
           }),
         },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Outfit_600SemiBold', color: colors.textSecondary },
+        tabBarActiveTintColor: '#F5A623',
+        tabBarInactiveTintColor: '#6F6B6B',
+        tabBarLabelStyle: { fontSize: 11, fontFamily: fonts.bodySemiBold, color: '#6F6B6B' },
         tabBarShowLabel: true,
       }}
     >

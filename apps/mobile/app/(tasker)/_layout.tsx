@@ -9,7 +9,7 @@ export default function TaskerLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.cream },
+        contentStyle: { backgroundColor: '#0D0D0D' },
       }}
     >
       <Stack.Screen name="(tabs)" />

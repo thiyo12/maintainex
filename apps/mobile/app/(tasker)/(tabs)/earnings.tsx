@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CreditCard } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
@@ -79,7 +79,7 @@ export default function TaskerEarnings() {
               {data?.pendingCommissionPayments?.map((cp) => (
                 <View key={cp.id} style={styles.commissionCard}>
                   <View style={styles.commissionHeader}>
-                    <Ionicons name="cash-outline" size={20} color={colors.amber} />
+                    <CreditCard size={20} color={colors.amber} />
                     <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
                   </View>
                   <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
@@ -129,7 +129,7 @@ export default function TaskerEarnings() {
             <Text style={styles.transactionTitle}>{t('wallet.transactions')}</Text>
             {(data?.transactions || []).length === 0 ? (
               <View style={styles.empty}>
-                <Ionicons name="cash-outline" size={48} color={colors.border} style={{ marginBottom: 12 }} />
+                <CreditCard size={48} color={colors.border} style={{ marginBottom: 12 }} />
                 <Text style={styles.emptyTitle}>{t('wallet.noTransactions')}</Text>
               </View>
             ) : (

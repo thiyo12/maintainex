@@ -128,7 +128,30 @@
 - `real-estate/upload.tsx` — V3.3 Create Listing (CaretLeft, Sparkle, Camera)
 - `real-estate/my-listings.tsx` — V3.3 My Listings (CaretLeft, Plus, House)
 
-### B8: Tasker Shell + Setup + Profile — PENDING
+## B8: Tasker Shell + Setup + Profile — CODE COMPLETE
+
+### B8 Verification
+- ✅ B8-introduced TypeScript errors = 0
+- ✅ Ionicons in B8 scope = 0
+- ✅ lib/design imports in B8 scope = 0
+
+### B8 Files Rewritten (11)
+**Shell (3):**
+- `(tasker)/_layout.tsx` — V3.3 Tasker Root Stack (canvas #0D0D0D)
+- `(tasker)/(tabs)/_layout.tsx` — V3.3 Tasker Tab Bar (lib/design→useColors+fonts, Compass/Briefcase/User)
+- `(tasker)/(tabs)/index.tsx` — V3.3 Tasker Dashboard (lib/design→useColors+fonts, online toggle, earnings, jobs feed, 15s polling)
+
+**Setup/Onboarding (5):**
+- `(tasker)/identity.tsx` — V3.3 KYC Identity (Ionicons→Phosphor: Camera, Image, CreditCard)
+- `(tasker)/readiness.tsx` — V3.3 Setup Checklist (Ionicons→Phosphor: CheckCircle, Lightning, MapPin, Clock)
+- `(tasker)/settings/availability.tsx` — V3.3 Availability (Ionicons→Phosphor: Play, Pause, Check, Clock)
+- `(tasker)/settings/service-area.tsx` — V3.3 Service Area (Ionicons→Phosphor: Navigation, MapPin)
+- `(tasker)/settings/job-selection.tsx` — V3.3 Job/Skills Selection (Ionicons→Phosphor: Wrench, Check)
+
+**Profile (3):**
+- `(tasker)/settings/edit-profile.tsx` — V3.3 Edit Profile (Ionicons→Phosphor: Shield)
+- `(tasker)/(tabs)/profile.tsx` — V3.3 Tasker Profile (Ionicons→Phosphor: 16 icons, unread badges, 30s polling)
+- `(tasker)/(tabs)/earnings.tsx` — V3.3 Earnings (Ionicons→Phosphor: CreditCard)
 ### B9: Tasker Work + Earnings — PENDING
 ### B10: Company Operations — PENDING
 ### B11: Company Finance/Contracts/Profile — PENDING

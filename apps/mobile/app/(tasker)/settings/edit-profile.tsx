@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Animated, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { Shield } from 'phosphor-react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
@@ -125,7 +125,7 @@ export default function TaskerEditProfile() {
             <Text style={styles.label}>{t('profile.fullName')}</Text>
             {nameLocked && (
               <View style={styles.verifiedBadge}>
-                <Ionicons name="shield-checkmark" size={12} color={colors.amber} />
+                <Shield size={12} color={colors.amber} weight="fill" />
                 <Text style={styles.verifiedBadgeText}>{t('profile.nameLocked')}</Text>
               </View>
             )}

@@ -9,7 +9,8 @@ import { useAuth } from '../../../lib/auth'
 import { taskers, earnings, notifications } from '../../../lib/api'
 import { v2Jobs, v2Identity } from '../../../lib/api-v2'
 import { on } from '../../../lib/events'
-import { colors, spacing, radius, typography, shadows } from '../../../lib/design'
+import { useColors } from '../../../lib/ThemeContext'
+import { fonts } from '../../../lib/fonts'
 import { categoryIcon } from '../../../lib/categoryVisuals'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'
@@ -26,6 +27,7 @@ export default function TaskerDashboard() {
   const { t } = useTranslation()
   const router = useRouter()
   const { user } = useAuth()
+  const colors = useColors()
 
   const [isOnline, setIsOnline] = useState(true)
   const [openJobs, setOpenJobs] = useState<any[]>([])
@@ -156,12 +158,14 @@ export default function TaskerDashboard() {
   const activeId = activeJob?.id
   const activeBudget = activeJob ? Number(activeJob.budgetAmount || 0) : 0
 
+  const styles = makeStyles(colors)
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor="#F5A623" />}
       >
         {/* ═══ Top bar ═══ */}
         <View style={styles.headerRow}>
@@ -171,7 +175,7 @@ export default function TaskerDashboard() {
           </View>
           <PressableScale onPress={() => router.push('/notifications')} scaleTo={0.94} style={styles.iconBtnPress}>
             <View style={styles.iconBtn}>
-              <Bell size={20} color={colors.textPrimary} weight="regular" />
+              <Bell size={20} color="#FFFFFF" weight="regular" />
               {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
             </View>
           </PressableScale>
@@ -180,24 +184,24 @@ export default function TaskerDashboard() {
         {/* ═══ Availability ═══ */}
         <PressableScale onPress={toggleOnline} scaleTo={0.99} style={styles.availPress}>
           <LinearGradient
-            colors={isOnline ? [colors.accent, colors.accentDim] : [colors.surface, colors.surfaceHigh]}
+            colors={isOnline ? ['#F5A623', '#D4900A'] : ['#FFFFFF', '#2E2E2E']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[styles.availCard, !isOnline && styles.availCardOffline]}
           >
             <View style={styles.availLeft}>
-              <View style={[styles.availDot, { backgroundColor: isOnline ? colors.background : colors.textSecondary }]} />
+              <View style={[styles.availDot, { backgroundColor: isOnline ? '#0D0D0D' : '#6F6B6B' }]} />
               <View>
-                <Text style={[styles.availTitle, { color: isOnline ? colors.background : colors.textPrimary }]}>
+                <Text style={[styles.availTitle, { color: isOnline ? '#0D0D0D' : '#FFFFFF' }]}>
                   {isOnline ? t('ui.youreOnline') : t('ui.youreOffline')}
                 </Text>
-                <Text style={[styles.availSub, { color: isOnline ? 'rgba(11,12,18,0.7)' : colors.textSecondary }]}>
+                <Text style={[styles.availSub, { color: isOnline ? 'rgba(11,12,18,0.7)' : '#6F6B6B' }]}>
                   {isOnline ? t('ui.tapToPause') : t('ui.tapToStart')}
                 </Text>
               </View>
             </View>
             <View style={[styles.availBadge, isOnline ? styles.availBadgeOn : styles.availBadgeOff]}>
               {!isOnline && <View style={styles.availPing} />}
-              <Text style={[styles.availBadgeText, { color: isOnline ? colors.background : colors.textPrimary }]}>
+              <Text style={[styles.availBadgeText, { color: isOnline ? '#0D0D0D' : '#FFFFFF' }]}>
                 {isOnline ? t('tasker.online') : t('tasker.paused')}
               </Text>
             </View>
@@ -225,22 +229,22 @@ export default function TaskerDashboard() {
           <View style={styles.earnCard}>
             <View style={styles.earnHead}>
               <Text style={styles.earnLabel}>{t('ui.availableBalance')}</Text>
-              <Wallet size={18} color={colors.accent} weight="fill" />
+              <Wallet size={18} color="#F5A623" weight="fill" />
             </View>
             <Text style={styles.earnBalance}>LKR {balance.toLocaleString()}</Text>
             <View style={styles.chipRow}>
               <View style={styles.chip}>
-                <Lightning size={14} color={colors.accent} weight="fill" />
+                <Lightning size={14} color="#F5A623" weight="fill" />
                 <Text style={styles.chipValue}>{today !== null ? `+${today.toLocaleString()}` : '—'}</Text>
                 <Text style={styles.chipLabel}>{t('ui.today')}</Text>
               </View>
               <View style={styles.chip}>
-                <CheckCircle size={14} color={colors.accent} weight="fill" />
+                <CheckCircle size={14} color="#F5A623" weight="fill" />
                 <Text style={styles.chipValue}>{doneJobs}</Text>
                 <Text style={styles.chipLabel}>{t('tasker.jobsDone')}</Text>
               </View>
               <View style={styles.chip}>
-                <Star size={14} color={colors.accent} weight="fill" />
+                <Star size={14} color="#F5A623" weight="fill" />
                 <Text style={styles.chipValue}>{rating ? rating.toFixed(1) : '—'}</Text>
                 <Text style={styles.chipLabel}>{t('tasker.rating')}</Text>
               </View>
@@ -256,23 +260,23 @@ export default function TaskerDashboard() {
         ) : activeJob ? (
           <AnimatedEntry delay={120}>
             <PressableScale onPress={() => router.push(`/(tasker)/jobs/v2/manage/${activeId}` as any)} scaleTo={0.98} style={styles.activePress}>
-              <LinearGradient colors={[colors.accent, colors.accentDim]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.activeCard}>
+              <LinearGradient colors={['#F5A623', '#D4900A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.activeCard}>
                 <View style={styles.activeGlow} />
                 <View style={styles.activeHead}>
                   <Text style={styles.activeLabel}>{t('ui.activeJob')}</Text>
                   <View style={styles.activeCountPill}>
-                    <Timer size={12} color={colors.background} weight="fill" />
+                    <Timer size={12} color="#0D0D0D" weight="fill" />
                     <Text style={styles.activeCountText}>{activeBudget > 0 ? `LKR ${activeBudget.toLocaleString()}` : ''}</Text>
                   </View>
                 </View>
                 <Text style={styles.activeTitle} numberOfLines={1}>{activeJob.title || 'Your job'}</Text>
                 <View style={styles.activeMeta}>
-                  <MapPin size={13} color={colors.background} weight="fill" />
+                  <MapPin size={13} color="#0D0D0D" weight="fill" />
                   <Text style={styles.activeMetaText} numberOfLines={1}>{activeJob.locationName || 'Location shared in chat'}</Text>
                 </View>
                 <View style={styles.activeCtaRow}>
                   <View style={styles.activeCta}>
-                    <ArrowRight size={16} color={colors.background} weight="bold" />
+                    <ArrowRight size={16} color="#0D0D0D" weight="bold" />
                     <Text style={styles.activeCtaText}>{t('ui.openJob')}</Text>
                   </View>
                 </View>
@@ -281,7 +285,7 @@ export default function TaskerDashboard() {
           </AnimatedEntry>
         ) : (
           <View style={styles.idleCard}>
-            <Coffee size={18} color={colors.accent} weight="fill" />
+            <Coffee size={18} color="#F5A623" weight="fill" />
             <Text style={styles.idleText}>{t('ui.noActiveJobs')}</Text>
             <PressableScale onPress={() => router.push('/(tasker)/jobs/v2/browse' as any)} scaleTo={0.96}>
               <Text style={styles.idleCta}>{t('ui.browseWork')} →</Text>
@@ -313,12 +317,12 @@ export default function TaskerDashboard() {
                 <AnimatedEntry key={job.id} delay={i * 70}>
                   <View style={styles.jobCard}>
                     <View style={styles.jobIconBox}>
-                      <Icon size={22} color={colors.accent} weight="fill" />
+                      <Icon size={22} color="#F5A623" weight="fill" />
                     </View>
                     <View style={styles.jobBody}>
                       <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
                       <View style={styles.jobMetaRow}>
-                        <MapPin size={12} color={colors.textSecondary} weight="fill" />
+                        <MapPin size={12} color="#6F6B6B" weight="fill" />
                         <Text style={styles.jobMetaText} numberOfLines={1}>{job.locationName || t('ui.nearYou')}</Text>
                       </View>
                       <Text style={styles.jobBudget}>LKR {(job.budgetAmount || 0).toLocaleString()}</Text>
@@ -339,97 +343,97 @@ export default function TaskerDashboard() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingBottom: 32, paddingHorizontal: spacing.md },
+const makeStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  scroll: { paddingBottom: 32, paddingHorizontal: 16 },
 
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.sm },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
   greetingBlock: {},
-  greetingSub: { ...typography.bodyMuted, fontSize: 14, fontFamily: 'Outfit_500Medium' },
-  greetingName: { ...typography.h1, fontSize: 28, letterSpacing: -0.5, marginTop: 2 },
-  iconBtnPress: { borderRadius: radius.full },
+  greetingSub: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#6F6B6B' },
+  greetingName: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF', letterSpacing: -0.5, marginTop: 2 },
+  iconBtnPress: { borderRadius: 999 },
   iconBtn: {
-    width: 44, height: 44, borderRadius: radius.full,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    width: 44, height: 44, borderRadius: 999,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E',
     alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
   bellDot: {
     position: 'absolute', top: 8, right: 9, width: 9, height: 9, borderRadius: 5,
-    backgroundColor: colors.accent, borderWidth: 1.5, borderColor: colors.background,
+    backgroundColor: '#F5A623', borderWidth: 1.5, borderColor: '#0D0D0D',
   },
 
-  availPress: { marginTop: spacing.lg, borderRadius: radius.lg, ...shadows.card },
-  availCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.lg, padding: spacing.md },
-  availCardOffline: { borderWidth: 1, borderColor: colors.border },
-  availLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  availPress: { marginTop: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  availCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, padding: 16 },
+  availCardOffline: { borderWidth: 1, borderColor: '#2E2E2E' },
+  availLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   availDot: { width: 12, height: 12, borderRadius: 6 },
-  availTitle: { ...typography.body, fontFamily: 'Outfit_700Bold', fontSize: 15 },
-  availSub: { ...typography.caption, marginTop: 2 },
-  availBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full },
-  availBadgeOn: { backgroundColor: colors.background },
-  availBadgeOff: { backgroundColor: colors.surfaceHigh, borderWidth: 1, borderColor: colors.border },
-  availPing: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent },
-  availBadgeText: { ...typography.caption, fontFamily: 'Outfit_700Bold' },
+  availTitle: { fontFamily: fonts.bodyBold, fontSize: 15 },
+  availSub: { fontFamily: fonts.body, marginTop: 2, fontSize: 12, color: '#6F6B6B' },
+  availBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  availBadgeOn: { backgroundColor: '#0D0D0D' },
+  availBadgeOff: { backgroundColor: '#2E2E2E', borderWidth: 1, borderColor: '#2E2E2E' },
+  availPing: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F5A623' },
+  availBadgeText: { fontFamily: fonts.body, fontSize: 12 },
 
-  earnCard: { marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadows.card },
+  earnCard: { marginTop: 24, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#2E2E2E', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   earnHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  earnLabel: { ...typography.label, color: colors.textSecondary },
-  earnBalance: { ...typography.h1, fontSize: 30, color: colors.accent, letterSpacing: -0.5, marginTop: 4 },
-  chipRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, backgroundColor: colors.surfaceHigh, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 8 },
-  chipValue: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_700Bold' },
-  chipLabel: { ...typography.caption, color: colors.textSecondary },
+  earnLabel: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 12 },
+  earnBalance: { fontSize: 30, fontFamily: fonts.heading, color: '#F5A623', letterSpacing: -0.5, marginTop: 4 },
+  chipRow: { flexDirection: 'row', gap: 8, marginTop: 24 },
+  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, backgroundColor: '#2E2E2E', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
+  chipValue: { fontFamily: fonts.body, color: '#FFFFFF', fontSize: 12 },
+  chipLabel: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 12 },
 
-  activeWrap: { marginTop: spacing.lg },
-  activePress: { marginTop: spacing.lg, borderRadius: radius.lg, ...shadows.card },
-  activeCard: { borderRadius: radius.lg, padding: spacing.lg, overflow: 'hidden' },
+  activeWrap: { marginTop: 24 },
+  activePress: { marginTop: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  activeCard: { borderRadius: 16, padding: 24, overflow: 'hidden' },
   activeGlow: { position: 'absolute', right: -40, top: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255,255,255,0.12)' },
-  activeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  activeLabel: { ...typography.label, color: colors.background, opacity: 0.85, fontFamily: 'Outfit_600SemiBold' },
-  activeCountPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(11,12,18,0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
-  activeCountText: { ...typography.caption, color: colors.textPrimary, fontFamily: 'Outfit_600SemiBold' },
-  activeTitle: { ...typography.h3, fontSize: 21, color: colors.background },
-  activeMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: spacing.sm },
-  activeMetaText: { ...typography.caption, color: colors.background, opacity: 0.9, flex: 1 },
-  activeCtaRow: { marginTop: spacing.lg },
+  activeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  activeLabel: { fontFamily: fonts.bodySemiBold, color: '#0D0D0D', opacity: 0.85, fontSize: 12 },
+  activeCountPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(11,12,18,0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  activeCountText: { fontFamily: fonts.bodySemiBold, color: '#FFFFFF', fontSize: 12 },
+  activeTitle: { fontSize: 21, fontFamily: fonts.heading, color: '#0D0D0D' },
+  activeMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  activeMetaText: { fontFamily: fonts.body, color: '#0D0D0D', opacity: 0.9, flex: 1, fontSize: 12 },
+  activeCtaRow: { marginTop: 24 },
   activeCta: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.background, paddingVertical: 10, paddingHorizontal: 16, borderRadius: radius.full,
+    backgroundColor: '#0D0D0D', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 999,
   },
-  activeCtaText: { ...typography.body, color: colors.textPrimary, fontFamily: 'Outfit_700Bold', fontSize: 14 },
+  activeCtaText: { fontFamily: fonts.bodyBold, color: '#FFFFFF', fontSize: 14 },
 
   idleCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg,
-    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2E2E2E',
   },
-  idleText: { ...typography.body, color: colors.textSecondary, flex: 1, fontSize: 14, fontFamily: 'Outfit_500Medium' },
-  idleCta: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_700Bold' },
+  idleText: { fontFamily: fonts.body, color: '#6F6B6B', flex: 1, fontSize: 14 },
+  idleCta: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12 },
 
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.md },
-  sectionTitle: { ...typography.h3, fontSize: 18 },
-  seeAll: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_600SemiBold' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontFamily: fonts.heading, color: '#FFFFFF' },
+  seeAll: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12 },
 
-  feedGap: { gap: spacing.sm },
+  feedGap: { gap: 8 },
   jobCard: {
-    flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E',
   },
-  jobIconBox: { width: 44, height: 44, borderRadius: radius.sm * 1.5, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  jobBody: { flex: 1, marginLeft: spacing.md },
-  jobTitle: { ...typography.body, fontFamily: 'Outfit_600SemiBold', fontSize: 15 },
+  jobIconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF1D2', alignItems: 'center', justifyContent: 'center' },
+  jobBody: { flex: 1, marginLeft: 16 },
+  jobTitle: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: '#FFFFFF' },
   jobMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  jobMetaText: { ...typography.caption, color: colors.textSecondary, flex: 1 },
-  jobBudget: { ...typography.caption, color: colors.accent, fontFamily: 'Outfit_700Bold', marginTop: 4 },
-  quotePress: { paddingLeft: spacing.sm },
-  quoteBtn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.full },
-  quoteText: { ...typography.caption, color: colors.background, fontFamily: 'Outfit_700Bold' },
+  jobMetaText: { fontFamily: fonts.body, color: '#6F6B6B', flex: 1, fontSize: 12 },
+  jobBudget: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12, marginTop: 4 },
+  quotePress: { paddingLeft: 8 },
+  quoteBtn: { backgroundColor: '#F5A623', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
+  quoteText: { fontFamily: fonts.body, color: '#0D0D0D', fontSize: 12 },
 
-  feedEmpty: { alignItems: 'center', paddingVertical: spacing.xl, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed' },
-  feedEmptyText: { ...typography.bodyMuted },
+  feedEmpty: { alignItems: 'center', paddingVertical: 32, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#2E2E2E', borderStyle: 'dashed' },
+  feedEmptyText: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 14 },
 
   readinessBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg,
-    backgroundColor: '#FFFBEB', borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: '#FDE68A',
+    flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 24,
+    backgroundColor: '#FFFBEB', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FDE68A',
   },
   readinessTitle: { fontSize: 14, fontWeight: '700', color: '#92400E' },
   readinessSub: { fontSize: 12, color: '#B45309', marginTop: 2 },

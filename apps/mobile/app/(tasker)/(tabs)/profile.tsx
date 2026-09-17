@@ -2,7 +2,24 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import {
+  Wrench,
+  Lightning,
+  Images,
+  Image,
+  ChatCircleDots,
+  Star,
+  ShieldCheck,
+  CheckCircle,
+  CaretRight,
+  Wallet,
+  Bell,
+  UserCircle,
+  SignOut,
+  CreditCard,
+  Ribbon,
+  Shield,
+} from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { taskers, getAuthToken, conversations, notifications } from '../../../lib/api'
@@ -151,9 +168,9 @@ export default function TaskerProfile() {
   ]
 
   const verifications = [
-    { icon: 'card-outline', title: 'National ID Verified', sub: 'Checked against NIC database', done: true },
-    { icon: 'ribbon-outline', title: 'Trade Certificate', sub: 'Vocational Training Authority', done: true },
-    { icon: 'shield-outline', title: 'Skill Test', sub: 'Take a quick assessment', done: false },
+    { icon: 'card', title: 'National ID Verified', sub: 'Checked against NIC database', done: true },
+    { icon: 'ribbon', title: 'Trade Certificate', sub: 'Vocational Training Authority', done: true },
+    { icon: 'shield', title: 'Skill Test', sub: 'Take a quick assessment', done: false },
   ] as const
 
   return (
@@ -184,20 +201,20 @@ export default function TaskerProfile() {
         <Animated.View style={[styles.card, sectionAnim2]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="construct-outline" size={14} color={colors.amberDark} />
+              <Wrench size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
             <View style={styles.chipRow}>
               {skills.length > 0 ? skills.map((s: string) => (
                 <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                  <Ionicons name="flash-outline" size={12} color={colors.amberDark} />
+                  <Lightning size={12} color={colors.amberDark} />
                   <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
                 </Animated.View>
               )) : (
                 <>
-                  {[{ icon: 'flash-outline', label: 'Wiring' }, { icon: 'bulb-outline', label: 'Lighting' }, { icon: 'power-outline', label: 'Inverters' }, { icon: 'flash-outline', label: 'Wiring Repairs' }].map((s) => (
+                  {[{ icon: 'lightning', label: 'Wiring' }, { icon: 'lightning', label: 'Lighting' }, { icon: 'lightning', label: 'Inverters' }, { icon: 'lightning', label: 'Wiring Repairs' }].map((s) => (
                     <Animated.View key={s.label} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                      <Ionicons name={s.icon as any} size={12} color={colors.amberDark} />
+                      <Lightning size={12} color={colors.amberDark} />
                       <Text style={[styles.chipText, { color: colors.amberDark }]}>{s.label}</Text>
                     </Animated.View>
                   ))}
@@ -210,13 +227,13 @@ export default function TaskerProfile() {
         <Animated.View style={[styles.card, sectionAnim3]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="images-outline" size={14} color={colors.amberDark} />
+              <Images size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
             <View style={styles.portGrid}>
               {[1, 2, 3].map((i) => (
                 <Animated.View key={i} style={[styles.portItem, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
-                  <Ionicons name="image-outline" size={22} color={colors.muted} />
+                  <Image size={22} color={colors.muted} />
                 </Animated.View>
               ))}
             </View>
@@ -226,7 +243,7 @@ export default function TaskerProfile() {
         <Animated.View style={[styles.card, sectionAnim4]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
+              <ChatCircleDots size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
             {reviews.map((rev, i) => (
@@ -239,7 +256,7 @@ export default function TaskerProfile() {
                     <Text style={[styles.revName, { color: colors.ink }]}>{rev.name}</Text>
                     <View style={styles.revStars}>
                       {Array.from({ length: 5 }).map((_, si) => (
-                        <Ionicons key={si} name={si < rev.stars ? 'star' : 'star-outline'} size={11} color={colors.amber} />
+                        <Star key={si} size={11} color={colors.amber} weight={si < rev.stars ? 'fill' : 'regular'} />
                       ))}
                     </View>
                   </View>
@@ -253,13 +270,15 @@ export default function TaskerProfile() {
         <Animated.View style={[styles.card, sectionAnim5, { marginBottom: 24 }]}>
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <Ionicons name="shield-checkmark-outline" size={14} color={colors.amberDark} />
+              <ShieldCheck size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.identityVerification')}</Text>
             </View>
             {verifications.map((v, i) => (
               <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
-                  <Ionicons name={v.icon as any} size={16} color={v.done ? '#059669' : colors.amberDark} />
+                  {v.icon === 'card' && <CreditCard size={16} color={v.done ? '#059669' : colors.amberDark} />}
+                  {v.icon === 'ribbon' && <Ribbon size={16} color={v.done ? '#059669' : colors.amberDark} />}
+                  {v.icon === 'shield' && <Shield size={16} color={v.done ? '#059669' : colors.amberDark} />}
                 </View>
                 <View style={styles.verifText}>
                   <Text style={[styles.verifTitle, { color: colors.ink }]}>{v.title}</Text>
@@ -282,37 +301,37 @@ export default function TaskerProfile() {
               onPress={() => router.push('/(tasker)/readiness' as any)}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#D97706" />
+                <CheckCircle size={16} color="#D97706" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('readiness.title')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/(tasker)/(tabs)/earnings')}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="wallet-outline" size={16} color="#059669" />
+                <Wallet size={16} color="#059669" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>Earnings</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/(tasker)/settings/job-selection')}
             >
               <View style={[styles.menuIcon, { backgroundColor: colors.amberLight }]}>
-                <Ionicons name="construct-outline" size={16} color={colors.amberDark} />
+                <Wrench size={16} color={colors.amberDark} />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>Your Services</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/(chat)' as any)}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="chatbubble-ellipses-outline" size={16} color="#2563EB" />
+                <ChatCircleDots size={16} color="#2563EB" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.messages')}</Text>
               {unreadMsgs > 0 && (
@@ -320,14 +339,14 @@ export default function TaskerProfile() {
                   <Text style={styles.badgeText}>{unreadMsgs > 99 ? '99+' : unreadMsgs}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/notifications' as any)}
             >
               <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="notifications-outline" size={16} color="#D48900" />
+                <Bell size={16} color="#D48900" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.notifications')}</Text>
               {unreadNotifs > 0 && (
@@ -335,21 +354,21 @@ export default function TaskerProfile() {
                   <Text style={styles.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/settings/my-profile')}>
               <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
-                <Ionicons name="person-circle-outline" size={16} color="#7C3AED" />
+                <UserCircle size={16} color="#7C3AED" />
               </View>
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('tasker.myProfile')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
               <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="log-out-outline" size={16} color="#DC2626" />
+                <SignOut size={16} color="#DC2626" />
               </View>
               <Text style={[styles.menuTitle, { color: '#DC2626' }]}>{t('profile.logout')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <CaretRight size={16} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </Animated.View>

@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
-import { MapPin } from 'phosphor-react-native'
+import { MapPin, Navigation } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
@@ -136,7 +135,7 @@ export default function ServiceAreaScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
+        <ActivityIndicator size="large" color="#F5A623" style={{ marginTop: 60 }} />
       </SafeAreaView>
     )
   }
@@ -149,13 +148,13 @@ export default function ServiceAreaScreen() {
 
         {/* Auto-detect */}
         <TouchableOpacity style={styles.detectBtn} onPress={detectLocation} activeOpacity={0.7}>
-          <Ionicons name="locate-outline" size={20} color={colors.amberDark} />
+          <Navigation size={20} color="#D4900A" weight="fill" />
           <Text style={styles.detectBtnText}>{t('serviceArea.detectedLocation')}</Text>
         </TouchableOpacity>
 
         {detectedLocation && (
           <View style={styles.detectedCard}>
-            <MapPin size={16} color={colors.amberDark} weight="fill" />
+            <MapPin size={16} color="#D4900A" weight="fill" />
             <Text style={styles.detectedText}>{detectedLocation}</Text>
           </View>
         )}
@@ -212,7 +211,7 @@ export default function ServiceAreaScreen() {
           activeOpacity={0.7}
         >
           {saving ? (
-            <ActivityIndicator size="small" color={colors.white} />
+            <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.saveBtnText}>{t('serviceArea.save')}</Text>
           )}
@@ -225,53 +224,53 @@ export default function ServiceAreaScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: colors.ink, marginTop: 16 },
-  subtitle: { fontSize: 14, color: colors.muted, marginTop: 4, marginBottom: 20, lineHeight: 20 },
+  heading: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', marginTop: 16 },
+  subtitle: { fontSize: 14, color: '#6F6B6B', marginTop: 4, marginBottom: 20, lineHeight: 20 },
 
   detectBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.white,
-    padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: colors.amberLight, marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFFFF',
+    padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#FFF1D2', marginBottom: 12,
   },
-  detectBtnText: { fontSize: 14, fontWeight: '600', color: colors.amberDark },
+  detectBtnText: { fontSize: 14, fontWeight: '600', color: '#D4900A' },
   detectedCard: {
     flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#D1FAE5',
     padding: 12, borderRadius: 12, marginBottom: 20,
   },
   detectedText: { fontSize: 13, color: '#065F46', fontWeight: '600', flex: 1 },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.ink, marginBottom: 10, marginTop: 8 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#FFFFFF', marginBottom: 10, marginTop: 8 },
 
   radiusRow: { flexDirection: 'row', gap: 8, marginBottom: 20, flexWrap: 'wrap' },
   radiusBtn: {
     paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20,
-    backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#2E2E2E',
   },
-  radiusBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  radiusBtnText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  radiusBtnTextSelected: { color: colors.amberDark },
+  radiusBtnSelected: { borderColor: '#F5A623', backgroundColor: '#FFF1D2' },
+  radiusBtnText: { fontSize: 13, fontWeight: '600', color: '#6F6B6B' },
+  radiusBtnTextSelected: { color: '#D4900A' },
 
   stateGroup: { marginBottom: 16 },
-  stateLabel: { fontSize: 12, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 },
+  stateLabel: { fontSize: 12, fontWeight: '700', color: '#6F6B6B', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 0.5 },
 
   areaBtn: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
-    padding: 14, borderRadius: 12, marginBottom: 6, borderWidth: 1.5, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+    padding: 14, borderRadius: 12, marginBottom: 6, borderWidth: 1.5, borderColor: '#2E2E2E',
   },
-  areaBtnSelected: { borderColor: colors.amber, backgroundColor: colors.amberBg },
+  areaBtnSelected: { borderColor: '#F5A623', backgroundColor: '#FFF1D2' },
   areaRadio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border,
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#2E2E2E',
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
-  areaRadioSelected: { borderColor: colors.amber },
-  areaRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber },
+  areaRadioSelected: { borderColor: '#F5A623' },
+  areaRadioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#F5A623' },
   areaBody: { flex: 1 },
-  areaName: { fontSize: 14, fontWeight: '600', color: colors.ink },
-  areaNameSelected: { color: colors.amberDark },
-  areaCity: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  areaName: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
+  areaNameSelected: { color: '#D4900A' },
+  areaCity: { fontSize: 12, color: '#6F6B6B', marginTop: 2 },
 
-  saveBtn: { backgroundColor: colors.amber, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
+  saveBtn: { backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
   saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 })

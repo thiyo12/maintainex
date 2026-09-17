@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
+import { CaretLeft, Check, Wrench } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { skillsApi } from '../../../lib/api'
@@ -100,7 +100,7 @@ export default function JobSelectionScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+          <CaretLeft size={24} color="#FFFFFF" weight="bold" />
         </TouchableOpacity>
         <Text style={styles.heading}>Your Services</Text>
         <View style={{ width: 24 }} />
@@ -108,7 +108,7 @@ export default function JobSelectionScreen() {
 
       {loading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={colors.amber} />
+          <ActivityIndicator size="large" color="#F5A623" />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -117,37 +117,37 @@ export default function JobSelectionScreen() {
           </Text>
 
           {cats.map((cat, ci) => (
-            <View key={cat.id} style={[styles.catCard, { backgroundColor: colors.white }]}>
+            <View key={cat.id} style={[styles.catCard, { backgroundColor: '#FFFFFF' }]}>
               <View style={styles.catHeader}>
-                <Ionicons name={(cat.iconName || 'construct-outline') as any} size={16} color={colors.amber} />
-                <Text style={[styles.catName, { color: colors.ink }]}>{cat.name}</Text>
+                <Wrench size={16} color="#F5A623" weight="fill" />
+                <Text style={[styles.catName, { color: '#FFFFFF' }]}>{cat.name}</Text>
               </View>
               {cat.jobs.length === 0 ? (
-                <Text style={[styles.emptyJobs, { color: colors.muted }]}>No jobs in this category yet.</Text>
+                <Text style={[styles.emptyJobs, { color: '#6F6B6B' }]}>No jobs in this category yet.</Text>
               ) : (
                 cat.jobs.map((job, ji) => (
                   <TouchableOpacity key={job.id} style={styles.jobRow} onPress={() => toggle(ci, ji)} activeOpacity={0.7}>
-                    <View style={[styles.check, job.selected && { backgroundColor: colors.amber, borderColor: colors.amber }]}>
-                      {job.selected && <Ionicons name="checkmark" size={13} color="#0D0D0D" />}
+                    <View style={[styles.check, job.selected && { backgroundColor: '#F5A623', borderColor: '#F5A623' }]}>
+                      {job.selected && <Check size={13} color="#0D0D0D" weight="fill" />}
                     </View>
                     <View style={styles.jobBody}>
-                      <Text style={[styles.jobName, { color: colors.ink }]}>{job.name}</Text>
+                      <Text style={[styles.jobName, { color: '#FFFFFF' }]}>{job.name}</Text>
                       {job.selected ? (
                         <View>
-                          <View style={[styles.rateWrap, { borderColor: colors.border }]}>
-                            <Text style={[styles.rateLabel, { color: colors.muted }]}>Rate ({job.currency}/hr)</Text>
+                          <View style={[styles.rateWrap, { borderColor: '#2E2E2E' }]}>
+                            <Text style={[styles.rateLabel, { color: '#6F6B6B' }]}>Rate ({job.currency}/hr)</Text>
                             <TextInput
-                              style={[styles.rateInput, { color: colors.ink }]}
+                              style={[styles.rateInput, { color: '#FFFFFF' }]}
                               value={String(job.hourlyRate || '')}
                               keyboardType="numeric"
                               placeholder={`Default ${job.priceMin || ''}`}
-                              placeholderTextColor={colors.muted}
+                              placeholderTextColor="#6F6B6B"
                               onPressIn={(e: any) => e.stopPropagation?.()}
                               onChangeText={(v) => patchJob(ci, ji, { hourlyRate: Number(v) || 0 })}
                             />
                           </View>
                           <View style={styles.levelWrap}>
-                            <Text style={[styles.rateLabel, { color: colors.muted }]}>Experience</Text>
+                            <Text style={[styles.rateLabel, { color: '#6F6B6B' }]}>Experience</Text>
                             <View style={styles.levelRow}>
                               {LEVELS.map(lv => (
                                 <TouchableOpacity
@@ -155,10 +155,10 @@ export default function JobSelectionScreen() {
                                   onPress={(e: any) => { e.stopPropagation?.(); patchJob(ci, ji, { experienceLevel: lv.value }) }}
                                   style={[
                                     styles.levelBtn,
-                                    job.experienceLevel === lv.value ? { backgroundColor: colors.amber } : { backgroundColor: colors.surface },
+                                    job.experienceLevel === lv.value ? { backgroundColor: '#F5A623' } : { backgroundColor: '#2E2E2E' },
                                   ]}
                                 >
-                                  <Text style={[styles.levelText, { color: job.experienceLevel === lv.value ? '#0D0D0D' : colors.muted }]}>
+                                  <Text style={[styles.levelText, { color: job.experienceLevel === lv.value ? '#0D0D0D' : '#6F6B6B' }]}>
                                     {lv.label}
                                   </Text>
                                 </TouchableOpacity>
@@ -174,7 +174,7 @@ export default function JobSelectionScreen() {
             </View>
           ))}
 
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.amber }, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
+          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#F5A623' }, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
             {saving ? (
               <ActivityIndicator size="small" color="#0D0D0D" />
             ) : (
@@ -188,18 +188,18 @@ export default function JobSelectionScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+  container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  heading: { fontSize: 18, fontFamily: fonts.bodyBold, color: colors.ink },
+  heading: { fontSize: 18, fontFamily: fonts.bodyBold, color: '#FFFFFF' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40 },
-  subTitle: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginBottom: 16, lineHeight: 19 },
+  subTitle: { fontSize: 13, fontFamily: fonts.body, color: '#6F6B6B', marginBottom: 16, lineHeight: 19 },
   catCard: { borderRadius: 16, padding: 14, marginBottom: 12 },
   catHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   catName: { fontSize: 15, fontFamily: fonts.bodyBold },
   emptyJobs: { fontSize: 12, fontFamily: fonts.body, paddingVertical: 8 },
-  jobRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.border, marginTop: 4 },
-  check: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: colors.muted, alignItems: 'center', justifyContent: 'center', marginTop: 1, marginRight: 10 },
+  jobRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2E2E2E', marginTop: 4 },
+  check: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#6F6B6B', alignItems: 'center', justifyContent: 'center', marginTop: 1, marginRight: 10 },
   jobBody: { flex: 1 },
   jobName: { fontSize: 14, fontFamily: fonts.bodyMedium },
   rateWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginTop: 8 },
