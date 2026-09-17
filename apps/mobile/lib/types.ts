@@ -21,6 +21,10 @@ export interface User {
   gender?: 'MALE' | 'FEMALE' | 'OTHER'
   language?: 'EN' | 'TA' | 'SI'
   emergencyContact?: string
+  area?: string
+  city?: string
+  province?: string
+  region?: string
 }
 
 export interface AuthResponse {
