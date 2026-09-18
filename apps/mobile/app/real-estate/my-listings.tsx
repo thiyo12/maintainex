@@ -1,32 +1,36 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Alert } from 'react-native'
+import { useCallback, useEffect, useState } from 'react'
+import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CaretLeft, Plus, House } from 'phosphor-react-native'
-import { useTheme } from '../../lib/ThemeContext'
+import { House, Plus, Sparkle, Trash } from 'phosphor-react-native'
 import { realEstate } from '../../lib/api'
-import { fonts } from '../../lib/fonts'
-import { spacing, fontSizes } from '../../lib/tokens'
+import { v3 } from '../../theme/v3/tokens'
+import V3PageHeader from '../../components/v3/V3PageHeader'
 
-const STATUS_TABS = ['all', 'draft', 'pending', 'approved', 'rejected']
+const TABS = ['all', 'pending', 'approved', 'rejected'] as const
 
-export default function myListings() {
-  const { colors } = useTheme()
-  const styles = makeStyles(colors)
+function money(value: unknown, countryCode?: string) {
+  const n = Number(value)
+  return Number.isFinite(n) ? `${countryCode === 'CA' ? 'CAD' : 'LKR'} ${Math.round(n).toLocaleString()}` : 'Price on request'
+}
+
+export default function MyListingsScreen() {
   const router = useRouter()
   const [listings, setListings] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('all')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState('all')
 
   const load = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true)
+    else setLoading(true)
     try {
-      if (refresh) setRefreshing(true)
-      else setLoading(true)
-      const data = await realEstate.myListings({ status: activeTab === 'all' ? undefined : activeTab })
-      setListings(data?.data || data || [])
-    } catch (e) {
-      console.error('Load my listings error:', e)
+      const response: any = await realEstate.myListings()
+      const list = Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
+      setListings(activeTab === 'all' ? list : list.filter((item: any) => item.status === activeTab))
+    } catch (error) {
+      console.error('Load my listings error:', error)
+      setListings([])
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -35,138 +39,86 @@ export default function myListings() {
 
   useEffect(() => { load() }, [load])
 
-  const handleDelete = (id: string) => {
-    Alert.alert('Delete Listing', 'Are you sure?', [
+  const remove = (id: string) => {
+    Alert.alert('Delete listing?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => {
-        try {
-          await realEstate.delete(id)
-          setListings(prev => prev.filter(l => l.id !== id))
-        } catch {}
-      }},
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await realEstate.delete(id)
+            setListings((current) => current.filter((item) => item.id !== id))
+          } catch (error: any) {
+            Alert.alert('Could not delete', error?.message || 'Please try again.')
+          }
+        },
+      },
     ])
   }
 
-  const handleSubmit = async (id: string) => {
-    try {
-      await realEstate.submit(id)
-      Alert.alert('Submitted', 'Your listing is now under review')
-      load()
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to submit')
-    }
-  }
-
-  const handleBoost = async (id: string) => {
-    Alert.alert('Boost Listing', 'Choose boost tier', [
-      { text: 'Basic (7 days)', onPress: () => doBoost(id, 'basic') },
-      { text: 'Premium (14 days)', onPress: () => doBoost(id, 'premium') },
-      { text: 'Top (30 days)', onPress: () => doBoost(id, 'top') },
+  const boost = (id: string) => {
+    Alert.alert('Boost listing', 'Choose a promotion tier.', [
+      { text: 'Basic', onPress: async () => { try { await realEstate.boost(id, 'basic'); load() } catch {} } },
+      { text: 'Premium', onPress: async () => { try { await realEstate.boost(id, 'premium'); load() } catch {} } },
       { text: 'Cancel', style: 'cancel' },
     ])
-  }
-
-  const doBoost = async (id: string, tier: string) => {
-    try {
-      await realEstate.boost(id, tier)
-      Alert.alert('Boosted!', `Listing boosted with ${tier} tier`)
-      load()
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to boost')
-    }
-  }
-
-  const statusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return '#10B981'
-      case 'pending': return '#F5A623'
-      case 'rejected': return '#EF4444'
-      case 'draft': return '#6B7280'
-      default: return colors.muted
-    }
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <CaretLeft size={22} color={colors.ink} weight="regular" />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.ink }]}>My Listings</Text>
-        <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.amber }]} onPress={() => router.push('/real-estate/upload')}>
-          <Plus size={20} color="#111" weight="bold" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader
+        title="My listings"
+        subtitle="Manage property status, reach and performance."
+        right={
+          <TouchableOpacity style={styles.add} onPress={() => router.push('/real-estate/upload' as any)}>
+            <Plus size={19} color={v3.colors.paper} weight="bold" />
+          </TouchableOpacity>
+        }
+      />
 
-      {/* Status Tabs */}
-      <View style={styles.tabRow}>
-        {STATUS_TABS.map(tab => (
-          <TouchableOpacity key={tab} style={[styles.tab, activeTab === tab && { backgroundColor: colors.amber }]} onPress={() => setActiveTab(tab)}>
-            <Text style={[styles.tabText, { color: activeTab === tab ? '#111' : colors.muted }]}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+        {TABS.map((tab) => (
+          <TouchableOpacity key={tab} onPress={() => setActiveTab(tab)} style={[styles.tab, activeTab === tab && styles.tabActive]}>
+            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.amber} />
-        </View>
-      ) : listings.length === 0 ? (
-        <View style={styles.center}>
-          <House size={48} color={colors.muted} weight="regular" />
-          <Text style={[styles.emptyText, { color: colors.muted }]}>No listings found</Text>
-          <TouchableOpacity style={[styles.createBtn, { backgroundColor: colors.amber }]} onPress={() => router.push('/real-estate/upload')}>
-            <Text style={styles.createBtnText}>Create Listing</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.center}><ActivityIndicator color={v3.colors.ink} /></View>
       ) : (
         <FlatList
           data={listings}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.amber} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={v3.colors.ink} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <House size={34} color={v3.colors.ink} weight="fill" />
+              <Text style={styles.emptyTitle}>No listings here</Text>
+              <Text style={styles.emptyText}>Create your first property listing or switch the filter.</Text>
+              <TouchableOpacity style={styles.primary} onPress={() => router.push('/real-estate/upload' as any)}>
+                <Text style={styles.primaryText}>List a property</Text>
+              </TouchableOpacity>
+            </View>
+          }
           renderItem={({ item }) => (
-            <TouchableOpacity style={[styles.listingCard, { backgroundColor: colors.white, borderColor: colors.border }]} onPress={() => router.push(`/real-estate/${item.id}`)}>
-              <View style={styles.listingHeader}>
-                <View style={[styles.statusBadge, { backgroundColor: statusColor(item.status) + '20' }]}>
-                  <Text style={[styles.statusText, { color: statusColor(item.status) }]}>{item.status}</Text>
+            <TouchableOpacity activeOpacity={0.82} style={styles.card} onPress={() => router.push(`/real-estate/${item.id}` as any)}>
+              <View style={styles.topRow}>
+                <View style={[styles.status, statusStyle(item.status)]}>
+                  <Text style={[styles.statusText, statusTextStyle(item.status)]}>{String(item.status || 'unknown').toUpperCase()}</Text>
                 </View>
-                {item.isFeatured && (
-                  <View style={[styles.featuredBadge, { backgroundColor: '#FEF3C7' }]}>
-                    <Text style={[styles.featuredText, { color: '#D48900' }]}>Featured</Text>
-                  </View>
-                )}
-                {item.boostTier && (
-                  <View style={[styles.boostBadge, { backgroundColor: '#DBEAFE' }]}>
-                    <Text style={[styles.boostText, { color: '#2563EB' }]}>{item.boostTier}</Text>
-                  </View>
-                )}
+                {item.isFeatured ? <View style={styles.featured}><Text style={styles.featuredText}>FEATURED</Text></View> : null}
+                {item.boostTier ? <View style={styles.boost}><Text style={styles.boostText}>{String(item.boostTier).toUpperCase()}</Text></View> : null}
               </View>
-              <Text style={[styles.listingTitle, { color: colors.ink }]} numberOfLines={1}>{item.title}</Text>
-              <Text style={[styles.listingPrice, { color: colors.amber }]}>
-                {item.countryCode === 'CA' ? 'CAD' : 'Rs.'} {item.priceLkr?.toLocaleString()}
-              </Text>
-              <Text style={[styles.listingLocation, { color: colors.muted }]} numberOfLines={1}>
-                {item.city || item.district || item.address || 'No location'}
-              </Text>
-              <View style={styles.listingStats}>
-                <Text style={[styles.statText, { color: colors.muted }]}>{item.views} views</Text>
-                <Text style={[styles.statText, { color: colors.muted }]}>{item.saves} saves</Text>
-              </View>
-              <View style={styles.listingActions}>
-                {item.status === 'draft' || item.status === 'rejected' ? (
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.amber }]} onPress={() => handleSubmit(item.id)}>
-                    <Text style={styles.actionBtnText}>Submit</Text>
-                  </TouchableOpacity>
-                ) : null}
+              <Text style={styles.title} numberOfLines={1}>{item.title || 'Property'}</Text>
+              <Text style={styles.price}>{money(item.priceLkr, item.countryCode)}</Text>
+              <Text style={styles.location} numberOfLines={1}>{[item.area, item.city, item.district].filter(Boolean).join(', ') || 'No location added'}</Text>
+              <View style={styles.stats}><Text style={styles.stat}>{item.views || 0} views</Text><Text style={styles.stat}>{item.saves || 0} saves</Text></View>
+              <View style={styles.actions}>
                 {item.status === 'approved' && !item.boostTier ? (
-                  <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#DBEAFE' }]} onPress={() => handleBoost(item.id)}>
-                    <Text style={[styles.actionBtnText, { color: '#2563EB' }]}>Boost</Text>
-                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => boost(item.id)} style={styles.action}><Sparkle size={15} color={v3.colors.ink} weight="fill" /><Text style={styles.actionText}>Boost</Text></TouchableOpacity>
                 ) : null}
-                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => handleDelete(item.id)}>
-                  <Text style={[styles.actionBtnText, { color: '#DC2626' }]}>Delete</Text>
-                </TouchableOpacity>
+                <TouchableOpacity onPress={() => remove(item.id)} style={[styles.action, styles.deleteAction]}><Trash size={15} color={v3.colors.error} weight="bold" /><Text style={[styles.actionText, { color: v3.colors.error }]}>Delete</Text></TouchableOpacity>
               </View>
             </TouchableOpacity>
           )}
@@ -176,34 +128,47 @@ export default function myListings() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.md },
-  backBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
-  title: { flex: 1, fontSize: fontSizes.h2, fontFamily: fonts.heading },
-  addBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  tabRow: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.xl, marginBottom: spacing.md },
-  tab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 100, backgroundColor: colors.white },
-  tabText: { fontSize: 12, fontFamily: fonts.bodyMedium },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
-  emptyText: { fontSize: fontSizes.body, fontFamily: fonts.body },
-  createBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, marginTop: spacing.md },
-  createBtnText: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, color: '#111' },
-  list: { paddingHorizontal: spacing.xl, paddingBottom: 32 },
-  listingCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 12 },
-  listingHeader: { flexDirection: 'row', gap: 6, marginBottom: 8 },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  statusText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  featuredBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  featuredText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  boostBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100 },
-  boostText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  listingTitle: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, marginBottom: 4 },
-  listingPrice: { fontSize: fontSizes.body, fontFamily: fonts.heading, marginBottom: 2 },
-  listingLocation: { fontSize: fontSizes.caption, fontFamily: fonts.body, marginBottom: 8 },
-  listingStats: { flexDirection: 'row', gap: 16, marginBottom: 12 },
-  statText: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body },
-  listingActions: { flexDirection: 'row', gap: 8 },
-  actionBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8 },
-  actionBtnText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#111' },
+function statusStyle(status: string) {
+  if (status === 'approved') return { backgroundColor: v3.colors.successSoft }
+  if (status === 'rejected') return { backgroundColor: v3.colors.errorSoft }
+  return { backgroundColor: v3.colors.amberSoft }
+}
+function statusTextStyle(status: string) {
+  if (status === 'approved') return { color: v3.colors.success }
+  if (status === 'rejected') return { color: v3.colors.error }
+  return { color: v3.colors.amberDark }
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  add: { width: 40, height: 40, borderRadius: 20, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  tabs: { paddingHorizontal: 18, paddingBottom: 12, gap: 8 },
+  tab: { height: 36, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper, justifyContent: 'center' },
+  tabActive: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  tabText: { fontFamily: 'Outfit_700Bold', fontSize: 11.5, color: v3.colors.ink },
+  tabTextActive: { color: v3.colors.paper },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list: { paddingHorizontal: 18, paddingBottom: 36 },
+  empty: { marginTop: 28, padding: 28, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center' },
+  emptyTitle: { marginTop: 10, fontFamily: 'Outfit_800ExtraBold', fontSize: 17, color: v3.colors.ink },
+  emptyText: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 12, lineHeight: 18, color: v3.colors.textSecondary, textAlign: 'center' },
+  primary: { marginTop: 16, height: 46, paddingHorizontal: 18, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  primaryText: { fontFamily: 'Outfit_700Bold', fontSize: 12.5, color: v3.colors.paper },
+  card: { marginBottom: 10, padding: 15, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  status: { height: 24, paddingHorizontal: 8, borderRadius: 9, justifyContent: 'center' },
+  statusText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9, letterSpacing: 0.5 },
+  featured: { height: 24, paddingHorizontal: 8, borderRadius: 9, backgroundColor: v3.colors.amber, justifyContent: 'center' },
+  featuredText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9, color: v3.colors.ink },
+  boost: { height: 24, paddingHorizontal: 8, borderRadius: 9, backgroundColor: v3.colors.infoSoft, justifyContent: 'center' },
+  boostText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9, color: v3.colors.info },
+  title: { marginTop: 11, fontFamily: 'Outfit_800ExtraBold', fontSize: 15, color: v3.colors.ink },
+  price: { marginTop: 4, fontFamily: 'Outfit_900Black', fontSize: 18, color: v3.colors.ink },
+  location: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 11.5, color: v3.colors.textSecondary },
+  stats: { marginTop: 8, flexDirection: 'row', gap: 14 },
+  stat: { fontFamily: 'Outfit_500Medium', fontSize: 10.5, color: v3.colors.textMuted },
+  actions: { marginTop: 12, flexDirection: 'row', gap: 8 },
+  action: { minHeight: 38, paddingHorizontal: 12, borderRadius: 11, backgroundColor: v3.colors.canvas, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  deleteAction: { backgroundColor: v3.colors.errorSoft, borderColor: '#FFD7CF' },
+  actionText: { fontFamily: 'Outfit_700Bold', fontSize: 11.5, color: v3.colors.ink },
 })
