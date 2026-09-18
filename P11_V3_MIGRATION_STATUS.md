@@ -1,5 +1,47 @@
 # Phase 11 — V3.3 UI Migration Status
 
+## 2026-09-19 — V3.3 FULL FINAL corrective pass
+
+The earlier B8/B9/B10 notes recorded component/library migration, but several Tasker/Company screens still did **not visually match the approved V3.3 FULL FINAL · STATE COMPLETE screens**. This corrective pass treats the approved screen SVG library as the source of truth.
+
+### Corrected directly on `phase11-v3-exact-ui`
+- ✅ Tasker root stack — legacy native headers removed from custom V3.3 screens
+- ✅ Tasker bottom navigation — Home / Jobs / Go / Earnings / Profile
+- ✅ Tasker Home — exact offline + online state structure
+- ✅ Tasker My Jobs — V3.3 work pipeline
+- ✅ Tasker Earnings — V3.3 balance / weekly / recent earnings
+- ✅ Tasker Profile — V3.3 identity / metrics / service settings
+- ✅ Nearby Jobs — V3.3 compact numbered job list
+- ✅ Job Opportunity + Send Quote — V3.3 two-state flow with identity gate
+- ✅ Active Job lifecycle — accepted / navigation / PIN / in-progress / waiting / completed states
+- ✅ Arrival PIN — V3.3 trust flow
+- ✅ Evidence — V3.3 before/after capture layout
+- ✅ Change Order — V3.3 approval flow
+- ✅ Inspection — V3.3 pre-submit checklist
+- ✅ Identity Verification — V3.3 trust & safety layout
+- ✅ Readiness — V3.3 setup checklist
+- ✅ Services selection — V3.3 job-selection layout
+- ✅ Service Area — V3.3 area/radius layout
+- ✅ Availability — V3.3 day/hour layout
+- ✅ Edit Tasker Profile — V3.3 profile editor
+- ✅ Withdraw Earnings — V3.3 payout layout
+- ✅ Company bottom navigation — Home / Dispatch / Team / Inbox / Profile
+- ✅ Company Profile — V3.3 Workspace profile layout
+- ✅ Test-provider seed hardening — every active TemplateJob must receive at least 3 sample Tasker matches; seed fails if coverage is incomplete
+- ✅ Added `npm run db:seed:taskers`
+
+### Safety
+- Customer V3.3 UI was not replaced by this corrective pass.
+- Existing Phase 1–10 APIs, auth, quote APIs, job lifecycle actions, identity APIs, wallet APIs, escrow reads, uploads, chat, location sharing, and RBAC remain wired to the existing backend.
+- Production seeding is still blocked by the seed script's production guard.
+- `main` is unchanged. All corrective work remains on `phase11-v3-exact-ui`.
+
+### Verification status
+- Source-level corrective review: complete for the screens listed above.
+- Device/runtime visual QA: **pending**.
+- Full TypeScript/build test: **not claimed in this corrective pass** until a checkout/CI runner executes it.
+
+
 ## B1: Audit — COMPLETE
 ## B2: Auth + Splash — CODE COMPLETE
 ## B3: Customer Home + Discovery — CODE COMPLETE
