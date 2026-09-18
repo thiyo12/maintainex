@@ -107,7 +107,7 @@ export default function V3DiscoverySearch({ placeholder, onCategorySelect, onJob
             <TouchableOpacity key={`c-${item.id}`} style={styles.resultRow} onPress={() => onCategorySelect(item.id, item.name)}>
               <View style={styles.resultCopy}>
                 <Text style={styles.resultTitle} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.resultMeta}>Category</Text>
+                <Text style={styles.resultMeta}>Category · choose exact work</Text>
               </View>
               <ArrowRight size={15} color={v3.colors.textMuted} />
             </TouchableOpacity>
@@ -117,7 +117,7 @@ export default function V3DiscoverySearch({ placeholder, onCategorySelect, onJob
             <TouchableOpacity key={`s-${item.id}`} style={styles.resultRow} onPress={() => onJobSelect(item.id, item.name, item.categoryId)}>
               <View style={styles.resultCopy}>
                 <Text style={styles.resultTitle} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.resultMeta} numberOfLines={1}>{item.categoryName || 'Service'}</Text>
+                <Text style={styles.resultMeta} numberOfLines={1}>{item.categoryName || 'Service'} · see nearby providers</Text>
               </View>
               <ArrowRight size={15} color={v3.colors.textMuted} />
             </TouchableOpacity>
