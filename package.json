@@ -22,7 +22,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "ts-node --tsconfig tsconfig.json prisma/seed.ts",
-    "postinstall": "npx prisma generate"
+    "postinstall": "npx prisma generate",
+    "db:seed:taskers": "ts-node --tsconfig tsconfig.json prisma/seed-taskers.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
