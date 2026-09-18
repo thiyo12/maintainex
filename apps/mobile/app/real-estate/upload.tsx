@@ -159,8 +159,8 @@ export default function UploadProperty() {
           <>
             <Text style={styles.eyebrow}>STEP 1 OF 3</Text>
             <Text style={styles.heroTitle}>Tell us the basics.</Text>
-            <Field label="TITLE" value={form.title} onChangeText={(v) => update('title', v)} placeholder="Modern 3BR home near the beach" />
-            <Field label="DESCRIPTION" value={form.description} onChangeText={(v) => update('description', v)} placeholder="What makes this place useful or special?" multiline />
+            <Field label="TITLE" value={form.title} onChangeText={(v: string) => update('title', v)} placeholder="Modern 3BR home near the beach" />
+            <Field label="DESCRIPTION" value={form.description} onChangeText={(v: string) => update('description', v)} placeholder="What makes this place useful or special?" multiline />
 
             <Text style={styles.label}>PROPERTY TYPE</Text>
             <View style={styles.chips}>
@@ -178,28 +178,28 @@ export default function UploadProperty() {
 
             <Text style={styles.label}>LOCATION</Text>
             <View style={styles.twoCol}>
-              <Field compact label="DISTRICT" value={form.district} onChangeText={(v) => update('district', v)} placeholder="Jaffna" />
-              <Field compact label="CITY" value={form.city} onChangeText={(v) => update('city', v)} placeholder="Jaffna" />
+              <Field compact label="DISTRICT" value={form.district} onChangeText={(v: string) => update('district', v)} placeholder="Jaffna" />
+              <Field compact label="CITY" value={form.city} onChangeText={(v: string) => update('city', v)} placeholder="Jaffna" />
             </View>
-            <Field label="AREA" value={form.area} onChangeText={(v) => update('area', v)} placeholder="Nallur" />
-            <Field label="ADDRESS" value={form.address} onChangeText={(v) => update('address', v)} placeholder="Street / landmark" />
+            <Field label="AREA" value={form.area} onChangeText={(v: string) => update('area', v)} placeholder="Nallur" />
+            <Field label="ADDRESS" value={form.address} onChangeText={(v: string) => update('address', v)} placeholder="Street / landmark" />
           </>
         ) : step === 1 ? (
           <>
             <Text style={styles.eyebrow}>STEP 2 OF 3</Text>
             <Text style={styles.heroTitle}>Price and key details.</Text>
 
-            <Field label={`PRICE (${currency})`} value={form.priceLkr} onChangeText={(v) => update('priceLkr', v)} placeholder="8500000" keyboardType="numeric" />
+            <Field label={`PRICE (${currency})`} value={form.priceLkr} onChangeText={(v: string) => update('priceLkr', v)} placeholder="8500000" keyboardType="numeric" />
             <View style={styles.threeCol}>
-              <Field compact label="BEDS" value={form.bedrooms} onChangeText={(v) => update('bedrooms', v)} placeholder="3" keyboardType="numeric" />
-              <Field compact label="BATHS" value={form.bathrooms} onChangeText={(v) => update('bathrooms', v)} placeholder="2" keyboardType="numeric" />
-              <Field compact label="PARKING" value={form.parking} onChangeText={(v) => update('parking', v)} placeholder="1" keyboardType="numeric" />
+              <Field compact label="BEDS" value={form.bedrooms} onChangeText={(v: string) => update('bedrooms', v)} placeholder="3" keyboardType="numeric" />
+              <Field compact label="BATHS" value={form.bathrooms} onChangeText={(v: string) => update('bathrooms', v)} placeholder="2" keyboardType="numeric" />
+              <Field compact label="PARKING" value={form.parking} onChangeText={(v: string) => update('parking', v)} placeholder="1" keyboardType="numeric" />
             </View>
             <View style={styles.twoCol}>
-              <Field compact label="AREA SQFT" value={form.areaSqft} onChangeText={(v) => update('areaSqft', v)} placeholder="1800" keyboardType="numeric" />
-              <Field compact label="LAND SQFT" value={form.landSize} onChangeText={(v) => update('landSize', v)} placeholder="2400" keyboardType="numeric" />
+              <Field compact label="AREA SQFT" value={form.areaSqft} onChangeText={(v: string) => update('areaSqft', v)} placeholder="1800" keyboardType="numeric" />
+              <Field compact label="LAND SQFT" value={form.landSize} onChangeText={(v: string) => update('landSize', v)} placeholder="2400" keyboardType="numeric" />
             </View>
-            <Field label="YEAR BUILT" value={form.yearBuilt} onChangeText={(v) => update('yearBuilt', v)} placeholder="2024" keyboardType="numeric" />
+            <Field label="YEAR BUILT" value={form.yearBuilt} onChangeText={(v: string) => update('yearBuilt', v)} placeholder="2024" keyboardType="numeric" />
 
             <View style={styles.switchCard}>
               <View><Text style={styles.switchTitle}>Furnished</Text><Text style={styles.switchMeta}>Furniture is included with the property.</Text></View>
@@ -249,8 +249,8 @@ export default function UploadProperty() {
               </ScrollView>
             ) : null}
 
-            <Field label="CONTACT NAME" value={form.contactName} onChangeText={(v) => update('contactName', v)} placeholder="Your name" />
-            <Field label="PHONE" value={form.contactPhone} onChangeText={(v) => update('contactPhone', v)} placeholder="+94..." keyboardType="phone-pad" />
+            <Field label="CONTACT NAME" value={form.contactName} onChangeText={(v: string) => update('contactName', v)} placeholder="Your name" />
+            <Field label="PHONE" value={form.contactPhone} onChangeText={(v: string) => update('contactPhone', v)} placeholder="+94..." keyboardType="phone-pad" />
 
             <View style={styles.reviewCard}>
               <View style={styles.reviewIcon}><Check size={18} color={v3.colors.success} weight="bold" /></View>
