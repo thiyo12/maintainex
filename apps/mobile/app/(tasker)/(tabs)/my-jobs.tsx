@@ -4,12 +4,12 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Warning, WarningCircle, EnvelopeSimple, Sun, Calendar, Checks, X, MapTrifold, Wrench, ChatCircleDots, NavigationArrow } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps'
 import { translateJobStatus } from '../../../lib/i18n'
 import { useColors } from '../../../lib/ThemeContext'
 import { v2Jobs, v2Quotes, v2JobActions } from '../../../lib/api-v2'
 import JobLifecycleTracker from '../../../components/ui/JobLifecycleTracker'
 import NewChatModal from '../../../components/chat/NewChatModal'
+import TaskerJobLocationMap from '../../../components/location/TaskerJobLocationMap'
 
 const getToday = () => new Date().toISOString().split('T')[0]
 
@@ -272,18 +272,13 @@ export default function TaskerMyJobs() {
               </TouchableOpacity>
             </View>
             {trackJob && hasCoords(trackJob) ? (
-              <MapView
+              <TaskerJobLocationMap
+                latitude={Number(trackJob.latitude)}
+                longitude={Number(trackJob.longitude)}
+                markerColor={colors.amber}
+                title={trackJob.title}
                 style={styles.map}
-                provider={PROVIDER_DEFAULT}
-                initialRegion={{
-                  latitude: Number(trackJob.latitude),
-                  longitude: Number(trackJob.longitude),
-                  latitudeDelta: 0.02,
-                  longitudeDelta: 0.02,
-                }}
-              >
-                <Marker coordinate={{ latitude: Number(trackJob.latitude), longitude: Number(trackJob.longitude) }} pinColor={colors.amber} title={trackJob.title} />
-              </MapView>
+              />
             ) : (
               <View style={styles.mapEmpty}>
                 <MapTrifold size={40} color={colors.muted} weight="regular" />
