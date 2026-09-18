@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import MapView, { Marker, PROVIDER_DEFAULT, Region } from 'react-native-maps'
+import MapView, { Marker, PROVIDER_DEFAULT, Region, MapPressEvent, MarkerDragStartEndEvent } from 'react-native-maps'
 import * as Location from 'expo-location'
 import { Crosshair, MapPin } from 'phosphor-react-native'
 import { v3 } from '../../theme/v3/tokens'
@@ -80,7 +80,7 @@ export default function JobLocationPicker({ value, onChange }: Props) {
           provider={PROVIDER_DEFAULT}
           style={StyleSheet.absoluteFill}
           initialRegion={region}
-          onPress={(event) => {
+          onPress={(event: MapPressEvent) => {
             const { latitude, longitude } = event.nativeEvent.coordinate
             setPoint(latitude, longitude)
           }}
@@ -89,7 +89,7 @@ export default function JobLocationPicker({ value, onChange }: Props) {
             <Marker
               coordinate={{ latitude: value.latitude, longitude: value.longitude }}
               draggable
-              onDragEnd={(event) => {
+              onDragEnd={(event: MarkerDragStartEndEvent) => {
                 const { latitude, longitude } = event.nativeEvent.coordinate
                 setPoint(latitude, longitude)
               }}
