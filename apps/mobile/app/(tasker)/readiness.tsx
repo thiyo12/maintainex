@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CheckCircle, Briefcase, Lightning, MapPin, Clock, Warning, Check, CaretRight } from 'phosphor-react-native'
+import { CheckCircle, Briefcase, Lightning, MapPin, Clock, Warning, Check, CaretRight, CaretLeft } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
+import { v3 } from '../../theme/v3/tokens'
 import { v2Identity, v2Availability, v2TaskerProfile } from '../../lib/api-v2'
 
 interface ReadinessStep {
@@ -125,143 +126,144 @@ export default function TaskerReadinessScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#F5A623" style={{ marginTop: 60 }} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.center}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Warning size={48} color="#6F6B6B" weight="regular" />
-          <Text style={styles.errorText}>{t('common.error')}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => { setError(false); setLoading(true); loadReadiness() }}>
-            <Text style={styles.retryBtnText}>{t('common.retry')}</Text>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.center}>
+          <Warning size={36} color={v3.colors.textMuted} />
+          <Text style={styles.errorTitle}>Unable to check readiness</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => { setError(false); setLoading(true); loadReadiness() }}>
+            <Text style={styles.primaryButtonText}>Try again</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <Text style={styles.heading}>{t('readiness.title')}</Text>
-        <Text style={styles.subtitle}>{t('readiness.subtitle')}</Text>
+  const stateLabel = (step: ReadinessStep) => {
+    if (step.status === 'complete') return 'Complete'
+    if (step.status === 'pending') return 'Pending'
+    return 'Required'
+  }
 
-        {/* Progress indicator */}
-        <View style={styles.progressCard}>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${(completedCount / steps.length) * 100}%` }]} />
-          </View>
-          <Text style={styles.progressText}>{t('readiness.stepOf', { current: completedCount, total: steps.length })}</Text>
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.circleButton} onPress={() => router.back()} activeOpacity={0.72}>
+            <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
+          </TouchableOpacity>
+          <Text style={styles.topLabel}>ALMOST READY</Text>
+          <View style={styles.circlePlaceholder} />
         </View>
 
-        {allComplete ? (
-          <View style={styles.successCard}>
-            <CheckCircle size={48} color="#059669" weight="fill" />
-            <Text style={styles.successText}>{t('readiness.allComplete')}</Text>
+        <Text style={styles.hero}>{allComplete ? 'You’re ready to work' : 'Complete your setup'}</Text>
+        <Text style={styles.subtitle}>
+          {allComplete
+            ? 'Your Tasker account has the core details needed to accept work.'
+            : 'Finish the required items below before taking jobs.'}
+        </Text>
+
+        <View style={styles.progressCard}>
+          <View style={styles.progressTop}>
+            <Text style={styles.progressValue}>{completedCount}/{steps.length}</Text>
+            <Text style={styles.progressLabel}>READY</Text>
           </View>
-        ) : (
-          <>
-            <Text style={styles.sectionTitle}>{t('readiness.notReady')}</Text>
-            {steps.map((step) => {
-              const StepIcon = step.status === 'complete' ? Check : step.Icon
-              return (
-                <TouchableOpacity
-                  key={step.key}
-                  style={[styles.stepCard, step.status === 'complete' && styles.stepCardComplete]}
-                  onPress={() => router.push(step.screen as any)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.stepIcon, step.status === 'complete' && styles.stepIconComplete, step.status === 'pending' && styles.stepIconPending]}>
-                    <StepIcon
-                      size={20}
-                      color={step.status === 'complete' ? '#fff' : step.status === 'pending' ? '#D4900A' : '#6F6B6B'}
-                      weight={step.status === 'complete' ? 'fill' : 'regular'}
-                    />
-                  </View>
-                  <View style={styles.stepBody}>
-                    <Text style={[styles.stepLabel, step.status === 'complete' && styles.stepLabelComplete]}>
-                      {t(step.labelKey)}
-                    </Text>
-                    <Text style={[styles.stepStatus, step.status === 'complete' && styles.stepStatusComplete]}>
-                      {step.status === 'complete'
-                        ? t(step.completeKey)
-                        : step.status === 'pending' && step.pendingKey
-                          ? t(step.pendingKey)
-                          : t(step.missingKey)}
-                    </Text>
-                  </View>
-                  <CaretRight size={16} color="#6F6B6B" weight="bold" />
-                </TouchableOpacity>
-              )
-            })}
-          </>
-        )}
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${(completedCount / steps.length) * 100}%` }]} />
+          </View>
+        </View>
 
-        {firstIncomplete && !allComplete && (
-          <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => router.push(firstIncomplete.screen as any)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.primaryBtnText}>{t('readiness.completeSetup')}</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.stepList}>
+          {steps.map((step) => {
+            const StepIcon = step.status === 'complete' ? Check : step.Icon
+            const complete = step.status === 'complete'
+            const pending = step.status === 'pending'
+            return (
+              <TouchableOpacity
+                key={step.key}
+                style={styles.stepRow}
+                activeOpacity={0.72}
+                onPress={() => router.push(step.screen as any)}
+              >
+                <View style={[styles.stepIcon, complete && styles.stepIconDone, pending && styles.stepIconPending]}>
+                  <StepIcon
+                    size={17}
+                    color={complete ? v3.colors.success : pending ? v3.colors.amberDark : v3.colors.ink}
+                    weight={complete ? 'bold' : 'regular'}
+                  />
+                </View>
+                <View style={styles.stepCopy}>
+                  <Text style={styles.stepTitle}>{t(step.labelKey)}</Text>
+                  <Text style={styles.stepSub}>
+                    {step.status === 'complete'
+                      ? t(step.completeKey)
+                      : step.status === 'pending' && step.pendingKey
+                        ? t(step.pendingKey)
+                        : t(step.missingKey)}
+                  </Text>
+                </View>
+                <View style={[styles.statePill, complete && styles.statePillDone, pending && styles.statePillPending]}>
+                  <Text style={[styles.stateText, complete && styles.stateTextDone, pending && styles.stateTextPending]}>{stateLabel(step)}</Text>
+                </View>
+                <CaretRight size={15} color={v3.colors.textMuted} weight="bold" />
+              </TouchableOpacity>
+            )
+          })}
+        </View>
 
-        <View style={{ height: 40 }} />
+        <TouchableOpacity
+          style={styles.primaryButton}
+          activeOpacity={0.78}
+          onPress={() => {
+            if (allComplete) router.replace('/(tasker)/(tabs)/index' as any)
+            else if (firstIncomplete) router.push(firstIncomplete.screen as any)
+          }}
+        >
+          <Text style={styles.primaryButtonText}>{allComplete ? 'Open Tasker Home' : 'Continue setup'}</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F7F7' },
-  scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: '#000000', marginTop: 16 },
-  subtitle: { fontSize: 14, color: '#6F6B6B', marginTop: 4, marginBottom: 20, lineHeight: 20 },
-
-  progressCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#E5E5E5' },
-  progressBar: { height: 8, backgroundColor: '#E5E5E5', borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
-  progressFill: { height: '100%', backgroundColor: '#F5A623', borderRadius: 4 },
-  progressText: { fontSize: 12, color: '#6F6B6B', fontFamily: fonts.bodyMedium },
-
-  successCard: {
-    backgroundColor: '#D1FAE5', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: '#A7F3D0',
-  },
-  successText: { fontSize: 16, fontWeight: '700', color: '#065F46', marginTop: 12, textAlign: 'center' },
-
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#000000', marginBottom: 12 },
-
-  stepCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 14,
-    padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E5E5E5',
-  },
-  stepCardComplete: { borderColor: '#D1FAE5' },
-  stepIcon: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: '#F1F1F1',
-    alignItems: 'center', justifyContent: 'center', marginRight: 12,
-  },
-  stepIconComplete: { backgroundColor: '#059669' },
-  stepIconPending: { backgroundColor: '#FEF3C7' },
-  stepBody: { flex: 1 },
-  stepLabel: { fontSize: 14, fontWeight: '700', color: '#000000' },
-  stepLabelComplete: { color: '#065F46' },
-  stepStatus: { fontSize: 12, color: '#6F6B6B', marginTop: 2 },
-  stepStatusComplete: { color: '#059669' },
-
-  primaryBtn: {
-    backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 16,
-  },
-  primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#000000' },
-
-  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  errorText: { fontSize: 16, fontWeight: '700', color: '#000000', marginTop: 12, textAlign: 'center' },
-  retryBtn: {
-    backgroundColor: '#F5A623', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 32, marginTop: 20,
-  },
-  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#000000' },
+const makeStyles = (_colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  center: { flex: 1, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  topBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  circleButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  circlePlaceholder: { width: 38, height: 38 },
+  topLabel: { fontSize: 9, letterSpacing: 0.8, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  hero: { marginTop: 12, fontSize: 28, lineHeight: 34, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.4 },
+  subtitle: { marginTop: 7, maxWidth: 320, fontSize: 10.5, lineHeight: 16, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  progressCard: { minHeight: 94, marginTop: 24, borderRadius: 18, padding: 16, backgroundColor: v3.colors.ink },
+  progressTop: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  progressValue: { fontSize: 26, fontFamily: fonts.heading, color: v3.colors.paper },
+  progressLabel: { fontSize: 8.5, fontFamily: fonts.headingBold, color: v3.colors.amber },
+  progressTrack: { height: 6, marginTop: 16, borderRadius: 3, backgroundColor: '#343434', overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: v3.colors.success },
+  stepList: { marginTop: 20 },
+  stepRow: { minHeight: 68, paddingHorizontal: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  stepIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  stepIconDone: { backgroundColor: v3.colors.successSoft },
+  stepIconPending: { backgroundColor: v3.colors.amberSoft },
+  stepCopy: { flex: 1, marginLeft: 10, paddingRight: 8 },
+  stepTitle: { fontSize: 10.8, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  stepSub: { marginTop: 3, fontSize: 8.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  statePill: { minHeight: 22, paddingHorizontal: 8, borderRadius: 11, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  statePillDone: { backgroundColor: v3.colors.successSoft },
+  statePillPending: { backgroundColor: v3.colors.amberSoft },
+  stateText: { fontSize: 7.8, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  stateTextDone: { color: v3.colors.success },
+  stateTextPending: { color: v3.colors.amberDark },
+  primaryButton: { minWidth: 132, height: 54, marginTop: 28, paddingHorizontal: 20, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
+  errorTitle: { marginTop: 12, fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
 })
