@@ -69,8 +69,8 @@ export default function CustomerHome() {
 
   const loadProperties = useCallback(async () => {
     try {
-      const data = await realEstate.list({ status: 'ACTIVE' })
-      const list = Array.isArray(data) ? data : []
+      const response: any = await realEstate.list({ status: 'approved' })
+      const list = Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
       setProperties(list.slice(0, 4))
     } catch {}
   }, [])
