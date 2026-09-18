@@ -1,27 +1,27 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bell, Star, CheckCircle, MapPin, ArrowRight, Timer, Wallet, Lightning, Coffee, Warning } from 'phosphor-react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+import { DotsThree, Wrench, ArrowRight, Warning, Star } from 'phosphor-react-native'
 import { useAuth } from '../../../lib/auth'
 import { taskers, earnings, notifications } from '../../../lib/api'
 import { v2Jobs, v2Identity } from '../../../lib/api-v2'
-import { on } from '../../../lib/events'
+import { emit, on } from '../../../lib/events'
 import { fonts } from '../../../lib/fonts'
-import { categoryIcon } from '../../../lib/categoryVisuals'
 import { v3 } from '../../../theme/v3/tokens'
-
-import AvatarCircle from '../../../components/ui/AvatarCircle'
-import PressableScale from '../../../components/ui/PressableScale'
-import Skeleton from '../../../components/ui/Skeleton'
-import AnimatedEntry from '../../../components/ui/AnimatedEntry'
 
 let Notifications: any = null
 try { Notifications = require('expo-notifications') } catch {}
 
 const ACTIVE_STATUSES = ['QUOTE_ACCEPTED', 'PENDING_PAYMENT', 'ESCROW_DEPOSITED', 'IN_PROGRESS']
+
+const MARKERS = [
+  { left: '21%', top: '23%' },
+  { left: '69%', top: '18%' },
+  { left: '76%', top: '62%' },
+  { left: '32%', top: '72%' },
+] as const
 
 export default function TaskerDashboard() {
   const { t } = useTranslation()
@@ -33,7 +33,6 @@ export default function TaskerDashboard() {
   const [myJobs, setMyJobs] = useState<any[]>([])
   const [earningsData, setEarningsData] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -42,11 +41,11 @@ export default function TaskerDashboard() {
   const lastPollRef = useRef<string>(new Date().toISOString())
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const alertedJobsRef = useRef<Set<string>>(new Set())
-  const chatVisible = useRef(false)
 
   const loadData = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true)
     else setLoading(true)
+
     try {
       const [openRes, myRes, earningsRes, profileRes] = await Promise.allSettled([
         v2Jobs.list('role=provider'),
@@ -54,34 +53,68 @@ export default function TaskerDashboard() {
         earnings.get(),
         taskers.getMyProfile(),
       ])
-      if (openRes.status === 'fulfilled') setOpenJobs((openRes.value.jobs || []).slice(0, 6))
+
+      if (openRes.status === 'fulfilled') setOpenJobs(openRes.value.jobs || [])
       if (myRes.status === 'fulfilled') setMyJobs(myRes.value.jobs || [])
       if (earningsRes.status === 'fulfilled') setEarningsData(earningsRes.value)
+
       if (profileRes.status === 'fulfilled') {
-        setProfile(profileRes.value)
-        if (typeof profileRes.value.isOnline === 'boolean') setIsOnline(profileRes.value.isOnline)
-        const p = profileRes.value as any
-        const hasProfession = !!p.taskerProfile?.professionId
-        const hasSkills = Array.isArray(p.taskerProfile?.skills) && p.taskerProfile.skills.length > 0
-        const hasArea = !!p.areaId
+        const p: any = profileRes.value
+        setProfile(p)
+        if (typeof p?.isOnline === 'boolean') {
+          setIsOnline(p.isOnline)
+          emit('taskerOnlineChanged', p.isOnline)
+        }
+
+        const taskerProfile = p?.taskerProfile || p
+        const hasProfession = !!taskerProfile?.professionId
+        const hasSkills = Array.isArray(taskerProfile?.skills) && taskerProfile.skills.length > 0
+        const hasArea = !!p?.areaId || (Array.isArray(taskerProfile?.serviceAreas) && taskerProfile.serviceAreas.length > 0)
         setReadinessComplete(hasProfession && hasSkills && hasArea)
       }
-      const idRes = await Promise.allSettled([v2Identity.getStatus()])
-      if (idRes[0].status === 'fulfilled') {
-        const idStatus = (idRes[0] as any).value?.identityStatus
+
+      const [identity] = await Promise.allSettled([v2Identity.getStatus()])
+      if (identity.status === 'fulfilled') {
+        const idStatus = (identity as any).value?.identityStatus
         if (idStatus !== 'VERIFIED' && idStatus !== 'APPROVED') setReadinessComplete(false)
       }
-      notifications.unreadCount().then((r: any) => setUnreadCount(r.count || 0)).catch(() => {})
-    } catch {
+
+      notifications.unreadCount().catch(() => {})
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
   }, [])
 
-  useEffect(() => { const unsub = on('jobsChanged', () => setRefreshKey(k => k + 1)); return () => unsub() }, [])
-  useEffect(() => { if (refreshKey > 0) loadData() }, [refreshKey, loadData])
-  useEffect(() => { loadData() }, [loadData])
+  const toggleOnline = useCallback(async () => {
+    const next = !isOnline
+    setIsOnline(next)
+    emit('taskerOnlineChanged', next)
+
+    try {
+      await taskers.setOnline(next)
+    } catch {
+      setIsOnline(!next)
+      emit('taskerOnlineChanged', !next)
+    }
+  }, [isOnline])
+
+  useEffect(() => {
+    const offJobs = on('jobsChanged', () => setRefreshKey((k) => k + 1))
+    const offGo = on('taskerGoPressed', () => toggleOnline())
+    return () => {
+      offJobs()
+      offGo()
+    }
+  }, [toggleOnline])
+
+  useEffect(() => {
+    if (refreshKey > 0) loadData()
+  }, [refreshKey, loadData])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   useEffect(() => {
     const sub = Notifications?.addNotificationResponseReceivedListener
@@ -91,349 +124,521 @@ export default function TaskerDashboard() {
         })
       : null
     return () => sub?.remove()
-  }, [])
-
-  const toggleOnline = useCallback(async () => {
-    const next = !isOnline
-    try { setIsOnline(next); await taskers.setOnline(next) } catch { setIsOnline(!next) }
-  }, [isOnline])
+  }, [router])
 
   useEffect(() => {
     if (!isOnline) {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
       return
     }
+
     lastPollRef.current = new Date().toISOString()
     pollIntervalRef.current = setInterval(async () => {
       try {
         const res = await v2Jobs.pollNew(lastPollRef.current)
-        if (res.jobs && res.jobs.length > 0) {
-          lastPollRef.current = new Date().toISOString()
-          for (const job of res.jobs) {
-            if (alertedJobsRef.current.has(job.id)) continue
-            alertedJobsRef.current.add(job.id)
-            await Notifications?.scheduleNotificationAsync?.({
-              content: {
-                title: t('tasker.newJobAlert'),
-                body: `${job.title || ''} — LKR ${(job.budgetAmount || 0).toLocaleString()}`,
-                data: { jobId: job.id, screen: '/(tasker)/jobs/v2/quote/[id]' },
-                sound: true,
-              },
-              trigger: null,
-            })
-          }
+        if (!res.jobs?.length) return
+
+        lastPollRef.current = new Date().toISOString()
+        for (const job of res.jobs) {
+          if (alertedJobsRef.current.has(job.id)) continue
+          alertedJobsRef.current.add(job.id)
+          await Notifications?.scheduleNotificationAsync?.({
+            content: {
+              title: t('tasker.newJobAlert'),
+              body: (job.title || '') + ' — LKR ' + Number(job.budgetAmount || 0).toLocaleString(),
+              data: { jobId: job.id, screen: '/(tasker)/jobs/v2/quote/[id]' },
+              sound: true,
+            },
+            trigger: null,
+          })
         }
       } catch {}
     }, 15000)
-    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current) }
+
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    }
   }, [isOnline, t])
 
-  const activeJob = myJobs.find((j: any) => ACTIVE_STATUSES.includes(j.status))
-  const availableJobs = openJobs.filter((j: any) => !myJobs.some((m: any) => m.id === j.id))
+  const activeJob = myJobs.find((job: any) => ACTIVE_STATUSES.includes(job.status))
+  const availableJobs = openJobs.filter((job: any) => !myJobs.some((mine: any) => mine.id === job.id))
+  const bestJob = availableJobs[0]
 
-  const earningsToday = useCallback(() => {
+  const todayEarned = useCallback(() => {
     const today = new Date().toDateString()
     const payouts = earningsData?.recentPayouts || []
-    const clearedToday = payouts.filter((p: any) => {
-      const d = new Date(p.clearedAt || p.createdAt)
-      return d.toDateString() === today && p.status === 'CLEARED'
-    })
-    const sum = clearedToday.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0)
-    return sum || null
-  }, [earningsData])
+    return payouts
+      .filter((p: any) => new Date(p.clearedAt || p.createdAt).toDateString() === today && p.status === 'CLEARED')
+      .reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0)
+  }, [earningsData])()
 
-  const getGreeting = () => {
-    const h = new Date().getHours()
-    if (h < 12) return t('home.greeting.morning')
-    if (h < 17) return t('home.greeting.afternoon')
-    return t('home.greeting.evening')
-  }
-  const firstName = (user?.name || t('customer.tasker')).split(' ')[0]
-  const balance = Number(earningsData?.availableBalance ?? 0)
-  const today = earningsToday()
-  const rating = profile?.rating ?? 0
-  const doneJobs = profile?.completedJobs ?? earningsData?.completedJobs ?? 0
+  const rating = Number(profile?.rating ?? profile?.taskerProfile?.rating ?? 0)
+  const activeCount = myJobs.filter((job: any) => !['COMPLETED', 'CANCELLED'].includes(String(job.status))).length
+  const taskerProfile = profile?.taskerProfile || profile
+  const primaryArea = Array.isArray(taskerProfile?.serviceAreas) && taskerProfile.serviceAreas.length
+    ? taskerProfile.serviceAreas[0]
+    : profile?.area?.name || 'Near you'
 
-  const activeId = activeJob?.id
-  const activeBudget = activeJob ? Number(activeJob.budgetAmount || 0) : 0
-
-  const styles = makeStyles()
+  const firstName = String(user?.name || '').split(' ')[0]
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor="#F5A623" />}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData(true)} tintColor={v3.colors.ink} />}
       >
-        {/* ═══ Top bar ═══ */}
-        <View style={styles.headerRow}>
-          <View style={styles.greetingBlock}>
-            <Text style={styles.greetingSub}>{getGreeting()},</Text>
-            <Text style={styles.greetingName}>{firstName}</Text>
+        <View style={styles.appBar}>
+          <View>
+            <Text style={styles.brand}>MΛINTΛINEX</Text>
+            <Text style={[styles.roleLine, isOnline && styles.onlineText]}>
+              {isOnline ? 'Online · ' + primaryArea : 'Tasker'}
+            </Text>
           </View>
-          <PressableScale onPress={() => router.push('/notifications')} scaleTo={0.94} style={styles.iconBtnPress}>
-            <View style={styles.iconBtn}>
-              <Bell size={20} color={v3.colors.ink} weight="regular" />
-              {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
-            </View>
-          </PressableScale>
+
+          {isOnline ? (
+            <TouchableOpacity style={styles.onlinePill} activeOpacity={0.75} onPress={toggleOnline}>
+              <Text style={styles.onlinePillText}>ONLINE</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.roundButton} activeOpacity={0.72} onPress={() => router.push('/(tasker)/(tabs)/profile')}>
+              <DotsThree size={24} color={v3.colors.ink} weight="bold" />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* ═══ Availability ═══ */}
-        <PressableScale onPress={toggleOnline} scaleTo={0.99} style={styles.availPress}>
-          <LinearGradient
-            colors={isOnline ? [v3.colors.amber, '#FFD071'] : [v3.colors.paper, '#F1F1F1']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={[styles.availCard, !isOnline && styles.availCardOffline]}
-          >
-            <View style={styles.availLeft}>
-              <View style={[styles.availDot, { backgroundColor: isOnline ? '#0D0D0D' : '#6F6B6B' }]} />
+        {!isOnline ? (
+          <>
+            <View style={styles.offlineHeading}>
+              <Text style={styles.hero}>{'Ready to earn' + (firstName ? ', ' + firstName : '') + '?'}</Text>
+              <Text style={styles.subhead}>Go online to see jobs near you.</Text>
+            </View>
+
+            {!loading && !readinessComplete ? (
+              <TouchableOpacity style={styles.readiness} activeOpacity={0.78} onPress={() => router.push('/(tasker)/readiness' as any)}>
+                <Warning size={16} color="#9A6000" weight="fill" />
+                <View style={styles.readinessCopy}>
+                  <Text style={styles.readinessTitle}>Complete your setup</Text>
+                  <Text style={styles.readinessSub}>Finish readiness checks before accepting work.</Text>
+                </View>
+                <ArrowRight size={15} color="#9A6000" weight="bold" />
+              </TouchableOpacity>
+            ) : null}
+
+            <View style={[styles.map, styles.offlineMap]}>
+              <MapGrid />
+              <View style={styles.youDot} />
+            </View>
+
+            <View style={styles.offlineStatsCard}>
+              <View style={styles.todayBlock}>
+                <Text style={styles.mutedLabel}>Today</Text>
+                <Text style={styles.todayValue}>LKR {todayEarned.toLocaleString()}</Text>
+              </View>
+              <View style={styles.smallStat}>
+                <Text style={styles.mutedLabel}>Jobs</Text>
+                <Text style={styles.smallStatValue}>{activeCount}</Text>
+              </View>
+              <View style={styles.smallStat}>
+                <Text style={styles.mutedLabel}>Rating</Text>
+                <Text style={styles.smallStatValue}>{rating > 0 ? rating.toFixed(1) : '—'} ★</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.goOnlineButton, !readinessComplete && styles.goOnlineButtonDisabled]}
+              activeOpacity={0.78}
+              disabled={!readinessComplete}
+              onPress={toggleOnline}
+            >
+              <Text style={styles.goOnlineText}>{readinessComplete ? 'Go online' : 'Complete setup first'}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            {!loading && !readinessComplete ? (
+              <TouchableOpacity style={[styles.readiness, { marginTop: 10 }]} activeOpacity={0.78} onPress={() => router.push('/(tasker)/readiness' as any)}>
+                <Warning size={16} color="#9A6000" weight="fill" />
+                <View style={styles.readinessCopy}>
+                  <Text style={styles.readinessTitle}>Setup needs attention</Text>
+                  <Text style={styles.readinessSub}>Review readiness before taking another job.</Text>
+                </View>
+                <ArrowRight size={15} color="#9A6000" weight="bold" />
+              </TouchableOpacity>
+            ) : null}
+
+            <View style={[styles.map, styles.onlineMap]}>
+              <MapGrid />
+              {availableJobs.slice(0, 4).map((job: any, index: number) => {
+                const pos = MARKERS[index] || MARKERS[0]
+                return (
+                  <TouchableOpacity
+                    key={job.id}
+                    style={[styles.jobMarker, pos]}
+                    activeOpacity={0.78}
+                    onPress={() => router.push(('/(tasker)/jobs/v2/quote/' + job.id) as any)}
+                  >
+                    <Wrench size={15} color={v3.colors.ink} weight="bold" />
+                  </TouchableOpacity>
+                )
+              })}
+              {availableJobs.length === 0 ? <View style={styles.youDot} /> : null}
+            </View>
+
+            <View style={styles.onlineStatsCard}>
               <View>
-                <Text style={[styles.availTitle, { color: v3.colors.ink }]}>
-                  {isOnline ? t('ui.youreOnline') : t('ui.youreOffline')}
-                </Text>
-                <Text style={[styles.availSub, { color: v3.colors.textSecondary }]}>
-                  {isOnline ? t('ui.tapToPause') : t('ui.tapToStart')}
-                </Text>
+                <Text style={styles.onlineStatLabel}>TODAY</Text>
+                <Text style={styles.onlineToday}>LKR {todayEarned.toLocaleString()}</Text>
+              </View>
+              <Text style={styles.onlineStatValue}>{activeCount} {activeCount === 1 ? 'job' : 'jobs'}</Text>
+              <View style={styles.ratingInline}>
+                <Star size={12} color={v3.colors.amber} weight="fill" />
+                <Text style={styles.onlineStatValue}>{rating > 0 ? rating.toFixed(1) : '—'}</Text>
               </View>
             </View>
-            <View style={[styles.availBadge, isOnline ? styles.availBadgeOn : styles.availBadgeOff]}>
-              {!isOnline && <View style={styles.availPing} />}
-              <Text style={[styles.availBadgeText, { color: isOnline ? v3.colors.paper : v3.colors.ink }]}>
-                {isOnline ? t('tasker.online') : t('tasker.paused')}
-              </Text>
-            </View>
-          </LinearGradient>
-        </PressableScale>
 
-        {/* ═══ Readiness banner ═══ */}
-        {!loading && !readinessComplete && (
-          <AnimatedEntry delay={60}>
-            <PressableScale onPress={() => router.push('/(tasker)/readiness' as any)} scaleTo={0.98}>
-              <View style={styles.readinessBanner}>
-                <Warning size={20} color="#D97706" weight="fill" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.readinessTitle}>{t('readiness.notReady')}</Text>
-                  <Text style={styles.readinessSub}>{t('readiness.completeSetup')}</Text>
+            {activeJob ? (
+              <TouchableOpacity
+                style={styles.nearbyCard}
+                activeOpacity={0.78}
+                onPress={() => router.push(('/(tasker)/jobs/v2/manage/' + activeJob.id) as any)}
+              >
+                <View style={styles.nearbyTop}>
+                  <View>
+                    <Text style={styles.nearbyCount}>Active job</Text>
+                    <Text style={styles.nearbyHint}>Continue your current work</Text>
+                  </View>
+                  <ArrowRight size={18} color={v3.colors.ink} weight="bold" />
                 </View>
-                <ArrowRight size={16} color="#D97706" weight="bold" />
-              </View>
-            </PressableScale>
-          </AnimatedEntry>
-        )}
-
-        {/* ═══ Earnings card ═══ */}
-        <AnimatedEntry delay={80}>
-          <View style={styles.earnCard}>
-            <View style={styles.earnHead}>
-              <Text style={styles.earnLabel}>{t('ui.availableBalance')}</Text>
-              <Wallet size={18} color="#F5A623" weight="fill" />
-            </View>
-            <Text style={styles.earnBalance}>LKR {balance.toLocaleString()}</Text>
-            <View style={styles.chipRow}>
-              <View style={styles.chip}>
-                <Lightning size={14} color="#F5A623" weight="fill" />
-                <Text style={styles.chipValue}>{today !== null ? `+${today.toLocaleString()}` : '—'}</Text>
-                <Text style={styles.chipLabel}>{t('ui.today')}</Text>
-              </View>
-              <View style={styles.chip}>
-                <CheckCircle size={14} color="#F5A623" weight="fill" />
-                <Text style={styles.chipValue}>{doneJobs}</Text>
-                <Text style={styles.chipLabel}>{t('tasker.jobsDone')}</Text>
-              </View>
-              <View style={styles.chip}>
-                <Star size={14} color="#F5A623" weight="fill" />
-                <Text style={styles.chipValue}>{rating ? rating.toFixed(1) : '—'}</Text>
-                <Text style={styles.chipLabel}>{t('tasker.rating')}</Text>
-              </View>
-            </View>
-          </View>
-        </AnimatedEntry>
-
-        {/* ═══ Active job ═══ */}
-        {loading && myJobs.length === 0 ? (
-          <View style={styles.activeWrap}>
-            <Skeleton width="100%" height={120} radius={20} />
-          </View>
-        ) : activeJob ? (
-          <AnimatedEntry delay={120}>
-            <PressableScale onPress={() => router.push(`/(tasker)/jobs/v2/manage/${activeId}` as any)} scaleTo={0.98} style={styles.activePress}>
-              <LinearGradient colors={['#F5A623', '#D4900A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.activeCard}>
-                <View style={styles.activeGlow} />
-                <View style={styles.activeHead}>
-                  <Text style={styles.activeLabel}>{t('ui.activeJob')}</Text>
-                  <View style={styles.activeCountPill}>
-                    <Timer size={12} color="#0D0D0D" weight="fill" />
-                    <Text style={styles.activeCountText}>{activeBudget > 0 ? `LKR ${activeBudget.toLocaleString()}` : ''}</Text>
+                <View style={styles.bestMatchRow}>
+                  <View style={styles.bestIcon}><Wrench size={17} color={v3.colors.ink} weight="bold" /></View>
+                  <View style={styles.bestCopy}>
+                    <Text style={styles.bestEyebrow}>IN PROGRESS</Text>
+                    <Text style={styles.bestTitle} numberOfLines={1}>{activeJob.title || 'Current job'}</Text>
+                  </View>
+                  <View style={styles.viewJobsButton}>
+                    <Text style={styles.viewJobsText}>Open job</Text>
                   </View>
                 </View>
-                <Text style={styles.activeTitle} numberOfLines={1}>{activeJob.title || 'Your job'}</Text>
-                <View style={styles.activeMeta}>
-                  <MapPin size={13} color="#0D0D0D" weight="fill" />
-                  <Text style={styles.activeMetaText} numberOfLines={1}>{activeJob.locationName || 'Location shared in chat'}</Text>
-                </View>
-                <View style={styles.activeCtaRow}>
-                  <View style={styles.activeCta}>
-                    <ArrowRight size={16} color="#0D0D0D" weight="bold" />
-                    <Text style={styles.activeCtaText}>{t('ui.openJob')}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.nearbyCard}>
+                <View style={styles.nearbyTop}>
+                  <View>
+                    <Text style={styles.nearbyCount}>{availableJobs.length} {availableJobs.length === 1 ? 'job' : 'jobs'} nearby</Text>
+                    <Text style={styles.nearbyHint}>{availableJobs.length ? 'New work is available in your area.' : 'We’ll alert you when matching work appears.'}</Text>
                   </View>
                 </View>
-              </LinearGradient>
-            </PressableScale>
-          </AnimatedEntry>
-        ) : (
-          <View style={styles.idleCard}>
-            <Coffee size={18} color="#F5A623" weight="fill" />
-            <Text style={styles.idleText}>{t('ui.noActiveJobs')}</Text>
-            <PressableScale onPress={() => router.push('/(tasker)/jobs/v2/browse' as any)} scaleTo={0.96}>
-              <Text style={styles.idleCta}>{t('ui.browseWork')} →</Text>
-            </PressableScale>
-          </View>
-        )}
 
-        {/* ═══ Available jobs ═══ */}
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>{t('ui.newJobsNearYou')}</Text>
-          <PressableScale onPress={() => router.push('/(tasker)/jobs/v2/browse' as any)} scaleTo={0.96}>
-            <Text style={styles.seeAll}>{t('tasker.seeAll')} →</Text>
-          </PressableScale>
-        </View>
-        {loading && availableJobs.length === 0 ? (
-          <View style={styles.feedGap}>
-            <Skeleton width="100%" height={92} radius={16} />
-            <Skeleton width="100%" height={92} radius={16} />
-          </View>
-        ) : availableJobs.length === 0 ? (
-          <View style={styles.feedEmpty}>
-            <Text style={styles.feedEmptyText}>{t('tasker.noJobsFound')}</Text>
-          </View>
-        ) : (
-          <View style={styles.feedGap}>
-            {availableJobs.slice(0, 4).map((job, i) => {
-              const Icon = categoryIcon(job.categoryId)
-              return (
-                <AnimatedEntry key={job.id} delay={i * 70}>
-                  <View style={styles.jobCard}>
-                    <View style={styles.jobIconBox}>
-                      <Icon size={22} color="#F5A623" weight="fill" />
+                {bestJob ? (
+                  <View style={styles.bestMatchRow}>
+                    <View style={styles.bestIcon}><Wrench size={17} color={v3.colors.ink} weight="bold" /></View>
+                    <View style={styles.bestCopy}>
+                      <Text style={styles.bestEyebrow}>BEST MATCH</Text>
+                      <Text style={styles.bestTitle} numberOfLines={1}>{bestJob.title || 'New job'}</Text>
+                      <Text style={styles.bestMeta} numberOfLines={1}>
+                        {(bestJob.locationName || primaryArea) + (Number(bestJob.budgetAmount || 0) > 0 ? ' · LKR ' + Number(bestJob.budgetAmount).toLocaleString() : '')}
+                      </Text>
                     </View>
-                    <View style={styles.jobBody}>
-                      <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-                      <View style={styles.jobMetaRow}>
-                        <MapPin size={12} color="#6F6B6B" weight="fill" />
-                        <Text style={styles.jobMetaText} numberOfLines={1}>{job.locationName || t('ui.nearYou')}</Text>
-                      </View>
-                      <Text style={styles.jobBudget}>LKR {(job.budgetAmount || 0).toLocaleString()}</Text>
-                    </View>
-                    <PressableScale onPress={() => router.push(`/(tasker)/jobs/v2/quote/${job.id}` as any)} scaleTo={0.96} style={styles.quotePress}>
-                      <View style={styles.quoteBtn}>
-                        <Text style={styles.quoteText}>{t('ui.quoteNow')}</Text>
-                      </View>
-                    </PressableScale>
+                    <TouchableOpacity
+                      style={styles.viewJobsButton}
+                      activeOpacity={0.8}
+                      onPress={() => router.push('/(tasker)/jobs/v2/browse' as any)}
+                    >
+                      <Text style={styles.viewJobsText}>View jobs</Text>
+                    </TouchableOpacity>
                   </View>
-                </AnimatedEntry>
-              )
-            })}
-          </View>
+                ) : null}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = () => StyleSheet.create({
+function MapGrid() {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {[20, 85, 150, 215, 280, 345].map((top) => <View key={'h-' + top} style={[styles.gridH, { top }]} />)}
+      {[58, 150, 245, 335].map((left) => <View key={'v-' + left} style={[styles.gridV, { left }]} />)}
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: v3.colors.canvas },
-  scroll: { paddingBottom: 112, paddingHorizontal: 18 },
-
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
-  greetingBlock: {},
-  greetingSub: { fontSize: 12, fontFamily: fonts.bodyMedium, color: v3.colors.textSecondary },
-  greetingName: { fontSize: 28, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.5, marginTop: 2 },
-  iconBtnPress: { borderRadius: 999 },
-  iconBtn: {
-    width: 44, height: 44, borderRadius: 999,
-    backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line,
-    alignItems: 'center', justifyContent: 'center', position: 'relative',
+  content: { paddingBottom: 24 },
+  appBar: {
+    minHeight: 72,
+    paddingHorizontal: 18,
+    paddingTop: 7,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  bellDot: {
-    position: 'absolute', top: 8, right: 9, width: 9, height: 9, borderRadius: 5,
-    backgroundColor: v3.colors.amber, borderWidth: 1.5, borderColor: v3.colors.paper,
+  brand: {
+    fontSize: 13,
+    letterSpacing: 0.6,
+    fontFamily: fonts.headingBlack,
+    color: v3.colors.ink,
   },
-
-  availPress: { marginTop: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  availCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, padding: 16 },
-  availCardOffline: { borderWidth: 1, borderColor: v3.colors.line },
-  availLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  availDot: { width: 12, height: 12, borderRadius: 6 },
-  availTitle: { fontFamily: fonts.bodyMedium, fontSize: 15 },
-  availSub: { fontFamily: fonts.body, marginTop: 2, fontSize: 12, color: '#6F6B6B' },
-  availBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  availBadgeOn: { backgroundColor: v3.colors.ink },
-  availBadgeOff: { backgroundColor: v3.colors.surfaceGray, borderWidth: 1, borderColor: v3.colors.line },
-  availPing: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F5A623' },
-  availBadgeText: { fontFamily: fonts.body, fontSize: 12 },
-
-  earnCard: { marginTop: 16, backgroundColor: v3.colors.paper, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: v3.colors.line },
-  earnHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  earnLabel: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 12 },
-  earnBalance: { fontSize: 30, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.5, marginTop: 4 },
-  chipRow: { flexDirection: 'row', gap: 8, marginTop: 24 },
-  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, backgroundColor: v3.colors.canvas, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
-  chipValue: { fontFamily: fonts.body, color: v3.colors.ink, fontSize: 12 },
-  chipLabel: { fontFamily: fonts.body, color: v3.colors.textSecondary, fontSize: 10 },
-
-  activeWrap: { marginTop: 24 },
-  activePress: { marginTop: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
-  activeCard: { borderRadius: 16, padding: 24, overflow: 'hidden' },
-  activeGlow: { position: 'absolute', right: -40, top: -40, width: 150, height: 150, borderRadius: 75, backgroundColor: 'rgba(255,255,255,0.12)' },
-  activeHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  activeLabel: { fontFamily: fonts.bodySemiBold, color: '#0D0D0D', opacity: 0.85, fontSize: 12 },
-  activeCountPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(11,12,18,0.25)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  activeCountText: { fontFamily: fonts.bodySemiBold, color: '#FFFFFF', fontSize: 12 },
-  activeTitle: { fontSize: 21, fontFamily: fonts.heading, color: '#0D0D0D' },
-  activeMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
-  activeMetaText: { fontFamily: fonts.body, color: '#0D0D0D', opacity: 0.9, flex: 1, fontSize: 12 },
-  activeCtaRow: { marginTop: 24 },
-  activeCta: {
-    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#0D0D0D', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 999,
+  roleLine: {
+    marginTop: 9,
+    fontSize: 10,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.textMuted,
   },
-  activeCtaText: { fontFamily: fonts.bodyMedium, color: '#FFFFFF', fontSize: 14 },
-
-  idleCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16,
-    backgroundColor: v3.colors.paper, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: v3.colors.line,
+  onlineText: { color: v3.colors.success },
+  roundButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  idleText: { fontFamily: fonts.body, color: v3.colors.ink, flex: 1, fontSize: 14 },
-  idleCta: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12 },
-
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontFamily: fonts.heading, color: v3.colors.ink },
-  seeAll: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12 },
-
-  feedGap: { gap: 8 },
-  jobCard: {
-    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 18,
-    backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line,
+  onlinePill: {
+    minWidth: 72,
+    height: 32,
+    paddingHorizontal: 13,
+    borderRadius: 16,
+    backgroundColor: '#E8F8EF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  jobIconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF1D2', alignItems: 'center', justifyContent: 'center' },
-  jobBody: { flex: 1, marginLeft: 16 },
-  jobTitle: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: v3.colors.ink },
-  jobMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  jobMetaText: { fontFamily: fonts.body, color: '#6F6B6B', flex: 1, fontSize: 12 },
-  jobBudget: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12, marginTop: 4 },
-  quotePress: { paddingLeft: 8 },
-  quoteBtn: { backgroundColor: '#F5A623', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
-  quoteText: { fontFamily: fonts.body, color: '#0D0D0D', fontSize: 12 },
-
-  feedEmpty: { alignItems: 'center', paddingVertical: 32, backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, borderStyle: 'dashed' },
-  feedEmptyText: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 14 },
-
-  readinessBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 24,
-    backgroundColor: '#FFFBEB', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#FDE68A',
+  onlinePillText: {
+    color: v3.colors.success,
+    fontSize: 11,
+    fontFamily: fonts.headingBold,
   },
-  readinessTitle: { fontSize: 14, fontWeight: '700', color: '#92400E' },
-  readinessSub: { fontSize: 12, color: '#B45309', marginTop: 2 },
+  offlineHeading: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 16 },
+  hero: {
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: fonts.headingBlack,
+    color: v3.colors.ink,
+    letterSpacing: -0.4,
+  },
+  subhead: {
+    marginTop: 3,
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: fonts.bodySemiBold,
+    color: '#5B5B5B',
+  },
+  map: {
+    position: 'relative',
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#E8E8E8',
+  },
+  offlineMap: { height: 330 },
+  onlineMap: { height: 456, marginTop: 4 },
+  gridH: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#D2D2D2',
+  },
+  gridV: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#DADADA',
+    transform: [{ rotate: '8deg' }],
+  },
+  youDot: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    marginTop: -9,
+    borderRadius: 9,
+    backgroundColor: v3.colors.ink,
+  },
+  jobMarker: {
+    position: 'absolute',
+    width: 42,
+    height: 42,
+    marginLeft: -21,
+    marginTop: -21,
+    borderRadius: 21,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  readiness: {
+    marginHorizontal: 18,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    minHeight: 58,
+    borderRadius: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: v3.colors.amberBg,
+    borderWidth: 1,
+    borderColor: '#F5D79B',
+  },
+  readinessCopy: { flex: 1 },
+  readinessTitle: { fontSize: 11.5, fontFamily: fonts.headingBold, color: '#6A4300' },
+  readinessSub: { marginTop: 2, fontSize: 9.5, fontFamily: fonts.bodyMedium, color: '#8C650E' },
+  offlineStatsCard: {
+    marginHorizontal: 18,
+    marginTop: 15,
+    height: 106,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 17,
+  },
+  todayBlock: { flex: 1.25 },
+  mutedLabel: {
+    fontSize: 10,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.textMuted,
+  },
+  todayValue: {
+    marginTop: 8,
+    fontSize: 26,
+    lineHeight: 30,
+    fontFamily: fonts.headingBlack,
+    color: v3.colors.ink,
+  },
+  smallStat: { flex: 0.8 },
+  smallStatValue: {
+    marginTop: 8,
+    fontSize: 18,
+    fontFamily: fonts.headingBlack,
+    color: v3.colors.ink,
+  },
+  goOnlineButton: {
+    marginHorizontal: 18,
+    marginTop: 24,
+    height: 52,
+    borderRadius: 15,
+    backgroundColor: v3.colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goOnlineButtonDisabled: { backgroundColor: '#A6CDB7' },
+  goOnlineText: {
+    fontSize: 14,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.paper,
+  },
+  onlineStatsCard: {
+    marginHorizontal: 18,
+    marginTop: 14,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: v3.colors.ink,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  onlineStatLabel: {
+    fontSize: 8.5,
+    lineHeight: 11,
+    color: v3.colors.amber,
+    fontFamily: fonts.headingBold,
+  },
+  onlineToday: {
+    marginTop: 1,
+    fontSize: 13.5,
+    color: v3.colors.paper,
+    fontFamily: fonts.headingBlack,
+  },
+  onlineStatValue: {
+    fontSize: 11.5,
+    color: v3.colors.paper,
+    fontFamily: fonts.headingBold,
+  },
+  ratingInline: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  nearbyCard: {
+    marginHorizontal: 18,
+    marginTop: 10,
+    minHeight: 112,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  nearbyTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  nearbyCount: {
+    fontSize: 12.5,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  nearbyHint: {
+    marginTop: 1,
+    fontSize: 9.5,
+    fontFamily: fonts.bodyMedium,
+    color: v3.colors.textMuted,
+  },
+  bestMatchRow: {
+    marginTop: 11,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bestIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: v3.colors.surfaceGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bestCopy: { flex: 1, marginLeft: 9, marginRight: 8 },
+  bestEyebrow: {
+    fontSize: 8.5,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.textMuted,
+  },
+  bestTitle: {
+    marginTop: 1,
+    fontSize: 11.5,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  bestMeta: {
+    marginTop: 1,
+    fontSize: 9.5,
+    fontFamily: fonts.bodyMedium,
+    color: v3.colors.textMuted,
+  },
+  viewJobsButton: {
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    backgroundColor: v3.colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewJobsText: {
+    fontSize: 10,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.paper,
+  },
 })
