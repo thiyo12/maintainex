@@ -1,100 +1,69 @@
-import { useEffect, useRef } from 'react'
-import { View, Text, ScrollView, StyleSheet, Animated } from 'react-native'
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { User, Envelope, Phone, Briefcase, CalendarBlank } from 'phosphor-react-native'
+import { CalendarBlank, Envelope, Phone, ShieldCheck, User } from 'phosphor-react-native'
+import { useRouter } from 'expo-router'
 import { useAuth } from '../../../../lib/auth'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../lib/ThemeContext'
+import { v3 } from '../../../../theme/v3/tokens'
+import V3PageHeader from '../../../../components/v3/V3PageHeader'
+import { V3SectionLabel, V3SettingsCard, V3SettingsRow } from '../../../../components/v3/V3SettingsUI'
 
 export default function MyProfileScreen() {
-  const colors = useColors()
-  const { t } = useTranslation()
-  const styles = makeStyles(colors)
   const { user } = useAuth()
-  const fadeAnim = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
-  }, [fadeAnim])
-
+  const router = useRouter()
   if (!user) return null
 
   const memberSince = user.createdAt
-    ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : 'N/A'
-
-  const roleLabel =
-    user.role === 'CUSTOMER' ? t('profile.customer') :
-    user.role === 'TASKER' ? t('profile.tasker') :
-    t('profile.company')
-
-  const fields = [
-    { label: t('profile.fullName'), value: user.name, Icon: User },
-    { label: t('profile.email'), value: user.email, Icon: Envelope },
-    { label: t('profile.phone'), value: user.phone || t('profile.notSet'), Icon: Phone },
-    { label: t('profile.role'), value: roleLabel, Icon: Briefcase },
-    { label: t('profile.memberSince'), value: memberSince, Icon: CalendarBlank },
-  ]
+    ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })
+    : '—'
+  const initial = (user.name || 'M').trim().charAt(0).toUpperCase()
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>{t('profile.myProfile')}</Text>
-
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <View style={styles.avatarSection}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user.name.charAt(0).toUpperCase()}</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader title="Personal information" subtitle="Keep your account details current." />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{user.name}</Text>
+            <View style={styles.verifiedRow}>
+              <ShieldCheck size={14} color={v3.colors.success} weight="fill" />
+              <Text style={styles.verifiedText}>Verified mobile</Text>
             </View>
-            <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userRole}>{roleLabel}</Text>
           </View>
+          <TouchableOpacity onPress={() => router.push('/(customer)/settings/edit-profile' as any)} activeOpacity={0.75} style={styles.editBtn}>
+            <Text style={styles.editText}>Edit</Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.card}>
-            {fields.map((f, i) => (
-              <View key={f.label} style={[styles.row, i === fields.length - 1 && styles.lastRow]}>
-                <View style={styles.iconWrap}>
-                  <f.Icon size={20} color={colors.amberDark} weight="fill" />
-                </View>
-                <View style={styles.fieldContent}>
-                  <Text style={styles.fieldLabel}>{f.label}</Text>
-                  <Text style={styles.fieldValue}>{f.value}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-      </Animated.View>
+        <V3SectionLabel>Profile</V3SectionLabel>
+        <V3SettingsCard>
+          <V3SettingsRow icon={User} title="Full name" subtitle={user.name || 'Not set'} />
+          <V3SettingsRow icon={Phone} title="Mobile" subtitle={user.phone || 'Not set'} />
+          <V3SettingsRow icon={Envelope} title="Email" subtitle={user.email || 'Not set'} />
+          <V3SettingsRow icon={CalendarBlank} title="Member since" subtitle={memberSince} last />
+        </V3SettingsCard>
+
+        <View style={styles.privacy}>
+          <Text style={styles.privacyTitle}>Privacy first</Text>
+          <Text style={styles.privacyText}>Your phone and exact address stay private until a booking or safety workflow needs them.</Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 28, fontFamily: 'Outfit_900Black', color: colors.ink, paddingHorizontal: 24, marginBottom: 16 },
-  scroll: { paddingHorizontal: 24, paddingBottom: 32 },
-  avatarSection: { alignItems: 'center', marginBottom: 24 },
-  avatar: {
-    width: 80, height: 80, borderRadius: 40, backgroundColor: colors.amber,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
-  },
-  avatarText: { fontSize: 32, fontFamily: 'Outfit_700Bold', color: colors.ink },
-  userName: { fontSize: 20, fontFamily: 'Outfit_900Black', color: colors.ink },
-  userRole: { fontSize: 13, color: colors.muted, marginTop: 2, fontFamily: 'Outfit_500Medium' },
-  card: {
-    backgroundColor: colors.white, borderRadius: 16, padding: 4, marginBottom: 24,
-    borderWidth: 1, borderColor: colors.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
-  lastRow: { borderBottomWidth: 0 },
-  iconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.amberBg, alignItems: 'center', justifyContent: 'center' },
-  fieldContent: { flex: 1 },
-  fieldLabel: { fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: colors.muted, textTransform: 'uppercase' },
-  fieldValue: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: colors.ink, marginTop: 2 },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  hero: { marginBottom: 20, padding: 16, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  avatarText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 22, color: v3.colors.paper },
+  name: { fontFamily: 'Outfit_800ExtraBold', fontSize: 18, color: v3.colors.ink },
+  verifiedRow: { marginTop: 4, flexDirection: 'row', gap: 5, alignItems: 'center' },
+  verifiedText: { fontFamily: 'Outfit_500Medium', fontSize: 11.5, color: v3.colors.textSecondary },
+  editBtn: { height: 36, paddingHorizontal: 14, borderRadius: 12, backgroundColor: v3.colors.canvas, alignItems: 'center', justifyContent: 'center' },
+  editText: { fontFamily: 'Outfit_700Bold', fontSize: 12, color: v3.colors.ink },
+  privacy: { marginTop: 16, padding: 16, borderRadius: 18, backgroundColor: v3.colors.amberSoft },
+  privacyTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.ink },
+  privacyText: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 12, lineHeight: 18, color: v3.colors.textSecondary },
 })
