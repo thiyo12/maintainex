@@ -23,7 +23,7 @@ export default function EditProfileScreen() {
     if (name.trim().length < 2) return Alert.alert('Name required', 'Enter your full name.')
     setSaving(true)
     try {
-      await auth.updateProfile({ name: name.trim(), email: email.trim(), phone: phone.trim() })
+      await auth.updateProfile({ name: name.trim(), phone: phone.trim() })
       await refreshUser()
       Alert.alert('Saved', 'Your profile is up to date.')
     } catch (error: any) {
@@ -51,8 +51,9 @@ export default function EditProfileScreen() {
               value={value}
               onChangeText={setter}
               keyboardType={keyboard}
+              editable={label !== 'EMAIL'}
               autoCapitalize={label === 'EMAIL' ? 'none' : 'words'}
-              style={styles.input}
+              style={[styles.input, label === 'EMAIL' && styles.readOnly]}
               placeholderTextColor={v3.colors.textPlaceholder}
             />
           </View>
@@ -74,6 +75,7 @@ const styles = StyleSheet.create({
   field: { marginBottom: 12 },
   label: { marginBottom: 6, fontFamily: 'Outfit_800ExtraBold', fontSize: 10, color: v3.colors.textMuted, letterSpacing: 0.7 },
   input: { height: 54, borderRadius: 14, paddingHorizontal: 14, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, fontFamily: 'Outfit_600SemiBold', fontSize: 14, color: v3.colors.ink },
+  readOnly: { backgroundColor: '#EFEFEF', color: v3.colors.textSecondary },
   primary: { marginTop: 10, height: 56, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
   primaryText: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.paper },
 })
