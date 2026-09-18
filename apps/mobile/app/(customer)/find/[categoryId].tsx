@@ -55,14 +55,14 @@ export default function ServiceCategory() {
       >
         <Text style={styles.eyebrow}>POPULAR NEAR YOU</Text>
         <Text style={styles.title}>What needs fixing?</Text>
-        <Text style={styles.subtitle}>Choose a common task or describe your own.</Text>
+        <Text style={styles.subtitle}>Choose the exact work. Next, compare nearby taskers and verified company teams.</Text>
 
         <View style={styles.list}>
           {loading ? [0, 1, 2, 3, 4, 5].map(i => <View key={i} style={[styles.row, styles.skeleton]} />) : visible.map((item: any, index: number) => (
             <TouchableOpacity
               key={item.id || String(index)}
               style={styles.row}
-              onPress={() => router.push({ pathname: '/(customer)/find/job/[jobId]', params: { jobId: item.id } } as any)}
+              onPress={() => router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId: item.id, title: item.name || item.title || '', categoryId: categoryId! } } as any)}
               activeOpacity={0.72}
             >
               <View style={styles.numberCircle}><Text style={styles.numberText}>{index + 1}</Text></View>
