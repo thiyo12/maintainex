@@ -1710,6 +1710,5 @@ const ta: Record<string, any> = {
     noAcceptedQuote: 'இந்த வேலைக்கு ஏற்றுக்கொள்ளப்பட்ட மேற்கோள் இல்லை',
   },
 }
-}
 
 export default ta
