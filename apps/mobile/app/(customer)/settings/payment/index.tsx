@@ -1,97 +1,45 @@
-import { useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Animated } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CreditCard, Wallet, Link, PlusCircle } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../lib/ThemeContext'
-import { fonts } from '../../../../lib/fonts'
+import { Bank, CreditCard, Money, Plus, Wallet } from 'phosphor-react-native'
+import { useRouter } from 'expo-router'
+import { v3 } from '../../../../theme/v3/tokens'
+import V3PageHeader from '../../../../components/v3/V3PageHeader'
+import { V3SectionLabel, V3SettingsCard, V3SettingsRow } from '../../../../components/v3/V3SettingsUI'
 
 export default function PaymentScreen() {
-  const colors = useColors()
-  const { t } = useTranslation()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const fadeAnim = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
-  }, [])
-
-  const methods = [
-    { name: t('payment.methodVisa'), icon: CreditCard },
-    { name: t('payment.methodMastercard'), icon: CreditCard },
-    { name: t('payment.methodPayHere'), icon: Wallet },
-    { name: t('payment.methodStripe'), icon: Link },
-  ]
-
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>{t('profile.payment')}</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader title="Payments" subtitle="Choose how you want to secure eligible bookings." />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <V3SectionLabel>Payment methods</V3SectionLabel>
+        <V3SettingsCard>
+          <V3SettingsRow icon={CreditCard} title="Cards" subtitle="Add Visa or Mastercard for secure checkout" value="Add" onPress={() => Alert.alert('Cards', 'Card setup will open when the payment provider is connected.')} />
+          <V3SettingsRow icon={Money} title="Cash" subtitle="Available for eligible jobs" value="Eligible" onPress={() => Alert.alert('Cash', 'Cash is shown only when the selected job supports it.')} />
+          <V3SettingsRow icon={Wallet} title="MX Wallet" subtitle="Balance, top ups and refunds" onPress={() => router.push('/(customer)/wallet' as any)} />
+          <V3SettingsRow icon={Bank} title="Payout / refund destination" subtitle="Manage where eligible refunds are returned" onPress={() => Alert.alert('Refund destination', 'Refund destination management is being connected to the payment provider.')} last />
+        </V3SettingsCard>
 
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-          <View style={styles.infoCard}>
-            <Wallet size={40} color={'#6F6B6B'} weight="bold" />
-            <Text style={styles.infoTitle}>{t('profile.noPaymentMethods')}</Text>
-            <Text style={styles.infoSub}>
-              {t('profile.addPaymentMethod')}
-            </Text>
-          </View>
+        <TouchableOpacity activeOpacity={0.8} style={styles.primary} onPress={() => Alert.alert('Add payment method', 'Payment-provider setup is not enabled yet.')}>
+          <Plus size={18} color={v3.colors.paper} weight="bold" />
+          <Text style={styles.primaryText}>Add payment method</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => Alert.alert(t('payment.comingSoon'), t('payment.comingSoonDesc'))}
-          >
-            <PlusCircle size={20} color={'#FFFFFF'} weight="bold" />
-            <Text style={styles.addBtnText}>  {t('common.add')}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.sectionTitle}>{t('profile.payment')}</Text>
-          <View style={styles.card}>
-            {methods.map((m, i) => {
-              const MethodIcon = m.icon
-              return (
-                <View key={m.name} style={[styles.row, i === methods.length - 1 && { borderBottomWidth: 0 }]}>
-                  <MethodIcon size={20} color={'#F5A623'} weight="bold" />
-                  <Text style={styles.methodName}>{m.name}</Text>
-                </View>
-              )
-            })}
-          </View>
-        </ScrollView>
-      </Animated.View>
+        <View style={styles.note}>
+          <Text style={styles.noteTitle}>Protected checkout</Text>
+          <Text style={styles.noteText}>MaintainEX shows the final amount, service fee and protection status before you confirm payment.</Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF', paddingHorizontal: 24, marginBottom: 16 },
-  scroll: { paddingHorizontal: 24 },
-  infoCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 32,
-    alignItems: 'center', marginBottom: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  infoTitle: { fontSize: 17, fontFamily: fonts.headingBold, color: '#FFFFFF', marginTop: 12 },
-  infoSub: { fontSize: 13, color: '#6F6B6B', textAlign: 'center', marginTop: 6, lineHeight: 18 },
-  addBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#F5A623', paddingVertical: 14, borderRadius: 14, marginBottom: 24,
-  },
-  addBtnText: { fontSize: 16, fontFamily: fonts.headingBold, color: '#FFFFFF' },
-  sectionTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: '#6F6B6B', marginBottom: 10, textTransform: 'uppercase' },
-  card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 4, marginBottom: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
-  },
-  methodName: { fontSize: 15, fontFamily: fonts.bodySemiBold, color: '#FFFFFF' },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  primary: { marginTop: 16, height: 54, borderRadius: 16, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryText: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.paper },
+  note: { marginTop: 16, padding: 16, borderRadius: 18, backgroundColor: v3.colors.amberSoft },
+  noteTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.ink },
+  noteText: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 12, lineHeight: 18, color: v3.colors.textSecondary },
 })
