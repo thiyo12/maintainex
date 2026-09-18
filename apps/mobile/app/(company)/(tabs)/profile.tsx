@@ -189,7 +189,7 @@ export default function CompanyProfile() {
           <WorkspaceRow
             title="Support"
             subtitle="Help & contracts"
-            onPress={() => router.push('/settings/help' as any)}
+            onPress={() => router.push('/(company)/(tabs)/contracts-list' as any)}
           />
         </View>
 
