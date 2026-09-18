@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
+import { v3 } from '../../theme/v3/tokens'
 
 export default function CompanyLayout() {
   const colors = useColors()
@@ -9,7 +10,7 @@ export default function CompanyLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: v3.colors.canvas },
       }}
     >
       <Stack.Screen name="(tabs)" />
