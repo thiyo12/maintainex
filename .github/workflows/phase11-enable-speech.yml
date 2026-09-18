@@ -41,4 +41,6 @@ jobs:
             exit 0
           fi
           git commit -m "feat(p11): enable native speech recognition dependency"
+          git fetch origin phase11-v3-exact-ui
+          git rebase origin/phase11-v3-exact-ui
           git push origin HEAD:phase11-v3-exact-ui
