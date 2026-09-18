@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Switch } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Play, Pause, Check, Clock } from 'phosphor-react-native'
+import { Play, Pause, Check, Clock, CaretLeft } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { v2Availability } from '../../../lib/api-v2'
+import { v3 } from '../../../theme/v3/tokens'
 
 const DAYS = [
   { key: 'monday', labelKey: 'availabilitySettings.monday' },
@@ -92,183 +93,160 @@ export default function AvailabilityScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#F5A623" style={{ marginTop: 60 }} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loading}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-        <Text style={styles.heading}>{t('availabilitySettings.title')}</Text>
-        <Text style={styles.subtitle}>{t('availabilitySettings.subtitle')}</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backButton} activeOpacity={0.72} onPress={() => router.back()}>
+          <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <Text style={styles.topTitle}>Availability</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* Toggle */}
-        <View style={styles.toggleCard}>
-          <View style={styles.toggleLeft}>
-            {isAvailable
-              ? <Play size={24} color="#059669" weight="fill" />
-              : <Pause size={24} color="#6F6B6B" weight="regular" />
-            }
-            <View>
-              <Text style={styles.toggleLabel}>{isAvailable ? t('availabilitySettings.available') : t('availabilitySettings.unavailable')}</Text>
-              <Text style={styles.toggleHint}>{t('availabilitySettings.toggleAvailable')}</Text>
-            </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <Text style={styles.hero}>When are you available?</Text>
+        <Text style={styles.subtitle}>Set your normal working window. You can still go offline from Tasker Home anytime.</Text>
+
+        <View style={styles.statusCard}>
+          <View style={[styles.statusIcon, isAvailable && styles.statusIconOnline]}>
+            {isAvailable ? <Play size={18} color={v3.colors.success} weight="fill" /> : <Pause size={18} color={v3.colors.textMuted} weight="fill" />}
+          </View>
+          <View style={styles.statusCopy}>
+            <Text style={styles.statusTitle}>{isAvailable ? 'Available for matching' : 'Not available'}</Text>
+            <Text style={styles.statusText}>Allow MaintainEX to match jobs during your schedule.</Text>
           </View>
           <Switch
             value={isAvailable}
             onValueChange={setIsAvailable}
-            trackColor={{ false: '#2E2E2E', true: '#D1FAE5' }}
-            thumbColor={isAvailable ? '#059669' : '#6F6B6B'}
+            trackColor={{ false: '#D8D8D8', true: '#CDEFD9' }}
+            thumbColor={isAvailable ? v3.colors.success : v3.colors.textMuted}
           />
         </View>
 
-        {/* Work Days */}
-        <Text style={styles.sectionTitle}>{t('availabilitySettings.workDays')}</Text>
-        <View style={styles.daysGrid}>
+        <Text style={styles.sectionLabel}>WORK DAYS</Text>
+        <View style={styles.daysRow}>
           {DAYS.map((day) => {
-            const isSelected = selectedDays.includes(day.key)
+            const selected = selectedDays.includes(day.key)
             return (
               <TouchableOpacity
                 key={day.key}
-                style={[styles.dayBtn, isSelected && styles.dayBtnSelected]}
+                style={[styles.dayButton, selected && styles.dayButtonSelected]}
+                activeOpacity={0.72}
                 onPress={() => toggleDay(day.key)}
-                activeOpacity={0.7}
               >
-                <Text style={[styles.dayBtnText, isSelected && styles.dayBtnTextSelected]}>
-                  {t(day.labelKey).slice(0, 2)}
-                </Text>
-                {isSelected && <Check size={14} color="#fff" weight="fill" />}
+                {selected ? <Check size={11} color={v3.colors.paper} weight="bold" /> : null}
+                <Text style={[styles.dayText, selected && styles.dayTextSelected]}>{t(day.labelKey).slice(0, 2)}</Text>
               </TouchableOpacity>
             )
           })}
         </View>
 
-        {/* Work Hours */}
-        <Text style={styles.sectionTitle}>{t('availabilitySettings.workHours')}</Text>
+        <Text style={styles.sectionLabel}>WORK HOURS</Text>
         <View style={styles.timeRow}>
-          {/* Start Time */}
           <TouchableOpacity
-            style={styles.timeBtn}
+            style={styles.timeCard}
+            activeOpacity={0.72}
             onPress={() => { setShowStartPicker(!showStartPicker); setShowEndPicker(false) }}
-            activeOpacity={0.7}
           >
-            <Clock size={18} color="#D4900A" weight="regular" />
-            <View>
-              <Text style={styles.timeLabel}>{t('availabilitySettings.startTime')}</Text>
+            <Clock size={16} color={v3.colors.textMuted} />
+            <View style={styles.timeCopy}>
+              <Text style={styles.timeLabel}>Start</Text>
               <Text style={styles.timeValue}>{startTime}</Text>
             </View>
           </TouchableOpacity>
-
-          {/* End Time */}
           <TouchableOpacity
-            style={styles.timeBtn}
+            style={styles.timeCard}
+            activeOpacity={0.72}
             onPress={() => { setShowEndPicker(!showEndPicker); setShowStartPicker(false) }}
-            activeOpacity={0.7}
           >
-            <Clock size={18} color="#D4900A" weight="regular" />
-            <View>
-              <Text style={styles.timeLabel}>{t('availabilitySettings.endTime')}</Text>
+            <Clock size={16} color={v3.colors.textMuted} />
+            <View style={styles.timeCopy}>
+              <Text style={styles.timeLabel}>End</Text>
               <Text style={styles.timeValue}>{endTime}</Text>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Time Pickers */}
-        {showStartPicker && (
+        {showStartPicker || showEndPicker ? (
           <View style={styles.pickerCard}>
-            {TIMES.map((time) => (
-              <TouchableOpacity
-                key={time}
-                style={[styles.pickerItem, startTime === time && styles.pickerItemSelected]}
-                onPress={() => { setStartTime(time); setShowStartPicker(false) }}
-              >
-                <Text style={[styles.pickerText, startTime === time && styles.pickerTextSelected]}>{time}</Text>
-              </TouchableOpacity>
-            ))}
+            {TIMES.map((time) => {
+              const active = showStartPicker ? startTime === time : endTime === time
+              return (
+                <TouchableOpacity
+                  key={time}
+                  style={[styles.pickerItem, active && styles.pickerItemSelected]}
+                  activeOpacity={0.72}
+                  onPress={() => {
+                    if (showStartPicker) setStartTime(time)
+                    else setEndTime(time)
+                    setShowStartPicker(false)
+                    setShowEndPicker(false)
+                  }}
+                >
+                  <Text style={[styles.pickerText, active && styles.pickerTextSelected]}>{time}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
-        )}
+        ) : null}
 
-        {showEndPicker && (
-          <View style={styles.pickerCard}>
-            {TIMES.map((time) => (
-              <TouchableOpacity
-                key={time}
-                style={[styles.pickerItem, endTime === time && styles.pickerItemSelected]}
-                onPress={() => { setEndTime(time); setShowEndPicker(false) }}
-              >
-                <Text style={[styles.pickerText, endTime === time && styles.pickerTextSelected]}>{time}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryEyebrow}>NORMAL SCHEDULE</Text>
+          <Text style={styles.summaryTitle}>{selectedDays.length} days · {startTime}–{endTime}</Text>
+          <Text style={styles.summaryText}>Online/offline status on Home still controls whether new live opportunities appear.</Text>
+        </View>
 
-        {/* Save */}
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.7}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveBtnText}>{t('availabilitySettings.save')}</Text>
-          )}
+        <TouchableOpacity style={[styles.saveButton, saving && styles.disabled]} activeOpacity={0.78} onPress={handleSave} disabled={saving}>
+          {saving ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.saveText}>Save availability</Text>}
         </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F7F7' },
-  scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: '#000000', marginTop: 16 },
-  subtitle: { fontSize: 14, color: '#6F6B6B', marginTop: 4, marginBottom: 20, lineHeight: 20 },
-
-  toggleCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF', padding: 16, borderRadius: 18, borderWidth: 1, borderColor: '#E5E5E5', marginBottom: 24,
-  },
-  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  toggleLabel: { fontSize: 15, fontWeight: '700', color: '#000000' },
-  toggleHint: { fontSize: 12, color: '#6F6B6B', marginTop: 2 },
-
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#000000', marginBottom: 10 },
-
-  daysGrid: { flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' },
-  dayBtn: {
-    width: 48, height: 48, borderRadius: 12, backgroundColor: '#FFFFFF',
-    borderWidth: 1.5, borderColor: '#E5E5E5', alignItems: 'center', justifyContent: 'center',
-  },
-  dayBtnSelected: { backgroundColor: '#F5A623', borderColor: '#F5A623' },
-  dayBtnText: { fontSize: 13, fontWeight: '700', color: '#6F6B6B' },
-  dayBtnTextSelected: { color: '#000000' },
-
-  timeRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  timeBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E5E5',
-  },
-  timeLabel: { fontSize: 11, color: '#6F6B6B' },
-  timeValue: { fontSize: 18, fontWeight: '700', color: '#000000' },
-
-  pickerCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, marginBottom: 20,
-    borderWidth: 1, borderColor: '#E5E5E5', flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-  },
-  pickerItem: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#F1F1F1',
-  },
-  pickerItemSelected: { backgroundColor: '#F5A623' },
-  pickerText: { fontSize: 13, fontWeight: '600', color: '#6F6B6B' },
-  pickerTextSelected: { color: '#000000' },
-
-  saveBtn: { backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 12 },
-  saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#000000' },
+const makeStyles = (_colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topBar: { height: 70, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: 38, height: 38 },
+  topTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  hero: { marginTop: 8, fontSize: 27, lineHeight: 33, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.35 },
+  subtitle: { marginTop: 6, maxWidth: 330, fontSize: 10.5, lineHeight: 16, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  statusCard: { minHeight: 76, marginTop: 22, paddingHorizontal: 13, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  statusIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  statusIconOnline: { backgroundColor: v3.colors.successSoft },
+  statusCopy: { flex: 1, marginLeft: 10, paddingRight: 8 },
+  statusTitle: { fontSize: 10.8, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  statusText: { marginTop: 3, fontSize: 8.5, lineHeight: 13, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  sectionLabel: { marginTop: 24, marginBottom: 8, fontSize: 9, letterSpacing: 0.6, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  dayButton: { width: 44, height: 44, borderRadius: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  dayButtonSelected: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  dayText: { fontSize: 9.5, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  dayTextSelected: { marginTop: 1, color: v3.colors.paper },
+  timeRow: { flexDirection: 'row', gap: 9 },
+  timeCard: { flex: 1, height: 66, borderRadius: 16, paddingHorizontal: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  timeCopy: { marginLeft: 9 },
+  timeLabel: { fontSize: 8.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  timeValue: { marginTop: 3, fontSize: 15, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  pickerCard: { marginTop: 10, padding: 10, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pickerItem: { minWidth: 56, height: 34, paddingHorizontal: 8, borderRadius: 10, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  pickerItemSelected: { backgroundColor: v3.colors.ink },
+  pickerText: { fontSize: 8.8, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  pickerTextSelected: { color: v3.colors.paper },
+  summaryCard: { minHeight: 86, marginTop: 22, borderRadius: 16, padding: 14, backgroundColor: v3.colors.infoSoft },
+  summaryEyebrow: { fontSize: 8.5, fontFamily: fonts.headingBold, color: v3.colors.info },
+  summaryTitle: { marginTop: 7, fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  summaryText: { marginTop: 4, fontSize: 8.7, lineHeight: 14, fontFamily: fonts.bodySemiBold, color: '#4F4F4F' },
+  saveButton: { height: 54, marginTop: 24, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  disabled: { opacity: 0.5 },
+  saveText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
 })
