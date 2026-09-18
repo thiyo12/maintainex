@@ -6,6 +6,7 @@ import { CaretLeft, Check, Wrench } from 'phosphor-react-native'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { skillsApi } from '../../../lib/api'
+import { v3 } from '../../../theme/v3/tokens'
 
 type JobItem = {
   id: string
@@ -97,89 +98,95 @@ export default function JobSelectionScreen() {
   const selectedCount = cats.reduce((n, c) => n + c.jobs.filter(j => j.selected).length, 0)
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
-          <CaretLeft size={24} color="#FFFFFF" weight="bold" />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.72}>
+          <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
         </TouchableOpacity>
-        <Text style={styles.heading}>Your Services</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.topTitle}>Your services</Text>
+        <View style={styles.placeholder} />
       </View>
 
       {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color="#F5A623" />
-        </View>
+        <View style={styles.loadingWrap}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={styles.subTitle}>
-            Tell customers which jobs you handle and set an hourly rate for each.
-          </Text>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={styles.hero}>What can you do?</Text>
+          <Text style={styles.subtitle}>Choose the jobs you want MaintainEX to match with your Tasker account.</Text>
+
+          <View style={styles.countCard}>
+            <Text style={styles.countValue}>{selectedCount}</Text>
+            <Text style={styles.countLabel}>{selectedCount === 1 ? 'service selected' : 'services selected'}</Text>
+          </View>
 
           {cats.map((cat, ci) => (
-            <View key={cat.id} style={[styles.catCard, { backgroundColor: '#FFFFFF' }]}>
-              <View style={styles.catHeader}>
-                <Wrench size={16} color="#F5A623" weight="fill" />
-                <Text style={[styles.catName, { color: '#000000' }]}>{cat.name}</Text>
+            <View key={cat.id} style={styles.category}>
+              <View style={styles.categoryHeader}>
+                <View style={styles.categoryIcon}><Wrench size={16} color={v3.colors.ink} weight="bold" /></View>
+                <Text style={styles.categoryName}>{cat.name}</Text>
               </View>
+
               {cat.jobs.length === 0 ? (
-                <Text style={[styles.emptyJobs, { color: '#6F6B6B' }]}>No jobs in this category yet.</Text>
+                <Text style={styles.emptyJobs}>No active jobs in this category.</Text>
               ) : (
                 cat.jobs.map((job, ji) => (
-                  <TouchableOpacity key={job.id} style={styles.jobRow} onPress={() => toggle(ci, ji)} activeOpacity={0.7}>
-                    <View style={[styles.check, job.selected && { backgroundColor: '#F5A623', borderColor: '#F5A623' }]}>
-                      {job.selected && <Check size={13} color="#0D0D0D" weight="fill" />}
-                    </View>
-                    <View style={styles.jobBody}>
-                      <Text style={[styles.jobName, { color: '#000000' }]}>{job.name}</Text>
-                      {job.selected ? (
-                        <View>
-                          <View style={[styles.rateWrap, { borderColor: '#E5E5E5' }]}>
-                            <Text style={[styles.rateLabel, { color: '#6F6B6B' }]}>Rate ({job.currency}/hr)</Text>
+                  <View key={job.id} style={styles.serviceWrap}>
+                    <TouchableOpacity style={styles.serviceRow} activeOpacity={0.72} onPress={() => toggle(ci, ji)}>
+                      <View style={[styles.check, job.selected && styles.checkSelected]}>
+                        {job.selected ? <Check size={13} color={v3.colors.paper} weight="bold" /> : null}
+                      </View>
+                      <View style={styles.serviceCopy}>
+                        <Text style={styles.serviceName}>{job.name}</Text>
+                        <Text style={styles.serviceMeta}>
+                          {job.selected ? 'Active for matching' : 'Tap to add this service'}
+                        </Text>
+                      </View>
+                      <Text style={styles.chevron}>›</Text>
+                    </TouchableOpacity>
+
+                    {job.selected ? (
+                      <View style={styles.configCard}>
+                        <View style={styles.rateRow}>
+                          <Text style={styles.configLabel}>Hourly rate</Text>
+                          <View style={styles.rateInputWrap}>
+                            <Text style={styles.currency}>{job.currency || 'LKR'}</Text>
                             <TextInput
-                              style={[styles.rateInput, { color: '#000000' }]}
+                              style={styles.rateInput}
                               value={String(job.hourlyRate || '')}
                               keyboardType="numeric"
-                              placeholder={`Default ${job.priceMin || ''}`}
-                              placeholderTextColor="#6F6B6B"
-                              onPressIn={(e: any) => e.stopPropagation?.()}
-                              onChangeText={(v) => patchJob(ci, ji, { hourlyRate: Number(v) || 0 })}
+                              placeholder={String(job.priceMin || 0)}
+                              placeholderTextColor={v3.colors.textPlaceholder}
+                              onChangeText={(value) => patchJob(ci, ji, { hourlyRate: Number(value) || 0 })}
                             />
                           </View>
-                          <View style={styles.levelWrap}>
-                            <Text style={[styles.rateLabel, { color: '#6F6B6B' }]}>Experience</Text>
-                            <View style={styles.levelRow}>
-                              {LEVELS.map(lv => (
-                                <TouchableOpacity
-                                  key={lv.value}
-                                  onPress={(e: any) => { e.stopPropagation?.(); patchJob(ci, ji, { experienceLevel: lv.value }) }}
-                                  style={[
-                                    styles.levelBtn,
-                                    job.experienceLevel === lv.value ? { backgroundColor: '#F5A623' } : { backgroundColor: '#2E2E2E' },
-                                  ]}
-                                >
-                                  <Text style={[styles.levelText, { color: job.experienceLevel === lv.value ? '#0D0D0D' : '#6F6B6B' }]}>
-                                    {lv.label}
-                                  </Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          </View>
                         </View>
-                      ) : null}
-                    </View>
-                  </TouchableOpacity>
+
+                        <Text style={styles.configLabel}>Experience</Text>
+                        <View style={styles.levelRow}>
+                          {LEVELS.map((level) => {
+                            const selected = job.experienceLevel === level.value
+                            return (
+                              <TouchableOpacity
+                                key={level.value}
+                                style={[styles.levelButton, selected && styles.levelButtonSelected]}
+                                activeOpacity={0.72}
+                                onPress={() => patchJob(ci, ji, { experienceLevel: level.value })}
+                              >
+                                <Text style={[styles.levelText, selected && styles.levelTextSelected]}>{level.label}</Text>
+                              </TouchableOpacity>
+                            )
+                          })}
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
                 ))
               )}
             </View>
           ))}
 
-          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#F5A623' }, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-            {saving ? (
-              <ActivityIndicator size="small" color="#0D0D0D" />
-            ) : (
-              <Text style={styles.saveText}>Save {selectedCount > 0 ? `(${selectedCount})` : ''}</Text>
-            )}
+          <TouchableOpacity style={[styles.saveButton, saving && styles.disabled]} onPress={handleSave} disabled={saving} activeOpacity={0.78}>
+            {saving ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.saveText}>Save services{selectedCount ? ` · ${selectedCount}` : ''}</Text>}
           </TouchableOpacity>
         </ScrollView>
       )}
@@ -187,28 +194,44 @@ export default function JobSelectionScreen() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F7F7' },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  heading: { fontSize: 18, fontFamily: fonts.bodyMedium, color: '#000000' },
+const makeStyles = (_colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  topBar: { height: 70, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  backButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: 38, height: 38 },
+  topTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { padding: 16, paddingBottom: 40 },
-  subTitle: { fontSize: 13, fontFamily: fonts.body, color: '#6F6B6B', marginBottom: 16, lineHeight: 19 },
-  catCard: { borderRadius: 16, padding: 14, marginBottom: 12 },
-  catHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  catName: { fontSize: 15, fontFamily: fonts.bodyMedium },
-  emptyJobs: { fontSize: 12, fontFamily: fonts.body, paddingVertical: 8 },
-  jobRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E5E5E5', marginTop: 4 },
-  check: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#6F6B6B', alignItems: 'center', justifyContent: 'center', marginTop: 1, marginRight: 10 },
-  jobBody: { flex: 1 },
-  jobName: { fontSize: 14, fontFamily: fonts.bodyMedium },
-  rateWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6, marginTop: 8 },
-  rateLabel: { fontSize: 11, fontFamily: fonts.body },
-  rateInput: { flex: 1, fontSize: 13, fontFamily: fonts.bodyMedium, textAlign: 'right' },
-  levelWrap: { marginTop: 8 },
-  levelRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  levelBtn: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
-  levelText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  saveBtn: { borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8 },
-  saveText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#0D0D0D' },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  hero: { marginTop: 8, fontSize: 27, lineHeight: 33, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.35 },
+  subtitle: { marginTop: 6, maxWidth: 330, fontSize: 10.5, lineHeight: 16, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  countCard: { height: 60, marginTop: 20, paddingHorizontal: 15, borderRadius: 16, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center' },
+  countValue: { fontSize: 22, fontFamily: fonts.heading, color: v3.colors.paper },
+  countLabel: { marginLeft: 9, fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: '#CFCFCF' },
+  category: { marginTop: 22 },
+  categoryHeader: { height: 42, flexDirection: 'row', alignItems: 'center' },
+  categoryIcon: { width: 32, height: 32, borderRadius: 11, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  categoryName: { marginLeft: 9, fontSize: 12.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  emptyJobs: { paddingVertical: 10, fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  serviceWrap: { marginBottom: 8 },
+  serviceRow: { minHeight: 58, paddingHorizontal: 12, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  check: { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: '#C5C5C5', alignItems: 'center', justifyContent: 'center' },
+  checkSelected: { borderColor: v3.colors.ink, backgroundColor: v3.colors.ink },
+  serviceCopy: { flex: 1, marginLeft: 10, paddingRight: 8 },
+  serviceName: { fontSize: 10.8, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  serviceMeta: { marginTop: 3, fontSize: 8.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  chevron: { fontSize: 20, fontFamily: fonts.body, color: v3.colors.textMuted },
+  configCard: { marginTop: 6, padding: 12, borderRadius: 14, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  rateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  configLabel: { fontSize: 8.8, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  rateInputWrap: { width: 142, height: 42, borderRadius: 12, paddingHorizontal: 10, backgroundColor: v3.colors.surfaceGray, flexDirection: 'row', alignItems: 'center' },
+  currency: { fontSize: 9, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  rateInput: { flex: 1, paddingVertical: 0, marginLeft: 5, textAlign: 'right', fontSize: 12, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  levelRow: { flexDirection: 'row', gap: 6, marginTop: 7 },
+  levelButton: { flex: 1, height: 38, borderRadius: 11, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  levelButtonSelected: { backgroundColor: v3.colors.ink },
+  levelText: { fontSize: 8.5, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  levelTextSelected: { color: v3.colors.paper },
+  saveButton: { height: 54, marginTop: 24, borderRadius: 16, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  disabled: { opacity: 0.5 },
+  saveText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
 })
