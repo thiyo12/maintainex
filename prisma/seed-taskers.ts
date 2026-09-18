@@ -170,7 +170,7 @@ async function main() {
   const underCovered = allTemplates.filter((job) => (uniqueTaskersByJob.get(job.id)?.size || 0) < 3)
   if (underCovered.length > 0) {
     const details = underCovered
-      .map((job) => `${job.name || job.title || job.id}: ${uniqueTaskersByJob.get(job.id)?.size || 0}/3`)
+      .map((job) => `${job.id}: ${uniqueTaskersByJob.get(job.id)?.size || 0}/3`)
       .join(', ')
     throw new Error(`Test tasker coverage incomplete — ${details}`)
   }
