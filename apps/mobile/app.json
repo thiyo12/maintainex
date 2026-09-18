@@ -47,6 +47,16 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow MΛINTΛINEX to use the microphone so you can describe a job by voice.",
+          "speechRecognitionPermission": "Allow MΛINTΛINEX to turn your voice into a job description.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
       "expo-location",
       "expo-secure-store",
       "expo-font",
