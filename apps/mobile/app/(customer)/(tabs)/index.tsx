@@ -156,6 +156,7 @@ export default function CustomerHome() {
   const secondImage = secondProperty?.images?.[0] || secondProperty?.imageUrl || secondProperty?.photoUrl
   const acceptedAmount = money(activeJob?.acceptedQuote?.amount || activeJob?.acceptedQuote?.price || activeJob?.budget)
   const eta = activeJob?.acceptedQuote?.etaMinutes || activeJob?.etaMinutes
+  const firstName = (user?.name || 'there').trim().split(/\s+/)[0]
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -178,8 +179,31 @@ export default function CustomerHome() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.heroTitle}>What can we solve today?</Text>
-        <Text style={styles.heroSubtitle}>Post a job, find a pro, or book a stay.</Text>
+        <View style={styles.welcomeCard}>
+          <View style={styles.welcomeGlowOne} />
+          <View style={styles.welcomeGlowTwo} />
+          <Text style={styles.welcomeEyebrow}>WELCOME BACK</Text>
+          <Text style={styles.welcomeTitle}>Hi ${firstName}, what needs doing?</Text>
+          <Text style={styles.welcomeText}>Search the work, compare nearby providers, or post once and receive quotes.</Text>
+          <View style={styles.welcomeActions}>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              style={styles.welcomePrimary}
+              onPress={() => router.push('/(customer)/find' as any)}
+            >
+              <Wrench size={16} color={v3.colors.ink} weight="fill" />
+              <Text style={styles.welcomePrimaryText}>Find help</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.82}
+              style={styles.welcomeSecondary}
+              onPress={() => router.push('/(customer)/jobs/v2/create' as any)}
+            >
+              <Plus size={16} color={v3.colors.paper} weight="bold" />
+              <Text style={styles.welcomeSecondaryText}>Post job</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <TouchableOpacity style={styles.searchBar} onPress={() => router.push('/(customer)/find' as any)} activeOpacity={0.75}>
           <MagnifyingGlass size={18} color={v3.colors.ink} />
@@ -430,21 +454,97 @@ const styles = StyleSheet.create({
     borderColor: v3.colors.paper,
   },
 
-  heroTitle: {
+  welcomeCard: {
+    position: 'relative',
+    overflow: 'hidden',
+    marginHorizontal: 18,
     marginTop: 14,
+    minHeight: 188,
+    borderRadius: 24,
+    backgroundColor: v3.colors.ink,
     paddingHorizontal: 18,
-    fontSize: 25,
-    fontFamily: 'Outfit_900Black',
-    color: v3.colors.ink,
-    letterSpacing: -0.25,
+    paddingTop: 18,
+    paddingBottom: 16,
   },
-  heroSubtitle: {
-    paddingHorizontal: 18,
-    marginTop: 4,
-    fontSize: 10.5,
-    lineHeight: 15,
-    fontFamily: 'Outfit_600SemiBold',
-    color: v3.colors.textSecondary,
+  welcomeGlowOne: {
+    position: 'absolute',
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    right: -34,
+    top: -46,
+    backgroundColor: v3.colors.amber,
+    opacity: 0.95,
+  },
+  welcomeGlowTwo: {
+    position: 'absolute',
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    right: 42,
+    top: -44,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.08,
+  },
+  welcomeEyebrow: {
+    fontSize: 9,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.amber,
+    letterSpacing: 1,
+  },
+  welcomeTitle: {
+    marginTop: 8,
+    maxWidth: 245,
+    fontSize: 25,
+    lineHeight: 30,
+    fontFamily: 'Outfit_900Black',
+    color: v3.colors.paper,
+    letterSpacing: -0.35,
+  },
+  welcomeText: {
+    marginTop: 7,
+    maxWidth: 282,
+    fontSize: 11.2,
+    lineHeight: 16,
+    fontFamily: 'Outfit_400Regular',
+    color: '#C8C8C8',
+  },
+  welcomeActions: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 9,
+  },
+  welcomePrimary: {
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    backgroundColor: v3.colors.amber,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  welcomePrimaryText: {
+    fontSize: 11.5,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.ink,
+  },
+  welcomeSecondary: {
+    height: 42,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: '#404040',
+    backgroundColor: '#171717',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  welcomeSecondaryText: {
+    fontSize: 11.5,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: v3.colors.paper,
   },
 
   searchBar: {
