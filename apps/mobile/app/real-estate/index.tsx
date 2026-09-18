@@ -1,244 +1,276 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, StyleSheet,
+  Text, TextInput, TouchableOpacity, View,
+} from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CaretLeft, Heart, List, MagnifyingGlass, House, MapPin, PlusCircle } from 'phosphor-react-native'
-import { useTheme } from '../../lib/ThemeContext'
-import { useCountry } from '../../lib/country'
+import {
+  Buildings, CaretRight, Heart, House, List, MagnifyingGlass, MapPin, Plus,
+} from 'phosphor-react-native'
+
 import { realEstate } from '../../lib/api'
-import PropertyCard from '../../components/shared/PropertyCard'
-import { fonts } from '../../lib/fonts'
-import { spacing, fontSizes } from '../../lib/tokens'
+import { v3 } from '../../theme/v3/tokens'
+import V3CustomerBottomNav from '../../components/v3/V3CustomerBottomNav'
 
-const PURPOSE_FILTERS = ['all', 'sale', 'rent', 'commercial', 'land']
-const COUNTRY_FILTERS = [{ code: 'all', label: 'All' }, { code: 'LK', label: 'Sri Lanka' }, { code: 'CA', label: 'Canada' }]
+const MODES = [
+  { key: 'rent', label: 'Rent' },
+  { key: 'sale', label: 'Buy' },
+  { key: 'commercial', label: 'Commercial' },
+  { key: 'land', label: 'Land' },
+] as const
 
-export default function RealEstateList() {
-  const { colors } = useTheme()
-  const styles = makeStyles(colors)
+function money(value: unknown, countryCode?: string) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 'Price on request'
+  return `${countryCode === 'CA' ? 'CAD' : 'LKR'} ${Math.round(n).toLocaleString()}`
+}
+
+function photoOf(item: any) {
+  const photos = Array.isArray(item?.photos) ? item.photos : []
+  return photos[0] || item?.imageUrl || item?.photoUrl || null
+}
+
+export default function PropertyHub() {
   const router = useRouter()
-  const { selectedCountry } = useCountry()
+  const [mode, setMode] = useState<(typeof MODES)[number]['key']>('rent')
+  const [query, setQuery] = useState('')
   const [properties, setProperties] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activePurpose, setActivePurpose] = useState('all')
-  const [activeCountry, setActiveCountry] = useState(selectedCountry?.code || 'LK')
-  const [search, setSearch] = useState('')
-  const [sortBy, setSortBy] = useState('newest')
 
   const load = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true)
+    else setLoading(true)
     try {
-      if (refresh) setRefreshing(true)
-      else setLoading(true)
-      const params: any = { status: 'approved' }
-      if (activeCountry !== 'all') params.country = activeCountry
-      if (activePurpose !== 'all') params.purpose = activePurpose
-      if (search) params.q = search
-      params.sortBy = sortBy
-      const res: any = await realEstate.list(params)
-      const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []
-      setProperties(data)
-    } catch (e) {
-      console.error('Load real estate error:', e)
+      const response: any = await realEstate.list({
+        status: 'approved',
+        purpose: mode,
+        q: query.trim() || undefined,
+        sortBy: 'newest',
+      })
+      const list = Array.isArray(response) ? response : Array.isArray(response?.data) ? response.data : []
+      setProperties(list)
+    } catch (error) {
+      console.error('Load real estate error:', error)
+      setProperties([])
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [activeCountry, activePurpose, search, sortBy])
-
-  useEffect(() => { load() }, [load])
+  }, [mode, query])
 
   useEffect(() => {
-    const timer = setTimeout(() => load(), 500)
+    const timer = setTimeout(() => load(), query ? 320 : 0)
     return () => clearTimeout(timer)
-  }, [search, load])
+  }, [load, query])
 
-  const filtered = properties
+  const featured = useMemo(
+    () => properties.find((item) => item.isFeatured || item.boostTier) || properties[0] || null,
+    [properties],
+  )
+  const rest = useMemo(
+    () => properties.filter((item) => item.id !== featured?.id),
+    [properties, featured],
+  )
 
-  const badge = (purpose: string) => {
-    switch (purpose) {
-      case 'rent': return { label: 'RENT', color: '#6366F1' }
-      case 'commercial': return { label: 'COMM', color: '#10B981' }
-      case 'land': return { label: 'LAND', color: '#7C3AED' }
-      default: return { label: 'SALE', color: '#F5A623' }
-    }
-  }
+  const open = (item: any) => router.push(`/real-estate/${item.id}` as any)
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <CaretLeft size={22} color={colors.ink} weight="regular" />
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.ink }]}>Properties</Text>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/real-estate/favorites')}>
-          <Heart size={18} color={colors.ink} weight="regular" />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/real-estate/my-listings')}>
-          <List size={18} color={colors.ink} weight="regular" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.countryRow}>
-        {COUNTRY_FILTERS.map(c => (
-          <TouchableOpacity key={c.code} style={[styles.countryTab, activeCountry === c.code && { backgroundColor: colors.amber }]} onPress={() => setActiveCountry(c.code)}>
-            <Text style={[styles.countryTabText, { color: activeCountry === c.code ? '#111' : colors.muted }]}>{c.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={[styles.searchBar, { backgroundColor: colors.white, borderColor: colors.border }]}>
-        <MagnifyingGlass size={16} color={colors.muted} weight="regular" />
-        <TextInput style={[styles.searchInput, { color: colors.ink }]} placeholder="Search properties..." placeholderTextColor={colors.muted} value={search} onChangeText={setSearch} />
-      </View>
-
-      <View style={styles.filterRow}>
-        {PURPOSE_FILTERS.map(f => (
-          <TouchableOpacity key={f} style={[styles.filterChip, activePurpose === f && { backgroundColor: colors.amber, borderColor: colors.amber }]} onPress={() => setActivePurpose(f)}>
-            <Text style={[styles.filterText, { color: activePurpose === f ? '#111827' : colors.muted }]}>
-              {f === 'all' ? 'All' : f === 'land' ? 'Land' : f.charAt(0).toUpperCase() + f.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.sortRow}>
-        <TouchableOpacity style={[styles.sortBtn, sortBy === 'newest' && { borderBottomColor: colors.amber }]} onPress={() => setSortBy('newest')}>
-          <Text style={[styles.sortText, { color: sortBy === 'newest' ? colors.ink : colors.muted }]}>Newest</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.sortBtn, sortBy === 'price_asc' && { borderBottomColor: colors.amber }]} onPress={() => setSortBy('price_asc')}>
-          <Text style={[styles.sortText, { color: sortBy === 'price_asc' ? colors.ink : colors.muted }]}>Lowest</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.sortBtn, sortBy === 'price_desc' && { borderBottomColor: colors.amber }]} onPress={() => setSortBy('price_desc')}>
-          <Text style={[styles.sortText, { color: sortBy === 'price_desc' ? colors.ink : colors.muted }]}>Highest</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.sortBtn, sortBy === 'most_viewed' && { borderBottomColor: colors.amber }]} onPress={() => setSortBy('most_viewed')}>
-          <Text style={[styles.sortText, { color: sortBy === 'most_viewed' ? colors.ink : colors.muted }]}>Popular</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.amber} />
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={item => item.id || Math.random().toString()}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.amber} />}
-          ListHeaderComponent={
-            <>
-              {properties.some((p: any) => p.isFeatured || p.boostTier) && (
-                <View style={styles.featuredSection}>
-                  <Text style={[styles.featuredTitle, { color: colors.ink }]}>Featured</Text>
-                  {properties.filter((p: any) => p.isFeatured || p.boostTier).slice(0, 1).map((item: any) => (
-                    <TouchableOpacity key={item.id} style={[styles.featuredCard, { backgroundColor: colors.surface }]} onPress={() => router.push(`/real-estate/${item.id}`)}>
-                      <View style={[styles.featuredImage, { backgroundColor: colors.muted + '20' }]}>
-                        <House size={40} color={colors.muted} weight="regular" />
-                        <View style={[styles.featuredBgBadge, { backgroundColor: badge(item.purpose || 'sale').color }]}>
-                          <Text style={styles.featuredBgBadgeText}>{badge(item.purpose || 'sale').label}</Text>
-                        </View>
-                      </View>
-                      <View style={styles.featuredBody}>
-                        <Text style={[styles.featuredPrice, { color: colors.amberDark }]}>
-                          {item.countryCode === 'CA' ? 'CAD' : 'Rs.'} {item.priceLkr?.toLocaleString()}
-                        </Text>
-                        <Text style={[styles.featuredName, { color: colors.ink }]} numberOfLines={1}>{item.title}</Text>
-                        <View style={styles.featuredLocRow}>
-                          <MapPin size={12} color={colors.muted} weight="regular" />
-                          <Text style={[styles.featuredLoc, { color: colors.muted }]} numberOfLines={1}>{item.city || item.district || ''}</Text>
-                        </View>
-                        <View style={styles.featuredSpecs}>
-                          {item.bedrooms != null && <Text style={[styles.featuredSpec, { color: colors.muted }]}>{item.bedrooms} Bed</Text>}
-                          {item.bathrooms != null && <Text style={[styles.featuredSpec, { color: colors.muted }]}>{item.bathrooms} Bath</Text>}
-                          {(item.areaSqft || item.propertySize) && <Text style={[styles.featuredSpec, { color: colors.muted }]}>{item.areaSqft || item.propertySize} sqft</Text>}
-                          {item.parking != null && <Text style={[styles.featuredSpec, { color: colors.muted }]}>{item.parking} Parking</Text>}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </>
-          }
-          renderItem={({ item }) => (
-            <PropertyCard
-              title={item.title || 'Property'}
-              priceLkr={item.priceLkr || 0}
-              type={item.purpose || item.type || 'sale'}
-              countryCode={item.countryCode}
-              bedrooms={item.bedrooms}
-              bathrooms={item.bathrooms}
-              areaSqft={item.areaSqft || item.propertySize}
-              parking={item.parking}
-              location={item.city || item.district || item.address}
-              isFeatured={item.isFeatured}
-              boostTier={item.boostTier}
-              views={item.views}
-              saves={item.saves}
-              photos={item.photos}
-              onPress={() => router.push(`/real-estate/${item.id}`)}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={styles.center}>
-              <House size={48} color={colors.muted} weight="regular" />
-              <Text style={[styles.emptyText, { color: colors.muted }]}>No properties found</Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <FlatList
+        data={rest}
+        keyExtractor={(item) => String(item.id)}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={v3.colors.ink} />}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
+            <View style={styles.header}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>Stay & property</Text>
+                <Text style={styles.subtitle}>Rent first. Buy, commercial and land stay one tap away.</Text>
+              </View>
+              <TouchableOpacity activeOpacity={0.72} style={styles.iconBtn} onPress={() => router.push('/real-estate/favorites' as any)}>
+                <Heart size={18} color={v3.colors.ink} weight="bold" />
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.72} style={styles.iconBtn} onPress={() => router.push('/real-estate/my-listings' as any)}>
+                <List size={18} color={v3.colors.ink} weight="bold" />
+              </TouchableOpacity>
             </View>
-          }
-          ListFooterComponent={
-            <TouchableOpacity style={[styles.listPropertyBtn, { backgroundColor: colors.amber }]} onPress={() => router.push('/real-estate/upload')}>
-              <PlusCircle size={20} color="#111" weight="regular" />
-              <Text style={styles.listPropertyBtnText}>List Your Property</Text>
+
+            <View style={styles.search}>
+              <MagnifyingGlass size={18} color={v3.colors.ink} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Where do you need a place?"
+                placeholderTextColor={v3.colors.textPlaceholder}
+                style={styles.searchInput}
+              />
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modeRow}>
+              {MODES.map((item) => (
+                <TouchableOpacity
+                  key={item.key}
+                  activeOpacity={0.75}
+                  onPress={() => setMode(item.key)}
+                  style={[styles.modeChip, mode === item.key && styles.modeChipActive]}
+                >
+                  <Text style={[styles.modeText, mode === item.key && styles.modeTextActive]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.hero}>
+              <Text style={styles.eyebrow}>{mode === 'rent' ? 'NEED A PLACE?' : 'PROPERTY SEARCH'}</Text>
+              <Text style={styles.heroTitle}>
+                {mode === 'rent' ? 'Find a place without the clutter.' : 'Browse verified property listings.'}
+              </Text>
+              <Text style={styles.heroText}>Search by location, open the listing and contact the owner from one flow.</Text>
+            </View>
+
+            {loading ? (
+              <View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View>
+            ) : featured ? (
+              <>
+                <View style={styles.sectionRow}>
+                  <Text style={styles.sectionTitle}>Featured</Text>
+                  <Text style={styles.sectionMeta}>{properties.length} result{properties.length === 1 ? '' : 's'}</Text>
+                </View>
+                <TouchableOpacity activeOpacity={0.82} style={styles.featuredCard} onPress={() => open(featured)}>
+                  <View style={styles.featuredImageWrap}>
+                    {photoOf(featured) ? (
+                      <Image source={{ uri: photoOf(featured) }} style={styles.image} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.photoFallback}><House size={38} color={v3.colors.textMuted} /></View>
+                    )}
+                    <View style={styles.purposeBadge}><Text style={styles.purposeBadgeText}>{String(featured.purpose || mode).toUpperCase()}</Text></View>
+                    {featured.isFeatured ? <View style={styles.featuredBadge}><Text style={styles.featuredBadgeText}>FEATURED</Text></View> : null}
+                  </View>
+                  <View style={styles.featuredBody}>
+                    <Text style={styles.price}>{money(featured.priceLkr, featured.countryCode)}</Text>
+                    <Text style={styles.propertyTitle} numberOfLines={1}>{featured.title || 'Property'}</Text>
+                    <View style={styles.locationRow}>
+                      <MapPin size={13} color={v3.colors.textSecondary} />
+                      <Text style={styles.locationText} numberOfLines={1}>
+                        {[featured.area, featured.city, featured.district].filter(Boolean).join(', ') || 'Location available in listing'}
+                      </Text>
+                    </View>
+                    <View style={styles.specRow}>
+                      {featured.bedrooms != null ? <Text style={styles.spec}>{featured.bedrooms} bed</Text> : null}
+                      {featured.bathrooms != null ? <Text style={styles.spec}>{featured.bathrooms} bath</Text> : null}
+                      {featured.areaSqft ? <Text style={styles.spec}>{featured.areaSqft} sqft</Text> : null}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </>
+            ) : null}
+
+            <TouchableOpacity activeOpacity={0.82} style={styles.listYours} onPress={() => router.push('/real-estate/upload' as any)}>
+              <View style={styles.listYoursIcon}><Plus size={20} color={v3.colors.ink} weight="bold" /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.listYoursTitle}>List your place</Text>
+                <Text style={styles.listYoursText}>Create a rental, sale, commercial or land listing.</Text>
+              </View>
+              <CaretRight size={18} color={v3.colors.ink} weight="bold" />
             </TouchableOpacity>
-          }
-        />
-      )}
+
+            {rest.length ? (
+              <View style={styles.sectionRow}>
+                <Text style={styles.sectionTitle}>More properties</Text>
+                <Text style={styles.sectionMeta}>Newest first</Text>
+              </View>
+            ) : null}
+          </>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity activeOpacity={0.82} style={styles.card} onPress={() => open(item)}>
+            <View style={styles.cardImageWrap}>
+              {photoOf(item) ? <Image source={{ uri: photoOf(item) }} style={styles.image} resizeMode="cover" /> : (
+                <View style={styles.photoFallback}><Buildings size={28} color={v3.colors.textMuted} /></View>
+              )}
+            </View>
+            <View style={styles.cardBody}>
+              <Text style={styles.cardPrice}>{money(item.priceLkr, item.countryCode)}</Text>
+              <Text style={styles.cardTitle} numberOfLines={1}>{item.title || 'Property'}</Text>
+              <Text style={styles.cardLocation} numberOfLines={1}>{[item.area, item.city, item.district].filter(Boolean).join(', ') || 'View location'}</Text>
+            </View>
+            <CaretRight size={17} color={v3.colors.textMuted} weight="bold" />
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={!loading ? (
+          <View style={styles.empty}>
+            <House size={34} color={v3.colors.ink} weight="fill" />
+            <Text style={styles.emptyTitle}>No matching properties</Text>
+            <Text style={styles.emptyText}>Try another property type or a broader location search.</Text>
+          </View>
+        ) : null}
+        ListFooterComponent={<View style={{ height: 110 }} />}
+      />
+
+      <V3CustomerBottomNav
+        activeTab="explore"
+        onTabPress={(tab) => {
+          if (tab === 'home') router.push('/(customer)/(tabs)' as any)
+          else if (tab === 'explore') router.push('/(customer)/find' as any)
+          else router.push(`/(customer)/(tabs)/${tab}` as any)
+        }}
+        onPostJob={() => router.push('/(customer)/jobs/v2/create' as any)}
+      />
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.lg, paddingBottom: spacing.md, gap: 8 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  title: { flex: 1, fontSize: fontSizes.h2, fontFamily: fonts.heading },
-  actionBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  countryRow: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.xl, marginBottom: spacing.sm },
-  countryTab: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 100, backgroundColor: colors.white },
-  countryTabText: { fontSize: 12, fontFamily: fonts.bodyMedium },
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.xl, borderRadius: 14, borderWidth: 1,
-    paddingHorizontal: spacing.md, height: 44,
-  },
-  searchInput: { flex: 1, fontSize: fontSizes.body, fontFamily: fonts.body },
-  filterRow: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.xl, paddingVertical: spacing.sm },
-  filterChip: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: 100, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
-  filterText: { fontSize: fontSizes.captionSmall, fontFamily: fonts.bodyMedium },
-  sortRow: { flexDirection: 'row', gap: spacing.xl, paddingHorizontal: spacing.xl, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  sortBtn: { paddingBottom: spacing.xs, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  sortText: { fontSize: fontSizes.captionSmall, fontFamily: fonts.bodyMedium },
-  row: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
-  list: { paddingBottom: 32, paddingTop: 12 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.sm, paddingTop: 80 },
-  emptyText: { fontSize: fontSizes.body, fontFamily: fonts.body },
-  listPropertyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: spacing.xl, marginTop: spacing.md, paddingVertical: 14, borderRadius: 16 },
-  listPropertyBtnText: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, color: '#111' },
-  featuredSection: { paddingHorizontal: spacing.xl, marginBottom: spacing.md },
-  featuredTitle: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, marginBottom: spacing.sm },
-  featuredCard: { borderRadius: 16, overflow: 'hidden', marginBottom: spacing.md },
-  featuredImage: { height: 180, justifyContent: 'center', alignItems: 'center' },
-  featuredBgBadge: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100 },
-  featuredBgBadgeText: { fontSize: 10, fontFamily: fonts.bodyMedium, color: '#111' },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  list: { paddingHorizontal: 18, paddingBottom: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 8 },
+  title: { fontFamily: 'Outfit_900Black', fontSize: 28, color: v3.colors.ink, letterSpacing: -0.4 },
+  subtitle: { marginTop: 3, fontFamily: 'Outfit_400Regular', fontSize: 11.5, lineHeight: 16, color: v3.colors.textSecondary },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  search: { marginTop: 16, height: 54, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
+  searchInput: { flex: 1, marginLeft: 10, fontFamily: 'Outfit_600SemiBold', fontSize: 13, color: v3.colors.ink },
+  modeRow: { paddingTop: 10, paddingBottom: 2, gap: 8 },
+  modeChip: { height: 36, paddingHorizontal: 14, borderRadius: 12, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, justifyContent: 'center' },
+  modeChipActive: { backgroundColor: v3.colors.ink, borderColor: v3.colors.ink },
+  modeText: { fontFamily: 'Outfit_700Bold', fontSize: 11.5, color: v3.colors.ink },
+  modeTextActive: { color: v3.colors.paper },
+  hero: { marginTop: 14, padding: 18, borderRadius: 20, backgroundColor: v3.colors.amberSoft },
+  eyebrow: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9.5, color: v3.colors.amberDark, letterSpacing: 1 },
+  heroTitle: { marginTop: 7, fontFamily: 'Outfit_900Black', fontSize: 22, lineHeight: 28, color: v3.colors.ink },
+  heroText: { marginTop: 5, fontFamily: 'Outfit_400Regular', fontSize: 11.5, lineHeight: 17, color: v3.colors.textSecondary },
+  loading: { height: 160, alignItems: 'center', justifyContent: 'center' },
+  sectionRow: { marginTop: 18, marginBottom: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 15, color: v3.colors.ink },
+  sectionMeta: { fontFamily: 'Outfit_600SemiBold', fontSize: 10.5, color: v3.colors.textMuted },
+  featuredCard: { borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, overflow: 'hidden' },
+  featuredImageWrap: { height: 190, backgroundColor: v3.colors.surfaceGray },
+  image: { width: '100%', height: '100%' },
+  photoFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ECECEC' },
+  purposeBadge: { position: 'absolute', top: 12, left: 12, height: 26, paddingHorizontal: 10, borderRadius: 10, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  purposeBadgeText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9.5, color: v3.colors.paper },
+  featuredBadge: { position: 'absolute', top: 12, right: 12, height: 26, paddingHorizontal: 10, borderRadius: 10, backgroundColor: v3.colors.amber, alignItems: 'center', justifyContent: 'center' },
+  featuredBadgeText: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9.5, color: v3.colors.ink },
   featuredBody: { padding: 14 },
-  featuredPrice: { fontSize: fontSizes.h2, fontFamily: fonts.heading, letterSpacing: -0.3 },
-  featuredName: { fontSize: fontSizes.body, fontFamily: fonts.bodyMedium, marginTop: 4 },
-  featuredLocRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  featuredLoc: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body },
-  featuredSpecs: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  featuredSpec: { fontSize: fontSizes.captionSmall, fontFamily: fonts.body },
+  price: { fontFamily: 'Outfit_900Black', fontSize: 20, color: v3.colors.ink },
+  propertyTitle: { marginTop: 3, fontFamily: 'Outfit_700Bold', fontSize: 14, color: v3.colors.ink },
+  locationRow: { marginTop: 6, flexDirection: 'row', gap: 4, alignItems: 'center' },
+  locationText: { flex: 1, fontFamily: 'Outfit_400Regular', fontSize: 11.5, color: v3.colors.textSecondary },
+  specRow: { marginTop: 8, flexDirection: 'row', gap: 12 },
+  spec: { fontFamily: 'Outfit_600SemiBold', fontSize: 10.5, color: v3.colors.textSecondary },
+  listYours: { marginTop: 14, minHeight: 78, padding: 13, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  listYoursIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: v3.colors.amberSoft, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  listYoursTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.ink },
+  listYoursText: { marginTop: 2, fontFamily: 'Outfit_400Regular', fontSize: 11, color: v3.colors.textSecondary },
+  card: { minHeight: 88, marginBottom: 10, padding: 10, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  cardImageWrap: { width: 72, height: 68, borderRadius: 13, overflow: 'hidden', backgroundColor: v3.colors.surfaceGray },
+  cardBody: { flex: 1, marginLeft: 12 },
+  cardPrice: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.ink },
+  cardTitle: { marginTop: 2, fontFamily: 'Outfit_700Bold', fontSize: 12.5, color: v3.colors.ink },
+  cardLocation: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 10.5, color: v3.colors.textSecondary },
+  empty: { marginTop: 18, padding: 28, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center' },
+  emptyTitle: { marginTop: 10, fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: v3.colors.ink },
+  emptyText: { marginTop: 4, fontFamily: 'Outfit_400Regular', fontSize: 11.5, lineHeight: 17, color: v3.colors.textSecondary, textAlign: 'center' },
 })
