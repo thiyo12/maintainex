@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     color: v3.colors.paper,
   },
   avatarLoading: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(255,255,255,0.72)',
     alignItems: 'center',
     justifyContent: 'center',
