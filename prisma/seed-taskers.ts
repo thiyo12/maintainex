@@ -49,6 +49,7 @@ async function main() {
   const profilesByCategory = new Map<string, Array<{ id: string; hourlyRate: number }>>()
   const seededProfiles: Array<{ id: string; hourlyRate: number }> = []
   const passwordHash = await bcrypt.hash('test123', 12)
+  const seededLogins: TaskerSeed[] = []
 
   for (const tasker of TASKERS) {
     const category = catByName.get(tasker.categorySlug)
@@ -59,7 +60,14 @@ async function main() {
 
     const user = await prisma.user.upsert({
       where: { email: tasker.email },
-      update: { name: tasker.name, phone: tasker.phone, role: 'TASKER', isActive: true },
+      update: {
+        name: tasker.name,
+        phone: tasker.phone,
+        role: 'TASKER',
+        isActive: true,
+        identityStatus: 'APPROVED',
+        emailVerified: true,
+      },
       create: {
         email: tasker.email,
         passwordHash,
@@ -107,6 +115,7 @@ async function main() {
     const ref = { id: profile.id, hourlyRate: tasker.hourlyRate }
     seededProfiles.push(ref)
     profilesByCategory.set(category.id, [...(profilesByCategory.get(category.id) || []), ref])
+    seededLogins.push(tasker)
     console.log(`  ✓ ${tasker.name} (${tasker.email}) — ${tasker.categorySlug}`)
   }
 
@@ -147,9 +156,28 @@ async function main() {
     }
   }
 
-  console.log(`\n✅ Test coverage ready: ${allTemplates.length} active jobs, ${coverageRows} tasker-skill matches`)
+  const coverageLinks = await prisma.taskerSkill.findMany({
+    where: { jobId: { in: allTemplates.map((job) => job.id) } },
+    select: { jobId: true, taskerId: true },
+  })
+  const uniqueTaskersByJob = new Map<string, Set<string>>()
+  for (const link of coverageLinks) {
+    const set = uniqueTaskersByJob.get(link.jobId) || new Set<string>()
+    set.add(link.taskerId)
+    uniqueTaskersByJob.set(link.jobId, set)
+  }
+
+  const underCovered = allTemplates.filter((job) => (uniqueTaskersByJob.get(job.id)?.size || 0) < 3)
+  if (underCovered.length > 0) {
+    const details = underCovered
+      .map((job) => `${job.name || job.title || job.id}: ${uniqueTaskersByJob.get(job.id)?.size || 0}/3`)
+      .join(', ')
+    throw new Error(`Test tasker coverage incomplete — ${details}`)
+  }
+
+  console.log(`\n✅ Test coverage ready: ${allTemplates.length} active jobs, every job has at least 3 sample taskers (${coverageRows} seeded matches refreshed)`)
   console.log('\nTasker login credentials (password: test123):')
-  for (const tasker of TASKERS) console.log(`  ${tasker.email} — ${tasker.name} (${tasker.categorySlug})`)
+  for (const tasker of seededLogins) console.log(`  ${tasker.email} — ${tasker.name} (${tasker.categorySlug})`)
 }
 
 main()
