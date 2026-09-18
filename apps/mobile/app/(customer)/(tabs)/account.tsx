@@ -1,96 +1,88 @@
-import { useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, Alert, Switch, ActivityIndicator, TouchableOpacity } from 'react-native'
+import { useEffect, useState } from 'react'
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
-  ChatText, User, MapPin, CreditCard, Ticket, Crown, ClipboardText,
-  BuildingOffice, Wrench, Question, Info, FileText, Translate,
-  SignOut, Trash, CaretRight, Wallet, ShieldCheck, Camera,
+  CaretRight, ChatCircle, CreditCard, House, Lifebuoy, MapPin,
+  Medal, SignOut, Trash, UserCircle, Buildings,
 } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
-
 import { useAuth } from '../../../lib/auth'
 import { auth, upload } from '../../../lib/api'
+import { v2Trust } from '../../../lib/api-v2'
 import { v3 } from '../../../theme/v3/tokens'
-import { useTheme } from '../../../lib/ThemeContext'
-
 import V3CustomerBottomNav from '../../../components/v3/V3CustomerBottomNav'
-import V3TierBadge from '../../../components/v3/V3TierBadge'
-import AvatarCircle from '../../../components/ui/AvatarCircle'
-import LanguageSelector from '../../../components/ui/LanguageSelector'
 
-function MenuRow({ icon: Icon, label, onPress, color: accent, badge }: any) {
+type AccountRowProps = {
+  icon: any
+  title: string
+  subtitle: string
+  onPress: () => void
+}
+
+function AccountRow({ icon: Icon, title, subtitle, onPress }: AccountRowProps) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.menuRow}>
-      <View style={[styles.menuIconWrap, { backgroundColor: v3.colors.surfaceGray }]}>
-        <Icon size={20} color={accent || v3.colors.ink} weight="fill" />
+    <TouchableOpacity onPress={onPress} activeOpacity={0.72} style={styles.row}>
+      <View style={styles.rowIcon}>
+        <Icon size={20} color={v3.colors.ink} weight="fill" />
       </View>
-      <Text style={styles.menuLabel}>{label}</Text>
-      {badge != null && badge > 0 ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
-        </View>
-      ) : null}
-      <CaretRight size={14} color={v3.colors.textMuted} weight="bold" />
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowSubtitle}>{subtitle}</Text>
+      </View>
+      <CaretRight size={18} color={v3.colors.textMuted} weight="bold" />
     </TouchableOpacity>
   )
 }
 
-function SectionLabel({ label }: { label: string }) {
-  return <Text style={styles.sectionLabel}>{label}</Text>
-}
-
 export default function AccountScreen() {
   const router = useRouter()
-  const { t } = useTranslation()
-  const { isDark, toggleTheme } = useTheme()
   const { user, logout, refreshUser } = useAuth()
-  const [deleting, setDeleting] = useState(false)
+  const [trust, setTrust] = useState<any>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    v2Trust.get()
+      .then((result) => { if (active) setTrust(result) })
+      .catch(() => { if (active) setTrust(null) })
+    return () => { active = false }
+  }, [])
 
   const pickProfilePhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert(t('common.error'), t('errors.upload'))
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (permission.status !== 'granted') {
+      Alert.alert('Photo access needed', 'Allow photo access to update your profile picture.')
       return
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
     })
     if (result.canceled || !result.assets[0]) return
+
     setUploadingPhoto(true)
     try {
       const { url } = await upload.file(result.assets[0].uri)
       await auth.updateProfile({ profileImage: url })
       await refreshUser()
-    } catch {
-      Alert.alert(t('common.error'), t('errors.upload'))
+    } catch (error: any) {
+      Alert.alert('Could not update photo', error?.message || 'Please try again.')
     } finally {
       setUploadingPhoto(false)
     }
   }
 
-  const handleBecomeTasker = () => {
-    Alert.alert(
-      t('account.becomeTasker'),
-      t('account.becomeTaskerNote'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.continue') as string, onPress: () => router.push('/(auth)/role-switch?target=TASKER' as any) },
-      ]
-    )
-  }
-
   const handleDelete = () => {
     Alert.alert(
-      t('account.deleteAccount'),
-      t('account.deleteAccountConfirm'),
+      'Delete account?',
+      'This permanently removes your MaintainEX account.',
       [
-        { text: t('common.cancel'), style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: t('account.deleteAccount'),
+          text: 'Delete account',
           style: 'destructive',
           onPress: async () => {
             setDeleting(true)
@@ -98,14 +90,14 @@ export default function AccountScreen() {
               await auth.deleteAccount()
               await logout()
               router.replace('/(auth)/welcome')
-            } catch (e: any) {
-              Alert.alert(t('common.error'), e?.message || t('errors.generic'))
+            } catch (error: any) {
+              Alert.alert('Could not delete account', error?.message || 'Please try again.')
             } finally {
               setDeleting(false)
             }
           },
         },
-      ]
+      ],
     )
   }
 
@@ -114,99 +106,121 @@ export default function AccountScreen() {
     router.replace('/(auth)/welcome')
   }
 
+  const completed = Number(trust?.completedJobs ?? 0)
+  const cancelled = Number(trust?.cancelledJobs ?? 0)
+  const tierLabel = trust?.level === 'trusted' || trust?.level === 'high'
+    ? 'Priority Booker'
+    : 'Verified customer'
+
+  const avatarUri = (user as any)?.profileImage || (user as any)?.avatar
+  const initial = (user?.name || 'M').trim().charAt(0).toUpperCase()
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <View style={styles.profileHeader}>
-          <TouchableOpacity onPress={pickProfilePhoto} activeOpacity={0.7} style={styles.avatarWrap}>
-            <AvatarCircle uri={(user as any)?.profileImage || (user as any)?.avatar} name={user?.name} size={76} />
-            <View style={styles.avatarBadge}>
-              {uploadingPhoto ? <ActivityIndicator size="small" color={v3.colors.ink} /> : <Camera size={14} color={v3.colors.ink} weight="fill" />}
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.name}>{user?.name || 'User'}</Text>
-          <Text style={styles.sub}>{user?.email || ''}</Text>
-          {user?.phone ? <Text style={styles.sub}>{user.phone}</Text> : null}
-        </View>
+        <Text style={styles.pageTitle}>Account</Text>
 
-        <View style={styles.tierSection}>
-          <V3TierBadge tierLevel={(user as any)?.tierLevel} />
-        </View>
-
-        <SectionLabel label="My Account" />
-        <View style={styles.section}>
-          <MenuRow icon={ChatText} label={t('account.messages')} color={v3.colors.info} onPress={() => router.push('/(chat)' as any)} />
-          <MenuRow icon={User} label={t('account.personalInfo')} onPress={() => router.push('/settings/my-profile')} />
-          <MenuRow icon={MapPin} label={t('account.savedAddresses')} onPress={() => router.push('/settings/addresses')} />
-          <MenuRow icon={CreditCard} label={t('account.payment')} onPress={() => router.push('/settings/payment')} />
-          <MenuRow icon={Ticket} label={t('account.vouchers')} onPress={() => router.push('/settings/vouchers')} />
-          <MenuRow icon={Crown} label={t('account.membership')} onPress={() => router.push('/settings/membership')} />
-        </View>
-
-        <SectionLabel label="Services" />
-        <View style={styles.section}>
-          <MenuRow icon={ClipboardText} label={t('account.myJobs')} onPress={() => router.push('/(customer)/(tabs)/activity' as any)} />
-          <MenuRow icon={BuildingOffice} label={t('account.realEstate')} onPress={() => router.push('/real-estate' as any)} />
-          <MenuRow icon={Wrench} label={t('account.becomeTasker')} onPress={handleBecomeTasker} />
-        </View>
-
-        <SectionLabel label="Support" />
-        <View style={styles.section}>
-          <MenuRow icon={Question} label={t('account.help')} onPress={() => router.push('/settings/help')} />
-          <MenuRow icon={Info} label={t('account.about')} onPress={() => router.push('/settings/about')} />
-          <MenuRow icon={FileText} label={t('account.terms')} onPress={() => router.push('/settings/terms')} />
-          <View style={[styles.menuRow, { borderWidth: 1, borderColor: v3.colors.line }]}>
-            <View style={[styles.menuIconWrap, { backgroundColor: v3.colors.surfaceGray }]}>
-              <Translate size={20} color={v3.colors.ink} weight="fill" />
-            </View>
-            <Text style={styles.menuLabel}>{t('account.language')}</Text>
-            <LanguageSelector />
+        <TouchableOpacity onPress={pickProfilePhoto} activeOpacity={0.82} style={styles.profileCard}>
+          <View style={styles.avatar}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{initial}</Text>
+            )}
+            {uploadingPhoto ? (
+              <View style={styles.avatarLoading}>
+                <ActivityIndicator size="small" color={v3.colors.ink} />
+              </View>
+            ) : null}
           </View>
-          <View style={[styles.menuRow, { borderWidth: 1, borderColor: v3.colors.line }]}>
-            <View style={[styles.menuIconWrap, { backgroundColor: v3.colors.surfaceGray }]}>
-              <ShieldCheck size={20} color={v3.colors.ink} weight="fill" />
-            </View>
-            <Text style={styles.menuLabel}>{t('account.darkMode')}</Text>
-            <Switch
-              value={isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ false: v3.colors.line, true: v3.colors.ink }}
-              thumbColor={v3.colors.paper}
-            />
+          <View style={styles.profileCopy}>
+            <Text style={styles.name}>{user?.name || 'MaintainEX customer'}</Text>
+            <Text style={styles.profileMeta}>Customer · Verified mobile</Text>
           </View>
+          <CaretRight size={18} color={v3.colors.textMuted} weight="bold" />
+        </TouchableOpacity>
+
+        <View style={styles.tierCard}>
+          <View style={styles.tierBadge}>
+            <Medal size={15} color={v3.colors.amberDark} weight="fill" />
+            <Text style={styles.tierBadgeText}>{tierLabel.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.tierTitle}>{tierLabel}</Text>
+          <Text style={styles.tierMeta}>
+            {trust ? `${completed} completed · ${cancelled} cancelled` : 'Your booking history and trust status'}
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/settings/my-profile')} activeOpacity={0.7}>
+            <Text style={styles.badgesLink}>View profile ›</Text>
+          </TouchableOpacity>
         </View>
 
-        {user?.role === 'CUSTOMER' ? (
-          <TouchableOpacity onPress={() => router.push('/(customer)/wallet' as any)} activeOpacity={0.7} style={styles.earnCard}>
-            <View style={styles.earnIconBox}>
-              <Wallet size={22} color={v3.colors.paper} weight="fill" />
-            </View>
-            <View style={styles.earnBody}>
-              <Text style={styles.earnTitle}>{t('account.earnWithMX')}</Text>
-              <Text style={styles.earnSub}>{t('account.earnWithMXSub')}</Text>
-            </View>
-            <CaretRight size={16} color={v3.colors.paper} weight="bold" />
-          </TouchableOpacity>
-        ) : null}
+        <View style={styles.listCard}>
+          <AccountRow
+            icon={UserCircle}
+            title="Personal information"
+            subtitle="Profile & phone"
+            onPress={() => router.push('/settings/my-profile')}
+          />
+          <AccountRow
+            icon={MapPin}
+            title="Addresses"
+            subtitle="Home and saved locations"
+            onPress={() => router.push('/settings/addresses')}
+          />
+          <AccountRow
+            icon={CreditCard}
+            title="Payment & wallet"
+            subtitle="Cards, vouchers, balance"
+            onPress={() => router.push('/(customer)/wallet' as any)}
+          />
+          <AccountRow
+            icon={Medal}
+            title="Membership"
+            subtitle="Benefits and offers"
+            onPress={() => router.push('/settings/membership')}
+          />
+          <AccountRow
+            icon={Buildings}
+            title="Property"
+            subtitle="Saved stays & your listings"
+            onPress={() => router.push('/real-estate' as any)}
+          />
+          <AccountRow
+            icon={ChatCircle}
+            title="Messages"
+            subtitle="Chats with taskers and owners"
+            onPress={() => router.push('/(chat)' as any)}
+          />
+          <AccountRow
+            icon={Lifebuoy}
+            title="Help & safety"
+            subtitle="Support, disputes, emergency info"
+            onPress={() => router.push('/settings/help')}
+          />
+        </View>
 
-        <SectionLabel label="Account" />
-        <View style={styles.dangerRow}>
-          {deleting ? (
-            <Text style={styles.dangerText}>{t('common.loading')}</Text>
-          ) : (
-            <>
+        <View style={styles.secondaryCard}>
+          <AccountRow
+            icon={House}
+            title="Switch to tasker"
+            subtitle="Offer services with MaintainEX"
+            onPress={() => router.push('/(auth)/role-switch?target=TASKER' as any)}
+          />
+          <TouchableOpacity onPress={handleLogout} activeOpacity={0.7} style={styles.secondaryAction}>
+            <SignOut size={18} color={v3.colors.ink} weight="bold" />
+            <Text style={styles.secondaryText}>Sign out</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} activeOpacity={0.7} style={styles.secondaryAction}>
+            {deleting ? (
+              <ActivityIndicator size="small" color={v3.colors.error} />
+            ) : (
               <Trash size={18} color={v3.colors.error} weight="bold" />
-              <Text style={styles.dangerText} onPress={handleDelete}>{t('account.deleteAccount')}</Text>
-            </>
-          )}
-        </View>
-        <View style={styles.dangerRow}>
-          <SignOut size={18} color={v3.colors.error} weight="bold" />
-          <Text style={styles.dangerText} onPress={handleLogout}>{t('account.logout')}</Text>
+            )}
+            <Text style={styles.deleteText}>Delete account</Text>
+          </TouchableOpacity>
         </View>
 
-        <Text style={styles.version}>MaintainEX v1.0.0</Text>
-        <View style={{ height: 100 }} />
+        <View style={{ height: 106 }} />
       </ScrollView>
 
       <V3CustomerBottomNav
@@ -224,48 +238,143 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: v3.colors.canvas },
-  scroll: { paddingBottom: 20, paddingHorizontal: 18, paddingTop: 8 },
-  profileHeader: { alignItems: 'center', paddingTop: 8, paddingBottom: 16, gap: 2 },
-  avatarWrap: { position: 'relative' },
-  avatarBadge: {
-    position: 'absolute', right: -2, bottom: -2, width: 26, height: 26, borderRadius: 13,
-    backgroundColor: v3.colors.paper, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: v3.colors.canvas,
+  scroll: { paddingHorizontal: 18, paddingTop: 8 },
+  pageTitle: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 28,
+    color: v3.colors.ink,
+    marginBottom: 18,
   },
-  name: { fontSize: 24, fontFamily: 'Outfit_900Black', color: v3.colors.textPrimary, marginTop: 8 },
-  sub: { fontSize: 13, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted },
-  tierSection: { alignItems: 'center', marginBottom: 16 },
-  sectionLabel: {
-    fontSize: 11, fontFamily: 'Outfit_700Bold', textTransform: 'uppercase', letterSpacing: 0.8,
-    color: v3.colors.textMuted, marginBottom: 8, marginTop: 16,
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: v3.colors.paper,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
   },
-  section: { gap: 8 },
-  menuRow: {
-    flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: v3.radius.lg,
-    backgroundColor: v3.colors.surfaceWhite, borderWidth: 1, borderColor: v3.colors.line,
+  avatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: v3.colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  menuIconWrap: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  menuLabel: { fontSize: 14, fontFamily: 'Outfit_500Medium', color: v3.colors.textPrimary, flex: 1 },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: v3.colors.error, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginRight: 4 },
-  badgeText: { fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
-  earnCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: v3.colors.ink, borderRadius: v3.radius.lg,
-    padding: 16, marginTop: 16,
+  avatarImage: { width: 58, height: 58 },
+  avatarText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 24,
+    color: v3.colors.paper,
   },
-  earnIconBox: {
-    width: 42, height: 42, borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
+  avatarLoading: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  earnBody: { flex: 1, marginLeft: 12 },
-  earnTitle: { fontSize: 15, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
-  earnSub: { fontSize: 11, fontFamily: 'Outfit_500Medium', color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  dangerRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    padding: 14, borderRadius: v3.radius.lg, borderWidth: 1, borderColor: v3.colors.error + '44',
-    backgroundColor: v3.colors.surfaceWhite, marginBottom: 8,
+  profileCopy: { flex: 1, marginLeft: 14 },
+  name: { fontFamily: 'Outfit_800ExtraBold', fontSize: 20, color: v3.colors.ink },
+  profileMeta: {
+    marginTop: 3,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13,
+    color: v3.colors.textSecondary,
   },
-  dangerText: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: v3.colors.error },
-  version: { textAlign: 'center', fontSize: 11, fontFamily: 'Outfit_400Regular', color: v3.colors.textLight, marginTop: 20 },
+  tierCard: {
+    marginTop: 12,
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: v3.colors.amberSoft,
+    borderWidth: 1,
+    borderColor: '#F3D89E',
+  },
+  tierBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: v3.colors.paper,
+  },
+  tierBadgeText: {
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 10,
+    letterSpacing: 0.6,
+    color: v3.colors.amberDark,
+  },
+  tierTitle: {
+    marginTop: 12,
+    fontFamily: 'Outfit_800ExtraBold',
+    fontSize: 18,
+    color: v3.colors.ink,
+  },
+  tierMeta: {
+    marginTop: 3,
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 13,
+    color: v3.colors.textSecondary,
+  },
+  badgesLink: {
+    marginTop: 10,
+    fontFamily: 'Outfit_700Bold',
+    fontSize: 13,
+    color: v3.colors.ink,
+  },
+  listCard: {
+    marginTop: 16,
+    backgroundColor: v3.colors.paper,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    overflow: 'hidden',
+  },
+  row: {
+    minHeight: 72,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: v3.colors.line,
+  },
+  rowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: v3.colors.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rowCopy: { flex: 1 },
+  rowTitle: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.ink },
+  rowSubtitle: {
+    marginTop: 2,
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 12,
+    color: v3.colors.textSecondary,
+  },
+  secondaryCard: {
+    marginTop: 16,
+    backgroundColor: v3.colors.paper,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    overflow: 'hidden',
+  },
+  secondaryAction: {
+    minHeight: 54,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: v3.colors.line,
+  },
+  secondaryText: { fontFamily: 'Outfit_600SemiBold', fontSize: 14, color: v3.colors.ink },
+  deleteText: { fontFamily: 'Outfit_600SemiBold', fontSize: 14, color: v3.colors.error },
 })
