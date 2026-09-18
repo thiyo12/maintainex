@@ -177,7 +177,7 @@ export default function AccountScreen() {
             icon={CreditCard}
             title="Payment & wallet"
             subtitle="Cards, vouchers, balance"
-            onPress={() => router.push('/(customer)/wallet' as any)}
+            onPress={() => router.push('/(customer)/settings/payment' as any)}
           />
           <AccountRow
             icon={Gift}
