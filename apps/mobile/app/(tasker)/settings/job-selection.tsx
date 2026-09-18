@@ -120,7 +120,7 @@ export default function JobSelectionScreen() {
             <View key={cat.id} style={[styles.catCard, { backgroundColor: '#FFFFFF' }]}>
               <View style={styles.catHeader}>
                 <Wrench size={16} color="#F5A623" weight="fill" />
-                <Text style={[styles.catName, { color: '#FFFFFF' }]}>{cat.name}</Text>
+                <Text style={[styles.catName, { color: '#000000' }]}>{cat.name}</Text>
               </View>
               {cat.jobs.length === 0 ? (
                 <Text style={[styles.emptyJobs, { color: '#6F6B6B' }]}>No jobs in this category yet.</Text>
@@ -131,13 +131,13 @@ export default function JobSelectionScreen() {
                       {job.selected && <Check size={13} color="#0D0D0D" weight="fill" />}
                     </View>
                     <View style={styles.jobBody}>
-                      <Text style={[styles.jobName, { color: '#FFFFFF' }]}>{job.name}</Text>
+                      <Text style={[styles.jobName, { color: '#000000' }]}>{job.name}</Text>
                       {job.selected ? (
                         <View>
-                          <View style={[styles.rateWrap, { borderColor: '#2E2E2E' }]}>
+                          <View style={[styles.rateWrap, { borderColor: '#E5E5E5' }]}>
                             <Text style={[styles.rateLabel, { color: '#6F6B6B' }]}>Rate ({job.currency}/hr)</Text>
                             <TextInput
-                              style={[styles.rateInput, { color: '#FFFFFF' }]}
+                              style={[styles.rateInput, { color: '#000000' }]}
                               value={String(job.hourlyRate || '')}
                               keyboardType="numeric"
                               placeholder={`Default ${job.priceMin || ''}`}
@@ -188,9 +188,9 @@ export default function JobSelectionScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: '#F7F7F7' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  heading: { fontSize: 18, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  heading: { fontSize: 18, fontFamily: fonts.bodyMedium, color: '#000000' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 16, paddingBottom: 40 },
   subTitle: { fontSize: 13, fontFamily: fonts.body, color: '#6F6B6B', marginBottom: 16, lineHeight: 19 },
@@ -198,7 +198,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   catHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   catName: { fontSize: 15, fontFamily: fonts.bodyMedium },
   emptyJobs: { fontSize: 12, fontFamily: fonts.body, paddingVertical: 8 },
-  jobRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#2E2E2E', marginTop: 4 },
+  jobRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E5E5E5', marginTop: 4 },
   check: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: '#6F6B6B', alignItems: 'center', justifyContent: 'center', marginTop: 1, marginRight: 10 },
   jobBody: { flex: 1 },
   jobName: { fontSize: 14, fontFamily: fonts.bodyMedium },

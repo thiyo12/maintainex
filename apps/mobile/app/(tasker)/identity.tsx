@@ -124,7 +124,7 @@ export default function IdentityVerificationScreen() {
       <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
-            <X size={24} color="#FFFFFF" weight="bold" />
+            <X size={24} color="#000000" weight="bold" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('verify.title')}</Text>
           <View style={{ width: 24 }} />
@@ -243,38 +243,38 @@ export default function IdentityVerificationScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: '#F7F7F7' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: '#000000' },
   subtitle: { fontSize: 14, color: '#6F6B6B', paddingHorizontal: 20, marginBottom: 24, lineHeight: 20 },
   section: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#000000', marginBottom: 12 },
   nameInput: {
     backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, fontSize: 15,
-    color: '#FFFFFF', borderWidth: 1.5, borderColor: '#2E2E2E', marginBottom: 8,
+    color: '#000000', borderWidth: 1.5, borderColor: '#E5E5E5', marginBottom: 8,
   },
   docOption: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
     padding: 16, borderRadius: 12, marginBottom: 8,
-    borderWidth: 1.5, borderColor: '#2E2E2E',
+    borderWidth: 1.5, borderColor: '#E5E5E5',
   },
   docOptionSelected: { borderColor: '#F5A623', backgroundColor: '#FFF1D2' },
-  docLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#FFFFFF', marginLeft: 12 },
+  docLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: '#000000', marginLeft: 12 },
   docLabelSelected: { color: '#D4900A' },
   imageActions: { flexDirection: 'row', gap: 12 },
   imageBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, gap: 8,
-    borderWidth: 1.5, borderColor: '#2E2E2E', borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: '#E5E5E5', borderStyle: 'dashed',
   },
-  imageBtnText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  imageBtnText: { fontSize: 15, fontWeight: '600', color: '#000000' },
   previewWrap: { position: 'relative' },
   preview: { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#2E2E2E' },
   retakeBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 2 },
-  uploadingBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', padding: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#2E2E2E', gap: 10 },
+  uploadingBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', padding: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E5E5', gap: 10 },
   uploadingText: { fontSize: 14, color: '#6F6B6B' },
   note: { fontSize: 12, color: '#6F6B6B', paddingHorizontal: 20, marginBottom: 16, lineHeight: 18, fontStyle: 'italic' },
   submitBtn: { backgroundColor: '#F5A623', marginHorizontal: 20, paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  submitBtnText: { fontSize: 16, fontWeight: '700', color: '#000000' },
 })

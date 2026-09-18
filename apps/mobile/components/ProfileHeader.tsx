@@ -26,8 +26,8 @@ export default function ProfileHeader({
   const { t } = useTranslation()
   const isTasker = variant === 'tasker'
   const gradientColors = isTasker
-    ? (['#F5A623', '#FBBF24'] as const)
-    : (['#4F46E5', '#818CF8'] as const)
+    ? (['#000000', '#292929'] as const)
+    : (['#000000', '#3A3A3A'] as const)
 
   const RoleIcon = isTasker ? Lightning : Buildings
   const labelParts = (roleLabel || subtitle || '').split('·')

@@ -9,9 +9,9 @@ import { useAuth } from '../../../lib/auth'
 import { taskers, earnings, notifications } from '../../../lib/api'
 import { v2Jobs, v2Identity } from '../../../lib/api-v2'
 import { on } from '../../../lib/events'
-import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { categoryIcon } from '../../../lib/categoryVisuals'
+import { v3 } from '../../../theme/v3/tokens'
 
 import AvatarCircle from '../../../components/ui/AvatarCircle'
 import PressableScale from '../../../components/ui/PressableScale'
@@ -27,7 +27,6 @@ export default function TaskerDashboard() {
   const { t } = useTranslation()
   const router = useRouter()
   const { user } = useAuth()
-  const colors = useColors()
 
   const [isOnline, setIsOnline] = useState(true)
   const [openJobs, setOpenJobs] = useState<any[]>([])
@@ -158,7 +157,7 @@ export default function TaskerDashboard() {
   const activeId = activeJob?.id
   const activeBudget = activeJob ? Number(activeJob.budgetAmount || 0) : 0
 
-  const styles = makeStyles(colors)
+  const styles = makeStyles()
 
   return (
     <SafeAreaView style={styles.container}>
@@ -171,11 +170,11 @@ export default function TaskerDashboard() {
         <View style={styles.headerRow}>
           <View style={styles.greetingBlock}>
             <Text style={styles.greetingSub}>{getGreeting()},</Text>
-            <Text style={styles.greetingName}>{firstName} 👋</Text>
+            <Text style={styles.greetingName}>{firstName}</Text>
           </View>
           <PressableScale onPress={() => router.push('/notifications')} scaleTo={0.94} style={styles.iconBtnPress}>
             <View style={styles.iconBtn}>
-              <Bell size={20} color="#FFFFFF" weight="regular" />
+              <Bell size={20} color={v3.colors.ink} weight="regular" />
               {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
             </View>
           </PressableScale>
@@ -184,24 +183,24 @@ export default function TaskerDashboard() {
         {/* ═══ Availability ═══ */}
         <PressableScale onPress={toggleOnline} scaleTo={0.99} style={styles.availPress}>
           <LinearGradient
-            colors={isOnline ? ['#F5A623', '#D4900A'] : ['#FFFFFF', '#2E2E2E']}
+            colors={isOnline ? [v3.colors.amber, '#FFD071'] : [v3.colors.paper, '#F1F1F1']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
             style={[styles.availCard, !isOnline && styles.availCardOffline]}
           >
             <View style={styles.availLeft}>
               <View style={[styles.availDot, { backgroundColor: isOnline ? '#0D0D0D' : '#6F6B6B' }]} />
               <View>
-                <Text style={[styles.availTitle, { color: isOnline ? '#0D0D0D' : '#FFFFFF' }]}>
+                <Text style={[styles.availTitle, { color: v3.colors.ink }]}>
                   {isOnline ? t('ui.youreOnline') : t('ui.youreOffline')}
                 </Text>
-                <Text style={[styles.availSub, { color: isOnline ? 'rgba(11,12,18,0.7)' : '#6F6B6B' }]}>
+                <Text style={[styles.availSub, { color: v3.colors.textSecondary }]}>
                   {isOnline ? t('ui.tapToPause') : t('ui.tapToStart')}
                 </Text>
               </View>
             </View>
             <View style={[styles.availBadge, isOnline ? styles.availBadgeOn : styles.availBadgeOff]}>
               {!isOnline && <View style={styles.availPing} />}
-              <Text style={[styles.availBadgeText, { color: isOnline ? '#0D0D0D' : '#FFFFFF' }]}>
+              <Text style={[styles.availBadgeText, { color: isOnline ? v3.colors.paper : v3.colors.ink }]}>
                 {isOnline ? t('tasker.online') : t('tasker.paused')}
               </Text>
             </View>
@@ -343,46 +342,46 @@ export default function TaskerDashboard() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  scroll: { paddingBottom: 32, paddingHorizontal: 16 },
+const makeStyles = () => StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  scroll: { paddingBottom: 112, paddingHorizontal: 18 },
 
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8 },
   greetingBlock: {},
-  greetingSub: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#6F6B6B' },
-  greetingName: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF', letterSpacing: -0.5, marginTop: 2 },
+  greetingSub: { fontSize: 12, fontFamily: fonts.bodyMedium, color: v3.colors.textSecondary },
+  greetingName: { fontSize: 28, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.5, marginTop: 2 },
   iconBtnPress: { borderRadius: 999 },
   iconBtn: {
     width: 44, height: 44, borderRadius: 999,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E',
+    backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line,
     alignItems: 'center', justifyContent: 'center', position: 'relative',
   },
   bellDot: {
     position: 'absolute', top: 8, right: 9, width: 9, height: 9, borderRadius: 5,
-    backgroundColor: '#F5A623', borderWidth: 1.5, borderColor: '#0D0D0D',
+    backgroundColor: v3.colors.amber, borderWidth: 1.5, borderColor: v3.colors.paper,
   },
 
   availPress: { marginTop: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
   availCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, padding: 16 },
-  availCardOffline: { borderWidth: 1, borderColor: '#2E2E2E' },
+  availCardOffline: { borderWidth: 1, borderColor: v3.colors.line },
   availLeft: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   availDot: { width: 12, height: 12, borderRadius: 6 },
   availTitle: { fontFamily: fonts.bodyMedium, fontSize: 15 },
   availSub: { fontFamily: fonts.body, marginTop: 2, fontSize: 12, color: '#6F6B6B' },
   availBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  availBadgeOn: { backgroundColor: '#0D0D0D' },
-  availBadgeOff: { backgroundColor: '#2E2E2E', borderWidth: 1, borderColor: '#2E2E2E' },
+  availBadgeOn: { backgroundColor: v3.colors.ink },
+  availBadgeOff: { backgroundColor: v3.colors.surfaceGray, borderWidth: 1, borderColor: v3.colors.line },
   availPing: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#F5A623' },
   availBadgeText: { fontFamily: fonts.body, fontSize: 12 },
 
-  earnCard: { marginTop: 24, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 24, borderWidth: 1, borderColor: '#2E2E2E', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
+  earnCard: { marginTop: 16, backgroundColor: v3.colors.paper, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: v3.colors.line },
   earnHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   earnLabel: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 12 },
-  earnBalance: { fontSize: 30, fontFamily: fonts.heading, color: '#F5A623', letterSpacing: -0.5, marginTop: 4 },
+  earnBalance: { fontSize: 30, fontFamily: fonts.heading, color: v3.colors.ink, letterSpacing: -0.5, marginTop: 4 },
   chipRow: { flexDirection: 'row', gap: 8, marginTop: 24 },
-  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, backgroundColor: '#2E2E2E', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
-  chipValue: { fontFamily: fonts.body, color: '#FFFFFF', fontSize: 12 },
-  chipLabel: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 12 },
+  chip: { flex: 1, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, backgroundColor: v3.colors.canvas, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
+  chipValue: { fontFamily: fonts.body, color: v3.colors.ink, fontSize: 12 },
+  chipLabel: { fontFamily: fonts.body, color: v3.colors.textSecondary, fontSize: 10 },
 
   activeWrap: { marginTop: 24 },
   activePress: { marginTop: 24, borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4 },
@@ -403,24 +402,24 @@ const makeStyles = (colors: any) => StyleSheet.create({
   activeCtaText: { fontFamily: fonts.bodyMedium, color: '#FFFFFF', fontSize: 14 },
 
   idleCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 24,
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#2E2E2E',
+    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16,
+    backgroundColor: v3.colors.paper, borderRadius: 18, padding: 16, borderWidth: 1, borderColor: v3.colors.line,
   },
-  idleText: { fontFamily: fonts.body, color: '#6F6B6B', flex: 1, fontSize: 14 },
+  idleText: { fontFamily: fonts.body, color: v3.colors.ink, flex: 1, fontSize: 14 },
   idleCta: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12 },
 
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 32, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontFamily: fonts.heading, color: '#FFFFFF' },
+  sectionTitle: { fontSize: 18, fontFamily: fonts.heading, color: v3.colors.ink },
   seeAll: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12 },
 
   feedGap: { gap: 8 },
   jobCard: {
-    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E',
+    flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 18,
+    backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line,
   },
   jobIconBox: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#FFF1D2', alignItems: 'center', justifyContent: 'center' },
   jobBody: { flex: 1, marginLeft: 16 },
-  jobTitle: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: '#FFFFFF' },
+  jobTitle: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: v3.colors.ink },
   jobMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   jobMetaText: { fontFamily: fonts.body, color: '#6F6B6B', flex: 1, fontSize: 12 },
   jobBudget: { fontFamily: fonts.body, color: '#F5A623', fontSize: 12, marginTop: 4 },
@@ -428,7 +427,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
   quoteBtn: { backgroundColor: '#F5A623', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
   quoteText: { fontFamily: fonts.body, color: '#0D0D0D', fontSize: 12 },
 
-  feedEmpty: { alignItems: 'center', paddingVertical: 32, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#2E2E2E', borderStyle: 'dashed' },
+  feedEmpty: { alignItems: 'center', paddingVertical: 32, backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, borderStyle: 'dashed' },
   feedEmptyText: { fontFamily: fonts.body, color: '#6F6B6B', fontSize: 14 },
 
   readinessBanner: {

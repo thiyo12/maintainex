@@ -225,50 +225,50 @@ export default function AvailabilityScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: '#F7F7F7' },
   scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', marginTop: 16 },
+  heading: { fontSize: 24, fontWeight: '800', color: '#000000', marginTop: 16 },
   subtitle: { fontSize: 14, color: '#6F6B6B', marginTop: 4, marginBottom: 20, lineHeight: 20 },
 
   toggleCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#2E2E2E', marginBottom: 24,
+    backgroundColor: '#FFFFFF', padding: 16, borderRadius: 18, borderWidth: 1, borderColor: '#E5E5E5', marginBottom: 24,
   },
   toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  toggleLabel: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
+  toggleLabel: { fontSize: 15, fontWeight: '700', color: '#000000' },
   toggleHint: { fontSize: 12, color: '#6F6B6B', marginTop: 2 },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#FFFFFF', marginBottom: 10 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#000000', marginBottom: 10 },
 
   daysGrid: { flexDirection: 'row', gap: 8, marginBottom: 24, flexWrap: 'wrap' },
   dayBtn: {
     width: 48, height: 48, borderRadius: 12, backgroundColor: '#FFFFFF',
-    borderWidth: 1.5, borderColor: '#2E2E2E', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: '#E5E5E5', alignItems: 'center', justifyContent: 'center',
   },
   dayBtnSelected: { backgroundColor: '#F5A623', borderColor: '#F5A623' },
   dayBtnText: { fontSize: 13, fontWeight: '700', color: '#6F6B6B' },
-  dayBtnTextSelected: { color: '#FFFFFF' },
+  dayBtnTextSelected: { color: '#000000' },
 
   timeRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   timeBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#2E2E2E',
+    backgroundColor: '#FFFFFF', padding: 14, borderRadius: 12, borderWidth: 1.5, borderColor: '#E5E5E5',
   },
   timeLabel: { fontSize: 11, color: '#6F6B6B' },
-  timeValue: { fontSize: 18, fontWeight: '700', color: '#FFFFFF' },
+  timeValue: { fontSize: 18, fontWeight: '700', color: '#000000' },
 
   pickerCard: {
     backgroundColor: '#FFFFFF', borderRadius: 14, padding: 12, marginBottom: 20,
-    borderWidth: 1, borderColor: '#2E2E2E', flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    borderWidth: 1, borderColor: '#E5E5E5', flexDirection: 'row', flexWrap: 'wrap', gap: 8,
   },
   pickerItem: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#2E2E2E',
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#F1F1F1',
   },
   pickerItemSelected: { backgroundColor: '#F5A623' },
   pickerText: { fontSize: 13, fontWeight: '600', color: '#6F6B6B' },
-  pickerTextSelected: { color: '#FFFFFF' },
+  pickerTextSelected: { color: '#000000' },
 
   saveBtn: { backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 12 },
   saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#000000' },
 })

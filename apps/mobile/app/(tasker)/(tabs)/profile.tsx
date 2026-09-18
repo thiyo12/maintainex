@@ -6,7 +6,6 @@ import {
   Wrench,
   Lightning,
   Images,
-  Image,
   ChatCircleDots,
   Star,
   ShieldCheck,
@@ -30,6 +29,12 @@ import { fonts } from '../../../lib/fonts'
 import OfferProgramSection from '../../../components/offers/OfferProgramSection'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+
+type TaskerProfileView = TaskerProfile & {
+  completionRate?: number
+  experienceYears?: number
+  reviews?: Array<{ reviewerName?: string; rating?: number; comment?: string }>
+}
 
 function useSlideUp(delay = 0) {
   const anim = useRef(new Animated.Value(0)).current
@@ -60,7 +65,7 @@ export default function TaskerProfile() {
   const styles = makeStyles(colors)
   const { user, logout } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<TaskerProfile | null>(null)
+  const [profile, setProfile] = useState<TaskerProfileView | null>(null)
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
   const [unreadMsgs, setUnreadMsgs] = useState(0)
   const [unreadNotifs, setUnreadNotifs] = useState(0)
@@ -161,16 +166,18 @@ export default function TaskerProfile() {
   const skills = profile?.skills || []
   const rating = profile?.rating || 0
   const completedJobs = profile?.completedJobs || 0
-
-  const reviews = [
-    { initials: 'PK', name: 'Priya K.', stars: 5, text: 'Fixed our wiring issue quickly and explained everything clearly. Highly recommend!' },
-    { initials: 'RJ', name: 'Ruwan J.', stars: 4, text: 'On time and professional. Slightly higher price but worth it.' },
-  ]
+  const serviceAreas = Array.isArray(profile?.serviceAreas) ? profile.serviceAreas : []
+  const reviews = (Array.isArray(profile?.reviews) ? profile.reviews : []).map((review: any) => ({
+    initials: String(review.reviewerName || 'C').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase(),
+    name: review.reviewerName || 'Customer',
+    stars: Math.max(0, Math.min(5, Number(review.rating || 0))),
+    text: review.comment || '',
+  }))
 
   const verifications = [
-    { icon: 'card', title: 'National ID Verified', sub: 'Checked against NIC database', done: true },
-    { icon: 'ribbon', title: 'Trade Certificate', sub: 'Vocational Training Authority', done: true },
-    { icon: 'shield', title: 'Skill Test', sub: 'Take a quick assessment', done: false },
+    { icon: 'card', title: 'Identity verification', sub: 'Government ID review', done: identityStatus === 'APPROVED' || identityStatus === 'VERIFIED' },
+    { icon: 'ribbon', title: 'Service skills', sub: skills.length > 0 ? `${skills.length} selected` : 'Add your services', done: skills.length > 0 },
+    { icon: 'shield', title: 'Service area', sub: serviceAreas.length > 0 ? serviceAreas.join(', ') : 'Add where you work', done: serviceAreas.length > 0 },
   ] as const
 
   return (
@@ -180,7 +187,7 @@ export default function TaskerProfile() {
           initials={initials}
           name={name}
           nickname={nickname}
-          roleLabel={`Electrician · Colombo 6`}
+          roleLabel={`${skills[0] || 'Independent tasker'}${serviceAreas[0] ? ` · ${serviceAreas[0]}` : ''}`}
           variant="tasker"
           verified={identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'}
           onEdit={() => router.push('/(tasker)/settings/edit-profile')}
@@ -189,7 +196,7 @@ export default function TaskerProfile() {
 
         <Animated.View style={[styles.card, cardAnim]}>
           <View style={styles.statsRow}>
-            {[{ val: completedJobs, lbl: t('tasker.jobsDone') }, { val: rating.toFixed(1), lbl: t('tasker.rating') }, { val: '98%', lbl: t('tasker.active') }, { val: '3yr', lbl: t('profile.experience') }].map((s) => (
+            {[{ val: completedJobs, lbl: t('tasker.jobsDone') }, { val: rating ? rating.toFixed(1) : 'New', lbl: t('tasker.rating') }, { val: `${Number(profile?.completionRate || 0)}%`, lbl: t('tasker.active') }, { val: profile?.experienceYears ? `${profile.experienceYears}yr` : '—', lbl: t('profile.experience') }].map((s) => (
               <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
                 <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
@@ -210,16 +217,7 @@ export default function TaskerProfile() {
                   <Lightning size={12} color={colors.amberDark} />
                   <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
                 </Animated.View>
-              )) : (
-                <>
-                  {[{ icon: 'lightning', label: 'Wiring' }, { icon: 'lightning', label: 'Lighting' }, { icon: 'lightning', label: 'Inverters' }, { icon: 'lightning', label: 'Wiring Repairs' }].map((s) => (
-                    <Animated.View key={s.label} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                      <Lightning size={12} color={colors.amberDark} />
-                      <Text style={[styles.chipText, { color: colors.amberDark }]}>{s.label}</Text>
-                    </Animated.View>
-                  ))}
-                </>
-              )}
+              )) : <Text style={styles.emptyText}>Add services to receive matching jobs.</Text>}
             </View>
           </View>
         </Animated.View>
@@ -230,13 +228,7 @@ export default function TaskerProfile() {
               <Images size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
-            <View style={styles.portGrid}>
-              {[1, 2, 3].map((i) => (
-                <Animated.View key={i} style={[styles.portItem, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
-                  <Image size={22} color={colors.muted} />
-                </Animated.View>
-              ))}
-            </View>
+            <Text style={styles.emptyText}>Completed-work photos will appear here when you add job evidence.</Text>
           </View>
         </Animated.View>
 
@@ -246,7 +238,7 @@ export default function TaskerProfile() {
               <ChatCircleDots size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
-            {reviews.map((rev, i) => (
+            {reviews.map((rev: any, i: number) => (
               <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
@@ -264,6 +256,7 @@ export default function TaskerProfile() {
                 </View>
               </View>
             ))}
+            {reviews.length === 0 ? <Text style={styles.emptyText}>Customer reviews will appear here after completed work.</Text> : null}
           </View>
         </Animated.View>
 
@@ -421,6 +414,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderRadius: 100,
   },
   chipText: { fontSize: 11, fontFamily: fonts.bodyMedium },
+  emptyText: { fontSize: 11, lineHeight: 17, fontFamily: fonts.body, color: colors.muted, paddingVertical: 6 },
   portGrid: { flexDirection: 'row', gap: 8 },
   portItem: {
     flex: 1,

@@ -153,9 +153,13 @@ export default function CompanyProfile() {
   const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : 'CO'
   const services = profile?.services || []
   const rating = profile?.rating || 0
-  const activeContracts = profile?.activeContracts || profile?.activeContractCount || 0
-  const teamMembers = profile?.teamMembers || profile?.teamCount || 0
-  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || '2yr'
+  const recentContracts = Array.isArray(profile?.recentContracts) ? profile.recentContracts : []
+  const activeContracts = recentContracts.filter((contract: any) => !['COMPLETED', 'CANCELLED'].includes(String(contract.status).toUpperCase())).length
+  const teamMembers = Array.isArray(profile?.teamMembers) ? profile.teamMembers.length : Number(profile?.teamCount || 0)
+  const yearsInBusiness = profile?.createdAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
+    : null
+  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || (yearsInBusiness == null ? '—' : yearsInBusiness < 1 ? '<1yr' : `${yearsInBusiness}yr`)
 
   if (loading) {
     return (
@@ -167,11 +171,16 @@ export default function CompanyProfile() {
     )
   }
 
-  const activeJobs = [
-    { Icon: Drop, title: t('company.sampleJob1'), sub: t('company.sampleJobSub1'), status: 'open' as const },
-    { Icon: Snowflake, title: t('company.sampleJob2'), sub: t('company.sampleJobSub2'), status: 'progress' as const },
-    { Icon: Lightning, title: t('company.sampleJob3'), sub: t('company.sampleJobSub3'), status: 'done' as const },
-  ]
+  const activeJobs = recentContracts.slice(0, 3).map((job: any) => ({
+    Icon: Briefcase,
+    title: job.title || job.name || t('tasker.activeJobs'),
+    sub: job.locationName || job.location || job.reference || '',
+    status: ['COMPLETED', 'DONE'].includes(String(job.status).toUpperCase())
+      ? 'done'
+      : ['IN_PROGRESS', 'ASSIGNED', 'ACCEPTED'].includes(String(job.status).toUpperCase())
+        ? 'progress'
+        : 'open',
+  }))
 
   const statusStyles: Record<string, { bg: string; text: string }> = {
     open: { bg: '#D1FAE5', text: '#059669' },
@@ -185,13 +194,16 @@ export default function CompanyProfile() {
     done: t('common.done'),
   }
 
-  const reviews = [
-    { initials: t('company.sampleReviewInitials'), name: t('company.sampleReviewName'), stars: 5, text: t('company.sampleReviewText') },
-  ]
+  const reviews = (Array.isArray(profile?.reviews) ? profile.reviews : []).slice(0, 3).map((review: any) => ({
+    initials: String(review.reviewerName || review.customerName || 'C').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase(),
+    name: review.reviewerName || review.customerName || 'Customer',
+    stars: Math.max(0, Math.min(5, Number(review.rating || 0))),
+    text: review.comment || review.text || '',
+  }))
 
   const verifications = [
-    { Icon: Buildings, title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: true },
-    { Icon: EnvelopeSimple, title: t('company.verificationTitle2'), sub: t('company.verificationSub2'), done: true },
+    { Icon: Buildings, title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: Boolean(profile?.isVerified || profile?.verificationStatus === 'VERIFIED') },
+    { Icon: EnvelopeSimple, title: t('company.verificationTitle2'), sub: t('company.verificationSub2'), done: Boolean(profile?.emailVerified) },
   ] as const
 
   const jobIconComponents: Record<string, any> = {
@@ -216,7 +228,7 @@ export default function CompanyProfile() {
 
         <Animated.View style={[styles.card, cardAnim]}>
           <View style={styles.statsRow}>
-            {[{ val: activeContracts || 86, lbl: t('profile.jobsPosted') }, { val: rating || '4.7', lbl: t('profile.rating') }, { val: teamMembers || 24, lbl: t('company.teamMembers') }, { val: inBusiness, lbl: t('company.inBusiness') }].map((s) => (
+            {[{ val: activeContracts, lbl: t('profile.jobsPosted') }, { val: rating ? Number(rating).toFixed(1) : 'New', lbl: t('profile.rating') }, { val: teamMembers, lbl: t('company.teamMembers') }, { val: inBusiness, lbl: t('company.inBusiness') }].map((s) => (
               <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
                 <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
@@ -240,19 +252,7 @@ export default function CompanyProfile() {
                     <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
                   </Animated.View>
                 )
-              }) : (
-                <>
-                  {[t('categories.plumbing'), t('categories.electrical'), t('categories.acRepair'), t('categories.generalRepairs')].map((s) => {
-                    const IconComp = jobIconComponents[s] || Wrench
-                    return (
-                      <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                        <IconComp size={12} color={colors.amberDark} />
-                        <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
-                      </Animated.View>
-                    )
-                  })}
-                </>
-              )}
+              }) : <Text style={styles.emptyText}>Add the services your company provides so customers can find your team.</Text>}
             </View>
           </View>
         </Animated.View>
@@ -263,7 +263,7 @@ export default function CompanyProfile() {
               <Briefcase size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.activeJobs')}</Text>
             </View>
-            {activeJobs.map((job, i) => {
+            {activeJobs.map((job: any, i: number) => {
               const st = statusStyles[job.status]
               return (
                 <View key={i} style={[styles.jobRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
@@ -280,6 +280,7 @@ export default function CompanyProfile() {
                 </View>
               )
             })}
+            {activeJobs.length === 0 ? <Text style={styles.emptyText}>No active company jobs yet.</Text> : null}
           </View>
         </Animated.View>
 
@@ -289,7 +290,7 @@ export default function CompanyProfile() {
               <ChatCircleText size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
-            {reviews.map((rev, i) => (
+            {reviews.map((rev: any, i: number) => (
               <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
@@ -307,6 +308,7 @@ export default function CompanyProfile() {
                 </View>
               </View>
             ))}
+            {reviews.length === 0 ? <Text style={styles.emptyText}>Customer reviews will appear here after completed work.</Text> : null}
           </View>
         </Animated.View>
 
@@ -419,6 +421,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderRadius: 100,
   },
   chipText: { fontSize: 11, fontFamily: fonts.bodyMedium },
+  emptyText: { fontSize: 11, lineHeight: 17, fontFamily: fonts.body, color: colors.muted, paddingVertical: 6 },
   jobRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
   jobIcon: {
     width: 36,

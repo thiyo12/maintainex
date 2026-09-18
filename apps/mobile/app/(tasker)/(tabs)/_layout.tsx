@@ -26,17 +26,17 @@ export default function TaskerTabs() {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E5E5',
-          height: 56 + bottomPad,
+          height: 68 + bottomPad,
           paddingBottom: bottomPad,
-          paddingTop: 6,
+          paddingTop: 10,
           ...Platform.select({
             ios: { position: 'absolute', bottom: 0, left: 0, right: 0 },
             default: { elevation: 8 },
           }),
         },
-        tabBarActiveTintColor: '#F5A623',
+        tabBarActiveTintColor: '#000000',
         tabBarInactiveTintColor: '#8A8A8A',
-        tabBarLabelStyle: { fontSize: 11, fontFamily: fonts.bodySemiBold, color: '#8A8A8A' },
+        tabBarLabelStyle: { fontSize: 9, fontFamily: fonts.bodySemiBold },
         tabBarShowLabel: true,
       }}
     >
@@ -47,7 +47,7 @@ export default function TaskerTabs() {
           options={{
             title: t(tab.key),
             tabBarIcon: ({ focused }) => (
-              <TabIcon icon={tab.icon} focused={focused} />
+              <TabIcon icon={tab.icon} focused={focused} activeColor="#000000" inactiveColor="#8A8A8A" />
             ),
           }}
         />

@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const profile = await prisma.companyProfile.findUnique({
       where: { id: context!.companyId },
       include: {
+        user: { select: { emailVerified: true } },
         teamMembers: true,
         contracts: {
           orderBy: { createdAt: 'desc' },
@@ -53,6 +54,8 @@ export async function GET(request: NextRequest) {
       rating: profile.rating,
       completedProjects: profile.completedProjects,
       isVerified: profile.isVerified,
+      verificationStatus: profile.verificationStatus,
+      emailVerified: profile.user.emailVerified,
       logo: profile.logo,
       createdAt: profile.createdAt.toISOString(),
       teamMembers: profile.teamMembers.map(t => ({

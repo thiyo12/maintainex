@@ -12,7 +12,15 @@ export async function GET(request: NextRequest) {
     }
     const tasker = await prisma.taskerProfile.findUnique({
       where: { userId: user.id },
-      include: { user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } } },
+      include: {
+        user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          include: { reviewer: { select: { name: true } } },
+        },
+        taskerSkills: { select: { experienceYears: true } },
+      },
     })
     if (!tasker) {
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
@@ -31,6 +39,16 @@ export async function GET(request: NextRequest) {
       latitude: tasker.latitude,
       longitude: tasker.longitude,
       profileImage: tasker.profileImage,
+      completionRate: tasker.completionRate,
+      avgResponseMin: tasker.avgResponseMin,
+      experienceYears: tasker.taskerSkills.reduce((max, skill) => Math.max(max, skill.experienceYears), 0),
+      reviews: tasker.reviews.map((review) => ({
+        id: review.id,
+        reviewerName: review.reviewer.name,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+      })),
       user: tasker.user,
     })
   } catch (error) {

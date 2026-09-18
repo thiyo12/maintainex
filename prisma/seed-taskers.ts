@@ -37,88 +37,119 @@ const TASKERS: TaskerSeed[] = [
 ]
 
 async function main() {
-  console.log('Seeding tasker profiles...')
+  console.log('Seeding development taskers and complete service coverage...')
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('seed-taskers.ts is test data and must not run in production')
+  }
 
   const categories = await prisma.jobCategory.findMany()
-  const catByName = new Map(categories.map(c => [c.name, c]))
-  const allTemplates = await prisma.templateJob.findMany()
+  const catByName = new Map(categories.map((category) => [category.name, category]))
+  const allTemplates = await prisma.templateJob.findMany({ where: { isActive: true } })
+  const profilesByCategory = new Map<string, Array<{ id: string; hourlyRate: number }>>()
+  const seededProfiles: Array<{ id: string; hourlyRate: number }> = []
+  const passwordHash = await bcrypt.hash('test123', 12)
 
-  let created = 0
-  let skipped = 0
-
-  for (const t of TASKERS) {
-    const existingUser = await prisma.user.findUnique({ where: { email: t.email } })
-    if (existingUser) {
-      console.log(`  SKIP ${t.email} — already exists`)
-      skipped++
-      continue
-    }
-
-    const category = catByName.get(t.categorySlug)
+  for (const tasker of TASKERS) {
+    const category = catByName.get(tasker.categorySlug)
     if (!category) {
-      console.log(`  SKIP ${t.email} — category "${t.categorySlug}" not found`)
-      skipped++
+      console.log(`  SKIP ${tasker.email} — category "${tasker.categorySlug}" not found`)
       continue
     }
 
-    const passwordHash = await bcrypt.hash(t.password, 12)
-
-    const user = await prisma.user.create({
-      data: {
-        email: t.email,
+    const user = await prisma.user.upsert({
+      where: { email: tasker.email },
+      update: { name: tasker.name, phone: tasker.phone, role: 'TASKER', isActive: true },
+      create: {
+        email: tasker.email,
         passwordHash,
-        name: t.name,
-        phone: t.phone,
+        name: tasker.name,
+        phone: tasker.phone,
         role: 'TASKER',
+        identityStatus: 'APPROVED',
+        emailVerified: true,
       },
     })
 
-    const profile = await prisma.taskerProfile.create({
-      data: {
-        userId: user.id,
-        bio: t.bio,
-        hourlyRate: t.hourlyRate,
-        rating: t.rating,
-        completedJobs: t.completedJobs,
+    const profile = await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        bio: tasker.bio,
+        hourlyRate: tasker.hourlyRate,
+        rating: tasker.rating,
+        completedJobs: tasker.completedJobs,
         isVerified: true,
-        isOnline: t.isOnline,
+        verificationStatus: 'VERIFIED',
+        isOnline: tasker.isOnline,
         skills: JSON.stringify([category.name]),
         serviceAreas: JSON.stringify(['Colombo', 'Gampaha']),
-        latitude: t.latitude,
-        longitude: t.longitude,
+        latitude: tasker.latitude,
+        longitude: tasker.longitude,
+        locationUpdatedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
+        bio: tasker.bio,
+        hourlyRate: tasker.hourlyRate,
+        rating: tasker.rating,
+        completedJobs: tasker.completedJobs,
+        isVerified: true,
+        verificationStatus: 'VERIFIED',
+        isOnline: tasker.isOnline,
+        skills: JSON.stringify([category.name]),
+        serviceAreas: JSON.stringify(['Colombo', 'Gampaha']),
+        latitude: tasker.latitude,
+        longitude: tasker.longitude,
         locationUpdatedAt: new Date(),
       },
     })
 
-    const categoryTemplates = allTemplates.filter(j => j.categoryId === category.id)
+    const ref = { id: profile.id, hourlyRate: tasker.hourlyRate }
+    seededProfiles.push(ref)
+    profilesByCategory.set(category.id, [...(profilesByCategory.get(category.id) || []), ref])
+    console.log(`  ✓ ${tasker.name} (${tasker.email}) — ${tasker.categorySlug}`)
+  }
 
-    for (let i = 0; i < Math.min(categoryTemplates.length, 4); i++) {
-      const job = categoryTemplates[i]
-      const priceMin = Math.max(job.priceMin, t.hourlyRate * job.typicalDurationMinutes / 60)
-      await prisma.taskerSkill.create({
-        data: {
-          taskerId: profile.id,
+  if (seededProfiles.length === 0) throw new Error('No development tasker profiles were available')
+
+  let coverageRows = 0
+  for (let jobIndex = 0; jobIndex < allTemplates.length; jobIndex++) {
+    const job = allTemplates[jobIndex]
+    const categoryPool = profilesByCategory.get(job.categoryId) || []
+    const pool = categoryPool.length > 0 ? categoryPool : seededProfiles
+    const targetCount = Math.min(3, pool.length)
+
+    for (let index = 0; index < targetCount; index++) {
+      const tasker = pool[(jobIndex + index) % pool.length]
+      const fixedRate = Math.max(job.priceMin, tasker.hourlyRate * job.typicalDurationMinutes / 60)
+      await prisma.taskerSkill.upsert({
+        where: { taskerId_jobId: { taskerId: tasker.id, jobId: job.id } },
+        update: {
+          experienceYears: 3 + ((jobIndex + index) % 8),
+          experienceLevel: index === 0 ? 3 : 2,
+          hourlyRate: tasker.hourlyRate,
+          fixedRate: Math.round(fixedRate),
+          currency: job.currency || 'LKR',
+          countryCode: 'LK',
+        },
+        create: {
+          taskerId: tasker.id,
           jobId: job.id,
-          experienceYears: Math.floor(Math.random() * 10) + 2,
-          hourlyRate: t.hourlyRate,
-          fixedRate: Math.round(priceMin),
-          currency: 'LKR',
+          experienceYears: 3 + ((jobIndex + index) % 8),
+          experienceLevel: index === 0 ? 3 : 2,
+          hourlyRate: tasker.hourlyRate,
+          fixedRate: Math.round(fixedRate),
+          currency: job.currency || 'LKR',
+          countryCode: 'LK',
         },
       })
-    }
-
-    created++
-    console.log(`  ✓ ${t.name} (${t.email}) — ${t.categorySlug}, ${categoryTemplates.length} templates available`)
-  }
-
-  console.log(`\n✅ Done. Created: ${created}, Skipped: ${skipped}`)
-
-  if (created > 0) {
-    console.log('\nTasker login credentials:')
-    for (const t of TASKERS) {
-      console.log(`  ${t.email} — ${t.name} (${t.categorySlug})`)
+      coverageRows++
     }
   }
+
+  console.log(`\n✅ Test coverage ready: ${allTemplates.length} active jobs, ${coverageRows} tasker-skill matches`)
+  console.log('\nTasker login credentials (password: test123):')
+  for (const tasker of TASKERS) console.log(`  ${tasker.email} — ${tasker.name} (${tasker.categorySlug})`)
 }
 
 main()

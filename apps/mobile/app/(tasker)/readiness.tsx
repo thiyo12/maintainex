@@ -219,13 +219,13 @@ export default function TaskerReadinessScreen() {
 }
 
 const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1, backgroundColor: '#F7F7F7' },
   scroll: { paddingHorizontal: 24 },
-  heading: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', marginTop: 16 },
+  heading: { fontSize: 24, fontWeight: '800', color: '#000000', marginTop: 16 },
   subtitle: { fontSize: 14, color: '#6F6B6B', marginTop: 4, marginBottom: 20, lineHeight: 20 },
 
-  progressCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#2E2E2E' },
-  progressBar: { height: 8, backgroundColor: '#2E2E2E', borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
+  progressCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#E5E5E5' },
+  progressBar: { height: 8, backgroundColor: '#E5E5E5', borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', backgroundColor: '#F5A623', borderRadius: 4 },
   progressText: { fontSize: 12, color: '#6F6B6B', fontFamily: fonts.bodyMedium },
 
@@ -234,21 +234,21 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   successText: { fontSize: 16, fontWeight: '700', color: '#065F46', marginTop: 12, textAlign: 'center' },
 
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#FFFFFF', marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#000000', marginBottom: 12 },
 
   stepCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 14,
-    padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#2E2E2E',
+    padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#E5E5E5',
   },
   stepCardComplete: { borderColor: '#D1FAE5' },
   stepIcon: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: '#2E2E2E',
+    width: 40, height: 40, borderRadius: 12, backgroundColor: '#F1F1F1',
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   stepIconComplete: { backgroundColor: '#059669' },
   stepIconPending: { backgroundColor: '#FEF3C7' },
   stepBody: { flex: 1 },
-  stepLabel: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  stepLabel: { fontSize: 14, fontWeight: '700', color: '#000000' },
   stepLabelComplete: { color: '#065F46' },
   stepStatus: { fontSize: 12, color: '#6F6B6B', marginTop: 2 },
   stepStatusComplete: { color: '#059669' },
@@ -256,12 +256,12 @@ const makeStyles = (colors: any) => StyleSheet.create({
   primaryBtn: {
     backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 16,
   },
-  primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  primaryBtnText: { fontSize: 16, fontWeight: '700', color: '#000000' },
 
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  errorText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', marginTop: 12, textAlign: 'center' },
+  errorText: { fontSize: 16, fontWeight: '700', color: '#000000', marginTop: 12, textAlign: 'center' },
   retryBtn: {
     backgroundColor: '#F5A623', borderRadius: 14, paddingVertical: 12, paddingHorizontal: 32, marginTop: 20,
   },
-  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#000000' },
 })
