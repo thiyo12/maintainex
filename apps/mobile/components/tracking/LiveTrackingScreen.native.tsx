@@ -9,13 +9,13 @@ import { ArrowLeft, Star, Check, ChatCircle, PaperPlaneTilt, Timer, Hash, Wrench
 import { useTranslation } from 'react-i18next'
 import Reanimated, { ZoomIn } from 'react-native-reanimated'
 
-import { useColors } from '../../../lib/ThemeContext'
-import { v2Jobs } from '../../../lib/api-v2'
-import { fonts } from '../../../lib/fonts'
+import { useColors } from '../../lib/ThemeContext'
+import { v2Jobs } from '../../lib/api-v2'
+import { fonts } from '../../lib/fonts'
 
-import AvatarCircle from '../../../components/ui/AvatarCircle'
-import PressableScale from '../../../components/ui/PressableScale'
-import NewChatModal from '../../../components/chat/NewChatModal'
+import AvatarCircle from '../ui/AvatarCircle'
+import PressableScale from '../ui/PressableScale'
+import NewChatModal from '../chat/NewChatModal'
 
 const AnimatedMarker = Animated.createAnimatedComponent(Marker) as any
 
