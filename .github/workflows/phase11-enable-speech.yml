@@ -1,0 +1,44 @@
+name: Phase 11 Enable Speech
+
+on:
+  push:
+    branches:
+      - phase11-v3-exact-ui
+    paths:
+      - scripts/phase11-enable-speech.trigger
+
+permissions:
+  contents: write
+
+jobs:
+  install-speech:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout takeover branch
+        uses: actions/checkout@v4
+        with:
+          ref: phase11-v3-exact-ui
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install Expo SDK 56 speech recognition
+        working-directory: apps/mobile
+        run: npm install expo-speech-recognition@56.0.3 --save-exact
+
+      - name: Commit dependency lock
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/mobile/package.json apps/mobile/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No dependency changes"
+            exit 0
+          fi
+          git commit -m "feat(p11): enable native speech recognition dependency"
+          git push origin HEAD:phase11-v3-exact-ui
