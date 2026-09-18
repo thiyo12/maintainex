@@ -246,12 +246,11 @@ export default function TaskerDashboard() {
             </View>
 
             <TouchableOpacity
-              style={[styles.goOnlineButton, !readinessComplete && styles.goOnlineButtonDisabled]}
+              style={styles.goOnlineButton}
               activeOpacity={0.78}
-              disabled={!readinessComplete}
               onPress={toggleOnline}
             >
-              <Text style={styles.goOnlineText}>{readinessComplete ? 'Go online' : 'Complete setup first'}</Text>
+              <Text style={styles.goOnlineText}>Go online</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -535,7 +534,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  goOnlineButtonDisabled: { backgroundColor: '#A6CDB7' },
   goOnlineText: {
     fontSize: 14,
     fontFamily: fonts.headingBold,
