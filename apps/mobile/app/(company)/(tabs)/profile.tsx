@@ -1,102 +1,58 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Animated } from 'react-native'
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import {
-  WarningCircle,
-  SquaresFour,
-  Briefcase,
-  ChatCircleText,
-  Star,
-  ShieldCheck,
-  CaretRight,
-  Bell,
-  UserCircle,
-  Buildings,
-  EnvelopeSimple,
-  Drop,
-  Lightning,
-  Snowflake,
-  Hammer,
-  Wrench,
-} from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../lib/ThemeContext'
-import { company, conversations, notifications, getAuthToken } from '../../../lib/api'
-import { useAuth } from '../../../lib/auth'
-import ProfileHeader from '../../../components/ProfileHeader'
+import { Bell, CaretDown, CaretRight, MapPin, WarningCircle } from 'phosphor-react-native'
+import { company, notifications } from '../../../lib/api'
+import { v2Identity } from '../../../lib/api-v2'
 import { fonts } from '../../../lib/fonts'
-import OfferProgramSection from '../../../components/offers/OfferProgramSection'
+import { v3 } from '../../../theme/v3/tokens'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
-
-function useSlideUp(delay = 0) {
-  const anim = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 450, delay, useNativeDriver: true }).start()
-  }, [])
-  return {
-    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
-    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-  }
+type WorkspaceRowProps = {
+  title: string
+  subtitle: string
+  onPress: () => void
 }
 
-function usePopIn(delay = 0) {
-  const anim = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.spring(anim, { toValue: 1, delay, useNativeDriver: true, friction: 7, tension: 60 }).start()
-  }, [])
-  return {
-    opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
-  }
+function WorkspaceRow({ title, subtitle, onPress }: WorkspaceRowProps) {
+  return (
+    <TouchableOpacity style={styles.row} activeOpacity={0.72} onPress={onPress}>
+      <View style={styles.rowCopy}>
+        <Text style={styles.rowTitle}>{title}</Text>
+        <Text style={styles.rowSubtitle} numberOfLines={1}>{subtitle}</Text>
+      </View>
+      <CaretRight size={17} color={v3.colors.textMuted} weight="bold" />
+    </TouchableOpacity>
+  )
 }
 
 export default function CompanyProfile() {
   const router = useRouter()
-  const colors = useColors()
-  const styles = makeStyles(colors)
-  const { t } = useTranslation()
-  const { logout } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [unreadMsgs, setUnreadMsgs] = useState(0)
+  const [identityStatus, setIdentityStatus] = useState('NOT_SUBMITTED')
   const [unreadNotifs, setUnreadNotifs] = useState(0)
 
-  const cardAnim = useSlideUp(0)
-  const sectionAnim2 = useSlideUp(80)
-  const sectionAnim3 = useSlideUp(130)
-  const sectionAnim4 = useSlideUp(180)
-  const sectionAnim5 = useSlideUp(230)
-  const popIn0 = usePopIn(80)
-  const popIn1 = usePopIn(120)
-  const popIn2 = usePopIn(160)
-  const popIn3 = usePopIn(200)
-  const popIn4 = usePopIn(240)
-  const popIn5 = usePopIn(280)
-  const popIn6 = usePopIn(320)
-  const popIn7 = usePopIn(360)
-  const popIn8 = usePopIn(400)
-  const popIn9 = usePopIn(440)
-  const popIn10 = usePopIn(480)
-  const popIn11 = usePopIn(520)
-  const popIns = [popIn0, popIn1, popIn2, popIn3, popIn4, popIn5, popIn6, popIn7, popIn8, popIn9, popIn10, popIn11]
-  let popInIdx = 0
-
-  const handleLogout = async () => {
-    await logout()
-    router.replace('/(auth)/welcome')
-  }
-
   const fetchProfile = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
     try {
-      const data = await company.profile.get()
-      setProfile(data)
-    } catch {
-      setError(t('errors.generic'))
-      setProfile(null)
+      const [profileRes, identityRes, unreadRes] = await Promise.allSettled([
+        company.profile.get(),
+        v2Identity.getStatus(),
+        notifications.unreadCount(),
+      ])
+
+      if (profileRes.status === 'fulfilled') setProfile(profileRes.value)
+      else setError('Unable to load the company profile.')
+
+      if (identityRes.status === 'fulfilled') {
+        setIdentityStatus((identityRes.value as any)?.identityStatus || 'NOT_SUBMITTED')
+      }
+
+      if (unreadRes.status === 'fulfilled') setUnreadNotifs(Number((unreadRes.value as any)?.count || 0))
     } finally {
       setLoading(false)
     }
@@ -104,371 +60,342 @@ export default function CompanyProfile() {
 
   useEffect(() => {
     fetchProfile()
-    ;(async () => {
-      try {
-        const token = await getAuthToken()
-        const res = await fetch(`${API_URL}/api/mobile/v2/identity`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setIdentityStatus(data.identityStatus)
-        }
-      } catch (e) { console.error('Load identity error:', e) }
-    })()
   }, [fetchProfile])
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | null = null
-    const loadCounts = async () => {
-      try {
-        const [convos, notifs] = await Promise.all([
-          conversations.list(),
-          notifications.list(),
-        ])
-        setUnreadMsgs((convos || []).reduce((n: number, c: any) => n + (c.unreadCount || 0), 0))
-        setUnreadNotifs((notifs || []).filter((n: any) => !n.read).length)
-      } catch {}
-    }
-    loadCounts()
-    interval = setInterval(loadCounts, 30000)
-    return () => { if (interval) clearInterval(interval) }
-  }, [])
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="small" color={v3.colors.ink} />
+        </View>
+      </SafeAreaView>
+    )
+  }
 
   if (error && !profile) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <WarningCircle size={48} color={colors.error} style={{ marginBottom: 16 }} />
-          <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center', marginBottom: 20 }}>{error}</Text>
-          <TouchableOpacity style={{ backgroundColor: colors.amber, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 }} onPress={() => { setLoading(true); setError(null); fetchProfile() }}>
-            <Text style={{ color: colors.ink, fontFamily: fonts.headingBold }}>{t('common.retry')}</Text>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.errorWrap}>
+          <WarningCircle size={38} color={v3.colors.error} weight="regular" />
+          <Text style={styles.errorTitle}>Company profile unavailable</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} activeOpacity={0.78} onPress={fetchProfile}>
+            <Text style={styles.retryText}>Try again</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     )
   }
 
-  const name = profile?.companyName || profile?.name || t('profile.company')
-  const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : 'CO'
-  const services = profile?.services || []
-  const rating = profile?.rating || 0
-  const recentContracts = Array.isArray(profile?.recentContracts) ? profile.recentContracts : []
-  const activeContracts = recentContracts.filter((contract: any) => !['COMPLETED', 'CANCELLED'].includes(String(contract.status).toUpperCase())).length
-  const teamMembers = Array.isArray(profile?.teamMembers) ? profile.teamMembers.length : Number(profile?.teamCount || 0)
-  const yearsInBusiness = profile?.createdAt
-    ? Math.max(0, Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
-    : null
-  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || (yearsInBusiness == null ? '—' : yearsInBusiness < 1 ? '<1yr' : `${yearsInBusiness}yr`)
+  const name = profile?.companyName || profile?.name || 'Company'
+  const initials = String(name).split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'CO'
+  const services = Array.isArray(profile?.services) ? profile.services : []
+  const serviceAreas = Array.isArray(profile?.serviceAreas)
+    ? profile.serviceAreas
+    : Array.isArray(profile?.areas)
+      ? profile.areas.map((area: any) => area?.name || area).filter(Boolean)
+      : []
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.amber} />
-        </View>
-      </SafeAreaView>
-    )
-  }
+  const location = serviceAreas[0] || profile?.district || profile?.city || profile?.address?.district || 'Service area'
+  const isVerified = Boolean(
+    profile?.isVerified ||
+    profile?.verificationStatus === 'VERIFIED' ||
+    ['APPROVED', 'VERIFIED'].includes(identityStatus)
+  )
 
-  const activeJobs = recentContracts.slice(0, 3).map((job: any) => ({
-    Icon: Briefcase,
-    title: job.title || job.name || t('tasker.activeJobs'),
-    sub: job.locationName || job.location || job.reference || '',
-    status: ['COMPLETED', 'DONE'].includes(String(job.status).toUpperCase())
-      ? 'done'
-      : ['IN_PROGRESS', 'ASSIGNED', 'ACCEPTED'].includes(String(job.status).toUpperCase())
-        ? 'progress'
-        : 'open',
-  }))
+  const subscriptionName =
+    profile?.subscription?.planName ||
+    profile?.subscription?.plan ||
+    profile?.subscriptionPlan ||
+    profile?.planName ||
+    'Manage plan'
 
-  const statusStyles: Record<string, { bg: string; text: string }> = {
-    open: { bg: '#D1FAE5', text: '#059669' },
-    progress: { bg: '#DBEAFE', text: '#2563EB' },
-    done: { bg: colors.surface, text: colors.muted },
-  }
+  const payoutLabel =
+    profile?.payoutAccount?.bankName ||
+    profile?.bankName ||
+    profile?.payoutBank ||
+    'Manage payout details'
 
-  const statusLabels: Record<string, string> = {
-    open: t('jobs.status.open'),
-    progress: t('jobs.status.inProgress'),
-    done: t('common.done'),
-  }
-
-  const reviews = (Array.isArray(profile?.reviews) ? profile.reviews : []).slice(0, 3).map((review: any) => ({
-    initials: String(review.reviewerName || review.customerName || 'C').split(' ').map((part: string) => part[0]).join('').slice(0, 2).toUpperCase(),
-    name: review.reviewerName || review.customerName || 'Customer',
-    stars: Math.max(0, Math.min(5, Number(review.rating || 0))),
-    text: review.comment || review.text || '',
-  }))
-
-  const verifications = [
-    { Icon: Buildings, title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: Boolean(profile?.isVerified || profile?.verificationStatus === 'VERIFIED') },
-    { Icon: EnvelopeSimple, title: t('company.verificationTitle2'), sub: t('company.verificationSub2'), done: Boolean(profile?.emailVerified) },
-  ] as const
-
-  const jobIconComponents: Record<string, any> = {
-    [t('categories.plumbing')]: Drop,
-    [t('categories.electrical')]: Lightning,
-    [t('categories.acRepair')]: Snowflake,
-    [t('categories.generalRepairs')]: Hammer,
-  }
+  const serviceAreaLabel = serviceAreas.length
+    ? serviceAreas.slice(0, 3).join(', ')
+    : profile?.district || 'Add service areas'
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.cream }]}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <ProfileHeader
-          initials={initials}
-          name={name}
-          roleLabel={t('company.roleLabel')}
-          variant="company"
-          verified={identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'}
-          onEdit={() => router.push('/(company)/settings/edit-profile')}
-          onSettings={() => router.push('/notifications')}
-        />
-
-        <Animated.View style={[styles.card, cardAnim]}>
-          <View style={styles.statsRow}>
-            {[{ val: activeContracts, lbl: t('profile.jobsPosted') }, { val: rating ? Number(rating).toFixed(1) : 'New', lbl: t('profile.rating') }, { val: teamMembers, lbl: t('company.teamMembers') }, { val: inBusiness, lbl: t('company.inBusiness') }].map((s) => (
-              <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
-                <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
-                <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
-              </Animated.View>
-            ))}
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, sectionAnim2]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <SquaresFour size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
-            </View>
-            <View style={styles.chipRow}>
-              {services.length > 0 ? services.map((s: string) => {
-                const IconComp = jobIconComponents[s] || Wrench
-                return (
-                  <Animated.View key={s} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                    <IconComp size={12} color={colors.amberDark} />
-                    <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
-                  </Animated.View>
-                )
-              }) : <Text style={styles.emptyText}>Add the services your company provides so customers can find your team.</Text>}
-            </View>
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, sectionAnim3]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <Briefcase size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.activeJobs')}</Text>
-            </View>
-            {activeJobs.map((job: any, i: number) => {
-              const st = statusStyles[job.status]
-              return (
-                <View key={i} style={[styles.jobRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                  <View style={[styles.jobIcon, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <job.Icon size={15} color={colors.amberDark} />
-                  </View>
-                  <View style={styles.jobText}>
-                    <Text style={[styles.jobTitle, { color: colors.ink }]}>{job.title}</Text>
-                    <Text style={[styles.jobSub, { color: colors.muted }]}>{job.sub}</Text>
-                  </View>
-                  <View style={[styles.jobStatus, { backgroundColor: st.bg }]}>
-                    <Text style={[styles.jobStatusText, { color: st.text }]}>{statusLabels[job.status]}</Text>
-                  </View>
-                </View>
-              )
-            })}
-            {activeJobs.length === 0 ? <Text style={styles.emptyText}>No active company jobs yet.</Text> : null}
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, sectionAnim4]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <ChatCircleText size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
-            </View>
-            {reviews.map((rev: any, i: number) => (
-              <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
-                </View>
-                <View style={styles.revBody}>
-                  <View style={styles.revTop}>
-                    <Text style={[styles.revName, { color: colors.ink }]}>{rev.name}</Text>
-                    <View style={styles.revStars}>
-                      {Array.from({ length: 5 }).map((_, si) => (
-                        <Star key={si} size={11} color={colors.amber} weight={si < rev.stars ? 'fill' : 'regular'} />
-                      ))}
-                    </View>
-                  </View>
-                  <Text style={[styles.revText, { color: colors.muted }]}>"{rev.text}"</Text>
-                </View>
-              </View>
-            ))}
-            {reviews.length === 0 ? <Text style={styles.emptyText}>Customer reviews will appear here after completed work.</Text> : null}
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, sectionAnim5, { marginBottom: 24 }]}>
-          <View style={styles.section}>
-            <View style={styles.sectionTitleRow}>
-              <ShieldCheck size={14} color={colors.indigo} />
-              <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('verify.title')}</Text>
-            </View>
-            {verifications.map((v, i) => (
-              <View key={i} style={[styles.verifRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                <View style={[styles.verifIcon, v.done ? { backgroundColor: '#D1FAE5' } : { backgroundColor: colors.amberLight }]}>
-                  <v.Icon size={16} color={v.done ? '#059669' : colors.amberDark} />
-                </View>
-                <View style={styles.verifText}>
-                  <Text style={[styles.verifTitle, { color: colors.ink }]}>{v.title}</Text>
-                  <Text style={[styles.verifSub, { color: colors.muted }]}>{v.sub}</Text>
-                </View>
-                <Text style={[styles.verifStatus, { color: v.done ? '#059669' : colors.amberDark }]}>
-                  {v.done ? t('common.done') : t('common.pending')}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-
-        <Animated.View style={[styles.card, { marginBottom: 24 }]}>
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/(chat)' as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#DBEAFE' }]}>
-                <ChatCircleText size={16} color="#2563EB" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.messages')}</Text>
-              {unreadMsgs > 0 && (
-                <View style={[styles.badge, { backgroundColor: colors.amberDark }]}>
-                  <Text style={styles.badgeText}>{unreadMsgs > 99 ? '99+' : unreadMsgs}</Text>
-                </View>
-              )}
-              <CaretRight size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              onPress={() => router.push('/notifications' as any)}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: '#FEF3C7' }]}>
-                <Bell size={16} color="#D48900" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.notifications')}</Text>
-              {unreadNotifs > 0 && (
-                <View style={[styles.badge, { backgroundColor: colors.amberDark }]}>
-                  <Text style={styles.badgeText}>{unreadNotifs > 99 ? '99+' : unreadNotifs}</Text>
-                </View>
-              )}
-              <CaretRight size={16} color={colors.muted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={() => router.push('/settings/my-profile')}>
-              <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
-                <UserCircle size={16} color="#7C3AED" />
-              </View>
-              <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('profile.myProfile')}</Text>
-              <CaretRight size={16} color={colors.muted} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={styles.appBar}>
+          <View>
+            <Text style={styles.brand}>MΛINTΛINEX</Text>
+            <TouchableOpacity style={styles.locationRow} activeOpacity={0.72} onPress={() => router.push('/(company)/settings/edit-profile' as any)}>
+              <MapPin size={12} color="#5B5B5B" weight="regular" />
+              <Text style={styles.locationText} numberOfLines={1}>{String(location)}</Text>
+              <CaretDown size={11} color="#5B5B5B" weight="bold" />
             </TouchableOpacity>
           </View>
-        </Animated.View>
 
-        <OfferProgramSection variant="company" companyId={profile?.id} />
+          <TouchableOpacity style={styles.bellButton} activeOpacity={0.72} onPress={() => router.push('/notifications' as any)}>
+            <Bell size={18} color={v3.colors.ink} weight="regular" />
+            {unreadNotifs > 0 ? <View style={styles.bellDot} /> : null}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.pageTitle}>Company profile</Text>
+
+        <View style={styles.identityRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <View style={styles.identityCopy}>
+            <Text style={styles.companyName} numberOfLines={1}>{name}</Text>
+            <Text style={[styles.companyStatus, isVerified ? styles.verifiedText : styles.pendingText]}>
+              {isVerified ? 'Verified company' : 'Verification pending'}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionLabel}>Workspace</Text>
+
+        <View style={styles.rows}>
+          <WorkspaceRow
+            title="Company details"
+            subtitle="Registration, documents"
+            onPress={() => router.push('/(company)/settings/edit-profile' as any)}
+          />
+          <WorkspaceRow
+            title="Subscription"
+            subtitle={String(subscriptionName)}
+            onPress={() => router.push('/(company)/settings/subscription' as any)}
+          />
+          <WorkspaceRow
+            title="Service catalogue"
+            subtitle={services.length ? services.length + ' services' : 'Add company services'}
+            onPress={() => router.push('/(company)/settings/edit-profile' as any)}
+          />
+          <WorkspaceRow
+            title="Service areas"
+            subtitle={serviceAreaLabel}
+            onPress={() => router.push('/(company)/settings/edit-profile' as any)}
+          />
+          <WorkspaceRow
+            title="Team permissions"
+            subtitle="Roles & access"
+            onPress={() => router.push('/(company)/(tabs)/team' as any)}
+          />
+          <WorkspaceRow
+            title="Payout account"
+            subtitle={String(payoutLabel)}
+            onPress={() => router.push('/(company)/(tabs)/earnings-list' as any)}
+          />
+          <WorkspaceRow
+            title="Support"
+            subtitle="Help & contracts"
+            onPress={() => router.push('/settings/help' as any)}
+          />
+        </View>
+
+        <View style={styles.moreSection}>
+          <Text style={styles.moreLabel}>Operations</Text>
+          <WorkspaceRow
+            title="Contracts"
+            subtitle="Open and completed company contracts"
+            onPress={() => router.push('/(company)/(tabs)/contracts-list' as any)}
+          />
+          <WorkspaceRow
+            title="Milestones"
+            subtitle="Track project milestones"
+            onPress={() => router.push('/(company)/(tabs)/milestones-list' as any)}
+          />
+          <WorkspaceRow
+            title="Company inbox"
+            subtitle="Customer and workforce conversations"
+            onPress={() => router.push('/(company)/(tabs)/inbox' as any)}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1 },
-  card: {
-    marginHorizontal: 8,
-    marginBottom: 8,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 28,
-    elevation: 4,
-    overflow: 'hidden',
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: {
+    paddingBottom: 34,
   },
-  statsRow: { flexDirection: 'row', padding: 16, gap: 10 },
-  statCard: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  statValue: { fontSize: 17, fontFamily: fonts.headingBold, letterSpacing: -0.3 },
-  statLabel: { fontSize: 9, fontFamily: fonts.bodyMedium, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 2 },
-  section: { padding: 16 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  sectionTitle: { fontSize: 12, fontFamily: fonts.headingBold },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
+  appBar: {
+    minHeight: 78,
+    paddingHorizontal: 18,
+    paddingTop: 7,
+    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 13,
-    borderRadius: 100,
+    justifyContent: 'space-between',
   },
-  chipText: { fontSize: 11, fontFamily: fonts.bodyMedium },
-  emptyText: { fontSize: 11, lineHeight: 17, fontFamily: fonts.body, color: colors.muted, paddingVertical: 6 },
-  jobRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11 },
-  jobIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  brand: {
+    fontSize: 13,
+    letterSpacing: 0.6,
+    fontFamily: fonts.heading,
+    color: v3.colors.ink,
+  },
+  locationRow: {
+    marginTop: 8,
+    maxWidth: 220,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  locationText: {
+    maxWidth: 160,
+    fontSize: 11.5,
+    fontFamily: fonts.bodyMedium,
+    color: '#5B5B5B',
+  },
+  bellButton: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: v3.colors.paper,
     borderWidth: 1,
-    justifyContent: 'center',
+    borderColor: v3.colors.line,
     alignItems: 'center',
-    flexShrink: 0,
-  },
-  jobText: { flex: 1 },
-  jobTitle: { fontSize: 12, fontFamily: fonts.headingBold },
-  jobSub: { fontSize: 10, fontFamily: fonts.body, marginTop: 1 },
-  jobStatus: { paddingVertical: 3, paddingHorizontal: 9, borderRadius: 100 },
-  jobStatusText: { fontSize: 9, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.4 },
-  revItem: { flexDirection: 'row', gap: 10, paddingVertical: 12 },
-  revAvt: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    borderWidth: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
   },
-  revAvtText: { fontSize: 12, fontFamily: fonts.headingBold },
-  revBody: { flex: 1 },
-  revTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  revName: { fontSize: 12, fontFamily: fonts.headingBold },
-  revStars: { flexDirection: 'row', gap: 1 },
-  revText: { fontSize: 11, fontFamily: fonts.body, lineHeight: 16, marginTop: 3 },
-  verifRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  verifIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  bellDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: v3.colors.amber,
+    borderWidth: 2,
+    borderColor: v3.colors.paper,
+  },
+  pageTitle: {
+    marginHorizontal: 18,
+    marginTop: 12,
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: fonts.heading,
+    color: v3.colors.ink,
+    letterSpacing: -0.4,
+  },
+  identityRow: {
+    marginHorizontal: 18,
+    marginTop: 20,
+    minHeight: 64,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#D9D9D9',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
   },
-  verifText: { flex: 1 },
-  verifTitle: { fontSize: 12, fontFamily: fonts.headingBold },
-  verifSub: { fontSize: 10, fontFamily: fonts.body, marginTop: 1 },
-  verifStatus: { fontSize: 10, fontFamily: fonts.headingBold, textTransform: 'uppercase', letterSpacing: 0.4 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
-  menuIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuTitle: { flex: 1, fontSize: 14, fontFamily: fonts.bodyMedium },
-  badge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
-  badgeText: { color: '#fff', fontSize: 11, fontFamily: fonts.bodyMedium },
+  avatarText: {
+    fontSize: 12,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  identityCopy: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  companyName: {
+    fontSize: 17,
+    fontFamily: fonts.heading,
+    color: v3.colors.ink,
+  },
+  companyStatus: {
+    marginTop: 4,
+    fontSize: 10.5,
+    fontFamily: fonts.bodySemiBold,
+  },
+  verifiedText: { color: v3.colors.success },
+  pendingText: { color: v3.colors.amberDark },
+  sectionLabel: {
+    marginHorizontal: 18,
+    marginTop: 32,
+    marginBottom: 7,
+    fontSize: 12,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.textMuted,
+  },
+  rows: {
+    paddingHorizontal: 28,
+  },
+  row: {
+    minHeight: 61,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: v3.colors.line,
+  },
+  rowCopy: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  rowTitle: {
+    fontSize: 12.5,
+    lineHeight: 16,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  rowSubtitle: {
+    marginTop: 3,
+    fontSize: 9.5,
+    lineHeight: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: v3.colors.textMuted,
+  },
+  moreSection: {
+    marginTop: 28,
+    paddingHorizontal: 28,
+  },
+  moreLabel: {
+    marginBottom: 7,
+    fontSize: 10,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.45,
+  },
+  errorWrap: {
+    flex: 1,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorTitle: {
+    marginTop: 14,
+    fontSize: 17,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.ink,
+  },
+  errorText: {
+    marginTop: 5,
+    textAlign: 'center',
+    fontSize: 11,
+    lineHeight: 17,
+    fontFamily: fonts.body,
+    color: v3.colors.textMuted,
+  },
+  retryButton: {
+    marginTop: 18,
+    height: 44,
+    paddingHorizontal: 22,
+    borderRadius: 13,
+    backgroundColor: v3.colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryText: {
+    fontSize: 11,
+    fontFamily: fonts.headingBold,
+    color: v3.colors.paper,
+  },
 })
