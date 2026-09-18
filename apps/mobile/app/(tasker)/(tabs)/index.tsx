@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   brand: {
     fontSize: 13,
     letterSpacing: 0.6,
-    fontFamily: fonts.headingBlack,
+    fontFamily: fonts.heading,
     color: v3.colors.ink,
   },
   roleLine: {
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   hero: {
     fontSize: 28,
     lineHeight: 34,
-    fontFamily: fonts.headingBlack,
+    fontFamily: fonts.heading,
     color: v3.colors.ink,
     letterSpacing: -0.4,
   },
@@ -516,14 +516,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 26,
     lineHeight: 30,
-    fontFamily: fonts.headingBlack,
+    fontFamily: fonts.heading,
     color: v3.colors.ink,
   },
   smallStat: { flex: 0.8 },
   smallStatValue: {
     marginTop: 8,
     fontSize: 18,
-    fontFamily: fonts.headingBlack,
+    fontFamily: fonts.heading,
     color: v3.colors.ink,
   },
   goOnlineButton: {
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontSize: 13.5,
     color: v3.colors.paper,
-    fontFamily: fonts.headingBlack,
+    fontFamily: fonts.heading,
   },
   onlineStatValue: {
     fontSize: 11.5,
