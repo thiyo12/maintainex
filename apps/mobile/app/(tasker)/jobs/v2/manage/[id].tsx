@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Calendar, MapPin, ChatCircleDots, Check, NavigationArrow, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText } from 'phosphor-react-native'
+import { Calendar, MapPin, ChatCircleDots, NavigationArrow, Radio, ShieldCheck, Hourglass, Flag, CheckCircle, ArrowCircleRight, MagnifyingGlass, Camera, FileText, CaretLeft, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
+import { v3 } from '../../../../../theme/v3/tokens'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
 import * as Location from 'expo-location'
@@ -173,280 +174,291 @@ export default function V2ProviderManageJobScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loading}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   if (!job) return null
 
-  const ActionBtn = ({ label, loadingKey, onPress, color, outline }: { label: string; loadingKey: string; onPress: () => void; color?: string; outline?: boolean }) => (
+  const progressStatus = workspace?.progressStatus || (
+    job.status === 'IN_PROGRESS'
+      ? 'IN_PROGRESS'
+      : job.status === 'COMPLETED'
+        ? 'COMPLETED'
+        : ['QUOTE_ACCEPTED', 'PENDING_PAYMENT', 'ESCROW_DEPOSITED'].includes(job.status)
+          ? 'ACCEPTED'
+          : job.status
+  )
+
+  const isAccepted = progressStatus === 'ACCEPTED'
+  const isInProgress = progressStatus === 'IN_PROGRESS'
+  const isWaiting = progressStatus === 'COMPLETION_REQUESTED' || job.status === 'COMPLETION_PENDING'
+  const isCompleted = job.status === 'COMPLETED' || progressStatus === 'COMPLETED'
+  const canDispute = job.status !== 'COMPLETED' && job.status !== 'CANCELLED'
+
+  const customerName = job.customer?.name || 'Customer'
+  const customerInitial = customerName.trim().charAt(0).toUpperCase() || 'C'
+  const scheduleLabel = job.preferredDate
+    ? [job.preferredDate, job.timeSlot].filter(Boolean).join(' · ')
+    : 'Schedule confirmed in job details'
+
+  const ActionBtn = ({ label, loadingKey, onPress, outline = false }: { label: string; loadingKey: string; onPress: () => void; outline?: boolean }) => (
     <TouchableOpacity
-      style={[
-        styles.actionBtn,
-        outline ? { backgroundColor: 'transparent', borderWidth: 2, borderColor: color || colors.amber } : { backgroundColor: color || colors.amber },
-        actionLoading !== '' && styles.btnDisabled,
-      ]}
+      style={[outline ? styles.secondaryAction : styles.primaryAction, actionLoading !== '' && styles.disabled]}
       onPress={onPress}
       disabled={actionLoading !== ''}
+      activeOpacity={0.78}
     >
       {actionLoading === loadingKey ? (
-        <ActivityIndicator color={outline ? (color || colors.amber) : colors.ink} />
+        <ActivityIndicator size="small" color={outline ? v3.colors.ink : v3.colors.paper} />
       ) : (
-        <Text style={[styles.actionBtnText, outline ? { color: color || colors.amber } : { color: colors.ink }]}>{label}</Text>
+        <Text style={outline ? styles.secondaryActionText : styles.primaryActionText}>{label}</Text>
       )}
     </TouchableOpacity>
   )
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Hero */}
-        <View style={styles.hero}>
-          <Text style={styles.title}>{job.title}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColors[job.status] || colors.muted }]}>
-            <Text style={styles.statusText}>{t(translateJobStatus(job.status))}</Text>
-          </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.circleButton} activeOpacity={0.72} onPress={() => router.back()}>
+          <CaretLeft size={17} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <View style={styles.topCopy}>
+          <Text style={styles.topTitle}>{isCompleted ? 'Completed job' : 'Active job'}</Text>
+          <Text style={styles.topSub}>{String(progressStatus || job.status).replaceAll('_', ' ').toLowerCase()}</Text>
         </View>
-
-        {/* Scheduled Date */}
-        {job.preferredDate && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-            <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight || colors.amberBg }]}>
-              <Calendar size={16} color={colors.amberDark} />
-              <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
-                {job.timeSlot
-                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.timeSlot })
-                  : `${job.preferredDate}`}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Details */}
-        <View style={styles.section}>
-          <View style={styles.detailCard}>
-            <Text style={styles.detailDesc}>{job.description}</Text>
-            <View style={styles.detailRow}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('jobDetail.budget')}</Text>
-                <Text style={styles.detailValue}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>{t('jobs.details')}</Text>
-                <Text style={styles.detailValue}>{job.budgetType}</Text>
-              </View>
-            </View>
-            {job.locationName && (
-              <View style={styles.locationRow}>
-                <MapPin size={14} color={colors.muted} style={{ marginRight: 4 }} />
-                <Text style={styles.detailLocation}>{job.locationName}</Text>
-              </View>
-            )}
-            {job.customer?.id && (
-              <TouchableOpacity
-                style={[styles.msgBtn, { backgroundColor: colors.amber }]}
-                onPress={() => setMsgRecipient({ id: job.customer!.id!, name: job.customer?.name || 'Customer' })}
-              >
-                <ChatCircleDots size={16} color={colors.ink} />
-                <Text style={styles.msgBtnText}>Message customer</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        <View style={[styles.statusPill, isInProgress && styles.statusPillLive, isCompleted && styles.statusPillDone]}>
+          <Text style={[styles.statusPillText, isInProgress && styles.statusPillTextLive, isCompleted && styles.statusPillTextDone]}>
+            {isCompleted ? 'DONE' : isInProgress ? 'IN PROGRESS' : isWaiting ? 'WAITING' : 'ACTIVE'}
+          </Text>
         </View>
+      </View>
 
-        {/* Customer Address */}
-        {job.addressStreet && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('jobDetail.shareAddress')}</Text>
-            <View style={styles.addressCard}>
-              <Text style={styles.addressText}>
-                {job.addressStreet}{job.addressBuilding ? `, ${job.addressBuilding}` : ''}
-                {job.addressApartment ? `, ${job.addressApartment}` : ''}
-              </Text>
-              {job.addressLandmark ? (
-                <View style={styles.locationRow}>
-                  <MapPin size={14} color={colors.muted} style={{ marginRight: 4 }} />
-                  <Text style={styles.addressLandmark}>{job.addressLandmark}</Text>
-                </View>
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        {isAccepted ? (
+          <>
+            <View style={styles.mapStage}>
+              <View style={styles.mapLineOne} />
+              <View style={styles.mapLineTwo} />
+              <View style={styles.mapLineThree} />
+              <View style={styles.mapPin}><MapPin size={18} color={v3.colors.paper} weight="fill" /></View>
+            </View>
+
+            <View style={styles.stageHeader}>
+              <Text style={styles.stageEyebrow}>HEAD TO CUSTOMER</Text>
+              <Text style={styles.stageTitle}>{job.title || 'Customer job'}</Text>
+              <Text style={styles.stageMeta}>{scheduleLabel}</Text>
+            </View>
+
+            <View style={styles.customerCard}>
+              <View style={styles.customerAvatar}><Text style={styles.customerInitial}>{customerInitial}</Text></View>
+              <View style={styles.customerCopy}>
+                <Text style={styles.customerName}>{customerName}</Text>
+                <Text style={styles.customerMeta} numberOfLines={2}>
+                  {job.locationName || job.addressStreet || 'Customer address becomes available for accepted work'}
+                </Text>
+              </View>
+              {job.customer?.id ? (
+                <TouchableOpacity
+                  style={styles.messageCircle}
+                  activeOpacity={0.72}
+                  onPress={() => setMsgRecipient({ id: job.customer!.id!, name: customerName })}
+                >
+                  <ChatCircleDots size={17} color={v3.colors.ink} weight="bold" />
+                </TouchableOpacity>
               ) : null}
             </View>
-          </View>
-        )}
 
-        {/* Escrow */}
-        {escrow && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('jobDetail.escrow')}</Text>
-            <View style={styles.escrowCard}>
-              <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
-              <View style={[styles.escrowBadge, escrow.status === 'PROTECTED' ? styles.escrowActive : styles.escrowInactive]}>
-                <Text style={styles.escrowBadgeText}>{escrow.status}</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Progress + Workspace */}
-        {workspace && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('tracking.inProgress')}</Text>
-            <View style={styles.progressCard}>
-              <View style={styles.progressSteps}>
-                {['ACCEPTED', 'IN_PROGRESS', 'COMPLETION_REQUESTED', 'COMPLETED'].map((step, i) => {
-                  const stepOrder = ['ACCEPTED', 'IN_PROGRESS', 'COMPLETION_REQUESTED', 'COMPLETED']
-                  const currentIdx = stepOrder.indexOf(workspace.progressStatus)
-                  const isDone = i <= currentIdx
-                  return (
-                    <View key={step} style={styles.progressStep}>
-                      <View style={[styles.progressDot, isDone && styles.progressDotDone]}>
-                        {isDone ? <Check size={16} color={colors.ink} /> : <Text style={styles.progressNum}>{i + 1}</Text>}
-                      </View>
-                      <Text style={[styles.progressLabel, isDone && styles.progressLabelDone]}>
-                        {step === 'COMPLETION_REQUESTED' ? t('tasker.reviews') : step === 'COMPLETED' ? t('common.done') : step.replace('_', ' ')}
-                      </Text>
-                    </View>
-                  )
-                })}
+            <View style={styles.pinNotice}>
+              <ShieldCheck size={18} color={v3.colors.info} weight="fill" />
+              <View style={styles.pinCopy}>
+                <Text style={styles.pinTitle}>Arrival PIN required</Text>
+                <Text style={styles.pinText}>Ask the customer for the arrival PIN when you reach the job.</Text>
               </View>
             </View>
 
-            <View style={styles.progressActions}>
-              {workspace.progressStatus === 'ACCEPTED' && !locationSharing && (
-                <TouchableOpacity
-                  style={styles.navBtn}
-                  onPress={startLocationSharing}
-                >
-                  <NavigationArrow size={20} color={colors.ink} />
-                  <Text style={styles.navBtnText}>{t('tracking.startNavigationArrow')}</Text>
-                </TouchableOpacity>
-              )}
-              {locationSharing && (
-                <View style={styles.sharingActive}>
-                  <Radio size={18} color={colors.success} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sharingActiveText}>{t('tracking.sharingLocation')}</Text>
-                    <Text style={styles.sharingHint}>{t('tracking.keepOpenShare')}</Text>
-                  </View>
-                  <TouchableOpacity onPress={stopLocationSharing} style={styles.stopSharingBtn}>
-                    <Text style={styles.stopSharingText}>{t('tracking.stopSharing')}</Text>
-                  </TouchableOpacity>
+            {!locationSharing ? (
+              <TouchableOpacity style={styles.primaryAction} activeOpacity={0.78} onPress={startLocationSharing}>
+                {actionLoading === 'IN_PROGRESS' ? (
+                  <ActivityIndicator size="small" color={v3.colors.paper} />
+                ) : (
+                  <>
+                    <NavigationArrow size={17} color={v3.colors.paper} weight="fill" />
+                    <Text style={styles.primaryActionText}>Start navigation</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.sharingCard}>
+                <Radio size={17} color={v3.colors.success} weight="fill" />
+                <View style={styles.sharingCopy}>
+                  <Text style={styles.sharingTitle}>Location sharing active</Text>
+                  <Text style={styles.sharingText}>Keep MaintainEX open while travelling.</Text>
                 </View>
-              )}
-              {workspace.progressStatus === 'ACCEPTED' && (
-                <TouchableOpacity
-                  style={[styles.verifyPinBtn]}
-                  onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
-                >
-                  <ShieldCheck size={20} color={colors.ink} />
-                  <Text style={styles.verifyPinText}>{t('jobDetail.confirmArrivalDesc')}</Text>
-                </TouchableOpacity>
-              )}
-              {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
-                <View style={styles.waitingCard}>
-                  <Hourglass size={20} color={colors.amberDark} />
-                  <Text style={styles.waitingText}>{t('jobDetail.waitingForQuotes')}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Mark Complete */}
-        {workspace?.progressStatus === 'IN_PROGRESS' && (
-          <View style={[styles.section, styles.highlightSection]}>
-            <Flag size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>{t('common.finish')}</Text>
-            <Text style={styles.highlightDesc}>{t('jobDetail.confirmStart')}</Text>
-            {ActionBtn({ label: t('common.done'), loadingKey: 'complete', onPress: handleMarkComplete })}
-          </View>
-        )}
-
-        {/* Review Customer */}
-        {job.status === 'COMPLETED' && reviews?.providerReviews?.length === 0 && (
-          <View style={[styles.section, styles.reviewSection]}>
-            <Text style={styles.reviewTitle}>{t('tasker.reviews')}</Text>
-            <Text style={styles.reviewLabel}>{t('receipt.rateQuality')} (1-5)</Text>
-            <TextInput style={styles.input} value={reviewCoop} onChangeText={setReviewCoop} keyboardType="numeric" placeholderTextColor={colors.muted} />
-            <Text style={styles.reviewLabel}>{t('receipt.rateCommunication')} (1-5)</Text>
-            <TextInput style={styles.input} value={reviewComm} onChangeText={setReviewComm} keyboardType="numeric" placeholderTextColor={colors.muted} />
-            <Text style={styles.reviewLabel}>{t('receipt.rateValue')} (1-5)</Text>
-            <TextInput style={styles.input} value={reviewExp} onChangeText={setReviewExp} keyboardType="numeric" placeholderTextColor={colors.muted} />
-            <Text style={styles.reviewLabel}>{t('receipt.writeReview')}</Text>
-            <TextInput style={[styles.input, styles.textArea]} value={reviewComment} onChangeText={setReviewComment} multiline placeholderTextColor={colors.muted} />
-            {ActionBtn({ label: t('receipt.submitReview'), loadingKey: 'review', onPress: handleSubmitReview })}
-          </View>
-        )}
-
-        {job.status === 'COMPLETED' && reviews?.providerReviews?.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.reviewedCard}>
-              <CheckCircle size={20} color={colors.success} />
-              <Text style={styles.reviewedText}>{t('receipt.reviewSubmitted')}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Start Next Job */}
-        {job.status === 'COMPLETED' && nextJob && (
-          <View style={[styles.section, styles.highlightSection]}>
-            <ArrowCircleRight size={32} color={colors.amberDark} style={{ marginBottom: 8 }} />
-            <Text style={styles.highlightTitle}>{t('tasker.startNextJob')}</Text>
-            <Text style={styles.highlightDesc}>{nextJob.title}</Text>
-            {nextJob.preferredDate && (
-              <Text style={[styles.scheduleText, { color: colors.amberDark, marginBottom: 12 }]}>
-                {nextJob.timeSlot
-                  ? t('booking.scheduledFor', { date: nextJob.preferredDate, timeSlot: nextJob.timeSlot })
-                  : nextJob.preferredDate}
-              </Text>
+                <TouchableOpacity onPress={stopLocationSharing}><Text style={styles.stopText}>Stop</Text></TouchableOpacity>
+              </View>
             )}
+
             <TouchableOpacity
-              style={styles.startNextBtn}
-              onPress={() => router.push(`/(tasker)/jobs/v2/manage/${nextJob.id}`)}
+              style={styles.secondaryAction}
+              activeOpacity={0.78}
+              onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`) as any)}
             >
-              <Text style={styles.startNextBtnText}>{t('tasker.startNextJob')}</Text>
+              <ShieldCheck size={16} color={v3.colors.ink} weight="bold" />
+              <Text style={styles.secondaryActionText}>Verify arrival PIN</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          </>
+        ) : null}
 
-        {/* Dispute */}
-        {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
-          <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
-            <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
-          </TouchableOpacity>
-        )}
+        {isInProgress ? (
+          <>
+            <View style={styles.liveCard}>
+              <Text style={styles.liveEyebrow}>IN PROGRESS</Text>
+              <Text style={styles.liveTitle}>{job.title || 'Job in progress'}</Text>
+              <Text style={styles.liveMeta}>{scheduleLabel}</Text>
+            </View>
 
-        {/* Action shortcuts for active jobs */}
-        {workspace?.progressStatus === 'IN_PROGRESS' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('jobDetail.whatsIncluded')}</Text>
-            <View style={styles.shortcutsRow}>
-              <TouchableOpacity
-                style={styles.shortcutBtn}
-                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/inspection` as any)}
-              >
-                <MagnifyingGlass size={20} color={colors.amberDark} />
-                <Text style={styles.shortcutText}>{t('inspection.title')}</Text>
+            <Text style={styles.sectionTitle}>Tools</Text>
+            <View style={styles.toolGrid}>
+              <TouchableOpacity style={styles.toolCard} activeOpacity={0.72} onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/evidence`) as any)}>
+                <Camera size={19} color={v3.colors.ink} weight="bold" />
+                <Text style={styles.toolTitle}>Add evidence</Text>
+                <Text style={styles.toolMeta}>Before & after</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.toolCard} activeOpacity={0.72} onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/change-order`) as any)}>
+                <FileText size={19} color={v3.colors.ink} weight="bold" />
+                <Text style={styles.toolTitle}>Change order</Text>
+                <Text style={styles.toolMeta}>Extra scope</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.shortcutBtn}
-                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/evidence` as any)}
+                style={styles.toolCard}
+                activeOpacity={0.72}
+                onPress={() => job.customer?.id && setMsgRecipient({ id: job.customer.id, name: customerName })}
               >
-                <Camera size={20} color={colors.amberDark} />
-                <Text style={styles.shortcutText}>{t('evidence.title')}</Text>
+                <ChatCircleDots size={19} color={v3.colors.ink} weight="bold" />
+                <Text style={styles.toolTitle}>Message customer</Text>
+                <Text style={styles.toolMeta}>Job chat</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.shortcutBtn}
-                onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/change-order` as any)}
-              >
-                <FileText size={20} color={colors.amberDark} />
-                <Text style={styles.shortcutText}>{t('changeOrder.title')}</Text>
+              <TouchableOpacity style={styles.toolCard} activeOpacity={0.72} onPress={handleDispute}>
+                <Flag size={19} color={v3.colors.ink} weight="bold" />
+                <Text style={styles.toolTitle}>Report issue</Text>
+                <Text style={styles.toolMeta}>Raise dispute</Text>
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity style={styles.inspectionRow} activeOpacity={0.72} onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/inspection`) as any)}>
+              <MagnifyingGlass size={17} color={v3.colors.ink} weight="bold" />
+              <View style={styles.inspectionCopy}>
+                <Text style={styles.inspectionTitle}>Inspection checklist</Text>
+                <Text style={styles.inspectionText}>Confirm work quality before completion.</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+
+            {ActionBtn({ label: 'Mark work complete', loadingKey: 'complete', onPress: handleMarkComplete })}
+          </>
+        ) : null}
+
+        {isWaiting ? (
+          <View style={styles.waitingCard}>
+            <Hourglass size={23} color={v3.colors.amberDark} weight="fill" />
+            <Text style={styles.waitingTitle}>Waiting for customer</Text>
+            <Text style={styles.waitingText}>Your completion request is submitted. The customer needs to review and confirm the work.</Text>
           </View>
-        )}
+        ) : null}
+
+        {!isAccepted && !isInProgress && !isWaiting && !isCompleted ? (
+          <View style={styles.summaryCard}>
+            <Wrench size={22} color={v3.colors.ink} weight="bold" />
+            <Text style={styles.summaryTitle}>{job.title || 'Job details'}</Text>
+            <Text style={styles.summaryText}>{job.description || 'Review the current job status and continue when the next action is available.'}</Text>
+          </View>
+        ) : null}
+
+        <Text style={styles.sectionTitle}>Job</Text>
+        <View style={styles.detailCard}>
+          <Text style={styles.detailTitle}>{job.title || 'MaintainEX job'}</Text>
+          <Text style={styles.detailText}>{job.description || 'No additional description.'}</Text>
+
+          <View style={styles.detailDivider} />
+          <View style={styles.detailLine}>
+            <Calendar size={15} color={v3.colors.textMuted} />
+            <Text style={styles.detailLineText}>{scheduleLabel}</Text>
+          </View>
+          <View style={styles.detailLine}>
+            <MapPin size={15} color={v3.colors.textMuted} />
+            <Text style={styles.detailLineText}>{job.locationName || job.addressStreet || 'Location on job record'}</Text>
+          </View>
+          <View style={styles.detailMoneyRow}>
+            <Text style={styles.detailLabel}>Job value</Text>
+            <Text style={styles.detailMoney}>LKR {Number(job.budgetAmount || 0).toLocaleString()}</Text>
+          </View>
+          {escrow ? (
+            <View style={styles.escrowRow}>
+              <ShieldCheck size={14} color={v3.colors.success} weight="fill" />
+              <Text style={styles.escrowText}>Escrow {String(escrow.status || 'protected').toLowerCase()} · LKR {Number(escrow.amount || 0).toLocaleString()}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {isCompleted && reviews?.providerReviews?.length === 0 ? (
+          <View style={styles.reviewCard}>
+            <Text style={styles.reviewEyebrow}>RATE CUSTOMER</Text>
+            <View style={styles.reviewIdentity}>
+              <View style={styles.customerAvatar}><Text style={styles.customerInitial}>{customerInitial}</Text></View>
+              <View>
+                <Text style={styles.customerName}>{customerName}</Text>
+                <Text style={styles.customerMeta}>Help keep the marketplace trustworthy.</Text>
+              </View>
+            </View>
+
+            <Text style={styles.reviewLabel}>Cooperation · 1–5</Text>
+            <TextInput style={styles.reviewInput} value={reviewCoop} onChangeText={setReviewCoop} keyboardType="number-pad" maxLength={1} />
+            <Text style={styles.reviewLabel}>Communication · 1–5</Text>
+            <TextInput style={styles.reviewInput} value={reviewComm} onChangeText={setReviewComm} keyboardType="number-pad" maxLength={1} />
+            <Text style={styles.reviewLabel}>Overall experience · 1–5</Text>
+            <TextInput style={styles.reviewInput} value={reviewExp} onChangeText={setReviewExp} keyboardType="number-pad" maxLength={1} />
+            <Text style={styles.reviewLabel}>Private note</Text>
+            <TextInput
+              style={[styles.reviewInput, styles.reviewNote]}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+              textAlignVertical="top"
+              placeholder="Anything MaintainEX should know?"
+              placeholderTextColor={v3.colors.textPlaceholder}
+            />
+            {ActionBtn({ label: 'Submit customer rating', loadingKey: 'review', onPress: handleSubmitReview })}
+          </View>
+        ) : null}
+
+        {isCompleted && reviews?.providerReviews?.length > 0 ? (
+          <View style={styles.reviewedCard}>
+            <CheckCircle size={17} color={v3.colors.success} weight="fill" />
+            <Text style={styles.reviewedText}>Customer rating submitted</Text>
+          </View>
+        ) : null}
+
+        {isCompleted && nextJob ? (
+          <TouchableOpacity style={styles.nextCard} activeOpacity={0.72} onPress={() => router.push((`/(tasker)/jobs/v2/manage/${nextJob.id}`) as any)}>
+            <ArrowCircleRight size={19} color={v3.colors.ink} weight="bold" />
+            <View style={styles.nextCopy}>
+              <Text style={styles.nextEyebrow}>NEXT JOB</Text>
+              <Text style={styles.nextTitle} numberOfLines={1}>{nextJob.title}</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {canDispute && !isInProgress ? (
+          <TouchableOpacity style={styles.reportLink} activeOpacity={0.72} onPress={handleDispute}>
+            <Text style={styles.reportLinkText}>Report a problem with this job</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
+
       <NewChatModal
         visible={!!msgRecipient}
         onClose={() => setMsgRecipient(null)}
@@ -459,102 +471,110 @@ export default function V2ProviderManageJobScreen() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
+const makeStyles = (_colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topBar: {
+    minHeight: 70,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circleButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topCopy: { flex: 1, marginLeft: 10 },
+  topTitle: { fontSize: 15, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  topSub: { marginTop: 2, fontSize: 9, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted, textTransform: 'capitalize' },
+  statusPill: { minHeight: 25, paddingHorizontal: 10, borderRadius: 13, backgroundColor: v3.colors.amberSoft, alignItems: 'center', justifyContent: 'center' },
+  statusPillText: { fontSize: 8.5, fontFamily: fonts.headingBold, color: v3.colors.amberDark },
+  statusPillLive: { backgroundColor: v3.colors.successSoft },
+  statusPillTextLive: { color: v3.colors.success },
+  statusPillDone: { backgroundColor: v3.colors.infoSoft },
+  statusPillTextDone: { color: v3.colors.info },
   scroll: { flex: 1 },
-  hero: { padding: 20, paddingBottom: 12 },
-  title: { fontSize: 24, fontWeight: '800', color: colors.ink, marginBottom: 10, lineHeight: 32 },
-  statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
-  statusText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-
-  section: { padding: 20, paddingBottom: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 12 },
-
-  detailCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  detailDesc: { fontSize: 14, color: colors.ink, opacity: 0.8, lineHeight: 22, marginBottom: 14 },
-  detailRow: { flexDirection: 'row', gap: 16, marginBottom: 10 },
-  detailItem: { flex: 1 },
-  detailLabel: { fontSize: 11, fontWeight: '600', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  detailValue: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 2 },
-  detailLocation: { fontSize: 13, color: colors.muted },
-  msgBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 11, borderRadius: 12, marginTop: 12 },
-  msgBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
-  locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-
-  addressCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  addressText: { fontSize: 14, color: colors.ink, lineHeight: 22 },
-  addressLandmark: { fontSize: 13, color: colors.muted },
-
-  escrowCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  escrowAmount: { fontSize: 20, fontWeight: '800', color: colors.ink },
-  escrowBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  escrowActive: { backgroundColor: colors.amberBg },
-  escrowInactive: { backgroundColor: colors.border },
-  escrowBadgeText: { fontSize: 11, fontWeight: '700', color: colors.amberDark },
-
-  progressCard: { backgroundColor: colors.white, borderRadius: 14, padding: 20, marginBottom: 12, shadowColor: colors.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  progressSteps: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressStep: { alignItems: 'center', flex: 1 },
-  progressDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.border, justifyContent: 'center', alignItems: 'center', marginBottom: 6 },
-  progressDotDone: { backgroundColor: colors.amber },
-  progressNum: { fontSize: 13, fontWeight: '700', color: colors.muted },
-  progressLabel: { fontSize: 10, color: colors.muted, fontWeight: '600', textAlign: 'center' },
-  progressLabelDone: { color: colors.amberDark },
-  progressActions: { gap: 8 },
-  navBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
-  },
-  navBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
-  progressBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
-  },
-  progressBtnText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
-  verifyPinBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 12,
-  },
-  verifyPinText: { fontSize: 15, fontFamily: fonts.bodyMedium, color: colors.ink },
-
-  scheduleCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 1 },
-  scheduleText: { fontSize: 13, fontFamily: fonts.bodyMedium, flex: 1 },
-
-  highlightSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight || colors.amberBg, alignItems: 'center' },
-  highlightTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 6 },
-  highlightDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 20, marginBottom: 16 },
-  startNextBtn: { backgroundColor: colors.amber, paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  startNextBtnText: { fontSize: 15, fontWeight: '700', color: colors.ink },
-
-  actionBtn: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', minWidth: 120, marginTop: 4 },
-  btnDisabled: { opacity: 0.5 },
-  actionBtnText: { fontSize: 15, fontWeight: '700' },
-
-  reviewSection: { backgroundColor: colors.amberBg, borderRadius: 16, marginHorizontal: 0, marginBottom: 4, padding: 20, borderWidth: 1, borderColor: colors.amberLight || colors.amberBg },
-  reviewTitle: { fontSize: 18, fontWeight: '700', color: colors.ink, marginBottom: 12, textAlign: 'center' },
-  reviewLabel: { fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 12, marginBottom: 4 },
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 12, padding: 12, fontSize: 14, color: colors.ink, backgroundColor: colors.white },
-  textArea: { height: 80, textAlignVertical: 'top' },
-
-  reviewedCard: { backgroundColor: '#D1FAE5', borderRadius: 14, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  reviewedText: { fontSize: 14, color: colors.success, fontWeight: '600' },
-
-  disputeBtn: { alignItems: 'center', paddingVertical: 16, marginBottom: 12 },
-  disputeBtnText: { fontSize: 13, color: colors.muted, fontWeight: '600', textDecorationLine: 'underline' },
-
-  shortcutsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  shortcutBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: colors.white, paddingVertical: 12, paddingHorizontal: 16,
-    borderRadius: 12, borderWidth: 1, borderColor: colors.border,
-  },
-  shortcutText: { fontSize: 13, fontWeight: '600', color: colors.ink },
-
-  waitingCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amberBg, borderRadius: 12, padding: 16 },
-  waitingText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amberDark },
-  sharingActive: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12 },
-  sharingActiveText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.success },
-  sharingHint: { fontSize: 11, fontFamily: fonts.body, color: '#065F46', marginTop: 2 },
-  stopSharingBtn: { backgroundColor: '#065F46', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  stopSharingText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  mapStage: { height: 238, marginHorizontal: -18, backgroundColor: '#E7E7E7', overflow: 'hidden', position: 'relative' },
+  mapLineOne: { position: 'absolute', left: -10, right: -10, top: 70, height: 1, backgroundColor: '#CBCBCB', transform: [{ rotate: '8deg' }] },
+  mapLineTwo: { position: 'absolute', left: -10, right: -10, top: 145, height: 1, backgroundColor: '#D0D0D0', transform: [{ rotate: '-5deg' }] },
+  mapLineThree: { position: 'absolute', top: -20, bottom: -20, left: '58%', width: 1, backgroundColor: '#CECECE', transform: [{ rotate: '10deg' }] },
+  mapPin: { position: 'absolute', top: 98, left: '52%', width: 36, height: 36, borderRadius: 18, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  stageHeader: { paddingTop: 18 },
+  stageEyebrow: { fontSize: 9, fontFamily: fonts.headingBold, color: v3.colors.amberDark },
+  stageTitle: { marginTop: 5, fontSize: 24, lineHeight: 29, fontFamily: fonts.heading, color: v3.colors.ink },
+  stageMeta: { marginTop: 4, fontSize: 10, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  customerCard: { minHeight: 72, marginTop: 16, paddingHorizontal: 12, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  customerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#D9D9D9', alignItems: 'center', justifyContent: 'center' },
+  customerInitial: { fontSize: 11, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  customerCopy: { flex: 1, marginLeft: 10, paddingRight: 8 },
+  customerName: { fontSize: 11.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  customerMeta: { marginTop: 3, fontSize: 8.8, lineHeight: 13, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  messageCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  pinNotice: { minHeight: 72, marginTop: 12, padding: 13, borderRadius: 15, backgroundColor: v3.colors.infoSoft, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  pinCopy: { flex: 1 },
+  pinTitle: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.info },
+  pinText: { marginTop: 3, fontSize: 8.8, lineHeight: 14, fontFamily: fonts.bodySemiBold, color: '#4F4F4F' },
+  primaryAction: { minHeight: 52, marginTop: 18, paddingHorizontal: 18, borderRadius: 15, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryActionText: { fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.paper },
+  secondaryAction: { minHeight: 50, marginTop: 10, paddingHorizontal: 18, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  secondaryActionText: { fontSize: 11.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  disabled: { opacity: 0.55 },
+  sharingCard: { minHeight: 60, marginTop: 18, paddingHorizontal: 13, borderRadius: 15, backgroundColor: v3.colors.successSoft, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  sharingCopy: { flex: 1 },
+  sharingTitle: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.success },
+  sharingText: { marginTop: 2, fontSize: 8.7, fontFamily: fonts.bodySemiBold, color: '#4F4F4F' },
+  stopText: { fontSize: 9.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  liveCard: { minHeight: 118, borderRadius: 18, backgroundColor: v3.colors.ink, padding: 18, marginTop: 7 },
+  liveEyebrow: { fontSize: 9, fontFamily: fonts.headingBold, color: v3.colors.success },
+  liveTitle: { marginTop: 9, fontSize: 22, lineHeight: 27, fontFamily: fonts.heading, color: v3.colors.paper },
+  liveMeta: { marginTop: 5, fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: '#CFCFCF' },
+  sectionTitle: { marginTop: 24, marginBottom: 9, fontSize: 13, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  toolGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  toolCard: { width: '48.7%', minHeight: 96, borderRadius: 16, padding: 14, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  toolTitle: { marginTop: 12, fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  toolMeta: { marginTop: 3, fontSize: 8.5, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  inspectionRow: { minHeight: 64, marginTop: 10, borderRadius: 15, paddingHorizontal: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  inspectionCopy: { flex: 1, marginLeft: 9 },
+  inspectionTitle: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  inspectionText: { marginTop: 2, fontSize: 8.6, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  chevron: { fontSize: 20, fontFamily: fonts.body, color: v3.colors.textMuted },
+  waitingCard: { minHeight: 150, marginTop: 18, padding: 20, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  waitingTitle: { marginTop: 10, fontSize: 16, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  waitingText: { marginTop: 6, textAlign: 'center', fontSize: 9.5, lineHeight: 15, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  summaryCard: { minHeight: 130, marginTop: 7, padding: 18, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  summaryTitle: { marginTop: 14, fontSize: 17, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  summaryText: { marginTop: 5, fontSize: 9.5, lineHeight: 15, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  detailCard: { borderRadius: 18, padding: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  detailTitle: { fontSize: 14, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  detailText: { marginTop: 5, fontSize: 9.5, lineHeight: 15, fontFamily: fonts.bodySemiBold, color: v3.colors.textSecondary },
+  detailDivider: { height: StyleSheet.hairlineWidth, marginVertical: 13, backgroundColor: v3.colors.line },
+  detailLine: { minHeight: 27, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailLineText: { flex: 1, fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: '#4F4F4F' },
+  detailMoneyRow: { marginTop: 8, paddingTop: 11, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailLabel: { fontSize: 9, fontFamily: fonts.bodySemiBold, color: v3.colors.textMuted },
+  detailMoney: { fontSize: 12, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  escrowRow: { marginTop: 10, paddingTop: 9, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  escrowText: { flex: 1, fontSize: 8.8, fontFamily: fonts.bodySemiBold, color: v3.colors.success },
+  reviewCard: { marginTop: 24, borderRadius: 18, padding: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  reviewEyebrow: { fontSize: 9, fontFamily: fonts.headingBold, color: v3.colors.amberDark },
+  reviewIdentity: { marginTop: 12, marginBottom: 15, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  reviewLabel: { marginTop: 10, marginBottom: 5, fontSize: 9, fontFamily: fonts.headingBold, color: v3.colors.textSecondary },
+  reviewInput: { height: 48, borderRadius: 14, paddingHorizontal: 13, backgroundColor: v3.colors.surfaceGray, fontSize: 12, fontFamily: fonts.bodyMedium, color: v3.colors.ink },
+  reviewNote: { height: 82, paddingTop: 12 },
+  reviewedCard: { minHeight: 56, marginTop: 18, borderRadius: 15, paddingHorizontal: 14, backgroundColor: v3.colors.successSoft, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  reviewedText: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.success },
+  nextCard: { minHeight: 62, marginTop: 14, borderRadius: 15, paddingHorizontal: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  nextCopy: { flex: 1, marginLeft: 9 },
+  nextEyebrow: { fontSize: 8, fontFamily: fonts.headingBold, color: v3.colors.textMuted },
+  nextTitle: { marginTop: 2, fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  reportLink: { minHeight: 48, marginTop: 12, alignItems: 'center', justifyContent: 'center' },
+  reportLinkText: { fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: v3.colors.error },
 })
