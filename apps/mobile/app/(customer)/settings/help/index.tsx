@@ -1,103 +1,43 @@
-import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native'
-import { useRouter } from 'expo-router'
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CaretUp, CaretDown, Envelope, Phone } from 'phosphor-react-native'
-import { useColors } from '../../../../lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '../../../../lib/fonts'
+import { ChatCircle, CreditCard, House, Lifebuoy, ShieldWarning, UserCircle, Wrench } from 'phosphor-react-native'
+import { v3 } from '../../../../theme/v3/tokens'
+import V3PageHeader from '../../../../components/v3/V3PageHeader'
+import { V3SectionLabel, V3SettingsCard, V3SettingsRow } from '../../../../components/v3/V3SettingsUI'
+import { useRouter } from 'expo-router'
 
 export default function HelpScreen() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const [openIndex, setOpenIndex] = useState<number | null>(null)
-
-  const faqs = [
-    { q: t('profile.faq1Q'), a: t('profile.faq1A') },
-    { q: t('profile.faq2Q'), a: t('profile.faq2A') },
-    { q: t('profile.faq3Q'), a: t('profile.faq3A') },
-    { q: t('profile.faq4Q'), a: t('profile.faq4A') },
-  ]
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start()
-  }, [])
-
-  const toggle = (i: number) => setOpenIndex(openIndex === i ? null : i)
-
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <Text style={styles.heading}>{t('profile.helpSupport')}</Text>
-
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
-          <Text style={styles.sectionTitle}>{t('profile.faq')}</Text>
-
-          <View style={styles.card}>
-            {faqs.map((faq, i) => {
-              const isOpen = openIndex === i
-              return (
-                <View key={i} style={[styles.faqItem, i === faqs.length - 1 && { borderBottomWidth: 0 }]}>
-                  <TouchableOpacity style={styles.faqHeader} onPress={() => toggle(i)} activeOpacity={0.7}>
-                    <Text style={styles.faqQuestion}>{faq.q}</Text>
-                    {isOpen ? (
-                      <CaretUp size={18} color="#6F6B6B" weight="fill" />
-                    ) : (
-                      <CaretDown size={18} color="#6F6B6B" weight="fill" />
-                    )}
-                  </TouchableOpacity>
-                  {isOpen && (
-                    <Text style={styles.faqAnswer}>{faq.a}</Text>
-                  )}
-                </View>
-              )
-            })}
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader title="Help" subtitle="Choose a topic or contact MaintainEX support." />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <Lifebuoy size={24} color={v3.colors.ink} weight="fill" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroTitle}>How can we help?</Text>
+            <Text style={styles.heroText}>Start with the area that best matches your issue.</Text>
           </View>
+        </View>
 
-          <Text style={styles.sectionTitle}>{t('profile.contactUs')}</Text>
-          <View style={styles.card}>
-            <View style={styles.contactRow}>
-              <Envelope size={20} color="#F5A623" weight="fill" />
-              <Text style={styles.contactText}>  support@maintainex.com</Text>
-            </View>
-            <View style={[styles.contactRow, { borderBottomWidth: 0 }]}>
-              <Phone size={20} color="#F5A623" weight="fill" />
-              <Text style={styles.contactText}>  +94 11 234 5678</Text>
-            </View>
-          </View>
-        </ScrollView>
-      </Animated.View>
+        <V3SectionLabel>Support topics</V3SectionLabel>
+        <V3SettingsCard>
+          <V3SettingsRow icon={Wrench} title="Jobs & taskers" subtitle="Booking, quotes and cancellations" onPress={() => router.push('/(customer)/(tabs)/activity' as any)} />
+          <V3SettingsRow icon={CreditCard} title="Payments & refunds" subtitle="Escrow, cards and wallet" onPress={() => router.push('/(customer)/wallet' as any)} />
+          <V3SettingsRow icon={House} title="Property & rentals" subtitle="Bookings, hosts and listings" onPress={() => router.push('/real-estate' as any)} />
+          <V3SettingsRow icon={ShieldWarning} title="Safety & disputes" subtitle="Report an issue or payment dispute" onPress={() => router.push('/(customer)/(tabs)/activity' as any)} />
+          <V3SettingsRow icon={UserCircle} title="Account & verification" subtitle="Login, identity and privacy" onPress={() => router.push('/(customer)/settings/my-profile' as any)} />
+          <V3SettingsRow icon={ChatCircle} title="Contact MaintainEX" subtitle="Email support" onPress={() => Linking.openURL('mailto:support@maintainex.lk')} last />
+        </V3SettingsCard>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  heading: { fontSize: 28, fontFamily: 'Outfit_900Black', color: '#FFFFFF', paddingHorizontal: 24, marginBottom: 16 },
-  scroll: { paddingHorizontal: 24 },
-  sectionTitle: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: '#6F6B6B', marginBottom: 10, marginTop: 8, textTransform: 'uppercase' },
-  card: {
-    backgroundColor: '#FFFFFF', borderRadius: 14, padding: 4, marginBottom: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 2,
-  },
-  faqItem: {
-    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
-    paddingHorizontal: 16,
-  },
-  faqHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 16,
-  },
-  faqQuestion: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF', flex: 1, paddingRight: 12 },
-  faqAnswer: { fontSize: 13, color: '#6F6B6B', fontFamily: 'Outfit_500Medium', lineHeight: 20, paddingBottom: 16 },
-  contactRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: '#2E2E2E',
-  },
-  contactText: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#FFFFFF' },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  hero: { marginBottom: 20, padding: 16, borderRadius: 18, backgroundColor: v3.colors.amberSoft, flexDirection: 'row', gap: 12, alignItems: 'center' },
+  heroTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 16, color: v3.colors.ink },
+  heroText: { marginTop: 3, fontFamily: 'Outfit_400Regular', fontSize: 11.5, color: v3.colors.textSecondary },
 })
