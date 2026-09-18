@@ -2,7 +2,7 @@ import { useEffect, useMemo, useCallback, useState, useSyncExternalStore } from 
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Image } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bell, MapPin, MagnifyingGlass, Microphone, Heart } from 'phosphor-react-native'
+import { Bell, Briefcase, ChatCircle, Heart, MagnifyingGlass, MapPin, Microphone, Plus, Wrench } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../../lib/auth'
@@ -243,6 +243,64 @@ export default function CustomerHome() {
         ) : null}
 
         <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Your shortcuts</Text>
+          <Text style={styles.sectionHint}>Fast access</Text>
+        </View>
+
+        <View style={styles.shortcutGrid}>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(customer)/jobs/v2/create' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.ink }]}>
+              <Plus size={19} color={v3.colors.paper} weight="bold" />
+            </View>
+            <Text style={styles.shortcutTitle}>Post a job</Text>
+            <Text style={styles.shortcutMeta}>Describe it in seconds</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(customer)/find' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.amberSoft }]}>
+              <Wrench size={19} color={v3.colors.ink} weight="fill" />
+            </View>
+            <Text style={styles.shortcutTitle}>Find a pro</Text>
+            <Text style={styles.shortcutMeta}>Browse trusted taskers</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(customer)/(tabs)/activity' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.infoSoft }]}>
+              <Briefcase size={19} color={v3.colors.info} weight="fill" />
+            </View>
+            <Text style={styles.shortcutTitle}>My jobs</Text>
+            <Text style={styles.shortcutMeta}>Track quotes & progress</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.78} style={styles.shortcutCard} onPress={() => router.push('/(chat)' as any)}>
+            <View style={[styles.shortcutIcon, { backgroundColor: v3.colors.successSoft }]}>
+              <ChatCircle size={19} color={v3.colors.success} weight="fill" />
+            </View>
+            <Text style={styles.shortcutTitle}>Messages</Text>
+            <Text style={styles.shortcutMeta}>Taskers, companies, owners</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>Available now</Text>
+          <TouchableOpacity onPress={() => router.push('/(customer)/find' as any)}>
+            <Text style={styles.sectionLink}>See taskers →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskerRow}>
+          {(relatedProviders.length > 0 ? relatedProviders : []).slice(0, 8).map((p: any) => (
+            <TouchableOpacity key={p.id} style={styles.taskerMini} onPress={() => router.push(`/(customer)/find/tasker-profile/${p.id}` as any)}>
+              <AvatarCircle
+                uri={p.avatarUrl || p.profilePhoto || p.imageUrl}
+                name={p.name || 'Tasker'}
+                size={36}
+                showOnline
+              />
+              <Text style={styles.taskerName} numberOfLines={1}>{(p.name || 'Tasker').split(' ')[0]}</Text>
+            </TouchableOpacity>
+          ))}
+          {!loading && relatedProviders.length === 0 ? <Text style={styles.emptyHint}>No taskers online right now.</Text> : null}
+        </ScrollView>
+
+        <View style={styles.sectionTitleRow}>
           <Text style={styles.sectionTitle}>Stay & rent</Text>
           <TouchableOpacity onPress={() => router.push('/real-estate' as any)}>
             <Text style={styles.sectionLink}>Property hub →</Text>
@@ -303,27 +361,6 @@ export default function CustomerHome() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>Available now</Text>
-          <TouchableOpacity onPress={() => router.push('/(customer)/find' as any)}>
-            <Text style={styles.sectionLink}>See taskers →</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.taskerRow}>
-          {(relatedProviders.length > 0 ? relatedProviders : []).slice(0, 8).map((p: any) => (
-            <TouchableOpacity key={p.id} style={styles.taskerMini} onPress={() => router.push(`/(customer)/find/tasker-profile/${p.id}` as any)}>
-              <AvatarCircle
-                uri={p.avatarUrl || p.profilePhoto || p.imageUrl}
-                name={p.name || 'Tasker'}
-                size={36}
-                showOnline
-              />
-              <Text style={styles.taskerName} numberOfLines={1}>{(p.name || 'Tasker').split(' ')[0]}</Text>
-            </TouchableOpacity>
-          ))}
-          {!loading && relatedProviders.length === 0 ? <Text style={styles.emptyHint}>No taskers online right now.</Text> : null}
-        </ScrollView>
 
         <View style={{ height: 112 }} />
       </ScrollView>
@@ -455,6 +492,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_800ExtraBold',
     color: '#4F4F4F',
   },
+  sectionHint: { fontSize: 9.8, fontFamily: 'Outfit_700Bold', color: v3.colors.textMuted },
+  shortcutGrid: {
+    marginTop: 10,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  shortcutCard: {
+    width: '48.5%',
+    minHeight: 112,
+    borderRadius: 18,
+    backgroundColor: v3.colors.paper,
+    borderWidth: 1,
+    borderColor: v3.colors.line,
+    padding: 13,
+  },
+  shortcutIcon: {
+    width: 38, height: 38, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 11,
+  },
+  shortcutTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 13.5, color: v3.colors.ink },
+  shortcutMeta: { marginTop: 3, fontFamily: 'Outfit_400Regular', fontSize: 10.5, lineHeight: 14, color: v3.colors.textSecondary },
 
   quickRow: {
     marginTop: 10,
