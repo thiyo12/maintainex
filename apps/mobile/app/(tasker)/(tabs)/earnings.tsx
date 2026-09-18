@@ -109,7 +109,7 @@ export default function TaskerEarnings() {
           activeOpacity={0.72}
           onPress={() => {
             if (router.canGoBack()) router.back()
-            else router.replace('/(tasker)/(tabs)' as any)
+            else router.replace('/(tasker)/(tabs)/index' as any)
           }}
         >
           <CaretLeft size={18} color={v3.colors.ink} weight="bold" />
