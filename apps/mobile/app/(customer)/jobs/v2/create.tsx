@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput,
+  ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
+import Constants from 'expo-constants'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
   ArrowLeft, Camera, CaretRight, Check, CheckCircle, ClockAfternoon,
-  MapPin, Plus, Sparkle, Wallet, X,
+  MapPin, Microphone, Plus, Sparkle, Wallet, X,
 } from 'phosphor-react-native'
 
 import { useAuth } from '../../../../lib/auth'
@@ -17,6 +18,7 @@ import { v2Jobs, v2Search, v2SmartBooking, type SmartTemplate } from '../../../.
 import type { JobCategory } from '../../../../lib/types'
 import { v3 } from '../../../../theme/v3/tokens'
 import V3CustomerBottomNav from '../../../../components/v3/V3CustomerBottomNav'
+import JobLocationPicker from '../../../../components/location/JobLocationPicker'
 
 type SearchCategory = {
   id: string
@@ -59,10 +61,14 @@ export default function CreateJobScreen() {
   const [searching, setSearching] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [createdJob, setCreatedJob] = useState<any>(null)
+  const [listening, setListening] = useState(false)
+  const descriptionRef = useRef<TextInput>(null)
+  const speechCleanup = useRef<(() => void) | null>(null)
 
   const [locationText, setLocationText] = useState(
     [(user as any)?.area, (user as any)?.city].filter(Boolean).join(', ')
   )
+  const [locationCoords, setLocationCoords] = useState<{ latitude: number | null; longitude: number | null }>({ latitude: null, longitude: null })
   const [when, setWhen] = useState<'now' | 'tomorrow' | 'flexible'>('now')
   const [budgetMode, setBudgetMode] = useState<'quotes' | 'fixed'>('quotes')
   const [budget, setBudget] = useState('')
@@ -207,7 +213,106 @@ export default function CreateJobScreen() {
     return null
   }, [estimate, selectedCategory])
 
-  const canContinue = description.trim().length >= 8 && !!selectedCategory
+  const canContinue = description.trim().length >= 3 && !!selectedCategory
+
+  const stopVoice = () => {
+    speechCleanup.current?.()
+    speechCleanup.current = null
+    setListening(false)
+    if (Platform.OS !== 'web') {
+      try {
+        const { ExpoSpeechRecognitionModule } = require('expo-speech-recognition')
+        ExpoSpeechRecognitionModule.stop()
+      } catch {}
+    }
+  }
+
+  const startVoice = async () => {
+    if (listening) {
+      stopVoice()
+      return
+    }
+
+    if (Platform.OS === 'web') {
+      const root: any = globalThis as any
+      const Recognition = root.SpeechRecognition || root.webkitSpeechRecognition
+      if (!Recognition) {
+        Alert.alert('Voice input unavailable', 'This browser does not support speech recognition.')
+        return
+      }
+      const recognition = new Recognition()
+      recognition.lang = ((user as any)?.countryCode || 'LK').toUpperCase() === 'LK' ? 'en-LK' : 'en-CA'
+      recognition.interimResults = true
+      recognition.continuous = false
+      recognition.onstart = () => setListening(true)
+      recognition.onresult = (event: any) => {
+        let transcript = ''
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          transcript += event.results[i]?.[0]?.transcript || ''
+        }
+        if (transcript.trim()) setDescription(transcript.trim())
+      }
+      recognition.onerror = () => setListening(false)
+      recognition.onend = () => setListening(false)
+      recognition.start()
+      return
+    }
+
+    if ((Constants as any).appOwnership === 'expo') {
+      Alert.alert(
+        'Voice input needs the MaintainEX development build',
+        'Expo Go cannot load native speech recognition. The production/development build supports the Voice button. For this Expo Go test, tap the description field and use the keyboard microphone.'
+      )
+      descriptionRef.current?.focus()
+      return
+    }
+
+    try {
+      const { ExpoSpeechRecognitionModule } = require('expo-speech-recognition')
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Microphone permission needed', 'Allow microphone and speech recognition so you can describe the job by voice.')
+        return
+      }
+
+      const startSub = ExpoSpeechRecognitionModule.addListener('start', () => setListening(true))
+      const resultSub = ExpoSpeechRecognitionModule.addListener('result', (event: any) => {
+        const transcript = event.results?.[0]?.transcript?.trim()
+        if (transcript) setDescription(transcript)
+      })
+      const endSub = ExpoSpeechRecognitionModule.addListener('end', () => {
+        setListening(false)
+        speechCleanup.current?.()
+        speechCleanup.current = null
+      })
+      const errorSub = ExpoSpeechRecognitionModule.addListener('error', (event: any) => {
+        setListening(false)
+        Alert.alert('Voice input stopped', event?.message || 'Please try again.')
+      })
+
+      speechCleanup.current = () => {
+        startSub.remove()
+        resultSub.remove()
+        endSub.remove()
+        errorSub.remove()
+      }
+
+      ExpoSpeechRecognitionModule.start({
+        lang: ((user as any)?.countryCode || 'LK').toUpperCase() === 'LK' ? 'en-LK' : 'en-CA',
+        interimResults: true,
+        continuous: false,
+        maxAlternatives: 1,
+        iosTaskHint: 'dictation',
+      })
+    } catch {
+      Alert.alert('Voice input unavailable', 'Use a MaintainEX development or production build to enable speech recognition.')
+      descriptionRef.current?.focus()
+    }
+  }
+
+  useEffect(() => () => {
+    speechCleanup.current?.()
+  }, [])
 
   const pickPhotos = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -283,6 +388,8 @@ export default function CreateJobScreen() {
         templateJobId: selectedTemplate?.refJob?.id || undefined,
         countryCode,
         targetTaskerId: params.taskerId || null,
+        latitude: locationCoords.latitude,
+        longitude: locationCoords.longitude,
         smartBookingJson: {
           source: 'V3_POST_JOB',
           naturalDescription: description.trim(),
@@ -306,6 +413,7 @@ export default function CreateJobScreen() {
   const selectSuggestion = (item: any) => {
     const full = categories.find((cat) => cat.id === item.id)
     setSelectedCategory(full || item)
+    if (description.trim().length < 3) setDescription(item.name || 'Service request')
   }
 
   const renderBottomNav = step < 2 ? (
@@ -374,6 +482,7 @@ export default function CreateJobScreen() {
 
             <View style={styles.describeBox}>
               <TextInput
+                ref={descriptionRef}
                 value={description}
                 onChangeText={setDescription}
                 placeholder="My AC is running but not cooling"
@@ -387,9 +496,9 @@ export default function CreateJobScreen() {
               </Text>
 
               <View style={styles.attachRow}>
-                <TouchableOpacity activeOpacity={0.7} disabled style={[styles.attachAction, styles.disabledAction]}>
-                  <Sparkle size={17} color={v3.colors.textSecondary} weight="fill" />
-                  <Text style={styles.attachText}>Voice</Text>
+                <TouchableOpacity activeOpacity={0.7} onPress={startVoice} style={[styles.attachAction, listening && styles.voiceActive]}>
+                  {listening ? <ActivityIndicator size="small" color={v3.colors.ink} /> : <Microphone size={17} color={v3.colors.ink} weight="fill" />}
+                  <Text style={styles.attachText}>{listening ? 'Listening…' : 'Voice'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity activeOpacity={0.7} onPress={pickPhotos} style={styles.attachAction}>
                   {photoUploading ? (
@@ -567,6 +676,15 @@ export default function CreateJobScreen() {
               </View>
             </View>
 
+            <Text style={[styles.sectionTitle, { marginTop: 18, marginBottom: 10 }]}>Pin the exact location</Text>
+            <JobLocationPicker
+              value={{ latitude: locationCoords.latitude, longitude: locationCoords.longitude, label: locationText }}
+              onChange={(next) => {
+                setLocationCoords({ latitude: next.latitude, longitude: next.longitude })
+                if (next.label) setLocationText(next.label)
+              }}
+            />
+
             <View style={styles.rangeCard}>
               <View>
                 <Text style={styles.rangeLabel}>Estimated local range</Text>
@@ -695,6 +813,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   disabledAction: { opacity: 0.55 },
+  voiceActive: { backgroundColor: v3.colors.amberSoft, borderColor: '#F2D08C' },
   attachText: { fontFamily: 'Outfit_600SemiBold', fontSize: 13, color: v3.colors.ink },
   photoStrip: { gap: 10, paddingTop: 12 },
   photoWrap: { width: 72, height: 72, borderRadius: 14, overflow: 'hidden' },
