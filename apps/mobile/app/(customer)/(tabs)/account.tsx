@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import {
-  CaretRight, ChatCircle, CreditCard, House, Lifebuoy, MapPin,
+  Bell, CaretRight, ChatCircle, CreditCard, Gift, House, Info, Lifebuoy, MapPin,
   Medal, SignOut, Trash, UserCircle, Buildings,
 } from 'phosphor-react-native'
 import { useAuth } from '../../../lib/auth'
@@ -149,7 +149,7 @@ export default function AccountScreen() {
           <Text style={styles.tierMeta}>
             {trust ? `${completed} completed · ${cancelled} cancelled` : 'Your booking history and trust status'}
           </Text>
-          <TouchableOpacity onPress={() => router.push('/settings/my-profile')} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => router.push('/(customer)/settings/my-profile' as any)} activeOpacity={0.7}>
             <Text style={styles.badgesLink}>View profile ›</Text>
           </TouchableOpacity>
         </View>
@@ -162,10 +162,16 @@ export default function AccountScreen() {
             onPress={() => router.push('/settings/my-profile')}
           />
           <AccountRow
+            icon={Bell}
+            title="Notifications"
+            subtitle="Job, message and offer alerts"
+            onPress={() => router.push('/(customer)/settings/notifications' as any)}
+          />
+          <AccountRow
             icon={MapPin}
             title="Addresses"
             subtitle="Home and saved locations"
-            onPress={() => router.push('/settings/addresses')}
+            onPress={() => router.push('/(customer)/settings/addresses' as any)}
           />
           <AccountRow
             icon={CreditCard}
@@ -174,10 +180,16 @@ export default function AccountScreen() {
             onPress={() => router.push('/(customer)/wallet' as any)}
           />
           <AccountRow
+            icon={Gift}
+            title="Vouchers"
+            subtitle="Discounts and member offers"
+            onPress={() => router.push('/(customer)/settings/vouchers' as any)}
+          />
+          <AccountRow
             icon={Medal}
             title="Membership"
             subtitle="Benefits and offers"
-            onPress={() => router.push('/settings/membership')}
+            onPress={() => router.push('/(customer)/settings/membership' as any)}
           />
           <AccountRow
             icon={Buildings}
@@ -195,7 +207,13 @@ export default function AccountScreen() {
             icon={Lifebuoy}
             title="Help & safety"
             subtitle="Support, disputes, emergency info"
-            onPress={() => router.push('/settings/help')}
+            onPress={() => router.push('/(customer)/settings/help' as any)}
+          />
+          <AccountRow
+            icon={Info}
+            title="About & legal"
+            subtitle="MaintainEX, terms and privacy"
+            onPress={() => router.push('/(customer)/settings/about' as any)}
           />
         </View>
 
