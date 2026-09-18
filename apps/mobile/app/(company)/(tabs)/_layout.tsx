@@ -1,54 +1,56 @@
 import { Tabs } from 'expo-router'
-import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useTranslation } from 'react-i18next'
-import TabIcon from '../../../components/ui/TabIcon'
+import { House, MapPin, Users, ChatCircleDots, User } from 'phosphor-react-native'
 import { fonts } from '../../../lib/fonts'
-import { House, Truck, Users, ChatCircleDots, User } from 'phosphor-react-native'
+import { v3 } from '../../../theme/v3/tokens'
 
-const tabConfigs = [
-  { name: 'index', key: 'company.dashboard', icon: House },
-  { name: 'dispatch', key: 'company.workforce.dispatch', icon: Truck },
-  { name: 'team', key: 'company.team', icon: Users },
-  { name: 'inbox', key: 'company.inbox', icon: ChatCircleDots },
-  { name: 'profile', key: 'company.profile', icon: User },
-]
+const tabs = [
+  { name: 'index', label: 'Home', Icon: House },
+  { name: 'dispatch', label: 'Dispatch', Icon: MapPin },
+  { name: 'team', label: 'Team', Icon: Users },
+  { name: 'inbox', label: 'Inbox', Icon: ChatCircleDots },
+  { name: 'profile', label: 'Profile', Icon: User },
+] as const
 
 export default function CompanyTabs() {
   const insets = useSafeAreaInsets()
-  const { t } = useTranslation()
-  const bottomPad = Math.max(insets.bottom, 4)
+  const bottom = Math.max(insets.bottom, 0)
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          height: 78 + bottom,
+          paddingTop: 11,
+          paddingBottom: bottom + 8,
+          backgroundColor: v3.colors.paper,
           borderTopWidth: 1,
-          borderTopColor: '#E5E5E5',
-          height: 52 + bottomPad,
-          paddingBottom: bottomPad,
-          paddingTop: 6,
-          ...Platform.select({
-            ios: { position: 'absolute', bottom: 0, left: 0, right: 0 },
-            default: { elevation: 8 },
-          }),
+          borderTopColor: v3.colors.line,
+          elevation: 0,
         },
-        tabBarActiveTintColor: '#F5A623',
-        tabBarInactiveTintColor: '#8A8A8A',
-        tabBarLabelStyle: { fontSize: 9, fontFamily: fonts.bodySemiBold, color: '#8A8A8A' },
+        tabBarItemStyle: {
+          paddingTop: 0,
+        },
+        tabBarActiveTintColor: v3.colors.ink,
+        tabBarInactiveTintColor: v3.colors.textMuted,
+        tabBarLabelStyle: {
+          marginTop: 6,
+          fontSize: 9,
+          lineHeight: 11,
+          fontFamily: fonts.bodySemiBold,
+        },
         tabBarShowLabel: true,
       }}
     >
-      {tabConfigs.map((tab) => (
+      {tabs.map(({ name, label, Icon }) => (
         <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
+          key={name}
+          name={name}
           options={{
-            title: t(tab.key),
-            tabBarIcon: ({ focused }) => (
-              <TabIcon icon={tab.icon} focused={focused} activeColor="#F5A623" />
+            title: label,
+            tabBarIcon: ({ color, focused }) => (
+              <Icon size={18} color={color} weight={focused ? 'bold' : 'regular'} />
             ),
           }}
         />
