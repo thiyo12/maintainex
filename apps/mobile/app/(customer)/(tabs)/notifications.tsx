@@ -7,8 +7,7 @@ import { Briefcase, Money, ChatCircle, Info, Checks, BellSlash, CaretRight } fro
 import { useTranslation } from 'react-i18next'
 
 import { notifications } from '../../../lib/api'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
+import { v3 } from '../../../theme/v3/tokens'
 
 import PressableScale from '../../../components/ui/PressableScale'
 import EmptyState from '../../../components/ui/EmptyState'
@@ -63,7 +62,6 @@ function useRelativeTime(t: (k: string, opts?: any) => string) {
 export default function NotificationsScreen() {
   const router = useRouter()
   const { t } = useTranslation()
-  const colors = useColors()
   const [list, setList] = useState<AppNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -107,7 +105,6 @@ export default function NotificationsScreen() {
   }
 
   const unreadCount = list.filter((n) => !n.read).length
-  const styles = makeStyles(colors)
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -168,16 +165,16 @@ export default function NotificationsScreen() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: v3.colors.canvas },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 16, paddingTop: 8, marginBottom: 16,
   },
-  pageTitle: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF', letterSpacing: -0.5 },
+  pageTitle: { fontSize: 28, fontFamily: 'Outfit_900Black', color: v3.colors.ink, letterSpacing: -0.5 },
   markAllPress: { borderRadius: 999 },
-  markAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: '#FFF1D2' },
-  markAllText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: '#F5A623' },
+  markAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: v3.colors.amberSoft },
+  markAllText: { fontSize: 12, fontFamily: 'Outfit_700Bold', color: v3.colors.amberDark },
 
   scroll: { paddingBottom: 32, paddingHorizontal: 16 },
   list: { gap: 8 },
@@ -185,16 +182,16 @@ const makeStyles = (colors: any) => StyleSheet.create({
   cardPress: { borderRadius: 14 },
   card: {
     flexDirection: 'row', alignItems: 'flex-start', padding: 16, borderRadius: 14,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#2E2E2E',
+    backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line,
   },
   cardUnread: {
-    borderWidth: 3, borderColor: '#F5A623',
+    borderWidth: 1.5, borderColor: v3.colors.amber, backgroundColor: v3.colors.amberSoft,
   },
-  unreadDot: { position: 'absolute', top: 16, right: 16, width: 8, height: 8, borderRadius: 4, backgroundColor: '#F5A623' },
+  unreadDot: { position: 'absolute', top: 14, right: 14, width: 8, height: 8, borderRadius: 4, backgroundColor: v3.colors.amber },
   iconBox: { width: 46, height: 46, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, marginLeft: 16, marginRight: 16 },
-  title: { fontFamily: 'Outfit_600SemiBold', fontSize: 15, color: '#FFFFFF' },
-  titleUnread: { color: '#F5A623' },
-  text: { fontSize: 14, fontFamily: fonts.body, color: '#6F6B6B', marginTop: 2, lineHeight: 19 },
-  time: { fontSize: 12, fontFamily: fonts.bodyLight, color: '#6B6B6B', marginTop: 6 },
+  title: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.ink },
+  titleUnread: { color: v3.colors.ink },
+  text: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: v3.colors.textSecondary, marginTop: 2, lineHeight: 18 },
+  time: { fontSize: 11, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted, marginTop: 6 },
 })
