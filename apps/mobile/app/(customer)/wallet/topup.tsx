@@ -1,210 +1,140 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView, Modal, Linking } from 'react-native'
+import {
+  ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, TextInput,
+  TouchableOpacity, View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CreditCard, Globe, Buildings, LockSimple } from 'phosphor-react-native'
-import { useRouter } from 'expo-router'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
+import { CreditCard, LockSimple, Plus } from 'phosphor-react-native'
+
 import { v2Wallet } from '../../../lib/api-v2'
-import { formatCurrency, getCurrencyForCountry } from '../../../lib/currency-format'
-import { Currency } from '../../../lib/money'
-import { useCountry } from '../../../lib/country'
+import { v3 } from '../../../theme/v3/tokens'
+import V3PageHeader from '../../../components/v3/V3PageHeader'
 
 const PRESETS = [500, 1000, 2500, 5000, 10000, 25000]
 
-const METHODS = [
-  { id: 'payhere', label: 'Card / Bank / eZ Cash', sub: 'Visa, Mastercard, Dialog, Sampath', icon: CreditCard, badge: 'Instant', badgeColor: '#22C55E' },
-  { id: 'stripe', label: 'International Card', sub: 'Visa / Mastercard (USD, CAD, GBP)', icon: Globe, badge: 'Instant', badgeColor: '#22C55E' },
-  { id: 'bank_transfer', label: 'Direct Bank Transfer', sub: "People's Bank, BOC, Commercial Bank", icon: Buildings, badge: '1-2 hours', badgeColor: '#3B82F6' },
-]
-
 export default function TopUpScreen() {
-  const colors = useColors()
-  const router = useRouter()
-  const { selectedCountry } = useCountry()
-  const currency: Currency = getCurrencyForCountry(selectedCountry?.code || 'LK')
   const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('payhere')
   const [loading, setLoading] = useState(false)
-  const [showBank, setShowBank] = useState(false)
-  const styles = makeStyles(colors)
 
-  const handleTopUp = async () => {
-    const amt = parseFloat(amount)
-    if (!amt || amt < 100) {
-      Alert.alert(`Minimum top-up is ${formatCurrency(BigInt(10000), currency)}`)
+  const topUp = async () => {
+    const value = Number(amount)
+    if (!Number.isFinite(value) || value < 100) {
+      Alert.alert('Check amount', 'Enter at least LKR 100.')
       return
     }
-    if (method === 'bank_transfer') {
-      setShowBank(true)
-      return
-    }
+
     setLoading(true)
     try {
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/v2/wallet/topup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await (await import('../../../lib/api')).getAuthToken()}`,
-        },
-        body: JSON.stringify({ amount: amt }),
-      })
-      const data = await res.json()
-      if (data.success && data.paymentUrl) {
-        await Linking.openURL(data.paymentUrl)
-        Alert.alert(
-          'Payment Processing',
-          'Complete your payment in the browser. Your wallet will be updated automatically after confirmation.',
-          [{ text: 'OK' }]
-        )
-      } else if (data.code === 'PAYHERE_NOT_CONFIGURED') {
-        Alert.alert(
-          'Payment Gateway Setup',
-          'Online payments are being configured. Please use Direct Bank Transfer for now.',
-          [{ text: 'OK', onPress: () => { setMethod('bank_transfer'); setShowBank(true) } }]
-        )
-      } else {
-        Alert.alert('Error', data.error || 'Failed to initiate payment')
+      const response = await v2Wallet.topUp(value)
+      if (response.paymentUrl) {
+        await Linking.openURL(response.paymentUrl)
+        Alert.alert('Payment opened', 'Complete the payment securely, then return to MaintainEX.')
+        return
       }
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to initiate payment')
+      Alert.alert(
+        'Online top up unavailable',
+        'The payment gateway has not returned a checkout link. No money was taken.'
+      )
+    } catch (error: any) {
+      let message = error?.message || 'Could not start the top up.'
+      try { message = JSON.parse(message).error || message } catch {}
+      Alert.alert('Could not top up', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const numAmt = parseFloat(amount) || 0
+  const value = Number(amount) || 0
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <View style={styles.section}>
-          <Text style={styles.sLabel}>Select Amount ({currency})</Text>
-          <View style={styles.presets}>
-            {PRESETS.map(p => (
-              <TouchableOpacity
-                key={p}
-                style={[styles.preset, amount === String(p) && styles.presetOn]}
-                onPress={() => setAmount(String(p))}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.presetTxt, amount === String(p) && styles.presetTxtOn]}>
-                  {p.toLocaleString()}
-                </Text>
-              </TouchableOpacity>
-            ))}
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <V3PageHeader title="Add money" subtitle="Top up MX Wallet through the connected payment provider." />
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.amountCard}>
+          <Text style={styles.eyebrow}>AMOUNT</Text>
+          <View style={styles.amountRow}>
+            <Text style={styles.currency}>LKR</Text>
+            <TextInput
+              value={amount}
+              onChangeText={(text) => setAmount(text.replace(/[^0-9.]/g, ''))}
+              placeholder="0"
+              placeholderTextColor="#A7A7A7"
+              keyboardType="decimal-pad"
+              style={styles.amountInput}
+            />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sLabel}>Or enter custom amount</Text>
-          <TextInput
-            style={styles.input}
-            value={amount}
-            onChangeText={setAmount}
-            placeholder="0.00"
-            placeholderTextColor={'#6F6B6B'}
-            keyboardType="decimal-pad"
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sLabel}>Payment Method</Text>
-          {METHODS.map(m => {
-            const MethodIcon = m.icon
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={[styles.methodCard, method === m.id && styles.methodOn]}
-                onPress={() => setMethod(m.id)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.methodIcon}>
-                  <MethodIcon size={20} color={'#D4900A'} weight="bold" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.methodLbl}>{m.label}</Text>
-                  <Text style={styles.methodSub}>{m.sub}</Text>
-                </View>
-                <Text style={[styles.badge, { backgroundColor: m.badgeColor + '20', color: m.badgeColor }]}>
-                  {m.badge}
-                </Text>
-              </TouchableOpacity>
-            )
-          })}
-        </View>
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.btn, (loading || !amount) && { opacity: 0.5 }]}
-            onPress={handleTopUp}
-            disabled={loading || !amount}
-            activeOpacity={0.8}
-          >
-            <LockSimple size={18} color="#111827" weight="bold" />
-            <Text style={styles.btnTxt}>
-              {loading ? 'Processing...' : `Add ${formatCurrency(BigInt(Math.round(numAmt * 100)), currency)} to Wallet`}
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.feeNote}>
-            Your money is secured. We never share your payment details.
-          </Text>
-        </View>
-      </ScrollView>
-
-      <Modal visible={showBank} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
-          <View style={styles.bankModal}>
-            <Text style={{ fontSize: 16, fontFamily: fonts.headingBold, color: '#FFFFFF', marginBottom: 4 }}>
-              Bank Transfer Details
-            </Text>
-            <Text style={{ fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B', marginBottom: 16 }}>
-              Transfer {formatCurrency(BigInt(Math.round(numAmt * 100)), currency)} to this account and use your phone number as reference.
-            </Text>
-            {[
-              ['Bank', "People's Bank"],
-              ['Branch', 'Jaffna'],
-              ['Account Name', 'MΛINTΛINEX (Pvt) Ltd'],
-              ['Account No.', '123-456-789'],
-              ['Reference', 'Your registered phone number'],
-            ].map(([l, v]) => (
-              <View key={l} style={styles.bankRow}>
-                <Text style={styles.bankLabel}>{l}</Text>
-                <Text style={styles.bankVal}>{v}</Text>
-              </View>
-            ))}
-            <TouchableOpacity style={[styles.btn, { marginTop: 16 }]} onPress={() => setShowBank(false)} activeOpacity={0.8}>
-              <Text style={styles.btnTxt}>Done — I've transferred</Text>
+        <Text style={styles.section}>QUICK AMOUNTS</Text>
+        <View style={styles.presets}>
+          {PRESETS.map((preset) => (
+            <TouchableOpacity
+              key={preset}
+              activeOpacity={0.75}
+              onPress={() => setAmount(String(preset))}
+              style={[styles.preset, amount === String(preset) && styles.presetActive]}
+            >
+              <Text style={[styles.presetText, amount === String(preset) && styles.presetTextActive]}>
+                {preset.toLocaleString()}
+              </Text>
             </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.providerCard}>
+          <View style={styles.providerIcon}><CreditCard size={20} color={v3.colors.ink} weight="fill" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.providerTitle}>Secure online checkout</Text>
+            <Text style={styles.providerText}>Available methods are shown by the connected payment provider at checkout.</Text>
           </View>
         </View>
-      </Modal>
+
+        <View style={styles.protection}>
+          <LockSimple size={17} color={v3.colors.success} weight="fill" />
+          <Text style={styles.protectionText}>No card or bank details are stored on this screen.</Text>
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={0.82}
+          disabled={loading || value < 100}
+          onPress={topUp}
+          style={[styles.primary, (loading || value < 100) && styles.disabled]}
+        >
+          {loading ? <ActivityIndicator color={v3.colors.paper} /> : (
+            <>
+              <Plus size={18} color={v3.colors.paper} weight="bold" />
+              <Text style={styles.primaryText}>
+                {value >= 100 ? `Add LKR ${value.toLocaleString()}` : 'Enter an amount'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  section: { marginHorizontal: 16, marginBottom: 20 },
-  sLabel: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#6F6B6B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  amountCard: { padding: 18, borderRadius: 20, backgroundColor: v3.colors.ink },
+  eyebrow: { fontFamily: 'Outfit_800ExtraBold', fontSize: 9.5, color: '#AFAFAF', letterSpacing: 1 },
+  amountRow: { marginTop: 8, flexDirection: 'row', alignItems: 'baseline' },
+  currency: { fontFamily: 'Outfit_800ExtraBold', fontSize: 14, color: v3.colors.amber, marginRight: 10 },
+  amountInput: { flex: 1, padding: 0, fontFamily: 'Outfit_900Black', fontSize: 38, color: v3.colors.paper },
+  section: { marginTop: 20, marginBottom: 9, fontFamily: 'Outfit_800ExtraBold', fontSize: 10, color: v3.colors.textMuted, letterSpacing: 0.8 },
   presets: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  preset: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 100, borderWidth: 1.5, borderColor: '#2E2E2E', backgroundColor: '#FFFFFF' },
-  presetOn: { borderColor: '#F5A623', backgroundColor: '#FFF1D2' },
-  presetTxt: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
-  presetTxtOn: { color: '#D4900A' },
-  input: { borderWidth: 1.5, borderColor: '#2E2E2E', borderRadius: 14, padding: 14, fontSize: 22, fontFamily: fonts.heading, color: '#FFFFFF', backgroundColor: '#FFFFFF', letterSpacing: -0.5 },
-  methodCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8, borderWidth: 1.5, borderColor: '#2E2E2E', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
-  methodOn: { borderColor: '#F5A623', backgroundColor: '#FFF1D2' },
-  methodIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
-  methodLbl: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
-  methodSub: { fontSize: 11, fontFamily: fonts.body, color: '#6F6B6B', marginTop: 1 },
-  badge: { fontSize: 9, fontFamily: fonts.bodyMedium, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 100, overflow: 'hidden', textTransform: 'uppercase', letterSpacing: 0.5 },
-  footer: { margin: 16 },
-  btn: { backgroundColor: '#F5A623', borderRadius: 14, padding: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: '#F5A623', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6 },
-  btnTxt: { fontSize: 15, fontFamily: fonts.headingBold, color: '#111827' },
-  feeNote: { fontSize: 11, fontFamily: fonts.body, color: '#6F6B6B', textAlign: 'center', marginTop: 10 },
-  bankModal: { backgroundColor: '#FFFFFF', margin: 24, borderRadius: 18, padding: 20 },
-  bankRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 0.5, borderTopColor: '#2E2E2E' },
-  bankLabel: { fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B' },
-  bankVal: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  preset: { minWidth: 92, height: 42, borderRadius: 12, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  presetActive: { backgroundColor: v3.colors.amberSoft, borderColor: '#F2D08C' },
+  presetText: { fontFamily: 'Outfit_700Bold', fontSize: 12, color: v3.colors.ink },
+  presetTextActive: { color: v3.colors.amberDark },
+  providerCard: { marginTop: 20, minHeight: 78, padding: 14, borderRadius: 18, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
+  providerIcon: { width: 42, height: 42, borderRadius: 13, backgroundColor: v3.colors.amberSoft, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  providerTitle: { fontFamily: 'Outfit_800ExtraBold', fontSize: 13.5, color: v3.colors.ink },
+  providerText: { marginTop: 2, fontFamily: 'Outfit_400Regular', fontSize: 10.5, lineHeight: 15, color: v3.colors.textSecondary },
+  protection: { marginTop: 14, padding: 12, borderRadius: 14, backgroundColor: v3.colors.successSoft, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  protectionText: { flex: 1, fontFamily: 'Outfit_500Medium', fontSize: 11, color: v3.colors.textSecondary },
+  primary: { marginTop: 20, height: 56, borderRadius: 16, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  disabled: { opacity: 0.35 },
+  primaryText: { fontFamily: 'Outfit_700Bold', fontSize: 15, color: v3.colors.paper },
 })
