@@ -12,6 +12,20 @@ export async function PUT(request: NextRequest) {
     if (blocked) return blocked
 
     const { isOnline } = await request.json()
+    if (!!isOnline) {
+      const identity = (user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+      if (!['VERIFIED', 'APPROVED'].includes(identity)) {
+        return NextResponse.json({ error: 'Identity verification is required before going online.' }, { status: 403 })
+      }
+      const profile = await prisma.taskerProfile.findUnique({
+        where: { userId: user.id },
+        select: { verificationStatus: true, isVerified: true },
+      })
+      if (!profile || profile.verificationStatus !== 'VERIFIED' || !profile.isVerified) {
+        return NextResponse.json({ error: 'Tasker verification is required before going online.' }, { status: 403 })
+      }
+    }
+
     await prisma.taskerProfile.update({
       where: { userId: user.id },
       data: { isOnline: !!isOnline },
