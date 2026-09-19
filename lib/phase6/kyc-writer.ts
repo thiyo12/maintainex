@@ -72,7 +72,10 @@ export async function transitionUserKyc(
         REJECTED: ['PENDING'],
         SUSPENDED: ['PENDING'],
       }
-      if (!validProfileTransitions[currentProfileStatus]?.includes(profileTarget)) {
+      if (
+        currentProfileStatus !== profileTarget &&
+        !validProfileTransitions[currentProfileStatus]?.includes(profileTarget)
+      ) {
         return { success: false, error: `Invalid provider verification transition: ${currentProfileStatus} → ${profileTarget}` }
       }
     }
