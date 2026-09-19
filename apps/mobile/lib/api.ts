@@ -78,7 +78,18 @@ export async function getActiveCompanyId(): Promise<string | null> {
 
 // Auth
 export const auth = {
-  register: (data: { name: string; phone: string; email?: string; role: string }) =>
+  register: (data: {
+    role: 'CUSTOMER' | 'TASKER'
+    phone: string
+    countryCode?: string
+    name?: string
+    email?: string
+    dateOfBirth?: string
+    address?: string
+    experienceYears?: number
+    experienceSummary?: string
+    serviceJobIds?: string[]
+  }) =>
     request<any>('/api/mobile/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: { email: string; password: string }) =>
     request<AuthResponse>('/api/mobile/auth/login', { method: 'POST', body: JSON.stringify(data) }),
@@ -188,7 +199,7 @@ export const conversations = {
 }
 
 export const skillsApi = {
-  list: () => request<any[]>('/api/mobile/taskers/skills'),
+  list: () => request<{ categories: any[] }>('/api/mobile/taskers/skills'),
   save: (data: any[]) =>
     request<{ saved: number }>('/api/mobile/taskers/skills', { method: 'PUT', body: JSON.stringify({ skills: data }) }),
 }
