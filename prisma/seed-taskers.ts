@@ -76,6 +76,7 @@ async function main() {
         phone: tasker.phone,
         role: 'TASKER',
         identityStatus: 'VERIFIED',
+        phoneVerified: true,
         emailVerified: true,
       },
     })
