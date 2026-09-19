@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
       id: tasker.id,
       userId: tasker.userId,
       bio: tasker.bio,
+      dateOfBirth: tasker.dateOfBirth ? tasker.dateOfBirth.toISOString().split('T')[0] : null,
+      address: tasker.address,
       hourlyRate: tasker.hourlyRate,
       skills: safeParseJsonArr(tasker.skills),
       serviceAreas: safeParseJsonArr(tasker.serviceAreas),
@@ -71,9 +73,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
     }
 
-    const { bio, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
+    const { bio, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
     if (bio !== undefined) updateData.bio = bio
+    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null
+    if (address !== undefined) updateData.address = typeof address === 'string' ? address.trim() : null
     if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
     if (skills !== undefined) updateData.skills = JSON.stringify(skills)
     if (serviceAreas !== undefined) updateData.serviceAreas = JSON.stringify(serviceAreas)
@@ -104,6 +108,8 @@ export async function PUT(request: NextRequest) {
       id: updated.id,
       userId: updated.userId,
       bio: updated.bio,
+      dateOfBirth: updated.dateOfBirth ? updated.dateOfBirth.toISOString().split('T')[0] : null,
+      address: updated.address,
       hourlyRate: updated.hourlyRate,
       skills: safeParseJsonArr(updated.skills),
       serviceAreas: safeParseJsonArr(updated.serviceAreas),
