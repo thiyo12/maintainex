@@ -71,7 +71,7 @@ export default function RegisterScreen() {
         const available = rows
           .map(category => ({
             ...category,
-            jobs: (category.jobs || []).filter(job => job.isActive !== false && !job.isCompanyOnly),
+            jobs: (category.jobs || []).filter(job => !job.isCompanyOnly),
           }))
           .filter(category => (category.jobs || []).length > 0)
         setCatalog(available)
