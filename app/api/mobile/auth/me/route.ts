@@ -25,6 +25,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    const [taskerPresence, ownedCompany, companyMembership] = await Promise.all([
+      prisma.taskerProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+      prisma.companyProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+      prisma.teamMember.findFirst({ where: { userId: user.id, status: 'ACTIVE' }, select: { companyId: true } }),
+    ])
+    const profileSet = new Set<string>(['CUSTOMER', fullUser.role])
+    if (taskerPresence) profileSet.add('TASKER')
+    if (ownedCompany || companyMembership) profileSet.add('COMPANY')
+
     let extra = {}
     let needsOnboarding = false
     let tierLevel = 'EXPLORER'
@@ -83,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      user: { ...fullUser, tierLevel, completedJobs, totalSpent, ...extra },
+      user: { ...fullUser, tierLevel, completedJobs, totalSpent, availableProfiles: Array.from(profileSet), ...extra },
       needsOnboarding,
     })
   } catch (error) {
