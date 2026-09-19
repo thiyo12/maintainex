@@ -57,9 +57,19 @@ export default function EntryScreen() {
 
     Animated.timing(sceneOpacity, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => {
       if (isAuthenticated) {
-        if (user?.role === 'TASKER' && user?.needsOnboarding) router.replace('/(auth)/onboarding/tasker-services')
-        else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
-        else if (user?.role === 'TASKER') router.replace('/(tasker)')
+        if (user?.role === 'TASKER') {
+          const identity = (user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+          const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
+          if (user.needsOnboarding || user.taskerOnboardingStage === 'SERVICES') {
+            router.replace('/(auth)/onboarding/tasker-services')
+          } else if (user.taskerOnboardingStage === 'IDENTITY' || (!identityReady && (identity === 'NOT_SUBMITTED' || identity === 'REJECTED'))) {
+            router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+          } else if (user.taskerOnboardingStage === 'PENDING_APPROVAL' || !identityReady) {
+            router.replace('/(auth)/pending-approval')
+          } else {
+            router.replace('/(tasker)')
+          }
+        } else if (user?.role === 'COMPANY' && user?.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
         else if (user?.role === 'COMPANY') router.replace('/(company)')
         else router.replace('/(customer)')
       } else {
