@@ -4,15 +4,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { CaretLeft, FileText, ShieldCheck } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../../lib/fonts'
 import { v2Jobs, v2ChangeOrder } from '../../../../../../lib/api-v2'
 import { v3 } from '../../../../../../theme/v3/tokens'
 
 export default function ChangeOrderScreen() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
 
