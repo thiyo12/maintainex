@@ -19,10 +19,17 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
+interface CompanyServiceJob {
+  id: string
+  name: string
+  isCompanyOnly?: boolean
+}
+
 interface Category {
   id: string
   name: string
   iconName: string
+  jobs: CompanyServiceJob[]
 }
 
 const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -45,24 +52,7 @@ const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
   Wrench,
 }
 
-const FALLBACK_CATEGORIES: Category[] = [
-  { id: 'electrical', name: 'Electrical', iconName: 'Lightning' },
-  { id: 'plumbing', name: 'Plumbing', iconName: 'Drop' },
-  { id: 'ac', name: 'AC & Refrigeration', iconName: 'Snowflake' },
-  { id: 'painting', name: 'Painting', iconName: 'Palette' },
-  { id: 'carpentry', name: 'Carpentry', iconName: 'Hammer' },
-  { id: 'cleaning', name: 'Cleaning', iconName: 'Sparkle' },
-  { id: 'gardening', name: 'Gardening', iconName: 'Leaf' },
-  { id: 'moving', name: 'Moving', iconName: 'Package' },
-  { id: 'pest-control', name: 'Pest Control', iconName: 'Bug' },
-  { id: 'roofing', name: 'Roofing', iconName: 'House' },
-  { id: 'flooring', name: 'Flooring', iconName: 'Layers' },
-  { id: 'tiling', name: 'Tiling', iconName: 'GridFour' },
-  { id: 'fencing', name: 'Fencing', iconName: 'Lock' },
-  { id: 'landscaping', name: 'Landscaping', iconName: 'Flower' },
-  { id: 'home-automation', name: 'Home Automation', iconName: 'Lightbulb' },
-  { id: 'solar', name: 'Solar', iconName: 'Sun' },
-]
+const FALLBACK_CATEGORIES: Category[] = []
 
 interface InviteEntry {
   name: string
@@ -84,6 +74,7 @@ export default function CompanySetupOnboarding() {
 
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   const [invites, setInvites] = useState<InviteEntry[]>([])
@@ -111,8 +102,12 @@ export default function CompanySetupOnboarding() {
               id: c.id,
               name: c.name,
               iconName: c.iconName || 'Wrench',
-            }))
+              jobs: Array.isArray(c.jobs)
+                ? c.jobs.map((job: any) => ({ id: job.id, name: job.name, isCompanyOnly: job.isCompanyOnly }))
+                : [],
+            })).filter((c: Category) => c.jobs.length > 0)
           )
+          setExpandedCategory((current) => current || data.find((c: any) => Array.isArray(c.jobs) && c.jobs.length > 0)?.id || null)
         }
       }
     } catch {
@@ -122,7 +117,7 @@ export default function CompanySetupOnboarding() {
     }
   }
 
-  const toggleCategory = (id: string) => {
+  const toggleService = (id: string) => {
     const next = new Set(selectedIds)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -160,13 +155,13 @@ export default function CompanySetupOnboarding() {
       const token = await getAuthToken()
 
       const profileRes = await fetch(`${API_URL}/api/mobile/company/profile`, {
-        method: 'PUT',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           companyName,
           registrationNo: registrationNo || undefined,
           description: description || undefined,
-          services: Array.from(selectedIds),
+          serviceJobIds: Array.from(selectedIds),
           serviceAreas: [],
         }),
       })
@@ -245,24 +240,65 @@ export default function CompanySetupOnboarding() {
         return (
           <View>
             <Text style={styles.sectionTitle}>{t('auth.onboarding.selectServicesTitle')}</Text>
-            <Text style={styles.sectionSub}>{t('auth.onboarding.selectServicesDesc2')}</Text>
+            <Text style={styles.sectionSub}>Choose the exact services your company can deliver. This keeps job matching accurate.</Text>
+            <View style={styles.serviceCountCard}>
+              <Text style={styles.serviceCount}>{selectedIds.size}</Text>
+              <Text style={styles.serviceCountLabel}>{selectedIds.size === 1 ? 'service selected' : 'services selected'}</Text>
+            </View>
             {categoriesLoading ? (
               <ActivityIndicator color={colors.amber} style={{ marginTop: 24 }} />
+            ) : categories.length === 0 ? (
+              <Text style={styles.skipHint}>Services could not be loaded. Check your connection and reopen this step.</Text>
             ) : (
-              <View style={styles.grid}>
+              <View>
                 {categories.map((cat) => {
-                  const selected = selectedIds.has(cat.id)
+                  const open = expandedCategory === cat.id
                   const IconComponent = CATEGORY_ICON_MAP[cat.iconName] || Wrench
+                  const selectedCount = cat.jobs.filter(job => selectedIds.has(job.id)).length
                   return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.card, selected && styles.cardSelected]}
-                      onPress={() => toggleCategory(cat.id)}
-                      activeOpacity={0.7}
-                    >
-                      <IconComponent size={28} color={selected ? colors.amberDark : colors.ink} weight="bold" />
-                      <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{t(getCategoryI18nKey(cat))}</Text>
-                    </TouchableOpacity>
+                    <View key={cat.id} style={styles.categoryCard}>
+                      <TouchableOpacity
+                        style={styles.categoryHeader}
+                        activeOpacity={0.72}
+                        onPress={() => setExpandedCategory(open ? null : cat.id)}
+                      >
+                        <View style={styles.categoryIcon}>
+                          <IconComponent size={20} color={colors.ink} weight="bold" />
+                        </View>
+                        <View style={styles.categoryCopy}>
+                          <Text style={styles.categoryName}>{t(getCategoryI18nKey(cat))}</Text>
+                          <Text style={styles.categoryMeta}>{selectedCount} selected · {cat.jobs.length} services</Text>
+                        </View>
+                        <CaretRight
+                          size={18}
+                          color={colors.muted}
+                          weight="bold"
+                          style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}
+                        />
+                      </TouchableOpacity>
+
+                      {open ? (
+                        <View style={styles.jobList}>
+                          {cat.jobs.map(job => {
+                            const selected = selectedIds.has(job.id)
+                            return (
+                              <TouchableOpacity
+                                key={job.id}
+                                style={styles.jobRow}
+                                activeOpacity={0.72}
+                                onPress={() => toggleService(job.id)}
+                              >
+                                <View style={[styles.jobCheck, selected && styles.jobCheckSelected]}>
+                                  {selected ? <Check size={13} color={colors.white} weight="bold" /> : null}
+                                </View>
+                                <Text style={styles.jobName}>{job.name}</Text>
+                                {job.isCompanyOnly ? <Text style={styles.companyOnly}>COMPANY</Text> : null}
+                              </TouchableOpacity>
+                            )
+                          })}
+                        </View>
+                      ) : null}
+                    </View>
                   )
                 })}
               </View>
@@ -341,7 +377,7 @@ export default function CompanySetupOnboarding() {
             <View style={styles.reviewSection}>
               <Text style={styles.reviewLabel}>{t('auth.onboarding.servicesCount', { n: selectedIds.size })}</Text>
               <Text style={styles.reviewValue}>
-                {categories.filter(c => selectedIds.has(c.id)).map(c => t(getCategoryI18nKey(c))).join(', ')}
+                {categories.flatMap(category => category.jobs).filter(job => selectedIds.has(job.id)).map(job => job.name).join(', ')}
               </Text>
             </View>
             <View style={styles.reviewSection}>
@@ -433,16 +469,21 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
   },
   textArea: { height: 100, textAlignVertical: 'top' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: {
-    width: '47%', padding: 16, borderRadius: 16, backgroundColor: colors.white,
-    alignItems: 'center', marginBottom: 8,
-    shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
-  },
-  cardSelected: { backgroundColor: colors.amberBg, borderWidth: 2, borderColor: colors.amber },
-  cardLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.ink, marginTop: 8, textAlign: 'center' },
-  cardLabelSelected: { fontFamily: fonts.bodyMedium, color: colors.amberDark },
+  serviceCountCard: { height: 58, borderRadius: 16, paddingHorizontal: 15, marginBottom: 14, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center' },
+  serviceCount: { fontSize: 22, fontFamily: fonts.headingBold, color: colors.white },
+  serviceCountLabel: { marginLeft: 8, fontSize: 10, fontFamily: fonts.bodyMedium, color: '#D0D0D0' },
+  categoryCard: { borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, marginBottom: 10, overflow: 'hidden' },
+  categoryHeader: { minHeight: 64, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center' },
+  categoryIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' },
+  categoryCopy: { flex: 1, marginLeft: 10 },
+  categoryName: { fontSize: 13, fontFamily: fonts.headingBold, color: colors.ink },
+  categoryMeta: { marginTop: 3, fontSize: 9.5, fontFamily: fonts.body, color: colors.muted },
+  jobList: { borderTopWidth: 1, borderTopColor: colors.border },
+  jobRow: { minHeight: 56, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  jobCheck: { width: 22, height: 22, borderRadius: 7, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  jobCheckSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
+  jobName: { flex: 1, marginLeft: 10, paddingRight: 8, fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
+  companyOnly: { fontSize: 7.5, letterSpacing: 0.5, fontFamily: fonts.headingBold, color: colors.amberDark },
   inviteForm: { marginBottom: 16 },
   addInviteBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
