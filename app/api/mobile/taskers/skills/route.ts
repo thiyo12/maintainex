@@ -114,7 +114,7 @@ export async function PUT(request: NextRequest) {
 
     const jobs = await prisma.templateJob.findMany({
       where: { id: { in: jobIds }, isActive: true },
-      select: { id: true, isCompanyOnly: true, categoryId: true },
+      select: { id: true, isCompanyOnly: true, categoryId: true, currency: true },
     })
     const allowedIds = new Set(jobs.filter(j => !j.isCompanyOnly).map(j => j.id))
 
@@ -145,7 +145,8 @@ export async function PUT(request: NextRequest) {
           fixedRate: s.fixedRate ?? 0,
           experienceYears: s.experienceYears ?? 0,
           experienceLevel: s.experienceLevel ?? 1,
-          currency: 'LKR',
+          currency: jobs.find(job => job.id === s.jobId)?.currency || 'LKR',
+          countryCode: user.countryCode || 'LK',
         },
       })
       saved++
