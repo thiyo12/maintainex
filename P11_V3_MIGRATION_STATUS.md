@@ -1,3 +1,34 @@
+# 2026-09-19 — AUTH + TASKER ONBOARDING CORRECTIVE FLOW
+
+Status: **SOURCE IMPLEMENTED ON `phase11-v3-exact-ui` · RUNTIME/DEVICE QA PENDING**
+
+The mobile auth flow was corrected to the approved product behavior:
+
+- Welcome now requires language selection before login/registration (English / Tamil / Sinhala) and persists `app-language`.
+- Customer registration is phone-first: mobile number → SMS OTP → Customer app. Personal profile fields remain optional after account creation.
+- Tasker registration is a separate multi-step flow: legal name, DOB, mobile, full address, optional email, work experience, exact service selection, review, SMS OTP, mandatory identity upload, then KYC pending.
+- Returning mobile login remains passwordless: mobile number → SMS OTP → role-aware destination.
+- Tasker service selection now uses exact active `TemplateJob` records and creates canonical `TaskerSkill` capability links rather than selecting a whole category.
+- Exact TemplateJob capability is now carried through matching; category fallback is reserved for free-form/custom jobs.
+- Taskers cannot receive provider job feeds, submit quotes, or go online before KYC approval.
+- Tasker birth date/address are persisted using nullable production-safe schema additions.
+- Direct profile phone-number changes are blocked until a dedicated OTP-verified phone-change flow exists.
+- SMS OTP delivery is implemented through the server-side Twilio REST API. Required production secrets are documented in `.env.example`.
+- Reserved sample Tasker numbers can use fixed OTP `000000` only when `ALLOW_TEST_OTP=true`; production must keep that flag off except controlled certification environments.
+- Sample tasker seed now uses canonical `VERIFIED` KYC state, verified phones, and tops up every active service to at least three TaskerSkill matches when the seed is executed.
+
+Database migration added:
+`prisma/migrations/20260919161000_tasker_registration_fields/migration.sql`
+
+Important deployment gate:
+1. Run full root + mobile TypeScript/build checks.
+2. Apply migrations with `npx prisma migrate deploy`.
+3. Configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` before testing real SMS.
+4. Run `npm run db:seed:taskers` only in a non-production test environment.
+5. Complete simulator/device E2E: Customer register/login and Tasker register → OTP → ID → admin KYC approval → exact matching job.
+
+---
+
 # Phase 11 — V3.3 UI Migration Status
 
 ## 2026-09-19 — V3.3 FULL FINAL corrective pass
