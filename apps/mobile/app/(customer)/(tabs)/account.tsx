@@ -220,9 +220,9 @@ export default function AccountScreen() {
         <View style={styles.secondaryCard}>
           <AccountRow
             icon={House}
-            title="Switch to tasker"
-            subtitle="Offer services with MaintainEX"
-            onPress={() => router.push('/(auth)/role-switch?target=TASKER' as any)}
+            title="Switch profile"
+            subtitle="Customer, Individual or Company workspace"
+            onPress={() => router.push('/(auth)/role-switch' as any)}
           />
           <TouchableOpacity onPress={handleLogout} activeOpacity={0.7} style={styles.secondaryAction}>
             <SignOut size={18} color={v3.colors.ink} weight="bold" />
