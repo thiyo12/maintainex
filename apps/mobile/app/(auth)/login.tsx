@@ -66,7 +66,7 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Use your mobile number to continue.</Text>
+          <Text style={styles.subtitle}>Use your mobile number. MaintainEX opens the right Customer, Individual, or Company workspace automatically.</Text>
 
           <Text style={styles.label}>Mobile number</Text>
           <View style={styles.phoneRow}>
