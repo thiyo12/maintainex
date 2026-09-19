@@ -105,7 +105,7 @@ export default function LoginScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerLabel}>New to MaintainEX?</Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+            <TouchableOpacity onPress={() => router.push('/(auth)/role-select')}>
               <Text style={styles.footerLink}>Create an account</Text>
             </TouchableOpacity>
           </View>
