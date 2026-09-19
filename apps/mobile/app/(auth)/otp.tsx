@@ -63,8 +63,10 @@ export default function OtpScreen() {
         } else {
           router.replace('/(tasker)')
         }
-      } else if (user.role === 'COMPANY') router.replace('/(company)')
-      else router.replace('/(customer)')
+      } else if (user.role === 'COMPANY') {
+        if (user.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
+        else router.replace('/(company)')
+      } else router.replace('/(customer)')
     } catch (err: any) {
       let message = err?.message || 'Invalid code'
       try { message = JSON.parse(message).error || message } catch {}
