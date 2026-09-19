@@ -10,6 +10,7 @@ export default function AuthLayout() {
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="role-select" />
+      <Stack.Screen name="provider-type" />
       <Stack.Screen name="pending-approval" />
       <Stack.Screen name="role-switch" options={{ presentation: 'modal' }} />
       <Stack.Screen name="onboarding/tasker-services" options={{ presentation: 'fullScreenModal' }} />
