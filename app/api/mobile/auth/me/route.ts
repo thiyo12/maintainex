@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (fullUser.role === 'TASKER') {
       const profile = await prisma.taskerProfile.findUnique({
         where: { userId: user.id },
-        select: { skills: true, dateOfBirth: true, address: true, bio: true },
+        select: { skills: true, dateOfBirth: true, address: true, bio: true, experienceSummary: true },
       })
       needsOnboarding = !profile || safeParseJsonArr(profile.skills).length === 0
       const identity = (fullUser.identityStatus || 'NOT_SUBMITTED').toUpperCase()
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         taskerOnboardingStage,
         taskerDateOfBirth: profile?.dateOfBirth ? profile.dateOfBirth.toISOString().split('T')[0] : null,
         taskerAddress: profile?.address || null,
-        taskerExperienceSummary: profile?.bio || null,
+        taskerExperienceSummary: profile?.experienceSummary || profile?.bio || null,
       }
     } else if (fullUser.role === 'COMPANY') {
       const profile = await prisma.companyProfile.findUnique({
