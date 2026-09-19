@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Image, TextInput } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { X, CheckCircle, Camera, Image as ImageIcon, CreditCard, Globe, Car, ShieldCheck } from 'phosphor-react-native'
 import * as ImagePicker from 'expo-image-picker'
@@ -15,6 +15,8 @@ export default function IdentityVerificationScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
+  const { onboarding } = useLocalSearchParams<{ onboarding?: string }>()
+  const isOnboarding = onboarding === '1'
   const { t } = useTranslation()
   const DOC_TYPES = [
     { key: 'NATIONAL_ID', label: t('verify.nationalIdCard'), Icon: CreditCard },
@@ -33,11 +35,14 @@ export default function IdentityVerificationScreen() {
   useEffect(() => {
     v2Identity.getStatus().then((data: any) => {
       if (data.identityStatus === 'APPROVED' || data.identityStatus === 'VERIFIED') {
-        Alert.alert(t('verify.alreadyVerified'), t('verify.alreadyVerified'))
-        router.back()
+        if (isOnboarding) router.replace('/(tasker)')
+        else {
+          Alert.alert(t('verify.alreadyVerified'), t('verify.alreadyVerified'))
+          router.back()
+        }
       }
     }).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  }, [isOnboarding])
 
   const pickImage = async (side: 'FRONT' | 'BACK') => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -105,7 +110,8 @@ export default function IdentityVerificationScreen() {
         await v2Identity.uploadDocument(docType, 'BACK', backUri, fullName.trim())
       }
       Alert.alert(t('common.success'), t('verify.underReview'))
-      router.back()
+      if (isOnboarding) router.replace('/(auth)/pending-approval')
+      else router.back()
     } catch {
       Alert.alert(t('common.error'), t('verify.submitFailed'))
     } finally {
@@ -150,10 +156,14 @@ export default function IdentityVerificationScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} activeOpacity={0.72} onPress={() => router.back()}>
-            <X size={17} color={v3.colors.ink} weight="bold" />
-          </TouchableOpacity>
-          <Text style={styles.headerLabel}>TRUST & SAFETY</Text>
+          {isOnboarding ? (
+            <View style={styles.closeButtonPlaceholder} />
+          ) : (
+            <TouchableOpacity style={styles.closeButton} activeOpacity={0.72} onPress={() => router.back()}>
+              <X size={17} color={v3.colors.ink} weight="bold" />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerLabel}>{isOnboarding ? 'FINAL REGISTRATION STEP' : 'TRUST & SAFETY'}</Text>
           <View style={styles.closeButtonPlaceholder} />
         </View>
 
@@ -161,7 +171,7 @@ export default function IdentityVerificationScreen() {
           <ShieldCheck size={26} color={v3.colors.info} weight="fill" />
         </View>
         <Text style={styles.hero}>Verify your identity</Text>
-        <Text style={styles.subtitle}>A verified identity helps customers trust who is arriving for the job.</Text>
+        <Text style={styles.subtitle}>{isOnboarding ? 'Upload a valid identity document. Your Tasker account will not receive jobs until verification is approved.' : 'A verified identity helps customers trust who is arriving for the job.'}</Text>
 
         <Text style={styles.sectionLabel}>YOUR LEGAL NAME</Text>
         <View style={styles.fieldCard}>
