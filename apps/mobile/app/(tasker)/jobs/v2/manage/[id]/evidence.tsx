@@ -4,7 +4,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Camera, Image as ImageIcon, XCircle, Images, CaretLeft } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../../lib/fonts'
 import { upload } from '../../../../../../lib/api'
 import { v2Evidence } from '../../../../../../lib/api-v2'
@@ -13,8 +12,6 @@ import { v3 } from '../../../../../../theme/v3/tokens'
 
 export default function EvidenceScreen() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
 
