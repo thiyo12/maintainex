@@ -67,14 +67,17 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    const result = await transitionUserKyc(prisma, {
-      userId: user.id,
-      action: 'SUBMIT',
-      documentId: doc.id,
-    })
+    const currentIdentityStatus = (user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+    if (currentIdentityStatus !== 'PENDING') {
+      const result = await transitionUserKyc(prisma, {
+        userId: user.id,
+        action: 'SUBMIT',
+        documentId: doc.id,
+      })
 
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 400 })
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 400 })
+      }
     }
 
     await createWorkItem({
