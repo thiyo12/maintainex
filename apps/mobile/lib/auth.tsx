@@ -171,10 +171,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isEmail ? { email: trimmed, code } : { phone: trimmed, code }
     )
     await setAuthToken(res.token)
-    setUser(res.user)
-    await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+
+    let finalUser = res.user as User
+    try {
+      const meRes = await auth.me()
+      finalUser = { ...res.user, ...meRes.user, needsOnboarding: meRes.needsOnboarding } as User
+    } catch {}
+
+    setUser(finalUser)
+    await SecureStore.setItemAsync('auth_user', JSON.stringify(finalUser))
     await SecureStore.setItemAsync('last_active_at', String(Date.now()))
-    return res.user
+    return finalUser
   }, [])
 
   const register = useCallback(async (data: {
@@ -217,8 +224,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(async () => {
     try {
       const res = await auth.me()
-      setUser(res.user)
-      await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+      const refreshed = { ...res.user, needsOnboarding: res.needsOnboarding } as User
+      setUser(refreshed)
+      await SecureStore.setItemAsync('auth_user', JSON.stringify(refreshed))
     } catch {
       await logout()
     }
