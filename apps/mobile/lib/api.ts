@@ -79,7 +79,7 @@ export async function getActiveCompanyId(): Promise<string | null> {
 // Auth
 export const auth = {
   register: (data: {
-    role: 'CUSTOMER' | 'TASKER'
+    role: 'CUSTOMER' | 'TASKER' | 'COMPANY'
     phone: string
     countryCode?: string
     name?: string
