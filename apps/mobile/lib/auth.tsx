@@ -17,7 +17,7 @@ interface AuthContextType {
   sendLoginOtp: (identifier: string) => Promise<void>
   otpLogin: (identifier: string, code: string) => Promise<any>
   register: (data: {
-    role: 'CUSTOMER' | 'TASKER'
+    role: 'CUSTOMER' | 'TASKER' | 'COMPANY'
     phone: string
     countryCode?: string
     name?: string
@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const register = useCallback(async (data: {
-    role: 'CUSTOMER' | 'TASKER'
+    role: 'CUSTOMER' | 'TASKER' | 'COMPANY'
     phone: string
     countryCode?: string
     name?: string
