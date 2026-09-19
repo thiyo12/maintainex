@@ -10,14 +10,37 @@ import { isTestOtpAllowed, isSyntheticCertAccount } from '@/lib/test-cert'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function inferPhoneCountries(phoneDigits: string): string[] {
+  if (phoneDigits.startsWith('94')) return ['LK']
+  if (phoneDigits.startsWith('41')) return ['CH']
+  if (phoneDigits.startsWith('49')) return ['DE']
+  if (phoneDigits.startsWith('44')) return ['GB']
+  if (phoneDigits.startsWith('91')) return ['IN']
+  if (phoneDigits.startsWith('61')) return ['AU']
+  if (phoneDigits.startsWith('1')) return ['CA', 'US']
+  return []
+}
+
 async function findUserByIdentifier(identifier: string) {
   if (EMAIL_REGEX.test(identifier)) {
     return prisma.user.findUnique({ where: { email: identifier } })
   }
-  const digits = identifier.replace(/\D/g, '').slice(-9)
-  if (!digits) return null
+
+  const allDigits = identifier.replace(/\D/g, '')
+  if (!allDigits) return null
+  const normalized = `+${allDigits}`
+
+  const exact = await prisma.user.findFirst({ where: { phone: normalized } })
+  if (exact) return exact
+
+  // Backward-compatible lookup for legacy locally-formatted numbers.
+  const digits = allDigits.slice(-9)
+  const countries = inferPhoneCountries(allDigits)
   return prisma.user.findFirst({
-    where: { phone: { endsWith: digits } },
+    where: {
+      phone: { endsWith: digits },
+      ...(countries.length > 0 ? { countryCode: { in: countries } } : {}),
+    },
   })
 }
 
