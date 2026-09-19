@@ -16,7 +16,18 @@ interface AuthContextType {
   loginWithOtp: (phone: string, otp: string) => Promise<any>
   sendLoginOtp: (identifier: string) => Promise<void>
   otpLogin: (identifier: string, code: string) => Promise<any>
-  register: (data: { name: string; phone: string; email?: string; role: string }) => Promise<any>
+  register: (data: {
+    role: 'CUSTOMER' | 'TASKER'
+    phone: string
+    countryCode?: string
+    name?: string
+    email?: string
+    dateOfBirth?: string
+    address?: string
+    experienceYears?: number
+    experienceSummary?: string
+    serviceJobIds?: string[]
+  }) => Promise<any>
   verifyRegisterOtp: (phone: string, code: string, purpose?: string) => Promise<any>
   switchRole: (role: string) => Promise<void>
   logout: () => Promise<void>
@@ -166,7 +177,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.user
   }, [])
 
-  const register = useCallback(async (data: { name: string; phone: string; email?: string; role: string }) => {
+  const register = useCallback(async (data: {
+    role: 'CUSTOMER' | 'TASKER'
+    phone: string
+    countryCode?: string
+    name?: string
+    email?: string
+    dateOfBirth?: string
+    address?: string
+    experienceYears?: number
+    experienceSummary?: string
+    serviceJobIds?: string[]
+  }) => {
     const res = await auth.register(data)
     return res
   }, [])
