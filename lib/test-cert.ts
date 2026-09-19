@@ -2,7 +2,8 @@
  * Beta Certification Test Account Utilities
  *
  * Controls test OTP bypass for synthetic beta certification accounts.
- * Only accounts with the BETA_CERT_2026_09 tag are eligible.
+ * Eligible accounts are explicitly tagged with BETA_CERT_2026_09 or use the
+ * reserved sample Tasker phone range from prisma/seed-taskers.ts.
  * Requires ALLOW_TEST_OTP=true in environment to function.
  */
 
