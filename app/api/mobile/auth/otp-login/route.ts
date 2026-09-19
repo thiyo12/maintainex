@@ -5,6 +5,7 @@ import { randomInt } from 'crypto'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
+import { sendOtpSms } from '@/lib/sms'
 import { isTestOtpAllowed, isSyntheticCertAccount } from '@/lib/test-cert'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -64,6 +65,13 @@ export async function POST(request: NextRequest) {
     const blocked = accountBlocked(user)
     if (blocked) return blocked
 
+    if (!user.phoneVerified && phoneId) {
+      return NextResponse.json({
+        error: 'Finish mobile number verification before signing in.',
+        code: 'PHONE_NOT_VERIFIED',
+      }, { status: 403 })
+    }
+
     if (!code) {
       const phone = phoneId || user.phone || identifier
       const { allowed, reason } = await checkOtpSendLimit(phone, ip)
@@ -86,11 +94,32 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      if (user.email) {
-        await sendOtpEmail(user.email, otp)
+      try {
+        if (phoneId) {
+          if (!user.phone) {
+            return NextResponse.json({ error: 'No mobile number is linked to this account.' }, { status: 400 })
+          }
+          await sendOtpSms(user.phone, otp)
+        } else if (user.email) {
+          await sendOtpEmail(user.email, otp)
+        } else {
+          return NextResponse.json({ error: 'No verified delivery destination is available.' }, { status: 400 })
+        }
+      } catch (error) {
+        console.error('OTP delivery failed:', error)
+        await prisma.oTP.updateMany({
+          where: { userId: user.id, purpose: 'LOGIN', isUsed: false },
+          data: { isUsed: true },
+        })
+        return NextResponse.json({
+          error: phoneId
+            ? 'We could not send the SMS code. Please try again shortly.'
+            : 'We could not send the verification code. Please try again shortly.',
+          code: 'OTP_DELIVERY_FAILED',
+        }, { status: 503 })
       }
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true, channel: phoneId ? 'sms' : 'email' })
     }
 
     const { allowed: verifyAllowed, reason: verifyReason } = await checkOtpVerifyLimit(user.id)
