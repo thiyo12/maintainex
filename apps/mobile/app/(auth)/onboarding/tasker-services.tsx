@@ -1,275 +1,206 @@
-import { useState, useEffect } from 'react'
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, ActivityIndicator, Alert, TextInput,
-} from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { CaretDown, CaretUp, CheckCircle } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
+
 import { useAuth } from '../../../lib/auth'
-import { useColors } from '../../../lib/ThemeContext'
-import { useTranslation } from 'react-i18next'
-import { fonts } from '../../../lib/fonts'
-import { getCategoryI18nKey } from '../../../lib/categories'
-import { getAuthToken } from '../../../lib/api'
-import {
-  CaretLeft, CaretRight, CheckCircle,
-  Lightning, Drop, Snowflake, Palette, Hammer, Sparkle, Leaf, Package,
-  Bug, House, SquaresFour, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
-} from 'phosphor-react-native'
+import { skillsApi, taskers } from '../../../lib/api'
+import { v3 } from '../../../theme/v3/tokens'
+import V3Button from '../../../components/v3/V3Button'
+import V3NavBar from '../../../components/v3/V3NavBar'
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
+const MAX_SERVICES = 15
 
-interface Category {
+interface ServiceJob {
   id: string
   name: string
-  iconName: string
+  selected?: boolean
+  experienceYears?: number
+  experienceLevel?: number
+  hourlyRate?: number
+  fixedRate?: number
 }
 
-const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
-  Lightning,
-  Drop,
-  Snowflake,
-  Palette,
-  Hammer,
-  Sparkle,
-  Leaf,
-  Package,
-  Bug,
-  House,
-  Layers: SquaresFour,
-  GridFour,
-  Lock,
-  Flower,
-  Lightbulb,
-  Sun,
-  Wrench,
+interface ServiceCategory {
+  id: string
+  name: string
+  jobs: ServiceJob[]
 }
-
-const FALLBACK_CATEGORIES: Category[] = [
-  { id: 'electrical', name: 'Electrical', iconName: 'Lightning' },
-  { id: 'plumbing', name: 'Plumbing', iconName: 'Drop' },
-  { id: 'ac', name: 'AC & Refrigeration', iconName: 'Snowflake' },
-  { id: 'painting', name: 'Painting', iconName: 'Palette' },
-  { id: 'carpentry', name: 'Carpentry', iconName: 'Hammer' },
-  { id: 'cleaning', name: 'Cleaning', iconName: 'Sparkle' },
-  { id: 'gardening', name: 'Gardening', iconName: 'Leaf' },
-  { id: 'moving', name: 'Moving', iconName: 'Package' },
-  { id: 'pest-control', name: 'Pest Control', iconName: 'Bug' },
-  { id: 'roofing', name: 'Roofing', iconName: 'House' },
-  { id: 'flooring', name: 'Flooring', iconName: 'Layers' },
-  { id: 'tiling', name: 'Tiling', iconName: 'GridFour' },
-  { id: 'fencing', name: 'Fencing', iconName: 'Lock' },
-  { id: 'landscaping', name: 'Landscaping', iconName: 'Flower' },
-  { id: 'home-automation', name: 'Home Automation', iconName: 'Lightbulb' },
-  { id: 'solar', name: 'Solar', iconName: 'Sun' },
-]
 
 export default function TaskerServicesOnboarding() {
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
-  const { t } = useTranslation()
   const { user, refreshUser } = useAuth()
-  const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [allrounder, setAllrounder] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [categories, setCategories] = useState<ServiceCategory[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [phone, setPhone] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
   const needsPhone = !user?.phone
+  const selectedJobs = useMemo(
+    () => categories.flatMap(category => category.jobs).filter(job => selected.has(job.id)),
+    [categories, selected]
+  )
 
   useEffect(() => {
-    fetchCategories()
+    let active = true
+    skillsApi.list()
+      .then(({ categories: rows }) => {
+        if (!active) return
+        const normalized = (rows || []).map((category: any) => ({
+          id: category.id,
+          name: category.name,
+          jobs: Array.isArray(category.jobs) ? category.jobs : [],
+        }))
+        setCategories(normalized)
+        setExpanded(normalized[0]?.id || null)
+        setSelected(new Set(
+          normalized.flatMap((category: ServiceCategory) => category.jobs)
+            .filter((job: ServiceJob) => job.selected)
+            .map((job: ServiceJob) => job.id)
+        ))
+      })
+      .catch(() => Alert.alert('Unable to load services', 'Please check your connection and try again.'))
+      .finally(() => active && setLoading(false))
+    return () => { active = false }
   }, [])
 
-  const fetchCategories = async () => {
-    setLoading(true)
-    try {
-      const token = await getAuthToken()
-      const res = await fetch(`${API_URL}/api/mobile/job-categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.length > 0) {
-          setCategories(
-            data.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              iconName: c.iconName || 'Wrench',
-            }))
-          )
-        }
+  const toggle = (jobId: string) => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (next.has(jobId)) {
+        next.delete(jobId)
+        return next
       }
-    } catch {
-      // use fallback
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const toggleCategory = (id: string) => {
-    const next = new Set(selectedIds)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelectedIds(next)
-    if (next.size < categories.length) setAllrounder(false)
-  }
-
-  const toggleAllrounder = () => {
-    const next = !allrounder
-    setAllrounder(next)
-    if (next) setSelectedIds(new Set(categories.map(c => c.id)))
-    else setSelectedIds(new Set())
+      if (next.size >= MAX_SERVICES) {
+        Alert.alert('Service limit', `Choose up to ${MAX_SERVICES} services. You can update them later from Your Services.`)
+        return current
+      }
+      next.add(jobId)
+      return next
+    })
   }
 
   const handleSave = async () => {
-    if (selectedIds.size === 0) {
-      Alert.alert(t('errors.selectionRequired'), t('errors.selectService'))
+    if (selected.size === 0) {
+      Alert.alert('Choose your services', 'Select at least one exact service you can provide.')
       return
     }
-    if (needsPhone && phone.trim().length < 7) {
-      Alert.alert(t('common.error'), 'Please add a valid phone number so customers can reach you.')
+    if (needsPhone && phone.replace(/\D/g, '').length < 7) {
+      Alert.alert('Mobile number required', 'Add a valid mobile number before continuing.')
       return
     }
+
     setSaving(true)
     try {
-      const token = await getAuthToken()
-      const res = await fetch(`${API_URL}/api/mobile/taskers/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          skills: Array.from(selectedIds),
-          ...(needsPhone ? { phone: phone.trim() } : {}),
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        Alert.alert(t('common.error'), err.error || t('errors.generic'))
-        return
-      }
+      const payload = selectedJobs.map(job => ({
+        jobId: job.id,
+        experienceYears: job.experienceYears || 0,
+        experienceLevel: job.experienceLevel || 1,
+        hourlyRate: job.hourlyRate || 0,
+        fixedRate: job.fixedRate || 0,
+      }))
+      await skillsApi.save(payload)
+      if (needsPhone) await taskers.updateProfile({ phone: phone.trim() })
       await refreshUser()
-      router.replace('/(tasker)')
-    } catch {
-      Alert.alert(t('common.error'), t('errors.network'))
+
+      const identity = (user?.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+      if (identity === 'VERIFIED' || identity === 'APPROVED') router.replace('/(tasker)')
+      else router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+    } catch (err: any) {
+      let message = err?.message || 'Unable to save services'
+      try { message = JSON.parse(message).error || message } catch {}
+      Alert.alert('Unable to continue', message)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <CaretLeft size={24} color={colors.ink} weight="bold" />
-      </TouchableOpacity>
+    <View style={styles.screen}>
+      <V3NavBar title="Your services" onBack={() => router.back()} />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <Text style={styles.title}>Choose exact services</Text>
+        <Text style={styles.subtitle}>Do not select an entire trade unless you can perform each service. MaintainEX uses these selections to decide which jobs reach you.</Text>
 
-      <Text style={styles.title}>{t('auth.onboarding.selectServices')}</Text>
-      <Text style={styles.subtitle}>{t('auth.onboarding.selectServicesDesc')}</Text>
+        {needsPhone ? (
+          <View style={styles.phoneCard}>
+            <Text style={styles.label}>Mobile number</Text>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholder="077 123 4567"
+              placeholderTextColor={v3.colors.textPlaceholder}
+              style={styles.phoneInput}
+            />
+          </View>
+        ) : null}
 
-      {needsPhone && (
-        <View style={styles.phoneCard}>
-          <Text style={styles.phoneLabel}>Phone number</Text>
-          <TextInput
-            style={[styles.phoneInput, { backgroundColor: colors.surface, color: colors.ink, borderColor: colors.border }]}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholder="e.g. 077 123 4567"
-            placeholderTextColor={colors.muted}
-          />
-          <Text style={styles.phoneHint}>Customers use this to reach you. Keep it up to date in Settings.</Text>
+        <View style={styles.summary}>
+          <Text style={styles.summaryCount}>{selected.size}/{MAX_SERVICES} selected</Text>
+          <Text style={styles.summaryText}>You can add, remove and price individual services later from Tasker Profile → Your Services.</Text>
         </View>
-      )}
 
-      <TouchableOpacity
-        style={[styles.allrounderCard, allrounder && styles.allrounderCardActive]}
-        onPress={toggleAllrounder}
-        activeOpacity={0.7}
-      >
-        {allrounder ? (
-          <CheckCircle size={24} color={colors.amber} weight="fill" />
-        ) : (
-          <View style={styles.selectionCircle} />
-        )}
-        <View style={styles.allrounderTextWrap}>
-          <Text style={styles.allrounderLabel}>{t('auth.onboarding.allrounder')}</Text>
-          <Text style={styles.allrounderDesc}>{t('auth.onboarding.allrounderDesc', { n: categories.length })}</Text>
-        </View>
-      </TouchableOpacity>
-
-      {loading ? (
-        <ActivityIndicator color={colors.amber} style={{ marginTop: 24 }} />
-      ) : (
-        <View style={styles.grid}>
-          {categories.map((cat) => {
-            const selected = selectedIds.has(cat.id)
-            const IconComponent = CATEGORY_ICON_MAP[cat.iconName] || Wrench
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={[styles.card, selected && styles.cardSelected]}
-                onPress={() => toggleCategory(cat.id)}
-                activeOpacity={0.7}
-              >
-                <IconComponent size={28} color={selected ? colors.amberDark : colors.ink} weight="bold" />
-                <Text style={[styles.cardLabel, selected && styles.cardLabelSelected]}>{t(getCategoryI18nKey(cat))}</Text>
+        {loading ? (
+          <ActivityIndicator color={v3.colors.ink} style={{ marginTop: 40 }} />
+        ) : categories.map(category => {
+          const open = expanded === category.id
+          const categorySelected = category.jobs.filter(job => selected.has(job.id)).length
+          return (
+            <View key={category.id} style={styles.category}>
+              <TouchableOpacity style={styles.categoryHeader} onPress={() => setExpanded(open ? null : category.id)} activeOpacity={0.75}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.categoryName}>{category.name}</Text>
+                  <Text style={styles.categoryMeta}>{categorySelected} selected · {category.jobs.length} services</Text>
+                </View>
+                {open ? <CaretUp size={18} color={v3.colors.ink} /> : <CaretDown size={18} color={v3.colors.ink} />}
               </TouchableOpacity>
-            )
-          })}
-        </View>
-      )}
+              {open ? (
+                <View style={styles.jobs}>
+                  {category.jobs.map(job => {
+                    const checked = selected.has(job.id)
+                    return (
+                      <TouchableOpacity key={job.id} style={styles.jobRow} onPress={() => toggle(job.id)} activeOpacity={0.72}>
+                        <View style={[styles.checkbox, checked && styles.checkboxActive]}>
+                          {checked ? <CheckCircle size={19} color={v3.colors.ink} weight="fill" /> : null}
+                        </View>
+                        <Text style={styles.jobName}>{job.name}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              ) : null}
+            </View>
+          )
+        })}
 
-      <TouchableOpacity
-        style={[styles.saveButton, (selectedIds.size === 0 || saving) && styles.saveButtonDisabled]}
-        onPress={handleSave}
-        disabled={selectedIds.size === 0 || saving}
-      >
-        {saving ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <>
-            <Text style={styles.saveText}>{t('auth.onboarding.saveAndContinue')}</Text>
-            <CaretRight size={20} color={colors.white} weight="bold" />
-          </>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+        <View style={{ height: 24 }} />
+        <V3Button label="Save & continue" onPress={handleSave} loading={saving} disabled={selected.size === 0 || loading} />
+      </ScrollView>
+    </View>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  content: { padding: 24, paddingBottom: 48 },
-  backButton: { marginBottom: 16, alignSelf: 'flex-start' },
-  title: { fontSize: 26, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 8 },
-  subtitle: { fontSize: 15, fontFamily: fonts.body, color: colors.muted, marginBottom: 24, lineHeight: 22 },
-  phoneCard: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 14, marginBottom: 16, backgroundColor: colors.white },
-  phoneLabel: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink, marginBottom: 8 },
-  phoneInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, fontFamily: fonts.body },
-  phoneHint: { fontSize: 11, fontFamily: fonts.body, color: colors.muted, marginTop: 6 },
-  allrounderCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 16, borderRadius: 16, backgroundColor: colors.white,
-    marginBottom: 20, borderWidth: 2, borderColor: colors.border,
-  },
-  allrounderCardActive: { borderColor: colors.amber, backgroundColor: colors.amberBg },
-  selectionCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: colors.muted },
-  allrounderTextWrap: { flex: 1 },
-  allrounderLabel: { fontSize: 17, fontFamily: fonts.bodyMedium, color: colors.ink },
-  allrounderDesc: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, marginTop: 2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  card: {
-    width: '47%', padding: 16, borderRadius: 16, backgroundColor: colors.white,
-    alignItems: 'center', marginBottom: 8,
-    shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
-  },
-  cardSelected: { backgroundColor: colors.amberBg, borderWidth: 2, borderColor: colors.amber },
-  cardLabel: { fontSize: 13, fontFamily: fonts.body, color: colors.ink, marginTop: 8, textAlign: 'center' },
-  cardLabelSelected: { fontFamily: fonts.bodyMedium, color: colors.amberDark },
-  saveButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: colors.amber, paddingVertical: 16, borderRadius: 16, marginTop: 24,
-  },
-  saveButtonDisabled: { opacity: 0.5 },
-  saveText: { fontSize: 16, fontFamily: fonts.bodyMedium, color: colors.white },
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: v3.colors.canvas },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  title: { marginTop: 10, fontSize: 27, lineHeight: 32, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
+  subtitle: { marginTop: 6, marginBottom: 20, fontSize: 10.5, lineHeight: 16, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  phoneCard: { marginBottom: 14, padding: 14, borderRadius: 15, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper },
+  label: { marginBottom: 7, fontSize: 9.5, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  phoneInput: { height: 48, borderRadius: 13, borderWidth: 1, borderColor: v3.colors.line, paddingHorizontal: 13, fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: v3.colors.ink },
+  summary: { marginBottom: 14, padding: 14, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
+  summaryCount: { fontSize: 13, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  summaryText: { marginTop: 3, fontSize: 9.5, lineHeight: 14, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
+  category: { marginBottom: 10, borderRadius: 16, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, overflow: 'hidden' },
+  categoryHeader: { minHeight: 62, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center' },
+  categoryName: { fontSize: 13, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
+  categoryMeta: { marginTop: 3, fontSize: 9.5, fontFamily: 'Outfit_500Medium', color: v3.colors.textMuted },
+  jobs: { borderTopWidth: 1, borderTopColor: v3.colors.line },
+  jobRow: { minHeight: 56, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: v3.colors.line },
+  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  checkboxActive: { borderColor: v3.colors.ink },
+  jobName: { flex: 1, fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
 })
