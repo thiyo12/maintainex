@@ -16,8 +16,9 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('')
   const [sending, setSending] = useState(false)
 
-  const fullPhone = `${country.dial}${phone}`
   const phoneDigits = phone.replace(/\D/g, '')
+  const localDigits = phoneDigits.replace(/^0+/, '')
+  const fullPhone = `${country.dial}${localDigits}`
   const canSend = phoneDigits.length >= 7
 
   const handleContinue = async () => {
