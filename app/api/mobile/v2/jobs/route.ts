@@ -257,7 +257,12 @@ export async function GET(request: NextRequest) {
     if (role === 'provider' && user.role === 'TASKER') {
       const identity = (user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
       const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
-      if (!identityReady) {
+      const providerProfile = await prisma.taskerProfile.findUnique({
+        where: { userId: user.id },
+        select: { verificationStatus: true, isVerified: true },
+      })
+      const providerReady = providerProfile?.verificationStatus === 'VERIFIED' && providerProfile.isVerified === true
+      if (!identityReady || !providerReady) {
         return NextResponse.json({
           jobs: [],
           blockedReason: 'IDENTITY_VERIFICATION_REQUIRED',
