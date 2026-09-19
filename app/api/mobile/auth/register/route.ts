@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
           where: { userId: user.id },
           update: {
             bio: taskerInput.experienceSummary,
+            experienceSummary: taskerInput.experienceSummary,
             dateOfBirth: taskerInput.dateOfBirth,
             address: taskerInput.address,
             countryCode,
@@ -188,6 +189,7 @@ export async function POST(request: NextRequest) {
           create: {
             userId: user.id,
             bio: taskerInput.experienceSummary,
+            experienceSummary: taskerInput.experienceSummary,
             dateOfBirth: taskerInput.dateOfBirth,
             address: taskerInput.address,
             countryCode,
