@@ -125,7 +125,11 @@ async function main() {
   for (let jobIndex = 0; jobIndex < allTemplates.length; jobIndex++) {
     const job = allTemplates[jobIndex]
     const categoryPool = profilesByCategory.get(job.categoryId) || []
-    const pool = categoryPool.length > 0 ? categoryPool : seededProfiles
+    const categoryIds = new Set(categoryPool.map((profile) => profile.id))
+    const pool = [
+      ...categoryPool,
+      ...seededProfiles.filter((profile) => !categoryIds.has(profile.id)),
+    ]
     const targetCount = Math.min(3, pool.length)
 
     for (let index = 0; index < targetCount; index++) {
