@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
           if (!user.phone) {
             return NextResponse.json({ error: 'No mobile number is linked to this account.' }, { status: 400 })
           }
-          await sendOtpSms(user.phone, otp)
+          await sendOtpSms(user.phone, otp, user.countryCode)
         } else if (user.email) {
           await sendOtpEmail(user.email, otp)
         } else {
