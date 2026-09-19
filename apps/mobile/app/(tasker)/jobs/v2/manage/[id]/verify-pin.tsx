@@ -4,7 +4,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ShieldCheck, CaretLeft, Lock } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../../lib/fonts'
 import { v2JobActions } from '../../../../../../lib/api-v2'
 import PinInput from '../../../../../../components/ui/PinInput'
@@ -12,8 +11,6 @@ import { v3 } from '../../../../../../theme/v3/tokens'
 
 export default function ProviderPinVerifyScreen() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { id, purpose } = useLocalSearchParams<{ id: string; purpose: string }>()
 
