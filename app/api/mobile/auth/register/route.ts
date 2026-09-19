@@ -30,7 +30,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const role = body?.role === 'TASKER' ? 'TASKER' : body?.role === 'CUSTOMER' ? 'CUSTOMER' : ''
+    const role = body?.role === 'TASKER'
+      ? 'TASKER'
+      : body?.role === 'COMPANY'
+        ? 'COMPANY'
+        : body?.role === 'CUSTOMER'
+          ? 'CUSTOMER'
+          : ''
     const phone = normalizePhone(typeof body?.phone === 'string' ? body.phone : '')
     const fullDigits = phone.replace(/\D/g, '')
     const digits = fullDigits.slice(-9)
@@ -39,7 +45,7 @@ export async function POST(request: NextRequest) {
       : 'LK'
 
     if (!role) {
-      return NextResponse.json({ error: 'Choose Customer or Tasker registration' }, { status: 400 })
+      return NextResponse.json({ error: 'Choose Customer, Individual provider, or Company registration' }, { status: 400 })
     }
     if (!phone || digits.length < 7) {
       return NextResponse.json({ error: 'Valid mobile number required' }, { status: 400 })
@@ -61,6 +67,14 @@ export async function POST(request: NextRequest) {
       experienceSummary: string
       serviceJobIds: string[]
     } | null = null
+
+    let companyOwnerName = ''
+    if (role === 'COMPANY') {
+      companyOwnerName = typeof body?.name === 'string' ? body.name.trim() : ''
+      if (companyOwnerName.length < 2) {
+        return NextResponse.json({ error: 'Company owner full name is required' }, { status: 400 })
+      }
+    }
 
     if (role === 'TASKER') {
       const name = typeof body?.name === 'string' ? body.name.trim() : ''
@@ -138,7 +152,9 @@ export async function POST(request: NextRequest) {
 
     const displayName = role === 'TASKER'
       ? taskerInput!.name
-      : (typeof body?.name === 'string' && body.name.trim().length >= 2 ? body.name.trim() : `Customer ${digits.slice(-4)}`)
+      : role === 'COMPANY'
+        ? companyOwnerName
+        : (typeof body?.name === 'string' && body.name.trim().length >= 2 ? body.name.trim() : `Customer ${digits.slice(-4)}`)
 
     const email = rawEmail || existingPhone?.email || `${fullDigits}@maintainex.pending`
     const isCertRegistration = process.env.ALLOW_TEST_OTP === 'true' &&
