@@ -6,12 +6,14 @@ export interface Country {
   code: string
   name: string
   dial: string
-  flag: string
+  // Kept for backward compatibility with any existing callers/data.
+  // The V3.3 mobile selector intentionally does not display flags.
+  flag?: string
 }
 
 export const COUNTRIES: Country[] = [
-  { code: 'LK', name: 'Sri Lanka', dial: '+94', flag: '🇱🇰' },
-  { code: 'CA', name: 'Canada', dial: '+1', flag: '🇨🇦' },
+  { code: 'LK', name: 'Sri Lanka', dial: '+94' },
+  { code: 'CA', name: 'Canada', dial: '+1' },
 ]
 
 interface Props {
@@ -24,32 +26,44 @@ export default function CountryPicker({ selected, onChange }: Props) {
 
   return (
     <>
-      <TouchableOpacity style={styles.trigger} onPress={() => setVisible(true)}>
-        <Text style={styles.flag}>{selected.flag}</Text>
+      <TouchableOpacity
+        style={styles.trigger}
+        onPress={() => setVisible(true)}
+        activeOpacity={0.72}
+        accessibilityRole="button"
+        accessibilityLabel={`Country code ${selected.dial}. Double tap to change country.`}
+      >
         <Text style={styles.dial}>{selected.dial}</Text>
-        <CaretDown size={14} color="#B3B3B3" weight="bold" />
+        <CaretDown size={13} color="#777777" weight="bold" />
       </TouchableOpacity>
 
-      <Modal visible={visible} transparent animationType="fade">
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
         <Pressable style={styles.backdrop} onPress={() => setVisible(false)}>
-          <Pressable style={styles.sheet}>
+          <Pressable style={styles.sheet} onPress={() => {}}>
+            <View style={styles.handle} />
             <Text style={styles.sheetTitle}>Select country</Text>
-            {COUNTRIES.map((country) => (
-              <TouchableOpacity
-                key={country.code}
-                style={[styles.option, country.code === selected.code && styles.optionSelected]}
-                onPress={() => { onChange(country); setVisible(false) }}
-              >
-                <Text style={styles.optionFlag}>{country.flag}</Text>
-                <View style={styles.optionText}>
-                  <Text style={styles.optionName}>{country.name}</Text>
+
+            {COUNTRIES.map((country) => {
+              const active = country.code === selected.code
+              return (
+                <TouchableOpacity
+                  key={country.code}
+                  style={[styles.option, active && styles.optionSelected]}
+                  onPress={() => {
+                    onChange(country)
+                    setVisible(false)
+                  }}
+                  activeOpacity={0.72}
+                >
+                  <View style={styles.optionText}>
+                    <Text style={styles.optionName}>{country.name}</Text>
+                    <Text style={styles.optionCode}>{country.code}</Text>
+                  </View>
                   <Text style={styles.optionDial}>{country.dial}</Text>
-                </View>
-                {country.code === selected.code && (
-                  <Check size={20} color="#F5A623" weight="fill" />
-                )}
-              </TouchableOpacity>
-            ))}
+                  {active ? <Check size={18} color="#000000" weight="bold" /> : <View style={styles.checkSpace} />}
+                </TouchableOpacity>
+              )
+            })}
           </Pressable>
         </Pressable>
       </Modal>
@@ -59,33 +73,83 @@ export default function CountryPicker({ selected, onChange }: Props) {
 
 const styles = StyleSheet.create({
   trigger: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderTopLeftRadius: 16, borderBottomLeftRadius: 16,
-    borderRightWidth: 1, borderRightColor: '#2E2E2E',
+    height: '100%',
+    minWidth: 76,
+    paddingHorizontal: 14,
+    borderRightWidth: 1,
+    borderRightColor: '#E3E3E3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
   },
-  flag: { fontSize: 20 },
-  dial: { fontSize: 15, fontFamily: 'Outfit_500Medium', color: '#FFFFFF' },
+  dial: {
+    fontSize: 13,
+    fontFamily: 'Outfit_700Bold',
+    color: '#111111',
+  },
   backdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center', alignItems: 'center', padding: 32,
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    justifyContent: 'flex-end',
   },
   sheet: {
-    width: '100%', backgroundColor: '#1C1C1C', borderRadius: 20,
-    padding: 20, gap: 4,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 34,
+  },
+  handle: {
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D6D6D6',
+    alignSelf: 'center',
+    marginBottom: 18,
   },
   sheetTitle: {
-    fontSize: 17, fontFamily: 'Outfit_700Bold', color: '#FFFFFF',
-    textAlign: 'center', marginBottom: 12,
+    fontSize: 18,
+    fontFamily: 'Outfit_800ExtraBold',
+    color: '#111111',
+    marginBottom: 12,
   },
   option: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12,
+    minHeight: 62,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E7E7E7',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  optionSelected: { backgroundColor: 'rgba(245,166,35,0.12)' },
-  optionFlag: { fontSize: 28 },
-  optionText: { flex: 1 },
-  optionName: { fontSize: 15, fontFamily: 'Outfit_600SemiBold', color: '#FFFFFF' },
-  optionDial: { fontSize: 13, fontFamily: 'Outfit_400Regular', color: '#B3B3B3' },
+  optionSelected: {
+    backgroundColor: '#F7F7F7',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0,
+  },
+  optionText: {
+    flex: 1,
+  },
+  optionName: {
+    fontSize: 14,
+    fontFamily: 'Outfit_700Bold',
+    color: '#111111',
+  },
+  optionCode: {
+    marginTop: 2,
+    fontSize: 10,
+    fontFamily: 'Outfit_500Medium',
+    color: '#777777',
+  },
+  optionDial: {
+    marginRight: 12,
+    fontSize: 13,
+    fontFamily: 'Outfit_700Bold',
+    color: '#333333',
+  },
+  checkSpace: {
+    width: 18,
+  },
 })
