@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
       id: tasker.id,
       userId: tasker.userId,
       bio: tasker.bio,
+      experienceSummary: tasker.experienceSummary,
       dateOfBirth: tasker.dateOfBirth ? tasker.dateOfBirth.toISOString().split('T')[0] : null,
       address: tasker.address,
       hourlyRate: tasker.hourlyRate,
@@ -73,9 +74,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
     }
 
-    const { bio, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
+    const { bio, experienceSummary, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
     if (bio !== undefined) updateData.bio = bio
+    if (experienceSummary !== undefined) updateData.experienceSummary = typeof experienceSummary === 'string' ? experienceSummary.trim() : null
     if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null
     if (address !== undefined) updateData.address = typeof address === 'string' ? address.trim() : null
     if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
@@ -110,6 +112,7 @@ export async function PUT(request: NextRequest) {
       id: updated.id,
       userId: updated.userId,
       bio: updated.bio,
+      experienceSummary: updated.experienceSummary,
       dateOfBirth: updated.dateOfBirth ? updated.dateOfBirth.toISOString().split('T')[0] : null,
       address: updated.address,
       hourlyRate: updated.hourlyRate,
