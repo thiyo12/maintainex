@@ -24,8 +24,14 @@ export default function RegisterScreen() {
   const { register, verifyRegisterOtp } = useAuth()
 
   const [step, setStep] = useState(paramRole ? 2 : 1)
-  const [role, setRole] = useState<'CUSTOMER' | 'TASKER' | ''>(
-    paramRole === 'TASKER' ? 'TASKER' : paramRole === 'CUSTOMER' ? 'CUSTOMER' : ''
+  const [role, setRole] = useState<'CUSTOMER' | 'TASKER' | 'COMPANY' | ''>(
+    paramRole === 'TASKER'
+      ? 'TASKER'
+      : paramRole === 'COMPANY'
+        ? 'COMPANY'
+        : paramRole === 'CUSTOMER'
+          ? 'CUSTOMER'
+          : ''
   )
   const [country, setCountry] = useState<Country>(COUNTRIES[0])
   const [phone, setPhone] = useState('')
@@ -118,11 +124,19 @@ export default function RegisterScreen() {
             experienceSummary: experienceSummary.trim(),
             serviceJobIds: Array.from(selectedServices),
           }
-        : {
-            role: 'CUSTOMER' as const,
-            phone: fullPhone,
-            countryCode: country.code,
-          }
+        : role === 'COMPANY'
+          ? {
+              role: 'COMPANY' as const,
+              phone: fullPhone,
+              countryCode: country.code,
+              name: name.trim(),
+              email: email.trim() || undefined,
+            }
+          : {
+              role: 'CUSTOMER' as const,
+              phone: fullPhone,
+              countryCode: country.code,
+            }
 
       const res = await register(payload)
       if (!res?.requiresVerification) throw new Error('Verification code was not requested')
@@ -146,6 +160,8 @@ export default function RegisterScreen() {
       const user = await verifyRegisterOtp(fullPhone, candidate, 'PHONE_VERIFICATION')
       if (user?.role === 'TASKER') {
         router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+      } else if (user?.role === 'COMPANY') {
+        router.replace('/(auth)/onboarding/company-setup')
       } else {
         router.replace('/(customer)')
       }
@@ -205,12 +221,12 @@ export default function RegisterScreen() {
               icon={<Wrench size={18} color={v3.colors.info} weight="fill" />}
               iconBg={v3.colors.infoSoft}
               title="I want to earn"
-              subtitle="Add your work details, services and identity verification."
-              badge="Tasker"
+              subtitle="Choose whether you work as an individual professional or as a company."
+              badge="Provider"
               badgeColor={v3.colors.info}
               badgeBg={v3.colors.infoSoft}
-              selected={role === 'TASKER'}
-              onPress={() => setRole('TASKER')}
+              selected={false}
+              onPress={() => router.push('/(auth)/provider-type')}
             />
           </View>
 
@@ -218,7 +234,7 @@ export default function RegisterScreen() {
         </View>
       ) : step === 2 ? (
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <V3NavBar title={role === 'TASKER' ? 'Personal details' : 'Create account'} onBack={goBack} />
+          <V3NavBar title={role === 'TASKER' ? 'Personal details' : role === 'COMPANY' ? 'Company owner' : 'Create account'} onBack={goBack} />
           <View style={styles.content}>
             {role === 'CUSTOMER' ? (
               <>
@@ -233,6 +249,24 @@ export default function RegisterScreen() {
                 <V3InfoBanner title="Password-free sign in" subtitle="We will send a 6-digit OTP to this mobile number." />
                 <View style={{ height: 28 }} />
                 <V3Button label="Send OTP" onPress={sendRegistrationOtp} loading={loading} disabled={phoneDigits.length < 7} />
+              </>
+            ) : role === 'COMPANY' ? (
+              <>
+                <Text style={styles.title}>Create the owner account</Text>
+                <Text style={styles.subtitle}>Use the mobile number of the person responsible for this company. Company details and services come next.</Text>
+                <V3Input label="Owner's full name" placeholder="Full legal name" value={name} onChangeText={setName} autoCapitalize="words" />
+                <View style={styles.spacer} />
+                <Text style={styles.fieldLabel}>Mobile number</Text>
+                <View style={styles.phoneRow}>
+                  <CountryPicker selected={country} onChange={setCountry} />
+                  <V3Input containerStyle={styles.phoneInputContainer} placeholder="77 123 4567" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                </View>
+                <View style={styles.spacer} />
+                <V3Input label="Business email (optional)" placeholder="hello@company.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+                <View style={{ height: 18 }} />
+                <V3InfoBanner title="One owner, one company workspace" subtitle="After OTP verification you will create the company profile, choose services and set up your team." />
+                <View style={{ height: 26 }} />
+                <V3Button label="Send OTP" onPress={sendRegistrationOtp} loading={loading} disabled={name.trim().length < 2 || phoneDigits.length < 7} />
               </>
             ) : (
               <>
