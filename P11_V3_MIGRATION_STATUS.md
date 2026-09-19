@@ -1,3 +1,24 @@
+# 2026-09-19 — Provider profile + Company onboarding correction
+
+Implemented on `phase11-v3-exact-ui`:
+
+- Account creation now enters a dedicated animated profile selector instead of treating Company as a disabled third role.
+- Provider registration is a two-stage choice: **Earn with MaintainEX → Individual professional / Service company**.
+- Both selector screens use animated background cards and distinct Customer / Provider / Individual / Company visual states.
+- The selector copy is written separately for English, Tamil and Sinhala instead of mechanically translating the English wording.
+- Company owners now register with mobile OTP using the same password-free sign-in system as Customer and Tasker accounts.
+- Returning Company owners use the normal mobile-number + OTP login; MaintainEX detects the stored role and opens the Company workspace automatically.
+- New Company accounts continue from OTP to Company Profile onboarding.
+- Company onboarding now creates the real `CompanyProfile`, creates an active `COMPANY_OWNER` membership, and writes a company-create audit record.
+- Company onboarding selects **exact TemplateJob services**, then creates exact `CompanySpecialty` rows so capability matching can use the services the company actually offers.
+- Company team invitations are intentionally deferred until Company verification because the server already blocks unverified companies from inviting members.
+- Company profile GET/PUT now resolve the owner/member company automatically when callers omit `companyId`, fixing mobile Company profile access.
+- Existing Company accounts with an incomplete profile are routed back to Company onboarding after OTP login.
+
+Safety: Company marketplace eligibility remains gated by Company verification. This work is on the feature branch only; `main` is unchanged. Full TypeScript/Expo/device QA is still required before merge.
+
+---
+
 # 2026-09-19 — V3.3 auth + Tasker onboarding correction
 
 Implemented on `phase11-v3-exact-ui`:
