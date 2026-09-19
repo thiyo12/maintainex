@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { CaretDown, CaretUp, CheckCircle } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
 
 import { useAuth } from '../../../lib/auth'
-import { skillsApi, taskers } from '../../../lib/api'
+import { skillsApi } from '../../../lib/api'
 import { v3 } from '../../../theme/v3/tokens'
 import V3Button from '../../../components/v3/V3Button'
 import V3NavBar from '../../../components/v3/V3NavBar'
@@ -33,7 +33,6 @@ export default function TaskerServicesOnboarding() {
   const [categories, setCategories] = useState<ServiceCategory[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -87,8 +86,8 @@ export default function TaskerServicesOnboarding() {
       Alert.alert('Choose your services', 'Select at least one exact service you can provide.')
       return
     }
-    if (needsPhone && phone.replace(/\D/g, '').length < 7) {
-      Alert.alert('Mobile number required', 'Add a valid mobile number before continuing.')
+    if (needsPhone) {
+      Alert.alert('Mobile verification required', 'This account does not have a verified mobile number. Sign out and complete the new mobile registration flow before continuing.')
       return
     }
 
@@ -102,7 +101,6 @@ export default function TaskerServicesOnboarding() {
         fixedRate: job.fixedRate || 0,
       }))
       await skillsApi.save(payload)
-      if (needsPhone) await taskers.updateProfile({ phone: phone.trim() })
       await refreshUser()
 
       const identity = (user?.identityStatus || 'NOT_SUBMITTED').toUpperCase()
@@ -126,15 +124,8 @@ export default function TaskerServicesOnboarding() {
 
         {needsPhone ? (
           <View style={styles.phoneCard}>
-            <Text style={styles.label}>Mobile number</Text>
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              placeholder="077 123 4567"
-              placeholderTextColor={v3.colors.textPlaceholder}
-              style={styles.phoneInput}
-            />
+            <Text style={styles.warningTitle}>Mobile verification required</Text>
+            <Text style={styles.warningText}>This legacy Tasker account has no verified mobile number. A verified number is required before service onboarding can continue.</Text>
           </View>
         ) : null}
 
@@ -189,8 +180,8 @@ const styles = StyleSheet.create({
   title: { marginTop: 10, fontSize: 27, lineHeight: 32, fontFamily: 'Outfit_900Black', color: v3.colors.ink },
   subtitle: { marginTop: 6, marginBottom: 20, fontSize: 10.5, lineHeight: 16, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
   phoneCard: { marginBottom: 14, padding: 14, borderRadius: 15, borderWidth: 1, borderColor: v3.colors.line, backgroundColor: v3.colors.paper },
-  label: { marginBottom: 7, fontSize: 9.5, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
-  phoneInput: { height: 48, borderRadius: 13, borderWidth: 1, borderColor: v3.colors.line, paddingHorizontal: 13, fontSize: 12, fontFamily: 'Outfit_600SemiBold', color: v3.colors.ink },
+  warningTitle: { fontSize: 11, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.error },
+  warningText: { marginTop: 5, fontSize: 9.5, lineHeight: 14, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
   summary: { marginBottom: 14, padding: 14, borderRadius: 15, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line },
   summaryCount: { fontSize: 13, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
   summaryText: { marginTop: 3, fontSize: 9.5, lineHeight: 14, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
