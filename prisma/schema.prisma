@@ -1532,6 +1532,8 @@ model TaskerProfile {
   verifiedAt         DateTime?
 
   bio           String?
+  dateOfBirth   DateTime?
+  address       String?
   hourlyRate    Float   @default(0)
   skills        String? // Category slugs
   serviceAreas  String? // District names
