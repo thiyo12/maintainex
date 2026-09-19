@@ -240,7 +240,7 @@ export default function RegisterScreen() {
                 <Text style={styles.subtitle}>These details are required before a Tasker account can be created.</Text>
                 <V3Input label="Full legal name" placeholder="Name exactly as on your ID" value={name} onChangeText={setName} autoCapitalize="words" />
                 <View style={styles.spacer} />
-                <V3Input label="Date of birth" placeholder="YYYY-MM-DD" value={dateOfBirth} onChangeText={setDateOfBirth} keyboardType="numeric" />
+                <V3Input label="Date of birth" placeholder="YYYY-MM-DD" value={dateOfBirth} onChangeText={setDateOfBirth} />
                 <Text style={styles.hint}>Use the date shown on your identity document.</Text>
                 <View style={styles.spacer} />
                 <Text style={styles.fieldLabel}>Mobile number</Text>
