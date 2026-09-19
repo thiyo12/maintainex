@@ -50,7 +50,9 @@ export async function PUT(request: NextRequest) {
 
     const updateData: any = {}
     if (name !== undefined) updateData.name = name
-    if (phone !== undefined) updateData.phone = phone
+    if (phone !== undefined && phone !== user.phone) {
+      return NextResponse.json({ error: 'Mobile number changes require OTP verification.' }, { status: 400 })
+    }
     if (name !== undefined && name !== user.name) updateData.lastNameChangedAt = new Date()
 
     const updated = await prisma.user.update({
