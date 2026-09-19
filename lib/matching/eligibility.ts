@@ -440,8 +440,46 @@ async function evaluateCompanyProfession(
     }
   }
 
+  // Company onboarding is service-first as well. Exact CompanySpecialty rows
+  // are accepted as the declared capability source while the mapped profession
+  // still flows into jurisdiction/certification checks.
+  const specialtyCapability = await client.companyProfile.findUnique({
+    where: { id: companyId },
+    select: {
+      specialties: {
+        select: { categoryId: true, jobId: true },
+      },
+    },
+  })
+
+  const hasDeclaredCompanyCapability = !!specialtyCapability && (
+    job.templateJobId
+      ? specialtyCapability.specialties.some(specialty => specialty.jobId === job.templateJobId)
+      : specialtyCapability.specialties.some(specialty => specialty.categoryId === job.categoryId)
+  )
+
+  if (hasDeclaredCompanyCapability) {
+    const mapped = requirements.find(requirement => requirement.profession?.isActive)
+    if (mapped) {
+      const requiredSkillSlugs = mapped.skillRequirements
+        .filter(requirement => requirement.requirementMode !== 'PREFERRED')
+        .map(requirement => requirement.professionSkill.slug)
+
+      return {
+        gate: {
+          gate: 'COMPANY_PROFESSION_MATCH',
+          passed: true,
+          detail: job.templateJobId ? 'Exact registered company service capability' : 'Registered company category capability',
+        },
+        matchedProfessionId: mapped.professionId,
+        matchedSkills: requiredSkillSlugs,
+        preferredSkillsMatched: [],
+      }
+    }
+  }
+
   return {
-    gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'No approved company profession with required skills' },
+    gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'No approved company profession or registered service capability' },
     matchedProfessionId: null,
     matchedSkills: [],
     preferredSkillsMatched: [],
