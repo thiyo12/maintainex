@@ -162,6 +162,11 @@ export default function CompanyProfile() {
             onPress={() => router.push('/(company)/settings/edit-profile' as any)}
           />
           <WorkspaceRow
+            title="Switch profile"
+            subtitle="Customer, Individual or Company workspace"
+            onPress={() => router.push('/(auth)/role-switch' as any)}
+          />
+          <WorkspaceRow
             title="Subscription"
             subtitle={String(subscriptionName)}
             onPress={() => router.push('/(company)/settings/subscription' as any)}
