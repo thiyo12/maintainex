@@ -10,9 +10,8 @@ import { useTranslation } from 'react-i18next'
 import { fonts } from '../../../lib/fonts'
 import { getCategoryI18nKey } from '../../../lib/categories'
 import { getAuthToken } from '../../../lib/api'
-import { v2Team } from '../../../lib/api-v2'
 import {
-  CaretLeft, CaretRight, Check, CheckCircle, UserPlus, User, XCircle,
+  CaretLeft, CaretRight, Check, CheckCircle, UsersThree, ShieldCheck,
   Lightning, Drop, Snowflake, Palette, Hammer, Sparkle, Leaf, Package,
   Bug, House, SquaresFour, GridFour, Lock, Flower, Lightbulb, Sun, Wrench,
 } from 'phosphor-react-native'
@@ -54,12 +53,6 @@ const CATEGORY_ICON_MAP: Record<string, React.ComponentType<any>> = {
 
 const FALLBACK_CATEGORIES: Category[] = []
 
-interface InviteEntry {
-  name: string
-  email: string
-  phone: string
-}
-
 export default function CompanySetupOnboarding() {
   const colors = useColors()
   const styles = makeStyles(colors)
@@ -76,9 +69,6 @@ export default function CompanySetupOnboarding() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
-
-  const [invites, setInvites] = useState<InviteEntry[]>([])
-  const [newInvite, setNewInvite] = useState<InviteEntry>({ name: '', email: '', phone: '' })
 
   const STEPS = [t('auth.onboarding.steps.0'), t('auth.onboarding.steps.1'), t('auth.onboarding.steps.2'), t('auth.onboarding.steps.3')]
   const [saving, setSaving] = useState(false)
@@ -124,23 +114,6 @@ export default function CompanySetupOnboarding() {
     setSelectedIds(next)
   }
 
-  const addInvite = () => {
-    if (!newInvite.name) {
-      Alert.alert(t('common.error'), t('errors.enterMemberName'))
-      return
-    }
-    if (!newInvite.email && !newInvite.phone) {
-      Alert.alert(t('common.error'), t('errors.enterEmailOrPhone'))
-      return
-    }
-    setInvites([...invites, { ...newInvite }])
-    setNewInvite({ name: '', email: '', phone: '' })
-  }
-
-  const removeInvite = (index: number) => {
-    setInvites(invites.filter((_, i) => i !== index))
-  }
-
   const handleSubmit = async () => {
     if (!companyName) {
       Alert.alert(t('common.error'), t('errors.companyNameRequired'))
@@ -169,14 +142,6 @@ export default function CompanySetupOnboarding() {
         const err = await profileRes.json()
         Alert.alert(t('common.error'), err.error || t('errors.generic'))
         return
-      }
-
-      for (const invite of invites) {
-        try {
-          await v2Team.invite({ name: invite.name, email: invite.email || undefined, phone: invite.phone || undefined })
-        } catch {
-          // ignore individual invite failures
-        }
       }
 
       await refreshUser()
@@ -308,56 +273,24 @@ export default function CompanySetupOnboarding() {
       case 2:
         return (
           <View>
-            <Text style={styles.sectionTitle}>{t('auth.onboarding.inviteTeam')}</Text>
-            <Text style={styles.sectionSub}>{t('auth.onboarding.inviteTeamDesc')}</Text>
+            <Text style={styles.sectionTitle}>Your company workspace</Text>
+            <Text style={styles.sectionSub}>Your owner account is created first. After company verification, you can invite managers, dispatchers, workers and finance staff from the Team workspace.</Text>
 
-            <View style={styles.inviteForm}>
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.onboarding.memberName')}
-                placeholderTextColor={colors.muted}
-                value={newInvite.name}
-                onChangeText={(value) => setNewInvite({ ...newInvite, name: value })}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.onboarding.memberEmail')}
-                placeholderTextColor={colors.muted}
-                value={newInvite.email}
-                onChangeText={(value) => setNewInvite({ ...newInvite, email: value })}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.onboarding.memberPhone')}
-                placeholderTextColor={colors.muted}
-                value={newInvite.phone}
-                onChangeText={(value) => setNewInvite({ ...newInvite, phone: value })}
-                keyboardType="phone-pad"
-              />
-              <TouchableOpacity style={styles.addInviteBtn} onPress={addInvite}>
-                <UserPlus size={18} color={colors.white} weight="bold" />
-                <Text style={styles.addInviteText}>{t('auth.onboarding.addMember')}</Text>
-              </TouchableOpacity>
+            <View style={styles.workspaceCard}>
+              <View style={styles.workspaceIcon}><UsersThree size={24} color={colors.ink} weight="fill" /></View>
+              <View style={styles.workspaceCopy}>
+                <Text style={styles.workspaceTitle}>Team access unlocks after verification</Text>
+                <Text style={styles.workspaceBody}>This prevents unverified businesses from adding staff or receiving marketplace work.</Text>
+              </View>
             </View>
 
-            {invites.map((inv, i) => (
-              <View key={i} style={styles.inviteRow}>
-                <User size={20} color={colors.amber} weight="bold" />
-                <View style={styles.inviteInfo}>
-                  <Text style={styles.inviteName}>{inv.name}</Text>
-                  <Text style={styles.inviteContact}>{inv.email || inv.phone}</Text>
-                </View>
-                <TouchableOpacity onPress={() => removeInvite(i)}>
-                  <XCircle size={22} color={colors.muted} weight="bold" />
-                </TouchableOpacity>
+            <View style={styles.workspaceCard}>
+              <View style={styles.workspaceIcon}><ShieldCheck size={24} color={colors.ink} weight="fill" /></View>
+              <View style={styles.workspaceCopy}>
+                <Text style={styles.workspaceTitle}>Company review</Text>
+                <Text style={styles.workspaceBody}>Your company profile starts as Pending. MaintainEX can then review business details before marketplace activation.</Text>
               </View>
-            ))}
-
-            {invites.length === 0 && (
-              <Text style={styles.skipHint}>{t('auth.onboarding.inviteLater')}</Text>
-            )}
+            </View>
           </View>
         )
       case 3:
@@ -381,8 +314,8 @@ export default function CompanySetupOnboarding() {
               </Text>
             </View>
             <View style={styles.reviewSection}>
-              <Text style={styles.reviewLabel}>{t('auth.onboarding.teamInvites')}</Text>
-              <Text style={styles.reviewValue}>{invites.length} member{invites.length !== 1 ? 's' : ''}</Text>
+              <Text style={styles.reviewLabel}>Company status</Text>
+              <Text style={styles.reviewValue}>Pending verification · Team access after approval</Text>
             </View>
           </View>
         )
@@ -484,20 +417,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   jobCheckSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
   jobName: { flex: 1, marginLeft: 10, paddingRight: 8, fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
   companyOnly: { fontSize: 7.5, letterSpacing: 0.5, fontFamily: fonts.headingBold, color: colors.amberDark },
-  inviteForm: { marginBottom: 16 },
-  addInviteBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: colors.amber, paddingVertical: 12, borderRadius: 12, marginTop: 4,
-  },
-  addInviteText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.white },
-  inviteRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    padding: 12, backgroundColor: colors.white, borderRadius: 12,
-    marginBottom: 8, borderWidth: 1, borderColor: colors.border,
-  },
-  inviteInfo: { flex: 1 },
-  inviteName: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
-  inviteContact: { fontSize: 12, fontFamily: fonts.body, color: colors.muted },
+  workspaceCard: { minHeight: 96, padding: 14, borderRadius: 17, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, marginBottom: 10, flexDirection: 'row', alignItems: 'flex-start' },
+  workspaceIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' },
+  workspaceCopy: { flex: 1, marginLeft: 11 },
+  workspaceTitle: { fontSize: 12, fontFamily: fonts.headingBold, color: colors.ink },
+  workspaceBody: { marginTop: 4, fontSize: 9.5, lineHeight: 14, fontFamily: fonts.body, color: colors.muted },
   skipHint: { fontSize: 13, fontFamily: fonts.body, color: colors.muted, fontStyle: 'italic', marginTop: 8 },
   reviewSection: { marginBottom: 16, padding: 14, backgroundColor: colors.white, borderRadius: 12 },
   reviewLabel: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 4 },
