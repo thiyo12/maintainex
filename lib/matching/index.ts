@@ -456,6 +456,7 @@ export async function getEligibleTaskers(
         jobId,
         categoryId: job.categoryId,
         serviceTemplateId: job.serviceTemplateId || undefined,
+        templateJobId: job.templateJobId || undefined,
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         countryCode: job.countryCode,
@@ -478,7 +479,7 @@ export async function getEligibleCompanies(
 ): Promise<Array<{ companyId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true },
   })
   if (!job) return []
 
