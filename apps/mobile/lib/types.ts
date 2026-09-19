@@ -13,6 +13,7 @@ export interface User {
   profileImage?: string
   lastNameChangedAt?: string
   needsOnboarding?: boolean
+  availableProfiles?: UserRole[]
   taskerOnboardingStage?: 'SERVICES' | 'IDENTITY' | 'PENDING_APPROVAL' | 'READY'
   taskerDateOfBirth?: string | null
   taskerAddress?: string | null
