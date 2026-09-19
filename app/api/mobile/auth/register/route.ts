@@ -68,9 +68,10 @@ export async function POST(request: NextRequest) {
       const address = typeof body?.address === 'string' ? body.address.trim() : ''
       const experienceYears = Number(body?.experienceYears)
       const experienceSummary = typeof body?.experienceSummary === 'string' ? body.experienceSummary.trim() : ''
-      const serviceJobIds = Array.isArray(body?.serviceJobIds)
-        ? [...new Set(body.serviceJobIds.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0))]
-        : []
+      const rawServiceJobIds: unknown[] = Array.isArray(body?.serviceJobIds) ? body.serviceJobIds : []
+      const serviceJobIds: string[] = Array.from(
+        new Set(rawServiceJobIds.filter((id): id is string => typeof id === 'string' && id.length > 0))
+      )
 
       if (name.length < 2) return NextResponse.json({ error: 'Full legal name is required' }, { status: 400 })
       if (!dateOfBirth) return NextResponse.json({ error: 'Valid date of birth is required' }, { status: 400 })
