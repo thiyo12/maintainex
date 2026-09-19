@@ -222,10 +222,22 @@ async function evaluateTaskerProfession(
     if (!profile) {
       return { gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No provider profile' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
     }
-    // Legacy fallback: check if any taskerSkill matches the job category
-    const hasLegacy = profile.taskerSkills.some(s => s.job.categoryId === job.categoryId)
+    // Exact service selection is canonical when a TemplateJob is known.
+    // Category fallback is only used for genuinely free-form/custom jobs.
+    const hasLegacy = job.templateJobId
+      ? profile.taskerSkills.some(s => s.jobId === job.templateJobId)
+      : profile.taskerSkills.some(s => s.job.categoryId === job.categoryId)
     if (hasLegacy) {
-      return { gate: { gate: 'PROFESSION_MATCH', passed: true, detail: 'Legacy capability match' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
+      return {
+        gate: {
+          gate: 'PROFESSION_MATCH',
+          passed: true,
+          detail: job.templateJobId ? 'Exact service capability match' : 'Category capability match',
+        },
+        matchedProfessionId: null,
+        matchedSkills: [],
+        preferredSkillsMatched: [],
+      }
     }
     return { gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No matching capability' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
   }
@@ -318,9 +330,20 @@ async function evaluateCompanyProfession(
     if (!company) {
       return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'Company not found' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
     }
-    const hasSpecialty = company.specialties.some(s => s.categoryId === job.categoryId)
+    const hasSpecialty = job.templateJobId
+      ? company.specialties.some(s => s.jobId === job.templateJobId)
+      : company.specialties.some(s => s.categoryId === job.categoryId)
     if (hasSpecialty) {
-      return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: true, detail: 'Legacy specialty match' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
+      return {
+        gate: {
+          gate: 'COMPANY_PROFESSION_MATCH',
+          passed: true,
+          detail: job.templateJobId ? 'Exact service specialty match' : 'Category specialty match',
+        },
+        matchedProfessionId: null,
+        matchedSkills: [],
+        preferredSkillsMatched: [],
+      }
     }
     return { gate: { gate: 'COMPANY_PROFESSION_MATCH', passed: false, reason: 'No matching capability' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
   }
