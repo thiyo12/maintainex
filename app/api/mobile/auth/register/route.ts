@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const role = body?.role === 'TASKER' ? 'TASKER' : body?.role === 'CUSTOMER' ? 'CUSTOMER' : ''
     const phone = normalizePhone(typeof body?.phone === 'string' ? body.phone : '')
-    const digits = phone.replace(/\D/g, '').slice(-9)
+    const fullDigits = phone.replace(/\D/g, '')
+    const digits = fullDigits.slice(-9)
     const countryCode = typeof body?.countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(body.countryCode)
       ? body.countryCode.toUpperCase()
       : 'LK'
@@ -91,7 +92,12 @@ export async function POST(request: NextRequest) {
     }
 
     const existingPhone = await prisma.user.findFirst({
-      where: { phone: { endsWith: digits } },
+      where: {
+        OR: [
+          { phone },
+          { countryCode, phone: { endsWith: digits } },
+        ],
+      },
       include: { taskerProfile: true },
     })
 
@@ -133,7 +139,7 @@ export async function POST(request: NextRequest) {
       ? taskerInput!.name
       : (typeof body?.name === 'string' && body.name.trim().length >= 2 ? body.name.trim() : `Customer ${digits.slice(-4)}`)
 
-    const email = rawEmail || existingPhone?.email || `${digits}@maintainex.pending`
+    const email = rawEmail || existingPhone?.email || `${fullDigits}@maintainex.pending`
     const isCertRegistration = process.env.ALLOW_TEST_OTP === 'true' &&
       [email, displayName, phone].some(value => value.includes(CERT_TAG))
     const otp = isCertRegistration ? '000000' : randomInt(0, 1000000).toString().padStart(6, '0')
