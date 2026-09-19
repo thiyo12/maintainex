@@ -204,10 +204,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await auth.verifyOtp({ phone, code, purpose: purpose || 'PHONE_VERIFICATION' })
     if (res.token) {
       await setAuthToken(res.token)
-      setUser(res.user)
-      await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+
+      let finalUser = res.user as User
+      try {
+        const meRes = await auth.me()
+        finalUser = { ...res.user, ...meRes.user, needsOnboarding: meRes.needsOnboarding } as User
+      } catch {}
+
+      setUser(finalUser)
+      await SecureStore.setItemAsync('auth_user', JSON.stringify(finalUser))
       await SecureStore.setItemAsync('last_active_at', String(Date.now()))
-      return res.user
+      return finalUser
     }
     return res
   }, [])
