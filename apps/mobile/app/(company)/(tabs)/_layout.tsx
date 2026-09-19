@@ -50,7 +50,7 @@ export default function CompanyTabs() {
           options={{
             title: label,
             tabBarIcon: ({ color, focused }) => (
-              <Icon size={18} color={color} weight={focused ? 'bold' : 'regular'} />
+              <Icon size={18} color={String(color)} weight={focused ? 'bold' : 'regular'} />
             ),
           }}
         />
