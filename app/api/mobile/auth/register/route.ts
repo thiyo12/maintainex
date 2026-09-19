@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let selectedJobs: Array<{ id: string; categoryId: string; category: { id: string; slug: string | null } }> = []
+    let selectedJobs: Array<{ id: string; categoryId: string; currency: string; category: { id: string; slug: string | null } }> = []
     if (taskerInput) {
       selectedJobs = await prisma.templateJob.findMany({
         where: {
@@ -120,6 +120,7 @@ export async function POST(request: NextRequest) {
         select: {
           id: true,
           categoryId: true,
+          currency: true,
           category: { select: { id: true, slug: true } },
         },
       })
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
               experienceLevel,
               hourlyRate: 0,
               fixedRate: 0,
-              currency: 'LKR',
+              currency: job.currency || (countryCode === 'LK' ? 'LKR' : 'USD'),
               countryCode,
             },
           })
