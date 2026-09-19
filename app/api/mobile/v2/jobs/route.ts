@@ -254,6 +254,17 @@ export async function GET(request: NextRequest) {
     const myQuotes = searchParams.get('myQuotes')
     const areaId = searchParams.get('areaId')
 
+    if (role === 'provider' && user.role === 'TASKER') {
+      const identity = (user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+      const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
+      if (!identityReady) {
+        return NextResponse.json({
+          jobs: [],
+          blockedReason: 'IDENTITY_VERIFICATION_REQUIRED',
+        })
+      }
+    }
+
     const where: any = { isActive: true }
 
     if (myQuotes === 'true') {
