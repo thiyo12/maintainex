@@ -211,6 +211,7 @@ export default function TaskerProfile() {
         <View style={styles.accountSection}>
           <Text style={styles.accountLabel}>Account</Text>
           <ProfileRow title="Edit tasker profile" subtitle="Personal details, bio and profile media" onPress={() => router.push('/(tasker)/settings/edit-profile' as any)} />
+          <ProfileRow title="Switch profile" subtitle="Customer, Individual or Company workspace" onPress={() => router.push('/(auth)/role-switch' as any)} />
           <ProfileRow title="Messages" subtitle="Customer and job conversations" onPress={() => router.push('/(chat)' as any)} />
           <ProfileRow title="Notifications" subtitle="Job alerts and account updates" onPress={() => router.push('/notifications' as any)} />
           <TouchableOpacity style={styles.logoutRow} activeOpacity={0.72} onPress={handleLogout}>
