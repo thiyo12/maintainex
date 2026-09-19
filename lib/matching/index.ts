@@ -181,7 +181,7 @@ export async function findCandidates(
     const eligibility = await evaluateEligibility({
       providerType: 'INDIVIDUAL',
       providerId: profile.userId,
-      job: input,
+      job: { ...input, templateJobId: job.templateJobId || undefined },
       client,
     })
 
@@ -225,7 +225,7 @@ export async function findCandidates(
     const eligibility = await evaluateEligibility({
       providerType: 'COMPANY',
       providerId: company.id,
-      job: input,
+      job: { ...input, templateJobId: job.templateJobId || undefined },
       client,
     })
 
@@ -379,6 +379,7 @@ export async function evaluateTaskerEligibility(
       jobId,
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: job.templateJobId || undefined,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
       countryCode: job.countryCode,
@@ -415,6 +416,7 @@ export async function evaluateCompanyEligibility(
       jobId,
       categoryId: job.categoryId,
       serviceTemplateId: job.serviceTemplateId || undefined,
+      templateJobId: job.templateJobId || undefined,
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
       countryCode: job.countryCode,
@@ -432,7 +434,7 @@ export async function getEligibleTaskers(
 ): Promise<Array<{ providerId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true },
   })
   if (!job) return []
 
