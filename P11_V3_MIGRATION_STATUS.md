@@ -1,3 +1,22 @@
+# 2026-09-19 — V3.3 auth + Tasker onboarding correction
+
+Implemented on `phase11-v3-exact-ui`:
+
+- Welcome now presents English / தமிழ் / සිංහල and requires a language choice before registration or sign-in on first use.
+- Customer registration is mobile-number-first and passwordless; profile details can be completed later.
+- Tasker registration now collects legal name, date of birth, mobile number, full address, work experience and exact services before account verification.
+- Tasker service selection uses active `JobCategory -> TemplateJob` records and persists exact `TaskerSkill` relationships (max 15 initial services).
+- Registration and returning mobile sign-in use OTP. SMS delivery is wired through the server-side Twilio adapter.
+- After phone verification, a new Tasker is routed to ID verification and then to pending approval.
+- Tasker job discovery is blocked until both user KYC and provider-profile verification are complete.
+- For templated jobs, Tasker job discovery now uses exact selected `TemplateJob` capabilities; category fallback is retained only for free-form/custom jobs and legacy profiles.
+- Added database migration for Tasker date of birth, address and work-experience summary fields.
+- Front/back identity document submission supports multiple document sides while KYC is already pending.
+
+Deployment note: real SMS requires server environment configuration for `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` (or the configured Twilio messaging service if enabled). Device/runtime QA and a full build are still required before merging to `main`.
+
+---
+
 # 2026-09-19 — AUTH + TASKER ONBOARDING CORRECTIVE FLOW
 
 Status: **SOURCE IMPLEMENTED ON `phase11-v3-exact-ui` · RUNTIME/DEVICE QA PENDING**
