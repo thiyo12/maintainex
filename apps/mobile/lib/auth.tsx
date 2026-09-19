@@ -29,7 +29,7 @@ interface AuthContextType {
     serviceJobIds?: string[]
   }) => Promise<any>
   verifyRegisterOtp: (phone: string, code: string, purpose?: string) => Promise<any>
-  switchRole: (role: string) => Promise<void>
+  switchRole: (role: string) => Promise<User>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -242,9 +242,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const switchRole = useCallback(async (role: string) => {
     const res = await auth.switchRole(role)
     await setAuthToken(res.token)
-    setUser(res.user)
-    await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+
+    let finalUser = res.user as User
+    try {
+      const meRes = await auth.me()
+      finalUser = { ...res.user, ...meRes.user, needsOnboarding: meRes.needsOnboarding } as User
+    } catch {}
+
+    setUser(finalUser)
+    await SecureStore.setItemAsync('auth_user', JSON.stringify(finalUser))
     await SecureStore.setItemAsync('last_active_at', String(Date.now()))
+    return finalUser
   }, [])
 
   return (
