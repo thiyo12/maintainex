@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Shield, CaretLeft, Camera } from 'phosphor-react-native'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
 import { fontSizes } from '../../../lib/tokens'
 import { taskers, auth, upload, resolveImageUri } from '../../../lib/api'
@@ -14,8 +13,6 @@ import { v3 } from '../../../theme/v3/tokens'
 
 export default function TaskerEditProfile() {
   const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { user, refreshUser } = useAuth()
   const verified = user?.identityStatus === 'VERIFIED' || user?.identityStatus === 'APPROVED'
