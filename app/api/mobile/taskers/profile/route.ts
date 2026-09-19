@@ -84,7 +84,9 @@ export async function PUT(request: NextRequest) {
     if (profileImage !== undefined) updateData.profileImage = profileImage
 
     const userUpdate: any = {}
-    if (phone !== undefined) userUpdate.phone = phone
+    if (phone !== undefined && phone !== user.phone) {
+      return NextResponse.json({ error: 'Mobile number changes require OTP verification.' }, { status: 400 })
+    }
     if (nickname !== undefined) userUpdate.nickname = nickname?.trim() || null
 
     if (name !== undefined) {
