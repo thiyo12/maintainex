@@ -279,14 +279,28 @@ export async function GET(request: NextRequest) {
       if (areaId) where.areaId = areaId
 
       let allowedCategoryIds: string[] = []
+      let allowedTemplateJobIds: string[] = []
       const selections = await prisma.taskerSkill.findMany({
         where: { tasker: { userId: user.id } },
-        select: { job: { select: { categoryId: true } } },
+        select: {
+          jobId: true,
+          job: { select: { categoryId: true } },
+        },
       })
 
       if (selections.length > 0) {
+        allowedTemplateJobIds = [...new Set(selections.map((selection) => selection.jobId))]
         allowedCategoryIds = [...new Set(selections.map((selection) => selection.job.categoryId))]
+
+        // Exact TemplateJob selections are canonical. Free-form/custom jobs that
+        // do not have a TemplateJob can still fall back to the selected category.
+        where.OR = [
+          { templateJobId: { in: allowedTemplateJobIds } },
+          { templateJobId: null, categoryId: { in: allowedCategoryIds } },
+        ]
       } else {
+        // Backward compatibility for older Taskers that only stored category
+        // slugs before exact service selection was introduced.
         const profile = await prisma.taskerProfile.findUnique({
           where: { userId: user.id },
           select: { skills: true },
@@ -302,14 +316,19 @@ export async function GET(request: NextRequest) {
         }
         if (slugs.length > 0) {
           const categories = await prisma.jobCategory.findMany({
-            where: { slug: { in: slugs }, isActive: true },
+            where: {
+              isActive: true,
+              OR: [
+                { id: { in: slugs } },
+                { slug: { in: slugs } },
+              ],
+            },
             select: { id: true },
           })
           allowedCategoryIds = categories.map((category) => category.id)
         }
+        where.categoryId = { in: allowedCategoryIds }
       }
-
-      where.categoryId = { in: allowedCategoryIds }
     } else {
       where.customerId = user.id
     }
