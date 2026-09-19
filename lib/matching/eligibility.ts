@@ -296,8 +296,51 @@ async function evaluateTaskerProfession(
     }
   }
 
+  // MaintainEX Tasker registration is service-first: selecting an exact service is
+  // a self-declared capability. When a service has profession metadata but the
+  // Tasker does not yet have separate profession rows, preserve the exact
+  // TaskerSkill selection as the capability source. We still return the mapped
+  // profession so jurisdiction/certification gates remain enforceable.
+  const profileCapability = await client.taskerProfile.findUnique({
+    where: { userId: taskerId },
+    select: {
+      taskerSkills: {
+        select: {
+          jobId: true,
+          job: { select: { categoryId: true } },
+        },
+      },
+    },
+  })
+
+  const hasDeclaredCapability = !!profileCapability && (
+    job.templateJobId
+      ? profileCapability.taskerSkills.some(skill => skill.jobId === job.templateJobId)
+      : profileCapability.taskerSkills.some(skill => skill.job.categoryId === job.categoryId)
+  )
+
+  if (hasDeclaredCapability) {
+    const mapped = requirements.find(requirement => requirement.profession?.isActive)
+    if (mapped) {
+      const requiredSkillSlugs = mapped.skillRequirements
+        .filter(requirement => requirement.requirementMode !== 'PREFERRED')
+        .map(requirement => requirement.professionSkill.slug)
+
+      return {
+        gate: {
+          gate: 'PROFESSION_MATCH',
+          passed: true,
+          detail: job.templateJobId ? 'Exact registered service capability' : 'Registered category capability',
+        },
+        matchedProfessionId: mapped.professionId,
+        matchedSkills: requiredSkillSlugs,
+        preferredSkillsMatched: [],
+      }
+    }
+  }
+
   return {
-    gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No approved profession with required skills' },
+    gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No approved profession or registered service capability' },
     matchedProfessionId: null,
     matchedSkills: [],
     preferredSkillsMatched: [],
