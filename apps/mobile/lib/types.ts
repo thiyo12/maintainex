@@ -13,6 +13,10 @@ export interface User {
   profileImage?: string
   lastNameChangedAt?: string
   needsOnboarding?: boolean
+  taskerOnboardingStage?: 'SERVICES' | 'IDENTITY' | 'PENDING_APPROVAL' | 'READY'
+  taskerDateOfBirth?: string | null
+  taskerAddress?: string | null
+  taskerExperienceSummary?: string | null
   tierLevel?: 'EXPLORER' | 'REGULAR' | 'PREMIUM' | 'ELITE'
   completedJobs?: number
   totalSpent?: number
