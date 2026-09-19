@@ -66,6 +66,7 @@ async function main() {
         role: 'TASKER',
         isActive: true,
         identityStatus: 'VERIFIED',
+        phoneVerified: true,
         emailVerified: true,
       },
       create: {
