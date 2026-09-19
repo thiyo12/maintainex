@@ -92,6 +92,7 @@ export interface MatchingInput {
   urgency: UrgencyLevel
   categoryId: string
   serviceTemplateId?: string
+  templateJobId?: string
   latitude?: number | null
   longitude?: number | null
   countryCode?: string
