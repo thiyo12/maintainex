@@ -44,14 +44,16 @@ export async function sendOtpSms(phone: string, otp: string, countryCode?: strin
   const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim()
   const authToken = process.env.TWILIO_AUTH_TOKEN?.trim()
   const from = process.env.TWILIO_FROM_NUMBER?.trim()
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim()
 
-  if (!accountSid || !authToken || !from) {
+  if (!accountSid || !authToken || (!from && !messagingServiceSid)) {
     throw new Error('SMS provider is not configured')
   }
 
   const form = new URLSearchParams()
   form.set('To', to)
-  form.set('From', from)
+  if (messagingServiceSid) form.set('MessagingServiceSid', messagingServiceSid)
+  else form.set('From', from!)
   form.set('Body', `Your MaintainEX verification code is ${otp}. It expires in 5 minutes.`)
 
   const response = await fetch(
