@@ -79,6 +79,7 @@ export interface TaskerProfile {
   userId: string
   user: User
   bio: string
+  experienceSummary?: string | null
   dateOfBirth?: string | null
   address?: string | null
   experienceYears?: number
