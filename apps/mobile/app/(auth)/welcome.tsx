@@ -116,7 +116,7 @@ export default function WelcomeScreen() {
 
         <TouchableOpacity
           style={[styles.btnPrimary, !language && styles.btnDisabled]}
-          onPress={() => router.push('/(auth)/register')}
+          onPress={() => router.push('/(auth)/role-select')}
           activeOpacity={0.85}
           disabled={!language}
         >
