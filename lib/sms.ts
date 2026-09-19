@@ -11,15 +11,30 @@ export interface SmsDeliveryResult {
   messageId?: string
 }
 
-function normalizeE164(phone: string): string {
+const COUNTRY_DIAL: Record<string, string> = {
+  LK: '94',
+  CA: '1',
+  US: '1',
+  GB: '44',
+  DE: '49',
+  CH: '41',
+  IN: '91',
+  AU: '61',
+}
+
+function normalizeE164(phone: string, countryCode?: string): string {
   const trimmed = phone.trim()
   const digits = trimmed.replace(/\D/g, '')
   if (!digits) throw new Error('Invalid phone number')
-  return `+${digits}`
+  if (trimmed.startsWith('+')) return `+${digits}`
+
+  const dial = COUNTRY_DIAL[(countryCode || '').toUpperCase()]
+  if (!dial) throw new Error('Phone number must include an international country code')
+  return `+${dial}${digits.replace(/^0+/, '')}`
 }
 
-export async function sendOtpSms(phone: string, otp: string): Promise<SmsDeliveryResult> {
-  const to = normalizeE164(phone)
+export async function sendOtpSms(phone: string, otp: string, countryCode?: string): Promise<SmsDeliveryResult> {
+  const to = normalizeE164(phone, countryCode)
 
   // Synthetic certification accounts use a fixed OTP and must not send real SMS.
   if (process.env.ALLOW_TEST_OTP === 'true' && otp === '000000') {
