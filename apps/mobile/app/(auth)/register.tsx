@@ -382,6 +382,9 @@ export default function RegisterScreen() {
               />
             </View>
             <TouchableOpacity onPress={goBack}><Text style={styles.changeNumber}>Wrong number? Change it</Text></TouchableOpacity>
+            <TouchableOpacity onPress={sendRegistrationOtp} disabled={loading || verifying} activeOpacity={0.72}>
+              <Text style={styles.resendCode}>{loading ? 'Sending…' : 'Resend SMS code'}</Text>
+            </TouchableOpacity>
             {otpError ? <Text style={styles.otpError}>{otpError}</Text> : null}
             <View style={styles.otpBottom}>
               <V3Button label={role === 'TASKER' ? 'Verify & continue to ID' : 'Verify & create account'} onPress={() => handleVerifyOtp()} loading={verifying} disabled={otpCode.length !== 6} />
@@ -459,6 +462,7 @@ const styles = StyleSheet.create({
   enterCode: { marginTop: 46, textAlign: 'center', fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
   otpWrap: { alignItems: 'center', marginTop: 18 },
   changeNumber: { marginTop: 24, textAlign: 'center', fontSize: 10, fontFamily: 'Outfit_700Bold', color: v3.colors.textSecondary },
+  resendCode: { marginTop: 12, textAlign: 'center', fontSize: 10, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
   otpError: { marginTop: 8, textAlign: 'center', fontSize: 9.5, fontFamily: 'Outfit_600SemiBold', color: v3.colors.error },
   otpBottom: { flex: 1, justifyContent: 'flex-end', paddingBottom: 16 },
 })
