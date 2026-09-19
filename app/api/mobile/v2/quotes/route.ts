@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
-    if (user.identityStatus !== 'VERIFIED') {
+    if (!['VERIFIED', 'APPROVED'].includes((user.identityStatus || '').toUpperCase())) {
       return NextResponse.json({ error: 'Identity must be verified before submitting quotes' }, { status: 403 })
     }
 
