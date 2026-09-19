@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { changeLanguage, getCurrentLanguage } from '../../lib/i18n'
+import { changeLanguage } from '../../lib/i18n'
 
 const COPY = {
   en: {
@@ -37,8 +37,7 @@ type LanguageCode = keyof typeof COPY
 
 export default function WelcomeScreen() {
   const router = useRouter()
-  const initial = getCurrentLanguage()?.slice(0, 2)
-  const [language, setLanguage] = useState<LanguageCode>(initial === 'ta' || initial === 'si' ? initial : 'en')
+  const [language, setLanguage] = useState<LanguageCode | null>(null)
   const markOp = useRef(new Animated.Value(0)).current
   const markScale = useRef(new Animated.Value(0.9)).current
   const textOp = useRef(new Animated.Value(0)).current
@@ -48,7 +47,15 @@ export default function WelcomeScreen() {
   const btnsOp = useRef(new Animated.Value(0)).current
   const btnsY = useRef(new Animated.Value(14)).current
 
-  const copy = COPY[language]
+  const copy = COPY[language || 'en']
+
+  useEffect(() => {
+    AsyncStorage.getItem('app-language')
+      .then((saved) => {
+        if (saved === 'en' || saved === 'ta' || saved === 'si') setLanguage(saved)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     Animated.sequence([
@@ -107,11 +114,21 @@ export default function WelcomeScreen() {
           <LanguageChip label="සිංහල" active={language === 'si'} onPress={() => selectLanguage('si')} />
         </View>
 
-        <TouchableOpacity style={styles.btnPrimary} onPress={() => router.push('/(auth)/register')} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.btnPrimary, !language && styles.btnDisabled]}
+          onPress={() => router.push('/(auth)/register')}
+          activeOpacity={0.85}
+          disabled={!language}
+        >
           <Text style={styles.btnPrimaryText}>{copy.continue}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnSecondary} onPress={() => router.push('/(auth)/login')} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.btnSecondary, !language && styles.btnDisabled]}
+          onPress={() => router.push('/(auth)/login')}
+          activeOpacity={0.85}
+          disabled={!language}
+        >
           <Text style={styles.btnSecondaryText}>{copy.login}</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -171,4 +188,5 @@ const styles = StyleSheet.create({
   btnPrimaryText: { fontSize: 13.5, fontFamily: 'Outfit_800ExtraBold', fontWeight: '800', color: '#000000' },
   btnSecondary: { height: 52, borderRadius: 16, backgroundColor: 'transparent', borderWidth: 1, borderColor: '#E5E5E5', alignItems: 'center', justifyContent: 'center' },
   btnSecondaryText: { fontSize: 13.5, fontFamily: 'Outfit_800ExtraBold', fontWeight: '800', color: '#FFFFFF' },
+  btnDisabled: { opacity: 0.45 },
 })
