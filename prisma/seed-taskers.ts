@@ -65,7 +65,7 @@ async function main() {
         phone: tasker.phone,
         role: 'TASKER',
         isActive: true,
-        identityStatus: 'APPROVED',
+        identityStatus: 'VERIFIED',
         emailVerified: true,
       },
       create: {
@@ -74,7 +74,7 @@ async function main() {
         name: tasker.name,
         phone: tasker.phone,
         role: 'TASKER',
-        identityStatus: 'APPROVED',
+        identityStatus: 'VERIFIED',
         emailVerified: true,
       },
     })
