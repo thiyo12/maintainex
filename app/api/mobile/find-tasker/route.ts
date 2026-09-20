@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { matchTaskerCandidates, resolveJobCategoryKeys } from '@/lib/job-matching'
 import { getSetting } from '@/lib/settings'
+import { isSyntheticCertAccount } from '@/lib/test-cert'
 
 export async function GET(request: NextRequest) {
   try {
@@ -145,8 +146,62 @@ export async function GET(request: NextRequest) {
       providerType: 'INDIVIDUAL',
     }))
 
+    // Certification accounts are allowed to see other synthetic certification
+    // Taskers immediately so the full customer -> provider flow can be tested
+    // without weakening production verification rules. Exact TaskerSkill match
+    // is still required, and this path is impossible unless ALLOW_TEST_OTP=true.
+    const certificationTaskers: any[] = []
+    if (isSyntheticCertAccount(user)) {
+      const certProfiles = await prisma.taskerProfile.findMany({
+        where: {
+          countryCode,
+          taskerSkills: { some: { jobId: templateJob.id } },
+          user: { isSuspended: false, isBanned: false, isActive: true },
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+        },
+        take: 30,
+      })
+
+      for (const profile of certProfiles) {
+        if (!isSyntheticCertAccount(profile.user)) continue
+        const duplicate = taskerResults.some((tasker) => tasker.id === profile.id)
+        if (duplicate) continue
+
+        const distance =
+          lat != null && lng != null && profile.latitude != null && profile.longitude != null
+            ? distanceKm(lat, lng, profile.latitude, profile.longitude)
+            : null
+        if (distance != null && distance > radiusKm) continue
+
+        certificationTaskers.push({
+          id: profile.id,
+          userId: profile.userId,
+          name: profile.user.name,
+          bio: profile.bio || '',
+          rating: profile.rating,
+          completedJobs: profile.completedJobs,
+          isVerified: profile.isVerified,
+          isOnline: profile.isOnline,
+          availableNow: true,
+          profileImage: profile.profileImage,
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          distance,
+          score: 55,
+          skills: [],
+          hourlyRate: profile.hourlyRate,
+          fixedRate: 0,
+          experienceYears: 0,
+          providerType: 'INDIVIDUAL',
+          isCertificationTest: true,
+        })
+      }
+    }
+
     return NextResponse.json(
-      [...taskerResults, ...companies].sort((a, b) => {
+      [...taskerResults, ...certificationTaskers, ...companies].sort((a, b) => {
         const aDistance = a.distance == null ? Number.POSITIVE_INFINITY : a.distance
         const bDistance = b.distance == null ? Number.POSITIVE_INFINITY : b.distance
         if (Math.abs(Number(b.score || 0) - Number(a.score || 0)) > 8) return Number(b.score || 0) - Number(a.score || 0)
