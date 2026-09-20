@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { conversations, taskers, templateJobs } from '../../../../lib/api'
 import { v3 } from '../../../../theme/v3/tokens'
 import AvatarCircle from '../../../../components/ui/AvatarCircle'
-import { buildSampleProfile } from '../../../../lib/sampleTaskers'
 
 const formatPercent = (value: unknown) => {
   const n = Number(value)
@@ -34,12 +33,6 @@ export default function ProviderProfile() {
     setLoading(true)
     setError(false)
     try {
-      if (__DEV__ && taskerId.startsWith('sample-tasker-')) {
-        const service = jobId ? await templateJobs.get(jobId).catch(() => null) : null
-        setTasker(buildSampleProfile(taskerId, service?.name || jobId))
-        setJob(service)
-        return
-      }
       const [provider, service] = await Promise.all([
         taskers.get(taskerId),
         jobId ? templateJobs.get(jobId).catch(() => null) : Promise.resolve(null),
