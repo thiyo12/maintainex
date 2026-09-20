@@ -13,7 +13,6 @@ import { templateJobs, findTasker } from '../../../../lib/api'
 import { useCountry } from '../../../../lib/country'
 import { v3 } from '../../../../theme/v3/tokens'
 import AvatarCircle from '../../../../components/ui/AvatarCircle'
-import { buildSampleTaskers } from '../../../../lib/sampleTaskers'
 
 type Filter = 'all' | 'available' | 'taskers' | 'companies'
 
@@ -50,7 +49,6 @@ export default function ProviderResults() {
   const [filter, setFilter] = useState<Filter>('all')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [usingDemoProviders, setUsingDemoProviders] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -83,22 +81,10 @@ export default function ProviderResults() {
           maxDistance: 50,
         })
         const matched = Array.isArray(result) ? result : []
-        if (__DEV__ && matched.length === 0 && service) {
-          setProviders(buildSampleTaskers(service).map((tasker) => ({ ...tasker, providerType: 'INDIVIDUAL', isDemo: true })))
-          setUsingDemoProviders(true)
-        } else {
-          setProviders(matched)
-          setUsingDemoProviders(false)
-        }
+        setProviders(matched)
       } catch (error) {
         console.error('Failed to load nearby providers', error)
-        if (__DEV__ && service) {
-          setProviders(buildSampleTaskers(service).map((tasker) => ({ ...tasker, providerType: 'INDIVIDUAL', isDemo: true })))
-          setUsingDemoProviders(true)
-        } else {
-          setProviders([])
-          setUsingDemoProviders(false)
-        }
+        setProviders([])
       }
     } finally {
       setLoading(false)
@@ -188,9 +174,7 @@ export default function ProviderResults() {
               {loading ? 'Looking around you…' : `${providers.length} provider${providers.length === 1 ? '' : 's'} found`}
             </Text>
             <Text style={styles.summaryText}>
-              {usingDemoProviders
-                ? 'Demo taskers for this exact service. They are visible only in development builds.'
-                : coords ? 'Sorted using your current location and service match.' : 'Location permission improves nearby ranking.'}
+              {coords ? 'Sorted using your current location, service match and provider availability.' : 'Location permission improves nearby ranking.'}
             </Text>
           </View>
         </View>
@@ -247,7 +231,7 @@ export default function ProviderResults() {
                         <Text style={styles.name} numberOfLines={1}>{name}</Text>
                         {item.isVerified ? <SealCheck size={15} color={v3.colors.success} weight="fill" /> : null}
                       </View>
-                      <Text style={styles.typeLabel}>{item.isDemo ? 'Demo tasker · testing only' : isCompany ? 'Verified company team' : 'Independent tasker'}</Text>
+                      <Text style={styles.typeLabel}>{item.isCertificationTest ? 'Certification test tasker' : isCompany ? 'Verified company team' : 'Independent tasker'}</Text>
                     </View>
 
                     <View style={[styles.liveBadge, !online && styles.liveBadgeMuted]}>
