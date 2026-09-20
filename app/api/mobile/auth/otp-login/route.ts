@@ -169,7 +169,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many wrong attempts. Request a new code.' }, { status: 429 })
     }
 
-    if (isTestOtpAllowed(user, code)) {
+    const usedSyntheticTestOtp = isTestOtpAllowed(user, code)
+    if (usedSyntheticTestOtp) {
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     } else {
       const isValid = await bcrypt.compare(code, otpRecord.codeHash)
@@ -198,6 +199,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid code. Please try again.' }, { status: 400 })
       }
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
+    }
+
+    if (usedSyntheticTestOtp && user.role === 'TASKER' && isSyntheticCertAccount(user)) {
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { identityStatus: 'VERIFIED', phoneVerified: true },
+        })
+        await tx.taskerProfile.updateMany({
+          where: { userId: user.id },
+          data: {
+            verificationStatus: 'VERIFIED',
+            isVerified: true,
+            isOnline: true,
+          },
+        })
+      })
     }
 
     const authSession = await createMarketplaceAuthSession(user.id, {
