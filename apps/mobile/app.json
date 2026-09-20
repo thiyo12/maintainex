@@ -8,11 +8,6 @@
     "icon": "./assets/icon.png",
     "scheme": "maintainex",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0D0D0D"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "lk.maintainex.app",
@@ -56,8 +51,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0D0D0D",
-          "resizeMode": "contain"
+          "backgroundColor": "#0D0D0D"
         }
       ]
     ],
