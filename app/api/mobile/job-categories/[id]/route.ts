@@ -6,7 +6,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params
     const category = await prisma.jobCategory.findFirst({
-      where: { id, isActive: true },
+      where: {
+        isActive: true,
+        OR: [{ id }, { slug: id }],
+      },
       include: {
         jobs: { where: { isActive: true }, orderBy: [{ isPopular: 'desc' }, { name: 'asc' }] },
       },
