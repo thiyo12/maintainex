@@ -16,7 +16,6 @@ import i18next, { initI18n } from '../lib/i18n'
 import { ThemeProvider } from '../lib/theme'
 import { CountryProvider } from '../lib/country'
 import { getAuthToken } from '../lib/api'
-import { LoadingScreen } from '../components/ui/LoadingScreen'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -59,7 +58,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
   static getDerivedStateFromError(error: any) { return { error } }
   render() {
     if (this.state.error) {
-      const { View, Text, TouchableOpacity, StyleSheet } = require('react-native')
+      const { View, Text, TouchableOpacity } = require('react-native')
       return (
         <View style={ebStyles.container}>
           <Text style={ebStyles.title}>Something went wrong</Text>
@@ -97,13 +96,21 @@ export default function RootLayout() {
         if (saved && saved !== 'en') await i18next.changeLanguage(saved)
       } catch {}
       setI18nReady(true)
-      SplashScreen.hideAsync()
       registerForPushNotifications()
     })()
   }, [])
 
+  useEffect(() => {
+    if (fontsLoaded && i18nReady) {
+      SplashScreen.hideAsync()
+    }
+  }, [fontsLoaded, i18nReady])
+
+  // Keep the native launch layer visible until the JS splash is fully ready.
+  // The native layer is background-only, so there is no legacy splash image
+  // before the V3.3 animated splash in app/index.tsx.
   if (!fontsLoaded || !i18nReady) {
-    return <LoadingScreen />
+    return null
   }
 
   if (!Text.defaultProps) Text.defaultProps = {} as any
