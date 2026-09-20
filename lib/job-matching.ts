@@ -87,7 +87,7 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
   const allProfiles = await prisma.taskerProfile.findMany({
     where: targeted
       ? { userId: input.targetTaskerId! }
-      : { isOnline: true, isVerified: true },
+      : { isVerified: true },
     include: { user: { select: { id: true, name: true, pushToken: true, isSuspended: true } } },
   })
 
@@ -96,6 +96,9 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
 
   const candidates: MatchCandidate[] = []
 
+  // Discovery should not hide an otherwise eligible Tasker only because they
+  // are currently offline. Availability is a ranking/filter signal in the app;
+  // verification, skills, conflicts and distance remain the hard gates.
   for (const p of allProfiles) {
     if (p.user.isSuspended) continue
     if (!targeted && busy.has(p.userId)) continue
