@@ -168,5 +168,9 @@ const styles = StyleSheet.create({
   rowCopy: { flex: 1 },
   rowTitle: { fontSize: 11.2, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink },
   rowSub: { marginTop: 3, fontSize: 8.8, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textSecondary },
+  emptyCard: { marginTop: 8, padding: 20, borderRadius: 18, backgroundColor: v3.colors.amberSoft, borderWidth: 1, borderColor: '#F2D08C', alignItems: 'center' },
+  emptyTitle: { fontSize: 14, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.ink, textAlign: 'center' },
   empty: { marginTop: 8, fontSize: 10.5, lineHeight: 16, fontFamily: 'Outfit_600SemiBold', color: v3.colors.textMuted, textAlign: 'center' },
+  emptyButton: { marginTop: 14, height: 44, paddingHorizontal: 18, borderRadius: 13, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  emptyButtonText: { fontSize: 11.5, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
 })
