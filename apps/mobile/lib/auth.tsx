@@ -234,8 +234,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const refreshed = { ...res.user, needsOnboarding: res.needsOnboarding } as User
       setUser(refreshed)
       await SecureStore.setItemAsync('auth_user', JSON.stringify(refreshed))
-    } catch {
-      await logout()
+    } catch (err: any) {
+      const message = String(err?.message || '')
+      if (message.includes('401') || message.includes('403') || message.includes('Unauthorized')) {
+        await logout()
+        return
+      }
+      console.warn('refreshUser() failed transiently; keeping current session')
     }
   }, [logout])
 
