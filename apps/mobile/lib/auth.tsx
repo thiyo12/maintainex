@@ -195,8 +195,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = useCallback(async () => {
     try {
       const res = await auth.me()
-      setUser(res.user)
-      await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+      const updatedUser = { ...res.user, needsOnboarding: res.needsOnboarding } as User
+      setUser(updatedUser)
+      await SecureStore.setItemAsync('auth_user', JSON.stringify(updatedUser))
     } catch {
       await logout()
     }
