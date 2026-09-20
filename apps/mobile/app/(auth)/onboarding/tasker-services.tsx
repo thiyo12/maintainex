@@ -4,7 +4,7 @@ import { CaretDown, CaretUp, CheckCircle } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
 
 import { useAuth } from '../../../lib/auth'
-import { auth, skillsApi } from '../../../lib/api'
+import { auth, jobCategories, skillsApi } from '../../../lib/api'
 import { v3 } from '../../../theme/v3/tokens'
 import V3Button from '../../../components/v3/V3Button'
 import V3NavBar from '../../../components/v3/V3NavBar'
@@ -46,24 +46,67 @@ export default function TaskerServicesOnboarding() {
   const loadServices = async () => {
     setLoading(true)
     setLoadError('')
+
+    const normalize = (rows: any[]): ServiceCategory[] =>
+      rows
+        .filter((category: any) => category?.id && category?.name)
+        .map((category: any) => ({
+          id: category.id,
+          name: category.name,
+          jobs: Array.isArray(category.jobs)
+            ? category.jobs
+                .filter((job: any) => job?.id && job?.name && job?.isCompanyOnly !== true)
+                .map((job: any) => ({
+                  ...job,
+                  selected: Boolean(job.selected),
+                }))
+            : [],
+        }))
+        .filter((category: ServiceCategory) => category.jobs.length > 0)
+
     try {
-      const response = await skillsApi.list()
-      const rows = Array.isArray((response as any)?.categories) ? (response as any).categories : []
-      const normalized = rows.map((category: any) => ({
-        id: category.id,
-        name: category.name,
-        jobs: Array.isArray(category.jobs) ? category.jobs : [],
-      }))
+      let normalized: ServiceCategory[] = []
+
+      try {
+        const response: any = await skillsApi.list()
+        const rows = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.categories)
+            ? response.categories
+            : Array.isArray(response?.data)
+              ? response.data
+              : []
+        normalized = normalize(rows)
+      } catch (primaryError) {
+        console.warn('Tasker service selection endpoint unavailable; loading public service catalog instead.', primaryError)
+      }
+
+      // Fresh/legacy tasker accounts can briefly have no TaskerProfile on the
+      // production API. The public job catalog is the canonical fallback, so
+      // onboarding never gets trapped on “Services could not load”.
+      if (normalized.length === 0) {
+        const publicRows: any = await jobCategories.list(((user as any)?.countryCode || 'LK').toUpperCase())
+        const rows = Array.isArray(publicRows)
+          ? publicRows
+          : Array.isArray(publicRows?.data)
+            ? publicRows.data
+            : []
+        normalized = normalize(rows)
+      }
+
+      if (normalized.length === 0) {
+        setCategories([])
+        setLoadError('No active services are available right now. Please try again.')
+        return
+      }
+
       setCategories(normalized)
-      setExpanded(normalized[0]?.id || null)
+      setExpanded(current => current && normalized.some(category => category.id === current) ? current : normalized[0]?.id || null)
       setSelected(new Set(
         normalized.flatMap((category: ServiceCategory) => category.jobs)
           .filter((job: ServiceJob) => job.selected)
           .map((job: ServiceJob) => job.id)
       ))
-      if (normalized.flatMap((category: ServiceCategory) => category.jobs).length === 0) {
-        setLoadError('No active services are available for this account yet.')
-      }
     } catch (err: any) {
       let message = err?.message || 'Unable to load services'
       try { message = JSON.parse(message).error || message } catch {}
