@@ -10,7 +10,7 @@ import { useColors } from '../../../lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { fonts } from '../../../lib/fonts'
 import { getCategoryI18nKey } from '../../../lib/categories'
-import { getAuthToken } from '../../../lib/api'
+import { getAuthToken, taskers } from '../../../lib/api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -109,24 +109,19 @@ export default function TaskerServicesOnboarding() {
     }
     setSaving(true)
     try {
-      const token = await getAuthToken()
-      const res = await fetch(`${API_URL}/api/mobile/taskers/profile`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          skills: Array.from(selectedIds),
-          ...(needsPhone ? { phone: phone.trim() } : {}),
-        }),
+      await taskers.updateProfile({
+        skills: Array.from(selectedIds),
+        ...(needsPhone ? { phone: phone.trim() } : {}),
       })
-      if (!res.ok) {
-        const err = await res.json()
-        Alert.alert(t('common.error'), err.error || t('errors.generic'))
-        return
-      }
       await refreshUser()
       router.replace('/(tasker)')
-    } catch {
-      Alert.alert(t('common.error'), t('errors.network'))
+    } catch (err: any) {
+      let message = err?.message || t('errors.generic')
+      try {
+        const parsed = JSON.parse(message)
+        message = parsed?.error || parsed?.message || message
+      } catch {}
+      Alert.alert(t('common.error'), message)
     } finally {
       setSaving(false)
     }
