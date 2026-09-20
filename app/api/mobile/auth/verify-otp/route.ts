@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
-import { isTestOtpAllowed } from '@/lib/test-cert'
+import { isSyntheticCertAccount, isTestOtpAllowed } from '@/lib/test-cert'
 
 function accountBlocked(user: any): NextResponse | null {
   if (!user.isActive) {
@@ -117,9 +117,30 @@ export async function POST(request: NextRequest) {
     })
 
     if (otpPurpose === 'PHONE_VERIFICATION') {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { phoneVerified: true },
+      const certifySyntheticTasker =
+        testOtpAllowed &&
+        user.role === 'TASKER' &&
+        isSyntheticCertAccount(user)
+
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: {
+            phoneVerified: true,
+            ...(certifySyntheticTasker ? { identityStatus: 'VERIFIED' } : {}),
+          },
+        })
+
+        if (certifySyntheticTasker) {
+          await tx.taskerProfile.updateMany({
+            where: { userId: user.id },
+            data: {
+              verificationStatus: 'VERIFIED',
+              isVerified: true,
+              isOnline: true,
+            },
+          })
+        }
       })
       return buildPhoneVerificationAuthResponse(request, user.id)
     }
