@@ -18,20 +18,62 @@ export default function ServiceCategory() {
   const router = useRouter()
 
   const fetchData = useCallback(async () => {
+    if (!categoryId) {
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+
     try {
-      const [catData, jobsData] = await Promise.all([
-        jobCategories.get(categoryId!),
-        templateJobs.listByCategory(categoryId!, selectedCountry?.code),
-      ])
+      // The category endpoint already returns its active jobs. Load that first so
+      // one secondary template request cannot blank the whole service screen.
+      const catData: any = await jobCategories.get(categoryId)
       setCategory(catData)
-      setJobs(Array.isArray(jobsData) ? jobsData : [])
-    } catch (e) {
-      console.error('Failed to load services', e)
+
+      const embeddedJobs = Array.isArray(catData?.jobs) ? catData.jobs : []
+      setJobs(embeddedJobs)
+
+      // Template jobs can contain richer discovery metadata. Merge them when
+      // available, but never fail the screen if this optional request fails.
+      templateJobs.listByCategory(catData?.id || categoryId, selectedCountry?.code)
+        .then((jobsData: any) => {
+          const templates = Array.isArray(jobsData) ? jobsData : []
+          if (!templates.length) return
+
+          const merged = new Map<string, any>()
+          embeddedJobs.forEach((item: any) => merged.set(String(item.id), item))
+          templates.forEach((item: any) => merged.set(String(item.id), { ...merged.get(String(item.id)), ...item }))
+          setJobs(Array.from(merged.values()))
+        })
+        .catch((error) => {
+          console.warn('Template service metadata unavailable; using category jobs', error)
+        })
+    } catch (error) {
+      console.error('Failed to load service category', error)
+
+      // Last recovery path: resolve a slug/id from the category list, which
+      // also protects older deep links and fallback home-category slugs.
+      try {
+        const all: any = await jobCategories.list(selectedCountry?.code)
+        const list = Array.isArray(all) ? all : []
+        const match = list.find((item: any) => item.id === categoryId || item.slug === categoryId)
+        if (match) {
+          setCategory(match)
+          setJobs(Array.isArray(match.jobs) ? match.jobs : [])
+        } else {
+          setCategory(null)
+          setJobs([])
+        }
+      } catch (fallbackError) {
+        console.error('Failed to recover service category', fallbackError)
+        setCategory(null)
+        setJobs([])
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [categoryId, selectedCountry])
+  }, [categoryId, selectedCountry?.code])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -90,7 +132,17 @@ export default function ServiceCategory() {
           </TouchableOpacity>
 
           {!loading && jobs.length === 0 ? (
-            <Text style={styles.empty}>No templates are available for this category yet. You can still post a custom request.</Text>
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>No listed work types yet</Text>
+              <Text style={styles.empty}>You can still describe exactly what you need and send it to nearby providers.</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.emptyButton}
+                onPress={() => router.push({ pathname: '/(customer)/jobs/v2/create', params: { categoryId: category?.id || categoryId!, categoryName } } as any)}
+              >
+                <Text style={styles.emptyButtonText}>Post this job</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
         </View>
       </ScrollView>
