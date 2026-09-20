@@ -4,7 +4,7 @@ import { CaretDown, CaretUp, CheckCircle } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
 
 import { useAuth } from '../../../lib/auth'
-import { skillsApi } from '../../../lib/api'
+import { auth, skillsApi } from '../../../lib/api'
 import { v3 } from '../../../theme/v3/tokens'
 import V3Button from '../../../components/v3/V3Button'
 import V3NavBar from '../../../components/v3/V3NavBar'
@@ -35,6 +35,7 @@ export default function TaskerServicesOnboarding() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   const needsPhone = !user?.phone
   const selectedJobs = useMemo(
@@ -42,28 +43,48 @@ export default function TaskerServicesOnboarding() {
     [categories, selected]
   )
 
+  const loadServices = async () => {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const response = await skillsApi.list()
+      const rows = Array.isArray((response as any)?.categories) ? (response as any).categories : []
+      const normalized = rows.map((category: any) => ({
+        id: category.id,
+        name: category.name,
+        jobs: Array.isArray(category.jobs) ? category.jobs : [],
+      }))
+      setCategories(normalized)
+      setExpanded(normalized[0]?.id || null)
+      setSelected(new Set(
+        normalized.flatMap((category: ServiceCategory) => category.jobs)
+          .filter((job: ServiceJob) => job.selected)
+          .map((job: ServiceJob) => job.id)
+      ))
+      if (normalized.flatMap((category: ServiceCategory) => category.jobs).length === 0) {
+        setLoadError('No active services are available for this account yet.')
+      }
+    } catch (err: any) {
+      let message = err?.message || 'Unable to load services'
+      try { message = JSON.parse(message).error || message } catch {}
+      setLoadError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    let active = true
-    skillsApi.list()
-      .then(({ categories: rows }) => {
-        if (!active) return
-        const normalized = (rows || []).map((category: any) => ({
-          id: category.id,
-          name: category.name,
-          jobs: Array.isArray(category.jobs) ? category.jobs : [],
-        }))
-        setCategories(normalized)
-        setExpanded(normalized[0]?.id || null)
-        setSelected(new Set(
-          normalized.flatMap((category: ServiceCategory) => category.jobs)
-            .filter((job: ServiceJob) => job.selected)
-            .map((job: ServiceJob) => job.id)
-        ))
-      })
-      .catch(() => Alert.alert('Unable to load services', 'Please check your connection and try again.'))
-      .finally(() => active && setLoading(false))
-    return () => { active = false }
-  }, [])
+    if (!user) return
+    if (user.role === 'CUSTOMER') {
+      router.replace('/(customer)' as any)
+      return
+    }
+    if (user.role === 'COMPANY') {
+      router.replace('/(company)' as any)
+      return
+    }
+    loadServices()
+  }, [user?.id, user?.role])
 
   const toggle = (jobId: string) => {
     setSelected(current => {
@@ -101,11 +122,20 @@ export default function TaskerServicesOnboarding() {
         fixedRate: job.fixedRate || 0,
       }))
       await skillsApi.save(payload)
+
+      let freshUser = user
+      try {
+        const me = await auth.me()
+        freshUser = { ...(user || {}), ...me.user, needsOnboarding: me.needsOnboarding } as any
+      } catch {}
       await refreshUser()
 
-      const identity = (user?.identityStatus || 'NOT_SUBMITTED').toUpperCase()
-      if (identity === 'VERIFIED' || identity === 'APPROVED') router.replace('/(tasker)')
-      else router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+      const identity = String((freshUser as any)?.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+      if (identity === 'VERIFIED' || identity === 'APPROVED') {
+        router.replace('/(tasker)' as any)
+      } else {
+        router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+      }
     } catch (err: any) {
       let message = err?.message || 'Unable to save services'
       try { message = JSON.parse(message).error || message } catch {}
@@ -136,6 +166,14 @@ export default function TaskerServicesOnboarding() {
 
         {loading ? (
           <ActivityIndicator color={v3.colors.ink} style={{ marginTop: 40 }} />
+        ) : loadError ? (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorTitle}>Services could not load</Text>
+            <Text style={styles.errorText}>{loadError}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadServices} activeOpacity={0.78}>
+              <Text style={styles.retryText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
         ) : categories.map(category => {
           const open = expanded === category.id
           const categorySelected = category.jobs.filter(job => selected.has(job.id)).length
@@ -168,7 +206,7 @@ export default function TaskerServicesOnboarding() {
         })}
 
         <View style={{ height: 24 }} />
-        <V3Button label="Save & continue" onPress={handleSave} loading={saving} disabled={selected.size === 0 || loading} />
+        <V3Button label="Save & continue" onPress={handleSave} loading={saving} disabled={selected.size === 0 || loading || !!loadError} />
       </ScrollView>
     </View>
   )
@@ -194,4 +232,9 @@ const styles = StyleSheet.create({
   checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { borderColor: v3.colors.ink },
   jobName: { flex: 1, fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.ink },
+  errorCard: { marginTop: 12, padding: 18, borderRadius: 16, backgroundColor: v3.colors.errorSoft, borderWidth: 1, borderColor: '#FFD3CC' },
+  errorTitle: { fontSize: 14, fontFamily: 'Outfit_800ExtraBold', color: v3.colors.error },
+  errorText: { marginTop: 5, fontSize: 11, lineHeight: 17, fontFamily: 'Outfit_500Medium', color: v3.colors.textSecondary },
+  retryButton: { marginTop: 14, alignSelf: 'flex-start', height: 40, paddingHorizontal: 16, borderRadius: 12, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  retryText: { fontSize: 11, fontFamily: 'Outfit_700Bold', color: v3.colors.paper },
 })
