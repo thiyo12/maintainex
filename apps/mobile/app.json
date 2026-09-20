@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "lk.maintainex.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Maintainex needs your location to find nearby taskers and track jobs.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Maintainex needs background location to share live tasker tracking during active jobs.",
@@ -51,7 +51,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0D0D0D"
+          "backgroundColor": "#0D0D0D",
+          "image": "./assets/logo.png",
+          "imageWidth": 140,
+          "resizeMode": "contain"
         }
       ]
     ],
