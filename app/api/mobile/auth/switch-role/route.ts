@@ -34,6 +34,25 @@ export async function PUT(request: NextRequest) {
 
     const oldRole = user.role
 
+    if (targetRole === 'TASKER') {
+      await prisma.taskerProfile.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { userId: user.id },
+      })
+    } else if (targetRole === 'COMPANY') {
+      await prisma.companyProfile.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: {
+          userId: user.id,
+          companyName: user.name || 'Service Company',
+          services: '[]',
+          serviceAreas: '[]',
+        },
+      })
+    }
+
     await prisma.user.update({
       where: { id: user.id },
       data: { role: targetRole },
