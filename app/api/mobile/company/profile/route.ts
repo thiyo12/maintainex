@@ -90,7 +90,95 @@ export async function PUT(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { companyId, ...data } = body
+    const { companyId: requestedCompanyId, ...data } = body
+    let companyId = typeof requestedCompanyId === 'string' && requestedCompanyId.trim()
+      ? requestedCompanyId.trim()
+      : null
+
+    // Registration/onboarding path: a COMPANY user does not have a companyId
+    // until this first profile is created.
+    if (!companyId) {
+      const existingProfile = await prisma.companyProfile.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      })
+
+      if (!existingProfile) {
+        if (user.role !== 'COMPANY') {
+          return NextResponse.json({ error: 'Company account required' }, { status: 403 })
+        }
+
+        const companyName = typeof data.companyName === 'string' ? data.companyName.trim() : ''
+        const services = Array.isArray(data.services) ? data.services.filter(Boolean) : []
+        const serviceAreas = Array.isArray(data.serviceAreas) ? data.serviceAreas.filter(Boolean) : []
+
+        if (!companyName) {
+          return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
+        }
+        if (services.length === 0) {
+          return NextResponse.json({ error: 'Select at least one service' }, { status: 400 })
+        }
+
+        const created = await prisma.$transaction(async (tx) => {
+          const profile = await tx.companyProfile.create({
+            data: {
+              userId: user.id,
+              companyName,
+              registrationNo: data.registrationNo || null,
+              description: data.description || null,
+              services: JSON.stringify(services),
+              serviceAreas: JSON.stringify(serviceAreas),
+              countryCode: user.countryCode || 'LK',
+            },
+          })
+
+          await tx.teamMember.create({
+            data: {
+              companyId: profile.id,
+              userId: user.id,
+              name: user.name,
+              role: 'COMPANY_OWNER',
+              skills: '[]',
+              status: 'ACTIVE',
+            },
+          })
+
+          return profile
+        })
+
+        return NextResponse.json({
+          success: true,
+          created: true,
+          profile: { id: created.id, companyName: created.companyName },
+        }, { status: 201 })
+      }
+
+      companyId = existingProfile.id
+
+      // Repair legacy company profiles that predate the owner-membership model.
+      const membership = await prisma.teamMember.findFirst({
+        where: { companyId, userId: user.id },
+        select: { id: true, role: true, status: true },
+      })
+      if (!membership && user.role === 'COMPANY') {
+        await prisma.teamMember.create({
+          data: {
+            companyId,
+            userId: user.id,
+            name: user.name,
+            role: 'COMPANY_OWNER',
+            skills: '[]',
+            status: 'ACTIVE',
+          },
+        })
+      } else if (membership && user.role === 'COMPANY' &&
+        (membership.status !== 'ACTIVE' || membership.role !== 'COMPANY_OWNER')) {
+        await prisma.teamMember.update({
+          where: { id: membership.id },
+          data: { status: 'ACTIVE', role: 'COMPANY_OWNER', name: user.name },
+        })
+      }
+    }
 
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'company:update')
     if (error) return error
