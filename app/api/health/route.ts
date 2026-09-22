@@ -6,6 +6,7 @@ export async function GET() {
     await prisma.$queryRaw`SELECT 1`
     return NextResponse.json({
       status: 'healthy',
+      release: 'provider-onboarding-fix-20260922',
       timestamp: new Date().toISOString(),
     })
   } catch {
