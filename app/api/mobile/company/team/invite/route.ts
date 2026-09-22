@@ -17,15 +17,16 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { companyId, name, email, phone, role } = body
-    if (!companyId || !name) {
-      return NextResponse.json({ error: 'companyId and name are required' }, { status: 400 })
+    if (!name) {
+      return NextResponse.json({ error: 'name is required' }, { status: 400 })
     }
 
-    const { context, error } = await resolveCompanyContext(user.id, companyId, 'members:invite')
+    const { context, error } = await resolveCompanyContext(user.id, companyId || null, 'members:invite')
     if (error) return error
+    const resolvedCompanyId = context!.companyId
 
     const profile = await prisma.companyProfile.findUnique({
-      where: { id: companyId },
+      where: { id: resolvedCompanyId },
       select: { isVerified: true, companyName: true },
     })
     if (!profile) {
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createCompanyInvite({
-      companyId,
+      companyId: resolvedCompanyId,
       inviterUserId: user.id,
       inviterRole: context!.role,
       name,
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     await writeCompanyAuditLog({
-      companyId,
+      companyId: resolvedCompanyId,
       actorId: user.id,
       actorRole: context!.role,
       action: 'MEMBER_INVITE',

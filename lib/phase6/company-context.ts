@@ -13,18 +13,42 @@ export async function resolveCompanyContext(
   companyId: string | null,
   requiredPermission?: string
 ): Promise<{ context: CompanyContext | null; error?: NextResponse }> {
-  if (!companyId) {
-    return { context: null, error: NextResponse.json({ error: 'companyId is required' }, { status: 400 }) }
-  }
+  let membership: { id: string; role: string; companyId: string } | null = null
 
-  const membership = await prisma.teamMember.findFirst({
-    where: {
-      companyId,
-      userId,
-      status: 'ACTIVE',
-    },
-    select: { id: true, role: true },
-  })
+  if (companyId) {
+    membership = await prisma.teamMember.findFirst({
+      where: {
+        companyId,
+        userId,
+        status: 'ACTIVE',
+      },
+      select: { id: true, role: true, companyId: true },
+    })
+  } else {
+    // The mobile app can safely default to a single active company.
+    // Multiple-company users must choose explicitly so RBAC never guesses.
+    const memberships = await prisma.teamMember.findMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+      },
+      select: { id: true, role: true, companyId: true },
+      orderBy: { joinedAt: 'asc' },
+      take: 2,
+    })
+
+    if (memberships.length > 1) {
+      return {
+        context: null,
+        error: NextResponse.json(
+          { error: 'companyId is required when you belong to multiple companies' },
+          { status: 400 }
+        ),
+      }
+    }
+
+    membership = memberships[0] ?? null
+  }
 
   if (!membership) {
     return {
@@ -44,7 +68,7 @@ export async function resolveCompanyContext(
 
   return {
     context: {
-      companyId,
+      companyId: membership.companyId,
       role,
       membershipId: membership.id,
     },
