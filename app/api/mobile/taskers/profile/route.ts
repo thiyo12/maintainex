@@ -10,8 +10,17 @@ export async function GET(request: NextRequest) {
     if (!user || user.role !== 'TASKER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const tasker = await prisma.taskerProfile.findUnique({
+    const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+        countryCode: user.countryCode || 'LK',
+        verificationStatus: 'PENDING',
+        isVerified: false,
+        isOnline: false,
+        skills: '[]',
+      },
       include: {
         user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } },
         reviews: {
@@ -22,9 +31,6 @@ export async function GET(request: NextRequest) {
         taskerSkills: { select: { experienceYears: true } },
       },
     })
-    if (!tasker) {
-      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
-    }
     return NextResponse.json({
       id: tasker.id,
       userId: tasker.userId,
@@ -69,10 +75,18 @@ export async function PUT(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const tasker = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
-    if (!tasker) {
-      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
-    }
+    const tasker = await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+        countryCode: user.countryCode || 'LK',
+        verificationStatus: 'PENDING',
+        isVerified: false,
+        isOnline: false,
+        skills: '[]',
+      },
+    })
 
     const { bio, experienceSummary, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
