@@ -22,7 +22,9 @@ export default function RegisterScreen() {
   const { register, verifyRegisterOtp } = useAuth()
 
   const [step, setStep] = useState(paramRole ? 2 : 1)
-  const [role, setRole] = useState<'CUSTOMER' | 'TASKER' | 'COMPANY'>(paramRole === 'TASKER' ? 'TASKER' : paramRole === 'COMPANY' ? 'COMPANY' : paramRole === 'CUSTOMER' ? 'CUSTOMER' : '')
+  const [role, setRole] = useState<'CUSTOMER' | 'TASKER' | 'COMPANY' | ''>(
+    paramRole === 'TASKER' ? 'TASKER' : paramRole === 'COMPANY' ? 'COMPANY' : paramRole === 'CUSTOMER' ? 'CUSTOMER' : ''
+  )
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -232,7 +234,7 @@ export default function RegisterScreen() {
               />
             </View>
 
-            {role === 'TASKER' && (
+            {(role === 'TASKER' || role === 'COMPANY') && (
               <>
                 <Text style={styles.fieldLabel}>Email (optional)</Text>
                 <View style={styles.inputRow}>
