@@ -20,6 +20,27 @@ async function findUserByIdentifier(identifier: string) {
   })
 }
 
+async function ensureRoleProfile(user: any) {
+  if (user.role === 'TASKER') {
+    await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
+    })
+  } else if (user.role === 'COMPANY') {
+    await prisma.companyProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: {
+        userId: user.id,
+        companyName: user.name || 'Service Company',
+        services: '[]',
+        serviceAreas: '[]',
+      },
+    })
+  }
+}
+
 function accountBlocked(user: any): NextResponse | null {
   if (!user.isActive) {
     return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
@@ -147,6 +168,8 @@ export async function POST(request: NextRequest) {
       }
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     }
+
+    await ensureRoleProfile(user)
 
     const authSession = await createMarketplaceAuthSession(user.id, {
       ipAddress: ip,
