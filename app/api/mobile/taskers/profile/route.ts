@@ -48,10 +48,11 @@ export async function PUT(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const tasker = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
-    if (!tasker) {
-      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
-    }
+    await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
+    })
 
     const { bio, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
