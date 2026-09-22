@@ -17,9 +17,10 @@ export default function RoleSwitchScreen() {
   const ROLE_INFO: Record<string, { icon: string; label: string; desc: string }> = {
     TASKER: { icon: 'construct-outline', label: t('auth.roleSwitch.workAsTasker'), desc: t('auth.roleSwitch.workAsTaskerDesc') },
     CUSTOMER: { icon: 'person-outline', label: t('auth.roleSwitch.hireProfessional'), desc: t('auth.roleSwitch.hireProfessionalDesc') },
+    COMPANY: { icon: 'business-outline', label: t('auth.roleSelect.weAreCompany'), desc: t('auth.roleSelect.weAreCompanyDesc') },
   }
 
-  const targetRole = target === 'TASKER' ? 'TASKER' : 'CUSTOMER'
+  const targetRole = target === 'TASKER' ? 'TASKER' : target === 'COMPANY' ? 'COMPANY' : 'CUSTOMER'
   const info = ROLE_INFO[targetRole]
   if (!info) return null
 
@@ -27,7 +28,8 @@ export default function RoleSwitchScreen() {
     setSwitching(true)
     try {
       await switchRole(targetRole)
-      if (targetRole === 'TASKER') router.replace('/(tasker)')
+      if (targetRole === 'TASKER') router.replace('/(auth)/onboarding/tasker-services')
+      else if (targetRole === 'COMPANY') router.replace('/(auth)/onboarding/company-setup')
       else router.replace('/(customer)')
     } catch {
       setSwitching(false)
