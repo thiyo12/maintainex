@@ -160,10 +160,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isEmail ? { email: trimmed, code } : { phone: trimmed, code }
     )
     await setAuthToken(res.token)
-    setUser(res.user)
-    await SecureStore.setItemAsync('auth_user', JSON.stringify(res.user))
+
+    let authenticatedUser = res.user as User
+    try {
+      const meRes = await auth.me()
+      authenticatedUser = {
+        ...authenticatedUser,
+        ...meRes.user,
+        needsOnboarding: meRes.needsOnboarding,
+      } as User
+    } catch {
+      // The OTP session is still valid; onboarding can be resolved on next launch.
+    }
+
+    setUser(authenticatedUser)
+    await SecureStore.setItemAsync('auth_user', JSON.stringify(authenticatedUser))
     await SecureStore.setItemAsync('last_active_at', String(Date.now()))
-    return res.user
+    return authenticatedUser
   }, [])
 
   const register = useCallback(async (data: { name: string; phone: string; email?: string; role: string }) => {
