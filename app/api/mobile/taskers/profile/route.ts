@@ -10,13 +10,12 @@ export async function GET(request: NextRequest) {
     if (!user || user.role !== 'TASKER') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const tasker = await prisma.taskerProfile.findUnique({
+    const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
       include: { user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } } },
     })
-    if (!tasker) {
-      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
-    }
     return NextResponse.json({
       id: tasker.id,
       userId: tasker.userId,
