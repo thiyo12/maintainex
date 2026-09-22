@@ -74,9 +74,17 @@ export default function LoginScreen() {
     setOtpError('')
     try {
       const user = await otpLogin(fullPhone, code)
-      if (user.role === 'TASKER') router.replace('/(tasker)')
-      else if (user.role === 'COMPANY') router.replace('/(company)')
-      else router.replace('/(customer)')
+      if (user.role === 'TASKER' && user.needsOnboarding) {
+        router.replace('/(auth)/onboarding/tasker-services')
+      } else if (user.role === 'COMPANY' && user.needsOnboarding) {
+        router.replace('/(auth)/onboarding/company-setup')
+      } else if (user.role === 'TASKER') {
+        router.replace('/(tasker)')
+      } else if (user.role === 'COMPANY') {
+        router.replace('/(company)')
+      } else {
+        router.replace('/(customer)')
+      }
     } catch (err: any) {
       let message = err?.message || 'Invalid code'
       try { message = JSON.parse(message).error || message } catch {}
