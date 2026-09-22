@@ -15,11 +15,12 @@ export async function GET(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const tasker = await prisma.taskerProfile.findUnique({
+    const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
       select: { id: true },
     })
-    if (!tasker) return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
 
     const [categories, existing] = await Promise.all([
       prisma.jobCategory.findMany({
@@ -87,11 +88,12 @@ export async function PUT(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const tasker = await prisma.taskerProfile.findUnique({
+    const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
       select: { id: true },
     })
-    if (!tasker) return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
 
     const body = await request.json()
     const skills: Array<{
