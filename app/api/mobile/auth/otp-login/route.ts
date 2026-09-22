@@ -27,17 +27,6 @@ async function ensureRoleProfile(user: any) {
       update: {},
       create: { userId: user.id },
     })
-  } else if (user.role === 'COMPANY') {
-    await prisma.companyProfile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: {
-        userId: user.id,
-        companyName: user.name || 'Service Company',
-        services: '[]',
-        serviceAreas: '[]',
-      },
-    })
   }
 }
 
