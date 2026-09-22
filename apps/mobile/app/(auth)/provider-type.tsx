@@ -4,6 +4,7 @@ import { Buildings, CaretRight, UserCircle } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
 
 import { getCurrentLanguage } from '../../lib/i18n'
+import { useAuth } from '../../lib/auth'
 import { v3 } from '../../theme/v3/tokens'
 import AuthShell from '../../components/v3/AuthShell'
 import V3NavBar from '../../components/v3/V3NavBar'
@@ -55,6 +56,7 @@ const COPY = {
 
 export default function ProviderTypeScreen() {
   const router = useRouter()
+  const { isAuthenticated, logout } = useAuth()
   const language = getCurrentLanguage()?.slice(0, 2)
   const copy = COPY[language === 'ta' || language === 'si' ? language : 'en']
 
@@ -72,6 +74,11 @@ export default function ProviderTypeScreen() {
     loop.start()
     return () => loop.stop()
   }, [appear, drift])
+
+  const beginRegistration = async (role: 'TASKER' | 'COMPANY') => {
+    if (isAuthenticated) await logout()
+    router.replace({ pathname: '/(auth)/register', params: { role } } as any)
+  }
 
   const softMove = useMemo(() => ({
     transform: [
@@ -101,7 +108,7 @@ export default function ProviderTypeScreen() {
         <TouchableOpacity
           style={[styles.providerCard, styles.individualCard]}
           activeOpacity={0.86}
-          onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'TASKER' } } as any)}
+          onPress={() => beginRegistration('TASKER')}
         >
           <Animated.View style={[styles.bigOrb, styles.individualOrb, softMove]} />
           <View style={styles.cardHeader}>
@@ -121,7 +128,7 @@ export default function ProviderTypeScreen() {
         <TouchableOpacity
           style={[styles.providerCard, styles.companyCard]}
           activeOpacity={0.86}
-          onPress={() => router.push({ pathname: '/(auth)/register', params: { role: 'COMPANY' } } as any)}
+          onPress={() => beginRegistration('COMPANY')}
         >
           <Animated.View
             style={[
