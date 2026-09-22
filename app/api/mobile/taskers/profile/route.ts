@@ -48,10 +48,13 @@ export async function PUT(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const tasker = await prisma.taskerProfile.findUnique({ where: { userId: user.id } })
-    if (!tasker) {
-      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
-    }
+    // Older/seeded TASKER users may predate the TaskerProfile row.
+    // Self-heal only the authenticated user's own provider profile.
+    const tasker = await prisma.taskerProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
+    })
 
     const { bio, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
