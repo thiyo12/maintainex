@@ -66,15 +66,6 @@ export async function POST(request: NextRequest) {
       await prisma.taskerProfile.create({
         data: { userId: user.id },
       })
-    } else if (userRole === 'COMPANY') {
-      await prisma.companyProfile.create({
-        data: {
-          userId: user.id,
-          companyName: name,
-          services: '[]',
-          serviceAreas: '[]',
-        },
-      })
     }
 
     const isCertRegistration = process.env.ALLOW_TEST_OTP === 'true' && email && email.endsWith('@maintainex-test.lk')
