@@ -20,11 +20,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify ownership
-    const tasker = await prisma.taskerProfile.findUnique({
+    const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
+      update: {},
+      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
       select: { id: true },
     })
-    if (!tasker) return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
 
     const taskerProfession = await prisma.taskerProfession.findUnique({
       where: { id: taskerProfessionId },
