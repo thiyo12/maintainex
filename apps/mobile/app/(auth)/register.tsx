@@ -164,7 +164,7 @@ export default function RegisterScreen() {
         if (user.needsOnboarding || user.taskerOnboardingStage === 'SERVICES') {
           router.replace('/(auth)/onboarding/tasker-services')
         } else if (identityReady || user.taskerOnboardingStage === 'READY') {
-          router.replace('/(tasker)')
+          router.replace('/(tasker)/(tabs)/profile' as any)
         } else if (user.taskerOnboardingStage === 'PENDING_APPROVAL') {
           router.replace('/(auth)/pending-approval')
         } else {
