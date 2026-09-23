@@ -1531,8 +1531,11 @@ model TaskerProfile {
   verifiedBy         String? // Admin ID who verified
   verifiedAt         DateTime?
 
-  bio           String?
-  hourlyRate    Float   @default(0)
+  bio               String?
+  dateOfBirth       DateTime?
+  address           String?
+  experienceSummary String?
+  hourlyRate        Float   @default(0)
   skills        String? // Category slugs
   serviceAreas  String? // District names
   countryCode   String  @default("LK")
