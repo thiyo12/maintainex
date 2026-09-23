@@ -265,36 +265,102 @@ export async function GET(request: NextRequest) {
       where.id = { in: quoteJobIds.map((quote) => quote.jobId) }
     } else if (role === 'provider') {
       where.status = 'OPEN'
+      where.countryCode = user.countryCode
       if (areaId) where.areaId = areaId
 
       let allowedCategoryIds: string[] = []
-      const selections = await prisma.taskerSkill.findMany({
-        where: { tasker: { userId: user.id } },
-        select: { job: { select: { categoryId: true } } },
-      })
 
-      if (selections.length > 0) {
-        allowedCategoryIds = [...new Set(selections.map((selection) => selection.job.categoryId))]
-      } else {
-        const profile = await prisma.taskerProfile.findUnique({
+      if (user.role === 'COMPANY') {
+        const companyProfile = await prisma.companyProfile.findUnique({
           where: { userId: user.id },
-          select: { skills: true },
+          select: {
+            services: true,
+            specialties: { select: { categoryId: true, jobId: true } },
+          },
         })
-        const slugs: string[] = []
-        if (profile?.skills) {
-          try {
-            const parsed = JSON.parse(profile.skills)
-            if (Array.isArray(parsed)) slugs.push(...parsed.map(String))
-          } catch {
-            slugs.push(profile.skills)
+
+        if (companyProfile) {
+          const directCategoryIds = companyProfile.specialties
+            .map((specialty) => specialty.categoryId)
+            .filter((id): id is string => Boolean(id))
+
+          const specialtyJobIds = companyProfile.specialties
+            .map((specialty) => specialty.jobId)
+            .filter((id): id is string => Boolean(id))
+
+          const specialtyJobs = specialtyJobIds.length > 0
+            ? await prisma.templateJob.findMany({
+                where: { id: { in: specialtyJobIds }, isActive: true },
+                select: { categoryId: true },
+              })
+            : []
+
+          const serviceKeys: string[] = []
+          if (companyProfile.services) {
+            try {
+              const parsed = JSON.parse(companyProfile.services)
+              if (Array.isArray(parsed)) serviceKeys.push(...parsed.map(String))
+            } catch {
+              serviceKeys.push(...companyProfile.services.split(',').map((value) => value.trim()).filter(Boolean))
+            }
           }
+
+          const serviceCategories = serviceKeys.length > 0
+            ? await prisma.jobCategory.findMany({
+                where: {
+                  isActive: true,
+                  OR: [
+                    { id: { in: serviceKeys } },
+                    { slug: { in: serviceKeys } },
+                    { name: { in: serviceKeys } },
+                  ],
+                },
+                select: { id: true },
+              })
+            : []
+
+          allowedCategoryIds = [...new Set([
+            ...directCategoryIds,
+            ...specialtyJobs.map((job) => job.categoryId),
+            ...serviceCategories.map((category) => category.id),
+          ])]
         }
-        if (slugs.length > 0) {
-          const categories = await prisma.jobCategory.findMany({
-            where: { slug: { in: slugs }, isActive: true },
-            select: { id: true },
+      } else {
+        const selections = await prisma.taskerSkill.findMany({
+          where: { tasker: { userId: user.id } },
+          select: { job: { select: { categoryId: true } } },
+        })
+
+        if (selections.length > 0) {
+          allowedCategoryIds = [...new Set(selections.map((selection) => selection.job.categoryId))]
+        } else {
+          const profile = await prisma.taskerProfile.findUnique({
+            where: { userId: user.id },
+            select: { skills: true },
           })
-          allowedCategoryIds = categories.map((category) => category.id)
+          const slugs: string[] = []
+          if (profile?.skills) {
+            try {
+              const parsed = JSON.parse(profile.skills)
+              if (Array.isArray(parsed)) slugs.push(...parsed.map(String))
+            } catch {
+              slugs.push(profile.skills)
+            }
+          }
+          if (slugs.length > 0) {
+            const categories = await prisma.jobCategory.findMany({
+              where: {
+                isActive: true,
+                OR: [
+                  { id: { in: slugs } },
+                  { slug: { in: slugs } },
+                  { name: { in: slugs } },
+                ],
+              },
+              select: { id: true },
+            })
+            allowedCategoryIds = categories.map((category) => category.id)
+          }
         }
       }
 

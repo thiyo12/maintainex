@@ -26,6 +26,7 @@ vi.mock('@/lib/auth/marketplace-session', () => ({
 
 vi.mock('@/lib/email', () => ({ sendOtpEmail: vi.fn() }))
 vi.mock('@/lib/sms', () => ({ sendOtpSms: vi.fn() }))
+vi.mock('@/lib/demo-marketplace', () => ({ provisionInteractiveDemoMarketplace: vi.fn(async () => undefined) }))
 
 import { POST } from '@/app/api/mobile/auth/otp-login/route'
 import { prisma } from '@/lib/prisma'
