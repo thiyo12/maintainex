@@ -385,6 +385,14 @@ async function validatePurposeTx(
     case 'WORK_START': {
       if (job.status !== 'IN_PROGRESS') return false
       if (workspace?.progressStatus !== 'ACCEPTED') return false
+
+      const activePin = await tx.jobVerificationPin.findFirst({
+        where: { jobId, status: 'ACTIVE' },
+        orderBy: { version: 'desc' },
+        select: { arrivalVerifiedAt: true },
+      })
+      if (!activePin?.arrivalVerifiedAt) return false
+
       if (job.requiresInspection) {
         const inspection = await tx.jobInspection.findFirst({
           where: { jobId, status: 'COMPLETED' },
