@@ -237,6 +237,14 @@ beforeEach(async () => {
   await prisma.jobVerificationPin.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { status: 'QUOTE_ACCEPTED', approvedQuoteId: null },
+  })
+  await prisma.jobWorkspace.update({
+    where: { jobId: jobAId },
+    data: { progressStatus: 'ACCEPTED' },
+  })
 })
 
 describe('Phase 10.5 — Job Verification PIN', () => {
@@ -449,6 +457,24 @@ describe('Phase 10.5 — Job Verification PIN', () => {
   })
 
   describe('Lifecycle Purpose Validation', () => {
+    it('WORK_START PIN advances a newly accepted job and repairs approvedQuoteId', async () => {
+      const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+      const { pin } = await generateJobPin(jobAId, customerAId)
+
+      const result = await verifyJobPin(jobAId, providerId, pin, 'WORK_START')
+      expect(result.valid).toBe(true)
+
+      const [job, workspace, acceptedQuote] = await Promise.all([
+        prisma.marketplaceJob.findUnique({ where: { id: jobAId } }),
+        prisma.jobWorkspace.findUnique({ where: { jobId: jobAId } }),
+        prisma.jobQuote.findFirst({ where: { jobId: jobAId, status: 'ACCEPTED' } }),
+      ])
+
+      expect(job!.status).toBe('IN_PROGRESS')
+      expect(workspace!.progressStatus).toBe('IN_PROGRESS')
+      expect(job!.approvedQuoteId).toBe(acceptedQuote!.id)
+    })
+
     it('WORK_START rejects when inspection required but not completed', async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
       const { pin } = await generateJobPin(inspectionFirstJobId, customerAId)

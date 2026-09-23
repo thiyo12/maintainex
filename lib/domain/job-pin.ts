@@ -270,15 +270,27 @@ export async function verifyJobPin(
       data: updateData,
     })
 
-    // 9. Execute canonical lifecycle transition for WORK_START (within same transaction)
+    // 9. WORK_START PIN is the canonical customer authorization to begin work.
+    // Advance the job + workspace together in the same transaction so the app
+    // cannot show "started" in one state machine while the other remains scheduled.
     if (purpose === 'WORK_START') {
-      const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
-      if (workspace && workspace.progressStatus === 'ACCEPTED') {
-        await tx.jobWorkspace.updateMany({
-          where: { jobId, progressStatus: 'ACCEPTED' },
-          data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
-        })
-      }
+      const acceptedQuote = await tx.jobQuote.findFirst({
+        where: { jobId, status: 'ACCEPTED' },
+        select: { id: true },
+      })
+      if (!acceptedQuote) throw new Error('Accepted quote not found during WORK_START')
+
+      const jobChanged = await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
+        data: { status: 'IN_PROGRESS', approvedQuoteId: acceptedQuote.id },
+      })
+      if (jobChanged.count !== 1) throw new Error('Job state changed during WORK_START')
+
+      const workspaceChanged = await tx.jobWorkspace.updateMany({
+        where: { jobId, progressStatus: 'ACCEPTED' },
+        data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
+      })
+      if (workspaceChanged.count !== 1) throw new Error('Workspace state changed during WORK_START')
     }
 
     // 10. Emit security events
@@ -383,7 +395,10 @@ async function validatePurposeTx(
       return job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS'
 
     case 'WORK_START': {
-      if (job.status !== 'IN_PROGRESS') return false
+      // The customer PIN is the authorization to start work. A normal accepted
+      // job is still QUOTE_ACCEPTED at this point; successful verification
+      // atomically advances both the job and workspace to IN_PROGRESS.
+      if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) return false
       if (workspace?.progressStatus !== 'ACCEPTED') return false
       if (job.requiresInspection) {
         const inspection = await tx.jobInspection.findFirst({
@@ -392,7 +407,13 @@ async function validatePurposeTx(
         if (!inspection) return false
         if (!inspection.verifiedByCustomer) return false
       }
-      if (!job.approvedQuoteId) return false
+      const acceptedQuote = job.approvedQuoteId
+        ? { id: job.approvedQuoteId }
+        : await tx.jobQuote.findFirst({
+            where: { jobId, status: 'ACCEPTED' },
+            select: { id: true },
+          })
+      if (!acceptedQuote) return false
       return true
     }
 

@@ -118,7 +118,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
         categoryId,
         budgetType: 'FIXED',
         photos: '[]',
-        status: 'IN_PROGRESS',
+        status: 'QUOTE_ACCEPTED',
         countryCode: 'LK',
       },
     })
@@ -191,6 +191,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
     if (!prisma) return
     await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "jobId" IN ($1, $2, $3)`, jobAId, jobBId, workStartJobId)
     await prisma.$executeRawUnsafe(`UPDATE "JobWorkspace" SET "progressStatus" = 'ACCEPTED' WHERE "jobId" = $1`, workStartJobId)
+    await prisma.$executeRawUnsafe(`UPDATE "MarketplaceJob" SET "status" = 'QUOTE_ACCEPTED', "approvedQuoteId" = $2 WHERE "id" = $1`, workStartJobId, workStartQuoteId)
   })
 
   describe('Database Constraints', () => {
@@ -260,7 +261,9 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       const { pin } = await generateJobPin(workStartJobId, customerAId)
 
       const preWorkspace = await prisma.jobWorkspace.findUnique({ where: { jobId: workStartJobId } })
+      const preJob = await prisma.marketplaceJob.findUnique({ where: { id: workStartJobId } })
       expect(preWorkspace!.progressStatus).toBe('ACCEPTED')
+      expect(preJob!.status).toBe('QUOTE_ACCEPTED')
 
       const batch1 = await Promise.allSettled(
         Array.from({ length: 5 }, () =>
@@ -304,7 +307,9 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       expect(result.valid).toBe(false)
 
       const postWorkspace = await prisma.jobWorkspace.findUnique({ where: { jobId: workStartJobId } })
+      const postJob = await prisma.marketplaceJob.findUnique({ where: { id: workStartJobId } })
       expect(postWorkspace!.progressStatus).toBe('ACCEPTED')
+      expect(postJob!.status).toBe('QUOTE_ACCEPTED')
     })
 
     it('second WORK_START attempt is rejected after first consumed the purpose', { timeout: 30000 }, async () => {
