@@ -110,7 +110,6 @@ export default function V2ProviderManageJobScreen() {
         return
       }
       setLocationSharing(true)
-      await handleUpdateProgress('IN_PROGRESS')
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
     }
@@ -308,6 +307,15 @@ export default function V2ProviderManageJobScreen() {
             >
               <ShieldCheck size={16} color={v3.colors.ink} weight="bold" />
               <Text style={styles.secondaryActionText}>Verify arrival PIN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.primaryAction}
+              activeOpacity={0.78}
+              onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`) as any)}
+            >
+              <Play size={16} color={v3.colors.paper} weight="fill" />
+              <Text style={styles.primaryActionText}>Start work with PIN</Text>
             </TouchableOpacity>
           </>
         ) : null}
