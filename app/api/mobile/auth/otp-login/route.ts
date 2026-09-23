@@ -6,7 +6,7 @@ import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/mark
 import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
 import { sendOtpSms } from '@/lib/sms'
-import { isTestOtpAllowed, isSyntheticCertAccount } from '@/lib/test-cert'
+import { getInteractiveTestRole, INTERACTIVE_TEST_PHONES, isTestOtpAllowed, isSyntheticCertAccount, type InteractiveTestRole } from '@/lib/test-cert'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -41,6 +41,152 @@ async function findUserByIdentifier(identifier: string) {
       phone: { endsWith: digits },
       ...(countries.length > 0 ? { countryCode: { in: countries } } : {}),
     },
+  })
+}
+
+async function ensureInteractiveDemoAccount(role: InteractiveTestRole) {
+  const phone = INTERACTIVE_TEST_PHONES[role]
+  const email = `demo.${role.toLowerCase()}@maintainex-test.lk`
+  const name = role === 'CUSTOMER'
+    ? 'MaintainEX Demo Customer'
+    : role === 'TASKER'
+      ? 'MaintainEX Demo Tasker'
+      : 'MaintainEX Demo Owner'
+
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.user.findUnique({ where: { email } })
+    const user = existing
+      ? await tx.user.update({
+          where: { id: existing.id },
+          data: {
+            name,
+            phone,
+            phoneVerified: true,
+            role,
+            countryCode: 'US',
+            isActive: true,
+            isSuspended: false,
+            isBanned: false,
+            ...(role === 'TASKER' ? { identityStatus: 'VERIFIED' } : {}),
+          },
+        })
+      : await tx.user.create({
+          data: {
+            email,
+            passwordHash: '',
+            name,
+            phone,
+            phoneVerified: true,
+            role,
+            countryCode: 'US',
+            isActive: true,
+            ...(role === 'TASKER' ? { identityStatus: 'VERIFIED' } : {}),
+          },
+        })
+
+    if (role === 'CUSTOMER') {
+      await tx.customerProfile.upsert({
+        where: { userId: user.id },
+        update: {},
+        create: { userId: user.id, source: 'BETA_DEMO' },
+      })
+    }
+
+    if (role === 'TASKER') {
+      const sampleJob = await tx.templateJob.findFirst({
+        where: { isActive: true, isCompanyOnly: false },
+        orderBy: [{ isPopular: 'desc' }, { name: 'asc' }],
+        select: {
+          id: true,
+          currency: true,
+          category: { select: { id: true, slug: true } },
+        },
+      })
+      const skillKeys = sampleJob
+        ? [sampleJob.category.id, sampleJob.category.slug].filter(Boolean)
+        : []
+
+      const profile = await tx.taskerProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          skills: JSON.stringify(skillKeys),
+          countryCode: 'US',
+          verificationStatus: 'VERIFIED',
+          isVerified: true,
+          isOnline: true,
+        },
+        create: {
+          userId: user.id,
+          skills: JSON.stringify(skillKeys),
+          countryCode: 'US',
+          verificationStatus: 'VERIFIED',
+          isVerified: true,
+          isOnline: true,
+        },
+      })
+
+      if (sampleJob) {
+        await tx.taskerSkill.upsert({
+          where: { taskerId_jobId: { taskerId: profile.id, jobId: sampleJob.id } },
+          update: {},
+          create: {
+            taskerId: profile.id,
+            jobId: sampleJob.id,
+            experienceYears: 3,
+            experienceLevel: 2,
+            hourlyRate: 0,
+            fixedRate: 0,
+            currency: sampleJob.currency || 'USD',
+            countryCode: 'US',
+          },
+        })
+      }
+    }
+
+    if (role === 'COMPANY') {
+      const profile = await tx.companyProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          companyName: 'MaintainEX Demo Company',
+          countryCode: 'US',
+          verificationStatus: 'VERIFIED',
+          isVerified: true,
+        },
+        create: {
+          userId: user.id,
+          companyName: 'MaintainEX Demo Company',
+          services: '[]',
+          serviceAreas: '[]',
+          countryCode: 'US',
+          verificationStatus: 'VERIFIED',
+          isVerified: true,
+        },
+      })
+
+      const owner = await tx.teamMember.findFirst({
+        where: { companyId: profile.id, userId: user.id },
+        select: { id: true },
+      })
+      if (owner) {
+        await tx.teamMember.update({
+          where: { id: owner.id },
+          data: { name, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+        })
+      } else {
+        await tx.teamMember.create({
+          data: {
+            companyId: profile.id,
+            userId: user.id,
+            name,
+            role: 'COMPANY_OWNER',
+            status: 'ACTIVE',
+            skills: '[]',
+          },
+        })
+      }
+    }
+
+    return user
   })
 }
 
@@ -80,7 +226,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email or phone required' }, { status: 400 })
     }
 
-    const user = await findUserByIdentifier(identifier)
+    const interactiveRole = phoneId ? getInteractiveTestRole(phoneId) : null
+    const user = interactiveRole
+      ? await ensureInteractiveDemoAccount(interactiveRole)
+      : await findUserByIdentifier(identifier)
+
     if (!user) {
       return NextResponse.json({ error: 'If an account exists, an OTP has been sent.' }, { status: 200 })
     }
