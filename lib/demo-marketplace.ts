@@ -296,7 +296,12 @@ export async function provisionInteractiveDemoMarketplace(
 
   await prisma.user.update({
     where: { id: userId },
-    data: { countryCode },
+    data: {
+      countryCode,
+      ...(role === 'CUSTOMER'
+        ? {}
+        : { identityStatus: 'VERIFIED', phoneVerified: true }),
+    },
   })
 
   if (role === 'CUSTOMER') {
