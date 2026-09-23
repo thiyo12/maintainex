@@ -4,7 +4,7 @@ import { CaretDown, CaretUp, CheckCircle } from 'phosphor-react-native'
 import { useRouter } from 'expo-router'
 
 import { useAuth } from '../../../lib/auth'
-import { auth, jobCategories, skillsApi } from '../../../lib/api'
+import { jobCategories, skillsApi } from '../../../lib/api'
 import { v3 } from '../../../theme/v3/tokens'
 import V3Button from '../../../components/v3/V3Button'
 import V3NavBar from '../../../components/v3/V3NavBar'
@@ -166,19 +166,12 @@ export default function TaskerServicesOnboarding() {
       }))
       await skillsApi.save(payload)
 
-      let freshUser = user
-      try {
-        const me = await auth.me()
-        freshUser = { ...(user || {}), ...me.user, needsOnboarding: me.needsOnboarding } as any
-      } catch {}
       await refreshUser()
 
-      const identity = String((freshUser as any)?.identityStatus || 'NOT_SUBMITTED').toUpperCase()
-      if (identity === 'VERIFIED' || identity === 'APPROVED') {
-        router.replace('/(tasker)' as any)
-      } else {
-        router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
-      }
+      // Service selection is profile readiness, not an authentication gate.
+      // Save successfully and return to the Tasker workspace; identity and
+      // other readiness items remain available from Tasker Profile.
+      router.replace('/(tasker)' as any)
     } catch (err: any) {
       let message = err?.message || 'Unable to save services'
       try { message = JSON.parse(message).error || message } catch {}
