@@ -54,11 +54,14 @@ async function ensureInteractiveDemoAccount(role: InteractiveTestRole) {
       : 'MaintainEX Demo Owner'
 
   return prisma.$transaction(async (tx) => {
-    const existing = await tx.user.findUnique({ where: { email } })
+    const existing = await tx.user.findFirst({
+      where: { OR: [{ email }, { phone }] },
+    })
     const user = existing
       ? await tx.user.update({
           where: { id: existing.id },
           data: {
+            email,
             name,
             phone,
             phoneVerified: true,
