@@ -92,7 +92,21 @@ export async function PUT(request: NextRequest) {
     const updateData: any = {}
     if (bio !== undefined) updateData.bio = bio
     if (experienceSummary !== undefined) updateData.experienceSummary = typeof experienceSummary === 'string' ? experienceSummary.trim() : null
-    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null
+    if (dateOfBirth !== undefined) {
+      if (!dateOfBirth) {
+        updateData.dateOfBirth = null
+      } else {
+        const rawDate = String(dateOfBirth).trim()
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+          return NextResponse.json({ error: 'Date of birth must use YYYY-MM-DD' }, { status: 400 })
+        }
+        const parsedDate = new Date(`${rawDate}T00:00:00.000Z`)
+        if (Number.isNaN(parsedDate.getTime()) || parsedDate >= new Date()) {
+          return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 })
+        }
+        updateData.dateOfBirth = parsedDate
+      }
+    }
     if (address !== undefined) updateData.address = typeof address === 'string' ? address.trim() : null
     if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
     if (skills !== undefined) updateData.skills = JSON.stringify(skills)

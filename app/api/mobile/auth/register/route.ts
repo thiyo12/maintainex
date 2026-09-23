@@ -13,13 +13,6 @@ function normalizePhone(value: string): string {
   return digits ? `+${digits}` : ''
 }
 
-function validDate(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
-  const parsed = new Date(`${value}T00:00:00.000Z`)
-  if (Number.isNaN(parsed.getTime()) || parsed >= new Date()) return null
-  return parsed
-}
-
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown'
@@ -37,6 +30,9 @@ export async function POST(request: NextRequest) {
         : body?.role === 'CUSTOMER'
           ? 'CUSTOMER'
           : ''
+
+    const name = typeof body?.name === 'string' ? body.name.trim() : ''
+    const companyName = typeof body?.companyName === 'string' ? body.companyName.trim() : ''
     const phone = normalizePhone(typeof body?.phone === 'string' ? body.phone : '')
     const fullDigits = phone.replace(/\D/g, '')
     const digits = fullDigits.slice(-9)
@@ -47,8 +43,14 @@ export async function POST(request: NextRequest) {
     if (!role) {
       return NextResponse.json({ error: 'Choose Customer, Individual provider, or Company registration' }, { status: 400 })
     }
+    if (name.length < 2) {
+      return NextResponse.json({ error: 'Full name is required' }, { status: 400 })
+    }
     if (!phone || digits.length < 7) {
       return NextResponse.json({ error: 'Valid mobile number required' }, { status: 400 })
+    }
+    if (role === 'COMPANY' && companyName.length < 2) {
+      return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
     }
 
     const rawEmail = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
@@ -59,51 +61,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let taskerInput: {
-      name: string
-      dateOfBirth: Date
-      address: string
-      experienceYears: number
-      experienceSummary: string
-      serviceJobIds: string[]
-    } | null = null
-
-    let companyOwnerName = ''
-    if (role === 'COMPANY') {
-      companyOwnerName = typeof body?.name === 'string' ? body.name.trim() : ''
-      if (companyOwnerName.length < 2) {
-        return NextResponse.json({ error: 'Company owner full name is required' }, { status: 400 })
-      }
-    }
+    const rawServiceJobIds: unknown[] = Array.isArray(body?.serviceJobIds) ? body.serviceJobIds : []
+    const serviceJobIds: string[] = Array.from(
+      new Set(rawServiceJobIds.filter((id): id is string => typeof id === 'string' && id.length > 0))
+    )
 
     if (role === 'TASKER') {
-      const name = typeof body?.name === 'string' ? body.name.trim() : ''
-      const dateOfBirth = validDate(typeof body?.dateOfBirth === 'string' ? body.dateOfBirth.trim() : '')
-      const address = typeof body?.address === 'string' ? body.address.trim() : ''
-      const experienceYears = Number(body?.experienceYears)
-      const experienceSummary = typeof body?.experienceSummary === 'string' ? body.experienceSummary.trim() : ''
-      const rawServiceJobIds: unknown[] = Array.isArray(body?.serviceJobIds) ? body.serviceJobIds : []
-      const serviceJobIds: string[] = Array.from(
-        new Set(rawServiceJobIds.filter((id): id is string => typeof id === 'string' && id.length > 0))
-      )
-
-      if (name.length < 2) return NextResponse.json({ error: 'Full legal name is required' }, { status: 400 })
-      if (!dateOfBirth) return NextResponse.json({ error: 'Valid date of birth is required' }, { status: 400 })
-      if (address.length < 5) return NextResponse.json({ error: 'Full address is required' }, { status: 400 })
-      if (!Number.isInteger(experienceYears) || experienceYears < 0 || experienceYears > 60) {
-        return NextResponse.json({ error: 'Work experience must be between 0 and 60 years' }, { status: 400 })
-      }
-      if (experienceSummary.length < 10) {
-        return NextResponse.json({ error: 'Tell us briefly about your work experience' }, { status: 400 })
-      }
       if (serviceJobIds.length === 0) {
         return NextResponse.json({ error: 'Select at least one service you can provide' }, { status: 400 })
       }
       if (serviceJobIds.length > MAX_TASKER_SERVICES) {
         return NextResponse.json({ error: `Select up to ${MAX_TASKER_SERVICES} services during registration` }, { status: 400 })
       }
-
-      taskerInput = { name, dateOfBirth, address, experienceYears, experienceSummary, serviceJobIds }
     }
 
     const existingPhone = await prisma.user.findFirst({
@@ -113,7 +82,6 @@ export async function POST(request: NextRequest) {
           { countryCode, phone: { endsWith: digits } },
         ],
       },
-      include: { taskerProfile: true },
     })
 
     if (existingPhone?.phoneVerified) {
@@ -131,10 +99,10 @@ export async function POST(request: NextRequest) {
     }
 
     let selectedJobs: Array<{ id: string; categoryId: string; currency: string; category: { id: string; slug: string | null } }> = []
-    if (taskerInput) {
+    if (role === 'TASKER') {
       selectedJobs = await prisma.templateJob.findMany({
         where: {
-          id: { in: taskerInput.serviceJobIds },
+          id: { in: serviceJobIds },
           isActive: true,
           isCompanyOnly: false,
         },
@@ -145,19 +113,13 @@ export async function POST(request: NextRequest) {
           category: { select: { id: true, slug: true } },
         },
       })
-      if (selectedJobs.length !== taskerInput.serviceJobIds.length) {
+      if (selectedJobs.length !== serviceJobIds.length) {
         return NextResponse.json({ error: 'One or more selected services are unavailable' }, { status: 400 })
       }
     }
 
-    const displayName = role === 'TASKER'
-      ? taskerInput!.name
-      : role === 'COMPANY'
-        ? companyOwnerName
-        : (typeof body?.name === 'string' && body.name.trim().length >= 2 ? body.name.trim() : `Customer ${digits.slice(-4)}`)
-
     const email = rawEmail || existingPhone?.email || `${fullDigits}@maintainex.pending`
-    const isCertRegistration = isSyntheticCertAccount({ email, name: displayName, phone })
+    const isCertRegistration = isSyntheticCertAccount({ email, name, phone })
     const otp = isCertRegistration ? '000000' : randomInt(0, 1000000).toString().padStart(6, '0')
     const codeHash = await bcrypt.hash(otp, 10)
 
@@ -166,7 +128,7 @@ export async function POST(request: NextRequest) {
         ? await tx.user.update({
             where: { id: existingPhone.id },
             data: {
-              name: displayName,
+              name,
               phone,
               email,
               role,
@@ -176,7 +138,7 @@ export async function POST(request: NextRequest) {
           })
         : await tx.user.create({
             data: {
-              name: displayName,
+              name,
               phone,
               email,
               passwordHash: '',
@@ -186,15 +148,11 @@ export async function POST(request: NextRequest) {
             },
           })
 
-      if (role === 'TASKER' && taskerInput) {
+      if (role === 'TASKER') {
         const categoryKeys = [...new Set(selectedJobs.flatMap(job => [job.category.id, job.category.slug].filter(Boolean) as string[]))]
         const profile = await tx.taskerProfile.upsert({
           where: { userId: user.id },
           update: {
-            bio: taskerInput.experienceSummary,
-            experienceSummary: taskerInput.experienceSummary,
-            dateOfBirth: taskerInput.dateOfBirth,
-            address: taskerInput.address,
             countryCode,
             skills: JSON.stringify(categoryKeys),
             verificationStatus: 'PENDING',
@@ -203,10 +161,6 @@ export async function POST(request: NextRequest) {
           },
           create: {
             userId: user.id,
-            bio: taskerInput.experienceSummary,
-            experienceSummary: taskerInput.experienceSummary,
-            dateOfBirth: taskerInput.dateOfBirth,
-            address: taskerInput.address,
             countryCode,
             skills: JSON.stringify(categoryKeys),
             verificationStatus: 'PENDING',
@@ -216,18 +170,56 @@ export async function POST(request: NextRequest) {
         })
 
         await tx.taskerSkill.deleteMany({ where: { taskerId: profile.id } })
-        const experienceLevel = taskerInput.experienceYears >= 5 ? 3 : taskerInput.experienceYears >= 2 ? 2 : 1
         for (const job of selectedJobs) {
           await tx.taskerSkill.create({
             data: {
               taskerId: profile.id,
               jobId: job.id,
-              experienceYears: taskerInput.experienceYears,
-              experienceLevel,
+              experienceYears: 0,
+              experienceLevel: 1,
               hourlyRate: 0,
               fixedRate: 0,
               currency: job.currency || (countryCode === 'LK' ? 'LKR' : 'USD'),
               countryCode,
+            },
+          })
+        }
+      }
+
+      if (role === 'COMPANY') {
+        const profile = await tx.companyProfile.upsert({
+          where: { userId: user.id },
+          update: {
+            companyName,
+            countryCode,
+          },
+          create: {
+            userId: user.id,
+            companyName,
+            services: '[]',
+            serviceAreas: '[]',
+            countryCode,
+          },
+        })
+
+        const membership = await tx.teamMember.findFirst({
+          where: { companyId: profile.id, userId: user.id },
+          select: { id: true },
+        })
+        if (membership) {
+          await tx.teamMember.update({
+            where: { id: membership.id },
+            data: { name, role: 'COMPANY_OWNER', status: 'ACTIVE' },
+          })
+        } else {
+          await tx.teamMember.create({
+            data: {
+              companyId: profile.id,
+              userId: user.id,
+              name,
+              role: 'COMPANY_OWNER',
+              status: 'ACTIVE',
+              skills: '[]',
             },
           })
         }
@@ -252,7 +244,7 @@ export async function POST(request: NextRequest) {
 
     if (!isCertRegistration) {
       try {
-        await sendOtpSms(phone, otp)
+        await sendOtpSms(phone, otp, countryCode)
       } catch (error) {
         console.error('Registration SMS error:', error)
         return NextResponse.json({
