@@ -25,6 +25,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    const [taskerPresence, ownedCompany, companyMembership] = await Promise.all([
+      prisma.taskerProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+      prisma.companyProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
+      prisma.teamMember.findFirst({ where: { userId: user.id, status: 'ACTIVE' }, select: { companyId: true } }),
+    ])
+    const profileSet = new Set<string>(['CUSTOMER', fullUser.role])
+    if (taskerPresence) profileSet.add('TASKER')
+    if (ownedCompany || companyMembership) profileSet.add('COMPANY')
+
     let extra = {}
     let needsOnboarding = false
     let tierLevel = 'EXPLORER'
@@ -33,9 +42,24 @@ export async function GET(request: NextRequest) {
     if (fullUser.role === 'TASKER') {
       const profile = await prisma.taskerProfile.findUnique({
         where: { userId: user.id },
-        select: { skills: true },
+        select: { skills: true, dateOfBirth: true, address: true, bio: true, experienceSummary: true },
       })
       needsOnboarding = !profile || safeParseJsonArr(profile.skills).length === 0
+      const identity = (fullUser.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+      const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
+      const taskerOnboardingStage = needsOnboarding
+        ? 'SERVICES'
+        : identityReady
+          ? 'READY'
+          : (identity === 'NOT_SUBMITTED' || identity === 'REJECTED')
+            ? 'IDENTITY'
+            : 'PENDING_APPROVAL'
+      extra = {
+        taskerOnboardingStage,
+        taskerDateOfBirth: profile?.dateOfBirth ? profile.dateOfBirth.toISOString().split('T')[0] : null,
+        taskerAddress: profile?.address || null,
+        taskerExperienceSummary: profile?.experienceSummary || profile?.bio || null,
+      }
     } else if (fullUser.role === 'COMPANY') {
       const profile = await prisma.companyProfile.findUnique({
         where: { userId: user.id },
@@ -68,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      user: { ...fullUser, tierLevel, completedJobs, totalSpent, ...extra },
+      user: { ...fullUser, tierLevel, completedJobs, totalSpent, availableProfiles: Array.from(profileSet), ...extra },
       needsOnboarding,
     })
   } catch (error) {

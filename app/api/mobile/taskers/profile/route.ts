@@ -13,13 +13,31 @@ export async function GET(request: NextRequest) {
     const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
-      create: { userId: user.id, countryCode: user.countryCode || 'LK' },
-      include: { user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } } },
+      create: {
+        userId: user.id,
+        countryCode: user.countryCode || 'LK',
+        verificationStatus: 'PENDING',
+        isVerified: false,
+        isOnline: false,
+        skills: '[]',
+      },
+      include: {
+        user: { select: { id: true, name: true, phone: true, email: true, nickname: true, identityStatus: true } },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          include: { reviewer: { select: { name: true } } },
+        },
+        taskerSkills: { select: { experienceYears: true } },
+      },
     })
     return NextResponse.json({
       id: tasker.id,
       userId: tasker.userId,
       bio: tasker.bio,
+      experienceSummary: tasker.experienceSummary,
+      dateOfBirth: tasker.dateOfBirth ? tasker.dateOfBirth.toISOString().split('T')[0] : null,
+      address: tasker.address,
       hourlyRate: tasker.hourlyRate,
       skills: safeParseJsonArr(tasker.skills),
       serviceAreas: safeParseJsonArr(tasker.serviceAreas),
@@ -30,6 +48,16 @@ export async function GET(request: NextRequest) {
       latitude: tasker.latitude,
       longitude: tasker.longitude,
       profileImage: tasker.profileImage,
+      completionRate: tasker.completionRate,
+      avgResponseMin: tasker.avgResponseMin,
+      experienceYears: tasker.taskerSkills.reduce((max, skill) => Math.max(max, skill.experienceYears), 0),
+      reviews: tasker.reviews.map((review) => ({
+        id: review.id,
+        reviewerName: review.reviewer.name,
+        rating: review.rating,
+        comment: review.comment,
+        createdAt: review.createdAt.toISOString(),
+      })),
       user: tasker.user,
     })
   } catch (error) {
@@ -47,22 +75,34 @@ export async function PUT(request: NextRequest) {
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    await prisma.taskerProfile.upsert({
+    const tasker = await prisma.taskerProfile.upsert({
       where: { userId: user.id },
       update: {},
-      create: { userId: user.id },
+      create: {
+        userId: user.id,
+        countryCode: user.countryCode || 'LK',
+        verificationStatus: 'PENDING',
+        isVerified: false,
+        isOnline: false,
+        skills: '[]',
+      },
     })
 
-    const { bio, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
+    const { bio, experienceSummary, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
     const updateData: any = {}
     if (bio !== undefined) updateData.bio = bio
+    if (experienceSummary !== undefined) updateData.experienceSummary = typeof experienceSummary === 'string' ? experienceSummary.trim() : null
+    if (dateOfBirth !== undefined) updateData.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null
+    if (address !== undefined) updateData.address = typeof address === 'string' ? address.trim() : null
     if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
     if (skills !== undefined) updateData.skills = JSON.stringify(skills)
     if (serviceAreas !== undefined) updateData.serviceAreas = JSON.stringify(serviceAreas)
     if (profileImage !== undefined) updateData.profileImage = profileImage
 
     const userUpdate: any = {}
-    if (phone !== undefined) userUpdate.phone = phone
+    if (phone !== undefined && phone !== user.phone) {
+      return NextResponse.json({ error: 'Mobile number changes require OTP verification.' }, { status: 400 })
+    }
     if (nickname !== undefined) userUpdate.nickname = nickname?.trim() || null
 
     if (name !== undefined) {
@@ -86,6 +126,9 @@ export async function PUT(request: NextRequest) {
       id: updated.id,
       userId: updated.userId,
       bio: updated.bio,
+      experienceSummary: updated.experienceSummary,
+      dateOfBirth: updated.dateOfBirth ? updated.dateOfBirth.toISOString().split('T')[0] : null,
+      address: updated.address,
       hourlyRate: updated.hourlyRate,
       skills: safeParseJsonArr(updated.skills),
       serviceAreas: safeParseJsonArr(updated.serviceAreas),
