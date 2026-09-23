@@ -159,9 +159,20 @@ export default function RegisterScreen() {
     try {
       const user = await verifyRegisterOtp(fullPhone, candidate, 'PHONE_VERIFICATION')
       if (user?.role === 'TASKER') {
-        router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+        const identity = String(user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
+        const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
+        if (user.needsOnboarding || user.taskerOnboardingStage === 'SERVICES') {
+          router.replace('/(auth)/onboarding/tasker-services')
+        } else if (identityReady || user.taskerOnboardingStage === 'READY') {
+          router.replace('/(tasker)')
+        } else if (user.taskerOnboardingStage === 'PENDING_APPROVAL') {
+          router.replace('/(auth)/pending-approval')
+        } else {
+          router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
+        }
       } else if (user?.role === 'COMPANY') {
-        router.replace('/(auth)/onboarding/company-setup')
+        if (user.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
+        else router.replace('/(company)')
       } else {
         router.replace('/(customer)')
       }
