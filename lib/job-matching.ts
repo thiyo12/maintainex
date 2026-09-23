@@ -25,7 +25,7 @@ export interface MatchCandidate {
     longitude: number | null
     serviceRadius: number | null
     compositeScore: number
-    user: { id: string; name: string | null; pushToken: string | null; isSuspended: boolean }
+    user: { id: string; name: string | null; email: string; pushToken: string | null; isSuspended: boolean }
   }
   skills: string[]
   distanceKm: number | undefined
@@ -88,7 +88,7 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
     where: targeted
       ? { userId: input.targetTaskerId! }
       : { isOnline: true, isVerified: true },
-    include: { user: { select: { id: true, name: true, pushToken: true, isSuspended: true } } },
+    include: { user: { select: { id: true, name: true, email: true, pushToken: true, isSuspended: true } } },
   })
 
   const busy = await busyProviderIds()
@@ -98,6 +98,7 @@ export async function matchTaskerCandidates(input: MatchInput): Promise<MatchCan
 
   for (const p of allProfiles) {
     if (p.user.isSuspended) continue
+    if (process.env.ALLOW_TEST_OTP !== 'true' && p.user.email.endsWith('@maintainex-test.lk')) continue
     if (!targeted && busy.has(p.userId)) continue
 
     const skills = parseSkills(p.skills)

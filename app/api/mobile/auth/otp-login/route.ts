@@ -7,6 +7,7 @@ import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
 import { sendOtpSms } from '@/lib/sms'
 import { getInteractiveTestRole, INTERACTIVE_TEST_PHONES, isTestOtpAllowed, isSyntheticCertAccount, type InteractiveTestRole } from '@/lib/test-cert'
+import { provisionInteractiveDemoMarketplace } from '@/lib/demo-marketplace'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -233,6 +234,10 @@ export async function POST(request: NextRequest) {
     const user = interactiveRole
       ? await ensureInteractiveDemoAccount(interactiveRole)
       : await findUserByIdentifier(identifier)
+
+    if (user && interactiveRole) {
+      await provisionInteractiveDemoMarketplace(user.id, interactiveRole)
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'If an account exists, an OTP has been sent.' }, { status: 200 })

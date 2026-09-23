@@ -139,11 +139,11 @@ export async function findCandidates(
   // Phase 1: Collect eligible providers (eligibility evaluation)
   // =============================================
   interface EligibleIndividual {
-    profile: { userId: string; rating: number | null; completedJobs: number | null; compositeScore: number | null; latitude: number | null; longitude: number | null; user: { createdAt: Date; isSuspended: boolean; isBanned: boolean } }
+    profile: { userId: string; rating: number | null; completedJobs: number | null; compositeScore: number | null; latitude: number | null; longitude: number | null; user: { createdAt: Date; email: string; isSuspended: boolean; isBanned: boolean } }
     eligibility: EligibilityResult
   }
   interface EligibleCompany {
-    company: { id: string; userId: string; rating: number | null; completedProjects: number | null; latitude: number | null; longitude: number | null; user: { createdAt: Date; isSuspended: boolean; isBanned: boolean } }
+    company: { id: string; userId: string; rating: number | null; completedProjects: number | null; latitude: number | null; longitude: number | null; user: { createdAt: Date; email: string; isSuspended: boolean; isBanned: boolean } }
     eligibility: EligibilityResult
   }
 
@@ -158,7 +158,7 @@ export async function findCandidates(
       user: input.countryCode ? { countryCode: input.countryCode } : undefined,
     },
     include: {
-      user: { select: { id: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
+      user: { select: { id: true, email: true, isSuspended: true, isBanned: true, identityStatus: true, createdAt: true, countryCode: true } },
       taskerSkills: {
         select: {
           jobId: true,
@@ -169,6 +169,7 @@ export async function findCandidates(
   })
 
   for (const profile of individualProfiles) {
+    if (process.env.ALLOW_TEST_OTP !== 'true' && profile.user?.email.endsWith('@maintainex-test.lk')) continue
     if (!profile.user || profile.user.isSuspended || profile.user.isBanned) {
       excluded.push({
         providerId: profile.userId,
@@ -207,12 +208,13 @@ export async function findCandidates(
       user: input.countryCode ? { countryCode: input.countryCode } : undefined,
     },
     include: {
-      user: { select: { id: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
+      user: { select: { id: true, email: true, isSuspended: true, isBanned: true, countryCode: true, createdAt: true } },
       specialties: { select: { categoryId: true, jobId: true } },
     },
   })
 
   for (const company of companies) {
+    if (process.env.ALLOW_TEST_OTP !== 'true' && company.user?.email.endsWith('@maintainex-test.lk')) continue
     if (company.user?.isSuspended) {
       excluded.push({ providerId: company.id, providerType: 'COMPANY', reason: 'COMPANY_OWNER_SUSPENDED' })
       continue
