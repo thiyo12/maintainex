@@ -51,22 +51,9 @@ export default function OtpScreen() {
     setOtpError('')
     try {
       const user = await otpLogin(phone, candidate)
-      if (user.role === 'TASKER') {
-        const identity = (user.identityStatus || 'NOT_SUBMITTED').toUpperCase()
-        const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
-        if (user.needsOnboarding || user.taskerOnboardingStage === 'SERVICES') {
-          router.replace('/(auth)/onboarding/tasker-services')
-        } else if (user.taskerOnboardingStage === 'IDENTITY' || (!identityReady && (identity === 'NOT_SUBMITTED' || identity === 'REJECTED'))) {
-          router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
-        } else if (user.taskerOnboardingStage === 'PENDING_APPROVAL' || !identityReady) {
-          router.replace('/(auth)/pending-approval')
-        } else {
-          router.replace('/(tasker)')
-        }
-      } else if (user.role === 'COMPANY') {
-        if (user.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
-        else router.replace('/(company)')
-      } else router.replace('/(customer)')
+      if (user.role === 'TASKER') router.replace('/(tasker)' as any)
+      else if (user.role === 'COMPANY') router.replace('/(company)' as any)
+      else router.replace('/(customer)' as any)
     } catch (err: any) {
       let message = err?.message || 'Invalid code'
       try { message = JSON.parse(message).error || message } catch {}
