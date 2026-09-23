@@ -114,28 +114,9 @@ export default function RoleSwitchScreen() {
   }), [drift])
 
   const routeForUser = (nextUser: User) => {
-    if (nextUser.role === 'COMPANY') {
-      if (nextUser.needsOnboarding) router.replace('/(auth)/onboarding/company-setup')
-      else router.replace('/(company)')
-      return
-    }
-
-    if (nextUser.role === 'TASKER') {
-      const identity = (nextUser.identityStatus || 'NOT_SUBMITTED').toUpperCase()
-      const identityReady = identity === 'VERIFIED' || identity === 'APPROVED'
-      if (nextUser.needsOnboarding || nextUser.taskerOnboardingStage === 'SERVICES') {
-        router.replace('/(auth)/onboarding/tasker-services')
-      } else if (nextUser.taskerOnboardingStage === 'IDENTITY' || (!identityReady && (identity === 'NOT_SUBMITTED' || identity === 'REJECTED'))) {
-        router.replace({ pathname: '/(tasker)/identity', params: { onboarding: '1' } } as any)
-      } else if (nextUser.taskerOnboardingStage === 'PENDING_APPROVAL' || !identityReady) {
-        router.replace('/(auth)/pending-approval')
-      } else {
-        router.replace('/(tasker)')
-      }
-      return
-    }
-
-    router.replace('/(customer)')
+    if (nextUser.role === 'TASKER') router.replace('/(tasker)' as any)
+    else if (nextUser.role === 'COMPANY') router.replace('/(company)' as any)
+    else router.replace('/(customer)' as any)
   }
 
   const changeRole = async (next: Role) => {
