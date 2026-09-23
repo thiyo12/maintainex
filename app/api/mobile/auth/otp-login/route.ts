@@ -5,29 +5,43 @@ import { randomInt } from 'crypto'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
 import { sendOtpEmail } from '@/lib/email'
+import { sendOtpSms } from '@/lib/sms'
 import { isTestOtpAllowed, isSyntheticCertAccount } from '@/lib/test-cert'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function inferPhoneCountries(phoneDigits: string): string[] {
+  if (phoneDigits.startsWith('94')) return ['LK']
+  if (phoneDigits.startsWith('41')) return ['CH']
+  if (phoneDigits.startsWith('49')) return ['DE']
+  if (phoneDigits.startsWith('44')) return ['GB']
+  if (phoneDigits.startsWith('91')) return ['IN']
+  if (phoneDigits.startsWith('61')) return ['AU']
+  if (phoneDigits.startsWith('1')) return ['CA', 'US']
+  return []
+}
 
 async function findUserByIdentifier(identifier: string) {
   if (EMAIL_REGEX.test(identifier)) {
     return prisma.user.findUnique({ where: { email: identifier } })
   }
-  const digits = identifier.replace(/\D/g, '').slice(-9)
-  if (!digits) return null
-  return prisma.user.findFirst({
-    where: { phone: { endsWith: digits } },
-  })
-}
 
-async function ensureRoleProfile(user: any) {
-  if (user.role === 'TASKER') {
-    await prisma.taskerProfile.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id },
-    })
-  }
+  const allDigits = identifier.replace(/\D/g, '')
+  if (!allDigits) return null
+  const normalized = `+${allDigits}`
+
+  const exact = await prisma.user.findFirst({ where: { phone: normalized } })
+  if (exact) return exact
+
+  // Backward-compatible lookup for legacy locally-formatted numbers.
+  const digits = allDigits.slice(-9)
+  const countries = inferPhoneCountries(allDigits)
+  return prisma.user.findFirst({
+    where: {
+      phone: { endsWith: digits },
+      ...(countries.length > 0 ? { countryCode: { in: countries } } : {}),
+    },
+  })
 }
 
 function accountBlocked(user: any): NextResponse | null {
@@ -74,6 +88,13 @@ export async function POST(request: NextRequest) {
     const blocked = accountBlocked(user)
     if (blocked) return blocked
 
+    if (!user.phoneVerified && phoneId) {
+      return NextResponse.json({
+        error: 'Finish mobile number verification before signing in.',
+        code: 'PHONE_NOT_VERIFIED',
+      }, { status: 403 })
+    }
+
     if (!code) {
       const phone = phoneId || user.phone || identifier
       const { allowed, reason } = await checkOtpSendLimit(phone, ip)
@@ -81,7 +102,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: reason }, { status: 429 })
       }
 
-      const otp = isSyntheticCertAccount(user)
+      const syntheticTest = isSyntheticCertAccount(user)
+      const otp = syntheticTest
         ? '000000'
         : randomInt(0, 1000000).toString().padStart(6, '0')
       const codeHash = await bcrypt.hash(otp, 10)
@@ -96,11 +118,38 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      if (user.email) {
-        await sendOtpEmail(user.email, otp)
+      if (!syntheticTest) {
+        try {
+          if (phoneId) {
+            if (!user.phone) {
+              return NextResponse.json({ error: 'No mobile number is linked to this account.' }, { status: 400 })
+            }
+            await sendOtpSms(user.phone, otp, user.countryCode)
+          } else if (user.email) {
+            await sendOtpEmail(user.email, otp)
+          } else {
+            return NextResponse.json({ error: 'No verified delivery destination is available.' }, { status: 400 })
+          }
+        } catch (error) {
+          console.error('OTP delivery failed:', error)
+          await prisma.oTP.updateMany({
+            where: { userId: user.id, purpose: 'LOGIN', isUsed: false },
+            data: { isUsed: true },
+          })
+          return NextResponse.json({
+            error: phoneId
+              ? 'We could not send the SMS code. Please try again shortly.'
+              : 'We could not send the verification code. Please try again shortly.',
+            code: 'OTP_DELIVERY_FAILED',
+          }, { status: 503 })
+        }
       }
 
-      return NextResponse.json({ success: true })
+      return NextResponse.json({
+        success: true,
+        channel: syntheticTest ? 'test' : (phoneId ? 'sms' : 'email'),
+        testMode: syntheticTest,
+      })
     }
 
     const { allowed: verifyAllowed, reason: verifyReason } = await checkOtpVerifyLimit(user.id)
@@ -127,7 +176,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Too many wrong attempts. Request a new code.' }, { status: 429 })
     }
 
-    if (isTestOtpAllowed(user, code)) {
+    const usedSyntheticTestOtp = isTestOtpAllowed(user, code)
+    if (usedSyntheticTestOtp) {
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     } else {
       const isValid = await bcrypt.compare(code, otpRecord.codeHash)
@@ -158,7 +208,22 @@ export async function POST(request: NextRequest) {
       await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
     }
 
-    await ensureRoleProfile(user)
+    if (usedSyntheticTestOtp && user.role === 'TASKER' && isSyntheticCertAccount(user)) {
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { identityStatus: 'VERIFIED', phoneVerified: true },
+        })
+        await tx.taskerProfile.updateMany({
+          where: { userId: user.id },
+          data: {
+            verificationStatus: 'VERIFIED',
+            isVerified: true,
+            isOnline: true,
+          },
+        })
+      })
+    }
 
     const authSession = await createMarketplaceAuthSession(user.id, {
       ipAddress: ip,
