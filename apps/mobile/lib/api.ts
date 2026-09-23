@@ -83,6 +83,7 @@ export const auth = {
     phone: string
     countryCode?: string
     name?: string
+    companyName?: string
     email?: string
     dateOfBirth?: string
     address?: string
