@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2JobActions } from '../../../../../lib/api-v2'
+import { getActiveCompanyId } from '../../../../../lib/api'
 import { useAuth } from '../../../../../lib/auth'
 import Avatar from '../../../../../components/ui/Avatar'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
@@ -22,6 +23,7 @@ export default function CompanyManageJobScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
+  const [companyId, setCompanyId] = useState<string | null>(null)
 
   const loadJob = async () => {
     try {
@@ -36,8 +38,9 @@ export default function CompanyManageJobScreen() {
   }
 
   useEffect(() => { loadJob() }, [id])
+  useEffect(() => { getActiveCompanyId().then(setCompanyId) }, [])
 
-  const myQuote = job?.quotes?.find((q: any) => q.providerId === user?.id) || null
+  const myQuote = job?.quotes?.find((q: any) => q.providerType === 'COMPANY' && q.providerId === companyId) || null
 
   const handleUpdateProgress = async (status: string) => {
     setActionLoading(status)

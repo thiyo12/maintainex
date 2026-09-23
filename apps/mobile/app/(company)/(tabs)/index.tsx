@@ -1,319 +1,268 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useTranslation } from 'react-i18next'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Bell, Gear, Briefcase, Users, Flag, CreditCard, MagnifyingGlass, FileText } from 'phosphor-react-native'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
+import { useRouter } from 'expo-router'
+import {
+  ArrowRight,
+  Bell,
+  Briefcase,
+  CheckCircle,
+  Gear,
+  MagnifyingGlass,
+  ShieldCheck,
+  UsersThree,
+  Wallet,
+} from 'phosphor-react-native'
 import { company } from '../../../lib/api'
+import { v2Jobs } from '../../../lib/api-v2'
 import { useAuth } from '../../../lib/auth'
-import StatsCard from '../../../components/ui/StatsCard'
-import JobCard from '../../../components/ui/JobCard'
-import AISearchBar from '../../../components/shared/AISearchBar'
-import PropertyCard from '../../../components/shared/PropertyCard'
+import { v3 } from '../../../theme/v3/tokens'
+
+type DashboardState = {
+  profile: any
+  opportunities: any[]
+  contracts: any[]
+  team: any[]
+  monthlyRevenue: number
+}
+
+const EMPTY: DashboardState = {
+  profile: null,
+  opportunities: [],
+  contracts: [],
+  team: [],
+  monthlyRevenue: 0,
+}
 
 export default function CompanyDashboard() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { user } = useAuth()
+  const [data, setData] = useState<DashboardState>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [stats, setStats] = useState([
-    { label: t('company.activeContracts'), value: '-' },
-    { label: t('company.earnings'), value: '-' },
-    { label: t('company.team'), value: '-' },
-  ])
-  const [revenueMonth, setRevenueMonth] = useState('LKR 0')
-  const [openJobs, setOpenJobs] = useState<any[]>([])
-  const [recentActivity, setRecentActivity] = useState<{ text: string; time: string }[]>([])
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [earningsRes, contractsRes] = await Promise.all([
-        company.earnings.get(),
-        company.contracts.list(),
-      ])
-      const activeContracts = contractsRes.filter(
-        (c: any) => c.status === 'In progress' || c.status === 'active'
-      ).length
-      const monthRevenue = earningsRes.monthlyRevenue || earningsRes.totalRevenue || 0
-      const teamMembers = earningsRes.teamCount || '-'
-      const rating = earningsRes.rating || '—'
+  const load = useCallback(async () => {
+    const [profileRes, opportunitiesRes, contractsRes, teamRes, earningsRes] = await Promise.allSettled([
+      company.profile.get(),
+      v2Jobs.list('role=provider'),
+      company.contracts.list(),
+      company.team.list(),
+      company.earnings.get(),
+    ])
 
-      setStats([
-        { label: t('company.statActive'), value: String(activeContracts) },
-        { label: t('company.statRevenue'), value: `LKR ${(monthRevenue / 1000).toFixed(1)}K` },
-        { label: t('company.statTeam'), value: String(teamMembers) },
-      ])
-      setRevenueMonth(`LKR ${Number(monthRevenue).toLocaleString()}`)
-      setOpenJobs((contractsRes || []).slice(0, 5))
-
-      if (earningsRes.recentActivity) {
-        setRecentActivity(earningsRes.recentActivity)
-      } else {
-        const activity = contractsRes.slice(-4).map((c: any) => ({
-          text: `${c.title || t('jobs.contract')} - ${c.status}`,
-          time: c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : t('common.recently'),
-        }))
-        setRecentActivity(activity.length > 0 ? activity : [
-          { text: t('company.dashboard'), time: '' },
-        ])
-      }
-    } catch {
-      setRecentActivity([{ text: t('errors.generic'), time: '' }])
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
+    const teamPayload: any = teamRes.status === 'fulfilled' ? teamRes.value : null
+    setData({
+      profile: profileRes.status === 'fulfilled' ? profileRes.value : null,
+      opportunities: opportunitiesRes.status === 'fulfilled' ? opportunitiesRes.value.jobs || [] : [],
+      contracts: contractsRes.status === 'fulfilled' ? contractsRes.value || [] : [],
+      team: Array.isArray(teamPayload) ? teamPayload : teamPayload?.members || [],
+      monthlyRevenue: earningsRes.status === 'fulfilled'
+        ? Number((earningsRes.value as any)?.monthlyRevenue || (earningsRes.value as any)?.totalRevenue || 0)
+        : 0,
+    })
+    setLoading(false)
+    setRefreshing(false)
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { load() }, [load])
 
-  const getGreeting = () => {
-    const h = new Date().getHours()
-    if (h < 12) return t('home.greeting.morning')
-    if (h < 17) return t('home.greeting.afternoon')
-    return t('home.greeting.evening')
-  }
+  const readiness = useMemo(() => {
+    const p = data.profile
+    if (!p) return 0
+    const checks = [
+      Boolean(p.companyName),
+      Boolean(p.description),
+      Array.isArray(p.services) && p.services.length > 0,
+      Array.isArray(p.serviceAreas) && p.serviceAreas.length > 0,
+      data.team.length > 0,
+    ]
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+  }, [data.profile, data.team.length])
+
+  const activeContracts = data.contracts.filter((item: any) =>
+    ['ACTIVE', 'IN_PROGRESS', 'In progress', 'active'].includes(item.status)
+  )
+  const onlineTeam = data.team.filter((member: any) => member.isOnline).length
+  const companyName = data.profile?.companyName || 'Your company'
+  const verified = Boolean(data.profile?.isVerified)
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={'#F5A623'} />
-        </View>
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.loading}><ActivityIndicator size="small" color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchData} tintColor={'#F5A623'} />}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} tintColor={v3.colors.ink} />}
       >
-        {/* Header card */}
-        <View style={[styles.headerCard, { backgroundColor: '#FFFFFF' }]}>
-          <View style={styles.headerRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={[styles.avatar, { backgroundColor: '#818CF8' }]}>
-                <Text style={styles.avatarText}>{(user?.name || 'C')[0]}</Text>
-              </View>
-              <View>
-                <Text style={[styles.greeting, { color: '#6F6B6B' }]}>{getGreeting()}</Text>
-                <Text style={[styles.userName, { color: '#FFFFFF' }]}>{user?.name || t('profile.company')}</Text>
-              </View>
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.brand}>MΛINTΛINEX · BUSINESS</Text>
+            <Text style={styles.pageTitle}>Company workspace</Text>
+          </View>
+          <View style={styles.topActions}>
+            <TouchableOpacity style={styles.circleButton} onPress={() => router.push('/notifications' as any)}>
+              <Bell size={18} color={v3.colors.ink} weight="bold" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.circleButton} onPress={() => router.push('/(company)/settings/edit-profile' as any)}>
+              <Gear size={18} color={v3.colors.ink} weight="bold" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <View style={styles.companyMark}>
+              <Text style={styles.companyMarkText}>{companyName.slice(0, 1).toUpperCase()}</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity style={[styles.headerIcon, { backgroundColor: '#2E1A00' }]}>
-                <Bell size={18} color={'#D48900'} />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.headerIcon, { backgroundColor: '#2E1A00' }]} onPress={() => router.push('/(company)/settings/edit-profile')}>
-                <Gear size={18} color={'#D48900'} />
-              </TouchableOpacity>
+            <View style={styles.heroCopy}>
+              <View style={styles.nameLine}>
+                <Text style={styles.companyName} numberOfLines={1}>{companyName}</Text>
+                {verified ? <ShieldCheck size={17} color={v3.colors.success} weight="fill" /> : null}
+              </View>
+              <Text style={styles.ownerText}>{user?.name || 'Company owner'} · {verified ? 'Verified business' : 'Verification pending'}</Text>
             </View>
           </View>
-        </View>
 
-        {/* AI Search Bar */}
-        <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-          <AISearchBar
-            placeholder={t('tasker.searchJobs')}
-            onCategorySelect={(catId) => {
-              router.push({ pathname: '/(customer)/find/[categoryId]', params: { categoryId: catId } })
-            }}
-            onJobSelect={(jobId) => {
-              router.push({ pathname: '/(customer)/find/taskers/[jobId]', params: { jobId } })
-            }}
-            onPostJob={(query) => {
-              router.push({ pathname: '/(customer)/jobs/v2/create', params: { title: query } })
-            }}
-          />
-        </View>
-
-        {/* Stats row */}
-        <View style={styles.statsRow}>
-          {stats.map((s, i) => (
-            <StatsCard
-              key={i}
-              label={s.label}
-              value={s.value}
-              iconName={['FileText', 'Money', 'Users'][i]}
-              color={['#F5A623', '#06C167', '#3B82F6'][i]}
-            />
-          ))}
-        </View>
-
-        {/* Revenue */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: '#FFFFFF' }]}>{t('company.earnings')}</Text>
-          <View style={[styles.revenueCard, { backgroundColor: '#FFFFFF' }]}>
-            <Text style={[styles.revenueAmount, { color: '#D48900' }]}>{revenueMonth}</Text>
-            <Text style={[styles.revenueLabel, { color: '#6F6B6B' }]}>{t('tasker.earnings')}</Text>
+          <View style={styles.readinessRow}>
+            <View style={styles.readinessCopy}>
+              <Text style={styles.readinessLabel}>BUSINESS READINESS</Text>
+              <Text style={styles.readinessValue}>{readiness}% complete</Text>
+            </View>
+            <TouchableOpacity onPress={() => router.push('/(company)/(tabs)/profile' as any)}>
+              <Text style={styles.completeLink}>{readiness < 100 ? 'Finish setup' : 'View profile'} →</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${readiness}%` }]} />
           </View>
         </View>
 
-        {/* Active Contracts */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: '#FFFFFF' }]}>{t('company.activeContracts')}</Text>
-            <TouchableOpacity onPress={() => router.push('/(company)/(tabs)/contracts-list')}>
-              <Text style={[styles.seeAll, { color: '#D48900' }]}>{t('common.seeAll')}</Text>
-            </TouchableOpacity>
-          </View>
-          {openJobs.slice(0, 4).map((job) => (
-            <JobCard
-              key={job.id}
-              title={job.title || t('jobs.contract')}
-              category={job.categoryName || t('categories.general')}
-              budget={job.budgetAmount}
-              location={job.locationName}
-              status={job.status}
-              onPress={() => router.push(`/(company)/jobs/v2/browse`)}
-            />
-          ))}
+        <View style={styles.metricGrid}>
+          <Metric label="OPPORTUNITIES" value={String(data.opportunities.length)} />
+          <Metric label="ACTIVE WORK" value={String(activeContracts.length)} />
+          <Metric label="TEAM ONLINE" value={`${onlineTeam}/${data.team.length}`} />
+          <Metric label="MONTH REVENUE" value={data.monthlyRevenue ? `LKR ${Math.round(data.monthlyRevenue / 1000)}K` : 'LKR 0'} />
         </View>
 
-        {/* Real Estate */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: '#FFFFFF' }]}>{t('realEstate.title')}</Text>
-            <TouchableOpacity onPress={() => router.push('/real-estate')}>
-              <Text style={[styles.seeAll, { color: '#D48900' }]}>{t('common.seeAll')}</Text>
-            </TouchableOpacity>
+        <TouchableOpacity style={styles.primaryAction} activeOpacity={0.78} onPress={() => router.push('/(company)/jobs/v2/browse' as any)}>
+          <View style={styles.primaryIcon}><MagnifyingGlass size={20} color={v3.colors.paper} weight="bold" /></View>
+          <View style={styles.primaryCopy}>
+            <Text style={styles.primaryTitle}>Find work & send quotes</Text>
+            <Text style={styles.primaryText}>Jobs matching your verified services appear here.</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 16 }}>
-            <PropertyCard
-              title={t('realEstate.sampleTitle1')}
-              priceLkr={8500000}
-              type="sale"
-              bedrooms={3}
-              bathrooms={2}
-              areaSqft={1500}
-              location="Colombo 3"
-              onPress={() => router.push('/real-estate')}
-            />
-            <PropertyCard
-              title={t('realEstate.sampleTitle2')}
-              priceLkr={25000000}
-              type="sale"
-              bedrooms={5}
-              bathrooms={4}
-              areaSqft={3500}
-              location="Colombo 7"
-              onPress={() => router.push('/real-estate')}
-            />
-            <PropertyCard
-              title={t('realEstate.sampleTitle3')}
-              priceLkr={85000}
-              type="rent"
-              bedrooms={2}
-              bathrooms={1}
-              areaSqft={900}
-              location="Colombo 4"
-              onPress={() => router.push('/real-estate')}
-            />
-          </ScrollView>
+          <ArrowRight size={19} color={v3.colors.paper} weight="bold" />
+        </TouchableOpacity>
+
+        <Text style={styles.sectionTitle}>Operations</Text>
+        <View style={styles.actionGrid}>
+          <ActionCard icon={<Briefcase size={20} color={v3.colors.ink} weight="bold" />} title="My jobs" detail="Quotes & active work" onPress={() => router.push('/(company)/jobs/v2/my-quotes' as any)} />
+          <ActionCard icon={<UsersThree size={20} color={v3.colors.ink} weight="bold" />} title="Dispatch" detail="Assign your team" onPress={() => router.push('/(company)/(tabs)/dispatch' as any)} />
+          <ActionCard icon={<CheckCircle size={20} color={v3.colors.ink} weight="bold" />} title="Team" detail="People & availability" onPress={() => router.push('/(company)/(tabs)/team' as any)} />
+          <ActionCard icon={<Wallet size={20} color={v3.colors.ink} weight="bold" />} title="Earnings" detail="Revenue & payouts" onPress={() => router.push('/(company)/(tabs)/earnings' as any)} />
         </View>
 
-        {/* Quick post grid */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: '#FFFFFF', marginBottom: 12 }]}>{t('home.postOptions.title')}</Text>
-          <View style={styles.grid}>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: '#FFFFFF' }]} onPress={() => router.push('/(customer)/jobs/v2/create')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#2E1A00' }]}>
-                <Briefcase size={22} color={'#D48900'} />
-              </View>
-              <Text style={[styles.gridLabel, { color: '#FFFFFF' }]}>{t('home.postJob')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: '#FFFFFF' }]} onPress={() => router.push('/(company)/team/invite')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#0A1A2E' }]}>
-                <Users size={22} color={'#3B82F6'} />
-              </View>
-              <Text style={[styles.gridLabel, { color: '#FFFFFF' }]}>{t('company.inviteMember')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: '#FFFFFF' }]} onPress={() => router.push('/(company)/(tabs)/milestones-list')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#0A2E1A' }]}>
-                <Flag size={22} color={'#06C167'} />
-              </View>
-              <Text style={[styles.gridLabel, { color: '#FFFFFF' }]}>{t('company.milestones')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: '#FFFFFF' }]} onPress={() => router.push('/(company)/settings/subscription')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#1A0A2E' }]}>
-                <CreditCard size={22} color={'#A78BFA'} />
-              </View>
-              <Text style={[styles.gridLabel, { color: '#FFFFFF' }]}>{t('company.subscription')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: '#FFFFFF' }]} onPress={() => router.push('/(company)/jobs/v2/browse')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#0A0A2E' }]}>
-                <MagnifyingGlass size={22} color={'#818CF8'} />
-              </View>
-              <Text style={[styles.gridLabel, { color: '#FFFFFF' }]}>{t('company.browseJobs')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.gridCard, { backgroundColor: '#FFFFFF' }]} onPress={() => router.push('/(company)/jobs/v2/my-quotes')}>
-              <View style={[styles.gridIcon, { backgroundColor: '#0A1A2E' }]}>
-                <FileText size={22} color={'#3B82F6'} />
-              </View>
-              <Text style={[styles.gridLabel, { color: '#FFFFFF' }]}>{t('company.myQuotes')}</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>New opportunities</Text>
+          <TouchableOpacity onPress={() => router.push('/(company)/jobs/v2/browse' as any)}><Text style={styles.seeAll}>See all</Text></TouchableOpacity>
         </View>
+
+        {data.opportunities.length ? data.opportunities.slice(0, 3).map((job: any) => (
+          <TouchableOpacity key={job.id} style={styles.jobCard} activeOpacity={0.76} onPress={() => router.push(`/(company)/jobs/v2/quote/${job.id}` as any)}>
+            <View style={styles.jobTop}>
+              <View style={styles.openPill}><Text style={styles.openPillText}>OPEN</Text></View>
+              <Text style={styles.jobBudget}>{job.budgetAmount ? `LKR ${Number(job.budgetAmount).toLocaleString()}` : 'Request quotes'}</Text>
+            </View>
+            <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+            <Text style={styles.jobDescription} numberOfLines={2}>{job.description}</Text>
+            <View style={styles.jobBottom}><Text style={styles.jobMeta}>Matching your services</Text><Text style={styles.quoteLink}>Quote →</Text></View>
+          </TouchableOpacity>
+        )) : (
+          <View style={styles.emptyCard}>
+            <Briefcase size={23} color={v3.colors.textMuted} />
+            <Text style={styles.emptyTitle}>No matching jobs right now</Text>
+            <Text style={styles.emptyText}>Add services in your Company Profile so MaintainEX can route the right work to you.</Text>
+          </View>
+        )}
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  headerCard: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  avatar: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 18, fontFamily: 'Outfit_900Black', color: '#FFFFFF' },
-  greeting: { fontSize: 11, fontFamily: fonts.body },
-  userName: { fontSize: 16, fontFamily: fonts.headingBold, marginTop: 1 },
-  headerIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  statsRow: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginTop: 16 },
-  section: { marginHorizontal: 16, marginTop: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontFamily: fonts.headingBold, letterSpacing: -0.2 },
-  seeAll: { fontSize: 12, fontFamily: fonts.bodyMedium },
-  revenueCard: {
-    borderRadius: 16,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 4,
-    alignItems: 'center',
-  },
-  revenueAmount: { fontSize: 24, fontFamily: 'Outfit_900Black', letterSpacing: -0.5 },
-  revenueLabel: { fontSize: 11, fontFamily: fonts.body, marginTop: 2 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  gridCard: {
-    width: '48%',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  gridIcon: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  gridLabel: { fontSize: 12, fontFamily: fonts.bodyMedium, textAlign: 'center' },
+function Metric({ label, value }: { label: string; value: string }) {
+  return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>
+}
+
+function ActionCard({ icon, title, detail, onPress }: { icon: React.ReactNode; title: string; detail: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.actionCard} activeOpacity={0.72} onPress={onPress}>
+      <View style={styles.actionIcon}>{icon}</View>
+      <Text style={styles.actionTitle}>{title}</Text>
+      <Text style={styles.actionDetail}>{detail}</Text>
+    </TouchableOpacity>
+  )
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 18, paddingBottom: 20 },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, paddingBottom: 14 },
+  brand: { ...v3.typography.label, color: v3.colors.amberDark, letterSpacing: 1.1 },
+  pageTitle: { ...v3.typography.h4, color: v3.colors.ink, marginTop: 2 },
+  topActions: { flexDirection: 'row', gap: 8 },
+  circleButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  hero: { backgroundColor: v3.colors.ink, borderRadius: 24, padding: 18 },
+  heroTop: { flexDirection: 'row', alignItems: 'center' },
+  companyMark: { width: 50, height: 50, borderRadius: 17, backgroundColor: v3.colors.amber, alignItems: 'center', justifyContent: 'center' },
+  companyMarkText: { ...v3.typography.title, color: v3.colors.ink },
+  heroCopy: { flex: 1, marginLeft: 12 },
+  nameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  companyName: { ...v3.typography.title, color: v3.colors.paper, flexShrink: 1 },
+  ownerText: { ...v3.typography.caption, color: v3.colors.textLight, marginTop: 2 },
+  readinessRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 18 },
+  readinessCopy: { gap: 2 },
+  readinessLabel: { ...v3.typography.smallBold, color: v3.colors.textLight, letterSpacing: 0.8 },
+  readinessValue: { ...v3.typography.bodyBold, color: v3.colors.paper },
+  completeLink: { ...v3.typography.captionBold, color: v3.colors.amber },
+  progressTrack: { height: 5, backgroundColor: '#333', borderRadius: 999, marginTop: 8, overflow: 'hidden' },
+  progressFill: { height: 5, backgroundColor: v3.colors.amber, borderRadius: 999 },
+  metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  metric: { width: '48.7%', backgroundColor: v3.colors.paper, borderRadius: 17, borderWidth: 1, borderColor: v3.colors.line, padding: 14 },
+  metricValue: { ...v3.typography.title, color: v3.colors.ink },
+  metricLabel: { ...v3.typography.smallBold, color: v3.colors.textMuted, marginTop: 4, letterSpacing: 0.4 },
+  primaryAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.amber, borderRadius: 20, padding: 15, marginTop: 12 },
+  primaryIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  primaryCopy: { flex: 1, marginHorizontal: 11 },
+  primaryTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  primaryText: { ...v3.typography.caption, color: '#5D430D', marginTop: 2 },
+  sectionTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 20, marginBottom: 10 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  seeAll: { ...v3.typography.captionBold, color: v3.colors.amberDark, marginBottom: 10 },
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  actionCard: { width: '48.7%', backgroundColor: v3.colors.paper, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: v3.colors.line },
+  actionIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  actionTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  actionDetail: { ...v3.typography.caption, color: v3.colors.textMuted, marginTop: 2 },
+  jobCard: { backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 15, marginBottom: 9 },
+  jobTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  openPill: { backgroundColor: v3.colors.successSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  openPillText: { ...v3.typography.smallBold, color: v3.colors.success },
+  jobBudget: { ...v3.typography.captionBold, color: v3.colors.ink },
+  jobTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink, marginTop: 10 },
+  jobDescription: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 17, marginTop: 3 },
+  jobBottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  jobMeta: { ...v3.typography.small, color: v3.colors.textMuted },
+  quoteLink: { ...v3.typography.captionBold, color: v3.colors.amberDark },
+  emptyCard: { backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 20, alignItems: 'center' },
+  emptyTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink, marginTop: 8 },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 4 },
 })
