@@ -165,7 +165,7 @@ export default function CompanyDashboard() {
           <ActionCard icon={<Briefcase size={20} color={v3.colors.ink} weight="bold" />} title="My jobs" detail="Quotes & active work" onPress={() => router.push('/(company)/jobs/v2/my-quotes' as any)} />
           <ActionCard icon={<UsersThree size={20} color={v3.colors.ink} weight="bold" />} title="Dispatch" detail="Assign your team" onPress={() => router.push('/(company)/(tabs)/dispatch' as any)} />
           <ActionCard icon={<CheckCircle size={20} color={v3.colors.ink} weight="bold" />} title="Team" detail="People & availability" onPress={() => router.push('/(company)/(tabs)/team' as any)} />
-          <ActionCard icon={<Wallet size={20} color={v3.colors.ink} weight="bold" />} title="Earnings" detail="Revenue & payouts" onPress={() => router.push('/(company)/(tabs)/earnings' as any)} />
+          <ActionCard icon={<Wallet size={20} color={v3.colors.ink} weight="bold" />} title="Earnings" detail="Revenue & payouts" onPress={() => router.push('/(company)/(tabs)/earnings-list' as any)} />
         </View>
 
         <View style={styles.sectionHeader}>
