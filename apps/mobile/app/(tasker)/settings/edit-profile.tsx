@@ -21,6 +21,9 @@ export default function TaskerEditProfile() {
   const [nickname, setNickname] = useState('')
   const [phone, setPhone] = useState('')
   const [profileImage, setProfileImage] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [address, setAddress] = useState('')
+  const [experienceSummary, setExperienceSummary] = useState('')
   const [bio, setBio] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
   const [saving, setSaving] = useState(false)
@@ -38,6 +41,9 @@ export default function TaskerEditProfile() {
       try {
         const p = await taskers.getMyProfile()
         setBio(p.bio || '')
+        setDateOfBirth(p.dateOfBirth || '')
+        setAddress(p.address || '')
+        setExperienceSummary(p.experienceSummary || '')
         setHourlyRate(p.hourlyRate != null ? String(p.hourlyRate) : '')
         if (p.profileImage) setProfileImage(p.profileImage)
         if (p.user?.nickname) setNickname(p.user.nickname)
@@ -82,6 +88,9 @@ export default function TaskerEditProfile() {
         name: nameLocked ? undefined : name.trim(),
         nickname: nickname.trim() || undefined,
         phone: phone.trim(),
+        dateOfBirth: dateOfBirth.trim() || undefined,
+        address: address.trim() || undefined,
+        experienceSummary: experienceSummary.trim() || undefined,
         bio: bio.trim(),
         hourlyRate: hourlyRate.trim() ? Number(hourlyRate) : undefined,
         profileImage: profileImage || undefined,
@@ -158,6 +167,41 @@ export default function TaskerEditProfile() {
               onChangeText={setPhone}
               keyboardType="phone-pad"
               placeholder="Phone number"
+              placeholderTextColor={v3.colors.textPlaceholder}
+            />
+          </View>
+
+          <Text style={styles.sectionLabel}>DATE OF BIRTH</Text>
+          <View style={styles.fieldCard}>
+            <TextInput
+              style={styles.fieldInput}
+              value={dateOfBirth}
+              onChangeText={setDateOfBirth}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={v3.colors.textPlaceholder}
+            />
+          </View>
+
+          <Text style={styles.sectionLabel}>ADDRESS</Text>
+          <View style={styles.fieldCard}>
+            <TextInput
+              style={styles.fieldInput}
+              value={address}
+              onChangeText={setAddress}
+              placeholder="Street, area, city"
+              placeholderTextColor={v3.colors.textPlaceholder}
+            />
+          </View>
+
+          <Text style={styles.sectionLabel}>EXPERIENCE</Text>
+          <View style={styles.bioCard}>
+            <TextInput
+              style={styles.bioInput}
+              value={experienceSummary}
+              onChangeText={setExperienceSummary}
+              multiline
+              textAlignVertical="top"
+              placeholder="Tell us about your work experience and the jobs you have handled."
               placeholderTextColor={v3.colors.textPlaceholder}
             />
           </View>
