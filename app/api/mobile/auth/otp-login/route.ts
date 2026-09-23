@@ -250,9 +250,11 @@ export async function POST(request: NextRequest) {
 
     if (!code) {
       const phone = phoneId || user.phone || identifier
-      const { allowed, reason } = await checkOtpSendLimit(phone, ip)
-      if (!allowed) {
-        return NextResponse.json({ error: reason }, { status: 429 })
+      if (!interactiveRole) {
+        const { allowed, reason } = await checkOtpSendLimit(phone, ip)
+        if (!allowed) {
+          return NextResponse.json({ error: reason }, { status: 429 })
+        }
       }
 
       const syntheticTest = isSyntheticCertAccount(user)
@@ -260,6 +262,13 @@ export async function POST(request: NextRequest) {
         ? '000000'
         : randomInt(0, 1000000).toString().padStart(6, '0')
       const codeHash = await bcrypt.hash(otp, 10)
+
+      if (interactiveRole) {
+        await prisma.oTP.updateMany({
+          where: { userId: user.id, purpose: 'LOGIN', isUsed: false },
+          data: { isUsed: true },
+        })
+      }
 
       await prisma.oTP.create({
         data: {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   INTERACTIVE_TEST_PHONES,
   getInteractiveTestRole,
+  isInteractiveTestPhone,
   isSyntheticCertAccount,
   isTestOtpAllowed,
 } from '@/lib/test-cert'
@@ -45,5 +46,20 @@ describe('Synthetic OTP certification accounts', () => {
     process.env.ALLOW_TEST_OTP = 'false'
     expect(isSyntheticCertAccount({ phone: INTERACTIVE_TEST_PHONES.TASKER })).toBe(false)
     expect(isTestOtpAllowed({ phone: INTERACTIVE_TEST_PHONES.TASKER }, '000000')).toBe(false)
+  })
+
+  it('never recognises lookalike numbers outside the approved demo set', () => {
+    expect(getInteractiveTestRole('+12025550999')).toBeNull()
+    expect(isInteractiveTestPhone('+12025550999')).toBe(false)
+    expect(isSyntheticCertAccount({ phone: '+12025550999' })).toBe(false)
+    expect(isTestOtpAllowed({ phone: '+12025550999' }, '000000')).toBe(false)
+  })
+
+  it('does not recognise demo phones when ALLOW_TEST_OTP is not true', () => {
+    process.env.ALLOW_TEST_OTP = 'false'
+    expect(getInteractiveTestRole(INTERACTIVE_TEST_PHONES.CUSTOMER)).toBeNull()
+    expect(isInteractiveTestPhone(INTERACTIVE_TEST_PHONES.CUSTOMER)).toBe(false)
+    expect(isInteractiveTestPhone(INTERACTIVE_TEST_PHONES.TASKER)).toBe(false)
+    expect(isInteractiveTestPhone(INTERACTIVE_TEST_PHONES.COMPANY)).toBe(false)
   })
 })
