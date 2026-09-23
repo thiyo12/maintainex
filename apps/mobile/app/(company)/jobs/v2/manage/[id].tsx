@@ -1,238 +1,244 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { CaretLeft, PlusCircle, MapPin, ChatCircleText, Play, CheckCircle } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../../../lib/ThemeContext'
-import { fonts } from '../../../../../lib/fonts'
-import { v2Jobs, v2JobActions } from '../../../../../lib/api-v2'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import {
+  Briefcase,
+  CaretLeft,
+  ChatCircleDots,
+  CheckCircle,
+  Clock,
+  MapPin,
+  Play,
+  ShieldCheck,
+  UsersThree,
+} from 'phosphor-react-native'
 import { getActiveCompanyId } from '../../../../../lib/api'
-import { useAuth } from '../../../../../lib/auth'
-import Avatar from '../../../../../components/ui/Avatar'
+import { v2JobActions, v2Jobs } from '../../../../../lib/api-v2'
+import { v3 } from '../../../../../theme/v3/tokens'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
 
 export default function CompanyManageJobScreen() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
-  const { user } = useAuth()
   const [job, setJob] = useState<any>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
-  const [companyId, setCompanyId] = useState<string | null>(null)
 
-  const loadJob = async () => {
+  const load = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
-    } catch {
-      Alert.alert(t('common.error'), t('errors.jobNotFound'))
-      router.back()
+      const [jobRes, activeCompanyId] = await Promise.all([
+        v2Jobs.get(id),
+        getActiveCompanyId(),
+      ])
+      setJob(jobRes.job)
+      setCompanyId(activeCompanyId)
+    } catch (error: any) {
+      Alert.alert('Unable to load job', error?.message || 'Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { loadJob() }, [id])
-  useEffect(() => { getActiveCompanyId().then(setCompanyId) }, [])
+  useEffect(() => { load() }, [id])
 
-  const myQuote = job?.quotes?.find((q: any) => q.providerType === 'COMPANY' && q.providerId === companyId) || null
+  const myQuote = useMemo(
+    () => job?.quotes?.find((quote: any) => quote.providerType === 'COMPANY' && quote.providerId === companyId) || null,
+    [job?.quotes, companyId],
+  )
 
-  const handleUpdateProgress = async (status: string) => {
-    setActionLoading(status)
+  const progress = job?.workspace?.progressStatus || (
+    job?.status === 'IN_PROGRESS'
+      ? 'IN_PROGRESS'
+      : job?.status === 'COMPLETED'
+        ? 'COMPLETED'
+        : job?.status === 'QUOTE_ACCEPTED'
+          ? 'ACCEPTED'
+          : job?.status
+  )
+
+  const accepted = myQuote?.status === 'ACCEPTED'
+  const protectedPayment = job?.escrow?.status === 'PROTECTED'
+  const isReadyToTravel = accepted && protectedPayment && progress === 'ACCEPTED'
+  const isInProgress = progress === 'IN_PROGRESS'
+  const isWaitingCustomer = progress === 'COMPLETION_REQUESTED'
+  const isCompleted = progress === 'COMPLETED' || job?.status === 'COMPLETED'
+  const customerName = job?.customer?.name || 'Customer'
+  const customerInitial = customerName.charAt(0).toUpperCase() || 'C'
+
+  const markComplete = async () => {
+    setActionLoading('complete')
     try {
-      await v2JobActions.updateProgress(id, status)
-      loadJob()
-    } catch (e: any) {
-      Alert.alert(t('common.error'), e.message)
+      await v2JobActions.complete(id, 'MARK_COMPLETE')
+      await load()
+      Alert.alert('Work submitted', 'The customer can now review and release payment.')
+    } catch (error: any) {
+      Alert.alert('Unable to complete', error?.message || 'Please try again.')
     } finally {
       setActionLoading('')
     }
   }
 
-  const quoteStatusLabel = (q: any) => {
-    if (!q) return null
-    switch (q.status) {
-      case 'PENDING': return { text: t('company.quoteOpen'), color: colors.amberDark, bg: colors.amberBg }
-      case 'ACCEPTED': return job?.status === 'QUOTE_ACCEPTED'
-        ? { text: t('company.quoteAwaitingPayment'), color: '#6D28D9', bg: '#EDE9FE' }
-        : { text: t('company.quoteAccepted'), color: '#065F46', bg: '#DCFCE7' }
-      case 'REJECTED': return { text: t('company.quoteRejected'), color: colors.error, bg: colors.errorBg }
-      default: return { text: q.status, color: colors.muted, bg: colors.surface }
-    }
-  }
-
-  const worksCard = (ws: any) => {
-    if (!ws) return null
-    switch (ws.progressStatus) {
-      case 'COMPLETED': return { text: t('company.quoteCompleted'), color: colors.success, bg: colors.successBg }
-      case 'DISPUTED': return { text: t('company.quoteCancelled'), color: colors.error, bg: colors.errorBg }
-      default: return { text: ws.progressStatus.replace('_', ' '), color: colors.muted, bg: colors.surface }
-    }
-  }
-
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color={colors.companyAccent} style={{ marginTop: 60 }} />
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
   if (!job) return null
 
-  const qs = quoteStatusLabel(myQuote)
-  const wsCard = worksCard(job.workspace)
-  const canStart = job.workspace?.progressStatus === 'ACCEPTED'
-  const canComplete = job.workspace?.progressStatus === 'IN_PROGRESS'
+  const quotePrice = myQuote?.price ? Number(myQuote.price) : 0
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <CaretLeft size={24} color={colors.ink} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('company.manageJob')}</Text>
-          <TouchableOpacity onPress={() => router.push('/(company)/jobs/v2/browse')} hitSlop={8}>
-            <PlusCircle size={24} color={colors.companyAccent} />
-          </TouchableOpacity>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.circle} onPress={() => router.back()}>
+          <CaretLeft size={18} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>COMPANY JOB</Text>
+          <Text style={styles.headerTitle}>Manage work</Text>
+        </View>
+        <TouchableOpacity style={styles.circle} onPress={() => router.push('/(company)/(tabs)/dispatch' as any)}>
+          <UsersThree size={18} color={v3.colors.ink} weight="bold" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <View style={styles.statusPill}>
+              <Text style={styles.statusPillText}>{String(progress || job.status).replaceAll('_', ' ')}</Text>
+            </View>
+            <Text style={styles.heroMoney}>{quotePrice ? `LKR ${quotePrice.toLocaleString()}` : 'Company quote'}</Text>
+          </View>
+          <Text style={styles.heroTitle}>{job.title || 'MaintainEX job'}</Text>
+          <Text style={styles.heroText} numberOfLines={3}>{job.description || 'Review the job details and continue when the next step is available.'}</Text>
         </View>
 
-        {/* Job Card */}
-        <View style={styles.jobCard}>
-          <View style={styles.jobTop}>
-            <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
-            {job.status === 'OPEN' && (
-              <View style={styles.openBadge}><Text style={styles.openBadgeText}>{t('jobs.status.open')}</Text></View>
-            )}
+        <View style={styles.customerCard}>
+          <View style={styles.customerAvatar}><Text style={styles.customerInitial}>{customerInitial}</Text></View>
+          <View style={styles.customerCopy}>
+            <Text style={styles.customerName}>{customerName}</Text>
+            <Text style={styles.customerMeta}>{job.addressStreet || job.locationName || 'Customer location is protected until payment.'}</Text>
           </View>
-          <Text style={styles.jobDesc} numberOfLines={2}>{job.description}</Text>
-          <View style={styles.jobMeta}>
-            <Text style={styles.budget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
-            <Text style={styles.budgetType}>{job.budgetType}</Text>
-          </View>
-          {job.locationName && (
-            <View style={styles.locationRow}>
-              <MapPin size={14} color={colors.muted} />
-              <Text style={styles.locationText}>{job.locationName}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Customer */}
-        {job.customer && (
-          <View style={styles.customerCard}>
-            <Avatar name={job.customer.name || t('customer.unknown')} size={40} color={colors.companyAccent} />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.customerName}>{job.customer.name || t('customer.unknown')}</Text>
-              <Text style={styles.customerLabel}>{t('profile.customer')}</Text>
-            </View>
-            <TouchableOpacity style={styles.chatBtn} onPress={() => setChatVisible(true)}>
-              <ChatCircleText size={18} color="#FFFFFF" />
-              <Text style={styles.chatBtnText}>{t('company.messageCustomer')}</Text>
+          {job.customer?.id ? (
+            <TouchableOpacity style={styles.messageBtn} onPress={() => setChatVisible(true)}>
+              <ChatCircleDots size={17} color={v3.colors.ink} weight="bold" />
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* My Quote */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('quotes.yourQuote')}</Text>
-          {myQuote ? (
-            <View style={styles.quoteCard}>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>{t('quotes.price')}</Text>
-                <Text style={styles.quotePrice}>LKR {myQuote.price}</Text>
-              </View>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>{t('quotes.estimatedTime')}</Text>
-                <Text style={styles.quoteValue}>{myQuote.estimatedCompletionTime || '—'}</Text>
-              </View>
-              {myQuote.message ? (
-                <View style={styles.quoteRow}>
-                  <Text style={styles.quoteLabel}>{t('quotes.message')}</Text>
-                  <Text style={[styles.quoteValue, { flex: 1, marginLeft: 8, textAlign: 'right' }]} numberOfLines={3}>{myQuote.message}</Text>
-                </View>
-              ) : null}
-              {qs && (
-                <View style={[styles.statusPill, { backgroundColor: qs.bg }]}>
-                  <Text style={[styles.statusPillText, { color: qs.color }]}>{qs.text}</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>{t('company.noQuotesYet')}</Text>
-              <Text style={styles.emptyDesc}>{t('company.noQuotesYetDesc')}</Text>
-              <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(company)/jobs/v2/browse')}>
-                <Text style={styles.browseBtnText}>{t('company.browseJobs')} →</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          ) : null}
         </View>
 
-        {/* Escrow Status */}
-        {job.escrow && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Escrow</Text>
-            <View style={styles.escrowCard}>
-              <View style={styles.quoteRow}>
-                <Text style={styles.quoteLabel}>{t('wallet.balance')}</Text>
-                <Text style={styles.quotePrice}>LKR {job.escrow.amount}</Text>
-              </View>
-              {wsCard && (
-                <View style={[styles.statusPill, { backgroundColor: wsCard.bg }]}>
-                  <Text style={[styles.statusPillText, { color: wsCard.color }]}>{wsCard.text}</Text>
-                </View>
-              )}
-              {job.escrow.status === 'PROTECTED' && (
-                <Text style={styles.escrowHint}>{t('booking.escrowInfo')}</Text>
-              )}
-            </View>
-          </View>
+        <Text style={styles.sectionTitle}>Current step</Text>
+
+        {!myQuote ? (
+          <StepCard
+            icon={<Briefcase size={21} color={v3.colors.ink} weight="bold" />}
+            title="No company quote on this job"
+            text="Return to opportunities and send a company quote first."
+          >
+            <Action label="Browse opportunities" onPress={() => router.push('/(company)/jobs/v2/browse' as any)} />
+          </StepCard>
+        ) : myQuote.status === 'PENDING' ? (
+          <StepCard
+            icon={<Clock size={21} color={v3.colors.amberDark} weight="fill" />}
+            title="Quote sent"
+            text="The customer is comparing offers. You will be notified if your company is selected."
+          />
+        ) : myQuote.status === 'REJECTED' ? (
+          <StepCard
+            icon={<Briefcase size={21} color={v3.colors.textMuted} weight="bold" />}
+            title="Another quote was selected"
+            text="This job is no longer assigned to your company."
+          />
+        ) : accepted && !protectedPayment ? (
+          <StepCard
+            icon={<ShieldCheck size={21} color={v3.colors.info} weight="fill" />}
+            title="Selected · waiting for protected payment"
+            text="Do not travel to the job until the customer funds escrow. The address and work-start controls unlock after payment."
+          />
+        ) : isReadyToTravel ? (
+          <StepCard
+            icon={<MapPin size={21} color={v3.colors.info} weight="fill" />}
+            title="Travel to the customer"
+            text="When your team arrives, verify the customer's arrival PIN. Work cannot begin before arrival is verified."
+          >
+            <Action
+              label="Verify arrival PIN"
+              outline
+              onPress={() => router.push((`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`) as any)}
+            />
+            <Action
+              label="Start work with PIN"
+              onPress={() => router.push((`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`) as any)}
+            />
+          </StepCard>
+        ) : isInProgress ? (
+          <StepCard
+            icon={<Play size={21} color={v3.colors.success} weight="fill" />}
+            title="Work in progress"
+            text="The arrival and work-start checks are complete. Keep job evidence and scope updates inside MaintainEX."
+          >
+            <Action
+              label={actionLoading === 'complete' ? 'Submitting…' : 'Mark work complete'}
+              disabled={!!actionLoading}
+              onPress={markComplete}
+            />
+          </StepCard>
+        ) : isWaitingCustomer ? (
+          <StepCard
+            icon={<Clock size={21} color={v3.colors.amberDark} weight="fill" />}
+            title="Waiting for customer approval"
+            text="Completion was submitted. The customer must confirm the work before protected funds are released."
+          />
+        ) : isCompleted ? (
+          <StepCard
+            icon={<CheckCircle size={21} color={v3.colors.success} weight="fill" />}
+            title="Job completed"
+            text="The job is closed and payment settlement has been processed through the protected payment flow."
+          />
+        ) : (
+          <StepCard
+            icon={<Briefcase size={21} color={v3.colors.ink} weight="bold" />}
+            title="Job status updated"
+            text="Refresh the job if the next action is not visible yet."
+          />
         )}
 
-        {/* Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('company.manageJob')}</Text>
-          <View style={styles.actions}>
-            {canStart && (
-              <TouchableOpacity
-                style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
-                onPress={() => handleUpdateProgress('IN_PROGRESS')}
-                disabled={actionLoading !== ''}
-              >
-                <Play size={18} color="#111827" />
-                <Text style={styles.actionBtnText}>{t('booking.statusInProgress')}</Text>
-              </TouchableOpacity>
-            )}
-            {canComplete && (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.completeBtn, actionLoading !== '' && styles.btnDisabled]}
-                onPress={() => handleUpdateProgress('COMPLETION_REQUESTED')}
-                disabled={actionLoading !== ''}
-              >
-                <CheckCircle size={18} color="#111827" />
-                <Text style={styles.actionBtnText}>{t('tracking.confirmComplete')}</Text>
-              </TouchableOpacity>
-            )}
-            {!canStart && !canComplete && (
-              <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(company)/jobs/v2/browse')}>
-                <Text style={styles.browseBtnText}>{t('company.browseJobs')} →</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        <Text style={styles.sectionTitle}>Job details</Text>
+        <View style={styles.detailCard}>
+          <Detail label="Customer" value={customerName} />
+          <Detail label="Quote" value={quotePrice ? `LKR ${quotePrice.toLocaleString()}` : '—'} />
+          <Detail label="Escrow" value={job.escrow?.status || 'Not funded'} />
+          <Detail label="Job status" value={String(job.status || '—').replaceAll('_', ' ')} last />
         </View>
+
+        <TouchableOpacity style={styles.dispatchCard} onPress={() => router.push('/(company)/(tabs)/dispatch' as any)}>
+          <UsersThree size={20} color={v3.colors.ink} weight="bold" />
+          <View style={styles.dispatchCopy}>
+            <Text style={styles.dispatchTitle}>Dispatch your workforce</Text>
+            <Text style={styles.dispatchText}>Assign accepted company work to the right team member.</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <NewChatModal
         visible={chatVisible}
         onClose={() => setChatVisible(false)}
-        recipient={job.customer ? { id: job.customer.id, name: job.customer.name || t('customer.unknown') } : null}
+        recipient={job.customer ? { id: job.customer.id, name: customerName } : null}
         jobId={job.id}
         jobTitle={job.title}
       />
@@ -240,54 +246,81 @@ export default function CompanyManageJobScreen() {
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.cream },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
-  headerTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink },
+function StepCard({ icon, title, text, children }: { icon: React.ReactNode; title: string; text: string; children?: React.ReactNode }) {
+  return (
+    <View style={styles.stepCard}>
+      <View style={styles.stepIcon}>{icon}</View>
+      <Text style={styles.stepTitle}>{title}</Text>
+      <Text style={styles.stepText}>{text}</Text>
+      {children ? <View style={styles.actions}>{children}</View> : null}
+    </View>
+  )
+}
 
-  jobCard: { backgroundColor: colors.white, marginHorizontal: 20, marginTop: 8, borderRadius: 16, padding: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  jobTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  jobTitle: { fontSize: 18, fontFamily: fonts.heading, color: colors.ink, flex: 1, marginRight: 8 },
-  openBadge: { backgroundColor: colors.amberBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  openBadgeText: { fontSize: 11, fontFamily: fonts.headingBold, color: colors.amberDark },
-  jobDesc: { fontSize: 13, color: colors.ink, opacity: 0.65, lineHeight: 20, marginBottom: 12 },
-  jobMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  budget: { fontSize: 17, fontFamily: fonts.heading, color: colors.amberDark },
-  budgetType: { fontSize: 12, fontFamily: fonts.bodySemiBold, color: colors.muted, textTransform: 'uppercase' },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
-  locationText: { fontSize: 13, color: colors.muted },
+function Action({ label, onPress, outline = false, disabled = false }: { label: string; onPress: () => void; outline?: boolean; disabled?: boolean }) {
+  return (
+    <TouchableOpacity
+      style={[styles.action, outline && styles.actionOutline, disabled && styles.disabled]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.76}
+    >
+      <Text style={[styles.actionText, outline && styles.actionTextOutline]}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
 
-  customerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 20, marginTop: 12, borderRadius: 16, padding: 14 },
-  customerName: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink },
-  customerLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
-  chatBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.companyAccent, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 },
-  chatBtnText: { fontSize: 12, fontFamily: fonts.headingBold, color: '#FFFFFF' },
+function Detail({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+  return (
+    <View style={[styles.detailRow, !last && styles.detailBorder]}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  )
+}
 
-  section: { marginHorizontal: 20, marginTop: 18 },
-  sectionTitle: { fontSize: 16, fontFamily: fonts.heading, color: colors.ink, marginBottom: 10 },
-
-  quoteCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16 },
-  quoteRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  quoteLabel: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: colors.muted },
-  quotePrice: { fontSize: 17, fontFamily: fonts.heading, color: colors.ink },
-  quoteValue: { fontSize: 13, color: colors.ink },
-
-  statusPill: { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, marginTop: 4 },
-  statusPillText: { fontSize: 12, fontFamily: fonts.headingBold },
-
-  escrowCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16 },
-  escrowHint: { fontSize: 12, color: colors.muted, marginTop: 8, lineHeight: 18 },
-
-  emptyCard: { backgroundColor: colors.white, borderRadius: 16, padding: 20, alignItems: 'center' },
-  emptyTitle: { fontSize: 15, fontFamily: fonts.headingBold, color: colors.ink, marginBottom: 4 },
-  emptyDesc: { fontSize: 13, color: colors.muted, textAlign: 'center', marginBottom: 12 },
-
-  browseBtn: { backgroundColor: colors.amber, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, alignSelf: 'center', marginTop: 6 },
-  browseBtnText: { fontSize: 14, fontFamily: fonts.heading, color: '#111827' },
-
-  actions: { gap: 10 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.amber, borderRadius: 14, paddingVertical: 15 },
-  completeBtn: { backgroundColor: colors.success },
-  actionBtnText: { fontSize: 15, fontFamily: fonts.heading, color: '#111827' },
-  btnDisabled: { opacity: 0.5 },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 8, paddingBottom: 12 },
+  circle: { width: 40, height: 40, borderRadius: 20, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, marginHorizontal: 11 },
+  eyebrow: { ...v3.typography.smallBold, color: v3.colors.amberDark, letterSpacing: 0.7 },
+  headerTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 1 },
+  content: { paddingHorizontal: 18, paddingBottom: 36 },
+  hero: { backgroundColor: v3.colors.ink, borderRadius: 22, padding: 18 },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statusPill: { backgroundColor: v3.colors.amber, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  statusPillText: { ...v3.typography.smallBold, color: v3.colors.ink },
+  heroMoney: { ...v3.typography.captionBold, color: v3.colors.amber },
+  heroTitle: { ...v3.typography.h5, color: v3.colors.paper, marginTop: 12 },
+  heroText: { ...v3.typography.caption, color: v3.colors.textLight, lineHeight: 18, marginTop: 5 },
+  customerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 13, marginTop: 10 },
+  customerAvatar: { width: 44, height: 44, borderRadius: 15, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  customerInitial: { ...v3.typography.title, color: v3.colors.ink },
+  customerCopy: { flex: 1, marginLeft: 10 },
+  customerName: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  customerMeta: { ...v3.typography.caption, color: v3.colors.textMuted, marginTop: 2 },
+  messageBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: v3.colors.amberSoft, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 20, marginBottom: 9 },
+  stepCard: { backgroundColor: v3.colors.paper, borderRadius: 20, borderWidth: 1, borderColor: v3.colors.line, padding: 16 },
+  stepIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  stepTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 12 },
+  stepText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 18, marginTop: 4 },
+  actions: { gap: 9, marginTop: 14 },
+  action: { height: 50, borderRadius: 15, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  actionOutline: { backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.ink },
+  actionText: { ...v3.typography.bodyBold, color: v3.colors.paper },
+  actionTextOutline: { color: v3.colors.ink },
+  disabled: { opacity: 0.5 },
+  detailCard: { backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, overflow: 'hidden' },
+  detailRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14 },
+  detailBorder: { borderBottomWidth: 1, borderBottomColor: v3.colors.line },
+  detailLabel: { ...v3.typography.caption, color: v3.colors.textMuted },
+  detailValue: { ...v3.typography.captionBold, color: v3.colors.ink, maxWidth: '58%', textAlign: 'right' },
+  dispatchCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.amberSoft, borderRadius: 18, padding: 14, marginTop: 12 },
+  dispatchCopy: { flex: 1, marginLeft: 10 },
+  dispatchTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  dispatchText: { ...v3.typography.caption, color: v3.colors.amberDark, marginTop: 2 },
+  chevron: { fontSize: 23, color: v3.colors.ink },
 })
