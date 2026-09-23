@@ -162,7 +162,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   await prisma.$transaction(async (tx) => {
     const jobClaim = await tx.marketplaceJob.updateMany({
       where: { id: ctx.jobId, status: 'OPEN' },
-      data: { status: 'QUOTE_ACCEPTED' },
+      data: { status: 'QUOTE_ACCEPTED', approvedQuoteId: quoteId },
     })
     if (jobClaim.count !== 1) throw new Error('Job already has an accepted quote')
 
