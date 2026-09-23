@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   INTERACTIVE_TEST_PHONES,
+  getInteractiveTestRole,
   isSyntheticCertAccount,
   isTestOtpAllowed,
 } from '@/lib/test-cert'
@@ -22,6 +23,13 @@ describe('Synthetic OTP certification accounts', () => {
       expect(isSyntheticCertAccount({ phone })).toBe(true)
       expect(isTestOtpAllowed({ phone }, '000000')).toBe(true)
     }
+  })
+
+  it('maps each reserved demo phone to the intended workspace role', () => {
+    expect(getInteractiveTestRole(INTERACTIVE_TEST_PHONES.CUSTOMER)).toBe('CUSTOMER')
+    expect(getInteractiveTestRole(INTERACTIVE_TEST_PHONES.TASKER)).toBe('TASKER')
+    expect(getInteractiveTestRole(INTERACTIVE_TEST_PHONES.COMPANY)).toBe('COMPANY')
+    expect(getInteractiveTestRole('+94771234567')).toBeNull()
   })
 
   it('never allows 000000 for an ordinary phone number', () => {
