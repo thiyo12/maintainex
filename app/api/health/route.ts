@@ -6,7 +6,8 @@ export async function GET() {
     await prisma.$queryRaw`SELECT 1`
     return NextResponse.json({
       status: 'healthy',
-      release: 'provider-onboarding-fix-20260922',
+      release: 'v3-auth-tasker-flow-20260923',
+      testOtpMode: process.env.ALLOW_TEST_OTP === 'true' ? 'synthetic-only' : 'disabled',
       timestamp: new Date().toISOString(),
     })
   } catch {
