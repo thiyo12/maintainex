@@ -1,59 +1,40 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
+import { useCallback, useEffect, useState } from 'react'
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Users, User } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
-import { v2Request } from '../../../lib/api-v2'
+import { Briefcase, Plus, UserCircle } from 'phosphor-react-native'
 import { getActiveCompanyId } from '../../../lib/api'
+import { v2Request } from '../../../lib/api-v2'
+import { v3 } from '../../../theme/v3/tokens'
 
-interface Assignment {
+type Assignment = {
   id: string
-  jobId: string
-  workerUserId: string
   status: string
   assignedAt: string
-  acceptedAt: string | null
-  startedAt: string | null
-  completedAt: string | null
   job: { id: string; title: string; status: string }
   worker: { id: string; name: string; email: string }
 }
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  ASSIGNED: { bg: '#FEF3C7', text: '#D97706' },
-  ACCEPTED: { bg: '#DBEAFE', text: '#2563EB' },
-  IN_PROGRESS: { bg: '#D1FAE5', text: '#059669' },
-  COMPLETED: { bg: '#E0E7FF', text: '#4F46E5' },
-  REJECTED: { bg: '#FEE2E2', text: '#DC2626' },
-  REVOKED: { bg: '#F3F4F6', text: '#6B7280' },
-}
-
 export default function CompanyDispatch() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
   const router = useRouter()
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [filter, setFilter] = useState<'active' | 'in_progress' | 'completed'>('active')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [filter, setFilter] = useState<string>('active')
 
-  const fetchAssignments = useCallback(async () => {
+  const load = useCallback(async () => {
     try {
       const companyId = await getActiveCompanyId()
-      if (!companyId) return
+      if (!companyId) {
+        setAssignments([])
+        return
+      }
       const params = new URLSearchParams({ companyId })
-      if (filter === 'active') params.set('status', 'ASSIGNED')
-      else if (filter === 'in_progress') params.set('status', 'IN_PROGRESS')
-      else if (filter === 'completed') params.set('status', 'COMPLETED')
-
-      const data = await v2Request<{ assignments: Assignment[] }>(
-        `/api/mobile/company/assignments?${params.toString()}`
-      )
-      setAssignments(data.assignments || [])
+      if (filter === 'in_progress') params.set('status', 'IN_PROGRESS')
+      if (filter === 'completed') params.set('status', 'COMPLETED')
+      const data = await v2Request<{ assignments: Assignment[] }>(`/api/mobile/company/assignments?${params.toString()}`)
+      const rows = data.assignments || []
+      setAssignments(filter === 'active' ? rows.filter((row) => !['COMPLETED', 'REJECTED', 'REVOKED'].includes(row.status)) : rows)
     } catch {
       setAssignments([])
     } finally {
@@ -62,181 +43,88 @@ export default function CompanyDispatch() {
     }
   }, [filter])
 
-  useEffect(() => { fetchAssignments() }, [fetchAssignments])
+  useEffect(() => { setLoading(true); load() }, [load])
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    fetchAssignments()
-  }, [fetchAssignments])
-
-  const filters = [
-    { key: 'active', label: t('company.workforce.assigned') },
-    { key: 'in_progress', label: t('company.workforce.inProgress') },
-    { key: 'completed', label: t('company.workforce.completed') },
-  ]
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={'#F5A623'} />
-        </View>
-      </SafeAreaView>
-    )
-  }
+  if (loading) return <SafeAreaView style={styles.safe}><View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View></SafeAreaView>
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.heading}>{t('company.workforce.dispatch')}</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => router.push('/(company)/workforce/assign')}
-        >
-          <Text style={styles.addBtnText}>+ {t('company.workforce.assignWorker')}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.filterRow}>
-        {filters.map((f) => (
-          <TouchableOpacity
-            key={f.key}
-            style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} />}
       >
-        {assignments.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Users size={48} color={'#6F6B6B'} />
-            <Text style={styles.emptyText}>{t('company.workforce.noAssignments')}</Text>
-            <Text style={styles.emptyDesc}>{t('company.workforce.noAssignmentsDesc')}</Text>
-          </View>
-        ) : (
-          assignments.map((a) => {
-            const statusColor = STATUS_COLORS[a.status] || STATUS_COLORS.ASSIGNED
-            return (
-              <TouchableOpacity
-                key={a.id}
-                style={styles.assignmentCard}
-                activeOpacity={0.8}
-                onPress={() => router.push(`/(company)/workforce/assignment/${a.id}`)}
-              >
-                <View style={styles.assignmentHeader}>
-                  <Text style={styles.jobTitle}>{a.job?.title || 'Job'}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-                    <Text style={[styles.statusText, { color: statusColor.text }]}>
-                      {t(`company.workforce.${a.status.toLowerCase()}`) || a.status}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.assignmentWorker}>
-                  <User size={14} color={'#6F6B6B'} />
-                  <Text style={styles.workerName}>{a.worker?.name || 'Worker'}</Text>
-                </View>
-                <Text style={styles.assignmentDate}>
-                  {new Date(a.assignedAt).toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
-            )
-          })
+        <View style={styles.header}>
+          <View><Text style={styles.eyebrow}>OPERATIONS</Text><Text style={styles.title}>Dispatch</Text></View>
+          <TouchableOpacity style={styles.add} onPress={() => router.push('/(company)/workforce/assign' as any)}><Plus size={17} color={v3.colors.paper} weight="bold" /><Text style={styles.addText}>Assign</Text></TouchableOpacity>
+        </View>
+
+        <View style={styles.filters}>
+          {[
+            ['active', 'Active'],
+            ['in_progress', 'In progress'],
+            ['completed', 'Completed'],
+          ].map(([key, label]) => (
+            <TouchableOpacity key={key} style={[styles.filter, filter === key && styles.filterActive]} onPress={() => setFilter(key as any)}>
+              <Text style={[styles.filterText, filter === key && styles.filterTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {assignments.length ? assignments.map((assignment) => (
+          <TouchableOpacity key={assignment.id} style={styles.card} activeOpacity={0.72} onPress={() => router.push(`/(company)/workforce/assignment/${assignment.id}` as any)}>
+            <View style={styles.cardHeader}>
+              <View style={styles.jobIcon}><Briefcase size={18} color={v3.colors.ink} weight="bold" /></View>
+              <View style={styles.jobCopy}><Text style={styles.jobTitle}>{assignment.job?.title || 'Company job'}</Text><Text style={styles.jobStatus}>{assignment.job?.status || 'ACTIVE'}</Text></View>
+              <Status value={assignment.status} />
+            </View>
+            <View style={styles.workerRow}><UserCircle size={17} color={v3.colors.textMuted} /><Text style={styles.workerName}>{assignment.worker?.name || 'Unassigned worker'}</Text><Text style={styles.date}>{new Date(assignment.assignedAt).toLocaleDateString()}</Text></View>
+          </TouchableOpacity>
+        )) : (
+          <View style={styles.empty}><Briefcase size={30} color={v3.colors.textMuted} /><Text style={styles.emptyTitle}>No assignments here</Text><Text style={styles.emptyText}>After a company quote is accepted, assign the job to a team member and track progress from this workspace.</Text><TouchableOpacity style={styles.browse} onPress={() => router.push('/(company)/jobs/v2/browse' as any)}><Text style={styles.browseText}>Browse opportunities</Text></TouchableOpacity></View>
         )}
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF' },
-  addBtn: {
-    backgroundColor: '#F5A623',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  addBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#2E2E2E',
-  },
-  filterChipActive: {
-    backgroundColor: '#F5A623',
-    borderColor: '#F5A623',
-  },
-  filterText: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: '#6F6B6B' },
-  filterTextActive: { color: '#FFFFFF' },
-  assignmentCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  assignmentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  jobTitle: { fontSize: 15, fontFamily: fonts.bodyMedium, color: '#FFFFFF', flex: 1 },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12 },
-  statusText: { fontSize: 11, fontFamily: fonts.bodySemiBold },
-  assignmentWorker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  workerName: { fontSize: 13, color: '#6F6B6B' },
-  assignmentDate: { fontSize: 11, color: '#6F6B6B' },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontFamily: fonts.bodyMedium,
-    color: '#FFFFFF',
-    marginTop: 16,
-  },
-  emptyDesc: {
-    fontSize: 13,
-    color: '#6F6B6B',
-    marginTop: 8,
-    textAlign: 'center',
-  },
+function Status({ value }: { value: string }) {
+  const good = ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(value)
+  return <View style={[styles.status, good ? styles.statusGood : styles.statusWarm]}><Text style={[styles.statusText, good ? styles.statusTextGood : styles.statusTextWarm]}>{value.replaceAll('_', ' ')}</Text></View>
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 18, paddingBottom: 34 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, paddingBottom: 14 },
+  eyebrow: { ...v3.typography.label, color: v3.colors.amberDark, letterSpacing: 1 },
+  title: { ...v3.typography.h4, color: v3.colors.ink, marginTop: 2 },
+  add: { height: 40, borderRadius: 14, backgroundColor: v3.colors.ink, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, gap: 5 },
+  addText: { ...v3.typography.captionBold, color: v3.colors.paper },
+  filters: { flexDirection: 'row', backgroundColor: v3.colors.paper, padding: 4, borderRadius: 16, borderWidth: 1, borderColor: v3.colors.line, marginBottom: 12 },
+  filter: { flex: 1, height: 37, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  filterActive: { backgroundColor: v3.colors.ink },
+  filterText: { ...v3.typography.captionBold, color: v3.colors.textMuted },
+  filterTextActive: { color: v3.colors.paper },
+  card: { backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 14, marginBottom: 8 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center' },
+  jobIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  jobCopy: { flex: 1, marginLeft: 10 },
+  jobTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  jobStatus: { ...v3.typography.small, color: v3.colors.textMuted, marginTop: 2 },
+  status: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  statusGood: { backgroundColor: v3.colors.successSoft },
+  statusWarm: { backgroundColor: v3.colors.amberSoft },
+  statusText: { ...v3.typography.smallBold },
+  statusTextGood: { color: v3.colors.success },
+  statusTextWarm: { color: v3.colors.amberDark },
+  workerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: v3.colors.line },
+  workerName: { ...v3.typography.caption, color: v3.colors.textSecondary, marginLeft: 5, flex: 1 },
+  date: { ...v3.typography.small, color: v3.colors.textMuted },
+  empty: { alignItems: 'center', paddingTop: 65, paddingHorizontal: 34 },
+  emptyTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 12 },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 5 },
+  browse: { height: 46, borderRadius: 14, backgroundColor: v3.colors.ink, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  browseText: { ...v3.typography.bodyBold, color: v3.colors.paper },
 })
