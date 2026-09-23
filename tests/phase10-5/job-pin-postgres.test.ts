@@ -259,6 +259,12 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
       const { pin } = await generateJobPin(workStartJobId, customerAId)
 
+      const beforeArrival = await verifyJobPin(workStartJobId, providerId, pin, 'WORK_START')
+      expect(beforeArrival.valid).toBe(false)
+
+      const arrival = await verifyJobPin(workStartJobId, providerId, pin, 'ARRIVAL')
+      expect(arrival.valid).toBe(true)
+
       const preWorkspace = await prisma.jobWorkspace.findUnique({ where: { jobId: workStartJobId } })
       expect(preWorkspace!.progressStatus).toBe('ACCEPTED')
 
@@ -298,7 +304,9 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
 
     it('failed WORK_START with wrong PIN does not transition workspace', async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
-      await generateJobPin(workStartJobId, customerAId)
+      const { pin } = await generateJobPin(workStartJobId, customerAId)
+      const arrival = await verifyJobPin(workStartJobId, providerId, pin, 'ARRIVAL')
+      expect(arrival.valid).toBe(true)
 
       const result = await verifyJobPin(workStartJobId, providerId, '000000', 'WORK_START')
       expect(result.valid).toBe(false)
@@ -310,6 +318,8 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
     it('second WORK_START attempt is rejected after first consumed the purpose', { timeout: 30000 }, async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
       const { pin } = await generateJobPin(workStartJobId, customerAId)
+      const arrival = await verifyJobPin(workStartJobId, providerId, pin, 'ARRIVAL')
+      expect(arrival.valid).toBe(true)
 
       const first = await verifyJobPin(workStartJobId, providerId, pin, 'WORK_START')
       expect(first.valid).toBe(true)
