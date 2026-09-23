@@ -257,12 +257,30 @@ export async function GET(request: NextRequest) {
     const where: any = { isActive: true }
 
     if (myQuotes === 'true') {
-      const quoteJobIds = await prisma.jobQuote.findMany({
-        where: { providerId: user.id },
-        select: { jobId: true },
-        distinct: ['jobId'],
-      })
-      where.id = { in: quoteJobIds.map((quote) => quote.jobId) }
+      let providerId = user.id
+      let providerType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
+
+      if (user.role === 'COMPANY') {
+        const companyProfile = await prisma.companyProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        })
+        if (!companyProfile) {
+          where.id = { in: [] }
+        } else {
+          providerId = companyProfile.id
+          providerType = 'COMPANY'
+        }
+      }
+
+      if (!where.id) {
+        const quoteJobIds = await prisma.jobQuote.findMany({
+          where: { providerId, providerType },
+          select: { jobId: true },
+          distinct: ['jobId'],
+        })
+        where.id = { in: quoteJobIds.map((quote) => quote.jobId) }
+      }
     } else if (role === 'provider') {
       where.status = 'OPEN'
       where.countryCode = user.countryCode
