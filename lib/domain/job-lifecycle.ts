@@ -858,6 +858,17 @@ export async function completeAndReleaseEscrow(
       data: { status: 'COMPLETED', updatedAt: new Date() },
     })
 
+    await tx.companyJobAssignment.updateMany({
+      where: {
+        jobId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    })
+
     if (commissionCents > 0n) {
       await tx.commissionSettlement.create({
         data: {
