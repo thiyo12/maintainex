@@ -15,11 +15,13 @@ import { v3 } from '../../theme/v3/tokens'
 export default function CancelJobWithOtp({
   jobId,
   onDone,
+  initialReason = '',
 }: {
   jobId: string
   onDone: () => void
+  initialReason?: string
 }) {
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState(initialReason)
   const [code, setCode] = useState('')
   const [step, setStep] = useState<'reason' | 'code'>('reason')
   const [loading, setLoading] = useState(false)
