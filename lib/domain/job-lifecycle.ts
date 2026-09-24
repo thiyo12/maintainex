@@ -593,6 +593,22 @@ export async function releaseEscrow(
       currency: escrowCurrency,
       countryCode: job.countryCode || 'LK',
     })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_COMPLETED',
+      fromState: job.status,
+      toState: 'COMPLETED',
+      metadata: {
+        releaseMode: isStaff ? 'STAFF_RELEASE' : 'CUSTOMER_RELEASE',
+        escrowId: escrow.id,
+        commissionCents,
+        providerNetCents: netCents,
+        currency: escrowCurrency,
+      },
+    })
   })
 
   return {
