@@ -166,7 +166,7 @@ export async function evaluateEligibility(
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -460,39 +460,89 @@ async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  requestedJobId: string,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const requested = await client.marketplaceJob.findUnique({
+    where: { id: requestedJobId },
+    select: { preferredDate: true, estimatedDuration: true },
+  })
 
-  let activeCount: number
-  if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
-  } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
+  const requestedStart = requested?.preferredDate || null
+  const requestedDurationHours = Math.max(0.5, requested?.estimatedDuration || 2)
+  const requestedEnd = requestedStart
+    ? new Date(requestedStart.getTime() + requestedDurationHours * 60 * 60 * 1000)
+    : null
+
+  const rows = providerType === 'INDIVIDUAL'
+    ? await client.$queryRaw<Array<{ status: string; preferredDate: Date | null; estimatedDuration: number | null; updatedAt: Date }>>`
+        SELECT mj.status, mj."preferredDate", mj."estimatedDuration", mj."updatedAt"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'INDIVIDUAL'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj.id <> ${requestedJobId}
+      `
+    : await client.$queryRaw<Array<{ status: string; preferredDate: Date | null; estimatedDuration: number | null; updatedAt: Date }>>`
+        SELECT mj.status, mj."preferredDate", mj."estimatedDuration", mj."updatedAt"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'COMPANY'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj.id <> ${requestedJobId}
+      `
+
+  if (rows.length === 0) {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  const companyCapacity = providerType === 'COMPANY'
+    ? Math.max(1, await client.teamMember.count({
+        where: {
+          companyId: providerId,
+          status: 'ACTIVE',
+          userId: { not: null },
+          role: { in: ['COMPANY_OWNER', 'WORKER', 'DISPATCHER'] },
+        },
+      }))
+    : 1
+
+  // Unscheduled/immediate jobs should not be sent to an individual already
+  // working, or to a company whose active workload has reached workforce capacity.
+  if (!requestedStart || !requestedEnd) {
+    const blocked = rows.length >= companyCapacity
+    return blocked
+      ? { gate: 'NO_CONFLICT', passed: false, reason: `Active capacity conflict: ${rows.length}/${companyCapacity}` }
+      : { gate: 'NO_CONFLICT', passed: true, detail: `Capacity available: ${rows.length}/${companyCapacity} active` }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  const now = new Date()
+  let overlaps = 0
+  for (const row of rows) {
+    const activeStart = row.preferredDate || row.updatedAt || now
+    const durationHours = Math.max(0.5, row.estimatedDuration || 2)
+    const activeEnd = new Date(activeStart.getTime() + durationHours * 60 * 60 * 1000)
+    if (requestedStart < activeEnd && requestedEnd > activeStart) overlaps += 1
+  }
+
+  if (overlaps >= companyCapacity) {
+    return {
+      gate: 'NO_CONFLICT',
+      passed: false,
+      reason: `Scheduled capacity conflict: ${overlaps}/${companyCapacity} overlapping job(s)`,
+    }
+  }
+
+  return {
+    gate: 'NO_CONFLICT',
+    passed: true,
+    detail: overlaps > 0
+      ? `Scheduled capacity available: ${overlaps}/${companyCapacity} overlapping`
+      : 'No schedule overlap',
+  }
 }
 
 async function evaluateQualityFloor(
