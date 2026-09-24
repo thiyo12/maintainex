@@ -165,6 +165,14 @@ export async function evaluateEligibility(
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
+  // Gate: Provider-configured availability. Companies manage capacity at the
+  // worker dispatch layer, while individual Taskers can pause or set work days.
+  const availabilityGate = await evaluateConfiguredAvailability(client, providerType, providerId, job.jobId)
+  gates.push(availabilityGate)
+  if (!availabilityGate.passed) {
+    return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
+  }
+
   // Gate: No blocking assignment conflict
   const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
@@ -454,6 +462,64 @@ async function evaluateServiceArea(
     select: { user: { select: { countryCode: true } } },
   })
   return company?.user?.countryCode === jobCountryCode
+}
+
+async function evaluateConfiguredAvailability(
+  client: PrismaClient,
+  providerType: ProviderType,
+  providerId: string,
+  targetJobId: string,
+): Promise<EligibilityGate> {
+  if (providerType === 'COMPANY') {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'Company capacity is managed per worker' }
+  }
+
+  const availability = await client.providerAvailability.findUnique({
+    where: { providerId },
+  })
+  if (!availability) {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'No custom schedule set' }
+  }
+  if (!availability.isAvailable) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider marked unavailable' }
+  }
+
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: targetJobId },
+    select: { preferredDate: true },
+  })
+  const now = new Date()
+  const checkTime = job?.preferredDate || now
+
+  if (
+    availability.vacationStart &&
+    availability.vacationEnd &&
+    checkTime >= availability.vacationStart &&
+    checkTime <= availability.vacationEnd
+  ) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is on vacation for the requested date' }
+  }
+
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const dayName = dayNames[checkTime.getDay()]
+  if (!availability[dayName]) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider does not work on the requested day' }
+  }
+
+  const immediateCutoff = new Date(now.getTime() + 4 * 60 * 60 * 1000)
+  const isImmediate = !job?.preferredDate || job.preferredDate <= immediateCutoff
+  if (isImmediate) {
+    const [startHour, startMinute] = availability.startTime.split(':').map(Number)
+    const [endHour, endMinute] = availability.endTime.split(':').map(Number)
+    const minuteOfDay = now.getHours() * 60 + now.getMinutes()
+    const startsAt = startHour * 60 + startMinute
+    const endsAt = endHour * 60 + endMinute
+    if (minuteOfDay < startsAt || minuteOfDay > endsAt) {
+      return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is outside configured working hours' }
+    }
+  }
+
+  return { gate: 'AVAILABILITY', passed: true, detail: 'Provider schedule allows this job' }
 }
 
 async function evaluateConflict(
