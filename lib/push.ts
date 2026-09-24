@@ -2,7 +2,7 @@ import { prisma } from './prisma'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
-export type PushChannel = 'default' | 'job-offers'
+export type PushChannel = 'default' | 'job_offers'
 
 export interface PushOptions {
   channelId?: PushChannel
