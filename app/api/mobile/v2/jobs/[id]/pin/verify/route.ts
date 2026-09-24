@@ -22,8 +22,8 @@ export async function POST(
   if (!pin || typeof pin !== 'string') {
     return NextResponse.json({ error: 'PIN is required' }, { status: 400 })
   }
-  if (!purpose || !['ARRIVAL', 'WORK_START', 'COMPLETION'].includes(purpose)) {
-    return NextResponse.json({ error: 'Invalid purpose. Must be ARRIVAL, WORK_START, or COMPLETION' }, { status: 400 })
+  if (!purpose || !['ARRIVAL', 'WORK_START', 'COMPLETION', 'CANCELLATION'].includes(purpose)) {
+    return NextResponse.json({ error: 'Invalid purpose. Must be ARRIVAL, WORK_START, COMPLETION, or CANCELLATION' }, { status: 400 })
   }
 
   const result = await verifyJobPin(jobId, auth.id, pin, purpose)
