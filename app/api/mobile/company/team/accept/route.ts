@@ -46,9 +46,23 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { role: 'TASKER' },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { role: 'TASKER' },
+      })
+      await tx.taskerProfile.upsert({
+        where: { userId: user.id },
+        update: { countryCode: user.countryCode || 'LK' },
+        create: {
+          userId: user.id,
+          countryCode: user.countryCode || 'LK',
+          verificationStatus: 'PENDING',
+          isVerified: false,
+          isOnline: false,
+          skills: '[]',
+        },
+      })
     })
 
     return NextResponse.json({
