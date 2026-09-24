@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { DotsThree, Wrench, ArrowRight, Warning, Star } from 'phosphor-react-native'
 import { useAuth } from '../../../lib/auth'
 import { taskers, earnings, notifications } from '../../../lib/api'
-import { v2Jobs, v2Identity } from '../../../lib/api-v2'
+import { v2Jobs, v2Identity, v2WorkerAssignments, type V2WorkerAssignment } from '../../../lib/api-v2'
 import { emit, on } from '../../../lib/events'
 import { fonts } from '../../../lib/fonts'
 import { v3 } from '../../../theme/v3/tokens'
@@ -31,6 +31,7 @@ export default function TaskerDashboard() {
   const [isOnline, setIsOnline] = useState(true)
   const [openJobs, setOpenJobs] = useState<any[]>([])
   const [myJobs, setMyJobs] = useState<any[]>([])
+  const [companyAssignments, setCompanyAssignments] = useState<V2WorkerAssignment[]>([])
   const [earningsData, setEarningsData] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -47,15 +48,17 @@ export default function TaskerDashboard() {
     else setLoading(true)
 
     try {
-      const [openRes, myRes, earningsRes, profileRes] = await Promise.allSettled([
+      const [openRes, myRes, assignmentRes, earningsRes, profileRes] = await Promise.allSettled([
         v2Jobs.list('role=provider'),
         v2Jobs.list('myQuotes=true'),
+        v2WorkerAssignments.list(),
         earnings.get(),
         taskers.getMyProfile(),
       ])
 
       if (openRes.status === 'fulfilled') setOpenJobs(openRes.value.jobs || [])
       if (myRes.status === 'fulfilled') setMyJobs(myRes.value.jobs || [])
+      if (assignmentRes.status === 'fulfilled') setCompanyAssignments(assignmentRes.value.assignments || [])
       if (earningsRes.status === 'fulfilled') setEarningsData(earningsRes.value)
 
       if (profileRes.status === 'fulfilled') {
@@ -161,6 +164,9 @@ export default function TaskerDashboard() {
   }, [isOnline, t])
 
   const activeJob = myJobs.find((job: any) => ACTIVE_STATUSES.includes(job.status))
+  const activeCompanyAssignment = companyAssignments.find((assignment) =>
+    ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(assignment.status)
+  )
   const availableJobs = openJobs.filter((job: any) => !myJobs.some((mine: any) => mine.id === job.id))
   const bestJob = availableJobs[0]
 
@@ -206,6 +212,32 @@ export default function TaskerDashboard() {
             </TouchableOpacity>
           )}
         </View>
+
+        {activeCompanyAssignment ? (
+          <TouchableOpacity
+            style={styles.companyAssignmentCard}
+            activeOpacity={0.78}
+            onPress={() => router.push(('/(tasker)/jobs/v2/manage/' + activeCompanyAssignment.job.id) as any)}
+          >
+            <View style={styles.companyAssignmentTop}>
+              <Text style={styles.companyAssignmentEyebrow}>COMPANY WORK</Text>
+              <View style={styles.companyAssignmentStatus}>
+                <Text style={styles.companyAssignmentStatusText}>{activeCompanyAssignment.status.replaceAll('_', ' ')}</Text>
+              </View>
+            </View>
+            <Text style={styles.companyAssignmentTitle} numberOfLines={1}>{activeCompanyAssignment.job.title}</Text>
+            <Text style={styles.companyAssignmentMeta} numberOfLines={1}>
+              {(activeCompanyAssignment.companyName || 'Company assignment') +
+                (activeCompanyAssignment.job.preferredDate ? ' · ' + new Date(activeCompanyAssignment.job.preferredDate).toLocaleDateString() : '')}
+            </Text>
+            <View style={styles.companyAssignmentOpen}>
+              <Text style={styles.companyAssignmentOpenText}>
+                {activeCompanyAssignment.status === 'ASSIGNED' ? 'Review assignment' : 'Open assigned job'}
+              </Text>
+              <ArrowRight size={15} color={v3.colors.ink} weight="bold" />
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         {!isOnline ? (
           <>
@@ -539,6 +571,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.headingBold,
     color: v3.colors.paper,
   },
+  companyAssignmentCard: {
+    marginHorizontal: 18,
+    marginBottom: 12,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: v3.colors.amberSoft,
+    borderWidth: 1,
+    borderColor: '#E8C16A',
+  },
+  companyAssignmentTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  companyAssignmentEyebrow: { ...v3.typography.smallBold, color: v3.colors.amberDark, letterSpacing: 0.8 },
+  companyAssignmentStatus: { borderRadius: 999, backgroundColor: v3.colors.paper, paddingHorizontal: 8, paddingVertical: 4 },
+  companyAssignmentStatusText: { ...v3.typography.smallBold, color: v3.colors.ink },
+  companyAssignmentTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink, marginTop: 9 },
+  companyAssignmentMeta: { ...v3.typography.caption, color: v3.colors.textSecondary, marginTop: 3 },
+  companyAssignmentOpen: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 11 },
+  companyAssignmentOpenText: { ...v3.typography.captionBold, color: v3.colors.ink },
+
   onlineStatsCard: {
     marginHorizontal: 18,
     marginTop: 14,

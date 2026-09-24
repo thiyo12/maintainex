@@ -80,7 +80,7 @@ export default function NotificationBridge() {
       notification => {
         const content = notification?.request?.content
         const data = (content?.data || {}) as Record<string, any>
-        if (data?.type !== 'NEW_JOB') return
+        if (!['NEW_JOB', 'COMPANY_ASSIGNMENT'].includes(String(data?.type || ''))) return
         if (data?.alertMode !== 'ring') return
 
         if (timerRef.current) clearTimeout(timerRef.current)
@@ -149,7 +149,7 @@ export default function NotificationBridge() {
               <BellRinging size={24} color={v3.colors.ink} weight="fill" />
             </View>
             <View style={styles.copy}>
-              <Text style={styles.eyebrow}>LIVE JOB OFFER</Text>
+              <Text style={styles.eyebrow}>{offer.data?.type === 'COMPANY_ASSIGNMENT' ? 'NEW COMPANY ASSIGNMENT' : 'LIVE JOB OFFER'}</Text>
               <Text style={styles.title} numberOfLines={2}>{offer.title}</Text>
             </View>
             <TouchableOpacity style={styles.close} onPress={() => setOffer(null)}>
@@ -169,7 +169,11 @@ export default function NotificationBridge() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.note}>Review the request before sending a quote. Offers are never auto-accepted.</Text>
+          <Text style={styles.note}>
+            {offer.data?.type === 'COMPANY_ASSIGNMENT'
+              ? 'Review the assigned job before accepting work.'
+              : 'Review the request before sending a quote. Offers are never auto-accepted.'}
+          </Text>
         </Animated.View>
       </View>
     </Modal>

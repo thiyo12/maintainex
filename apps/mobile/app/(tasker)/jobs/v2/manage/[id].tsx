@@ -8,7 +8,7 @@ import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v3 } from '../../../../../theme/v3/tokens'
-import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
+import { v2Jobs, v2JobActions, v2WorkerAssignments, type V2WorkerAssignment, V2Job } from '../../../../../lib/api-v2'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
 import * as Location from 'expo-location'
 
@@ -35,6 +35,7 @@ export default function V2ProviderManageJobScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [nextJob, setNextJob] = useState<V2Job | null>(null)
+  const [companyAssignment, setCompanyAssignment] = useState<V2WorkerAssignment | null>(null)
 
   const [reviewQuality, setReviewQuality] = useState('5')
   const [reviewComm, setReviewComm] = useState('5')
@@ -51,6 +52,8 @@ export default function V2ProviderManageJobScreen() {
       setWorkspace(res.job.workspace || null)
       setEscrow(res.job.escrow || null)
       setReviews(res.job.reviews || null)
+      const assignmentRes = await v2WorkerAssignments.list().catch(() => ({ assignments: [] }))
+      setCompanyAssignment(assignmentRes.assignments.find((assignment) => assignment.job.id === id) || null)
       loadNextJob()
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
@@ -117,6 +120,26 @@ export default function V2ProviderManageJobScreen() {
 
   const stopLocationSharing = async () => {
     setLocationSharing(false)
+  }
+
+  const handleAssignmentDecision = async (action: 'accept' | 'reject') => {
+    if (!companyAssignment) return
+    setActionLoading(`assignment-${action}`)
+    try {
+      await v2WorkerAssignments.action(companyAssignment.id, action, action === 'reject' ? 'Worker declined this schedule' : undefined)
+      if (action === 'reject') {
+        Alert.alert('Assignment declined', 'The company can assign another worker.', [
+          { text: 'Done', onPress: () => router.back() },
+        ])
+      } else {
+        Alert.alert('Assignment accepted', 'This job is now in your work schedule.')
+        await loadJob()
+      }
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e.message)
+    } finally {
+      setActionLoading('')
+    }
   }
 
   const handleMarkComplete = async () => {
@@ -237,7 +260,35 @@ export default function V2ProviderManageJobScreen() {
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {isAccepted ? (
+        {companyAssignment?.status === 'ASSIGNED' ? (
+          <View style={styles.assignmentGate}>
+            <View style={styles.assignmentBadge}><Text style={styles.assignmentBadgeText}>COMPANY ASSIGNMENT</Text></View>
+            <Text style={styles.assignmentTitle}>{companyAssignment.companyName || 'Your company'} assigned this job to you</Text>
+            <Text style={styles.assignmentText}>
+              Review the schedule before accepting. You cannot use arrival/work-start PINs until you accept this assignment.
+            </Text>
+            <View style={styles.assignmentActions}>
+              <TouchableOpacity
+                style={styles.assignmentReject}
+                disabled={actionLoading !== ''}
+                onPress={() => handleAssignmentDecision('reject')}
+              >
+                <Text style={styles.assignmentRejectText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.assignmentAccept}
+                disabled={actionLoading !== ''}
+                onPress={() => handleAssignmentDecision('accept')}
+              >
+                {actionLoading === 'assignment-accept'
+                  ? <ActivityIndicator size="small" color={v3.colors.paper} />
+                  : <Text style={styles.assignmentAcceptText}>Accept job</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
+        {isAccepted && companyAssignment?.status !== 'ASSIGNED' ? (
           <>
             <View style={styles.mapStage}>
               <View style={styles.mapLineOne} />
@@ -321,7 +372,7 @@ export default function V2ProviderManageJobScreen() {
           </>
         ) : null}
 
-        {isInProgress ? (
+        {isInProgress && companyAssignment?.status !== 'ASSIGNED' ? (
           <>
             <View style={styles.liveCard}>
               <Text style={styles.liveEyebrow}>IN PROGRESS</Text>
@@ -412,7 +463,7 @@ export default function V2ProviderManageJobScreen() {
           ) : null}
         </View>
 
-        {canOtpCancel ? (
+        {canOtpCancel && companyAssignment?.status !== 'ASSIGNED' ? (
           <TouchableOpacity
             style={styles.cancelAction}
             activeOpacity={0.72}
@@ -611,4 +662,14 @@ const makeStyles = (_colors: any) => StyleSheet.create({
   nextTitle: { marginTop: 2, fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
   reportLink: { minHeight: 48, marginTop: 12, alignItems: 'center', justifyContent: 'center' },
   reportLinkText: { fontSize: 9.5, fontFamily: fonts.bodySemiBold, color: v3.colors.error },
+  assignmentGate: { marginBottom: 14, borderRadius: 20, padding: 16, backgroundColor: v3.colors.amberSoft, borderWidth: 1, borderColor: '#E8C16A' },
+  assignmentBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: v3.colors.amber },
+  assignmentBadgeText: { ...v3.typography.smallBold, color: v3.colors.ink },
+  assignmentTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 11 },
+  assignmentText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 17, marginTop: 4 },
+  assignmentActions: { flexDirection: 'row', gap: 9, marginTop: 14 },
+  assignmentReject: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1, borderColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  assignmentRejectText: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  assignmentAccept: { flex: 1.25, height: 48, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  assignmentAcceptText: { ...v3.typography.bodyBold, color: v3.colors.paper },
 })
