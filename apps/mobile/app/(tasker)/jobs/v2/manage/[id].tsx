@@ -10,6 +10,7 @@ import { fonts } from '../../../../../lib/fonts'
 import { v3 } from '../../../../../theme/v3/tokens'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
+import CancelJobModal from '../../../../../components/jobs/CancelJobModal'
 import * as Location from 'expo-location'
 
 export default function V2ProviderManageJobScreen() {
@@ -43,6 +44,7 @@ export default function V2ProviderManageJobScreen() {
 
   const [locationSharing, setLocationSharing] = useState(false)
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
+  const [cancelVisible, setCancelVisible] = useState(false)
 
   const loadJob = async () => {
     try {
@@ -460,12 +462,30 @@ export default function V2ProviderManageJobScreen() {
           </TouchableOpacity>
         ) : null}
 
+        {isAccepted ? (
+          <TouchableOpacity style={styles.reportLink} activeOpacity={0.72} onPress={() => setCancelVisible(true)}>
+            <Text style={[styles.reportLinkText, { color: v3.colors.error }]}>Cancel before work starts</Text>
+          </TouchableOpacity>
+        ) : null}
+
         {canDispute && !isInProgress ? (
           <TouchableOpacity style={styles.reportLink} activeOpacity={0.72} onPress={handleDispute}>
             <Text style={styles.reportLinkText}>Report a problem with this job</Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        jobId={id}
+        jobTitle={job?.title}
+        onClose={() => setCancelVisible(false)}
+        onCancelled={async () => {
+          setCancelVisible(false)
+          Alert.alert('Job cancelled', 'The customer has been notified and any protected payment was refunded.')
+          router.back()
+        }}
+      />
 
       <NewChatModal
         visible={!!msgRecipient}
