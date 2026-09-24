@@ -203,6 +203,18 @@ export async function notifyPayoutProcessed(userId: string, title: string, body:
   })
 }
 
+export async function notifyJobCancelled(jobId: string, userId: string, jobTitle: string, cancelledBy: string) {
+  return createNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: `${cancelledBy} cancelled "${jobTitle}" before work started.`,
+    params: { jobTitle, cancelledBy },
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'JOB_CANCELLED', jobId },
+  })
+}
+
 export async function notifyJobEscalated(jobId: string, customerId: string, jobTitle: string) {
   return createNotification({
     userId: customerId,
