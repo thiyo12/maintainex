@@ -6,6 +6,8 @@ import type {
   MatchExclusionReason,
   MatchingInput,
 } from './types'
+import { readStoredList } from '@/lib/db-utils'
+import { getLocationName } from '@/lib/locations'
 
 export interface ProviderEligibilityInput {
   providerType: ProviderType
@@ -159,7 +161,7 @@ export async function evaluateEligibility(
   }
 
   // Gate: Service area (country match)
-  const serviceAreaPassed = await evaluateServiceArea(client, providerType, providerId, job.countryCode)
+  const serviceAreaPassed = await evaluateServiceArea(client, providerType, providerId, job)
   gates.push({ gate: 'SERVICE_AREA', passed: serviceAreaPassed, detail: serviceAreaPassed ? 'Country match confirmed' : 'No matching country code' })
   if (!serviceAreaPassed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -435,25 +437,103 @@ async function evaluateJurisdictionCredential(
   return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has ${validCerts} jurisdiction credential(s)` } }
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (value: number) => value * Math.PI / 180
+  const earthRadiusKm = 6371
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function configuredAreaMatches(serviceAreas: string | null | undefined, areaId: string | null): boolean {
+  if (!serviceAreas || !areaId) return true
+  const configured = readStoredList(serviceAreas)
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
+  if (configured.length === 0) return true
+
+  const fullLocation = getLocationName(areaId).toLowerCase()
+  const normalizedAreaId = areaId.toLowerCase()
+
+  return configured.some(area =>
+    area === normalizedAreaId ||
+    fullLocation.includes(area)
+  )
+}
+
 async function evaluateServiceArea(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
-  jobCountryCode: string | undefined,
+  job: MatchingInput,
 ): Promise<boolean> {
-  if (!jobCountryCode) return true
+  if (!job.countryCode) return true
+
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: job.jobId },
+    select: { areaId: true, latitude: true, longitude: true },
+  })
+
   if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { countryCode: true },
-    })
-    return user?.countryCode === jobCountryCode
+    const [user, profile] = await Promise.all([
+      client.user.findUnique({
+        where: { id: providerId },
+        select: { countryCode: true },
+      }),
+      client.taskerProfile.findUnique({
+        where: { userId: providerId },
+        select: {
+          countryCode: true,
+          serviceAreas: true,
+          latitude: true,
+          longitude: true,
+          serviceRadius: true,
+        },
+      }),
+    ])
+
+    const providerCountry = profile?.countryCode || user?.countryCode
+    if (providerCountry !== job.countryCode) return false
+
+    if (
+      target?.latitude != null && target.longitude != null &&
+      profile?.latitude != null && profile.longitude != null &&
+      profile.serviceRadius != null && profile.serviceRadius > 0
+    ) {
+      return haversineKm(target.latitude, target.longitude, profile.latitude, profile.longitude) <= profile.serviceRadius
+    }
+
+    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null)
   }
+
   const company = await client.companyProfile.findUnique({
     where: { id: providerId },
-    select: { user: { select: { countryCode: true } } },
+    select: {
+      countryCode: true,
+      serviceAreas: true,
+      latitude: true,
+      longitude: true,
+      serviceRadius: true,
+      user: { select: { countryCode: true } },
+    },
   })
-  return company?.user?.countryCode === jobCountryCode
+  if (!company) return false
+
+  const providerCountry = company.countryCode || company.user?.countryCode
+  if (providerCountry !== job.countryCode) return false
+
+  if (
+    target?.latitude != null && target.longitude != null &&
+    company.latitude != null && company.longitude != null &&
+    company.serviceRadius != null && company.serviceRadius > 0
+  ) {
+    return haversineKm(target.latitude, target.longitude, company.latitude, company.longitude) <= company.serviceRadius
+  }
+
+  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
 }
 
 async function evaluateConflict(
