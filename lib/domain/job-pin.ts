@@ -283,7 +283,7 @@ export async function verifyJobPin(
       await tx.companyJobAssignment.updateMany({
         where: {
           jobId,
-          status: { in: ['ASSIGNED', 'ACCEPTED'] },
+          status: 'ACCEPTED',
         },
         data: { status: 'IN_PROGRESS', startedAt: now },
       })
