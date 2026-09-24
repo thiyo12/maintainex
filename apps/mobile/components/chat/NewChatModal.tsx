@@ -66,7 +66,7 @@ export default function NewChatModal({ visible, onClose, recipient, jobId, jobTi
             placeholder="Write a message…"
             placeholderTextColor={colors.muted}
             multiline
-            maxLength={2000}
+            maxLength={1000}
           />
           <TouchableOpacity
             style={[styles.send, { backgroundColor: colors.amber, opacity: sending ? 0.6 : 1 }]}
