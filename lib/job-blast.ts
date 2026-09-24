@@ -1,12 +1,10 @@
 import { prisma } from './prisma'
-import { createNotification } from './notifications'
-import { sendExpoPush } from './push'
+import { createNotification, deliverNotification } from './notifications'
 import { findCandidates } from './matching'
 
 /**
- * Notify every provider entity returned by the canonical matching engine.
- * JobMatchQueue remains an individual/TaskerProfile compatibility queue; company
- * matches are delivered to the company owner without pretending they are taskers.
+ * Notify providers returned by the canonical matcher.
+ * Immediate jobs are only delivered to providers who pass conflict/availability gates.
  */
 export async function blastJobToTaskers(jobId: string): Promise<{ matched: number; totalCandidates: number }> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -24,8 +22,8 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     countryCode: job.countryCode || 'GLOBAL',
   })
 
-  let individualCandidates = result.candidates.filter((candidate) => candidate.providerType === 'INDIVIDUAL')
-  let companyCandidates = result.candidates.filter((candidate) => candidate.providerType === 'COMPANY')
+  let individualCandidates = result.candidates.filter(candidate => candidate.providerType === 'INDIVIDUAL')
+  let companyCandidates = result.candidates.filter(candidate => candidate.providerType === 'COMPANY')
 
   if (job.targetTaskerId) {
     const target = await prisma.taskerProfile.findFirst({
@@ -38,35 +36,33 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       select: { userId: true },
     })
     individualCandidates = target
-      ? individualCandidates.filter((candidate) => candidate.userId === target.userId)
+      ? individualCandidates.filter(candidate => candidate.userId === target.userId)
       : []
     companyCandidates = []
   }
 
-  const individualUserIds = individualCandidates.map((candidate) => candidate.userId || candidate.providerId)
+  const individualUserIds = individualCandidates.map(candidate => candidate.userId || candidate.providerId)
   const profiles = await prisma.taskerProfile.findMany({
     where: { userId: { in: individualUserIds } },
-    include: { user: { select: { pushToken: true } } },
-  })
-  const profileByUser = new Map(profiles.map((profile) => [profile.userId, profile]))
-
-  const companyIds = companyCandidates.map((candidate) => candidate.companyId || candidate.providerId)
-  const companies = await prisma.companyProfile.findMany({
-    where: { id: { in: companyIds } },
     select: {
       id: true,
       userId: true,
-      user: { select: { pushToken: true } },
+      isOnline: true,
     },
   })
-  const companyById = new Map(companies.map((company) => [company.id, company]))
+  const profileByUser = new Map(profiles.map(profile => [profile.userId, profile]))
+
+  const companyIds = companyCandidates.map(candidate => candidate.companyId || candidate.providerId)
+  const companies = await prisma.companyProfile.findMany({
+    where: { id: { in: companyIds } },
+    select: { id: true, userId: true },
+  })
+  const companyById = new Map(companies.map(company => [company.id, company]))
 
   await prisma.jobMatchQueue.deleteMany({ where: { jobId } })
 
-  const pushTitle = 'New job near you 🔔'
-  const pushBody = `${job.title} — a matching job is available. Tap to quote.`
-
   let matched = 0
+
   for (const candidate of individualCandidates) {
     const userId = candidate.userId || candidate.providerId
     const profile = profileByUser.get(userId)
@@ -88,20 +84,23 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       continue
     }
 
-    await createNotification({
+    await deliverNotification({
       userId,
-      title: pushTitle,
-      body: job.title,
+      title: profile.isOnline ? 'New job available now' : 'New job near you',
+      body: `${job.title} — review the request and send your price.`,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (profile.user.pushToken) {
-      await sendExpoPush(profile.user.pushToken, pushTitle, pushBody, {
+    }, {
+      channelId: 'job_offers',
+      priority: 'high',
+      interruptionLevel: 'time-sensitive',
+      data: {
         type: 'NEW_JOB',
+        deliveryMode: profile.isOnline ? 'LIVE_OFFER' : 'BACKGROUND_OFFER',
         jobId,
         categoryId: job.categoryId,
-      })
-    }
+      },
+    })
     matched += 1
   }
 
@@ -110,21 +109,24 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     const company = companyById.get(companyId)
     if (!company) continue
 
-    await createNotification({
+    await deliverNotification({
       userId: company.userId,
-      title: pushTitle,
-      body: job.title,
+      title: 'New company opportunity',
+      body: `${job.title} — review the request and send a company quote.`,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (company.user.pushToken) {
-      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
+    }, {
+      channelId: 'job_offers',
+      priority: 'high',
+      interruptionLevel: 'time-sensitive',
+      data: {
         type: 'NEW_JOB',
+        deliveryMode: 'COMPANY_OPPORTUNITY',
         jobId,
         categoryId: job.categoryId,
         companyId,
-      })
-    }
+      },
+    })
     matched += 1
   }
 
@@ -137,7 +139,9 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     await createNotification({
       userId: job.customerId,
       title: 'No providers available right now',
-      body: 'Try expanding your search or check back later. Your job is still posted.',
+      body: 'Try a future time or expand your search. Your job is still posted.',
+      referenceType: 'JOB',
+      referenceId: jobId,
     })
   }
 
