@@ -178,6 +178,22 @@ export async function checkWorkerEligibility(
         if (conflictingAssignments.length > 0) {
           reasons.push('Worker has a scheduling conflict with another assignment on the same date/time')
         }
+      } else {
+        const immediateConflict = await prisma.companyJobAssignment.findFirst({
+          where: {
+            workerUserId: userId,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+            jobId: { not: requiredJobId },
+            OR: [
+              { status: 'IN_PROGRESS' },
+              { job: { preferredDate: null } },
+            ],
+          },
+          select: { id: true },
+        })
+        if (immediateConflict) {
+          reasons.push('Worker is busy with active or unscheduled work; immediate assignment is blocked')
+        }
       }
     }
   }
