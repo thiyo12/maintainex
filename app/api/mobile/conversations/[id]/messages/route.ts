@@ -27,10 +27,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (normalizedText.length > MAX_MESSAGE_LENGTH) {
       return NextResponse.json({ error: `Message is too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` }, { status: 400 })
     }
-    if (text.trim().length > MAX_MESSAGE_LENGTH) {
-      return NextResponse.json({ error: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer` }, { status: 400 })
-    }
-
     const conversation = await prisma.conversation.findFirst({
       where: {
         id,
@@ -78,8 +74,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Fraud scan: always runs, never blocks — sanitizes + flags
-    const scan = await scanChatMessage(text.trim(), user.id, id)
-    const messageText = scan.sanitizedText || text.trim()
+    const scan = await scanChatMessage(normalizedText, user.id, id)
+    const messageText = scan.sanitizedText || normalizedText
 
     const message = await prisma.message.create({
       data: {
@@ -130,19 +126,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const membership = await prisma.conversationParticipant.findUnique({
       where: { conversationId_userId: { conversationId: id, userId: user.id } },
-      select: { id: true },
-    })
-    if (!membership) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
-    }
-
-    const membership = await prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId: id,
-          userId: user.id,
-        },
-      },
       select: { id: true },
     })
     if (!membership) {
