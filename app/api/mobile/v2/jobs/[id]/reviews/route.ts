@@ -59,7 +59,7 @@ export async function POST(
 
       if (quote.providerType === 'INDIVIDUAL') {
         await prisma.taskerProfile.updateMany({
-          where: { userId: quote.providerId },
+          where: { id: quote.providerId },
           data: { rating: Math.round(avgRating * 10) / 10, completedJobs: completedCount },
         })
         // Trigger reputation recalculation (fire-and-forget)
@@ -76,12 +76,20 @@ export async function POST(
 
     if (reviewType === 'PROVIDER_REVIEWS_CUSTOMER') {
       const quote = await prisma.jobQuote.findFirst({
-        where: { jobId: job.id, providerId: user.id, status: 'ACCEPTED' },
+        where: { jobId: job.id, status: 'ACCEPTED' },
       })
       if (!quote) return NextResponse.json({ error: 'Only the assigned provider can review' }, { status: 403 })
 
+      const providerAuthorized = quote.providerType === 'INDIVIDUAL'
+        ? quote.providerId === user.id
+        : Boolean(await prisma.teamMember.findFirst({
+            where: { companyId: quote.providerId, userId: user.id, status: 'ACTIVE' },
+            select: { id: true },
+          }))
+      if (!providerAuthorized) return NextResponse.json({ error: 'Only the assigned provider can review' }, { status: 403 })
+
       const existing = await prisma.providerReview.findUnique({
-        where: { jobId_providerId: { jobId: job.id, providerId: user.id } },
+        where: { jobId_providerId: { jobId: job.id, providerId: quote.providerType === 'COMPANY' ? quote.providerId : user.id } },
       })
       if (existing) return NextResponse.json({ error: 'Already reviewed' }, { status: 409 })
 
@@ -92,7 +100,7 @@ export async function POST(
       const review = await prisma.providerReview.create({
         data: {
           jobId: job.id,
-          providerId: user.id,
+          providerId: quote.providerType === 'COMPANY' ? quote.providerId : user.id,
           customerId: job.customerId,
           cooperation,
           communication,
@@ -122,8 +130,13 @@ export async function GET(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id }, select: { customerId: true } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId: id, status: 'ACCEPTED' }, select: { providerId: true } })
-    const isProvider = acceptedQuote?.providerId === user.id
+    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId: id, status: 'ACCEPTED' }, select: { providerId: true, providerType: true } })
+    const isProvider = acceptedQuote?.providerType === 'INDIVIDUAL'
+      ? acceptedQuote.providerId === user.id
+      : Boolean(acceptedQuote && await prisma.teamMember.findFirst({
+          where: { companyId: acceptedQuote.providerId, userId: user.id, status: 'ACTIVE' },
+          select: { id: true },
+        }))
     if (job.customerId !== user.id && !isProvider) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
