@@ -165,8 +165,16 @@ export async function evaluateEligibility(
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
+  // Gate: Provider-configured availability. Companies manage capacity at the
+  // worker dispatch layer, while individual Taskers can pause or set work days.
+  const availabilityGate = await evaluateConfiguredAvailability(client, providerType, providerId, job.jobId)
+  gates.push(availabilityGate)
+  if (!availabilityGate.passed) {
+    return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
+  }
+
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -456,43 +464,141 @@ async function evaluateServiceArea(
   return company?.user?.countryCode === jobCountryCode
 }
 
+async function evaluateConfiguredAvailability(
+  client: PrismaClient,
+  providerType: ProviderType,
+  providerId: string,
+  targetJobId: string,
+): Promise<EligibilityGate> {
+  if (providerType === 'COMPANY') {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'Company capacity is managed per worker' }
+  }
+
+  const availability = await client.providerAvailability.findUnique({
+    where: { providerId },
+  })
+  if (!availability) {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'No custom schedule set' }
+  }
+  if (!availability.isAvailable) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider marked unavailable' }
+  }
+
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: targetJobId },
+    select: { preferredDate: true },
+  })
+  const now = new Date()
+  const checkTime = job?.preferredDate || now
+
+  if (
+    availability.vacationStart &&
+    availability.vacationEnd &&
+    checkTime >= availability.vacationStart &&
+    checkTime <= availability.vacationEnd
+  ) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is on vacation for the requested date' }
+  }
+
+  const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const dayName = dayNames[checkTime.getDay()]
+  if (!availability[dayName]) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider does not work on the requested day' }
+  }
+
+  const immediateCutoff = new Date(now.getTime() + 4 * 60 * 60 * 1000)
+  const isImmediate = !job?.preferredDate || job.preferredDate <= immediateCutoff
+  if (isImmediate) {
+    const [startHour, startMinute] = availability.startTime.split(':').map(Number)
+    const [endHour, endMinute] = availability.endTime.split(':').map(Number)
+    const minuteOfDay = now.getHours() * 60 + now.getMinutes()
+    const startsAt = startHour * 60 + startMinute
+    const endsAt = endHour * 60 + endMinute
+    if (minuteOfDay < startsAt || minuteOfDay > endsAt) {
+      return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is outside configured working hours' }
+    }
+  }
+
+  return { gate: 'AVAILABILITY', passed: true, detail: 'Provider schedule allows this job' }
+}
+
 async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  targetJobId: string,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  // Companies can keep receiving opportunities while other company jobs are active.
+  // Worker-level conflicts are enforced when dispatching the accepted company job.
+  if (providerType === 'COMPANY') {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'Company capacity is enforced at worker dispatch' }
+  }
 
-  let activeCount: number
-  if (providerType === 'INDIVIDUAL') {
+  const targetJob = await client.marketplaceJob.findUnique({
+    where: { id: targetJobId },
+    select: { preferredDate: true, preferredTimeSlot: true },
+  })
+
+  const now = new Date()
+  const immediateCutoff = new Date(now.getTime() + 4 * 60 * 60 * 1000)
+
+  let activeCount = 0
+  if (!targetJob?.preferredDate || targetJob.preferredDate <= immediateCutoff) {
     const rows = await client.$queryRaw<{ cnt: bigint }[]>`
       SELECT COUNT(*) as cnt
       FROM "MarketplaceJob" mj
       JOIN "JobQuote" jq ON jq."jobId" = mj.id
       WHERE jq."providerId" = ${providerId}
+        AND jq."providerType" = 'INDIVIDUAL'
         AND jq.status = 'ACCEPTED'
+        AND mj.id <> ${targetJobId}
         AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
+        AND (mj."preferredDate" IS NULL OR mj."preferredDate" <= ${immediateCutoff})
     `
     activeCount = Number(rows[0]?.cnt ?? 0)
   } else {
+    const dayStart = new Date(targetJob.preferredDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
     const rows = await client.$queryRaw<{ cnt: bigint }[]>`
       SELECT COUNT(*) as cnt
       FROM "MarketplaceJob" mj
       JOIN "JobQuote" jq ON jq."jobId" = mj.id
       WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
+        AND jq."providerType" = 'INDIVIDUAL'
         AND jq.status = 'ACCEPTED'
+        AND mj.id <> ${targetJobId}
         AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
+        AND mj."preferredDate" >= ${dayStart}
+        AND mj."preferredDate" < ${dayEnd}
+        AND (
+          ${targetJob.preferredTimeSlot}::text IS NULL
+          OR mj."preferredTimeSlot" IS NULL
+          OR mj."preferredTimeSlot" = ${targetJob.preferredTimeSlot}
+        )
     `
     activeCount = Number(rows[0]?.cnt ?? 0)
   }
 
   if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+    return {
+      gate: 'NO_CONFLICT',
+      passed: false,
+      reason: targetJob?.preferredDate && targetJob.preferredDate > immediateCutoff
+        ? 'Scheduling conflict with another confirmed job'
+        : 'Provider is busy with a confirmed/current job',
+    }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  return {
+    gate: 'NO_CONFLICT',
+    passed: true,
+    detail: targetJob?.preferredDate && targetJob.preferredDate > immediateCutoff
+      ? 'No overlapping scheduled job'
+      : 'No immediate active-job conflict',
+  }
 }
 
 async function evaluateQualityFloor(
@@ -530,6 +636,7 @@ export function mapEligibilityToExclusionReason(gate: EligibilityGate): MatchExc
   if (gate.reason?.includes('Identity')) return 'IDENTITY_NOT_VERIFIED'
   if (gate.reason?.includes('not verified')) return 'PROVIDER_VERIFICATION_NOT_APPROVED'
   if (gate.gate === 'SERVICE_AREA' && !gate.passed) return 'OUTSIDE_SERVICE_AREA'
+  if (gate.gate === 'AVAILABILITY' && !gate.passed) return 'UNAVAILABLE'
   if (gate.gate === 'NO_CONFLICT' && !gate.passed) return 'ASSIGNMENT_CONFLICT'
   if (gate.gate === 'QUALITY_FLOOR' && !gate.passed) return 'QUALITY_FLOOR'
   if (gate.reason?.includes('No matching') || gate.reason?.includes('No approved')) return 'PROFESSION_MISMATCH'

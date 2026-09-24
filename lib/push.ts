@@ -2,12 +2,30 @@ import { prisma } from './prisma'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
-export async function sendExpoPush(to: string, title: string, body: string, data: Record<string, unknown>): Promise<void> {
+export async function sendExpoPush(
+  to: string,
+  title: string,
+  body: string,
+  data: Record<string, unknown>,
+  options?: {
+    sound?: 'default' | string | null
+    channelId?: string
+    priority?: 'default' | 'normal' | 'high'
+  },
+): Promise<void> {
   try {
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ to, title, body, data, sound: 'default' }]),
+      body: JSON.stringify([{
+        to,
+        title,
+        body,
+        data,
+        sound: options?.sound === undefined ? 'default' : options.sound,
+        ...(options?.channelId ? { channelId: options.channelId } : {}),
+        ...(options?.priority ? { priority: options.priority } : {}),
+      }]),
     })
     if (!res.ok) return
     const result = await res.json()

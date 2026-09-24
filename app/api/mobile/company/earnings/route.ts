@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { reconcilePriorWeekCommissions, startOfCurrentUtcWeek } from '@/lib/commission-reconcile'
+import { bigIntToSafeNumber } from '@/lib/money'
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,10 +19,51 @@ export async function GET(request: NextRequest) {
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'finance:read')
     if (error) return error
 
+    // Reconciliation moves no money; it only closes prior-week records that
+    // were already withheld at escrow release. This makes finance state
+    // self-healing even if the external weekly cron is delayed.
+    await reconcilePriorWeekCommissions().catch(error => {
+      console.error('Commission reconciliation on earnings read failed:', error)
+    })
+
+    const companyProfile = await prisma.companyProfile.findUnique({
+      where: { id: context!.companyId },
+      select: { userId: true, commissionRate: true },
+    })
+    if (!companyProfile) {
+      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+    }
+
     const contracts = await prisma.contract.findMany({
       where: { companyId: context!.companyId },
       include: { milestones: true },
     })
+
+    const monthStart = new Date()
+    monthStart.setUTCDate(1)
+    monthStart.setUTCHours(0, 0, 0, 0)
+    const weekStart = startOfCurrentUtcWeek()
+
+    const [marketplaceSettlements, weeklySettlements] = await Promise.all([
+      prisma.commissionSettlement.findMany({
+        where: {
+          providerId: companyProfile.userId,
+          createdAt: { gte: monthStart },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.commissionSettlement.findMany({
+        where: {
+          providerId: companyProfile.userId,
+          createdAt: { gte: weekStart },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
+
+    const marketplaceGross = marketplaceSettlements.reduce((sum, item) => sum + item.jobAmount, 0n)
+    const marketplaceCommission = marketplaceSettlements.reduce((sum, item) => sum + item.commissionAmount, 0n)
+    const marketplaceNet = marketplaceGross - marketplaceCommission
 
     const totalRevenue = contracts.reduce((sum, c) => sum + c.value, 0)
     const completedContracts = contracts.filter(c => c.status === 'COMPLETED')
@@ -47,6 +90,19 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
+      monthlyRevenue: bigIntToSafeNumber(marketplaceNet) / 100,
+      marketplaceGross: bigIntToSafeNumber(marketplaceGross) / 100,
+      marketplaceCommission: bigIntToSafeNumber(marketplaceCommission) / 100,
+      marketplaceNet: bigIntToSafeNumber(marketplaceNet) / 100,
+      commissionRate: companyProfile.commissionRate,
+      marketplaceCurrency: marketplaceSettlements[0]?.currency || 'LKR',
+      currentWeek: {
+        weekStart: weekStart.toISOString(),
+        jobs: weeklySettlements.length,
+        gross: bigIntToSafeNumber(weeklySettlements.reduce((sum, item) => sum + item.jobAmount, 0n)) / 100,
+        commission: bigIntToSafeNumber(weeklySettlements.reduce((sum, item) => sum + item.commissionAmount, 0n)) / 100,
+        net: bigIntToSafeNumber(weeklySettlements.reduce((sum, item) => sum + item.jobAmount - item.commissionAmount, 0n)) / 100,
+      },
       totalRevenue,
       completedRevenue,
       pendingRevenue,

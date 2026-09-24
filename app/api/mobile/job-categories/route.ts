@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       sortOrder: c.sortOrder,
       countries: safeParseJsonArr(c.countries),
       isActive: c.isActive,
-      jobs: c.jobs.map(j => ({
+      jobs: c.jobs.filter(j => storedListIncludes(j.countries, country)).map(j => ({
         id: j.id,
         categoryId: j.categoryId,
         name: j.name,

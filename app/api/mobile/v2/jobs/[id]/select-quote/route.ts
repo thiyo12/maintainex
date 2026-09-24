@@ -37,7 +37,7 @@ export async function POST(
     )
 
     const notificationUserId = await resolveNotificationUser(result.quote.providerId, result.quote.providerType)
-    notifyQuoteAccepted(result.job.id, notificationUserId, result.job.title)
+    await notifyQuoteAccepted(result.job.id, notificationUserId, result.job.title)
 
     return NextResponse.json({
       success: true,
