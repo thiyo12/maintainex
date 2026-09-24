@@ -59,7 +59,7 @@ export async function GET(
             })
           : null
 
-        if (companyQuote) {
+        if (companyQuote && (job.status === 'OPEN' || companyQuote.status === 'ACCEPTED')) {
           providerContextId = companyQuote.providerId
           providerContextType = 'COMPANY'
         }
@@ -68,7 +68,7 @@ export async function GET(
           where: { jobId: job.id, providerId: user.id, providerType: 'INDIVIDUAL' },
           orderBy: { createdAt: 'desc' },
         })
-        if (userQuote) {
+        if (userQuote && (job.status === 'OPEN' || userQuote.status === 'ACCEPTED')) {
           providerContextId = user.id
           providerContextType = 'INDIVIDUAL'
         }
@@ -183,9 +183,19 @@ export async function GET(
       })
     )
 
+    const canViewExactLocation =
+      isOwner ||
+      (!!acceptedQuote && acceptedQuote.status === 'ACCEPTED' && !!job.addressSharedAt)
+
     return NextResponse.json({
       job: {
         ...job,
+        addressStreet: canViewExactLocation ? job.addressStreet : null,
+        addressBuilding: canViewExactLocation ? job.addressBuilding : null,
+        addressApartment: canViewExactLocation ? job.addressApartment : null,
+        addressLandmark: canViewExactLocation ? job.addressLandmark : null,
+        latitude: canViewExactLocation ? job.latitude : null,
+        longitude: canViewExactLocation ? job.longitude : null,
         budgetAmount: job.budgetAmount != null ? Number(job.budgetAmount) : null,
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
         smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
@@ -236,16 +246,8 @@ export async function PATCH(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const isOwner = job.customerId === user.id
-    let isAssignedProvider = false
     if (!isOwner) {
-      const acceptedQuote = await prisma.jobQuote.findFirst({
-        where: { jobId: job.id, providerId: user.id, status: 'ACCEPTED' },
-      })
-      isAssignedProvider = !!acceptedQuote
-    }
-
-    if (!isOwner && !isAssignedProvider) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
     }
 
     if (!['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
