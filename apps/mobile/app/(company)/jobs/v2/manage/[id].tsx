@@ -25,7 +25,7 @@ export default function CompanyManageJobScreen() {
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
+      const res = await v2Jobs.get(id, 'company')
       setJob(res.job)
     } catch {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
@@ -37,7 +37,7 @@ export default function CompanyManageJobScreen() {
 
   useEffect(() => { loadJob() }, [id])
 
-  const myQuote = job?.quotes?.find((q: any) => q.providerId === user?.id) || null
+  const myQuote = job?.quotes?.[0] || null
 
   const handleUpdateProgress = async (status: string) => {
     setActionLoading(status)
