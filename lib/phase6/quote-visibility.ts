@@ -58,9 +58,38 @@ export async function resolveQuoteVisibility(
     where: { jobId, providerId: userId, providerType: 'INDIVIDUAL' },
     select: { id: true },
   })
+  if (individualQuote) {
+    return {
+      allowedQuoteIds: [individualQuote.id],
+      isCustomer: false,
+    }
+  }
+
+  // Company members should not have to know/pass the CompanyProfile id just to
+  // read their own company's quote. Resolve active memberships automatically.
+  const memberships = await client.teamMember.findMany({
+    where: { userId, status: 'ACTIVE' },
+    select: { companyId: true, role: true },
+  })
+  const readableCompanyIds = memberships
+    .filter(member => hasCompanyPermission(member.role as CompanyRole, 'quotes:read'))
+    .map(member => member.companyId)
+
+  if (readableCompanyIds.length === 0) {
+    return { allowedQuoteIds: [], isCustomer: false }
+  }
+
+  const companyQuotes = await client.jobQuote.findMany({
+    where: {
+      jobId,
+      providerType: 'COMPANY',
+      providerId: { in: readableCompanyIds },
+    },
+    select: { id: true },
+  })
 
   return {
-    allowedQuoteIds: individualQuote ? [individualQuote.id] : [],
+    allowedQuoteIds: companyQuotes.map(quote => quote.id),
     isCustomer: false,
   }
 }
