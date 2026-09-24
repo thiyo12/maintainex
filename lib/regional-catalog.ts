@@ -102,9 +102,7 @@ export async function ensureRegionalCatalog(countryCode: string): Promise<void> 
       isActive: true,
     }
 
-    if (existing) {
-      await prisma.templateJob.update({ where: { id: existing.id }, data })
-    } else {
+    if (!existing) {
       await prisma.templateJob.create({
         data: { categoryId: category.id, name: job.name, ...data },
       })
