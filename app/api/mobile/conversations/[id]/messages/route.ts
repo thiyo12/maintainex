@@ -5,6 +5,8 @@ import { scanChatMessage } from '@/lib/fraud-detection'
 import { sendExpoPush } from '@/lib/push'
 
 const DAILY_MESSAGE_LIMIT = 50
+const BURST_MESSAGE_LIMIT = 12
+const MAX_MESSAGE_LENGTH = 2000
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,8 +19,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (blocked) return blocked
 
     const { text } = await request.json()
-    if (!text?.trim()) {
+    if (typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Message text required' }, { status: 400 })
+    }
+    if (text.trim().length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: `Message is too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` }, { status: 400 })
     }
 
     const conversation = await prisma.conversation.findFirst({
@@ -37,18 +42,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    // Rate limit: max 50 messages per conversation per day per user
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const sentToday = await prisma.message.count({
-      where: {
-        conversationId: id,
-        senderId: user.id,
-        createdAt: { gte: since },
-      },
-    })
+    // Abuse controls: 12 messages/minute and 50 messages/conversation/day.
+    const [sentLastMinute, sentToday] = await Promise.all([
+      prisma.message.count({
+        where: {
+          conversationId: id,
+          senderId: user.id,
+          createdAt: { gte: new Date(Date.now() - 60 * 1000) },
+        },
+      }),
+      prisma.message.count({
+        where: {
+          conversationId: id,
+          senderId: user.id,
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+      }),
+    ])
+    if (sentLastMinute >= BURST_MESSAGE_LIMIT) {
+      return NextResponse.json({
+        error: 'You are sending messages too quickly. Try again in a minute.',
+      }, { status: 429 })
+    }
     if (sentToday >= DAILY_MESSAGE_LIMIT) {
       return NextResponse.json({
-        error: 'Daily message limit reached. Please continue using Maintainex for safe communication.',
+        error: 'Daily message limit reached for this conversation. Try again tomorrow.',
       }, { status: 429 })
     }
 
