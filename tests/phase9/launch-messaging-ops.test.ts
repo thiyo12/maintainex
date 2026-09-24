@@ -26,10 +26,10 @@ describe('launch messaging + operations source guards', () => {
   it('keeps urgent job push aligned with V3 ring channel', () => {
     const blast = source('lib/job-blast.ts')
     const waves = source('lib/matching/waves.ts')
-    expect(blast).toContain("channelId: 'job_offers'")
+    expect(blast).toContain("pushChannelId: 'job_offers'")
     expect(blast).toContain("alertMode: profile.isOnline ? 'ring' : 'push'")
     expect(waves).toContain("alertMode: 'ring'")
-    expect(waves).toContain('sendExpoPush(')
+    expect(waves).toContain('createAndPushNotification(')
   })
 
   it('prevents immediate matching to already committed solo taskers', () => {
