@@ -7,7 +7,10 @@ import { findCandidates } from './matching'
  * JobMatchQueue remains an individual/TaskerProfile compatibility queue; company
  * matches are delivered to the company owner without pretending they are taskers.
  */
-export async function blastJobToTaskers(jobId: string): Promise<{ matched: number; totalCandidates: number }> {
+export async function blastJobToTaskers(
+  jobId: string,
+  options?: { excludeIndividualUserIds?: string[]; excludeCompanyIds?: string[] },
+): Promise<{ matched: number; totalCandidates: number }> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job || job.status !== 'OPEN') return { matched: 0, totalCandidates: 0 }
 
@@ -51,6 +54,15 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       const busy = new Set(activeQuotes.map(quote => quote.providerId))
       individualCandidates = individualCandidates.filter(candidate => !busy.has(candidate.userId || candidate.providerId))
     }
+  }
+
+  if (options?.excludeIndividualUserIds?.length) {
+    const excluded = new Set(options.excludeIndividualUserIds)
+    individualCandidates = individualCandidates.filter(candidate => !excluded.has(candidate.userId || candidate.providerId))
+  }
+  if (options?.excludeCompanyIds?.length) {
+    const excluded = new Set(options.excludeCompanyIds)
+    companyCandidates = companyCandidates.filter(candidate => !excluded.has(candidate.companyId || candidate.providerId))
   }
 
   if (job.targetTaskerId) {
