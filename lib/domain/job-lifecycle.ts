@@ -488,7 +488,20 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') {
-    throw new Error('Only the customer or staff can refund escrow')
+    const providerActor = await resolveProviderActor(jobId, ctx.actorId)
+    const workspace = await prisma.jobWorkspace.findUnique({
+      where: { jobId },
+      select: { progressStatus: true },
+    })
+    const providerPreStartCancellation =
+      providerActor != null &&
+      providerActor === ctx.actorType &&
+      job.status === 'QUOTE_ACCEPTED' &&
+      workspace?.progressStatus === 'ACCEPTED'
+
+    if (!providerPreStartCancellation) {
+      throw new Error('Only the customer, staff, or accepted provider before work starts can refund escrow')
+    }
   }
 
   const escrow = await prisma.jobEscrow.findFirst({
