@@ -1,278 +1,202 @@
-import { useState, useEffect, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Money } from 'phosphor-react-native'
-import { useTranslation } from 'react-i18next'
-import { useColors } from '../../../lib/ThemeContext'
-import { fonts } from '../../../lib/fonts'
+import { CalendarBlank, ShieldCheck, Wallet } from 'phosphor-react-native'
 import { company } from '../../../lib/api'
+import { v3 } from '../../../theme/v3/tokens'
 
-type Period = 'monthly' | 'quarterly' | 'yearly'
+type WeeklyStatement = {
+  weekStart: string
+  weekEnd: string
+  jobs: number
+  grossAmount: number
+  commissionRate: number
+  commissionWithheld: number
+  netPayout: number
+  amountDue: number
+  reconciliationStatus: string
+}
 
 export default function CompanyEarnings() {
-  const { t } = useTranslation()
-  const colors = useColors()
-  const styles = makeStyles(colors)
-  const [period, setPeriod] = useState<Period>('monthly')
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [earnings, setEarnings] = useState<any>(null)
-  const [payouts, setPayouts] = useState<any[]>([])
+  const [refreshing, setRefreshing] = useState(false)
 
-  const fetchEarnings = useCallback(async (p?: Period) => {
+  const load = useCallback(async () => {
     try {
-      const data = await company.earnings.get(p || period)
-      setEarnings(data)
-      setPayouts(data.recentPayouts || data.payouts || [])
+      setData(await company.earnings.get('monthly'))
     } catch {
-      setEarnings(null)
-      setPayouts([])
+      setData(null)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
-  }, [period])
+  }, [])
 
-  useEffect(() => {
-    fetchEarnings(period)
-  }, [period, fetchEarnings])
-
-  const totalRevenue = earnings?.totalRevenue || earnings?.monthlyRevenue || 0
-  const pendingAmount = earnings?.pendingAmount || 0
-  const paidOut = earnings?.paidOut || 0
-  const avgPerJob = earnings?.avgPerJob || 0
-  const revenueChange = earnings?.revenueChange || 0
+  useEffect(() => { load() }, [load])
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={'#F5A623'} />
-        </View>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loading}><ActivityIndicator color={v3.colors.ink} /></View>
       </SafeAreaView>
     )
   }
 
+  const statements: WeeklyStatement[] = data?.weeklyCommissionStatements || []
+  const gross = Number(data?.marketplaceRevenue || 0)
+  const commission = Number(data?.marketplaceCommissionWithheld || 0)
+  const net = Number(data?.marketplaceNetPayout || 0)
+  const rate = Number(data?.commissionRate ?? 10)
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.heading}>{t('company.earnings')}</Text>
-      </View>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load() }} />}
+      >
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>COMPANY FINANCE</Text>
+          <Text style={styles.title}>Earnings</Text>
+        </View>
 
-      <View style={styles.revenueCard}>
-        <Text style={styles.revenueLabel}>{t('tasker.totalEarned')}</Text>
-        <Text style={styles.revenueValue}>LKR {Number(totalRevenue).toLocaleString()}</Text>
-        <Text style={styles.revenuePeriod}>{t('company.thisPeriod', { period })}</Text>
-        <View style={styles.revenueChange}>
-          <Text style={styles.changeText}>↑ {revenueChange}% {t('company.fromLast', { period })}</Text>
+        <View style={styles.hero}>
+          <View style={styles.heroIcon}><Wallet size={22} color={v3.colors.ink} weight="fill" /></View>
+          <Text style={styles.heroLabel}>NET MARKETPLACE PAYOUT</Text>
+          <Text style={styles.heroValue}>LKR {net.toLocaleString()}</Text>
+          <Text style={styles.heroText}>
+            MaintainEX withholds the {rate}% company commission automatically when each completed job is released.
+          </Text>
         </View>
-      </View>
 
-      {(earnings?.pendingCommissionPayments || []).length > 0 && (
-        <View style={styles.commissionSection}>
-          <Text style={styles.commissionTitle}>Pending Commission Payments</Text>
-          {earnings?.pendingCommissionPayments?.map((cp: any) => (
-            <View key={cp.id} style={styles.commissionCard}>
-              <View style={styles.commissionHeader}>
-                <Money size={20} color={'#F5A623'} />
-                <Text style={styles.commissionRef}>{cp.referenceNumber}</Text>
-              </View>
-              <Text style={styles.commissionAmount}>LKR {cp.amountDue.toLocaleString()}</Text>
-              <Text style={styles.commissionInstruction}>
-                Pay this amount to any MΛINTΛINEX agent using reference: {cp.referenceNumber}
-              </Text>
-              <Text style={styles.commissionWeek}>
-                Week: {new Date(cp.weekStart).toLocaleDateString()} - {new Date(cp.weekEnd).toLocaleDateString()}
-              </Text>
-            </View>
-          ))}
+        <View style={styles.metrics}>
+          <Metric label="GROSS JOB VALUE" value={`LKR ${gross.toLocaleString()}`} />
+          <Metric label="COMMISSION WITHHELD" value={`LKR ${commission.toLocaleString()}`} />
         </View>
-      )}
 
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>{t('wallet.pending')}</Text>
-          <Text style={styles.statValue}>LKR {Number(pendingAmount).toLocaleString()}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>{t('wallet.withdraw')}</Text>
-          <Text style={styles.statValue}>LKR {Number(paidOut).toLocaleString()}</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>{t('tasker.earnings')}</Text>
-          <Text style={styles.statValue}>LKR {Number(avgPerJob).toLocaleString()}</Text>
-        </View>
-      </View>
-
-      <View style={styles.periodTabs}>
-        {(['monthly', 'quarterly', 'yearly'] as Period[]).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[styles.periodTab, period === p && styles.periodTabActive]}
-            onPress={() => setPeriod(p)}
-          >
-            <Text style={[styles.periodTabText, period === p && styles.periodTabTextActive]}>
-              {p.charAt(0).toUpperCase() + p.slice(1)}
+        <View style={styles.policyCard}>
+          <ShieldCheck size={20} color={v3.colors.success} weight="fill" />
+          <View style={styles.policyCopy}>
+            <Text style={styles.policyTitle}>No second weekly charge</Text>
+            <Text style={styles.policyText}>
+              Commission is already deducted per completed job. Weekly statements below are reconciliation records only.
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          </View>
+        </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.payoutTitle}>{t('wallet.transactions')}</Text>
-        {payouts.length === 0 ? (
-          <Text style={styles.emptyText}>{t('wallet.noTransactions')}</Text>
-        ) : (
-          payouts.map((p, i) => {
-            const status = p.status || (p.paid ? 'Paid' : 'Pending')
-            const isPaid = status === 'Paid' || status === 'paid'
-            const statusLabel = isPaid ? t('common.success') : t('common.pending')
-            return (
-              <View key={p.id || i} style={styles.payoutCard}>
-                <View style={styles.payoutLeft}>
-                  <View style={[styles.payoutDot, { backgroundColor: isPaid ? '#06C167' : '#F5A623' }]} />
-                  <View style={styles.payoutInfo}>
-                    <Text style={styles.payoutContract} numberOfLines={1}>{p.contract || p.title}</Text>
-                    <Text style={styles.payoutDate}>{p.date || (p.paidAt ? new Date(p.paidAt).toLocaleDateString() : '')}</Text>
-                  </View>
-                </View>
-                <View style={styles.payoutRight}>
-                  <Text style={[styles.payoutAmount, { color: isPaid ? '#06C167' : '#F5A623' }]}>
-                    LKR {Number(p.amount).toLocaleString()}
-                  </Text>
-                  <Text style={styles.payoutStatus}>{statusLabel}</Text>
-                </View>
+        <Text style={styles.sectionTitle}>Weekly statements</Text>
+
+        {statements.length ? statements.map((statement) => (
+          <View key={statement.weekStart} style={styles.statement}>
+            <View style={styles.statementHeader}>
+              <View style={styles.weekIcon}><CalendarBlank size={17} color={v3.colors.ink} weight="bold" /></View>
+              <View style={styles.weekCopy}>
+                <Text style={styles.weekTitle}>
+                  {new Date(statement.weekStart).toLocaleDateString()} – {new Date(statement.weekEnd).toLocaleDateString()}
+                </Text>
+                <Text style={styles.weekMeta}>{statement.jobs} completed job{statement.jobs === 1 ? '' : 's'}</Text>
               </View>
-            )
-          })
+              <View style={[
+                styles.status,
+                statement.reconciliationStatus === 'RECONCILED' ? styles.statusDone : styles.statusPending,
+              ]}>
+                <Text style={[
+                  styles.statusText,
+                  statement.reconciliationStatus === 'RECONCILED' ? styles.statusTextDone : styles.statusTextPending,
+                ]}>
+                  {statement.reconciliationStatus === 'RECONCILED' ? 'RECONCILED' : 'PENDING'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.line} />
+            <MoneyRow label="Gross" value={statement.grossAmount} />
+            <MoneyRow label={`MaintainEX commission (${statement.commissionRate}%)`} value={-statement.commissionWithheld} />
+            <MoneyRow label="Net payout" value={statement.netPayout} strong last />
+          </View>
+        )) : (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>No marketplace earnings yet</Text>
+            <Text style={styles.emptyText}>Completed and released Company jobs will appear here by week.</Text>
+          </View>
         )}
+
+        <View style={{ height: 28 }} />
       </ScrollView>
     </SafeAreaView>
   )
 }
 
-const makeStyles = (colors: any) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0D0D0D' },
-  topBar: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  heading: { fontSize: 28, fontFamily: fonts.heading, color: '#FFFFFF' },
-  revenueCard: {
-    backgroundColor: '#F5A623',
-    marginHorizontal: 24,
-    padding: 24,
-    borderRadius: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  revenueLabel: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
-  revenueValue: { fontSize: 34, fontFamily: 'Outfit_900Black', color: '#FFFFFF', marginBottom: 4 },
-  revenuePeriod: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 12 },
-  revenueChange: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  changeText: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: '#FFFFFF' },
-  statsRow: { flexDirection: 'row', paddingHorizontal: 24, gap: 10, marginBottom: 16 },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 12,
-    borderRadius: 14,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  statLabel: { fontSize: 11, color: '#6F6B6B', marginBottom: 4 },
-  statValue: { fontSize: 13, fontFamily: 'Outfit_900Black', color: '#FFFFFF' },
-  periodTabs: {
-    flexDirection: 'row',
-    marginHorizontal: 24,
-    backgroundColor: '#2E2E2E',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 16,
-  },
-  periodTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  periodTabActive: { backgroundColor: '#FFFFFF' },
-  periodTabText: { fontSize: 14, fontFamily: fonts.bodySemiBold, color: '#6F6B6B' },
-  periodTabTextActive: { color: '#F5A623', fontFamily: fonts.bodyMedium },
-  payoutTitle: {
-    fontSize: 16, fontFamily: fonts.bodyMedium, color: '#FFFFFF',
-    paddingHorizontal: 24, marginBottom: 10,
-  },
-  payoutCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  payoutLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  payoutDot: { width: 8, height: 8, borderRadius: 4 },
-  payoutInfo: { flex: 1 },
-  payoutContract: { fontSize: 13, fontFamily: fonts.bodySemiBold, color: '#FFFFFF' },
-  payoutDate: { fontSize: 11, color: '#6F6B6B', marginTop: 2 },
-  payoutRight: { alignItems: 'flex-end' },
-  payoutAmount: { fontSize: 14, fontFamily: fonts.bodyMedium },
-  payoutStatus: { fontSize: 11, color: '#6F6B6B', marginTop: 2 },
-  emptyText: { textAlign: 'center', color: '#6F6B6B', marginTop: 20, fontSize: 14 },
-  commissionSection: {
-    marginHorizontal: 24,
-    marginBottom: 16,
-  },
-  commissionTitle: {
-    fontSize: 16,
-    fontFamily: fonts.bodyMedium,
-    color: '#FFFFFF',
-    marginBottom: 10,
-  },
-  commissionCard: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F5A623',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  commissionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  commissionRef: {
-    fontSize: 16,
-    fontFamily: 'Outfit_900Black',
-    color: '#F5A623',
-  },
-  commissionAmount: {
-    fontSize: 20,
-    fontFamily: 'Outfit_900Black',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  commissionInstruction: {
-    fontSize: 13,
-    color: '#6F6B6B',
-    marginBottom: 4,
-  },
-  commissionWeek: {
-    fontSize: 12,
-    color: '#6F6B6B',
-  },
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricLabel}>{label}</Text>
+      <Text style={styles.metricValue}>{value}</Text>
+    </View>
+  )
+}
+
+function MoneyRow({ label, value, strong = false, last = false }: { label: string; value: number; strong?: boolean; last?: boolean }) {
+  const sign = value < 0 ? '−' : ''
+  return (
+    <View style={[styles.moneyRow, !last && styles.moneyBorder]}>
+      <Text style={[styles.moneyLabel, strong && styles.moneyStrong]}>{label}</Text>
+      <Text style={[styles.moneyValue, strong && styles.moneyValueStrong]}>
+        {sign}LKR {Math.abs(value).toLocaleString()}
+      </Text>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: v3.colors.canvas },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  content: { paddingHorizontal: 18, paddingBottom: 20 },
+  header: { paddingTop: 8, paddingBottom: 14 },
+  eyebrow: { ...v3.typography.label, color: v3.colors.amberDark, letterSpacing: 1 },
+  title: { ...v3.typography.h4, color: v3.colors.ink, marginTop: 2 },
+  hero: { backgroundColor: v3.colors.ink, borderRadius: 24, padding: 18 },
+  heroIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: v3.colors.amber, alignItems: 'center', justifyContent: 'center' },
+  heroLabel: { ...v3.typography.smallBold, color: v3.colors.textLight, letterSpacing: 0.8, marginTop: 14 },
+  heroValue: { ...v3.typography.h4, color: v3.colors.paper, marginTop: 3 },
+  heroText: { ...v3.typography.caption, color: v3.colors.textLight, lineHeight: 17, marginTop: 7 },
+  metrics: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  metric: { flex: 1, backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 14 },
+  metricLabel: { ...v3.typography.smallBold, color: v3.colors.textMuted, letterSpacing: 0.4 },
+  metricValue: { ...v3.typography.bodyLarge, color: v3.colors.ink, marginTop: 5 },
+  policyCard: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: v3.colors.successSoft, borderRadius: 18, padding: 14, marginTop: 10 },
+  policyCopy: { flex: 1, marginLeft: 9 },
+  policyTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  policyText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 17, marginTop: 2 },
+  sectionTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 21, marginBottom: 9 },
+  statement: { backgroundColor: v3.colors.paper, borderRadius: 19, borderWidth: 1, borderColor: v3.colors.line, padding: 14, marginBottom: 9 },
+  statementHeader: { flexDirection: 'row', alignItems: 'center' },
+  weekIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: v3.colors.surfaceGray, alignItems: 'center', justifyContent: 'center' },
+  weekCopy: { flex: 1, marginLeft: 9 },
+  weekTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  weekMeta: { ...v3.typography.small, color: v3.colors.textMuted, marginTop: 2 },
+  status: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 4 },
+  statusDone: { backgroundColor: v3.colors.successSoft },
+  statusPending: { backgroundColor: v3.colors.amberSoft },
+  statusText: { ...v3.typography.smallBold },
+  statusTextDone: { color: v3.colors.success },
+  statusTextPending: { color: v3.colors.amberDark },
+  line: { height: 1, backgroundColor: v3.colors.line, marginVertical: 12 },
+  moneyRow: { minHeight: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  moneyBorder: { borderBottomWidth: 1, borderBottomColor: v3.colors.line },
+  moneyLabel: { ...v3.typography.caption, color: v3.colors.textSecondary },
+  moneyStrong: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  moneyValue: { ...v3.typography.captionBold, color: v3.colors.ink },
+  moneyValueStrong: { ...v3.typography.bodyLarge, color: v3.colors.success },
+  empty: { backgroundColor: v3.colors.paper, borderRadius: 18, borderWidth: 1, borderColor: v3.colors.line, padding: 22, alignItems: 'center' },
+  emptyTitle: { ...v3.typography.bodyLarge, color: v3.colors.ink },
+  emptyText: { ...v3.typography.caption, color: v3.colors.textMuted, textAlign: 'center', lineHeight: 17, marginTop: 4 },
 })
