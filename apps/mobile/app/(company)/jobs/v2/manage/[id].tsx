@@ -25,6 +25,7 @@ import { getActiveCompanyId } from '../../../../../lib/api'
 import { v2JobActions, v2Jobs } from '../../../../../lib/api-v2'
 import { v3 } from '../../../../../theme/v3/tokens'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
+import CancelJobModal from '../../../../../components/jobs/CancelJobModal'
 
 export default function CompanyManageJobScreen() {
   const router = useRouter()
@@ -34,6 +35,7 @@ export default function CompanyManageJobScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
+  const [cancelVisible, setCancelVisible] = useState(false)
 
   const load = async () => {
     try {
@@ -233,7 +235,25 @@ export default function CompanyManageJobScreen() {
           </View>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
+
+        {accepted && progress === 'ACCEPTED' ? (
+          <TouchableOpacity style={styles.cancelCard} onPress={() => setCancelVisible(true)}>
+            <Text style={styles.cancelText}>Cancel before work starts</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        jobId={id}
+        jobTitle={job?.title}
+        onClose={() => setCancelVisible(false)}
+        onCancelled={async () => {
+          setCancelVisible(false)
+          Alert.alert('Job cancelled', 'The customer has been notified and any protected payment was refunded.')
+          router.back()
+        }}
+      />
 
       <NewChatModal
         visible={chatVisible}
@@ -319,6 +339,8 @@ const styles = StyleSheet.create({
   detailLabel: { ...v3.typography.caption, color: v3.colors.textMuted },
   detailValue: { ...v3.typography.captionBold, color: v3.colors.ink, maxWidth: '58%', textAlign: 'right' },
   dispatchCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.amberSoft, borderRadius: 18, padding: 14, marginTop: 12 },
+  cancelCard: { height: 48, borderRadius: 15, borderWidth: 1, borderColor: v3.colors.error, alignItems: 'center', justifyContent: 'center', marginTop: 10 },
+  cancelText: { ...v3.typography.bodyBold, color: v3.colors.error },
   dispatchCopy: { flex: 1, marginLeft: 10 },
   dispatchTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
   dispatchText: { ...v3.typography.caption, color: v3.colors.amberDark, marginTop: 2 },
