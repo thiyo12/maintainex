@@ -6,12 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
 import { fonts } from '../../../lib/fonts'
-import { v2Request } from '../../../lib/api-v2'
+import { v2Jobs, v2Request } from '../../../lib/api-v2'
 import { getActiveCompanyId } from '../../../lib/api'
 
 interface TeamMember {
   id: string
-  userId: string
+  userId: string | null
   name: string
   role: string
   skills: string[]
@@ -49,16 +49,31 @@ export default function AssignWorkerScreen() {
       const companyId = await getActiveCompanyId()
       if (!companyId) return
 
-      const [teamData, assignmentsData] = await Promise.all([
+      const [teamData, assignmentsData, quoteJobs] = await Promise.all([
         v2Request<{ members: TeamMember[] }>(`/api/mobile/company/team?companyId=${companyId}`),
-        v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${companyId}&status=ASSIGNED`),
+        v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${companyId}`),
+        v2Jobs.list('myQuotes=true'),
       ])
 
-      const assignedJobIds = new Set(assignmentsData.assignments.map((a: any) => a.jobId))
+      const assignedJobIds = new Set(
+        (assignmentsData.assignments || [])
+          .filter((assignment: any) => ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(assignment.status))
+          .map((assignment: any) => assignment.jobId)
+      )
 
       setWorkers(
         (teamData.members || []).filter(
-          (m) => m.role === 'WORKER' || m.role === 'DISPATCHER'
+          (member) =>
+            !!member.userId &&
+            (member.role === 'WORKER' || member.role === 'DISPATCHER')
+        )
+      )
+
+      setAvailableJobs(
+        (quoteJobs.jobs || []).filter(
+          (job) =>
+            ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status) &&
+            !assignedJobIds.has(job.id)
         )
       )
     } catch {
@@ -111,13 +126,13 @@ export default function AssignWorkerScreen() {
 
         <Text style={styles.label}>{t('company.team')} — Worker</Text>
         {workers.length === 0 ? (
-          <Text style={styles.emptyText}>No workers available. Invite workers first.</Text>
+          <Text style={styles.emptyText}>No assignable workers yet. Invite a worker and have them activate their account first.</Text>
         ) : (
           workers.map((w) => (
             <TouchableOpacity
               key={w.id}
               style={[styles.optionCard, selectedWorker === w.userId && styles.optionCardActive]}
-              onPress={() => setSelectedWorker(w.userId)}
+              onPress={() => w.userId && setSelectedWorker(w.userId)}
             >
               <View style={styles.optionLeft}>
                 <View style={[styles.avatar, { backgroundColor: w.isOnline ? colors.success : colors.muted }]}>
@@ -126,11 +141,39 @@ export default function AssignWorkerScreen() {
                 <View>
                   <Text style={styles.optionName}>{w.name}</Text>
                   <Text style={styles.optionMeta}>
-                    {w.completedJobs} jobs · {w.rating > 0 ? `${w.rating}★` : 'No rating'}
+                    {w.isOnline ? 'Online · ' : 'Offline · '}{w.completedJobs} jobs · {w.rating > 0 ? `${w.rating}★` : 'No rating'}
                   </Text>
                 </View>
               </View>
               {selectedWorker === w.userId && (
+                <CheckCircle size={22} color={colors.amber} weight="fill" />
+              )}
+            </TouchableOpacity>
+          ))
+        )}
+
+        <Text style={styles.label}>Accepted work — Job</Text>
+        {availableJobs.length === 0 ? (
+          <Text style={styles.emptyText}>No accepted Company jobs are waiting for dispatch.</Text>
+        ) : (
+          availableJobs.map((job) => (
+            <TouchableOpacity
+              key={job.id}
+              style={[styles.optionCard, selectedJob === job.id && styles.optionCardActive]}
+              onPress={() => setSelectedJob(job.id)}
+            >
+              <View style={styles.optionLeft}>
+                <View style={[styles.jobBadge, { backgroundColor: job.status === 'IN_PROGRESS' ? colors.success : colors.amber }]}>
+                  <Text style={styles.jobBadgeText}>{job.status === 'IN_PROGRESS' ? 'PAID' : 'NEW'}</Text>
+                </View>
+                <View style={styles.jobCopy}>
+                  <Text style={styles.optionName} numberOfLines={1}>{job.title}</Text>
+                  <Text style={styles.optionMeta}>
+                    {job.preferredDate ? new Date(job.preferredDate).toLocaleDateString() : 'Flexible date'} · {job.status.replaceAll('_', ' ')}
+                  </Text>
+                </View>
+              </View>
+              {selectedJob === job.id && (
                 <CheckCircle size={22} color={colors.amber} weight="fill" />
               )}
             </TouchableOpacity>
@@ -170,7 +213,10 @@ const makeStyles = (colors: any) => StyleSheet.create({
     borderColor: 'transparent',
   },
   optionCardActive: { borderColor: colors.amber },
-  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  optionLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  jobCopy: { flex: 1 },
+  jobBadge: { minWidth: 42, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 7 },
+  jobBadgeText: { fontSize: 9, fontFamily: fonts.headingBold, color: '#111111' },
   avatar: {
     width: 40,
     height: 40,
