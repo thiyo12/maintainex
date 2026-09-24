@@ -156,10 +156,30 @@ export const v2Quotes = {
     })
     return { quote: normalizeQuoteMoney(response.quote) as V2Quote }
   },
-  list: async (jobId: string) => {
-    const response = await v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`)
+  list: async (jobId: string, companyId?: string) => {
+    const query = new URLSearchParams({ jobId })
+    if (companyId) query.set('companyId', companyId)
+    const response = await v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?${query.toString()}`)
     return { quotes: response.quotes.map((quote) => normalizeQuoteMoney(quote) as V2Quote) }
   },
+  revise: (quoteId: string, data: {
+    price: number
+    estimatedCompletionTime: string
+    message?: string
+    companyId?: string
+    revisionReason?: string
+  }) =>
+    v2Request<{ success: boolean; newQuoteId: string; revisionNumber: number }>(
+      `/api/mobile/v2/quotes/${quoteId}/revision`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          price: majorToMinorUnits(data.price),
+          revisionReason: data.revisionReason || 'Price updated after customer discussion',
+        }),
+      },
+    ),
 }
 
 export const v2JobActions = {
@@ -210,6 +230,16 @@ export const v2JobActions = {
     v2Request<{ success: boolean; purpose: string }>(`/api/mobile/v2/jobs/${jobId}/pin/verify`, { method: 'POST', body: JSON.stringify({ pin, purpose }) }),
   getCustomerStatus: (jobId: string) =>
     v2Request<{ status: any }>(`/api/mobile/v2/jobs/${jobId}/customer-status`),
+  requestCancellation: (jobId: string, reason?: string) =>
+    v2Request<{ success: boolean; expiresInSeconds: number; testMode?: boolean }>(
+      `/api/mobile/v2/jobs/${jobId}/cancel`,
+      { method: 'POST', body: JSON.stringify({ action: 'REQUEST_OTP', reason }) },
+    ),
+  confirmCancellation: (jobId: string, code: string, reason?: string) =>
+    v2Request<{ success: boolean; status: string; refundAmount: number }>(
+      `/api/mobile/v2/jobs/${jobId}/cancel`,
+      { method: 'POST', body: JSON.stringify({ action: 'CONFIRM', code, reason }) },
+    ),
 }
 
 export const v2Match = {
