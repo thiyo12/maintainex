@@ -178,8 +178,8 @@ export async function GET(request: NextRequest) {
     }
 
     const quotes = isCustomer
-      ? await prisma.jobQuote.findMany({ where: { jobId }, orderBy: { price: 'asc' } })
-      : await prisma.jobQuote.findMany({ where: { id: { in: allowedQuoteIds } }, orderBy: { price: 'asc' } })
+      ? await prisma.jobQuote.findMany({ where: { jobId, status: { not: 'SUPERSEDED' } }, orderBy: { price: 'asc' } })
+      : await prisma.jobQuote.findMany({ where: { id: { in: allowedQuoteIds }, status: { not: 'SUPERSEDED' } }, orderBy: { price: 'asc' } })
 
     const enriched = await Promise.all(
       quotes.map(async (q) => {
