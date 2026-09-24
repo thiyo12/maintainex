@@ -58,8 +58,9 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     },
     marketplaceJob: {
       count: vi.fn().mockResolvedValue(0),
+      findUnique: vi.fn().mockResolvedValue({ preferredDate: null, preferredTimeSlot: null }),
     },
-    $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any
 }
@@ -559,15 +560,67 @@ describe('Phase 10.2 — Eligibility Engine', () => {
   })
 
   describe('evaluateEligibility — conflict', () => {
-    it('fails NO_CONFLICT when provider has active jobs', async () => {
+    it('fails NO_CONFLICT for an unscheduled request when provider has an active job', async () => {
       const input = makeIndivInput({
         clientOverrides: {
-          $queryRaw: vi.fn().mockResolvedValue([{ cnt: 2n }]),
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'IN_PROGRESS', preferredDate: null, preferredTimeSlot: null },
+          ]),
         },
       })
       const result = await evaluateEligibility(input)
       expect(result.eligible).toBe(false)
       expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+    })
+
+    it('allows a future-day booking while an unscheduled job is currently in progress', async () => {
+      const tomorrow = new Date()
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+
+      const input = makeIndivInput({
+        clientOverrides: {
+          marketplaceJob: {
+            findUnique: vi.fn().mockResolvedValue({ preferredDate: tomorrow, preferredTimeSlot: 'afternoon' }),
+          },
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'IN_PROGRESS', preferredDate: null, preferredTimeSlot: null },
+          ]),
+        },
+      })
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
+    })
+
+    it('blocks the same day and same time slot', async () => {
+      const day = new Date('2026-10-05T00:00:00.000Z')
+      const input = makeIndivInput({
+        clientOverrides: {
+          marketplaceJob: {
+            findUnique: vi.fn().mockResolvedValue({ preferredDate: day, preferredTimeSlot: 'morning' }),
+          },
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'QUOTE_ACCEPTED', preferredDate: day, preferredTimeSlot: 'morning' },
+          ]),
+        },
+      })
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+    })
+
+    it('allows different dayparts on the same date', async () => {
+      const day = new Date('2026-10-05T00:00:00.000Z')
+      const input = makeIndivInput({
+        clientOverrides: {
+          marketplaceJob: {
+            findUnique: vi.fn().mockResolvedValue({ preferredDate: day, preferredTimeSlot: 'evening' }),
+          },
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'QUOTE_ACCEPTED', preferredDate: day, preferredTimeSlot: 'morning' },
+          ]),
+        },
+      })
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
     })
   })
 
