@@ -212,27 +212,3 @@ export async function shouldStopWaves(
   return { stop: false }
 }
 
-async function getPushToken(
-  client: PrismaClient,
-  providerType: string,
-  providerId: string,
-): Promise<string | null> {
-  if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  } else {
-    const company = await client.companyProfile.findUnique({
-      where: { id: providerId },
-      select: { userId: true },
-    })
-    if (!company) return null
-    const user = await client.user.findUnique({
-      where: { id: company.userId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  }
-}
