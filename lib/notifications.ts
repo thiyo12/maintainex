@@ -250,3 +250,57 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
     }),
   ])
 }
+
+
+export async function notifyQuoteRevised(
+  jobId: string,
+  customerId: string,
+  providerName: string,
+  formattedPrice: string,
+) {
+  return createNotificationAndPush({
+    userId: customerId,
+    title: 'Quote Updated',
+    body: `${providerName} revised the quote to ${formattedPrice}. Review the new offer before booking.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'QUOTE_REVISED', jobId },
+    channelId: 'job-updates',
+    priority: 'high',
+  })
+}
+
+export async function notifyWorkerAssigned(
+  jobId: string,
+  workerUserId: string,
+  jobTitle: string,
+) {
+  return createNotificationAndPush({
+    userId: workerUserId,
+    title: 'New Company Assignment',
+    body: `You were assigned to "${jobTitle}". Open MaintainEX to review the schedule and accept the work.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', jobId },
+    channelId: 'job-offers',
+    priority: 'high',
+  })
+}
+
+export async function notifyJobCancelled(
+  jobId: string,
+  userId: string,
+  jobTitle: string,
+  cancelledBy: 'CUSTOMER' | 'PROVIDER' | 'COMPANY',
+) {
+  return createNotificationAndPush({
+    userId,
+    title: 'Job Cancelled',
+    body: `"${jobTitle}" was cancelled by the ${cancelledBy === 'CUSTOMER' ? 'customer' : 'provider'} before work started.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'JOB_CANCELLED', jobId },
+    channelId: 'job-updates',
+    priority: 'high',
+  })
+}
