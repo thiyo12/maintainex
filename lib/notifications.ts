@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { formatCurrency, getCurrencyForCountry } from './currency-format'
 import type { Currency } from './money'
+import { sendExpoPush, type PushPriority } from './push'
 
 export async function createNotification(data: {
   userId: string
@@ -11,9 +12,14 @@ export async function createNotification(data: {
   params?: Record<string, string>
   referenceType?: string
   referenceId?: string
+  push?: boolean
+  pushData?: Record<string, unknown>
+  pushSound?: string
+  pushPriority?: PushPriority
+  pushChannelId?: string
 }) {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -35,6 +41,31 @@ export async function createNotification(data: {
             : null,
       },
     })
+
+    if (data.push !== false) {
+      const recipient = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { pushToken: true },
+      })
+      if (recipient?.pushToken) {
+        const referenceData = data.referenceType && data.referenceId
+          ? { referenceType: data.referenceType, referenceId: data.referenceId }
+          : {}
+        await sendExpoPush(
+          recipient.pushToken,
+          data.title,
+          data.body,
+          { ...referenceData, ...(data.pushData || {}) },
+          {
+            sound: data.pushSound || 'default',
+            priority: data.pushPriority || 'high',
+            channelId: data.pushChannelId,
+          },
+        )
+      }
+    }
+
+    return notification
   } catch (error) {
     console.error('Create notification error:', error)
   }
@@ -50,6 +81,18 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
+  })
+}
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
+  return createNotification({
+    userId: customerId,
+    title: 'Quote Updated',
+    body: `${providerName} updated their price for your job`,
+    params: { providerName },
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'QUOTE_REVISED', jobId },
   })
 }
 
