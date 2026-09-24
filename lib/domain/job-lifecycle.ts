@@ -521,6 +521,7 @@ export async function refundEscrow(
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
         data: { status: 'WITHDRAWN' },
       })
+      await tx.jobWorkspace.deleteMany({ where: { jobId } })
     })
     return { refundAmount: 0, refundCents: 0n }
   }
@@ -587,6 +588,7 @@ export async function refundEscrow(
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
       data: { status: 'WITHDRAWN' },
     })
+    await tx.jobWorkspace.deleteMany({ where: { jobId } })
   })
 
   return { refundAmount: refundMajor, refundCents }
