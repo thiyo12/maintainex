@@ -1,6 +1,5 @@
 import { prisma } from './prisma'
-import { createNotification } from './notifications'
-import { sendExpoPush } from './push'
+import { createAndPushNotification } from './notifications'
 import { findCandidates } from './matching'
 
 /**
@@ -88,20 +87,22 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       continue
     }
 
-    await createNotification({
+    await createAndPushNotification({
       userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (profile.user.pushToken) {
-      await sendExpoPush(profile.user.pushToken, pushTitle, pushBody, {
+      pushPriority: 'high',
+      pushChannelId: 'job_offers',
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-      })
-    }
+        alertMode: profile.isOnline ? 'ring' : 'push',
+        presence: profile.isOnline ? 'ONLINE' : 'OFFLINE',
+      },
+    })
     matched += 1
   }
 
@@ -110,21 +111,23 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     const company = companyById.get(companyId)
     if (!company) continue
 
-    await createNotification({
+    await createAndPushNotification({
       userId: company.userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (company.user.pushToken) {
-      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
+      pushPriority: 'high',
+      pushChannelId: 'job_offers',
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
         companyId,
-      })
-    }
+        alertMode: 'ring',
+        presence: 'COMPANY',
+      },
+    })
     matched += 1
   }
 
@@ -134,7 +137,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
   })
 
   if (matched === 0) {
-    await createNotification({
+    await createAndPushNotification({
       userId: job.customerId,
       title: 'No providers available right now',
       body: 'Try expanding your search or check back later. Your job is still posted.',

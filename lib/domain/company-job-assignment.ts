@@ -33,7 +33,19 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
-  if (job.status !== 'QUOTE_ACCEPTED') return { success: false, error: 'Job must be in QUOTE_ACCEPTED status' }
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    return { success: false, error: 'Job must be accepted and not yet completed or cancelled' }
+  }
+
+  if (job.status === 'IN_PROGRESS') {
+    const workspace = await prisma.jobWorkspace.findUnique({
+      where: { jobId },
+      select: { progressStatus: true },
+    })
+    if (workspace?.progressStatus !== 'ACCEPTED') {
+      return { success: false, error: 'Cannot assign a worker after work has started' }
+    }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -56,7 +68,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const assignment = await prisma.$transaction(async (tx) => {
     const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED', targetTaskerId: null },
+      where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] }, targetTaskerId: null },
       data: { targetTaskerId: workerUserId },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')

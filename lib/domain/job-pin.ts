@@ -279,6 +279,14 @@ export async function verifyJobPin(
           data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
         })
       }
+
+      await tx.companyJobAssignment.updateMany({
+        where: {
+          jobId,
+          status: 'ACCEPTED',
+        },
+        data: { status: 'IN_PROGRESS', startedAt: now },
+      })
     }
 
     // 10. Emit security events
@@ -358,7 +366,7 @@ async function resolvePinVerifierTx(
         jobId,
         workerUserId: userId,
         companyId: acceptedQuote.providerId,
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
       },
       select: { id: true },
     })

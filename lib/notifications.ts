@@ -1,8 +1,9 @@
 import { prisma } from './prisma'
-import { formatCurrency, getCurrencyForCountry } from './currency-format'
+import { formatCurrency } from './currency-format'
 import type { Currency } from './money'
+import { sendExpoPush, type ExpoPushOptions } from './push'
 
-export async function createNotification(data: {
+export type NotificationInput = {
   userId: string
   title: string
   body: string
@@ -11,9 +12,18 @@ export async function createNotification(data: {
   params?: Record<string, string>
   referenceType?: string
   referenceId?: string
-}) {
+  push?: boolean
+  pushData?: Record<string, unknown>
+  pushSound?: ExpoPushOptions['sound']
+  pushPriority?: ExpoPushOptions['priority']
+  pushChannelId?: string
+  pushTtl?: number
+}
+
+export async function createNotification(data: NotificationInput) {
+  let notification
   try {
-    return await prisma.notification.create({
+    notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -25,23 +35,73 @@ export async function createNotification(data: {
               ...(data.titleKey ? { titleKey: data.titleKey } : {}),
               ...(data.bodyKey ? { bodyKey: data.bodyKey } : {}),
               ...(data.params ? { params: data.params } : {}),
+              ...(data.pushData ? { pushData: data.pushData } : {}),
             })
-          : data.titleKey || data.params
+          : data.titleKey || data.params || data.pushData
             ? JSON.stringify({
                 ...(data.titleKey ? { titleKey: data.titleKey } : {}),
                 ...(data.bodyKey ? { bodyKey: data.bodyKey } : {}),
                 ...(data.params ? { params: data.params } : {}),
+                ...(data.pushData ? { pushData: data.pushData } : {}),
               })
             : null,
       },
     })
   } catch (error) {
     console.error('Create notification error:', error)
+    return undefined
   }
+
+  if (data.push === true) {
+    try {
+      const recipient = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { pushToken: true },
+      })
+
+      if (recipient?.pushToken) {
+        const referenceData = data.referenceType && data.referenceId
+          ? { referenceType: data.referenceType, referenceId: data.referenceId }
+          : {}
+
+        await sendExpoPush(
+          recipient.pushToken,
+          data.title,
+          data.body,
+          { ...referenceData, ...(data.pushData || {}) },
+          {
+            sound: data.pushSound === undefined ? 'default' : data.pushSound,
+            priority: data.pushPriority || 'high',
+            channelId: data.pushChannelId,
+            ttl: data.pushTtl,
+          },
+        )
+      }
+    } catch (error) {
+      // Push is best-effort; never lose the durable in-app notification.
+      console.error('Push notification delivery error:', error)
+    }
+  }
+
+  return notification
+}
+
+export async function createAndPushNotification(
+  data: NotificationInput & { pushOptions?: ExpoPushOptions },
+) {
+  const { pushOptions, ...notificationData } = data
+  return createNotification({
+    ...notificationData,
+    push: true,
+    pushSound: pushOptions?.sound ?? notificationData.pushSound,
+    pushPriority: pushOptions?.priority ?? notificationData.pushPriority,
+    pushChannelId: pushOptions?.channelId ?? notificationData.pushChannelId,
+    pushTtl: pushOptions?.ttl ?? notificationData.pushTtl,
+  })
 }
 
 export async function notifyQuoteSubmitted(jobId: string, customerId: string, providerName: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'New Quote Received',
     body: `${providerName} submitted a quote for your job`,
@@ -50,11 +110,26 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'QUOTE_SUBMITTED', jobId },
+  })
+}
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
+  return createAndPushNotification({
+    userId: customerId,
+    title: 'Revised Quote Received',
+    body: `${providerName} updated their quote. Review the new price before booking.`,
+    params: { providerName },
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'QUOTE_REVISED', jobId },
   })
 }
 
 export async function notifyQuoteAccepted(jobId: string, providerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Quote Accepted',
     body: `Your quote for "${jobTitle}" was accepted`,
@@ -63,11 +138,13 @@ export async function notifyQuoteAccepted(jobId: string, providerId: string, job
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'QUOTE_ACCEPTED', jobId },
   })
 }
 
 export async function notifyEscrowDeposited(jobId: string, providerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Escrow Deposited',
     body: `Customer deposited escrow for "${jobTitle}"`,
@@ -76,11 +153,13 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'ESCROW_DEPOSITED', jobId },
   })
 }
 
 export async function notifyJobCompleted(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Job Completed',
     body: `Your job "${jobTitle}" has been completed`,
@@ -89,11 +168,13 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'JOB_COMPLETED', jobId },
   })
 }
 
 export async function notifyCompletionRequested(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Completion Requested',
     body: `Provider marked "${jobTitle}" as complete. Please review and approve.`,
@@ -102,11 +183,13 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'COMPLETION_REQUESTED', jobId },
   })
 }
 
 export async function notifyJobStarted(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Job Started',
     body: `Your provider has started work on "${jobTitle}"`,
@@ -115,6 +198,8 @@ export async function notifyJobStarted(jobId: string, customerId: string, jobTit
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'JOB_STARTED', jobId },
   })
 }
 
@@ -124,23 +209,25 @@ export async function notifyPaymentReleased(
   jobTitle: string,
   amount: number,
   currency: Currency = 'LKR',
-  countryCode: string = 'LK'
+  countryCode: string = 'LK',
 ) {
   const formattedAmount = formatCurrency(BigInt(Math.round(amount * 100)), currency)
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Payment Released',
     body: `${formattedAmount} released for "${jobTitle}"`,
     titleKey: 'notification.payment_released.title',
     bodyKey: 'notification.payment_released.body',
-    params: { amount: formattedAmount, jobTitle },
+    params: { amount: formattedAmount, jobTitle, countryCode },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'payments',
+    pushData: { type: 'PAYMENT_RELEASED', jobId },
   })
 }
 
 export async function notifyEscrowTimeout(jobId: string, providerId: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Job Available Again',
     body: 'Customer did not fund escrow — job is available again',
@@ -148,52 +235,86 @@ export async function notifyEscrowTimeout(jobId: string, providerId: string) {
     bodyKey: 'notification.escrow_timeout.body',
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'ESCROW_TIMEOUT', jobId },
   })
 }
 
 export async function notifyPayoutProcessed(userId: string, title: string, body: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId,
     title,
     body,
     referenceType: 'WALLET',
+    pushChannelId: 'payments',
+    pushData: { type: 'PAYOUT_PROCESSED' },
+  })
+}
+
+export async function notifyJobCancelled(
+  jobId: string,
+  userId: string,
+  jobTitle: string,
+  cancelledBy: string,
+) {
+  return createAndPushNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: `${cancelledBy} cancelled "${jobTitle}" before work started.`,
+    params: { jobTitle, cancelledBy },
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'JOB_CANCELLED', jobId },
   })
 }
 
 export async function notifyJobEscalated(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: '⚠️ Tasker Required — No Response for 2 Hours',
-    body: `No tasker responded to "${jobTitle}" within the response window. Our team is arranging one for you.`,
+    body: `No tasker responded to "${jobTitle}" within the response window. Your job is still open.`,
     titleKey: 'notification.job_escalated.title',
     bodyKey: 'notification.job_escalated.body',
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushChannelId: 'job_updates',
+    pushData: { type: 'JOB_ESCALATED', jobId },
   })
 }
 
-export async function notifyTaskerAssigned(jobId: string, customerId: string, taskerId: string, taskerName: string, jobTitle: string) {
+export async function notifyTaskerAssigned(
+  jobId: string,
+  customerId: string,
+  taskerId: string,
+  taskerName: string,
+  jobTitle: string,
+) {
   return Promise.all([
-    createNotification({
+    createAndPushNotification({
       userId: customerId,
       title: 'Tasker Assigned',
-      body: `${taskerName} has been assigned to your job "${jobTitle}". They will contact you shortly.`,
+      body: `${taskerName} has been assigned to your job "${jobTitle}".`,
       titleKey: 'notification.tasker_assigned.title',
       bodyKey: 'notification.tasker_assigned.body',
       params: { taskerName, jobTitle },
       referenceType: 'JOB',
       referenceId: jobId,
+      pushChannelId: 'job_updates',
+      pushData: { type: 'TASKER_ASSIGNED', jobId },
     }),
-    createNotification({
+    createAndPushNotification({
       userId: taskerId,
       title: 'New Assignment',
-      body: `Admin assigned you to "${jobTitle}". Please review the job details and submit a quote.`,
+      body: `You were assigned to "${jobTitle}". Review the job details.`,
       titleKey: 'notification.new_assignment.title',
       bodyKey: 'notification.new_assignment.body',
       params: { jobTitle },
       referenceType: 'JOB',
       referenceId: jobId,
+      pushChannelId: 'job_offers',
+      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, alertMode: 'ring' },
     }),
   ])
 }

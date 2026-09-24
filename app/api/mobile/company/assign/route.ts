@@ -4,6 +4,7 @@ import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/mark
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 import { createAssignment, reassignWorker } from '@/lib/domain/company-job-assignment'
+import { createAndPushNotification } from '@/lib/notifications'
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,20 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ error: result.error, reasons: result.reasons }, { status: 400 })
     }
+
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id: jobId },
+      select: { title: true, preferredDate: true, preferredTimeSlot: true },
+    })
+    await createAndPushNotification({
+      userId: workerUserId,
+      title: 'New company assignment',
+      body: job?.title ? `You were assigned to "${job.title}"` : 'You have a new company job assignment',
+      referenceType: 'JOB',
+      referenceId: jobId,
+      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, assignmentId: result.assignmentId, alertMode: 'ring' },
+      pushOptions: { channelId: 'job_offers', priority: 'high', sound: 'default' },
+    })
 
     return NextResponse.json({ success: true, assignmentId: result.assignmentId, assignedTo: workerUserId })
   } catch (err) {
