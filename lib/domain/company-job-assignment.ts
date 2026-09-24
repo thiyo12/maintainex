@@ -1,6 +1,7 @@
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
+import { createNotification } from '@/lib/notifications'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -33,7 +34,17 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
-  if (job.status !== 'QUOTE_ACCEPTED') return { success: false, error: 'Job must be in QUOTE_ACCEPTED status' }
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    return { success: false, error: 'Job is not ready for workforce assignment' }
+  }
+
+  const workspace = await prisma.jobWorkspace.findUnique({
+    where: { jobId },
+    select: { progressStatus: true },
+  })
+  if (workspace?.progressStatus && workspace.progressStatus !== 'ACCEPTED') {
+    return { success: false, error: 'Work has already started; assignment changes require reassignment controls' }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -56,7 +67,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const assignment = await prisma.$transaction(async (tx) => {
     const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED', targetTaskerId: null },
+      where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] }, targetTaskerId: null },
       data: { targetTaskerId: workerUserId },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
@@ -89,6 +100,15 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     }, tx)
 
     return record
+  })
+
+  await createNotification({
+    userId: workerUserId,
+    title: 'New Company Assignment',
+    body: `You were assigned to "${job.title}". Open MaintainEX to review the work.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', jobId, assignmentId: assignment.id, companyId },
   })
 
   return { success: true, assignmentId: assignment.id }
@@ -164,6 +184,15 @@ export async function reassignWorker(
     }, tx)
 
     return newRecord
+  })
+
+  await createNotification({
+    userId: newWorkerUserId,
+    title: 'Job Reassigned to You',
+    body: `A company job has been reassigned to you. Open MaintainEX to review it.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', jobId, assignmentId: assignment.id, companyId },
   })
 
   return { success: true, assignmentId: assignment.id }
