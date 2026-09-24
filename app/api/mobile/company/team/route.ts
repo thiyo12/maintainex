@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         userId: m.userId,
         name: m.name,
         role: m.role,
+        status: m.status,
         skills: safeParseJsonArr(m.skills),
         isOnline: m.isOnline,
         rating: m.rating,
