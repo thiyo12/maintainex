@@ -96,11 +96,23 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       referenceId: jobId,
     })
     if (profile.user.pushToken) {
-      await sendExpoPush(profile.user.pushToken, pushTitle, pushBody, {
-        type: 'NEW_JOB',
-        jobId,
-        categoryId: job.categoryId,
-      })
+      const online = Boolean(profile.isOnline)
+      await sendExpoPush(
+        profile.user.pushToken,
+        online ? 'New job request nearby' : pushTitle,
+        pushBody,
+        {
+          type: 'NEW_JOB',
+          jobId,
+          categoryId: job.categoryId,
+          alertStyle: online ? 'ringing' : 'standard',
+        },
+        {
+          channelId: 'job-opportunities',
+          priority: 'high',
+          sound: 'default',
+        },
+      )
     }
     matched += 1
   }
@@ -118,12 +130,19 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       referenceId: jobId,
     })
     if (company.user.pushToken) {
-      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
-        type: 'NEW_JOB',
-        jobId,
-        categoryId: job.categoryId,
-        companyId,
-      })
+      await sendExpoPush(
+        company.user.pushToken,
+        pushTitle,
+        pushBody,
+        {
+          type: 'NEW_JOB',
+          jobId,
+          categoryId: job.categoryId,
+          companyId,
+          alertStyle: 'standard',
+        },
+        { channelId: 'job-opportunities', priority: 'high', sound: 'default' },
+      )
     }
     matched += 1
   }
