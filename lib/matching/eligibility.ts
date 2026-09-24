@@ -166,7 +166,7 @@ export async function evaluateEligibility(
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -460,39 +460,99 @@ async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  targetJobId: string,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-
-  let activeCount: number
-  if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
-  } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
+  // A company can legitimately handle multiple jobs through different workers.
+  // Worker-level conflicts are enforced by checkWorkerEligibility at dispatch time.
+  if (providerType === 'COMPANY') {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'Company capacity is managed per worker assignment' }
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  const targetJob = await client.marketplaceJob.findUnique({
+    where: { id: targetJobId },
+    select: {
+      preferredDate: true,
+      preferredTimeSlot: true,
+      urgency: true,
+    },
+  })
+  if (!targetJob) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: 'Target job not found' }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  const activeQuoteRows = await client.jobQuote.findMany({
+    where: {
+      providerId,
+      providerType: 'INDIVIDUAL',
+      status: 'ACCEPTED',
+      jobId: { not: targetJobId },
+    },
+    select: { jobId: true },
+  })
+
+  if (activeQuoteRows.length === 0) {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+  }
+
+  const activeJobs = await client.marketplaceJob.findMany({
+    where: {
+      id: { in: activeQuoteRows.map(row => row.jobId) },
+      status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] },
+    },
+    select: {
+      id: true,
+      status: true,
+      preferredDate: true,
+      preferredTimeSlot: true,
+    },
+  })
+
+  if (activeJobs.length === 0) {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+  }
+
+  const urgent = ['urgent', 'emergency'].includes((targetJob.urgency || '').toLowerCase())
+  const targetIsImmediate = urgent || !targetJob.preferredDate
+
+  if (targetIsImmediate) {
+    const blocking = activeJobs.filter(job => job.status === 'IN_PROGRESS' || !job.preferredDate)
+    if (blocking.length > 0) {
+      return {
+        gate: 'NO_CONFLICT',
+        passed: false,
+        reason: 'Provider is busy with an active job; immediate offers are suppressed',
+      }
+    }
+    return {
+      gate: 'NO_CONFLICT',
+      passed: true,
+      detail: 'Existing work is scheduled; immediate capacity remains available',
+    }
+  }
+
+  const targetDay = targetJob.preferredDate.toISOString().slice(0, 10)
+  const targetSlot = targetJob.preferredTimeSlot || 'anytime'
+  const overlaps = activeJobs.some(job => {
+    if (!job.preferredDate) return false
+    const sameDay = job.preferredDate.toISOString().slice(0, 10) === targetDay
+    if (!sameDay) return false
+    const activeSlot = job.preferredTimeSlot || 'anytime'
+    return targetSlot === 'anytime' || activeSlot === 'anytime' || targetSlot === activeSlot
+  })
+
+  if (overlaps) {
+    return {
+      gate: 'NO_CONFLICT',
+      passed: false,
+      reason: 'Provider already has work scheduled for this date/time',
+    }
+  }
+
+  return {
+    gate: 'NO_CONFLICT',
+    passed: true,
+    detail: 'No overlapping scheduled work',
+  }
 }
 
 async function evaluateQualityFloor(
