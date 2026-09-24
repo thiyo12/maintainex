@@ -139,7 +139,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
           jobId,
           categoryId: job.categoryId,
           companyId,
-          alertMode: 'standard',
+          alertMode: 'ring',
         },
         { channelId: 'job_offers', priority: 'high', sound: 'default' },
       )
