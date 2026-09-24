@@ -6,6 +6,8 @@ import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
+import { createAndPushNotification } from '@/lib/notifications'
+import { notifyQuoteRevised } from '@/lib/notifications'
 
 function parsePositiveMinorUnits(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value > 0n ? value : null
@@ -106,7 +108,7 @@ export async function POST(
     // Resolve benchmark for classification
     const job = await prisma.marketplaceJob.findUnique({
       where: { id: originalQuote.jobId },
-      select: { countryCode: true, categoryId: true },
+      select: { countryCode: true, categoryId: true, customerId: true, title: true },
     })
 
     let classification = 'INSUFFICIENT_DATA'
@@ -149,6 +151,30 @@ export async function POST(
     if (validatedLineItems.length > 0 && result.newQuoteId) {
       const { persistLineItems } = await import('@/lib/pricing/line-items')
       await persistLineItems(prisma, result.newQuoteId, validatedLineItems)
+    }
+
+    if (job?.customerId) {
+      let providerName = user.name || 'A provider'
+      if (resolvedProviderType === 'COMPANY') {
+        const company = await prisma.companyProfile.findUnique({
+          where: { id: resolvedProviderId },
+          select: { companyName: true },
+        })
+        providerName = company?.companyName || providerName
+      }
+      await notifyQuoteRevised(originalQuote.jobId, job.customerId, providerName)
+    }
+
+    if (job?.customerId && result.newQuoteId) {
+      await createAndPushNotification({
+        userId: job.customerId,
+        title: 'Updated quote received',
+        body: `A provider revised the price for "${job.title}"`,
+        referenceType: 'JOB',
+        referenceId: originalQuote.jobId,
+        pushData: { type: 'QUOTE_REVISED', jobId: originalQuote.jobId, quoteId: result.newQuoteId },
+        pushOptions: { priority: 'high', sound: 'default' },
+      })
     }
 
     return NextResponse.json({
