@@ -38,8 +38,21 @@ export async function POST(
     })
 
     return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Refund escrow error:', error)
+    const message = error?.message || 'Failed to process refund'
+    if (message === 'ACTIVE_JOB_REQUIRES_DISPUTE') {
+      return NextResponse.json({ error: 'Active jobs must use the dispute flow before any refund' }, { status: 409 })
+    }
+    if (message.includes('already refunded') || message.includes('state changed')) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (message.includes('Only the customer')) {
+      return NextResponse.json({ error: message }, { status: 403 })
+    }
+    if (message.includes('No refundable escrow')) {
+      return NextResponse.json({ error: message }, { status: 404 })
+    }
     return NextResponse.json({ error: 'Failed to process refund' }, { status: 500 })
   }
 }
