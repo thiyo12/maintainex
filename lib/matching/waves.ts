@@ -68,12 +68,13 @@ export async function createMatchingWave(
         referenceType: 'JOB_MATCH',
         referenceId: jobId,
         pushPriority: 'high',
-        pushChannelId: 'job-offers',
+        pushChannelId: 'job-alerts',
         pushData: {
           type: 'NEW_JOB',
           jobId,
           providerType: candidate.providerType,
           companyId: candidate.companyId,
+          alertMode: 'ring',
         },
       })
       notificationsSent++
