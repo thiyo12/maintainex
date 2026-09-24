@@ -165,6 +165,13 @@ export async function evaluateEligibility(
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
+  // Gate: Provider availability / work calendar
+  const availabilityGate = await evaluateProviderAvailability(client, providerId, job.jobId)
+  gates.push(availabilityGate)
+  if (!availabilityGate.passed) {
+    return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
+  }
+
   // Gate: No blocking assignment conflict
   const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
@@ -456,6 +463,47 @@ async function evaluateServiceArea(
   return company?.user?.countryCode === jobCountryCode
 }
 
+async function evaluateProviderAvailability(
+  client: PrismaClient,
+  providerId: string,
+  jobId: string,
+): Promise<EligibilityGate> {
+  const availability = await client.providerAvailability.findUnique({
+    where: { providerId },
+  })
+  if (!availability) {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'No custom availability set' }
+  }
+  if (!availability.isAvailable) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider marked unavailable' }
+  }
+
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { preferredDate: true },
+  })
+  const checkTime = job?.preferredDate || new Date()
+
+  if (
+    availability.vacationStart &&
+    availability.vacationEnd &&
+    checkTime >= availability.vacationStart &&
+    checkTime <= availability.vacationEnd
+  ) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider unavailable during vacation period' }
+  }
+
+  if (job?.preferredDate) {
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+    const day = dayNames[checkTime.getUTCDay()]
+    if (!availability[day]) {
+      return { gate: 'AVAILABILITY', passed: false, reason: `Provider does not work on ${day}` }
+    }
+  }
+
+  return { gate: 'AVAILABILITY', passed: true, detail: 'Provider availability confirmed' }
+}
+
 async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
@@ -580,6 +628,7 @@ export function mapEligibilityToExclusionReason(gate: EligibilityGate): MatchExc
   if (gate.reason?.includes('Identity')) return 'IDENTITY_NOT_VERIFIED'
   if (gate.reason?.includes('not verified')) return 'PROVIDER_VERIFICATION_NOT_APPROVED'
   if (gate.gate === 'SERVICE_AREA' && !gate.passed) return 'OUTSIDE_SERVICE_AREA'
+  if (gate.gate === 'AVAILABILITY' && !gate.passed) return 'ASSIGNMENT_CONFLICT'
   if (gate.gate === 'NO_CONFLICT' && !gate.passed) return 'ASSIGNMENT_CONFLICT'
   if (gate.gate === 'QUALITY_FLOOR' && !gate.passed) return 'QUALITY_FLOOR'
   if (gate.reason?.includes('No matching') || gate.reason?.includes('No approved')) return 'PROFESSION_MISMATCH'
