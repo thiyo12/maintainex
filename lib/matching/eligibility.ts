@@ -541,25 +541,30 @@ async function evaluateConflict(
   }
 
   if (providerType === 'INDIVIDUAL') {
-    const active = await client.marketplaceJob.findMany({
+    const acceptedQuotes = await client.jobQuote.findMany({
       where: {
-        id: { not: jobId },
-        status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] },
-        quotes: {
-          some: {
-            providerId,
-            providerType: 'INDIVIDUAL',
-            status: 'ACCEPTED',
-          },
-        },
+        providerId,
+        providerType: 'INDIVIDUAL',
+        status: 'ACCEPTED',
+        jobId: { not: jobId },
       },
-      select: {
-        id: true,
-        status: true,
-        preferredDate: true,
-        preferredTimeSlot: true,
-      },
+      select: { jobId: true },
     })
+
+    const active = acceptedQuotes.length > 0
+      ? await client.marketplaceJob.findMany({
+          where: {
+            id: { in: acceptedQuotes.map(row => row.jobId) },
+            status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] },
+          },
+          select: {
+            id: true,
+            status: true,
+            preferredDate: true,
+            preferredTimeSlot: true,
+          },
+        })
+      : []
 
     if (active.length === 0) {
       return { gate: 'NO_CONFLICT', passed: true, detail: 'No active assignment conflict' }
