@@ -71,7 +71,7 @@ export async function notifyUser(data: {
         ...(data.pushData || {}),
       },
       {
-        channelId: data.channelId || 'updates',
+        channelId: data.channelId || (data.referenceType === 'WALLET' ? 'payments' : 'job_updates'),
         priority: data.priority || 'high',
       },
     )
