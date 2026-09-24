@@ -76,8 +76,8 @@ export async function createMatchingWave(
           pushToken,
           'New Job Match',
           'A new job matches your skills — tap to view',
-          { type: 'NEW_JOB', jobId, alertStyle: 'standard' },
-          { channelId: 'job-opportunities', priority: 'high' },
+          { type: 'NEW_JOB', jobId, alertMode: 'standard' },
+          { channelId: 'job_offers', priority: 'high' },
         )
       }
       notificationsSent++
