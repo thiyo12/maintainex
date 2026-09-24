@@ -128,6 +128,7 @@ export async function findCandidates(
     select: {
       categoryId: true, serviceTemplateId: true, templateJobId: true,
       latitude: true, longitude: true, urgency: true, countryCode: true,
+      preferredDate: true, preferredTimeSlot: true,
     },
   })
   if (!job) return emptyResult(input.jobId, config.matchingVersion)
@@ -149,6 +150,55 @@ export async function findCandidates(
 
   const eligibleIndividuals: EligibleIndividual[] = []
   const eligibleCompanies: EligibleCompany[] = []
+
+  // Solo Taskers should not receive immediate jobs while already committed.
+  // Future jobs are still allowed unless they overlap the same scheduled slot.
+  const activeJobs = await client.marketplaceJob.findMany({
+    where: {
+      id: { not: input.jobId },
+      status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] },
+    },
+    select: { id: true, status: true, preferredDate: true, preferredTimeSlot: true },
+  })
+  const activeJobById = new Map(activeJobs.map(activeJob => [activeJob.id, activeJob]))
+  const activeIndividualQuotes = activeJobs.length
+    ? await client.jobQuote.findMany({
+        where: {
+          providerType: 'INDIVIDUAL',
+          status: 'ACCEPTED',
+          jobId: { in: activeJobs.map(activeJob => activeJob.id) },
+        },
+        select: { providerId: true, jobId: true },
+      })
+    : []
+  const activeByProvider = new Map<string, Array<{ status: string; preferredDate: Date | null; preferredTimeSlot: string | null }>>()
+  for (const quote of activeIndividualQuotes) {
+    const activeJob = activeJobById.get(quote.jobId)
+    if (!activeJob) continue
+    const list = activeByProvider.get(quote.providerId) || []
+    list.push(activeJob)
+    activeByProvider.set(quote.providerId, list)
+  }
+
+  const hasScheduleConflict = (providerId: string) => {
+    const commitments = activeByProvider.get(providerId) || []
+    if (commitments.length === 0) return false
+
+    if (!job.preferredDate) {
+      return true
+    }
+
+    const targetDay = job.preferredDate.toISOString().slice(0, 10)
+    return commitments.some(commitment => {
+      if (!commitment.preferredDate) {
+        return commitment.status === 'IN_PROGRESS'
+      }
+      const commitmentDay = commitment.preferredDate.toISOString().slice(0, 10)
+      if (commitmentDay !== targetDay) return false
+      if (!job.preferredTimeSlot || !commitment.preferredTimeSlot) return true
+      return commitment.preferredTimeSlot === job.preferredTimeSlot
+    })
+  }
 
   // INDIVIDUAL PROVIDERS
   const individualProfiles = await client.taskerProfile.findMany({
@@ -175,6 +225,18 @@ export async function findCandidates(
         providerId: profile.userId,
         providerType: 'INDIVIDUAL',
         reason: profile.user?.isSuspended ? 'PROVIDER_SUSPENDED' : 'PROVIDER_BANNED',
+      })
+      continue
+    }
+
+    if (hasScheduleConflict(profile.userId)) {
+      excluded.push({
+        providerId: profile.userId,
+        providerType: 'INDIVIDUAL',
+        reason: 'ASSIGNMENT_CONFLICT',
+        detail: job.preferredDate
+          ? 'Provider already has work in the requested schedule'
+          : 'Provider is already committed to active work',
       })
       continue
     }
