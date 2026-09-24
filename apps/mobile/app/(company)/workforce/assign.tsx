@@ -20,6 +20,7 @@ type TeamMember = {
   userId: string | null
   name: string
   role: string
+  status?: string
   skills: string[]
   isOnline: boolean
   rating: number
@@ -98,7 +99,7 @@ export default function AssignWorkerScreen() {
       setWorkers(
         (teamData.members || []).filter(member =>
           Boolean(member.userId)
-          && member.status !== 'SUSPENDED'
+          && member.status === 'ACTIVE'
           && ['WORKER', 'DISPATCHER', 'MANAGER', 'COMPANY_OWNER'].includes(member.role)
         )
       )
