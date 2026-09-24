@@ -38,7 +38,7 @@ export async function POST(
         'COMPLETION_REQUESTED'
       )
 
-      notifyCompletionRequested(job.id, job.customerId, job.title)
+      await notifyCompletionRequested(job.id, job.customerId, job.title)
       return NextResponse.json({ success: true, message: 'Completion pending customer approval' })
     }
 
@@ -48,8 +48,8 @@ export async function POST(
         job.id
       )
 
-      notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
-      notifyJobCompleted(job.id, job.customerId, job.title)
+      await notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
+      await notifyJobCompleted(job.id, job.customerId, job.title)
       return NextResponse.json({
         success: true,
         message: 'Job completed, funds released',
