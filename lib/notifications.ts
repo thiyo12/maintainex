@@ -20,8 +20,9 @@ export type NotificationInput = {
 }
 
 export async function createNotification(data: NotificationInput) {
+  let notification
   try {
-    const notification = await prisma.notification.create({
+    notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -45,8 +46,13 @@ export async function createNotification(data: NotificationInput) {
             : null,
       },
     })
+  } catch (error) {
+    console.error('Create notification error:', error)
+    return undefined
+  }
 
-    if (data.push !== false) {
+  if (data.push !== false) {
+    try {
       const recipient = await prisma.user.findUnique({
         where: { id: data.userId },
         select: { pushToken: true },
@@ -69,12 +75,13 @@ export async function createNotification(data: NotificationInput) {
           },
         )
       }
+    } catch (error) {
+      // Push is best-effort; never lose the durable in-app notification.
+      console.error('Push notification delivery error:', error)
     }
-
-    return notification
-  } catch (error) {
-    console.error('Create notification error:', error)
   }
+
+  return notification
 }
 
 export async function notifyQuoteSubmitted(jobId: string, customerId: string, providerName: string) {
