@@ -16,16 +16,33 @@ export interface SeasonalOffer {
   [key: string]: unknown
 }
 
-export function getCurrentSeason(): string {
-  const month = new Date().getMonth()
-  if (month >= 2 && month <= 4) return 'spring'
-  if (month >= 5 && month <= 7) return 'summer'
-  if (month >= 8 && month <= 10) return 'fall'
+export function getCurrentSeason(countryCode = 'LK', date = new Date()): string {
+  const month = date.getMonth() + 1
+  const country = countryCode.toUpperCase()
+
+  if (country === 'LK') {
+    if (month >= 5 && month <= 9) return 'southwest_monsoon'
+    if (month >= 10 && month <= 11) return 'second_intermonsoon'
+    if (month === 12 || month <= 2) return 'northeast_monsoon'
+    return 'first_intermonsoon'
+  }
+
+  if (month >= 3 && month <= 5) return 'spring'
+  if (month >= 6 && month <= 8) return 'summer'
+  if (month >= 9 && month <= 11) return 'fall'
   return 'winter'
 }
 
 export const SEASON_EMOJI: Record<string, string> = {
-  winter: '❄️', spring: '🌸', summer: '☀️', fall: '🍂', general: '🏠',
+  winter: '❄️',
+  spring: '🌸',
+  summer: '☀️',
+  fall: '🍂',
+  southwest_monsoon: '🌧️',
+  second_intermonsoon: '⛈️',
+  northeast_monsoon: '🌦️',
+  first_intermonsoon: '🌤️',
+  general: '🏠',
 }
 
 export function getSeasonEmoji(season: string): string {
@@ -34,9 +51,13 @@ export function getSeasonEmoji(season: string): string {
 
 const SEASON_COLORS: Record<string, { bg: string; text: string }> = {
   winter: { bg: '#3B82F6', text: '#FFFFFF' },
-  spring: { bg: '#F59E0B', text: '#FFFFFF' },
-  summer: { bg: '#EF4444', text: '#FFFFFF' },
+  spring: { bg: '#16A34A', text: '#FFFFFF' },
+  summer: { bg: '#F59E0B', text: '#111827' },
   fall: { bg: '#D97706', text: '#FFFFFF' },
+  southwest_monsoon: { bg: '#2563EB', text: '#FFFFFF' },
+  second_intermonsoon: { bg: '#4F46E5', text: '#FFFFFF' },
+  northeast_monsoon: { bg: '#0F766E', text: '#FFFFFF' },
+  first_intermonsoon: { bg: '#0891B2', text: '#FFFFFF' },
   general: { bg: '#8B5CF6', text: '#FFFFFF' },
 }
 
@@ -46,22 +67,86 @@ export function getSeasonColors(season: string) {
 
 const SEASONAL_SERVICE_NAMES: Record<string, Record<string, string[]>> = {
   CA: {
-    summer: ['AC Repair', 'AC Installation', 'Landscaping', 'Lawn Mowing', 'Pool Cleaning', 'Deck Building', 'Fence Installation', 'Car AC Service'],
-    winter: ['Snow Removal', 'Ice Removal', 'Furnace Repair', 'Heating Service', 'Frozen Pipe Repair', 'Winter Tire Change', 'Battery Boost'],
-    spring: ['Spring Cleaning', 'Lawn Cleanup', 'Gutter Cleaning', 'Window Cleaning', 'Pressure Washing', 'Garden Preparation', 'Landscaping'],
-    fall: ['Leaf Removal', 'Gutter Cleaning', 'Furnace Tune-Up', 'Chimney Cleaning', 'Roof Repair', 'Winter Preparation'],
+    summer: [
+      'AC installation',
+      'AC servicing and cleaning',
+      'Garden maintenance',
+      'Lawn mowing and care',
+      'Deck and porch building',
+      'Window cleaning',
+    ],
+    winter: [
+      'Snow removal',
+      'Sidewalk salting and de-icing',
+      'Pipe insulation and winterization',
+      'Frozen pipe repair',
+      'Ice dam removal',
+      'Winter roof and gutter preparation',
+      'Window and door winterization',
+      'AC winterization',
+    ],
+    spring: [
+      'Home deep cleaning',
+      'Garden maintenance',
+      'Gutter cleaning and repair',
+      'Window cleaning',
+      'Exterior house painting',
+    ],
+    fall: [
+      'Gutter cleaning and repair',
+      'Roof inspection and maintenance',
+      'Window and door winterization',
+      'Pipe insulation and winterization',
+      'AC winterization',
+    ],
   },
   LK: {
-    summer: ['AC Service', 'AC Repair', 'Deep Cleaning', 'Water Tank Cleaning', 'Mosquito Control', 'Garden Maintenance', 'Plumbing Repair'],
-    winter: ['AC Service', 'Heating Service', 'Plumbing Repair', 'Electrical Repair'],
-    spring: ['Deep Cleaning', 'Garden Maintenance', 'Painting Service', 'Pressure Washing', 'Window Cleaning'],
-    fall: ['Roof Leak Repair', 'Gutter Cleaning', 'Water Tank Cleaning', 'Painting Service'],
-    general: ['Deep Cleaning', 'AC Service', 'Roof Leak Repair', 'Water Tank Cleaning', 'Mosquito Control', 'Garden Maintenance', 'Plumbing Repair', 'Electrical Repair', 'Painting Service'],
+    southwest_monsoon: [
+      'Roof leak repair',
+      'Gutter cleaning and repair',
+      'Drain unblocking',
+      'Waterproof coating application',
+      'Bathroom waterproofing',
+      'Water pump repair',
+      'Mosquito control',
+    ],
+    second_intermonsoon: [
+      'Roof leak repair',
+      'Gutter cleaning and repair',
+      'Drain unblocking',
+      'Waterproof coating application',
+      'General pest control treatment',
+      'Home deep cleaning',
+    ],
+    northeast_monsoon: [
+      'Roof leak repair',
+      'Drain unblocking',
+      'Water pump repair',
+      'Gutter cleaning and repair',
+      'Electrical repair',
+      'Home deep cleaning',
+    ],
+    first_intermonsoon: [
+      'AC servicing and cleaning',
+      'AC not cooling repair',
+      'Mosquito control',
+      'Garden maintenance',
+      'Water tank installation',
+      'Solar maintenance and cleaning',
+    ],
+    general: [
+      'Home deep cleaning',
+      'AC servicing and cleaning',
+      'Roof leak repair',
+      'Mosquito control',
+      'Garden maintenance',
+      'Drain unblocking',
+    ],
   },
 }
 
 export function getSeasonalServiceNames(country: string, season: string): string[] {
-  const countryData = SEASONAL_SERVICE_NAMES[country]
+  const countryData = SEASONAL_SERVICE_NAMES[country.toUpperCase()]
   if (!countryData) return SEASONAL_SERVICE_NAMES.LK.general
   return countryData[season] || countryData.general || []
 }
@@ -69,40 +154,52 @@ export function getSeasonalServiceNames(country: string, season: string): string
 export function getSeasonalTitle(country: string, season: string): string {
   const titles: Record<string, Record<string, string>> = {
     CA: {
-      summer: 'Summer Cooling & Care',
+      summer: 'Summer Home Care',
       winter: 'Winter Services',
       spring: 'Spring Clean & Repair',
-      fall: 'Fall Preparation',
+      fall: 'Fall Winter-Prep',
     },
     LK: {
-      general: 'Special Offers',
+      southwest_monsoon: 'Southwest Monsoon Care',
+      second_intermonsoon: 'Inter-Monsoon Home Care',
+      northeast_monsoon: 'Northeast Monsoon Care',
+      first_intermonsoon: 'Hot-Season Home Care',
+      general: 'Popular Home Services',
     },
   }
-  return titles[country]?.[season] || titles.LK.general
+  return titles[country.toUpperCase()]?.[season] || titles.LK.general
 }
 
 export function getSeasonalDescription(country: string, season: string): string {
-  const descs: Record<string, Record<string, string>> = {
+  const descriptions: Record<string, Record<string, string>> = {
     CA: {
-      summer: 'Stay cool with professional summer services',
-      winter: 'Beat the cold with our winter maintenance services',
-      spring: 'Refresh your home for spring',
-      fall: 'Get your home ready for colder months',
+      summer: 'Cooling, yard and outdoor services for warmer months',
+      winter: 'Snow, ice, pipe and winterization services',
+      spring: 'Refresh and repair after winter',
+      fall: 'Prepare your home before colder weather',
     },
     LK: {
-      general: 'Popular home services at great prices',
+      southwest_monsoon: 'Leak, drainage, waterproofing and mosquito-prevention services',
+      second_intermonsoon: 'Storm, drainage and home-protection services',
+      northeast_monsoon: 'Rain-ready repairs and home maintenance',
+      first_intermonsoon: 'Cooling, garden and mosquito-control services',
+      general: 'Popular services selected for Sri Lankan homes',
     },
   }
-  return descs[country]?.[season] || descs.LK.general
+  return descriptions[country.toUpperCase()]?.[season] || descriptions.LK.general
 }
 
 export function getSeasonBadge(season: string): string {
   const badges: Record<string, string> = {
-    summer: 'HOT',
-    winter: 'COLD',
-    spring: 'FRESH',
-    fall: 'COZY',
-    general: 'OFFER',
+    summer: 'SUMMER',
+    winter: 'WINTER',
+    spring: 'SPRING',
+    fall: 'FALL',
+    southwest_monsoon: 'MONSOON',
+    second_intermonsoon: 'RAIN READY',
+    northeast_monsoon: 'MONSOON',
+    first_intermonsoon: 'SEASONAL',
+    general: 'POPULAR',
   }
-  return badges[season] || 'OFFER'
+  return badges[season] || 'SEASONAL'
 }
