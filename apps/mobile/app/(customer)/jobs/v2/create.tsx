@@ -13,6 +13,7 @@ import {
 } from 'phosphor-react-native'
 
 import { useAuth } from '../../../../lib/auth'
+import { useCountry } from '../../../../lib/country'
 import { jobCategories, upload } from '../../../../lib/api'
 import { v2Jobs, v2Search, v2SmartBooking, type SmartTemplate } from '../../../../lib/api-v2'
 import type { JobCategory } from '../../../../lib/types'
@@ -41,6 +42,8 @@ function cleanTitle(text: string) {
 export default function CreateJobScreen() {
   const router = useRouter()
   const { user } = useAuth()
+  const { selectedCountry } = useCountry()
+  const countryCode = (selectedCountry?.code || (user as any)?.countryCode || 'LK').toUpperCase()
   const params = useLocalSearchParams<{
     urgency?: string
     categoryId?: string
@@ -79,7 +82,7 @@ export default function CreateJobScreen() {
 
   useEffect(() => {
     let active = true
-    Promise.allSettled([jobCategories.list(), v2Jobs.list()])
+    Promise.allSettled([jobCategories.list(countryCode), v2Jobs.list()])
       .then(([categoryResult, jobsResult]) => {
         if (!active) return
         if (categoryResult.status === 'fulfilled') {
@@ -104,7 +107,7 @@ export default function CreateJobScreen() {
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [params.categoryId])
+  }, [params.categoryId, countryCode])
 
   useEffect(() => {
     const categoryId = selectedCategory?.id
@@ -114,7 +117,7 @@ export default function CreateJobScreen() {
     }
 
     let active = true
-    v2SmartBooking.templates(categoryId)
+    v2SmartBooking.templates(categoryId, countryCode)
       .then((templates) => {
         if (!active) return
         const match = templates.find((item: any) =>
@@ -131,7 +134,7 @@ export default function CreateJobScreen() {
         if (active) setSelectedTemplate(null)
       })
     return () => { active = false }
-  }, [selectedCategory?.id, params.templateJobId])
+  }, [selectedCategory?.id, params.templateJobId, countryCode])
 
   useEffect(() => {
     const q = description.trim()
@@ -143,7 +146,7 @@ export default function CreateJobScreen() {
 
     searchTimer.current = setTimeout(() => {
       setSearching(true)
-      v2Search.categories(q)
+      v2Search.categories(q, undefined, countryCode)
         .then((result) => {
           const mapped = (result.categories || []).slice(0, 5).map((item) => ({
             id: item.id,
@@ -164,7 +167,7 @@ export default function CreateJobScreen() {
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current)
     }
-  }, [description, categories, selectedCategory])
+  }, [description, categories, selectedCategory, countryCode])
 
   useEffect(() => {
     if (step !== 1 || !selectedTemplate) {
@@ -175,7 +178,7 @@ export default function CreateJobScreen() {
     v2SmartBooking.priceEstimate({
       templateId: selectedTemplate.id,
       answers: {},
-      countryCode: ((user as any)?.countryCode || 'LK').toUpperCase(),
+      countryCode: countryCode,
       urgency: params.urgency || 'normal',
       city: (user as any)?.city || undefined,
       scheduledFor: when === 'now' ? 'today' : when === 'tomorrow' ? 'tomorrow' : 'flexible',
@@ -241,7 +244,7 @@ export default function CreateJobScreen() {
         return
       }
       const recognition = new Recognition()
-      recognition.lang = ((user as any)?.countryCode || 'LK').toUpperCase() === 'LK' ? 'en-LK' : 'en-CA'
+      recognition.lang = countryCode === 'LK' ? 'en-LK' : 'en-CA'
       recognition.interimResults = true
       recognition.continuous = false
       recognition.onstart = () => setListening(true)
@@ -298,7 +301,7 @@ export default function CreateJobScreen() {
       }
 
       ExpoSpeechRecognitionModule.start({
-        lang: ((user as any)?.countryCode || 'LK').toUpperCase() === 'LK' ? 'en-LK' : 'en-CA',
+        lang: countryCode === 'LK' ? 'en-LK' : 'en-CA',
         interimResults: true,
         continuous: false,
         maxAlternatives: 1,
@@ -366,7 +369,7 @@ export default function CreateJobScreen() {
 
     setSubmitting(true)
     try {
-      const countryCode = ((user as any)?.countryCode || 'LK').toUpperCase()
+      const countryCode = countryCode
       const response = await v2Jobs.create({
         title: cleanTitle(description),
         description: [
