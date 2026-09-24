@@ -78,7 +78,7 @@ export async function createMatchingWave(
         body: 'A new job matches your skills — tap to view',
         referenceType: 'JOB_MATCH',
         referenceId: jobId,
-        pushChannel: isOnline ? 'job-offers' : 'default',
+        pushChannel: isOnline ? 'job_offers' : 'default',
         pushPriority: 'high',
         pushData: {
           type: 'NEW_JOB',
