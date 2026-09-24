@@ -89,7 +89,7 @@ async function notifyCounterparty(jobId: string, cancelledBy: string, reason?: s
     referenceType: 'JOB',
     referenceId: jobId,
     pushData: { type: 'JOB_CANCELLED', jobId },
-    channelId: 'updates',
+    channelId: 'job_updates',
     priority: 'high',
   })))
 }
