@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench } from 'phosphor-react-native'
+import { Timer, Star, CheckCircle, User, XCircle, Wrench, ChatCircleDots } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable'
 
 import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '../../../../../lib/api-v2'
+import { conversations } from '../../../../../lib/api'
 import { translateJobStatus } from '../../../../../lib/i18n'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
@@ -39,10 +40,10 @@ function useCountdown(target: number | null) {
 }
 
 function QuoteCardItem({
-  q, bestMatch, loading, onAccept, onViewProfile, onDismiss, colors, styles,
+  q, bestMatch, loading, onAccept, onMessage, onViewProfile, onDismiss, colors, styles,
 }: {
   q: V2Quote; bestMatch: boolean; loading: boolean; onAccept: () => void;
-  onViewProfile: () => void; onDismiss: () => void; colors: any; styles: any
+  onMessage: () => void; onViewProfile: () => void; onDismiss: () => void; colors: any; styles: any
 }) {
   const { t } = useTranslation()
   const provider = q.provider
@@ -103,9 +104,13 @@ function QuoteCardItem({
           </View>
 
           <View style={styles.actions}>
+            <TouchableOpacity style={styles.messageBtn} onPress={onMessage} activeOpacity={0.7}>
+              <ChatCircleDots size={16} color={colors.ink} weight="bold" />
+              <Text style={styles.messageBtnText}>Message</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.profileBtn} onPress={onViewProfile} activeOpacity={0.7}>
               <User size={16} color={colors.amber} weight="fill" />
-              <Text style={styles.profileBtnText}>{t('quotes.viewProfile')}</Text>
+              <Text style={styles.profileBtnText}>Profile</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.acceptBtn, loading && { opacity: 0.6 }]} onPress={onAccept} disabled={loading} activeOpacity={0.7}>
               {loading ? <View style={styles.miniSpinner} /> : null}
@@ -180,6 +185,27 @@ export default function V2QuotesScreen() {
       default: return list.sort((a, b) => (b.providerRating ?? 0) - (a.providerRating ?? 0))
     }
   }, [liveQuotes, sortBy])
+
+  const handleMessage = async (quote: V2Quote) => {
+    const participantId = quote.provider?.chatUserId || (
+      quote.providerType === 'INDIVIDUAL' ? quote.providerId : null
+    )
+    if (!participantId) {
+      Alert.alert('Messaging unavailable', 'This provider cannot receive messages right now.')
+      return
+    }
+
+    try {
+      const conversation = await conversations.create({
+        participantId,
+        jobId: id,
+        initialMessage: `Hi, I want to discuss your quote of LKR ${quote.price.toLocaleString()} for this job.`,
+      })
+      router.push(`/(chat)/${conversation.id}` as any)
+    } catch (error: any) {
+      Alert.alert('Could not start chat', error?.message || 'Please try again.')
+    }
+  }
 
   const handleAccept = async (quoteId: string) => {
     setActionLoading(quoteId)
@@ -256,7 +282,10 @@ export default function V2QuotesScreen() {
                   bestMatch={bestQuotes.has(q.id)}
                   loading={actionLoading === q.id}
                   onAccept={() => handleAccept(q.id)}
-                  onViewProfile={() => q.providerId ? router.push(`/(customer)/find/tasker-profile/${q.providerId}` as any) : undefined}
+                  onMessage={() => handleMessage(q)}
+                  onViewProfile={() => q.providerType === 'INDIVIDUAL' && q.providerId
+                    ? router.push(`/(customer)/find/tasker-profile/${q.providerId}` as any)
+                    : Alert.alert('Company profile', q.provider?.name || 'Verified MaintainEX company')}
                   onDismiss={() => setDismissed(prev => new Set(prev).add(q.id))}
                   colors={colors}
                   styles={styles}
@@ -330,14 +359,20 @@ const makeStyles = (colors: any) => StyleSheet.create({
   },
   metaText: { fontSize: 11, fontFamily: fonts.bodyMedium, color: colors.ink },
   actions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  profileBtn: {
+  messageBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 14, borderRadius: 16, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  messageBtnText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: colors.ink },
+  profileBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
     paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: '#2E2E2E',
   },
   profileBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
   acceptBtn: {
-    flex: 1.4, alignItems: 'center', justifyContent: 'center',
+    flex: 1.25, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 16,
     shadowColor: colors.amber, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 10, elevation: 6,
   },

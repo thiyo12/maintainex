@@ -20,6 +20,7 @@ import {
   Play,
   ShieldCheck,
   UsersThree,
+  WarningCircle,
 } from 'phosphor-react-native'
 import { getActiveCompanyId } from '../../../../../lib/api'
 import { v2JobActions, v2Jobs } from '../../../../../lib/api-v2'
@@ -73,6 +74,7 @@ export default function CompanyManageJobScreen() {
   const isInProgress = progress === 'IN_PROGRESS'
   const isWaitingCustomer = progress === 'COMPLETION_REQUESTED'
   const isCompleted = progress === 'COMPLETED' || job?.status === 'COMPLETED'
+  const canOtpCancel = accepted && progress === 'ACCEPTED' && ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job?.status)
   const customerName = job?.customer?.name || 'Customer'
   const customerInitial = customerName.charAt(0).toUpperCase() || 'C'
 
@@ -225,6 +227,20 @@ export default function CompanyManageJobScreen() {
           <Detail label="Job status" value={String(job.status || '—').replaceAll('_', ' ')} last />
         </View>
 
+        {canOtpCancel ? (
+          <TouchableOpacity
+            style={styles.cancelCard}
+            onPress={() => router.push((`/(company)/jobs/v2/manage/${id}/cancel`) as any)}
+            activeOpacity={0.72}
+          >
+            <WarningCircle size={20} color={v3.colors.error} weight="fill" />
+            <View style={styles.cancelCopy}>
+              <Text style={styles.cancelTitle}>Cancel before work starts</Text>
+              <Text style={styles.cancelText}>OTP required. If payment is protected, it returns to the customer.</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
         <TouchableOpacity style={styles.dispatchCard} onPress={() => router.push('/(company)/(tabs)/dispatch' as any)}>
           <UsersThree size={20} color={v3.colors.ink} weight="bold" />
           <View style={styles.dispatchCopy}>
@@ -318,6 +334,10 @@ const styles = StyleSheet.create({
   detailBorder: { borderBottomWidth: 1, borderBottomColor: v3.colors.line },
   detailLabel: { ...v3.typography.caption, color: v3.colors.textMuted },
   detailValue: { ...v3.typography.captionBold, color: v3.colors.ink, maxWidth: '58%', textAlign: 'right' },
+  cancelCard: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: v3.colors.errorSoft, borderRadius: 18, padding: 14, marginTop: 12 },
+  cancelCopy: { flex: 1, marginLeft: 10 },
+  cancelTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  cancelText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 16, marginTop: 2 },
   dispatchCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: v3.colors.amberSoft, borderRadius: 18, padding: 14, marginTop: 12 },
   dispatchCopy: { flex: 1, marginLeft: 10 },
   dispatchTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
