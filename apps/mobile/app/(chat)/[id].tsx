@@ -44,6 +44,7 @@ export default function ChatDetailScreen() {
   const [preWarn, setPreWarn] = useState<string[]>([])
   const [loading, setLoading] = useState(isDemo ? false : true)
   const [userId, setUserId] = useState<string | null>(isDemo ? '__me__' : null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [otherUser, setOtherUser] = useState<any>(isDemo ? { id: (id as string || '').replace('demo_', ''), name: decodeURIComponent(testUser as string || '') } : null)
   const [job, setJob] = useState<any>(null)
   const [sending, setSending] = useState(false)
@@ -54,6 +55,7 @@ export default function ChatDetailScreen() {
     try {
       const user = await auth.me()
       setUserId(user.user.id)
+      setUserRole(user.user.role || null)
     } catch {
       // fail silently
     }
@@ -186,6 +188,34 @@ export default function ChatDetailScreen() {
         </TouchableOpacity>
       </View>
 
+      {job && !isClosed ? (
+        <TouchableOpacity
+          style={styles.quoteActionBanner}
+          activeOpacity={0.78}
+          onPress={() => {
+            if (userRole === 'TASKER') {
+              router.push(`/(tasker)/jobs/v2/quote/${job.id}` as any)
+            } else if (userRole === 'COMPANY') {
+              router.push(`/(company)/jobs/v2/quote/${job.id}` as any)
+            } else {
+              router.push(`/(customer)/jobs/v2/quotes/${job.id}` as any)
+            }
+          }}
+        >
+          <View>
+            <Text style={styles.quoteActionTitle}>
+              {userRole === 'CUSTOMER' ? 'Compare & confirm quote' : 'Update negotiated quote'}
+            </Text>
+            <Text style={styles.quoteActionText}>
+              {userRole === 'CUSTOMER'
+                ? 'Only the price shown in the final quote can be accepted and paid.'
+                : 'Agreed on a different price? Publish it as a revised quote before booking.'}
+            </Text>
+          </View>
+          <CaretRight size={18} color="#111827" weight="bold" />
+        </TouchableOpacity>
+      ) : null}
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -300,7 +330,8 @@ export default function ChatDetailScreen() {
               <TextInput
                 style={[styles.input, { color: '#FFFFFF' }]}
                 value={inputText}
-                onChangeText={(t) => { setInputText(t); setPreWarn(detectWarnings(t)) }}
+                maxLength={2000}
+            onChangeText={(t) => { setInputText(t); setPreWarn(detectWarnings(t)) }}
                 placeholder={t('chat.inputPlaceholder')}
                 placeholderTextColor='#6F6B6B'
                 multiline
@@ -322,6 +353,23 @@ export default function ChatDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  quoteActionBanner: {
+    marginHorizontal: 14,
+    marginTop: 8,
+    marginBottom: 2,
+    minHeight: 66,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: '#F5A623',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  quoteActionTitle: { fontSize: 13, fontFamily: fonts.headingBold, color: '#111827' },
+  quoteActionText: { marginTop: 2, maxWidth: 285, fontSize: 10.5, lineHeight: 15, fontFamily: fonts.bodyMedium, color: '#5D430D' },
+
   container: { flex: 1, backgroundColor: '#0D0D0D' },
   topBar: {
     flexDirection: 'row',
