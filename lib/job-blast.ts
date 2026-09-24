@@ -87,6 +87,10 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       continue
     }
 
+    const recentlyOnline =
+      profile.isOnline &&
+      Date.now() - profile.updatedAt.getTime() <= 2 * 60 * 1000
+
     await createNotification({
       userId,
       title: pushTitle,
@@ -99,7 +103,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-        offerMode: profile.isOnline ? 'LIVE' : 'OFFLINE',
+        offerMode: recentlyOnline ? 'LIVE' : 'OFFLINE',
       },
     })
     matched += 1
