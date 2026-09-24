@@ -2,7 +2,6 @@ import { prisma } from './prisma'
 import { formatCurrency } from './currency-format'
 import type { Currency } from './money'
 import { sendExpoPush, type ExpoPushOptions } from './push'
-import { sendExpoPush, type ExpoPushOptions } from './push'
 
 export type NotificationInput = {
   userId: string
@@ -18,6 +17,7 @@ export type NotificationInput = {
   pushSound?: ExpoPushOptions['sound']
   pushPriority?: ExpoPushOptions['priority']
   pushChannelId?: string
+  pushTtl?: number
 }
 
 export async function createNotification(data: NotificationInput) {
@@ -52,7 +52,7 @@ export async function createNotification(data: NotificationInput) {
     return undefined
   }
 
-  if (data.push !== false) {
+  if (data.push === true) {
     try {
       const recipient = await prisma.user.findUnique({
         where: { id: data.userId },
@@ -73,6 +73,7 @@ export async function createNotification(data: NotificationInput) {
             sound: data.pushSound === undefined ? 'default' : data.pushSound,
             priority: data.pushPriority || 'high',
             channelId: data.pushChannelId,
+            ttl: data.pushTtl,
           },
         )
       }
@@ -85,43 +86,18 @@ export async function createNotification(data: NotificationInput) {
   return notification
 }
 
-export async function createAndPushNotification(data: {
-  userId: string
-  title: string
-  body: string
-  titleKey?: string
-  bodyKey?: string
-  params?: Record<string, string>
-  referenceType?: string
-  referenceId?: string
-  pushData?: Record<string, unknown>
-  pushOptions?: ExpoPushOptions
-}) {
-  const notification = await createNotification(data)
-
-  try {
-    const recipient = await prisma.user.findUnique({
-      where: { id: data.userId },
-      select: { pushToken: true },
-    })
-    if (recipient?.pushToken) {
-      await sendExpoPush(
-        recipient.pushToken,
-        data.title,
-        data.body,
-        {
-          ...(data.pushData || {}),
-          ...(data.referenceType ? { referenceType: data.referenceType } : {}),
-          ...(data.referenceId ? { referenceId: data.referenceId } : {}),
-        },
-        data.pushOptions,
-      )
-    }
-  } catch (error) {
-    console.error('Push notification delivery error:', error)
-  }
-
-  return notification
+export async function createAndPushNotification(
+  data: NotificationInput & { pushOptions?: ExpoPushOptions },
+) {
+  const { pushOptions, ...notificationData } = data
+  return createNotification({
+    ...notificationData,
+    push: true,
+    pushSound: pushOptions?.sound ?? notificationData.pushSound,
+    pushPriority: pushOptions?.priority ?? notificationData.pushPriority,
+    pushChannelId: pushOptions?.channelId ?? notificationData.pushChannelId,
+    pushTtl: pushOptions?.ttl ?? notificationData.pushTtl,
+  })
 }
 
 export async function notifyQuoteSubmitted(jobId: string, customerId: string, providerName: string) {
@@ -316,7 +292,7 @@ export async function notifyTaskerAssigned(
   jobTitle: string,
 ) {
   return Promise.all([
-    createNotification({
+    createAndPushNotification({
       userId: customerId,
       title: 'Tasker Assigned',
       body: `${taskerName} has been assigned to your job "${jobTitle}".`,
@@ -328,7 +304,7 @@ export async function notifyTaskerAssigned(
       pushChannelId: 'job_updates',
       pushData: { type: 'TASKER_ASSIGNED', jobId },
     }),
-    createNotification({
+    createAndPushNotification({
       userId: taskerId,
       title: 'New Assignment',
       body: `You were assigned to "${jobTitle}". Review the job details.`,
