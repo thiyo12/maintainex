@@ -92,7 +92,7 @@ export async function POST(
     const action = typeof body.action === 'string' ? body.action : ''
     const purpose = `${PURPOSE_PREFIX}${id}`
 
-    if (action === 'REQUEST_CODE') {
+    if (action === 'REQUEST_CODE' || action === 'REQUEST_OTP') {
       const hourAgo = new Date(Date.now() - 60 * 60 * 1000)
       const requestCount = await prisma.oTP.count({
         where: { userId: user.id, purpose, createdAt: { gte: hourAgo } },
@@ -130,11 +130,12 @@ export async function POST(
         success: true,
         channel: synthetic ? 'test' : 'sms',
         testMode: synthetic,
+        expiresInSeconds: 300,
       })
     }
 
     if (action !== 'CONFIRM') {
-      return NextResponse.json({ error: 'action must be REQUEST_CODE or CONFIRM' }, { status: 400 })
+      return NextResponse.json({ error: 'action must be REQUEST_OTP or CONFIRM' }, { status: 400 })
     }
 
     const code = typeof body.code === 'string' ? body.code.trim() : ''
@@ -175,12 +176,14 @@ export async function POST(
       select: { id: true },
     })
 
+    let refundAmount = 0
     if (escrow) {
-      await refundEscrow(
+      const refund = await refundEscrow(
         { jobId: id, actorId: user.id, actorType: participant.actorType },
         id,
         { allowAcceptedProviderCancellation: participant.actorType === 'PROVIDER' || participant.actorType === 'COMPANY' },
       )
+      refundAmount = Number(refund.refundAmount || 0)
     } else {
       await prisma.$transaction(async tx => {
         await tx.marketplaceJob.update({
@@ -212,7 +215,7 @@ export async function POST(
       })
     }
 
-    return NextResponse.json({ success: true, status: 'CANCELLED' })
+    return NextResponse.json({ success: true, status: 'CANCELLED', refundAmount })
   } catch (error) {
     console.error('Cancel job error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
