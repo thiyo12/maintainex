@@ -42,10 +42,10 @@ export async function GET(
     })
 
     const quotes = isOwner
-      ? await prisma.jobQuote.findMany({ where: { jobId: job.id }, orderBy: { price: 'asc' } })
+      ? await prisma.jobQuote.findMany({ where: { jobId: job.id, status: { not: 'SUPERSEDED' } }, orderBy: { price: 'asc' } })
       : visibility.allowedQuoteIds.length > 0
         ? await prisma.jobQuote.findMany({
-            where: { id: { in: visibility.allowedQuoteIds } },
+            where: { id: { in: visibility.allowedQuoteIds }, status: { not: 'SUPERSEDED' } },
             orderBy: { price: 'asc' },
           })
         : []
