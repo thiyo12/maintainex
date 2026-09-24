@@ -206,6 +206,23 @@ export async function workerAcceptAssignment(
     data: { status: 'ACCEPTED', acceptedAt: new Date() },
   })
 
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: assignment.companyId },
+    select: { userId: true },
+  })
+  if (company?.userId) {
+    await notifyUser({
+      userId: company.userId,
+      title: 'Worker accepted assignment',
+      body: 'Your assigned worker accepted the job.',
+      referenceType: 'JOB',
+      referenceId: assignment.jobId,
+      pushData: { type: 'COMPANY_ASSIGNMENT_ACCEPTED', assignmentId, jobId: assignment.jobId },
+      channelId: 'job_updates',
+      priority: 'high',
+    })
+  }
+
   return { success: true, assignmentId }
 }
 
@@ -241,6 +258,23 @@ export async function workerRejectAssignment(
       metadata: { reason },
     }, tx)
   })
+
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: assignment.companyId },
+    select: { userId: true },
+  })
+  if (company?.userId) {
+    await notifyUser({
+      userId: company.userId,
+      title: 'Worker declined assignment',
+      body: reason ? `Worker declined the job: ${reason.slice(0, 120)}` : 'Worker declined the assigned job.',
+      referenceType: 'JOB',
+      referenceId: assignment.jobId,
+      pushData: { type: 'COMPANY_ASSIGNMENT_REJECTED', assignmentId, jobId: assignment.jobId },
+      channelId: 'job_updates',
+      priority: 'high',
+    })
+  }
 
   return { success: true, assignmentId }
 }
