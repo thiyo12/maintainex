@@ -1,8 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import type { MatchingConfig, OpportunityStatus, WaveConfig, ProviderOpportunityRecord } from './types'
 import { getWaveConfig } from './config'
-import { createNotification } from '@/lib/notifications'
-import { sendExpoPush } from '@/lib/push'
+import { createAndPushNotification } from '@/lib/notifications'
 
 export interface WaveResult {
   waveNumber: number
@@ -62,20 +61,24 @@ export async function createMatchingWave(
       opportunitiesCreated++
 
       const notificationUserId = candidate.userId || candidate.providerId
-      await createNotification({
+      await createAndPushNotification({
         userId: notificationUserId,
         title: 'New Job Match',
         body: 'A new job matches your skills — tap to view',
         referenceType: 'JOB_MATCH',
         referenceId: jobId,
-        pushPriority: 'high',
-        pushChannelId: 'job_offers',
         pushData: {
           type: 'NEW_JOB',
           jobId,
           providerType: candidate.providerType,
           companyId: candidate.companyId,
           alertMode: 'ring',
+        },
+        pushOptions: {
+          priority: 'high',
+          channelId: 'job_offers',
+          sound: 'default',
+          ttl: 900,
         },
       })
       notificationsSent++
