@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
       commissionCents: bigint
       jobs: number
       pendingReconciliation: number
+      currency: string
     }>()
 
     for (const settlement of marketplaceSettlements) {
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
         commissionCents: 0n,
         jobs: 0,
         pendingReconciliation: 0,
+        currency: settlement.currency,
       }
       row.grossCents += settlement.jobAmount
       row.commissionCents += settlement.commissionAmount
@@ -113,6 +115,7 @@ export async function GET(request: NextRequest) {
           commissionWithheld: Number(row.commissionCents) / 100,
           netPayout: Number(row.grossCents - row.commissionCents) / 100,
           amountDue: 0,
+          currency: row.currency,
           reconciliationStatus: row.pendingReconciliation > 0 ? 'PENDING_RECONCILIATION' : 'RECONCILED',
         }
       })
@@ -120,6 +123,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       commissionCollectionMode: 'WITHHELD_PER_JOB',
       commissionRate: companyProfile.commissionRate,
+      currency: marketplaceSettlements[0]?.currency || (companyProfile.countryCode === 'CA' ? 'CAD' : 'LKR'),
       marketplaceRevenue: Number(marketplaceGrossCents) / 100,
       marketplaceCommissionWithheld: Number(marketplaceCommissionCents) / 100,
       marketplaceNetPayout: Number(marketplaceNetCents) / 100,
