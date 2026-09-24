@@ -16,11 +16,11 @@ describe('launch messaging + operations source guards', () => {
     expect(src).toContain('conversationId_userId')
   })
 
-  it('enforces chat length, hourly and daily message limits', () => {
+  it('enforces chat length, burst and daily message limits', () => {
     const src = source('app/api/mobile/conversations/[id]/messages/route.ts')
-    expect(src).toContain('MAX_MESSAGE_LENGTH = 1000')
-    expect(src).toContain('HOURLY_MESSAGE_LIMIT = 20')
-    expect(src).toContain('DAILY_MESSAGE_LIMIT = 50')
+    expect(src).toContain('MAX_MESSAGE_LENGTH = 2000')
+    expect(src).toContain('BURST_MESSAGE_LIMIT = 15')
+    expect(src).toContain('DAILY_MESSAGE_LIMIT = 120')
   })
 
   it('keeps urgent job push aligned with V3 ring channel', () => {
