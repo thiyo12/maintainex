@@ -222,7 +222,7 @@ export default function ChatDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.topBar, { borderBottomColor: '#2E2E2E', backgroundColor: '#FFFFFF' }]}>
+      <View style={[styles.topBar, { borderBottomColor: '#2E2E2E', backgroundColor: '#0D0D0D' }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <CaretLeft size={22} color='#FFFFFF' weight='bold' />
         </TouchableOpacity>
@@ -290,7 +290,7 @@ export default function ChatDetailScreen() {
                 ) : null}
                 {job?.categoryName || job?.photos?.length ? (
                   <TouchableOpacity
-                    style={[styles.jobCard, { backgroundColor: '#FFFFFF', borderColor: '#2E2E2E' }]}
+                    style={[styles.jobCard, { backgroundColor: '#1A1A1A', borderColor: '#2E2E2E' }]}
                     onPress={() => router.push(`/(customer)/jobs/v2/${job.id}`)}
                   >
                     {job.photos?.length ? (
@@ -333,7 +333,7 @@ export default function ChatDetailScreen() {
                     </View>
                   )}
                   <View style={[styles.messageWrap, { maxWidth: '78%' }, isUser ? styles.messageSent : styles.messageReceived]}>
-                    <View style={[styles.messageBubble, isUser ? { backgroundColor: '#F5A623', borderBottomRightRadius: 4 } : { backgroundColor: '#FFFFFF', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2E2E2E' }]}>
+                    <View style={[styles.messageBubble, isUser ? { backgroundColor: '#F5A623', borderBottomRightRadius: 4 } : { backgroundColor: '#1A1A1A', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#2E2E2E' }]}>
                       <Text style={[styles.messageText, { color: isUser ? '#111827' : '#FFFFFF' }]}>{item.text}</Text>
                     </View>
                     <View style={[styles.messageFooter, isUser ? styles.footerSent : styles.footerReceived]}>
@@ -363,14 +363,14 @@ export default function ChatDetailScreen() {
             <Text style={[styles.closedInputText, { color: '#991B1B' }]}>{t('chat.conversationClosed')}</Text>
           </View>
         ) : (
-          <View style={[styles.inputBar, { borderTopColor: '#2E2E2E', backgroundColor: '#FFFFFF' }]}>
+          <View style={[styles.inputBar, { borderTopColor: '#2E2E2E', backgroundColor: '#0D0D0D' }]}>
             {preWarn.length > 0 && (
               <View style={[styles.flagBanner, { backgroundColor: 'rgba(245,166,35,0.08)', borderColor: 'rgba(245,166,35,0.19)' }]}>
                 <ShieldCheck size={12} color='#F5A623' />
                 <Text style={[styles.flagBannerText, { color: '#FFFFFF' }]}>{preWarn.join(' · ')}</Text>
               </View>
             )}
-            <View style={[styles.inputWrap, { backgroundColor: '#FFFFFF', borderColor: '#2E2E2E' }]}>
+            <View style={[styles.inputWrap, { backgroundColor: '#1A1A1A', borderColor: '#2E2E2E' }]}>
               <TextInput
                 style={[styles.input, { color: '#FFFFFF' }]}
                 value={inputText}
