@@ -89,6 +89,20 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'QUOTE_SUBMITTED', jobId },
+  })
+}
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
+  return notifyUser({
+    userId: customerId,
+    title: 'Quote Updated',
+    body: `${providerName} updated the quote for your job`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'QUOTE_REVISED', jobId },
+    channelId: 'job_updates',
+    priority: 'high',
   })
 }
 
@@ -215,7 +229,7 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
 export async function notifyTaskerAssigned(jobId: string, customerId: string, taskerId: string, taskerName: string, jobTitle: string) {
   return Promise.all([
     notifyUser({
-      userId: customerId:
+      userId: customerId,
       title: 'Tasker Assigned',
       body: `${taskerName} has been assigned to your job "${jobTitle}". They will contact you shortly.`,
       titleKey: 'notification.tasker_assigned.title',
