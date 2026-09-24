@@ -75,6 +75,7 @@ export async function createMatchingWave(
           providerType: candidate.providerType,
           companyId: candidate.companyId,
           alertMode: 'ring',
+          alertMode: 'ring',
         },
       })
       notificationsSent++
