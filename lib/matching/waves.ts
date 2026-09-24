@@ -74,7 +74,7 @@ export async function createMatchingWave(
           referenceType: 'JOB_MATCH',
           referenceId: jobId,
           pushData: { type: 'NEW_JOB', jobId, providerType: candidate.providerType },
-          channelId: 'job-offers',
+          channelId: 'job_offers',
           priority: 'high',
         })
         notificationsSent++
@@ -223,29 +223,4 @@ async function getCompanyOwnerUserId(client: PrismaClient, companyId: string): P
     select: { userId: true },
   })
   return company?.userId || null
-}
-
-async function getPushToken(
-  client: PrismaClient,
-  providerType: string,
-  providerId: string,
-): Promise<string | null> {
-  if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  } else {
-    const company = await client.companyProfile.findUnique({
-      where: { id: providerId },
-      select: { userId: true },
-    })
-    if (!company) return null
-    const user = await client.user.findUnique({
-      where: { id: company.userId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  }
 }
