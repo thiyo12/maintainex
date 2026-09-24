@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+// Launch messaging/operations validation marker.
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`
