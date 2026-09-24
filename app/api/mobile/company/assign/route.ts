@@ -5,7 +5,6 @@ import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 import { createAssignment, reassignWorker } from '@/lib/domain/company-job-assignment'
 import { createAndPushNotification } from '@/lib/notifications'
-import { createNotification } from '@/lib/notifications'
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,21 +60,6 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ error: result.error, reasons: result.reasons }, { status: 400 })
     }
-
-    const job = await prisma.marketplaceJob.findUnique({
-      where: { id: jobId },
-      select: { title: true },
-    })
-    await createNotification({
-      userId: workerUserId,
-      title: existingAssignment ? 'Job Reassigned to You' : 'New Company Job Assignment',
-      body: job?.title || 'A company job has been assigned to you.',
-      referenceType: 'JOB',
-      referenceId: jobId,
-      pushPriority: 'high',
-      pushChannelId: 'job_offers',
-      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, companyId, alertMode: 'ring' },
-    })
 
     const job = await prisma.marketplaceJob.findUnique({
       where: { id: jobId },
