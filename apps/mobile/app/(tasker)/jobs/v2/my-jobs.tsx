@@ -28,7 +28,6 @@ export default function V2ProviderMyJobsScreen() {
   const [jobs, setJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [cancelling, setCancelling] = useState<string | null>(null)
   const today = getToday()
 
   const loadJobs = useCallback(async () => {
@@ -79,16 +78,7 @@ export default function V2ProviderMyJobsScreen() {
     return jobs.some(j => j.status === 'IN_PROGRESS')
   }, [jobs])
 
-  const dailyJobCount = useMemo(() => {
-    const activeToday = jobs.filter(j => {
-      if (j.status === 'COMPLETED') return false
-      if (!j.preferredDate) return true
-      return j.preferredDate === today
-    })
-    return activeToday.length
-  }, [jobs, today])
 
-  const dailyLimitReached = dailyJobCount >= 2
 
   return (
     <SafeAreaView style={styles.container}>
@@ -102,17 +92,10 @@ export default function V2ProviderMyJobsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Limit Banners */}
       {hasActiveJob && (
         <View style={styles.limitBanner}>
           <Warning size={16} color="#fff" />
-          <Text style={styles.limitBannerText}>{t('tasker.activeJobInProgress')}</Text>
-        </View>
-      )}
-      {dailyLimitReached && !hasActiveJob && (
-        <View style={[styles.limitBanner, { backgroundColor: colors.error }]}>
-          <WarningCircle size={16} color="#fff" />
-          <Text style={styles.limitBannerText}>{t('tasker.noMoreJobsToday')}</Text>
+          <Text style={styles.limitBannerText}>Immediate offers are paused while you work. Future scheduled opportunities can still appear.</Text>
         </View>
       )}
 
@@ -202,26 +185,9 @@ export default function V2ProviderMyJobsScreen() {
             <JobLifecycleTracker status={job.status} createdAt={job.createdAt} />
             <TouchableOpacity
               style={styles.cancelSmall}
-              onPress={() => {
-                Alert.alert(t('tasker.cancelQuote'), t('tasker.cancelQuote'), [
-                  { text: t('common.cancel'), style: 'cancel' },
-                  { text: t('common.submit'), style: 'destructive', onPress: async () => {
-                    setCancelling(job.id)
-                    try {
-                      await v2JobActions.complete(job.id, 'CANCEL')
-                      Alert.alert(t('common.success'), t('tasker.cancelQuote'))
-                    } catch {}
-                    setCancelling(null)
-                  }},
-                ])
-              }}
-              disabled={cancelling === job.id}
+              onPress={() => router.push(`/(tasker)/jobs/v2/manage/${job.id}` as any)}
             >
-              {cancelling === job.id ? (
-                <ActivityIndicator size="small" color={colors.error} />
-              ) : (
-                <Text style={styles.cancelSmallText}>{t('common.cancel')}</Text>
-              )}
+              <Text style={styles.cancelSmallText}>Manage / cancel securely</Text>
             </TouchableOpacity>
           </View>
         )}
