@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Image, Modal } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { PaperPlaneRight, CaretLeft, DotsThreeVertical, Image as ImageIcon, XCircle, Info, Lock, ShieldCheck, Wrench, CaretRight, Clock, WarningCircle, Check, User } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { conversations, auth, resolveImageUri } from '../../lib/api'
+import { v2Jobs, v2Quotes } from '../../lib/api-v2'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
 
@@ -46,6 +47,12 @@ export default function ChatDetailScreen() {
   const [userId, setUserId] = useState<string | null>(isDemo ? '__me__' : null)
   const [otherUser, setOtherUser] = useState<any>(isDemo ? { id: (id as string || '').replace('demo_', ''), name: decodeURIComponent(testUser as string || '') } : null)
   const [job, setJob] = useState<any>(null)
+  const [myQuote, setMyQuote] = useState<any>(null)
+  const [revisionVisible, setRevisionVisible] = useState(false)
+  const [revisionPrice, setRevisionPrice] = useState('')
+  const [revisionEta, setRevisionEta] = useState('')
+  const [revisionMessage, setRevisionMessage] = useState('')
+  const [revising, setRevising] = useState(false)
   const [sending, setSending] = useState(false)
   const [isClosed, setIsClosed] = useState(() => isDemo || CLOSED_STATUSES.includes((status as string || '').toUpperCase()))
   const flatListRef = useRef<FlatList>(null)
@@ -64,7 +71,21 @@ export default function ChatDetailScreen() {
     try {
       const data = await conversations.get(id as string)
       setMessages(data.messages || [])
-      if (data.job) setJob(data.job)
+      if (data.job) {
+        setJob(data.job)
+        try {
+          const detail = await v2Jobs.get(data.job.id)
+          const pending = (detail.job.quotes || [])
+            .filter((quote: any) => quote.status === 'PENDING')
+            .sort((a: any, b: any) => (b.revisionNumber || 1) - (a.revisionNumber || 1))
+          const mine = pending.find((quote: any) =>
+            quote.providerId === userId || quote.provider?.chatUserId === userId || quote.actorUserId === userId
+          )
+          setMyQuote(mine || null)
+        } catch {
+          setMyQuote(null)
+        }
+      }
       if (data.participants?.length > 0 && !otherUser) {
         const other = data.participants.find((p: any) => p.id !== userId)
         if (other) setOtherUser(other)
@@ -155,6 +176,47 @@ export default function ChatDetailScreen() {
     ])
   }
 
+  const openRevision = () => {
+    if (!myQuote) return
+    setRevisionPrice(String(myQuote.price || ''))
+    setRevisionEta(myQuote.estimatedCompletionTime || '')
+    setRevisionMessage(myQuote.message || '')
+    setRevisionVisible(true)
+  }
+
+  const submitRevision = async () => {
+    if (!myQuote || revising) return
+    const price = Number(revisionPrice)
+    if (!Number.isFinite(price) || price <= 0 || !revisionEta.trim()) {
+      Alert.alert('Complete the revised quote', 'Enter the agreed price and expected completion time.')
+      return
+    }
+
+    setRevising(true)
+    try {
+      await v2Quotes.revise(myQuote.id, {
+        price,
+        estimatedCompletionTime: revisionEta.trim(),
+        message: revisionMessage.trim() || myQuote.message || undefined,
+        revisionReason: 'Price updated after in-app negotiation',
+        ...(myQuote.providerType === 'COMPANY' ? { companyId: myQuote.providerId } : {}),
+      })
+      setRevisionVisible(false)
+      try {
+        await conversations.sendMessage(
+          id as string,
+          `I updated my formal quote to LKR ${price.toLocaleString()}. Please review the revised quote before booking.`,
+        )
+      } catch {}
+      await fetchMessages()
+      Alert.alert('Revised quote sent', 'The customer has been notified. The new quote is now the price that can be accepted.')
+    } catch (error: any) {
+      Alert.alert('Could not revise quote', error?.message || 'Please try again.')
+    } finally {
+      setRevising(false)
+    }
+  }
+
   const otherName = otherUser?.name || t('home.chat')
   const otherAvatar = resolveImageUri(otherUser?.profileImage || otherUser?.avatar)
 
@@ -214,6 +276,18 @@ export default function ChatDetailScreen() {
                   <ShieldCheck size={16} color='#F5A623' />
                   <Text style={[styles.safetyText, { color: '#FFFFFF' }]}>{t('chat.safetyMessage')}</Text>
                 </View>
+                {myQuote && job?.status === 'OPEN' ? (
+                  <View style={styles.quoteControl}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.quoteControlLabel}>YOUR FORMAL QUOTE</Text>
+                      <Text style={styles.quoteControlPrice}>LKR {Number(myQuote.price || 0).toLocaleString()}</Text>
+                      <Text style={styles.quoteControlHint}>Negotiate here, then update the quote so the final price is recorded before booking.</Text>
+                    </View>
+                    <TouchableOpacity style={styles.quoteControlButton} onPress={openRevision}>
+                      <Text style={styles.quoteControlButtonText}>Update quote</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
                 {job?.categoryName || job?.photos?.length ? (
                   <TouchableOpacity
                     style={[styles.jobCard, { backgroundColor: '#FFFFFF', borderColor: '#2E2E2E' }]}
@@ -317,6 +391,59 @@ export default function ChatDetailScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={revisionVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !revising && setRevisionVisible(false)}
+      >
+        <View style={styles.revisionOverlay}>
+          <View style={styles.revisionSheet}>
+            <Text style={styles.revisionTitle}>Send revised quote</Text>
+            <Text style={styles.revisionSubtitle}>Use the price you agreed in chat. The customer must still explicitly accept it.</Text>
+
+            <Text style={styles.revisionLabel}>Agreed price (LKR)</Text>
+            <TextInput
+              value={revisionPrice}
+              onChangeText={setRevisionPrice}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#6F6B6B"
+              style={styles.revisionInput}
+            />
+
+            <Text style={styles.revisionLabel}>Expected completion</Text>
+            <TextInput
+              value={revisionEta}
+              onChangeText={setRevisionEta}
+              placeholder="e.g. Today · 2 hours"
+              placeholderTextColor="#6F6B6B"
+              style={styles.revisionInput}
+            />
+
+            <Text style={styles.revisionLabel}>Updated scope / note</Text>
+            <TextInput
+              value={revisionMessage}
+              onChangeText={setRevisionMessage}
+              placeholder="What is included in this revised price?"
+              placeholderTextColor="#6F6B6B"
+              style={[styles.revisionInput, styles.revisionTextArea]}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <View style={styles.revisionActions}>
+              <TouchableOpacity style={styles.revisionCancel} onPress={() => setRevisionVisible(false)} disabled={revising}>
+                <Text style={styles.revisionCancelText}>Back to chat</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.revisionSend, revising && { opacity: 0.55 }]} onPress={submitRevision} disabled={revising}>
+                {revising ? <ActivityIndicator size="small" color="#111827" /> : <Text style={styles.revisionSendText}>Send revised quote</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -347,6 +474,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   safetyText: { fontSize: 12, fontFamily: fonts.body, flex: 1, lineHeight: 16 },
+  quoteControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFF1D2',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+  },
+  quoteControlLabel: { fontSize: 10, fontFamily: fonts.bodyMedium, color: '#8A5C00', letterSpacing: 0.8 },
+  quoteControlPrice: { fontSize: 18, fontFamily: fonts.heading, color: '#111827', marginTop: 2 },
+  quoteControlHint: { fontSize: 11, fontFamily: fonts.body, color: '#6B5A32', lineHeight: 15, marginTop: 2 },
+  quoteControlButton: { backgroundColor: '#111827', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11 },
+  quoteControlButtonText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#FFFFFF' },
+  revisionOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
+  revisionSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
+  revisionTitle: { fontSize: 20, fontFamily: fonts.heading, color: '#111827' },
+  revisionSubtitle: { fontSize: 12, fontFamily: fonts.body, color: '#6F6B6B', lineHeight: 17, marginTop: 5, marginBottom: 8 },
+  revisionLabel: { fontSize: 12, fontFamily: fonts.bodyMedium, color: '#4B5563', marginTop: 12, marginBottom: 6 },
+  revisionInput: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 13, color: '#111827', fontFamily: fonts.bodyMedium, fontSize: 14 },
+  revisionTextArea: { minHeight: 92, paddingTop: 12, paddingBottom: 12 },
+  revisionActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  revisionCancel: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' },
+  revisionCancelText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#111827' },
+  revisionSend: { flex: 1.35, height: 50, borderRadius: 14, backgroundColor: '#F5A623', alignItems: 'center', justifyContent: 'center' },
+  revisionSendText: { fontSize: 13, fontFamily: fonts.bodyMedium, color: '#111827' },
   flagBanner: {
     flexDirection: 'row',
     alignItems: 'center',
