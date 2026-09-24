@@ -1,3 +1,4 @@
+import { ensureRegionalCatalog } from '@/lib/regional-catalog'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { seedJobCategories } from '@/lib/v2-job-categories'
@@ -7,6 +8,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const country = searchParams.get('country') || 'LK'
+
+    await ensureRegionalCatalog(country)
 
     const count = await prisma.jobCategory.count()
     if (count === 0) {

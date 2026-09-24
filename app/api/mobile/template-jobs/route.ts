@@ -1,3 +1,4 @@
+import { ensureRegionalCatalog } from '@/lib/regional-catalog'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonArrayContains, safeParseJsonArr } from '@/lib/db-utils'
@@ -7,6 +8,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
     const country = searchParams.get('country') || 'LK'
+
+    await ensureRegionalCatalog(country)
 
     const where: any = { isActive: true }
     if (categoryId) where.categoryId = categoryId

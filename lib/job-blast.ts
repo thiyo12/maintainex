@@ -63,8 +63,9 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
 
   await prisma.jobMatchQueue.deleteMany({ where: { jobId } })
 
-  const pushTitle = 'New job near you 🔔'
-  const pushBody = `${job.title} — a matching job is available. Tap to quote.`
+  const scheduled = Boolean(job.preferredDate && job.preferredDate.getTime() > Date.now() + 4 * 60 * 60 * 1000)
+  const pushTitle = scheduled ? 'New scheduled job 📅' : 'New job near you 🔔'
+  const pushBody = `${job.title} — ${scheduled ? 'fits a future time slot' : 'a matching job is available now'}. Tap to quote.`
 
   let matched = 0
   for (const candidate of individualCandidates) {
@@ -100,7 +101,9 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-      })
+        alertMode: profile.isOnline && !scheduled ? 'FOREGROUND_URGENT' : 'STANDARD_PUSH',
+        scheduled,
+      }, { priority: 'high', channelId: 'jobs' })
     }
     matched += 1
   }
@@ -123,7 +126,9 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         jobId,
         categoryId: job.categoryId,
         companyId,
-      })
+        alertMode: scheduled ? 'STANDARD_PUSH' : 'FOREGROUND_URGENT',
+        scheduled,
+      }, { priority: 'high', channelId: 'jobs' })
     }
     matched += 1
   }

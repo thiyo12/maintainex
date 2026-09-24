@@ -148,7 +148,7 @@ export async function verifyJobPin(
   jobId: string,
   actorId: string,
   pin: string,
-  purpose: 'ARRIVAL' | 'WORK_START' | 'COMPLETION'
+  purpose: 'ARRIVAL' | 'WORK_START' | 'COMPLETION' | 'CANCELLATION'
 ): Promise<PinVerifyResult> {
   return prisma.$transaction(async (tx) => {
     // 1. Read job within transaction for consistency
@@ -202,9 +202,10 @@ export async function verifyJobPin(
     const purposeField =
       purpose === 'ARRIVAL' ? 'arrivalVerifiedAt'
       : purpose === 'WORK_START' ? 'workStartVerifiedAt'
-      : 'completionVerifiedAt'
+      : purpose === 'COMPLETION' ? 'completionVerifiedAt'
+      : null
 
-    if (pinRecord[purposeField] !== null) {
+    if (purposeField && pinRecord[purposeField] !== null) {
       emitSecurityEvent({
         type: 'job_pin_verify_failure',
         actorId,
@@ -263,7 +264,7 @@ export async function verifyJobPin(
       lockedUntil: null,
       lastSuccessfulUseAt: now,
     }
-    updateData[purposeField] = now
+    if (purposeField) updateData[purposeField] = now
 
     await tx.jobVerificationPin.update({
       where: { id: pinRecord.id },
@@ -284,7 +285,8 @@ export async function verifyJobPin(
     // 10. Emit security events
     const eventType = purpose === 'ARRIVAL' ? 'job_pin_arrival_verified'
       : purpose === 'WORK_START' ? 'job_pin_work_start_verified'
-      : 'job_pin_completion_verified'
+      : purpose === 'COMPLETION' ? 'job_pin_completion_verified'
+      : 'job_pin_cancellation_verified'
 
     emitSecurityEvent({
       type: eventType,
@@ -371,7 +373,7 @@ async function resolvePinVerifierTx(
 async function validatePurposeTx(
   tx: PrismaClientOrTx,
   jobId: string,
-  purpose: 'ARRIVAL' | 'WORK_START' | 'COMPLETION'
+  purpose: 'ARRIVAL' | 'WORK_START' | 'COMPLETION' | 'CANCELLATION'
 ): Promise<boolean> {
   const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return false
@@ -406,6 +408,17 @@ async function validatePurposeTx(
 
     case 'COMPLETION':
       return job.status === 'IN_PROGRESS' && workspace?.progressStatus === 'COMPLETION_REQUESTED'
+
+    case 'CANCELLATION': {
+      if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) return false
+      if (workspace?.progressStatus !== 'ACCEPTED') return false
+      const activePin = await tx.jobVerificationPin.findFirst({
+        where: { jobId, status: 'ACTIVE' },
+        orderBy: { version: 'desc' },
+        select: { workStartVerifiedAt: true },
+      })
+      return activePin?.workStartVerifiedAt == null
+    }
 
     default:
       return false

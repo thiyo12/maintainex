@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { formatCurrency, getCurrencyForCountry } from './currency-format'
 import type { Currency } from './money'
+import { sendExpoPush, type PushOptions } from './push'
 
 export async function createNotification(data: {
   userId: string
@@ -11,9 +12,12 @@ export async function createNotification(data: {
   params?: Record<string, string>
   referenceType?: string
   referenceId?: string
+  push?: boolean
+  pushData?: Record<string, unknown>
+  pushOptions?: PushOptions
 }) {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -35,6 +39,29 @@ export async function createNotification(data: {
             : null,
       },
     })
+
+    if (data.push) {
+      const user = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { pushToken: true },
+      })
+      if (user?.pushToken) {
+        await sendExpoPush(
+          user.pushToken,
+          data.title,
+          data.body,
+          {
+            type: data.referenceType || 'NOTIFICATION',
+            referenceType: data.referenceType || null,
+            referenceId: data.referenceId || null,
+            ...(data.pushData || {}),
+          },
+          data.pushOptions,
+        )
+      }
+    }
+
+    return notification
   } catch (error) {
     console.error('Create notification error:', error)
   }
@@ -50,6 +77,9 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'QUOTE_RECEIVED', jobId },
+    pushOptions: { priority: 'high', channelId: 'jobs' },
   })
 }
 
@@ -63,6 +93,9 @@ export async function notifyQuoteAccepted(jobId: string, providerId: string, job
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'QUOTE_ACCEPTED', jobId },
+    pushOptions: { priority: 'high', channelId: 'jobs' },
   })
 }
 
@@ -76,6 +109,9 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'ESCROW_FUNDED', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -89,6 +125,9 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'JOB_COMPLETED', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -102,6 +141,9 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'COMPLETION_REQUESTED', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -115,6 +157,9 @@ export async function notifyJobStarted(jobId: string, customerId: string, jobTit
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'JOB_STARTED', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -136,6 +181,9 @@ export async function notifyPaymentReleased(
     params: { amount: formattedAmount, jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'PAYMENT_RELEASED', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -148,6 +196,9 @@ export async function notifyEscrowTimeout(jobId: string, providerId: string) {
     bodyKey: 'notification.escrow_timeout.body',
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'ESCROW_TIMEOUT', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -170,6 +221,9 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    push: true,
+    pushData: { type: 'JOB_ESCALATED', jobId },
+    pushOptions: { priority: 'high', channelId: 'default' },
   })
 }
 
@@ -184,6 +238,8 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
       params: { taskerName, jobTitle },
       referenceType: 'JOB',
       referenceId: jobId,
+      push: true,
+      pushData: { type: 'TASKER_ASSIGNED', jobId },
     }),
     createNotification({
       userId: taskerId,
@@ -194,6 +250,36 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
       params: { jobTitle },
       referenceType: 'JOB',
       referenceId: jobId,
+      push: true,
+      pushData: { type: 'NEW_ASSIGNMENT', jobId },
+      pushOptions: { priority: 'high', channelId: 'jobs' },
     }),
   ])
+}
+
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
+  return createNotification({
+    userId: customerId,
+    title: 'Updated Quote Received',
+    body: `${providerName} updated their price for your job`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    push: true,
+    pushData: { type: 'QUOTE_REVISED', jobId },
+    pushOptions: { priority: 'high', channelId: 'jobs' },
+  })
+}
+
+export async function notifyJobCancelled(jobId: string, userId: string, jobTitle: string, cancelledBy: string) {
+  return createNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: `${jobTitle} was cancelled by ${cancelledBy}`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    push: true,
+    pushData: { type: 'JOB_CANCELLED', jobId },
+    pushOptions: { priority: 'high', channelId: 'jobs' },
+  })
 }

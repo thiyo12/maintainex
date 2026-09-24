@@ -60,19 +60,20 @@ export async function createMatchingWave(
       })
       opportunitiesCreated++
 
-      // Send notification
+      // Always create the in-app notification. Push delivery is automatic
+      // when the resolved account has a valid Expo token.
       const notificationUserId = candidate.userId || candidate.providerId
-      const pushToken = await getPushToken(client, candidate.providerType, candidate.providerId)
-      if (pushToken) {
-        await createNotification({
-          userId: notificationUserId,
-          title: 'New Job Match',
-          body: 'A new job matches your skills — tap to view',
-          referenceType: 'JOB_MATCH',
-          referenceId: jobId,
-        })
-        notificationsSent++
-      }
+      await createNotification({
+        userId: notificationUserId,
+        title: 'New Job Match',
+        body: 'A new job matches your skills — tap to view',
+        referenceType: 'JOB_MATCH',
+        referenceId: jobId,
+        push: true,
+        pushData: { type: 'NEW_JOB', jobId, waveNumber },
+        pushOptions: { priority: 'high', channelId: 'jobs' },
+      })
+      notificationsSent++
     } catch (err) {
       // Unique constraint violation = already exists, skip silently
       if ((err as any)?.code === 'P2002') continue
@@ -211,27 +212,3 @@ export async function shouldStopWaves(
   return { stop: false }
 }
 
-async function getPushToken(
-  client: PrismaClient,
-  providerType: string,
-  providerId: string,
-): Promise<string | null> {
-  if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  } else {
-    const company = await client.companyProfile.findUnique({
-      where: { id: providerId },
-      select: { userId: true },
-    })
-    if (!company) return null
-    const user = await client.user.findUnique({
-      where: { id: company.userId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  }
-}
