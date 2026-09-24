@@ -85,6 +85,7 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'QUOTE_SUBMITTED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -100,6 +101,7 @@ export async function notifyQuoteAccepted(jobId: string, providerId: string, job
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'QUOTE_ACCEPTED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -115,6 +117,7 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'ESCROW_DEPOSITED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -130,6 +133,7 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'JOB_COMPLETED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -145,6 +149,7 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'COMPLETION_REQUESTED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -160,6 +165,7 @@ export async function notifyJobStarted(jobId: string, customerId: string, jobTit
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'JOB_STARTED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -183,6 +189,7 @@ export async function notifyPaymentReleased(
     params: { amount: formattedAmount, jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'PAYMENT_RELEASED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -197,6 +204,7 @@ export async function notifyEscrowTimeout(jobId: string, providerId: string) {
     bodyKey: 'notification.escrow_timeout.body',
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'ESCROW_TIMEOUT', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
@@ -221,6 +229,7 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
+    pushData: { type: 'JOB_ESCALATED', jobId },
     channelId: 'job_updates',
     priority: 'high',
   })
