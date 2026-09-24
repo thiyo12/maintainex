@@ -6,6 +6,7 @@ import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
+import { createAndPushNotification } from '@/lib/notifications'
 import { notifyQuoteRevised } from '@/lib/notifications'
 
 function parsePositiveMinorUnits(value: unknown): bigint | null {
@@ -162,6 +163,18 @@ export async function POST(
         providerName = company?.companyName || providerName
       }
       await notifyQuoteRevised(originalQuote.jobId, job.customerId, providerName)
+    }
+
+    if (job?.customerId && result.newQuoteId) {
+      await createAndPushNotification({
+        userId: job.customerId,
+        title: 'Updated quote received',
+        body: `A provider revised the price for "${job.title}"`,
+        referenceType: 'JOB',
+        referenceId: originalQuote.jobId,
+        pushData: { type: 'QUOTE_REVISED', jobId: originalQuote.jobId, quoteId: result.newQuoteId },
+        pushOptions: { priority: 'high', sound: 'default' },
+      })
     }
 
     return NextResponse.json({
