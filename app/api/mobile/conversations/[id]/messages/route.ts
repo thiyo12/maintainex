@@ -4,7 +4,9 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { scanChatMessage } from '@/lib/fraud-detection'
 import { sendExpoPush } from '@/lib/push'
 
-const DAILY_MESSAGE_LIMIT = 50
+const DAILY_MESSAGE_LIMIT = 100
+const PER_MINUTE_MESSAGE_LIMIT = 15
+const MAX_MESSAGE_LENGTH = 1000
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -19,6 +21,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { text } = await request.json()
     if (!text?.trim()) {
       return NextResponse.json({ error: 'Message text required' }, { status: 400 })
+    }
+    if (typeof text !== 'string' || text.trim().length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer` }, { status: 400 })
     }
 
     const conversation = await prisma.conversation.findFirst({
@@ -37,15 +42,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    // Rate limit: max 50 messages per conversation per day per user
+    // Anti-spam limits: burst + rolling daily cap per conversation/user.
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const sentToday = await prisma.message.count({
-      where: {
-        conversationId: id,
-        senderId: user.id,
-        createdAt: { gte: since },
-      },
-    })
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000)
+    const [sentToday, sentLastMinute] = await Promise.all([
+      prisma.message.count({
+        where: {
+          conversationId: id,
+          senderId: user.id,
+          createdAt: { gte: since },
+        },
+      }),
+      prisma.message.count({
+        where: {
+          conversationId: id,
+          senderId: user.id,
+          createdAt: { gte: oneMinuteAgo },
+        },
+      }),
+    ])
+    if (sentLastMinute >= PER_MINUTE_MESSAGE_LIMIT) {
+      return NextResponse.json({
+        error: 'You are sending messages too quickly. Please wait a moment.',
+      }, { status: 429 })
+    }
     if (sentToday >= DAILY_MESSAGE_LIMIT) {
       return NextResponse.json({
         error: 'Daily message limit reached. Please continue using Maintainex for safe communication.',
@@ -101,6 +121,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const user = await authenticateRequest(request)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: id,
+          userId: user.id,
+        },
+      },
+      select: { id: true },
+    })
+    if (!participant) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
     const { searchParams } = new URL(request.url)
