@@ -99,7 +99,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     referenceType: 'JOB',
     referenceId: jobId,
     pushData: { type: 'COMPANY_ASSIGNMENT', assignmentId: assignment.id, jobId },
-    channelId: 'job-opportunities',
+    channelId: 'job_offers',
     priority: 'high',
   })
 
@@ -185,7 +185,7 @@ export async function reassignWorker(
     referenceType: 'JOB',
     referenceId: jobId,
     pushData: { type: 'COMPANY_ASSIGNMENT', assignmentId: assignment.id, jobId },
-    channelId: 'job-opportunities',
+    channelId: 'job_offers',
     priority: 'high',
   })
 
