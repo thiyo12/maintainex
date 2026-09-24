@@ -2,6 +2,50 @@ import { getAuthToken } from './api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
+const MONEY_SCALE = 100
+
+export function majorToMinorUnits(value: number): number {
+  if (!Number.isFinite(value)) throw new Error('Invalid money amount')
+  return Math.round(value * MONEY_SCALE)
+}
+
+export function minorToMajorUnits(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return null
+  return numeric / MONEY_SCALE
+}
+
+function normalizeQuoteMoney<T extends Record<string, any>>(quote: T): T {
+  if (!quote) return quote
+  return {
+    ...quote,
+    price: minorToMajorUnits(quote.price) ?? 0,
+  }
+}
+
+function normalizeEscrowMoney<T extends Record<string, any> | null | undefined>(escrow: T): T {
+  if (!escrow) return escrow
+  return {
+    ...escrow,
+    amount: minorToMajorUnits((escrow as any).amount) ?? 0,
+    serviceFee: minorToMajorUnits((escrow as any).serviceFee) ?? 0,
+    totalAmount: minorToMajorUnits((escrow as any).totalAmount) ?? 0,
+  } as T
+}
+
+function normalizeJobMoney<T extends Record<string, any>>(job: T): T {
+  if (!job) return job
+  return {
+    ...job,
+    budgetAmount: minorToMajorUnits(job.budgetAmount),
+    quotes: Array.isArray(job.quotes) ? job.quotes.map(normalizeQuoteMoney) : job.quotes,
+    acceptedQuote: job.acceptedQuote ? normalizeQuoteMoney(job.acceptedQuote) : job.acceptedQuote,
+    escrow: normalizeEscrowMoney(job.escrow),
+  }
+}
+
+
 export async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken()
   const headers: Record<string, string> = {
@@ -77,39 +121,67 @@ export const v2Locations = {
 }
 
 export const v2Jobs = {
-  create: (data: any) =>
-    v2Request<{ job: V2Job }>('/api/mobile/v2/jobs', { method: 'POST', body: JSON.stringify(data) }),
-  list: (params?: string) =>
-    v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs${params ? `?${params}` : ''}`),
-  get: (id: string) =>
-    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`),
-  pollNew: (since: string) =>
-    v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`),
+  create: async (data: any) => {
+    const payload = {
+      ...data,
+      budgetAmount: data?.budgetAmount == null ? data?.budgetAmount : majorToMinorUnits(Number(data.budgetAmount)),
+    }
+    const response = await v2Request<{ job: V2Job }>('/api/mobile/v2/jobs', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    return { job: normalizeJobMoney(response.job) as V2Job }
+  },
+  list: async (params?: string) => {
+    const response = await v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs${params ? `?${params}` : ''}`)
+    return { jobs: response.jobs.map((job) => normalizeJobMoney(job) as V2Job) }
+  },
+  get: async (id: string) => {
+    const response = await v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`)
+    return { job: normalizeJobMoney(response.job) as V2Job & { quotes: V2Quote[] } }
+  },
+  pollNew: async (since: string) => {
+    const response = await v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`)
+    return { jobs: response.jobs.map((job) => normalizeJobMoney(job) as V2Job) }
+  },
   getTaskerLocation: (id: string) =>
     v2Request<{ sharing: boolean; location: { providerId: string; latitude: number; longitude: number; updatedAt: string } | null }>(`/api/mobile/taskers/${id}/location`),
 }
 
 export const v2Quotes = {
-  submit: (data: { jobId: string; providerType: string; companyId?: string; price: number; estimatedCompletionTime?: string; message?: string }) =>
-    v2Request<{ quote: V2Quote }>('/api/mobile/v2/quotes', { method: 'POST', body: JSON.stringify(data) }),
-  list: (jobId: string) =>
-    v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`),
+  submit: async (data: { jobId: string; providerType: string; companyId?: string; price: number; estimatedCompletionTime?: string; message?: string }) => {
+    const response = await v2Request<{ quote: V2Quote }>('/api/mobile/v2/quotes', {
+      method: 'POST',
+      body: JSON.stringify({ ...data, price: majorToMinorUnits(data.price) }),
+    })
+    return { quote: normalizeQuoteMoney(response.quote) as V2Quote }
+  },
+  list: async (jobId: string) => {
+    const response = await v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`)
+    return { quotes: response.quotes.map((quote) => normalizeQuoteMoney(quote) as V2Quote) }
+  },
 }
 
 export const v2JobActions = {
-  update: (jobId: string, data: any) =>
-    v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  update: async (jobId: string, data: any) => {
+    const response = await v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(data) })
+    return { job: normalizeJobMoney(response.job) as V2Job }
+  },
 
   selectQuote: (jobId: string, quoteId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/select-quote`, { method: 'POST', body: JSON.stringify({ quoteId }) }),
   depositEscrow: (jobId: string, amount: number) =>
-    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow`, { method: 'POST', body: JSON.stringify({ amount }) }),
-  getEscrow: (jobId: string) =>
-    v2Request<{ escrow: any }>(`/api/mobile/v2/jobs/${jobId}/escrow`),
+    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow`, { method: 'POST', body: JSON.stringify({ amount: majorToMinorUnits(amount) }) }),
+  getEscrow: async (jobId: string) => {
+    const response = await v2Request<{ escrow: any }>(`/api/mobile/v2/jobs/${jobId}/escrow`)
+    return { escrow: normalizeEscrowMoney(response.escrow) }
+  },
   refundEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow/refund`, { method: 'POST' }),
-  shareAddress: (jobId: string, data: { street?: string; building?: string; apartment?: string; landmark?: string }) =>
-    v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}/share-address`, { method: 'POST', body: JSON.stringify(data) }),
+  shareAddress: async (jobId: string, data: { street?: string; building?: string; apartment?: string; landmark?: string }) => {
+    const response = await v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}/share-address`, { method: 'POST', body: JSON.stringify(data) })
+    return { job: normalizeJobMoney(response.job) as V2Job }
+  },
   getWorkspace: (jobId: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`),
   updateProgress: (jobId: string, progressStatus: string) =>
