@@ -5,10 +5,10 @@ import { scanChatMessage } from '@/lib/fraud-detection'
 import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit } from '@/lib/rate-limit/middleware'
 
-const MAX_MESSAGE_LENGTH = 2000
-const DAILY_MESSAGE_LIMIT = 120
-const BURST_MESSAGE_LIMIT = 15
-const BURST_WINDOW_MS = 60 * 1000
+const MAX_MESSAGE_LENGTH = 1000
+const DAILY_MESSAGE_LIMIT = 100
+const BURST_MESSAGE_LIMIT = 20
+const BURST_WINDOW_MS = 5 * 60 * 1000
 
 async function authorizeJobChat(userId: string, participantId: string, jobId: string): Promise<boolean> {
   const job = await prisma.marketplaceJob.findUnique({
@@ -114,8 +114,8 @@ async function appendMessage(
       recipient.user.pushToken,
       senderName || 'New message',
       messageText.substring(0, 120),
-      { screen: '/(chat)/[id]', id: conversationId, type: 'CHAT_MESSAGE' },
-      { priority: 'high' },
+      { screen: '/(chat)/[id]', id: conversationId, conversationId, type: 'CHAT_MESSAGE' },
+      { channelId: 'messages', priority: 'high' },
     )
   }
 
