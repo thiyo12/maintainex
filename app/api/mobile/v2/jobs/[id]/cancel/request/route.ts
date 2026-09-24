@@ -63,7 +63,9 @@ export async function POST(
       },
     })
 
-    await sendOtpSms(user.phone, code, user.countryCode)
+    if (!testMode) {
+      await sendOtpSms(user.phone, code, user.countryCode)
+    }
 
     return NextResponse.json({
       success: true,
