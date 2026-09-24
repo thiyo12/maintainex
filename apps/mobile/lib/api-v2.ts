@@ -105,6 +105,7 @@ export interface V2Quote {
   jobId: string
   providerId: string
   providerType: string
+  actorUserId?: string | null
   price: number
   estimatedCompletionTime: string
   message: string
