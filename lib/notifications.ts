@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { formatCurrency, getCurrencyForCountry } from './currency-format'
 import type { Currency } from './money'
 import { sendExpoPush } from './push'
+import { sendExpoPush } from './push'
 
 export async function createNotification(data: {
   userId: string
@@ -12,9 +13,13 @@ export async function createNotification(data: {
   params?: Record<string, string>
   referenceType?: string
   referenceId?: string
+  pushData?: Record<string, unknown>
+  push?: boolean
+  channelId?: string
+  priority?: 'default' | 'normal' | 'high'
 }) {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -26,16 +31,43 @@ export async function createNotification(data: {
               ...(data.titleKey ? { titleKey: data.titleKey } : {}),
               ...(data.bodyKey ? { bodyKey: data.bodyKey } : {}),
               ...(data.params ? { params: data.params } : {}),
+              ...(data.pushData ? { pushData: data.pushData } : {}),
             })
-          : data.titleKey || data.params
+          : data.titleKey || data.params || data.pushData
             ? JSON.stringify({
                 ...(data.titleKey ? { titleKey: data.titleKey } : {}),
                 ...(data.bodyKey ? { bodyKey: data.bodyKey } : {}),
                 ...(data.params ? { params: data.params } : {}),
+                ...(data.pushData ? { pushData: data.pushData } : {}),
               })
             : null,
       },
     })
+
+    if (data.push !== false) {
+      const recipient = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { pushToken: true },
+      })
+      if (recipient?.pushToken) {
+        void sendExpoPush(
+          recipient.pushToken,
+          data.title,
+          data.body,
+          {
+            ...(data.pushData || {}),
+            ...(data.referenceType ? { referenceType: data.referenceType } : {}),
+            ...(data.referenceId ? { referenceId: data.referenceId } : {}),
+          },
+          {
+            channelId: data.channelId,
+            priority: data.priority || 'high',
+          },
+        )
+      }
+    }
+
+    return notification
   } catch (error) {
     console.error('Create notification error:', error)
   }
@@ -249,4 +281,29 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
       referenceId: jobId,
     }),
   ])
+}
+
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
+  return createNotification({
+    userId: customerId,
+    title: 'Quote Updated',
+    body: `${providerName} updated their price for your job`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'QUOTE_REVISED', jobId },
+    channelId: 'job_updates',
+  })
+}
+
+export async function notifyJobCancelled(jobId: string, userId: string, jobTitle: string, cancelledBy: 'CUSTOMER' | 'PROVIDER' | 'COMPANY') {
+  return createNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: `"${jobTitle}" was cancelled by ${cancelledBy === 'CUSTOMER' ? 'the customer' : 'the provider'} before work started.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'JOB_CANCELLED', jobId, cancelledBy },
+    channelId: 'job_updates',
+  })
 }
