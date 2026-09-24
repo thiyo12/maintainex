@@ -100,7 +100,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-        alertMode: profile.isOnline ? 'urgent_foreground' : 'standard_push',
+        alertMode: profile.isOnline ? 'ring' : 'standard_push',
       }, {
         sound: 'default',
         channelId: 'job_offers',
