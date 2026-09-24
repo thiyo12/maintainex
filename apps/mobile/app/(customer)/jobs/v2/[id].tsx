@@ -79,6 +79,8 @@ export default function V2JobDetailScreen() {
   const [bargainPrice, setBargainPrice] = useState('')
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
+  const [cancelOtp, setCancelOtp] = useState('')
+  const [cancelStep, setCancelStep] = useState<'reason' | 'otp'>('reason')
 
   const loadJob = async () => {
     try {
@@ -98,11 +100,6 @@ export default function V2JobDetailScreen() {
 
   useEffect(() => { loadJob() }, [id])
 
-  const canCancelWithin30 = () => {
-    if (!job?.createdAt) return false
-    return (Date.now() - new Date(job.createdAt).getTime()) < 30 * 60 * 1000
-  }
-
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
@@ -112,13 +109,29 @@ export default function V2JobDetailScreen() {
   const handleBargain = async () => {
     if (!bargainModal || !bargainPrice) return
     const price = parseInt(bargainPrice, 10)
-    if (!price || price < 100) { Alert.alert(t('common.error'), t('errors.enterValidPrice')); return }
-    setActionLoading('bargain')
-    try {
-      await v2JobActions.complete(id, 'CANCEL')
-      setBargainModal(null); setBargainPrice(''); loadJob()
-    } catch { setBargainModal(null); setBargainPrice(''); loadJob()
-    } finally { setActionLoading('') }
+    if (!price || price < 100) {
+      Alert.alert(t('common.error'), t('errors.enterValidPrice'))
+      return
+    }
+
+    const participantId = bargainModal.providerType === 'COMPANY'
+      ? bargainModal.provider?.userId
+      : bargainModal.providerId
+
+    if (!participantId) {
+      Alert.alert('Chat unavailable', 'This provider does not have a linked chat account.')
+      return
+    }
+
+    setMsgRecipient({
+      id: participantId,
+      name: bargainModal.provider?.name || 'Provider',
+    })
+    setMsgPrefill(
+      `Hi ${bargainModal.provider?.name || ''}, would you accept LKR ${price.toLocaleString()} for "${job?.title || 'this job'}"? If we agree, please update your MaintainEX quote to the final price.`
+    )
+    setBargainModal(null)
+    setBargainPrice('')
   }
 
   const cancelReasons = [
@@ -130,12 +143,37 @@ export default function V2JobDetailScreen() {
   ]
 
   const handleCancelWithReason = async () => {
-    setCancelReasonVisible(false)
     setActionLoading('cancel')
-    removedJobs.add(id); emit('jobsChanged', id)
-    try { await v2JobActions.complete(id, 'CANCEL', cancelReason || ''); router.back() }
-    catch { router.back() }
-    finally { setActionLoading('') }
+    try {
+      if (cancelStep === 'reason') {
+        await v2JobActions.requestCancellation(id, cancelReason || 'Customer cancelled before work start')
+        setCancelStep('otp')
+        return
+      }
+
+      if (cancelOtp.trim().length !== 6) {
+        Alert.alert('Enter verification code', 'Enter the 6-digit cancellation code.')
+        return
+      }
+
+      const result = await v2JobActions.confirmCancellation(id, cancelOtp.trim(), cancelReason || 'Customer cancelled before work start')
+      setCancelReasonVisible(false)
+      setCancelStep('reason')
+      setCancelOtp('')
+      removedJobs.add(id)
+      emit('jobsChanged', id)
+      Alert.alert(
+        'Job cancelled',
+        result.refundAmount > 0
+          ? `Protected funds were refunded: LKR ${Number(result.refundAmount).toLocaleString()}`
+          : 'The job was cancelled before work started.',
+        [{ text: 'OK', onPress: () => router.back() }],
+      )
+    } catch (error: any) {
+      Alert.alert('Unable to cancel', error?.message || 'Please try again.')
+    } finally {
+      setActionLoading('')
+    }
   }
 
   const handleDepositEscrow = async () => {
@@ -250,11 +288,11 @@ export default function V2JobDetailScreen() {
         </View>
 
         {/* ─── Cancel Button ─── */}
-        {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED') && (
+        {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED' || (job.status === 'IN_PROGRESS' && workspace?.progressStatus === 'ACCEPTED')) && (
           <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
-              <Text style={styles.cancelBtnText}>{canCancelWithin30() ? 'Cancel this mission' : 'Request cancellation'}</Text>
+              <Text style={styles.cancelBtnText}>Cancel before work starts</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -408,7 +446,7 @@ export default function V2JobDetailScreen() {
                     style={styles.quoteMessageRow}
                     onPress={() => {
                       setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
-                      setMsgRecipient({ id: q.provider.id, name: q.provider.name || 'Provider' })
+                      setMsgRecipient({ id: q.providerType === 'COMPANY' ? (q.provider.userId || q.provider.id) : q.provider.id, name: q.provider.name || 'Provider' })
                     }}
                   >
                     <ChatCircle size={14} color={colors.amber} weight="fill" />
@@ -620,26 +658,49 @@ export default function V2JobDetailScreen() {
             <View style={[styles.modalIconCircle, { backgroundColor: '#E1190022' }]}>
               <XCircle size={32} color="#E11900" weight="fill" />
             </View>
-            <Text style={styles.modalTitle}>Cancel Mission</Text>
-            <View style={styles.reasonList}>
-              {cancelReasons.map((r) => (
-                <TouchableOpacity key={r.key} style={[styles.reasonOption, cancelReason === r.label && { backgroundColor: colors.amberBg }]}
-                  onPress={() => setCancelReason(r.label)} activeOpacity={0.7}>
-                  <View style={[styles.radio, { borderColor: '#2E2E2E' }, cancelReason === r.label && { borderColor: colors.amber }]}>
-                    {cancelReason === r.label && <View style={[styles.radioDot, { backgroundColor: colors.amber }]} />}
-                  </View>
-                  <Text style={styles.reasonText}>{r.label}</Text>
-                </TouchableOpacity>
-              ))}
-              <TextInput style={styles.reasonInput}
-                value={cancelReason} onChangeText={setCancelReason} placeholder="Other reason..." placeholderTextColor="#6F6B6B" multiline />
-            </View>
+            <Text style={styles.modalTitle}>{cancelStep === 'reason' ? 'Cancel job' : 'Verify cancellation'}</Text>
+            <Text style={styles.modalSub}>
+              {cancelStep === 'reason'
+                ? 'Cancellation is allowed before work starts. If payment is protected, it will be refunded automatically.'
+                : 'Enter the 6-digit code sent to your verified phone or email.'}
+            </Text>
+            {cancelStep === 'reason' ? (
+              <View style={styles.reasonList}>
+                {cancelReasons.map((r) => (
+                  <TouchableOpacity key={r.key} style={[styles.reasonOption, cancelReason === r.label && { backgroundColor: colors.amberBg }]}
+                    onPress={() => setCancelReason(r.label)} activeOpacity={0.7}>
+                    <View style={[styles.radio, { borderColor: '#2E2E2E' }, cancelReason === r.label && { borderColor: colors.amber }]}>
+                      {cancelReason === r.label && <View style={[styles.radioDot, { backgroundColor: colors.amber }]} />}
+                    </View>
+                    <Text style={styles.reasonText}>{r.label}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TextInput style={styles.reasonInput}
+                  value={cancelReason} onChangeText={setCancelReason} placeholder="Other reason..." placeholderTextColor="#6F6B6B" multiline />
+              </View>
+            ) : (
+              <TextInput
+                style={styles.modalInput}
+                value={cancelOtp}
+                onChangeText={(value) => setCancelOtp(value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-digit code"
+                placeholderTextColor="#6F6B6B"
+                keyboardType="number-pad"
+                maxLength={6}
+              />
+            )}
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setCancelReasonVisible(false)}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => {
+                setCancelReasonVisible(false)
+                setCancelStep('reason')
+                setCancelOtp('')
+              }}>
                 <Text style={styles.modalCancelText}>Keep Job</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalConfirmBtn, { backgroundColor: '#E11900' }]} onPress={handleCancelWithReason} disabled={actionLoading !== ''}>
-                {actionLoading === 'cancel' ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={[styles.modalConfirmText, { color: '#FFFFFF' }]}>Cancel</Text>}
+                {actionLoading === 'cancel'
+                  ? <ActivityIndicator color="#FFFFFF" size="small" />
+                  : <Text style={[styles.modalConfirmText, { color: '#FFFFFF' }]}>{cancelStep === 'reason' ? 'Send code' : 'Confirm cancel'}</Text>}
               </TouchableOpacity>
             </View>
           </View>
