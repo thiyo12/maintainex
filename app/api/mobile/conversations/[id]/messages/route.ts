@@ -4,7 +4,10 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { scanChatMessage } from '@/lib/fraud-detection'
 import { sendExpoPush } from '@/lib/push'
 
-const DAILY_MESSAGE_LIMIT = 50
+const DAILY_MESSAGE_LIMIT = 120
+const BURST_MESSAGE_LIMIT = 15
+const BURST_WINDOW_MS = 60 * 1000
+const MAX_MESSAGE_LENGTH = 2000
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,8 +20,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (blocked) return blocked
 
     const { text } = await request.json()
-    if (!text?.trim()) {
+    if (typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Message text required' }, { status: 400 })
+    }
+    const normalizedText = text.trim()
+    if (normalizedText.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json({ error: `Message is too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` }, { status: 400 })
     }
 
     const conversation = await prisma.conversation.findFirst({
@@ -37,24 +44,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    // Rate limit: max 50 messages per conversation per day per user
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const sentToday = await prisma.message.count({
-      where: {
-        conversationId: id,
-        senderId: user.id,
-        createdAt: { gte: since },
-      },
-    })
+    const now = Date.now()
+    const [sentToday, sentInBurst] = await Promise.all([
+      prisma.message.count({
+        where: {
+          conversationId: id,
+          senderId: user.id,
+          createdAt: { gte: new Date(now - 24 * 60 * 60 * 1000) },
+        },
+      }),
+      prisma.message.count({
+        where: {
+          conversationId: id,
+          senderId: user.id,
+          createdAt: { gte: new Date(now - BURST_WINDOW_MS) },
+        },
+      }),
+    ])
+
+    if (sentInBurst >= BURST_MESSAGE_LIMIT) {
+      return NextResponse.json({
+        error: 'You are sending messages too quickly. Please wait a moment.',
+      }, { status: 429 })
+    }
     if (sentToday >= DAILY_MESSAGE_LIMIT) {
       return NextResponse.json({
-        error: 'Daily message limit reached. Please continue using Maintainex for safe communication.',
+        error: 'Daily message limit reached for this job conversation.',
       }, { status: 429 })
     }
 
     // Fraud scan: always runs, never blocks — sanitizes + flags
-    const scan = await scanChatMessage(text.trim(), user.id, id)
-    const messageText = scan.sanitizedText || text.trim()
+    const scan = await scanChatMessage(normalizedText, user.id, id)
+    const messageText = scan.sanitizedText || normalizedText
 
     const message = await prisma.message.create({
       data: {
@@ -76,7 +97,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         recipient.user.pushToken,
         user.name || 'New message',
         messageText.substring(0, 120),
-        { screen: '/(chat)/[id]', id }
+        { type: 'CHAT_MESSAGE', conversationId: id, id, screen: '/(chat)/[id]' },
+        { channelId: 'messages', priority: 'high' },
       )
     }
 
@@ -103,12 +125,47 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const membership = await prisma.conversation.findFirst({
+      where: {
+        id,
+        participants: { some: { userId: user.id } },
+      },
+      select: { id: true },
+    })
+    if (!membership) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+
+    // Critical IDOR guard: only conversation participants can read messages.
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId: id, userId: user.id } },
+      select: { id: true },
+    })
+    if (!participant) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    const membership = await prisma.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId: id, userId: user.id } },
+      select: { id: true },
+    })
+    if (!membership) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
     const { searchParams } = new URL(request.url)
     const after = searchParams.get('after')
 
     const where: any = { conversationId: id }
     if (after) {
-      where.createdAt = { gt: new Date(after) }
+      const afterDate = new Date(after)
+      if (Number.isNaN(afterDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid after timestamp' }, { status: 400 })
+      }
+      where.createdAt = { gt: afterDate }
     }
 
     const messages = await prisma.message.findMany({
