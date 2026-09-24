@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
       referenceType: 'JOB',
       referenceId: jobId,
       pushPriority: 'high',
-      pushChannelId: 'job-offers',
-      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, companyId },
+      pushChannelId: 'job_offers',
+      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, companyId, alertMode: 'ring' },
     })
 
     return NextResponse.json({ success: true, assignmentId: result.assignmentId, assignedTo: workerUserId })
