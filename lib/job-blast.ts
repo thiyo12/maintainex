@@ -1,6 +1,5 @@
 import { prisma } from './prisma'
 import { createNotification } from './notifications'
-import { sendExpoPush } from './push'
 import { findCandidates } from './matching'
 
 /**
