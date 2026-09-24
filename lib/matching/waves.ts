@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import type { MatchingConfig, OpportunityStatus, WaveConfig, ProviderOpportunityRecord } from './types'
 import { getWaveConfig } from './config'
 import { createNotification } from '@/lib/notifications'
+import { sendExpoPush } from '@/lib/push'
 
 export interface WaveResult {
   waveNumber: number
