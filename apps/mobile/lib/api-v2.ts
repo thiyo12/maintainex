@@ -72,8 +72,10 @@ export const v2Jobs = {
     v2Request<{ job: V2Job }>('/api/mobile/v2/jobs', { method: 'POST', body: JSON.stringify(data) }),
   list: (params?: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs${params ? `?${params}` : ''}`),
-  get: (id: string) =>
-    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`),
+  get: (id: string, context?: 'company') =>
+    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(
+      `/api/mobile/v2/jobs/${id}${context ? `?context=${context}` : ''}`
+    ),
   pollNew: (since: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`),
   getTaskerLocation: (id: string) =>
@@ -99,6 +101,11 @@ export const v2JobActions = {
     v2Request<{ escrow: any }>(`/api/mobile/v2/jobs/${jobId}/escrow`),
   refundEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow/refund`, { method: 'POST' }),
+  cancel: (jobId: string, reason?: string) =>
+    v2Request<{ success: boolean; status: string; refunded: boolean; cancelledBy: string }>(
+      `/api/mobile/v2/jobs/${jobId}/cancel`,
+      { method: 'POST', body: JSON.stringify({ reason: reason || 'Cancelled by user' }) }
+    ),
   shareAddress: (jobId: string, data: { street?: string; building?: string; apartment?: string; landmark?: string }) =>
     v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}/share-address`, { method: 'POST', body: JSON.stringify(data) }),
   getWorkspace: (jobId: string) =>

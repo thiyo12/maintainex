@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
-    const country = searchParams.get('country') || 'LK'
+    const country = (searchParams.get('country') || user.countryCode || 'LK').toUpperCase()
 
     if (!query.trim()) {
       return NextResponse.json({ categories: [], jobs: [], taskers: [], totalResults: 0 })
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       prisma.jobCategory.findMany({
         where: {
           isActive: true,
-          name: { contains: query },
+          name: { contains: query, mode: 'insensitive' },
         },
         orderBy: { sortOrder: 'asc' },
         take: 5,
@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
         where: {
           isActive: true,
           OR: [
-            { name: { contains: query } },
-            { description: { contains: query } },
+            { name: { contains: query, mode: 'insensitive' } },
+            { description: { contains: query, mode: 'insensitive' } },
           ],
         },
         include: { category: true },
@@ -42,7 +42,11 @@ export async function GET(request: NextRequest) {
       prisma.taskerProfile.findMany({
         where: {
           isVerified: true,
-          user: { name: { contains: query } },
+          countryCode: country,
+          user: {
+            countryCode: country,
+            name: { contains: query, mode: 'insensitive' },
+          },
         },
         include: { user: { select: { id: true, name: true } } },
         take: 5,

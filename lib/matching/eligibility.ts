@@ -6,6 +6,8 @@ import type {
   MatchExclusionReason,
   MatchingInput,
 } from './types'
+import { readStoredList } from '@/lib/db-utils'
+import { getLocationName } from '@/lib/locations'
 
 export interface ProviderEligibilityInput {
   providerType: ProviderType
@@ -159,14 +161,14 @@ export async function evaluateEligibility(
   }
 
   // Gate: Service area (country match)
-  const serviceAreaPassed = await evaluateServiceArea(client, providerType, providerId, job.countryCode)
+  const serviceAreaPassed = await evaluateServiceArea(client, providerType, providerId, job)
   gates.push({ gate: 'SERVICE_AREA', passed: serviceAreaPassed, detail: serviceAreaPassed ? 'Country match confirmed' : 'No matching country code' })
   if (!serviceAreaPassed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -435,64 +437,183 @@ async function evaluateJurisdictionCredential(
   return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has ${validCerts} jurisdiction credential(s)` } }
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (value: number) => value * Math.PI / 180
+  const earthRadiusKm = 6371
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function configuredAreaMatches(serviceAreas: string | null | undefined, areaId: string | null): boolean {
+  if (!serviceAreas || !areaId) return true
+  const configured = readStoredList(serviceAreas)
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
+  if (configured.length === 0) return true
+
+  const fullLocation = getLocationName(areaId).toLowerCase()
+  const normalizedAreaId = areaId.toLowerCase()
+
+  return configured.some(area =>
+    area === normalizedAreaId ||
+    fullLocation.includes(area)
+  )
+}
+
 async function evaluateServiceArea(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
-  jobCountryCode: string | undefined,
+  job: MatchingInput,
 ): Promise<boolean> {
-  if (!jobCountryCode) return true
+  if (!job.countryCode) return true
+
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: job.jobId },
+    select: { areaId: true, latitude: true, longitude: true },
+  })
+
   if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { countryCode: true },
-    })
-    return user?.countryCode === jobCountryCode
+    const [user, profile] = await Promise.all([
+      client.user.findUnique({
+        where: { id: providerId },
+        select: { countryCode: true },
+      }),
+      client.taskerProfile.findUnique({
+        where: { userId: providerId },
+        select: {
+          countryCode: true,
+          serviceAreas: true,
+          latitude: true,
+          longitude: true,
+          serviceRadius: true,
+        },
+      }),
+    ])
+
+    const providerCountry = profile?.countryCode || user?.countryCode
+    if (providerCountry !== job.countryCode) return false
+
+    if (
+      target?.latitude != null && target.longitude != null &&
+      profile?.latitude != null && profile.longitude != null &&
+      profile.serviceRadius != null && profile.serviceRadius > 0
+    ) {
+      return haversineKm(target.latitude, target.longitude, profile.latitude, profile.longitude) <= profile.serviceRadius
+    }
+
+    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null)
   }
+
   const company = await client.companyProfile.findUnique({
     where: { id: providerId },
-    select: { user: { select: { countryCode: true } } },
+    select: {
+      countryCode: true,
+      serviceAreas: true,
+      latitude: true,
+      longitude: true,
+      serviceRadius: true,
+      user: { select: { countryCode: true } },
+    },
   })
-  return company?.user?.countryCode === jobCountryCode
+  if (!company) return false
+
+  const providerCountry = company.countryCode || company.user?.countryCode
+  if (providerCountry !== job.countryCode) return false
+
+  if (
+    target?.latitude != null && target.longitude != null &&
+    company.latitude != null && company.longitude != null &&
+    company.serviceRadius != null && company.serviceRadius > 0
+  ) {
+    return haversineKm(target.latitude, target.longitude, company.latitude, company.longitude) <= company.serviceRadius
+  }
+
+  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
 }
 
 async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  jobId: string,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-
-  let activeCount: number
-  if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
-  } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
+  type ActiveJob = {
+    id: string
+    status: string
+    preferredDate: Date | null
+    preferredTimeSlot: string | null
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { preferredDate: true, preferredTimeSlot: true },
+  })
+
+  const rows = providerType === 'INDIVIDUAL'
+    ? await client.$queryRaw<ActiveJob[]>`
+        SELECT mj.id, mj.status, mj."preferredDate", mj."preferredTimeSlot"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'INDIVIDUAL'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj.id <> ${jobId}
+      `
+    : await client.$queryRaw<ActiveJob[]>`
+        SELECT mj.id, mj.status, mj."preferredDate", mj."preferredTimeSlot"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'COMPANY'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj.id <> ${jobId}
+      `
+
+  if (rows.length === 0) {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  // Unscheduled/immediate requests remain conservative: an active job blocks them.
+  if (!target?.preferredDate) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${rows.length} active job(s)` }
+  }
+
+  const sameUtcDay = (a: Date, b: Date) =>
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+
+  const now = new Date()
+  const targetIsFutureDay =
+    Date.UTC(target.preferredDate.getUTCFullYear(), target.preferredDate.getUTCMonth(), target.preferredDate.getUTCDate()) >
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+
+  const conflicts = rows.filter(active => {
+    // A currently-running unscheduled job should not block a later-day booking.
+    if (!active.preferredDate) {
+      return !(active.status === 'IN_PROGRESS' && targetIsFutureDay)
+    }
+
+    if (!sameUtcDay(active.preferredDate, target.preferredDate!)) return false
+
+    const targetSlot = target.preferredTimeSlot
+    const activeSlot = active.preferredTimeSlot
+    if (!targetSlot || targetSlot === 'anytime' || !activeSlot || activeSlot === 'anytime') return true
+    return targetSlot === activeSlot
+  })
+
+  if (conflicts.length > 0) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: `Schedule conflict: ${conflicts.length} overlapping active job(s)` }
+  }
+
+  return { gate: 'NO_CONFLICT', passed: true, detail: 'No overlapping schedule conflict' }
 }
 
 async function evaluateQualityFloor(

@@ -79,6 +79,24 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
   })
 }
 
+export async function notifyJobCancelled(
+  jobId: string,
+  userId: string,
+  jobTitle: string,
+  cancelledBy: 'CUSTOMER' | 'PROVIDER'
+) {
+  return createNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: cancelledBy === 'CUSTOMER'
+      ? `Customer cancelled "${jobTitle}"`
+      : `Provider cancelled "${jobTitle}"`,
+    params: { jobTitle, cancelledBy },
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
 export async function notifyJobCompleted(jobId: string, customerId: string, jobTitle: string) {
   return createNotification({
     userId: customerId,

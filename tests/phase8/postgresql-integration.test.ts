@@ -110,6 +110,7 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
     if (caEscrowId) await prisma.financialLedger.deleteMany({ where: { referenceId: caEscrowId } }).catch(() => {})
     if (lkEscrowId) await prisma.commissionSettlement.deleteMany({ where: { escrowId: lkEscrowId } }).catch(() => {})
     if (caEscrowId) await prisma.commissionSettlement.deleteMany({ where: { escrowId: caEscrowId } }).catch(() => {})
+    await prisma.weeklySettlement.deleteMany({ where: { providerId: { in: [lkProviderId, caProviderId] } } }).catch(() => {})
     await prisma.jobEscrow.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } }).catch(() => {})
     await prisma.jobWorkspace.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } }).catch(() => {})
     await prisma.jobQuote.deleteMany({ where: { jobId: { in: [lkJobId, caJobId] } } }).catch(() => {})
@@ -263,11 +264,29 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       expect(settlement!.currency).toBe('LKR')
       expect(settlement!.countryCode).toBe('LK')
 
+      const weekly = await prisma.weeklySettlement.findFirst({ where: { providerId: lkProviderId } })
+      expect(weekly).not.toBeNull()
+      expect(weekly!.providerType).toBe('TASKER')
+      expect(weekly!.currency).toBe('LKR')
+      expect(weekly!.totalEarnings).toBeGreaterThan(0)
+      expect(weekly!.commissionOwed).toBeGreaterThan(0)
+
       const ledgerEntries = await prisma.financialLedger.findMany({ where: { referenceId: lkEscrowId, referenceType: 'ESCROW_RELEASE' } })
       expect(ledgerEntries.length).toBeGreaterThanOrEqual(1)
       for (const entry of ledgerEntries) {
         expect(entry.currency).toBe('LKR')
       }
+
+      const lifecycle = await prisma.jobLifecycleEvent.findMany({
+        where: { jobId: lkJobId },
+        orderBy: { createdAt: 'asc' },
+      })
+      expect(lifecycle.map(event => event.action)).toEqual(
+        expect.arrayContaining(['QUOTE_ACCEPTED', 'ESCROW_FUNDED', 'JOB_COMPLETED'])
+      )
+      expect(lifecycle.every(event => !!event.actorType && !!event.createdAt)).toBe(true)
+      expect(lifecycle.find(event => event.action === 'QUOTE_ACCEPTED')?.actorId).toBe(lkCustomerId)
+      expect(lifecycle.find(event => event.action === 'JOB_COMPLETED')?.toState).toBe('COMPLETED')
     })
 
     it('CA: provider canonical CAD balance credited, legacy float NOT touched', async () => {
@@ -290,6 +309,13 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       expect(settlement).not.toBeNull()
       expect(settlement!.currency).toBe('CAD')
       expect(settlement!.countryCode).toBe('CA')
+
+      const weekly = await prisma.weeklySettlement.findFirst({ where: { providerId: caProviderId } })
+      expect(weekly).not.toBeNull()
+      expect(weekly!.providerType).toBe('TASKER')
+      expect(weekly!.currency).toBe('CAD')
+      expect(weekly!.totalEarnings).toBeGreaterThan(0)
+      expect(weekly!.commissionOwed).toBeGreaterThan(0)
 
       const ledgerEntries = await prisma.financialLedger.findMany({ where: { referenceId: caEscrowId, referenceType: 'ESCROW_RELEASE' } })
       expect(ledgerEntries.length).toBeGreaterThanOrEqual(1)
@@ -353,6 +379,12 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       const settlement = await prisma.commissionSettlement.findFirst({ where: { jobId } })
       expect(settlement).toBeNull()
 
+      const weekly = await prisma.weeklySettlement.findFirst({ where: { providerId: provId } })
+      expect(weekly).not.toBeNull()
+      expect(weekly!.commissionOwed).toBe(0)
+      expect(weekly!.totalEarnings).toBe(1000)
+
+      await prisma.weeklySettlement.deleteMany({ where: { providerId: provId } }).catch(() => {})
       await prisma.financialLedger.deleteMany({ where: { referenceId: { contains: newPrefix } } }).catch(() => {})
       await prisma.jobEscrow.deleteMany({ where: { jobId } }).catch(() => {})
       await prisma.jobWorkspace.deleteMany({ where: { jobId } }).catch(() => {})

@@ -245,8 +245,10 @@ export const templateJobs = {
     request<TemplateJob[]>(`/api/mobile/template-jobs?categoryId=${categoryId}${country ? `&country=${country}` : ''}`),
   get: (id: string) =>
     request<TemplateJob>(`/api/mobile/template-jobs/${id}`),
-  search: (query: string) =>
-    request<TemplateJob[]>(`/api/mobile/template-jobs/search?q=${encodeURIComponent(query)}`),
+  search: (query: string, country?: string) =>
+    request<TemplateJob[]>(
+      `/api/mobile/template-jobs/search?q=${encodeURIComponent(query)}${country ? `&country=${encodeURIComponent(country)}` : ''}`
+    ),
   popular: (country?: string) =>
     request<TemplateJob[]>(`/api/mobile/template-jobs/popular${country ? `?country=${country}` : ''}`),
 }
@@ -272,8 +274,10 @@ export const quickBookings = {
 }
 
 export const search = {
-  all: (query: string) =>
-    request<SearchResult>(`/api/mobile/search?q=${encodeURIComponent(query)}`),
+  all: (query: string, country?: string) =>
+    request<SearchResult>(
+      `/api/mobile/search?q=${encodeURIComponent(query)}${country ? `&country=${encodeURIComponent(country)}` : ''}`
+    ),
 }
 
 // File upload

@@ -4,6 +4,7 @@ import { bigIntToSafeNumber, type Currency } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
 import { Prisma } from '@prisma/client'
+import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
@@ -76,18 +77,31 @@ export function canActorPerformWorkspaceTransition(actorType: ActorType, targetS
 }
 
 export async function transitionMarketplaceJob(ctx: TransitionContext, targetStatus: JobStatus) {
-  const job = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
-  if (!job) throw new Error('Job not found')
-  if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
-    throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
-  }
+  return prisma.$transaction(async tx => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
+    if (!job) throw new Error('Job not found')
+    if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
+      throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
+    }
 
-  const changed = await prisma.marketplaceJob.updateMany({
-    where: { id: ctx.jobId, status: job.status },
-    data: { status: targetStatus },
+    const changed = await tx.marketplaceJob.updateMany({
+      where: { id: ctx.jobId, status: job.status },
+      data: { status: targetStatus },
+    })
+    if (changed.count !== 1) throw new Error('Job state changed concurrently')
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_STATUS_CHANGED',
+      fromState: job.status,
+      toState: targetStatus,
+      metadata: ctx.reason ? { reason: ctx.reason, ...ctx.metadata } : ctx.metadata,
+    })
+
+    return tx.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
   })
-  if (changed.count !== 1) throw new Error('Job state changed concurrently')
-  return prisma.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
 }
 
 export async function transitionJobWorkspace(ctx: TransitionContext, targetStatus: WorkspaceStatus) {
@@ -117,6 +131,16 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
     },
   })
   if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
+
+  await recordJobLifecycleEvent(prisma, {
+    jobId: ctx.jobId,
+    actorId: ctx.actorId,
+    actorType: ctx.actorType,
+    action: 'WORKSPACE_STATUS_CHANGED',
+    fromState: workspace.progressStatus,
+    toState: targetStatus,
+    metadata: ctx.reason ? { reason: ctx.reason, ...ctx.metadata } : ctx.metadata,
+  })
 
   if (targetStatus === 'COMPLETED') {
     await prisma.marketplaceJob.updateMany({
@@ -217,6 +241,22 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         },
       })
     }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'QUOTE_ACCEPTED',
+      fromState: 'OPEN',
+      toState: 'QUOTE_ACCEPTED',
+      metadata: {
+        quoteId,
+        providerId: quote.providerId,
+        providerType: quote.providerType,
+        amountCents: quote.price,
+        currency: pricingConfig.defaultCurrency,
+      },
+    })
   })
 
   const committedJob = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
@@ -304,6 +344,22 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
       data: { status: 'IN_PROGRESS' },
     })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'ESCROW_FUNDED',
+      fromState: escrow.status,
+      toState: 'PROTECTED',
+      metadata: {
+        escrowId: escrow.id,
+        amountCents: totalAmount,
+        currency: escrowCurrency,
+        jobStateBefore: job.status,
+        jobStateAfter: 'IN_PROGRESS',
+      },
+    })
   })
 
   return { success: true, totalAmount, escrowId: escrow.id }
@@ -326,6 +382,62 @@ async function resolvePayoutIdentity(providerId: string, providerType: string) {
   const user = await prisma.user.findUnique({ where: { id: providerId }, select: { id: true } })
   if (!user) throw new Error('Provider user not found')
   return { providerEntityId: providerId, payoutUserId: providerId, commissionRate: null as number | null }
+}
+
+function getUtcWeekBounds(at: Date = new Date()) {
+  const day = at.getUTCDay()
+  const daysSinceMonday = (day + 6) % 7
+  const weekStart = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() - daysSinceMonday, 0, 0, 0, 0))
+  const weekEnd = new Date(weekStart)
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6)
+  weekEnd.setUTCHours(23, 59, 59, 999)
+  const dueAt = new Date(weekEnd)
+  dueAt.setUTCDate(dueAt.getUTCDate() + 7)
+  return { weekStart, weekEnd, dueAt }
+}
+
+async function recordWeeklySettlement(
+  tx: Prisma.TransactionClient,
+  input: {
+    providerId: string
+    providerType: string
+    jobAmountCents: bigint
+    commissionRate: number
+    commissionCents: bigint
+    currency: string
+    countryCode: string
+    completedAt?: Date
+  }
+) {
+  const { weekStart, weekEnd, dueAt } = getUtcWeekBounds(input.completedAt)
+  const totalEarnings = bigIntToSafeNumber(input.jobAmountCents) / 100
+  const commissionOwed = bigIntToSafeNumber(input.commissionCents) / 100
+  const providerType = input.providerType === 'COMPANY' ? 'COMPANY' : 'TASKER'
+
+  await tx.weeklySettlement.upsert({
+    where: { providerId_weekStart: { providerId: input.providerId, weekStart } },
+    create: {
+      providerId: input.providerId,
+      providerType,
+      weekStart,
+      weekEnd,
+      totalEarnings,
+      commissionRate: input.commissionRate,
+      commissionOwed,
+      commissionPaid: false,
+      dueAt,
+      status: 'PENDING',
+      currency: input.currency,
+      countryCode: input.countryCode,
+    },
+    update: {
+      totalEarnings: { increment: totalEarnings },
+      commissionOwed: { increment: commissionOwed },
+      commissionRate: input.commissionRate,
+      currency: input.currency,
+      countryCode: input.countryCode,
+    },
+  })
 }
 
 export async function releaseEscrow(
@@ -471,6 +583,32 @@ export async function releaseEscrow(
         },
       })
     }
+
+    await recordWeeklySettlement(tx, {
+      providerId: identity.payoutUserId,
+      providerType: quote.providerType,
+      jobAmountCents: escrow.amount,
+      commissionRate: rate,
+      commissionCents,
+      currency: escrowCurrency,
+      countryCode: job.countryCode || 'LK',
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_COMPLETED',
+      fromState: job.status,
+      toState: 'COMPLETED',
+      metadata: {
+        releaseMode: isStaff ? 'STAFF_RELEASE' : 'CUSTOMER_RELEASE',
+        escrowId: escrow.id,
+        commissionCents,
+        providerNetCents: netCents,
+        currency: escrowCurrency,
+      },
+    })
   })
 
   return {
@@ -487,8 +625,23 @@ export async function releaseEscrow(
 export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') {
-    throw new Error('Only the customer or staff can refund escrow')
+  const isCustomer = job.customerId === ctx.actorId
+  const isStaff = ctx.actorType === 'STAFF'
+  let isAcceptedProvider = false
+
+  if (!isCustomer && !isStaff && job.status === 'QUOTE_ACCEPTED') {
+    const resolvedActor = await resolveProviderActor(jobId, ctx.actorId)
+    isAcceptedProvider =
+      resolvedActor !== null &&
+      resolvedActor === ctx.actorType &&
+      (resolvedActor === 'PROVIDER' || resolvedActor === 'COMPANY')
+  }
+
+  if (!isCustomer && !isStaff && !isAcceptedProvider) {
+    throw new Error('Only the customer, accepted provider, or staff can refund escrow before work starts')
+  }
+  if (job.status === 'IN_PROGRESS' && !isStaff) {
+    throw new Error('ACTIVE_JOB_REQUIRES_DISPUTE')
   }
 
   const escrow = await prisma.jobEscrow.findFirst({
@@ -510,6 +663,22 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
       await tx.jobQuote.updateMany({
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
         data: { status: 'WITHDRAWN' },
+      })
+
+      await recordJobLifecycleEvent(tx, {
+        jobId,
+        actorId: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'JOB_CANCELLED',
+        fromState: job.status,
+        toState: 'CANCELLED',
+        metadata: {
+          reason: ctx.reason ?? null,
+          escrowId: escrow.id,
+          escrowFromState: 'PENDING_PAYMENT',
+          escrowToState: 'CANCELLED',
+          refundCents: 0,
+        },
       })
     })
     return { refundAmount: 0, refundCents: 0n }
@@ -576,6 +745,23 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     await tx.jobQuote.updateMany({
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
       data: { status: 'WITHDRAWN' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'ESCROW_REFUNDED',
+      fromState: job.status,
+      toState: 'CANCELLED',
+      metadata: {
+        reason: ctx.reason ?? null,
+        escrowId: escrow.id,
+        escrowFromState: escrow.status,
+        escrowToState: 'REFUNDED',
+        refundCents,
+        currency: escrow.currency,
+      },
     })
   })
 
@@ -648,6 +834,23 @@ export async function raiseJobDispute(
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
       data: { status: 'CANCELLED' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'DISPUTE_RAISED',
+      fromState: workspace.progressStatus,
+      toState: 'DISPUTED',
+      metadata: {
+        reason: ctx.reason ?? null,
+        jobStateBefore: job.status,
+        jobStateAfter: 'CANCELLED',
+        escrowId: escrow.id,
+        escrowFromState: 'PROTECTED',
+        escrowToState: 'ON_HOLD',
+      },
     })
 
     return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
@@ -874,6 +1077,34 @@ export async function completeAndReleaseEscrow(
         },
       })
     }
+
+    await recordWeeklySettlement(tx, {
+      providerId: identity.payoutUserId,
+      providerType: quote.providerType,
+      jobAmountCents: escrow.amount,
+      commissionRate: rate,
+      commissionCents,
+      currency: escrowCurrency,
+      countryCode: job.countryCode || 'LK',
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_COMPLETED',
+      fromState: job.status,
+      toState: 'COMPLETED',
+      metadata: {
+        releaseMode,
+        escrowId: escrow.id,
+        workspaceFromState: workspace.progressStatus,
+        workspaceToState: 'COMPLETED',
+        commissionCents,
+        providerNetCents: netCents,
+        currency: escrowCurrency,
+      },
+    })
 
     return {
       commission: commissionMajor,

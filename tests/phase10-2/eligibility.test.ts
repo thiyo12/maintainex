@@ -58,8 +58,9 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     },
     marketplaceJob: {
       count: vi.fn().mockResolvedValue(0),
+      findUnique: vi.fn().mockResolvedValue({ preferredDate: null, preferredTimeSlot: null }),
     },
-    $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any
 }
@@ -247,7 +248,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
             id: 'owner-1', isSuspended: false, isBanned: false,
           }),
         },
-        $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+        $queryRaw: vi.fn().mockResolvedValue([]),
       })
       const input = {
         providerType: 'COMPANY' as ProviderType,
@@ -558,16 +559,203 @@ describe('Phase 10.2 — Eligibility Engine', () => {
     })
   })
 
-  describe('evaluateEligibility — conflict', () => {
-    it('fails NO_CONFLICT when provider has active jobs', async () => {
+  describe('evaluateEligibility — local service area', () => {
+    it('rejects a provider whose configured service area does not include the job area', async () => {
+      const profile = {
+        id: 'profile-1',
+        userId: 'tasker-1',
+        verificationStatus: 'VERIFIED',
+        isVerified: true,
+        skills: null,
+        taskerSkills: [{ job: { categoryId: 'cat-1' } }],
+        rating: 4.5,
+        completedJobs: 5,
+        countryCode: 'LK',
+        serviceAreas: JSON.stringify(['Colombo']),
+        latitude: null,
+        longitude: null,
+        serviceRadius: null,
+      }
       const input = makeIndivInput({
         clientOverrides: {
-          $queryRaw: vi.fn().mockResolvedValue([{ cnt: 2n }]),
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'tasker-1',
+              isSuspended: false,
+              isBanned: false,
+              identityStatus: 'VERIFIED',
+              isActive: true,
+              countryCode: 'LK',
+            }),
+          },
+          taskerProfile: { findUnique: vi.fn().mockResolvedValue(profile) },
+          marketplaceJob: {
+            count: vi.fn().mockResolvedValue(0),
+            findUnique: vi.fn().mockImplementation(({ select }: any) => {
+              if (select?.areaId) return Promise.resolve({ areaId: 'lk-jaffna-town', latitude: null, longitude: null })
+              return Promise.resolve({ preferredDate: null, preferredTimeSlot: null })
+            }),
+          },
+        },
+      })
+      input.job.countryCode = 'LK'
+
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(false)
+      expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(false)
+    })
+
+    it('accepts a provider whose configured district matches the job location name', async () => {
+      const profile = {
+        id: 'profile-1',
+        userId: 'tasker-1',
+        verificationStatus: 'VERIFIED',
+        isVerified: true,
+        skills: null,
+        taskerSkills: [{ job: { categoryId: 'cat-1' } }],
+        rating: 4.5,
+        completedJobs: 5,
+        countryCode: 'LK',
+        serviceAreas: JSON.stringify(['Jaffna']),
+        latitude: null,
+        longitude: null,
+        serviceRadius: null,
+      }
+      const input = makeIndivInput({
+        clientOverrides: {
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'tasker-1',
+              isSuspended: false,
+              isBanned: false,
+              identityStatus: 'VERIFIED',
+              isActive: true,
+              countryCode: 'LK',
+            }),
+          },
+          taskerProfile: { findUnique: vi.fn().mockResolvedValue(profile) },
+          marketplaceJob: {
+            count: vi.fn().mockResolvedValue(0),
+            findUnique: vi.fn().mockImplementation(({ select }: any) => {
+              if (select?.areaId) return Promise.resolve({ areaId: 'lk-jaffna-town', latitude: null, longitude: null })
+              return Promise.resolve({ preferredDate: null, preferredTimeSlot: null })
+            }),
+          },
+        },
+      })
+      input.job.countryCode = 'LK'
+
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(true)
+    })
+
+    it('rejects a job outside the configured service radius', async () => {
+      const profile = {
+        id: 'profile-1',
+        userId: 'tasker-1',
+        verificationStatus: 'VERIFIED',
+        isVerified: true,
+        skills: null,
+        taskerSkills: [{ job: { categoryId: 'cat-1' } }],
+        rating: 4.5,
+        completedJobs: 5,
+        countryCode: 'LK',
+        serviceAreas: null,
+        latitude: 9.6615,
+        longitude: 80.0255,
+        serviceRadius: 5,
+      }
+      const input = makeIndivInput({
+        clientOverrides: {
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'tasker-1',
+              isSuspended: false,
+              isBanned: false,
+              identityStatus: 'VERIFIED',
+              isActive: true,
+              countryCode: 'LK',
+            }),
+          },
+          taskerProfile: { findUnique: vi.fn().mockResolvedValue(profile) },
+          marketplaceJob: {
+            count: vi.fn().mockResolvedValue(0),
+            findUnique: vi.fn().mockImplementation(({ select }: any) => {
+              if (select?.areaId) return Promise.resolve({ areaId: 'lk-colombo-wellawatte', latitude: 6.8741, longitude: 79.8608 })
+              return Promise.resolve({ preferredDate: null, preferredTimeSlot: null })
+            }),
+          },
+        },
+      })
+      input.job.countryCode = 'LK'
+
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(false)
+    })
+  })
+
+  describe('evaluateEligibility — conflict', () => {
+    it('fails NO_CONFLICT for an unscheduled request when provider has an active job', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'IN_PROGRESS', preferredDate: null, preferredTimeSlot: null },
+          ]),
         },
       })
       const result = await evaluateEligibility(input)
       expect(result.eligible).toBe(false)
       expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+    })
+
+    it('allows a future-day booking while an unscheduled job is currently in progress', async () => {
+      const tomorrow = new Date()
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
+
+      const input = makeIndivInput({
+        clientOverrides: {
+          marketplaceJob: {
+            findUnique: vi.fn().mockResolvedValue({ preferredDate: tomorrow, preferredTimeSlot: 'afternoon' }),
+          },
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'IN_PROGRESS', preferredDate: null, preferredTimeSlot: null },
+          ]),
+        },
+      })
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
+    })
+
+    it('blocks the same day and same time slot', async () => {
+      const day = new Date('2026-10-05T00:00:00.000Z')
+      const input = makeIndivInput({
+        clientOverrides: {
+          marketplaceJob: {
+            findUnique: vi.fn().mockResolvedValue({ preferredDate: day, preferredTimeSlot: 'morning' }),
+          },
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'QUOTE_ACCEPTED', preferredDate: day, preferredTimeSlot: 'morning' },
+          ]),
+        },
+      })
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+    })
+
+    it('allows different dayparts on the same date', async () => {
+      const day = new Date('2026-10-05T00:00:00.000Z')
+      const input = makeIndivInput({
+        clientOverrides: {
+          marketplaceJob: {
+            findUnique: vi.fn().mockResolvedValue({ preferredDate: day, preferredTimeSlot: 'evening' }),
+          },
+          $queryRaw: vi.fn().mockResolvedValue([
+            { id: 'active-1', status: 'QUOTE_ACCEPTED', preferredDate: day, preferredTimeSlot: 'morning' },
+          ]),
+        },
+      })
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
     })
   })
 
