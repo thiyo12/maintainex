@@ -6,6 +6,7 @@ import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
+import { notifyQuoteRevised } from '@/lib/notifications'
 
 function parsePositiveMinorUnits(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value > 0n ? value : null
@@ -106,7 +107,7 @@ export async function POST(
     // Resolve benchmark for classification
     const job = await prisma.marketplaceJob.findUnique({
       where: { id: originalQuote.jobId },
-      select: { countryCode: true, categoryId: true },
+      select: { countryCode: true, categoryId: true, customerId: true },
     })
 
     let classification = 'INSUFFICIENT_DATA'
@@ -145,10 +146,18 @@ export async function POST(
       return NextResponse.json({ error: result.error }, { status: 409 })
     }
 
+    if (job?.customerId) {
+      await notifyQuoteRevised(originalQuote.jobId, job.customerId, user.name || 'A provider')
+    }
+
     // Persist line items if provided
     if (validatedLineItems.length > 0 && result.newQuoteId) {
       const { persistLineItems } = await import('@/lib/pricing/line-items')
       await persistLineItems(prisma, result.newQuoteId, validatedLineItems)
+    }
+
+    if (job?.customerId) {
+      void notifyQuoteRevised(originalQuote.jobId, job.customerId, user.name || 'A provider')
     }
 
     return NextResponse.json({

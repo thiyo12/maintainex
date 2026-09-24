@@ -58,7 +58,7 @@ export async function POST(
 
     if (quote) {
       const notificationUserId = await resolveProviderNotificationUser(quote.providerId, quote.providerType)
-      notifyEscrowDeposited(job.id, notificationUserId, job.title)
+      await notifyEscrowDeposited(job.id, notificationUserId, job.title)
     }
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error: any) {

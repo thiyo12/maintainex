@@ -1,6 +1,7 @@
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
+import { notifyUser } from '@/lib/notifications'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -91,6 +92,17 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     return record
   })
 
+  await notifyUser({
+    userId: workerUserId,
+    title: 'New company job assignment',
+    body: `You were assigned to "${job.title}". Open MaintainEX to review and accept it.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', assignmentId: assignment.id, jobId },
+    channelId: 'job_offers',
+    priority: 'high',
+  })
+
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -166,6 +178,17 @@ export async function reassignWorker(
     return newRecord
   })
 
+  await notifyUser({
+    userId: newWorkerUserId,
+    title: 'Company job reassigned to you',
+    body: `A company job has been reassigned to you. Open MaintainEX to review it.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', assignmentId: assignment.id, jobId },
+    channelId: 'job_offers',
+    priority: 'high',
+  })
+
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -182,6 +205,23 @@ export async function workerAcceptAssignment(
     where: { id: assignmentId },
     data: { status: 'ACCEPTED', acceptedAt: new Date() },
   })
+
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: assignment.companyId },
+    select: { userId: true },
+  })
+  if (company?.userId) {
+    await notifyUser({
+      userId: company.userId,
+      title: 'Worker accepted assignment',
+      body: 'Your assigned worker accepted the job.',
+      referenceType: 'JOB',
+      referenceId: assignment.jobId,
+      pushData: { type: 'COMPANY_ASSIGNMENT_ACCEPTED', assignmentId, jobId: assignment.jobId },
+      channelId: 'job_updates',
+      priority: 'high',
+    })
+  }
 
   return { success: true, assignmentId }
 }
@@ -218,6 +258,23 @@ export async function workerRejectAssignment(
       metadata: { reason },
     }, tx)
   })
+
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: assignment.companyId },
+    select: { userId: true },
+  })
+  if (company?.userId) {
+    await notifyUser({
+      userId: company.userId,
+      title: 'Worker declined assignment',
+      body: reason ? `Worker declined the job: ${reason.slice(0, 120)}` : 'Worker declined the assigned job.',
+      referenceType: 'JOB',
+      referenceId: assignment.jobId,
+      pushData: { type: 'COMPANY_ASSIGNMENT_REJECTED', assignmentId, jobId: assignment.jobId },
+      channelId: 'job_updates',
+      priority: 'high',
+    })
+  }
 
   return { success: true, assignmentId }
 }

@@ -279,6 +279,20 @@ export async function verifyJobPin(
           data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
         })
       }
+
+      if (verifierType === 'ASSIGNED_WORKER') {
+        await tx.companyJobAssignment.updateMany({
+          where: {
+            jobId,
+            workerUserId: actorId,
+            status: 'ACCEPTED',
+          },
+          data: {
+            status: 'IN_PROGRESS',
+            startedAt: now,
+          },
+        })
+      }
     }
 
     // 10. Emit security events
@@ -347,22 +361,33 @@ async function resolvePinVerifierTx(
   }
 
   if (acceptedQuote.providerType === 'COMPANY') {
+    const activeAssignment = await tx.companyJobAssignment.findFirst({
+      where: {
+        jobId,
+        companyId: acceptedQuote.providerId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      select: { id: true, workerUserId: true, status: true },
+    })
+
+    // Once a worker is dispatched, only that worker may perform job-site PIN
+    // actions. They must accept the assignment before arrival/work-start.
+    if (activeAssignment) {
+      if (
+        activeAssignment.workerUserId === userId &&
+        ['ACCEPTED', 'IN_PROGRESS'].includes(activeAssignment.status)
+      ) {
+        return 'ASSIGNED_WORKER'
+      }
+      return null
+    }
+
+    // No dispatched worker: allow the company owner to self-perform.
     const companyProfile = await tx.companyProfile.findFirst({
       where: { userId, id: acceptedQuote.providerId },
       select: { id: true },
     })
     if (companyProfile) return 'COMPANY'
-
-    const assignment = await tx.companyJobAssignment.findFirst({
-      where: {
-        jobId,
-        workerUserId: userId,
-        companyId: acceptedQuote.providerId,
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
-      },
-      select: { id: true },
-    })
-    if (assignment) return 'ASSIGNED_WORKER'
   }
 
   return null

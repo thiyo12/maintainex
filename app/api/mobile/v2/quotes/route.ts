@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
+    await notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
     return NextResponse.json({ quote: { ...quote, price: quote.price.toString() } }, { status: 201 })
   } catch (error) {
@@ -183,15 +183,16 @@ export async function GET(request: NextRequest) {
 
     const enriched = await Promise.all(
       quotes.map(async (q) => {
-        let provider: { id: string; name?: string | null; phone?: string | null; email?: string | null } | null = null
+        let provider: { id: string; name?: string | null; phone?: string | null; email?: string | null; chatUserId?: string | null } | null = null
         let rating = 0
         let completedJobs = 0
 
         if (q.providerType === 'INDIVIDUAL') {
-          provider = await prisma.user.findUnique({
+          const individual = await prisma.user.findUnique({
             where: { id: q.providerId },
             select: isCustomer ? { id: true, name: true, phone: true, email: true } : { id: true, name: true },
           })
+          provider = individual ? { ...individual, chatUserId: individual.id } : null
           const p = await prisma.taskerProfile.findUnique({
             where: { userId: q.providerId },
             select: { rating: true, completedJobs: true },
@@ -200,9 +201,11 @@ export async function GET(request: NextRequest) {
         } else {
           const companyProfile = await prisma.companyProfile.findUnique({
             where: { id: q.providerId },
-            select: { id: true, companyName: true, rating: true, completedProjects: true },
+            select: { id: true, userId: true, companyName: true, rating: true, completedProjects: true },
           })
-          provider = companyProfile ? { id: companyProfile.id, name: companyProfile.companyName } : { id: q.providerId }
+          provider = companyProfile
+            ? { id: companyProfile.id, name: companyProfile.companyName, chatUserId: companyProfile.userId }
+            : { id: q.providerId }
           if (companyProfile) { rating = companyProfile.rating; completedJobs = companyProfile.completedProjects }
         }
 

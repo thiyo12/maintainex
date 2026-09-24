@@ -1,13 +1,44 @@
 {
   "crons": [
-    { "path": "/api/cron/pricing-train", "schedule": "0 0 1 * *" },
-    { "path": "/api/cron/learn", "schedule": "0 2 1 * *" },
-    { "path": "/api/cron/matching-waves", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/job-response-escalation", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/offer-timeouts", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/escrow-release", "schedule": "0 * * * *" },
-    { "path": "/api/cron/reputation", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/daily-maintenance", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/re-engagement", "schedule": "0 9 * * *" }
+    {
+      "path": "/api/cron/pricing-train",
+      "schedule": "0 0 1 * *"
+    },
+    {
+      "path": "/api/cron/learn",
+      "schedule": "0 2 1 * *"
+    },
+    {
+      "path": "/api/cron/matching-waves",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/job-response-escalation",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/offer-timeouts",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/escrow-release",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/reputation",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/daily-maintenance",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/re-engagement",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-commission",
+      "schedule": "15 0 * * 1"
+    }
   ]
 }

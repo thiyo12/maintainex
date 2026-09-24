@@ -16,9 +16,26 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Latitude and longitude required' }, { status: 400 })
     }
 
-    await prisma.taskerProfile.update({
+    const parsedLatitude = Number(latitude)
+    const parsedLongitude = Number(longitude)
+    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude) || Math.abs(parsedLatitude) > 90 || Math.abs(parsedLongitude) > 180) {
+      return NextResponse.json({ error: 'Invalid latitude or longitude' }, { status: 400 })
+    }
+
+    await prisma.taskerProfile.upsert({
       where: { userId: user.id },
-      data: { latitude: parseFloat(latitude), longitude: parseFloat(longitude), locationUpdatedAt: new Date() },
+      update: { latitude: parsedLatitude, longitude: parsedLongitude, locationUpdatedAt: new Date() },
+      create: {
+        userId: user.id,
+        countryCode: user.countryCode || 'LK',
+        verificationStatus: 'PENDING',
+        isVerified: false,
+        isOnline: false,
+        skills: '[]',
+        latitude: parsedLatitude,
+        longitude: parsedLongitude,
+        locationUpdatedAt: new Date(),
+      },
     })
 
     return NextResponse.json({ success: true })

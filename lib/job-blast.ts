@@ -1,6 +1,5 @@
 import { prisma } from './prisma'
-import { createNotification } from './notifications'
-import { sendExpoPush } from './push'
+import { createNotification, notifyUser } from './notifications'
 import { findCandidates } from './matching'
 
 /**
@@ -88,20 +87,22 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       continue
     }
 
-    await createNotification({
+    const online = Boolean(profile.isOnline)
+    await notifyUser({
       userId,
-      title: pushTitle,
-      body: job.title,
+      title: online ? 'New job request nearby' : pushTitle,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (profile.user.pushToken) {
-      await sendExpoPush(profile.user.pushToken, pushTitle, pushBody, {
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-      })
-    }
+        alertMode: online ? 'ring' : 'standard',
+      },
+      channelId: 'job_offers',
+      priority: 'high',
+    })
     matched += 1
   }
 
@@ -110,21 +111,22 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     const company = companyById.get(companyId)
     if (!company) continue
 
-    await createNotification({
+    await notifyUser({
       userId: company.userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (company.user.pushToken) {
-      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
         companyId,
-      })
-    }
+        alertMode: 'ring',
+      },
+      channelId: 'job_offers',
+      priority: 'high',
+    })
     matched += 1
   }
 
