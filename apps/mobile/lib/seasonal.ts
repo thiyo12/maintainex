@@ -16,8 +16,23 @@ export interface SeasonalOffer {
   [key: string]: unknown
 }
 
-export function getCurrentSeason(): string {
+export function getCurrentSeason(countryCode: string = 'CA'): string {
+  const country = countryCode.toUpperCase()
+
+  // Sri Lanka is tropical; do not show misleading winter/spring labels.
+  // Country-specific seasonal campaigns can still be served as "general".
+  if (country === 'LK') return 'general'
+
   const month = new Date().getMonth()
+  const southernHemisphere = ['AU', 'NZ'].includes(country)
+
+  if (southernHemisphere) {
+    if (month >= 2 && month <= 4) return 'fall'
+    if (month >= 5 && month <= 7) return 'winter'
+    if (month >= 8 && month <= 10) return 'spring'
+    return 'summer'
+  }
+
   if (month >= 2 && month <= 4) return 'spring'
   if (month >= 5 && month <= 7) return 'summer'
   if (month >= 8 && month <= 10) return 'fall'
