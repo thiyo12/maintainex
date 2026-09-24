@@ -2,32 +2,36 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { getLocationName } from '@/lib/locations'
+import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
+import { resolveProviderActor } from '@/lib/domain/job-lifecycle'
 
-function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<string, any> {
-  if (_isOwner) return data
+function redactCustomer(data: Record<string, any>, isOwner: boolean): Record<string, any> {
+  if (isOwner) return data
   return { ...data, phone: null, email: null }
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
-    const user = await authenticateRequest(_request)
+    const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    const isOwner = job.customerId === user.id
-    let isQuoter = isOwner
-    if (!isOwner) {
-      const userQuote = await prisma.jobQuote.findFirst({
-        where: { jobId: job.id, providerId: user.id },
-      })
-      isQuoter = !!userQuote
-      if (job.status !== 'OPEN' && !isQuoter) {
+    const visibility = await resolveQuoteVisibility(prisma, {
+      userId: user.id,
+      jobId: job.id,
+    })
+    const isOwner = visibility.isCustomer
+    const isQuoter = isOwner || visibility.allowedQuoteIds.length > 0
+
+    if (!isOwner && job.status !== 'OPEN' && !isQuoter) {
+      const providerActor = await resolveProviderActor(job.id, user.id)
+      if (!providerActor) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
     }
@@ -38,26 +42,56 @@ export async function GET(
     })
 
     const quotes = isOwner
-      ? await prisma.jobQuote.findMany({ where: { jobId: job.id }, orderBy: { price: 'asc' } })
-      : isQuoter
-        ? await prisma.jobQuote.findMany({ where: { jobId: job.id, providerId: user.id }, orderBy: { price: 'asc' } })
+      ? await prisma.jobQuote.findMany({ where: { jobId: job.id, status: { not: 'SUPERSEDED' } }, orderBy: { price: 'asc' } })
+      : visibility.allowedQuoteIds.length > 0
+        ? await prisma.jobQuote.findMany({
+            where: { id: { in: visibility.allowedQuoteIds }, status: { not: 'SUPERSEDED' } },
+            orderBy: { price: 'asc' },
+          })
         : []
 
-    const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-    const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: job.id } })
+    const [escrow, workspace] = await Promise.all([
+      prisma.jobEscrow.findFirst({ where: { jobId: job.id } }),
+      prisma.jobWorkspace.findUnique({ where: { jobId: job.id } }),
+    ])
 
-    const acceptedQuote = quotes.find((q) => q.status === 'ACCEPTED')
-    let acceptedProvider = null
-    if (acceptedQuote) {
-      const providerUser = await prisma.user.findUnique({
+    const acceptedQuote = isOwner
+      ? await prisma.jobQuote.findFirst({ where: { jobId: job.id, status: 'ACCEPTED' } })
+      : quotes.find(q => q.status === 'ACCEPTED') || null
+
+    let acceptedProvider: any = null
+    if (acceptedQuote?.providerType === 'INDIVIDUAL') {
+      const [providerUser, providerProfile] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: acceptedQuote.providerId },
+          select: { id: true, name: true },
+        }),
+        prisma.taskerProfile.findUnique({
+          where: { userId: acceptedQuote.providerId },
+          select: { latitude: true, longitude: true, rating: true },
+        }),
+      ])
+      if (providerUser) {
+        acceptedProvider = {
+          ...providerUser,
+          chatUserId: providerUser.id,
+          ...providerProfile,
+        }
+      }
+    } else if (acceptedQuote?.providerType === 'COMPANY') {
+      const company = await prisma.companyProfile.findUnique({
         where: { id: acceptedQuote.providerId },
-        select: { id: true, name: true, phone: true },
+        select: { id: true, userId: true, companyName: true, rating: true, logo: true },
       })
-      const providerProfile = await prisma.taskerProfile.findUnique({
-        where: { userId: acceptedQuote.providerId },
-        select: { latitude: true, longitude: true, rating: true },
-      })
-      if (providerUser) acceptedProvider = { ...providerUser, ...providerProfile }
+      if (company) {
+        acceptedProvider = {
+          id: company.id,
+          name: company.companyName,
+          chatUserId: company.userId,
+          rating: company.rating,
+          profileImage: company.logo,
+        }
+      }
     }
 
     const [customerReviews, providerReviews] = await Promise.all([
@@ -68,33 +102,81 @@ export async function GET(
     const locationName = job.areaId ? getLocationName(job.areaId) : null
 
     const [jobCategory, templateJob, serviceTemplate] = await Promise.all([
-      job.categoryId ? prisma.jobCategory.findUnique({ where: { id: job.categoryId }, select: { name: true } }) : null,
-      job.templateJobId ? prisma.templateJob.findUnique({ where: { id: job.templateJobId }, select: { name: true } }) : null,
-      job.serviceTemplateId ? prisma.serviceTemplate.findUnique({ where: { id: job.serviceTemplateId }, select: { name: true } }) : null,
+      job.categoryId
+        ? prisma.jobCategory.findUnique({ where: { id: job.categoryId }, select: { name: true } })
+        : null,
+      job.templateJobId
+        ? prisma.templateJob.findUnique({ where: { id: job.templateJobId }, select: { name: true } })
+        : null,
+      job.serviceTemplateId
+        ? prisma.serviceTemplate.findUnique({ where: { id: job.serviceTemplateId }, select: { name: true } })
+        : null,
     ])
 
     const enrichedQuotes = await Promise.all(
-      quotes.map(async (q) => {
-        const provider = await prisma.user.findUnique({
-          where: { id: q.providerId },
-          select: { id: true, name: true, phone: true, email: true },
-        })
-        let providerRating = 0, completedJobs = 0
+      quotes.map(async q => {
+        let provider: any = null
+        let providerRating = 0
+        let completedJobs = 0
+
         if (q.providerType === 'INDIVIDUAL') {
-          const p = await prisma.taskerProfile.findUnique({
-            where: { userId: q.providerId },
-            select: { rating: true, completedJobs: true },
-          })
-          if (p) { providerRating = p.rating; completedJobs = p.completedJobs }
+          const [providerUser, profile] = await Promise.all([
+            prisma.user.findUnique({
+              where: { id: q.providerId },
+              select: { id: true, name: true },
+            }),
+            prisma.taskerProfile.findUnique({
+              where: { userId: q.providerId },
+              select: { rating: true, completedJobs: true, profileImage: true, isOnline: true, isVerified: true },
+            }),
+          ])
+          if (providerUser) {
+            provider = {
+              id: providerUser.id,
+              name: providerUser.name,
+              chatUserId: providerUser.id,
+              profileImage: profile?.profileImage || null,
+              isOnline: profile?.isOnline || false,
+              isVerified: profile?.isVerified || false,
+            }
+          }
+          if (profile) {
+            providerRating = profile.rating
+            completedJobs = profile.completedJobs
+          }
         } else {
-          const p = await prisma.companyProfile.findUnique({
-            where: { userId: q.providerId },
-            select: { rating: true, completedProjects: true },
+          const profile = await prisma.companyProfile.findUnique({
+            where: { id: q.providerId },
+            select: {
+              id: true,
+              userId: true,
+              companyName: true,
+              logo: true,
+              rating: true,
+              completedProjects: true,
+              isVerified: true,
+            },
           })
-          if (p) { providerRating = p.rating; completedJobs = p.completedProjects }
+          if (profile) {
+            provider = {
+              id: profile.id,
+              name: profile.companyName,
+              chatUserId: profile.userId,
+              profileImage: profile.logo,
+              isVerified: profile.isVerified,
+            }
+            providerRating = profile.rating
+            completedJobs = profile.completedProjects
+          }
         }
-        const isQuoteOwner = q.providerId === user.id
-        return { ...q, price: Number(q.price), provider: provider ? redactSensitive(provider, isQuoteOwner) : null, providerRating, completedJobs }
+
+        return {
+          ...q,
+          price: Number(q.price),
+          provider,
+          providerRating,
+          completedJobs,
+        }
       })
     )
 
@@ -108,13 +190,26 @@ export async function GET(
         categoryName: jobCategory?.name || null,
         templateJobName: templateJob?.name || null,
         serviceTemplateName: serviceTemplate?.name || null,
-        customer: customer ? redactSensitive(customer, isOwner) : null,
+        customer: customer ? redactCustomer(customer, isOwner) : null,
         locationName,
         quotes: enrichedQuotes,
-        escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null,
+        escrow: escrow
+          ? {
+              ...escrow,
+              amount: Number(escrow.amount),
+              serviceFee: Number(escrow.serviceFee),
+              totalAmount: Number(escrow.totalAmount),
+            }
+          : null,
         workspace: workspace || null,
         reviews: { customerReviews, providerReviews },
-        acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: Number(acceptedQuote.price), provider: acceptedProvider } : null,
+        acceptedQuote: acceptedQuote
+          ? {
+              ...acceptedQuote,
+              price: Number(acceptedQuote.price),
+              provider: acceptedProvider,
+            }
+          : null,
       },
     })
   } catch (error) {
@@ -151,15 +246,9 @@ export async function PATCH(
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
     const isOwner = job.customerId === user.id
-    let isAssignedProvider = false
-    if (!isOwner) {
-      const acceptedQuote = await prisma.jobQuote.findFirst({
-        where: { jobId: job.id, providerId: user.id, status: 'ACCEPTED' },
-      })
-      isAssignedProvider = !!acceptedQuote
-    }
+    const providerActor = isOwner ? null : await resolveProviderActor(job.id, user.id)
 
-    if (!isOwner && !isAssignedProvider) {
+    if (!isOwner && !providerActor) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -174,9 +263,7 @@ export async function PATCH(
     const data: Record<string, any> = {}
 
     for (const key of UPDATABLE_FIELDS) {
-      if (key in body) {
-        data[key] = body[key]
-      }
+      if (key in body) data[key] = body[key]
     }
 
     if (Object.keys(data).length === 0) {
@@ -185,6 +272,9 @@ export async function PATCH(
 
     if (data.preferredDate) {
       data.preferredDate = new Date(data.preferredDate)
+      if (Number.isNaN(data.preferredDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid preferredDate' }, { status: 400 })
+      }
     }
 
     const updated = await prisma.marketplaceJob.update({

@@ -165,8 +165,16 @@ export async function evaluateEligibility(
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
-  // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  // Gate: Provider availability for the requested day/time.
+  const availabilityGate = await evaluateProviderAvailability(client, providerType, providerId, job.jobId)
+  gates.push(availabilityGate)
+  if (!availabilityGate.passed) {
+    return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
+  }
+
+  // Gate: No blocking assignment conflict. Busy providers may still receive
+  // future work when it does not overlap their existing schedule.
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -184,7 +192,7 @@ export async function evaluateEligibility(
     preferredSkillsMatched,
     jurisdictionPassed: true,
     serviceAreaPassed,
-    availabilityPassed: true,
+    availabilityPassed: availabilityGate.passed,
   }
 }
 
@@ -456,43 +464,175 @@ async function evaluateServiceArea(
   return company?.user?.countryCode === jobCountryCode
 }
 
+async function evaluateProviderAvailability(
+  client: PrismaClient,
+  providerType: ProviderType,
+  providerId: string,
+  jobId: string,
+): Promise<EligibilityGate> {
+  const availability = await client.providerAvailability.findUnique({
+    where: { providerId },
+  })
+  if (!availability) {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'No restrictive availability schedule configured' }
+  }
+  if (!availability.isAvailable) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is currently unavailable' }
+  }
+
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { preferredDate: true },
+  })
+  const requested = job?.preferredDate || new Date()
+
+  if (
+    availability.vacationStart &&
+    availability.vacationEnd &&
+    requested >= availability.vacationStart &&
+    requested <= availability.vacationEnd
+  ) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is on vacation for the requested date' }
+  }
+
+  const dayFlags = [
+    availability.sunday,
+    availability.monday,
+    availability.tuesday,
+    availability.wednesday,
+    availability.thursday,
+    availability.friday,
+    availability.saturday,
+  ]
+  if (!dayFlags[requested.getDay()]) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is not available on the requested day' }
+  }
+
+  return {
+    gate: 'AVAILABILITY',
+    passed: true,
+    detail: `Available on requested day (${availability.startTime}-${availability.endTime})`,
+  }
+}
+
+function sameCalendarDay(a: Date, b: Date): boolean {
+  return a.getUTCFullYear() === b.getUTCFullYear()
+    && a.getUTCMonth() === b.getUTCMonth()
+    && a.getUTCDate() === b.getUTCDate()
+}
+
+function timeSlotsConflict(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return true
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
 async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  jobId: string,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const targetJob = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { preferredDate: true, preferredTimeSlot: true },
+  })
+  if (!targetJob) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: 'Job not found for conflict evaluation' }
+  }
 
-  let activeCount: number
   if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
-  } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
+    const acceptedQuotes = await client.jobQuote.findMany({
+      where: {
+        providerId,
+        providerType: 'INDIVIDUAL',
+        status: 'ACCEPTED',
+        jobId: { not: jobId },
+      },
+      select: { jobId: true },
+    })
+
+    const active = acceptedQuotes.length > 0
+      ? await client.marketplaceJob.findMany({
+          where: {
+            id: { in: acceptedQuotes.map(row => row.jobId) },
+            status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] },
+          },
+          select: {
+            id: true,
+            status: true,
+            preferredDate: true,
+            preferredTimeSlot: true,
+          },
+        })
+      : []
+
+    if (active.length === 0) {
+      return { gate: 'NO_CONFLICT', passed: true, detail: 'No active assignment conflict' }
+    }
+
+    if (!targetJob.preferredDate) {
+      const activelyWorking = active.some(row => row.status === 'IN_PROGRESS' || !row.preferredDate)
+      return activelyWorking
+        ? { gate: 'NO_CONFLICT', passed: false, reason: 'Provider is busy with an active job; choose a future time to request another quote' }
+        : { gate: 'NO_CONFLICT', passed: true, detail: 'Existing work is scheduled for a different time' }
+    }
+
+    const conflicting = active.some(row => {
+      if (!row.preferredDate) return row.status === 'IN_PROGRESS'
+      return sameCalendarDay(row.preferredDate, targetJob.preferredDate!)
+        && timeSlotsConflict(row.preferredTimeSlot, targetJob.preferredTimeSlot)
+    })
+
+    return conflicting
+      ? { gate: 'NO_CONFLICT', passed: false, reason: 'Provider already has work scheduled for this date/time' }
+      : { gate: 'NO_CONFLICT', passed: true, detail: 'Provider is busy elsewhere but free for the requested schedule' }
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  const activeMembers = await client.teamMember.count({
+    where: {
+      companyId: providerId,
+      status: 'ACTIVE',
+      userId: { not: null },
+      role: { in: ['COMPANY_OWNER', 'MANAGER', 'DISPATCHER', 'WORKER'] },
+    },
+  })
+  const capacity = Math.max(activeMembers, 1)
+
+  const assignments = await client.companyJobAssignment.findMany({
+    where: {
+      companyId: providerId,
+      status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      jobId: { not: jobId },
+    },
+    include: {
+      job: {
+        select: {
+          status: true,
+          preferredDate: true,
+          preferredTimeSlot: true,
+        },
+      },
+    },
+  })
+
+  if (!targetJob.preferredDate) {
+    const activeNow = assignments.filter(row =>
+      row.status === 'IN_PROGRESS' || row.job.status === 'IN_PROGRESS' || !row.job.preferredDate
+    ).length
+    return activeNow >= capacity
+      ? { gate: 'NO_CONFLICT', passed: false, reason: 'Company workforce is fully occupied right now; choose a future time' }
+      : { gate: 'NO_CONFLICT', passed: true, detail: `Company has free workforce capacity (${activeNow}/${capacity} busy)` }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  const sameSlotAssignments = assignments.filter(row =>
+    row.job.preferredDate &&
+    sameCalendarDay(row.job.preferredDate, targetJob.preferredDate!) &&
+    timeSlotsConflict(row.job.preferredTimeSlot, targetJob.preferredTimeSlot)
+  ).length
+
+  return sameSlotAssignments >= capacity
+    ? { gate: 'NO_CONFLICT', passed: false, reason: 'Company workforce is fully booked for the requested date/time' }
+    : { gate: 'NO_CONFLICT', passed: true, detail: `Company has schedule capacity (${sameSlotAssignments}/${capacity} assigned)` }
 }
 
 async function evaluateQualityFloor(
