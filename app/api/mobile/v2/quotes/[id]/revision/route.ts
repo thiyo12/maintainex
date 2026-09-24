@@ -6,6 +6,7 @@ import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
+import { notifyQuoteRevised } from '@/lib/notifications'
 
 function parsePositiveMinorUnits(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value > 0n ? value : null
@@ -149,6 +150,29 @@ export async function POST(
     if (validatedLineItems.length > 0 && result.newQuoteId) {
       const { persistLineItems } = await import('@/lib/pricing/line-items')
       await persistLineItems(prisma, result.newQuoteId, validatedLineItems)
+    }
+
+    if (job && result.newQuoteId) {
+      const jobOwner = await prisma.marketplaceJob.findUnique({
+        where: { id: originalQuote.jobId },
+        select: { customerId: true },
+      })
+      if (jobOwner) {
+        let providerName = user.name || 'Provider'
+        if (resolvedProviderType === 'COMPANY') {
+          const company = await prisma.companyProfile.findUnique({
+            where: { id: resolvedProviderId },
+            select: { companyName: true },
+          })
+          providerName = company?.companyName || providerName
+        }
+        await notifyQuoteRevised(
+          originalQuote.jobId,
+          jobOwner.customerId,
+          providerName,
+          `LKR ${serverTotalCents.toString()}`,
+        )
+      }
     }
 
     return NextResponse.json({
