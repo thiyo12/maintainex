@@ -279,6 +279,17 @@ export async function verifyJobPin(
           data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
         })
       }
+
+      if (verifierType === 'ASSIGNED_WORKER') {
+        await tx.companyJobAssignment.updateMany({
+          where: {
+            jobId,
+            workerUserId: actorId,
+            status: { in: ['ASSIGNED', 'ACCEPTED'] },
+          },
+          data: { status: 'IN_PROGRESS', startedAt: now },
+        })
+      }
     }
 
     // 10. Emit security events
