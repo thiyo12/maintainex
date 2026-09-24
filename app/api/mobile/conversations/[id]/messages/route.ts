@@ -125,17 +125,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const membership = await prisma.conversation.findFirst({
-      where: {
-        id,
-        participants: { some: { userId: user.id } },
-      },
-      select: { id: true },
-    })
-    if (!membership) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
-    }
-
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
@@ -145,14 +134,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       select: { id: true },
     })
     if (!participant) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
-    }
-
-    const membership = await prisma.conversationParticipant.findUnique({
-      where: { conversationId_userId: { conversationId: id, userId: user.id } },
-      select: { id: true },
-    })
-    if (!membership) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
