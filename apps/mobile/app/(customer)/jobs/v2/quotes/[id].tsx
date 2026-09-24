@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench } from 'phosphor-react-native'
+import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench, ChatCircleDots } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable'
 
@@ -17,6 +17,7 @@ import PressableScale from '../../../../../components/ui/PressableScale'
 import EmptyState from '../../../../../components/ui/EmptyState'
 import AnimatedEntry from '../../../../../components/ui/AnimatedEntry'
 import Skeleton from '../../../../../components/ui/Skeleton'
+import NewChatModal from '../../../../../components/chat/NewChatModal'
 
 const VALIDITY_MS = 2 * 60 * 60 * 1000
 
@@ -39,10 +40,10 @@ function useCountdown(target: number | null) {
 }
 
 function QuoteCardItem({
-  q, bestMatch, loading, onAccept, onViewProfile, onDismiss, colors, styles,
+  q, bestMatch, loading, onAccept, onViewProfile, onMessage, onDismiss, colors, styles,
 }: {
   q: V2Quote; bestMatch: boolean; loading: boolean; onAccept: () => void;
-  onViewProfile: () => void; onDismiss: () => void; colors: any; styles: any
+  onViewProfile: () => void; onMessage: () => void; onDismiss: () => void; colors: any; styles: any
 }) {
   const { t } = useTranslation()
   const provider = q.provider
@@ -105,7 +106,11 @@ function QuoteCardItem({
           <View style={styles.actions}>
             <TouchableOpacity style={styles.profileBtn} onPress={onViewProfile} activeOpacity={0.7}>
               <User size={16} color={colors.amber} weight="fill" />
-              <Text style={styles.profileBtnText}>{t('quotes.viewProfile')}</Text>
+              <Text style={styles.profileBtnText}>Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.messageBtn} onPress={onMessage} activeOpacity={0.7}>
+              <ChatCircleDots size={16} color={colors.ink} weight="fill" />
+              <Text style={styles.messageBtnText}>Message</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.acceptBtn, loading && { opacity: 0.6 }]} onPress={onAccept} disabled={loading} activeOpacity={0.7}>
               {loading ? <View style={styles.miniSpinner} /> : null}
@@ -131,6 +136,7 @@ export default function V2QuotesScreen() {
   const [actionLoading, setActionLoading] = useState('')
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [sortBy, setSortBy] = useState<SortKey>('recommended')
+  const [chatQuote, setChatQuote] = useState<V2Quote | null>(null)
 
   const loadData = useCallback(async () => {
     try {
@@ -256,7 +262,12 @@ export default function V2QuotesScreen() {
                   bestMatch={bestQuotes.has(q.id)}
                   loading={actionLoading === q.id}
                   onAccept={() => handleAccept(q.id)}
-                  onViewProfile={() => q.providerId ? router.push(`/(customer)/find/tasker-profile/${q.providerId}` as any) : undefined}
+                  onViewProfile={() => {
+                    if (q.providerType === 'INDIVIDUAL' && q.providerId) {
+                      router.push(`/(customer)/find/tasker-profile/${q.providerId}` as any)
+                    }
+                  }}
+                  onMessage={() => setChatQuote(q)}
                   onDismiss={() => setDismissed(prev => new Set(prev).add(q.id))}
                   colors={colors}
                   styles={styles}
@@ -269,6 +280,18 @@ export default function V2QuotesScreen() {
           )}
         </ScrollView>
       )}
+
+      <NewChatModal
+        visible={Boolean(chatQuote)}
+        onClose={() => setChatQuote(null)}
+        recipient={chatQuote ? {
+          id: String((chatQuote.provider as any)?.userId || chatQuote.providerId),
+          name: (chatQuote.provider as any)?.name || (chatQuote.providerType === 'COMPANY' ? 'Company' : 'Tasker'),
+        } : null}
+        jobId={id}
+        jobTitle={job?.title}
+        prefilled={chatQuote ? `Hi, I want to discuss your LKR ${chatQuote.price.toLocaleString()} quote before I confirm.` : undefined}
+      />
     </SafeAreaView>
   )
 }
@@ -335,7 +358,13 @@ const makeStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border,
     backgroundColor: '#2E2E2E',
   },
-  profileBtnText: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.amber },
+  profileBtnText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.amber },
+  messageBtn: {
+    flex: 1.05, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5,
+    paddingVertical: 14, borderRadius: 16, backgroundColor: colors.surface,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  messageBtnText: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.ink },
   acceptBtn: {
     flex: 1.4, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.amber, paddingVertical: 14, borderRadius: 16,
