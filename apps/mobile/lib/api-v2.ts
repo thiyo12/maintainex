@@ -193,6 +193,40 @@ export const v2Quotes = {
     ),
 }
 
+
+export interface V2WorkerAssignment {
+  id: string
+  companyId: string
+  companyName?: string | null
+  status: 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
+  assignedAt: string
+  acceptedAt?: string | null
+  startedAt?: string | null
+  job: {
+    id: string
+    title: string
+    status: string
+    preferredDate?: string | null
+    preferredTimeSlot?: string | null
+    addressStreet?: string | null
+    budgetAmount?: number | null
+    countryCode?: string | null
+  }
+}
+
+export const v2WorkerAssignments = {
+  list: () =>
+    v2Request<{ assignments: V2WorkerAssignment[] }>('/api/mobile/worker/assignments'),
+  action: (assignmentId: string, action: 'accept' | 'reject', reason?: string) =>
+    v2Request<{ success: boolean; assignmentId: string }>(
+      `/api/mobile/company/assignments/${assignmentId}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ action, reason }),
+      },
+    ),
+}
+
 export const v2JobActions = {
   update: async (jobId: string, data: any) => {
     const response = await v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(data) })
