@@ -87,7 +87,7 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'quotes',
+    pushChannelId: 'job_updates',
     pushData: { type: 'QUOTE_SUBMITTED', jobId },
   })
 }
@@ -100,7 +100,7 @@ export async function notifyQuoteRevised(jobId: string, customerId: string, prov
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'quotes',
+    pushChannelId: 'job_updates',
     pushData: { type: 'QUOTE_REVISED', jobId },
   })
 }
@@ -115,7 +115,7 @@ export async function notifyQuoteAccepted(jobId: string, providerId: string, job
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'QUOTE_ACCEPTED', jobId },
   })
 }
@@ -130,7 +130,7 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'ESCROW_DEPOSITED', jobId },
   })
 }
@@ -145,7 +145,7 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'JOB_COMPLETED', jobId },
   })
 }
@@ -160,7 +160,7 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'COMPLETION_REQUESTED', jobId },
   })
 }
@@ -175,7 +175,7 @@ export async function notifyJobStarted(jobId: string, customerId: string, jobTit
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'JOB_STARTED', jobId },
   })
 }
@@ -198,7 +198,7 @@ export async function notifyPaymentReleased(
     params: { amount: formattedAmount, jobTitle, countryCode },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'payments',
     pushData: { type: 'PAYMENT_RELEASED', jobId },
   })
 }
@@ -212,7 +212,7 @@ export async function notifyEscrowTimeout(jobId: string, providerId: string) {
     bodyKey: 'notification.escrow_timeout.body',
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'ESCROW_TIMEOUT', jobId },
   })
 }
@@ -223,7 +223,7 @@ export async function notifyPayoutProcessed(userId: string, title: string, body:
     title,
     body,
     referenceType: 'WALLET',
-    pushChannelId: 'job-updates',
+    pushChannelId: 'payments',
     pushData: { type: 'PAYOUT_PROCESSED' },
   })
 }
@@ -241,7 +241,7 @@ export async function notifyJobCancelled(
     params: { jobTitle, cancelledBy },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'JOB_CANCELLED', jobId },
   })
 }
@@ -256,7 +256,7 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    pushChannelId: 'job-updates',
+    pushChannelId: 'job_updates',
     pushData: { type: 'JOB_ESCALATED', jobId },
   })
 }
@@ -278,7 +278,7 @@ export async function notifyTaskerAssigned(
       params: { taskerName, jobTitle },
       referenceType: 'JOB',
       referenceId: jobId,
-      pushChannelId: 'job-updates',
+      pushChannelId: 'job_updates',
       pushData: { type: 'TASKER_ASSIGNED', jobId },
     }),
     createNotification({
@@ -290,7 +290,7 @@ export async function notifyTaskerAssigned(
       params: { jobTitle },
       referenceType: 'JOB',
       referenceId: jobId,
-      pushChannelId: 'job-alerts',
+      pushChannelId: 'job_offers',
       pushData: { type: 'COMPANY_ASSIGNMENT', jobId, alertMode: 'ring' },
     }),
   ])
