@@ -1,6 +1,5 @@
 import { prisma } from './prisma'
 import { createNotification } from './notifications'
-import { sendExpoPush } from './push'
 import { findCandidates } from './matching'
 
 /**
@@ -91,17 +90,18 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     await createNotification({
       userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (profile.user.pushToken) {
-      await sendExpoPush(profile.user.pushToken, pushTitle, pushBody, {
+      pushPriority: 'high',
+      pushChannelId: 'job-offers',
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-      })
-    }
+        offerMode: profile.isOnline ? 'LIVE' : 'OFFLINE',
+      },
+    })
     matched += 1
   }
 
@@ -113,18 +113,19 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     await createNotification({
       userId: company.userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (company.user.pushToken) {
-      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
+      pushPriority: 'high',
+      pushChannelId: 'job-offers',
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
         companyId,
-      })
-    }
+        offerMode: 'OFFLINE',
+      },
+    })
     matched += 1
   }
 
