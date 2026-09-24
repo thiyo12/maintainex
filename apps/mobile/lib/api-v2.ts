@@ -242,15 +242,15 @@ export const v2JobActions = {
   getCustomerStatus: (jobId: string) =>
     v2Request<{ status: any }>(`/api/mobile/v2/jobs/${jobId}/customer-status`),
   requestCancelCode: (jobId: string, reason?: string) =>
-    v2Request<{ success: boolean; channel: string; testMode?: boolean }>(
+    v2Request<{ success: boolean; expiresInSeconds: number; testMode?: boolean }>(
       `/api/mobile/v2/jobs/${jobId}/cancel`,
       {
         method: 'POST',
-        body: JSON.stringify({ action: 'REQUEST_CODE', reason }),
+        body: JSON.stringify({ action: 'REQUEST_OTP', reason }),
       },
     ),
   confirmCancel: (jobId: string, code: string, reason?: string) =>
-    v2Request<{ success: boolean; status: string; refunded: boolean }>(
+    v2Request<{ success: boolean; status: string; refundAmount: number }>(
       `/api/mobile/v2/jobs/${jobId}/cancel`,
       {
         method: 'POST',

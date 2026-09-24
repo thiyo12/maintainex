@@ -55,8 +55,8 @@ export default function CancelJobWithOtp({
       const result = await v2JobActions.confirmCancel(jobId, code, reason.trim())
       Alert.alert(
         'Job cancelled',
-        result.refunded
-          ? 'The protected payment has been returned to the customer wallet.'
+        result.refundAmount > 0
+          ? `The protected payment was returned to the customer wallet (LKR ${result.refundAmount.toLocaleString()}).`
           : 'The job was cancelled before work started.',
         [{ text: 'Done', onPress: onDone }],
       )
