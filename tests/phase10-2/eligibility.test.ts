@@ -248,7 +248,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
             id: 'owner-1', isSuspended: false, isBanned: false,
           }),
         },
-        $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+        $queryRaw: vi.fn().mockResolvedValue([]),
       })
       const input = {
         providerType: 'COMPANY' as ProviderType,
