@@ -59,6 +59,10 @@ const SEASON_COLORS: Record<string, { bg: string; text: string }> = {
   inter_monsoon: { bg: '#4F46E5', text: '#FFFFFF' },
   northeast_monsoon: { bg: '#0EA5E9', text: '#FFFFFF' },
   general: { bg: '#8B5CF6', text: '#FFFFFF' },
+  southwest_monsoon: { bg: '#2563EB', text: '#FFFFFF' },
+  northeast_monsoon: { bg: '#1D4ED8', text: '#FFFFFF' },
+  inter_monsoon: { bg: '#475569', text: '#FFFFFF' },
+  dry: { bg: '#F59E0B', text: '#111111' },
 }
 
 export function getSeasonColors(season: string) {
