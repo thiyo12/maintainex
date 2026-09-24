@@ -586,7 +586,7 @@ async function evaluateConflict(
 
 function schedulesOverlap(
   incoming: { preferredDate: Date | null; preferredTimeSlot: string | null; estimatedDuration: number | null } | null,
-  existing: { preferredDate: Date | null; preferredTimeSlot: string | null; estimatedDuration: number | null },
+  existing: { preferredDate: Date | null; preferredTimeSlot: string | null; estimatedDuration: number | null; status: string },
 ): boolean {
   if (!incoming?.preferredDate) return true
   if (!existing.preferredDate) {
