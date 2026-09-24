@@ -43,8 +43,8 @@ function routeFor(data: Record<string, any>, role?: string) {
     return `/(tasker)/jobs/v2/quote/${jobId}`
   }
 
-  if (type === 'COMPANY_ASSIGNMENT' && jobId) {
-    return `/(tasker)/jobs/v2/manage/${jobId}`
+  if (type === 'COMPANY_ASSIGNMENT' && data?.assignmentId) {
+    return `/(tasker)/company-assignments/${data.assignmentId}`
   }
 
   if (jobId && role === 'CUSTOMER') return `/(customer)/jobs/v2/${jobId}`
