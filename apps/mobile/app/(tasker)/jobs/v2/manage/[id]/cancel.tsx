@@ -7,7 +7,7 @@ import { v3 } from '@/theme/v3/tokens'
 
 export default function CancelJobScreen() {
   const router = useRouter()
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, reason } = useLocalSearchParams<{ id: string; reason?: string }>()
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -23,7 +23,7 @@ export default function CancelJobScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <CancelJobWithOtp jobId={id} onDone={() => router.replace('/' as any)} />
+        <CancelJobWithOtp jobId={id} initialReason={reason || ''} onDone={() => router.replace('/' as any)} />
       </ScrollView>
     </SafeAreaView>
   )
