@@ -2,10 +2,11 @@ import { prisma } from './prisma'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
-export type ExpoPushOptions = {
-  channelId?: string
-  priority?: 'default' | 'normal' | 'high'
+export interface ExpoPushOptions {
   sound?: 'default' | null
+  priority?: 'default' | 'normal' | 'high'
+  channelId?: string
+  ttl?: number
 }
 
 export async function sendExpoPush(
@@ -21,28 +22,24 @@ export async function sendExpoPush(
       title,
       body,
       data,
+      sound: options.sound === undefined ? 'default' : options.sound,
       priority: options.priority || 'high',
     }
-
-    if (options.sound !== null) {
-      payload.sound = options.sound || 'default'
-    }
-    if (options.channelId) {
-      payload.channelId = options.channelId
-    }
+    if (options.channelId) payload.channelId = options.channelId
+    if (options.ttl != null) payload.ttl = options.ttl
 
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify([payload]),
     })
-
     if (!res.ok) return
 
     const result = await res.json()
     const ticket = result?.data?.[0]
     if (ticket?.status === 'error') {
-      if (/DeviceNotRegistered|InvalidTokens|MessageTooBig/.test(ticket.details?.error || '')) {
+      const errorCode = ticket.details?.error || ''
+      if (/DeviceNotRegistered|InvalidTokens|MessageTooBig/.test(errorCode)) {
         await prisma.user.updateMany({
           where: { pushToken: to },
           data: { pushToken: null },
