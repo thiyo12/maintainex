@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       members: members.map(m => ({
         id: m.id,
+        userId: m.userId,
         name: m.name,
         role: m.role,
         skills: safeParseJsonArr(m.skills),
