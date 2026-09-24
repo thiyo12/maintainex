@@ -98,11 +98,6 @@ export default function V2JobDetailScreen() {
 
   useEffect(() => { loadJob() }, [id])
 
-  const canCancelWithin30 = () => {
-    if (!job?.createdAt) return false
-    return (Date.now() - new Date(job.createdAt).getTime()) < 30 * 60 * 1000
-  }
-
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
@@ -112,13 +107,25 @@ export default function V2JobDetailScreen() {
   const handleBargain = async () => {
     if (!bargainModal || !bargainPrice) return
     const price = parseInt(bargainPrice, 10)
-    if (!price || price < 100) { Alert.alert(t('common.error'), t('errors.enterValidPrice')); return }
-    setActionLoading('bargain')
-    try {
-      await v2JobActions.complete(id, 'CANCEL')
-      setBargainModal(null); setBargainPrice(''); loadJob()
-    } catch { setBargainModal(null); setBargainPrice(''); loadJob()
-    } finally { setActionLoading('') }
+    if (!price || price < 100) {
+      Alert.alert(t('common.error'), t('errors.enterValidPrice'))
+      return
+    }
+
+    const chatUserId = bargainModal.provider?.chatUserId
+      || (bargainModal.providerType === 'INDIVIDUAL' ? bargainModal.providerId : null)
+
+    if (!chatUserId) {
+      Alert.alert('Messaging unavailable', 'This provider cannot receive negotiation messages right now.')
+      return
+    }
+
+    setMsgPrefill(
+      `Hi ${bargainModal.provider?.name || ''}, would you accept LKR ${price.toLocaleString()} for this job? If we agree, please update your official MaintainEX quote so I can accept the final price.`
+    )
+    setMsgRecipient({ id: chatUserId, name: bargainModal.provider?.name || 'Provider' })
+    setBargainModal(null)
+    setBargainPrice('')
   }
 
   const cancelReasons = [
@@ -131,11 +138,10 @@ export default function V2JobDetailScreen() {
 
   const handleCancelWithReason = async () => {
     setCancelReasonVisible(false)
-    setActionLoading('cancel')
-    removedJobs.add(id); emit('jobsChanged', id)
-    try { await v2JobActions.complete(id, 'CANCEL', cancelReason || ''); router.back() }
-    catch { router.back() }
-    finally { setActionLoading('') }
+    router.push({
+      pathname: '/(customer)/jobs/v2/[id]/cancel',
+      params: { id, reason: cancelReason || '' },
+    } as any)
   }
 
   const handleDepositEscrow = async () => {
@@ -185,6 +191,13 @@ export default function V2JobDetailScreen() {
 
   if (loading) return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
   if (!job) return null
+
+  const canOtpCancel =
+    job.status === 'OPEN'
+    || (
+      ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)
+      && (!workspace || workspace.progressStatus === 'ACCEPTED')
+    )
 
   const statusColor = (status: string) => {
     const m: Record<string, string> = { OPEN: colors.amber, IN_PROGRESS: '#3B82F6', QUOTE_ACCEPTED: '#8B5CF6', ESCROW_DEPOSITED: '#06B6D4', COMPLETED: colors.success, CANCELLED: colors.error, DISPUTED: colors.error }
@@ -250,11 +263,11 @@ export default function V2JobDetailScreen() {
         </View>
 
         {/* ─── Cancel Button ─── */}
-        {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED') && (
+        {canOtpCancel && (
           <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
-              <Text style={styles.cancelBtnText}>{canCancelWithin30() ? 'Cancel this mission' : 'Request cancellation'}</Text>
+              <Text style={styles.cancelBtnText}>Cancel before work starts · OTP required</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -403,12 +416,15 @@ export default function V2JobDetailScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : null}
-                {q.provider?.id && (
+                {(q.provider?.chatUserId || (q.providerType === 'INDIVIDUAL' && q.providerId)) && (
                   <TouchableOpacity
                     style={styles.quoteMessageRow}
                     onPress={() => {
                       setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
-                      setMsgRecipient({ id: q.provider.id, name: q.provider.name || 'Provider' })
+                      setMsgRecipient({
+                        id: q.provider?.chatUserId || q.providerId,
+                        name: q.provider?.name || 'Provider',
+                      })
                     }}
                   >
                     <ChatCircle size={14} color={colors.amber} weight="fill" />
