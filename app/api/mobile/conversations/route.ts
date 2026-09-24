@@ -2,6 +2,51 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
+async function getJobChatParticipantUserIds(jobId: string): Promise<Set<string> | null> {
+  const job = await prisma.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { customerId: true },
+  })
+  if (!job) return null
+
+  const [quotes, assignments] = await Promise.all([
+    prisma.jobQuote.findMany({
+      where: {
+        jobId,
+        status: { in: ['PENDING', 'ACCEPTED', 'SUPERSEDED'] },
+      },
+      select: { providerId: true, providerType: true },
+    }),
+    prisma.companyJobAssignment.findMany({
+      where: {
+        jobId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+      },
+      select: { workerUserId: true },
+    }),
+  ])
+
+  const ids = new Set<string>([job.customerId])
+  const companyIds = quotes
+    .filter(quote => quote.providerType === 'COMPANY')
+    .map(quote => quote.providerId)
+
+  for (const quote of quotes) {
+    if (quote.providerType === 'INDIVIDUAL') ids.add(quote.providerId)
+  }
+
+  if (companyIds.length > 0) {
+    const companies = await prisma.companyProfile.findMany({
+      where: { id: { in: companyIds } },
+      select: { userId: true },
+    })
+    companies.forEach(company => ids.add(company.userId))
+  }
+
+  assignments.forEach(assignment => ids.add(assignment.workerUserId))
+  return ids
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -75,8 +120,43 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const { participantId, jobId, initialMessage } = await request.json()
-    if (!participantId) {
+    if (!participantId || typeof participantId !== 'string') {
       return NextResponse.json({ error: 'participantId required' }, { status: 400 })
+    }
+    if (participantId === user.id) {
+      return NextResponse.json({ error: 'Cannot create a conversation with yourself' }, { status: 400 })
+    }
+    if (initialMessage && (typeof initialMessage !== 'string' || initialMessage.trim().length > 1000)) {
+      return NextResponse.json({ error: 'Initial message must be 1000 characters or fewer' }, { status: 400 })
+    }
+
+    const participant = await prisma.user.findUnique({
+      where: { id: participantId },
+      select: { id: true, isActive: true, isSuspended: true, isBanned: true },
+    })
+    if (!participant || !participant.isActive || participant.isSuspended || participant.isBanned) {
+      return NextResponse.json({ error: 'Participant unavailable' }, { status: 404 })
+    }
+
+    if (jobId) {
+      const allowed = await getJobChatParticipantUserIds(jobId)
+      if (!allowed) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      if (!allowed.has(user.id) || !allowed.has(participantId)) {
+        return NextResponse.json({ error: 'Job conversation is limited to job participants' }, { status: 403 })
+      }
+    }
+
+    const dayStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const conversationsCreatedToday = await prisma.conversation.count({
+      where: {
+        createdAt: { gte: dayStart },
+        participants: { some: { userId: user.id } },
+      },
+    })
+    if (conversationsCreatedToday >= 20) {
+      return NextResponse.json({ error: 'Conversation limit reached. Please try again later.' }, { status: 429 })
     }
 
     // Dedup scoped to job + the same two participants
