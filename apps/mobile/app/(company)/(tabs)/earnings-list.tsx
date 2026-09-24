@@ -20,6 +20,7 @@ type WeeklyStatement = {
   commissionRate: number
   commissionWithheld: number
   netPayout: number
+  currency: string
   amountDue: number
   reconciliationStatus: string
 }
@@ -55,6 +56,7 @@ export default function CompanyEarnings() {
   const commission = Number(data?.marketplaceCommissionWithheld || 0)
   const net = Number(data?.marketplaceNetPayout || 0)
   const rate = Number(data?.commissionRate ?? 10)
+  const currency = String(data?.currency || 'LKR')
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -71,15 +73,15 @@ export default function CompanyEarnings() {
         <View style={styles.hero}>
           <View style={styles.heroIcon}><Wallet size={22} color={v3.colors.ink} weight="fill" /></View>
           <Text style={styles.heroLabel}>NET MARKETPLACE PAYOUT</Text>
-          <Text style={styles.heroValue}>LKR {net.toLocaleString()}</Text>
+          <Text style={styles.heroValue}>{currency} {net.toLocaleString()}</Text>
           <Text style={styles.heroText}>
             MaintainEX withholds the {rate}% company commission automatically when each completed job is released.
           </Text>
         </View>
 
         <View style={styles.metrics}>
-          <Metric label="GROSS JOB VALUE" value={`LKR ${gross.toLocaleString()}`} />
-          <Metric label="COMMISSION WITHHELD" value={`LKR ${commission.toLocaleString()}`} />
+          <Metric label="GROSS JOB VALUE" value={`${currency} ${gross.toLocaleString()}`} />
+          <Metric label="COMMISSION WITHHELD" value={`${currency} ${commission.toLocaleString()}`} />
         </View>
 
         <View style={styles.policyCard}>
@@ -118,9 +120,9 @@ export default function CompanyEarnings() {
             </View>
 
             <View style={styles.line} />
-            <MoneyRow label="Gross" value={statement.grossAmount} />
-            <MoneyRow label={`MaintainEX commission (${statement.commissionRate}%)`} value={-statement.commissionWithheld} />
-            <MoneyRow label="Net payout" value={statement.netPayout} strong last />
+            <MoneyRow label="Gross" value={statement.grossAmount} currency={statement.currency || currency} />
+            <MoneyRow label={`MaintainEX commission (${statement.commissionRate}%)`} value={-statement.commissionWithheld} currency={statement.currency || currency} />
+            <MoneyRow label="Net payout" value={statement.netPayout} currency={statement.currency || currency} strong last />
           </View>
         )) : (
           <View style={styles.empty}>
@@ -144,13 +146,13 @@ function Metric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function MoneyRow({ label, value, strong = false, last = false }: { label: string; value: number; strong?: boolean; last?: boolean }) {
+function MoneyRow({ label, value, currency, strong = false, last = false }: { label: string; value: number; currency: string; strong?: boolean; last?: boolean }) {
   const sign = value < 0 ? '−' : ''
   return (
     <View style={[styles.moneyRow, !last && styles.moneyBorder]}>
       <Text style={[styles.moneyLabel, strong && styles.moneyStrong]}>{label}</Text>
       <Text style={[styles.moneyValue, strong && styles.moneyValueStrong]}>
-        {sign}LKR {Math.abs(value).toLocaleString()}
+        {sign}{currency} {Math.abs(value).toLocaleString()}
       </Text>
     </View>
   )
