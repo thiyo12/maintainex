@@ -191,6 +191,7 @@ export async function POST(
           where: { jobId, status: { in: ['PENDING', 'ACCEPTED'] } },
           data: { status: 'WITHDRAWN' },
         })
+        await tx.jobWorkspace.deleteMany({ where: { jobId } })
       })
     }
 
