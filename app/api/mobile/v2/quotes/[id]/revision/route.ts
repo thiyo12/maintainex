@@ -7,6 +7,7 @@ import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
 import { notifyQuoteRevised } from '@/lib/notifications'
+import { notifyQuoteRevised } from '@/lib/notifications'
 
 function parsePositiveMinorUnits(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value > 0n ? value : null
@@ -154,6 +155,10 @@ export async function POST(
     if (validatedLineItems.length > 0 && result.newQuoteId) {
       const { persistLineItems } = await import('@/lib/pricing/line-items')
       await persistLineItems(prisma, result.newQuoteId, validatedLineItems)
+    }
+
+    if (job?.customerId) {
+      void notifyQuoteRevised(originalQuote.jobId, job.customerId, user.name || 'A provider')
     }
 
     return NextResponse.json({
