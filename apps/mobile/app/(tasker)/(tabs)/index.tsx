@@ -146,7 +146,12 @@ export default function TaskerDashboard() {
             content: {
               title: t('tasker.newJobAlert'),
               body: (job.title || '') + ' — LKR ' + Number(job.budgetAmount || 0).toLocaleString(),
-              data: { jobId: job.id, screen: '/(tasker)/jobs/v2/quote/[id]' },
+              data: {
+                type: 'NEW_JOB',
+                jobId: job.id,
+                screen: '/(tasker)/jobs/v2/quote/[id]',
+                alertMode: 'ring',
+              },
               sound: true,
             },
             trigger: null,
