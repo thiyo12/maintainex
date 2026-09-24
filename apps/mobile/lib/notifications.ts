@@ -43,8 +43,16 @@ export async function registerForPushNotifications() {
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
+        name: 'General',
+        importance: Notifications.AndroidImportance.DEFAULT,
+      })
+      await Notifications.setNotificationChannelAsync('job-offers', {
+        name: 'Job offers',
+        description: 'High-priority alerts for matching work opportunities',
         importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 120, 250, 120, 400],
+        sound: 'default',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       })
     }
   } catch (_e) {
