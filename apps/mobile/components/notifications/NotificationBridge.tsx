@@ -81,7 +81,7 @@ export default function NotificationBridge() {
         const content = notification?.request?.content
         const data = (content?.data || {}) as Record<string, any>
         if (data?.type !== 'NEW_JOB') return
-        if (data?.alertMode !== 'ring') return
+        if (!['ring', 'urgent_foreground'].includes(String(data?.alertMode || ''))) return
 
         if (timerRef.current) clearTimeout(timerRef.current)
         setOffer({
@@ -90,7 +90,7 @@ export default function NotificationBridge() {
           data,
         })
 
-        Vibration.vibrate([0, 250, 140, 250])
+        Vibration.vibrate([0, 300, 140, 300, 140, 600])
         timerRef.current = setTimeout(() => setOffer(null), 45_000)
       },
       response => {

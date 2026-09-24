@@ -6,6 +6,7 @@ import { Bell, Briefcase, ChatCircle, Heart, MagnifyingGlass, MapPin, Microphone
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '../../../lib/auth'
+import { useCountry } from '../../../lib/country'
 import { v2Jobs, v2Quotes, v2Match } from '../../../lib/api-v2'
 import { taskers, notifications, realEstate } from '../../../lib/api'
 import { translateJobStatus } from '../../../lib/i18n'
@@ -26,6 +27,7 @@ const money = (value: unknown) => {
 export default function CustomerHome() {
   const router = useRouter()
   const { user } = useAuth()
+  const { selectedCountry } = useCountry()
   const { t } = useTranslation()
   const { newJobId } = useLocalSearchParams<{ newJobId?: string }>()
 
@@ -40,6 +42,7 @@ export default function CustomerHome() {
   const [properties, setProperties] = useState<any[]>([])
 
   const userId = user?.id
+  const countryCode = selectedCountry?.code || (user as any)?.countryCode || 'LK'
 
   const ownJobs = useMemo(
     () => myJobs.filter(j => !removedJobs.has(j.id) && (j.customerId === userId || (newJobId && j.id === newJobId))),
@@ -59,13 +62,13 @@ export default function CustomerHome() {
   const loadHomeCategories = useCallback(async () => {
     setHomeCategories(CATEGORY_FALLBACK)
     try {
-      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/job-categories`)
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/job-categories?country=${encodeURIComponent(countryCode)}`)
       if (!res.ok) return
       const data = await res.json()
       const list = Array.isArray(data) ? data : data.categories || data.data || []
       if (list.length > 0) setHomeCategories(list)
     } catch {}
-  }, [])
+  }, [countryCode])
 
   const loadProperties = useCallback(async () => {
     try {
