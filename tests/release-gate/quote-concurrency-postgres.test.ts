@@ -1,11 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 
+const isDB = !!process.env.DATABASE_URL
 const prisma = new PrismaClient()
 const jobId = 'release-gate-quote-race-job'
 const providerId = 'release-gate-quote-race-provider'
 
-describe('Release gate — quote concurrency', () => {
+describe.skipIf(!isDB)('Release gate — quote concurrency', () => {
   beforeEach(async () => {
     await prisma.jobQuote.deleteMany({ where: { jobId, providerId } })
   })
