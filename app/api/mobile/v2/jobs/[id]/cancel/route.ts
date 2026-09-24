@@ -6,7 +6,7 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { sendOtpSms } from '@/lib/sms'
 import { sendOtpEmail } from '@/lib/email'
 import { isSyntheticCertAccount, isTestOtpAllowed } from '@/lib/test-cert'
-import { checkOtpSendLimit, checkOtpVerifyLimit } from '@/lib/rate-limit-db'
+import { checkOtpSendLimit } from '@/lib/rate-limit-db'
 import { cancelJobBeforeWorkStart, resolveProviderActor, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyJobCancelled } from '@/lib/notifications'
 
@@ -140,6 +140,7 @@ export async function POST(
         success: true,
         testMode: synthetic,
         channel: synthetic ? 'test' : (user.phone ? 'sms' : 'email'),
+        expiresInSeconds: 300,
       })
     }
 
@@ -150,11 +151,6 @@ export async function POST(
     const code = typeof body.code === 'string' ? body.code.trim() : ''
     if (!/^\d{6}$/.test(code)) {
       return NextResponse.json({ error: 'A valid 6-digit code is required' }, { status: 400 })
-    }
-
-    const verifyLimit = await checkOtpVerifyLimit(user.id)
-    if (!verifyLimit.allowed) {
-      return NextResponse.json({ error: verifyLimit.reason }, { status: 429 })
     }
 
     const otp = await prisma.oTP.findFirst({
