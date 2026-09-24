@@ -214,8 +214,8 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
 
 export async function notifyTaskerAssigned(jobId: string, customerId: string, taskerId: string, taskerName: string, jobTitle: string) {
   return Promise.all([
-    createNotification({
-      userId: customerId,
+    notifyUser({
+      userId: customerId:
       title: 'Tasker Assigned',
       body: `${taskerName} has been assigned to your job "${jobTitle}". They will contact you shortly.`,
       titleKey: 'notification.tasker_assigned.title',
@@ -224,7 +224,7 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
       referenceType: 'JOB',
       referenceId: jobId,
     }),
-    createNotification({
+    notifyUser({
       userId: taskerId,
       title: 'New Assignment',
       body: `Admin assigned you to "${jobTitle}". Please review the job details and submit a quote.`,
