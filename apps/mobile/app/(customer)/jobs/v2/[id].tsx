@@ -73,10 +73,8 @@ export default function V2JobDetailScreen() {
   const [addressBuilding, setAddressBuilding] = useState('')
   const [addressApartment, setAddressApartment] = useState('')
   const [addressLandmark, setAddressLandmark] = useState('')
-  const [bargainModal, setBargainModal] = useState<V2Quote | null>(null)
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
   const [msgPrefill, setMsgPrefill] = useState('')
-  const [bargainPrice, setBargainPrice] = useState('')
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -98,27 +96,10 @@ export default function V2JobDetailScreen() {
 
   useEffect(() => { loadJob() }, [id])
 
-  const canCancelWithin30 = () => {
-    if (!job?.createdAt) return false
-    return (Date.now() - new Date(job.createdAt).getTime()) < 30 * 60 * 1000
-  }
-
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
     router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), quoteId } })
-  }
-
-  const handleBargain = async () => {
-    if (!bargainModal || !bargainPrice) return
-    const price = parseInt(bargainPrice, 10)
-    if (!price || price < 100) { Alert.alert(t('common.error'), t('errors.enterValidPrice')); return }
-    setActionLoading('bargain')
-    try {
-      await v2JobActions.complete(id, 'CANCEL')
-      setBargainModal(null); setBargainPrice(''); loadJob()
-    } catch { setBargainModal(null); setBargainPrice(''); loadJob()
-    } finally { setActionLoading('') }
   }
 
   const cancelReasons = [
@@ -132,10 +113,20 @@ export default function V2JobDetailScreen() {
   const handleCancelWithReason = async () => {
     setCancelReasonVisible(false)
     setActionLoading('cancel')
-    removedJobs.add(id); emit('jobsChanged', id)
-    try { await v2JobActions.complete(id, 'CANCEL', cancelReason || ''); router.back() }
-    catch { router.back() }
-    finally { setActionLoading('') }
+    try {
+      await v2JobActions.cancel(id, { reason: cancelReason || undefined })
+      removedJobs.add(id)
+      emit('jobsChanged', id)
+      router.back()
+    } catch (error: any) {
+      Alert.alert(
+        'Cancellation unavailable',
+        error?.message || 'This job can no longer be cancelled. If work already started, use Dispute.',
+      )
+      await loadJob()
+    } finally {
+      setActionLoading('')
+    }
   }
 
   const handleDepositEscrow = async () => {
@@ -250,11 +241,11 @@ export default function V2JobDetailScreen() {
         </View>
 
         {/* ─── Cancel Button ─── */}
-        {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED') && (
+        {(job.status === 'OPEN' || job.status === 'QUOTE_ACCEPTED' || (job.status === 'IN_PROGRESS' && workspace?.progressStatus === 'ACCEPTED')) && (
           <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
-              <Text style={styles.cancelBtnText}>{canCancelWithin30() ? 'Cancel this mission' : 'Request cancellation'}</Text>
+              <Text style={styles.cancelBtnText}>Cancel before work starts</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -396,10 +387,18 @@ export default function V2JobDetailScreen() {
                     <TouchableOpacity style={styles.quoteAcceptBtn} onPress={() => handleSelectQuote(q.id)} disabled={actionLoading !== ''}>
                       {actionLoading === q.id ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.quoteAcceptText}>Accept</Text>}
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.quoteBargainBtn}
-                      onPress={() => { setBargainModal(q); setBargainPrice(String(q.price)) }} disabled={actionLoading !== ''}>
+                    <TouchableOpacity
+                      style={styles.quoteBargainBtn}
+                      onPress={() => {
+                        const recipientId = String((q.provider as any)?.userId || q.provider?.id || q.providerId || '')
+                        if (!recipientId) return
+                        setMsgPrefill(`Hi ${q.provider?.name || ''}, I want to discuss your LKR ${q.price.toLocaleString()} quote. If we agree on a new price, please send me an updated quote in MaintainEX.`)
+                        setMsgRecipient({ id: recipientId, name: q.provider?.name || 'Provider' })
+                      }}
+                      disabled={actionLoading !== ''}
+                    >
                       <Handshake size={14} color={colors.amber} weight="fill" />
-                      <Text style={styles.quoteBargainText}>Bargain</Text>
+                      <Text style={styles.quoteBargainText}>Discuss price</Text>
                     </TouchableOpacity>
                   </View>
                 ) : null}
@@ -408,7 +407,10 @@ export default function V2JobDetailScreen() {
                     style={styles.quoteMessageRow}
                     onPress={() => {
                       setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
-                      setMsgRecipient({ id: q.provider.id, name: q.provider.name || 'Provider' })
+                      setMsgRecipient({
+                        id: String((q.provider as any)?.userId || q.provider.id),
+                        name: q.provider.name || 'Provider',
+                      })
                     }}
                   >
                     <ChatCircle size={14} color={colors.amber} weight="fill" />
@@ -586,31 +588,6 @@ export default function V2JobDetailScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* ─── Bargain Modal ─── */}
-      <Modal visible={!!bargainModal} transparent animationType="slide" onRequestClose={() => setBargainModal(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalIconCircle}>
-              <Handshake size={32} color={colors.amber} weight="fill" />
-            </View>
-            <Text style={styles.modalTitle}>Counter Offer</Text>
-            <Text style={styles.modalSub}>Propose your price to {bargainModal?.provider?.name || 'the hero'}</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={bargainPrice} onChangeText={setBargainPrice} placeholder="LKR 0" placeholderTextColor="#6F6B6B" keyboardType="numeric" />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setBargainModal(null)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalConfirmBtn} onPress={handleBargain} disabled={actionLoading !== ''}>
-                {actionLoading === 'bargain' ? <ActivityIndicator color="#111827" size="small" /> : <Text style={styles.modalConfirmText}>Send Offer</Text>}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ─── Cancel Reason Modal ─── */}
       <Modal visible={cancelReasonVisible} transparent animationType="slide" onRequestClose={() => setCancelReasonVisible(false)}>
