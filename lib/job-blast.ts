@@ -132,7 +132,7 @@ export async function blastJobToTaskers(
       body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-      pushChannel: profile.isOnline ? 'job-offers' : 'default',
+      pushChannel: profile.isOnline ? 'job_offers' : 'default',
       pushPriority: 'high',
       pushData: {
         type: 'NEW_JOB',
