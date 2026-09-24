@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client'
 import type { MatchingConfig, OpportunityStatus, WaveConfig, ProviderOpportunityRecord } from './types'
 import { getWaveConfig } from './config'
 import { createNotification } from '@/lib/notifications'
+import { sendExpoPush } from '@/lib/push'
 
 export interface WaveResult {
   waveNumber: number
@@ -63,16 +64,23 @@ export async function createMatchingWave(
       // Send notification
       const notificationUserId = candidate.userId || candidate.providerId
       const pushToken = await getPushToken(client, candidate.providerType, candidate.providerId)
+      await createNotification({
+        userId: notificationUserId,
+        title: 'New Job Match',
+        body: 'A new job matches your skills — tap to view',
+        referenceType: 'JOB_MATCH',
+        referenceId: jobId,
+      })
       if (pushToken) {
-        await createNotification({
-          userId: notificationUserId,
-          title: 'New Job Match',
-          body: 'A new job matches your skills — tap to view',
-          referenceType: 'JOB_MATCH',
-          referenceId: jobId,
-        })
-        notificationsSent++
+        await sendExpoPush(
+          pushToken,
+          'New Job Match',
+          'A new job matches your skills — tap to view',
+          { type: 'NEW_JOB', jobId, alertStyle: 'standard' },
+          { channelId: 'job-opportunities', priority: 'high' },
+        )
       }
+      notificationsSent++
     } catch (err) {
       // Unique constraint violation = already exists, skip silently
       if ((err as any)?.code === 'P2002') continue
