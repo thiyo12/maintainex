@@ -256,3 +256,30 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
     }),
   ])
 }
+
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
+  return createNotification({
+    userId: customerId,
+    title: 'Updated Quote Received',
+    body: `${providerName} updated their price for your job`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    push: true,
+    pushData: { type: 'QUOTE_REVISED', jobId },
+    pushOptions: { priority: 'high', channelId: 'jobs' },
+  })
+}
+
+export async function notifyJobCancelled(jobId: string, userId: string, jobTitle: string, cancelledBy: string) {
+  return createNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: `${jobTitle} was cancelled by ${cancelledBy}`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    push: true,
+    pushData: { type: 'JOB_CANCELLED', jobId },
+    pushOptions: { priority: 'high', channelId: 'jobs' },
+  })
+}
