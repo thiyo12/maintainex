@@ -490,6 +490,9 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') {
     throw new Error('Only the customer or staff can refund escrow')
   }
+  if (job.status === 'IN_PROGRESS' && ctx.actorType !== 'STAFF') {
+    throw new Error('ACTIVE_JOB_REQUIRES_DISPUTE')
+  }
 
   const escrow = await prisma.jobEscrow.findFirst({
     where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD'] } },
