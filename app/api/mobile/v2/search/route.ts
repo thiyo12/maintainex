@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiSearch, getAutocompleteSuggestions } from '@/lib/ai-search'
 import { logSearch, getPopularSearches } from '@/lib/search-engine'
+import { prisma } from '@/lib/prisma'
+import { storedListIncludes } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +12,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'all'
     const popular = searchParams.get('popular')
     const suggest = searchParams.get('suggest')
+    const country = (searchParams.get('country') || 'LK').toUpperCase()
 
     if (popular === 'true') {
       const results = await getPopularSearches()
@@ -27,7 +30,18 @@ export async function GET(request: NextRequest) {
 
     const results = aiSearch(q.trim())
 
-    const categories = results
+    const countryCategories = await prisma.jobCategory.findMany({
+      where: { isActive: true },
+      select: { id: true, slug: true, countries: true },
+    })
+    const allowedCategoryKeys = new Set(
+      countryCategories
+        .filter(category => storedListIncludes(category.countries, country))
+        .flatMap(category => [category.id, category.slug].filter((value): value is string => Boolean(value)))
+    )
+    const regionalResults = results.filter(result => allowedCategoryKeys.has(result.categoryId))
+
+    const categories = regionalResults
       .filter(r => r.type === 'category')
       .map(r => ({
         id: r.categoryId,
@@ -38,7 +52,7 @@ export async function GET(request: NextRequest) {
         correctedQuery: r.correctedQuery,
       }))
 
-    const subServices = results
+    const subServices = regionalResults
       .filter(r => r.type === 'subService')
       .map(r => ({
         id: r.subServiceId,
@@ -50,14 +64,15 @@ export async function GET(request: NextRequest) {
         score: r.score,
       }))
 
-    const bestMatch = results[0]
+    const bestMatch = regionalResults[0]
     const correctedQuery = bestMatch?.score && bestMatch.score < 85 ? bestMatch.correctedQuery : undefined
 
-    await logSearch(null, q.trim(), null, bestMatch?.score || 0, null)
+    await logSearch(null, q.trim(), null, bestMatch?.score || 0, country)
 
     return NextResponse.json({
       query: q,
       lang,
+      country,
       correctedQuery,
       categories: categories.slice(0, 5),
       subServices: subServices.slice(0, 5),
