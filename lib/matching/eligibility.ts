@@ -636,6 +636,7 @@ export function mapEligibilityToExclusionReason(gate: EligibilityGate): MatchExc
   if (gate.reason?.includes('Identity')) return 'IDENTITY_NOT_VERIFIED'
   if (gate.reason?.includes('not verified')) return 'PROVIDER_VERIFICATION_NOT_APPROVED'
   if (gate.gate === 'SERVICE_AREA' && !gate.passed) return 'OUTSIDE_SERVICE_AREA'
+  if (gate.gate === 'AVAILABILITY' && !gate.passed) return 'UNAVAILABLE'
   if (gate.gate === 'NO_CONFLICT' && !gate.passed) return 'ASSIGNMENT_CONFLICT'
   if (gate.gate === 'QUALITY_FLOOR' && !gate.passed) return 'QUALITY_FLOOR'
   if (gate.reason?.includes('No matching') || gate.reason?.includes('No approved')) return 'PROFESSION_MISMATCH'
