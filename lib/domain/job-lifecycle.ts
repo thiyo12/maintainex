@@ -496,7 +496,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     const providerPreStartCancellation =
       providerActor != null &&
       providerActor === ctx.actorType &&
-      job.status === 'QUOTE_ACCEPTED' &&
+      ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status) &&
       workspace?.progressStatus === 'ACCEPTED'
 
     if (!providerPreStartCancellation) {
