@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { refundEscrow, resolveProviderActor, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyJobCancelled } from '@/lib/notifications'
+import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 
 function sanitizeReason(value: unknown): string {
   if (typeof value !== 'string') return 'No reason provided'
@@ -113,6 +114,16 @@ export async function POST(
         await tx.companyJobAssignment.updateMany({
           where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
           data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: `Job cancelled: ${reason}` },
+        })
+
+        await recordJobLifecycleEvent(tx, {
+          jobId,
+          actorId: user.id,
+          actorType,
+          action: 'JOB_CANCELLED',
+          fromState: expectedStatus,
+          toState: 'CANCELLED',
+          metadata: { reason, refunded: false },
         })
       })
     }
