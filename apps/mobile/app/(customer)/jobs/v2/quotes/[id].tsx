@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Timer, Star, CheckCircle, User, XCircle, Wrench, ChatCircleDots } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
@@ -159,6 +159,7 @@ export default function V2QuotesScreen() {
   }, [id])
 
   useEffect(() => { loadData() }, [loadData])
+  useFocusEffect(useCallback(() => { loadData() }, [loadData]))
 
   const liveQuotes = useMemo(() => quotes.filter(q => !dismissed.has(q.id)), [quotes, dismissed])
 

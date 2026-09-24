@@ -31,9 +31,17 @@ export default function SeasonalOffers({ onServicePress }: Props) {
   const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current
 
   const countryCode = selectedCountry?.code || 'LK'
-  const season = getCurrentSeason()
+  const season = getCurrentSeason(countryCode)
   const seasonColors = getSeasonColors(season)
   const serviceNames = getSeasonalServiceNames(countryCode, season)
+  const seasonLabel = countryCode === 'LK'
+    ? ({
+        hot_dry: 'Hot & Dry',
+        southwest_monsoon: 'Southwest Monsoon',
+        inter_monsoon: 'Inter-Monsoon',
+        northeast_monsoon: 'Northeast Monsoon',
+      } as Record<string, string>)[season] || 'Seasonal'
+    : season.charAt(0).toUpperCase() + season.slice(1)
 
   useEffect(() => {
     if (serviceNames.length === 0) return
@@ -86,7 +94,7 @@ export default function SeasonalOffers({ onServicePress }: Props) {
         >
           <SeasonIcon season={season} size={18} color={seasonColors.text} />
           <Text style={[styles.tabLabel, { color: seasonColors.text }]}>
-            {season.charAt(0).toUpperCase() + season.slice(1)}
+            {seasonLabel}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -141,6 +149,10 @@ function SeasonIcon({ season, size, color }: { season: string; size: number; col
     winter: <Snowflake size={size} color={color} weight="bold" />,
     spring: <Flower size={size} color={color} weight="fill" />,
     fall: <Leaf size={size} color={color} weight="bold" />,
+    hot_dry: <Sun size={size} color={color} weight="fill" />,
+    southwest_monsoon: <Leaf size={size} color={color} weight="bold" />,
+    inter_monsoon: <Leaf size={size} color={color} weight="bold" />,
+    northeast_monsoon: <Leaf size={size} color={color} weight="bold" />,
   }
   return <>{icons[season] || <Sun size={size} color={color} weight="fill" />}</>
 }

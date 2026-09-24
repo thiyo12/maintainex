@@ -81,6 +81,7 @@ export default function NotificationBridge() {
         const content = notification?.request?.content
         const data = (content?.data || {}) as Record<string, any>
         if (data?.type !== 'NEW_JOB') return
+        if (data?.alertMode !== 'ring') return
 
         if (timerRef.current) clearTimeout(timerRef.current)
         setOffer({
