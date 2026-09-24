@@ -103,6 +103,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const membership = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: id,
+          userId: user.id,
+        },
+      },
+      select: { id: true },
+    })
+    if (!membership) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
     const { searchParams } = new URL(request.url)
     const after = searchParams.get('after')
 
