@@ -344,9 +344,7 @@ export async function POST(request: NextRequest) {
     }
 
     const usedSyntheticTestOtp = isTestOtpAllowed(user, code)
-    if (usedSyntheticTestOtp) {
-      await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
-    } else {
+    if (!usedSyntheticTestOtp) {
       const isValid = await bcrypt.compare(code, otpRecord.codeHash)
       if (!isValid) {
         const updated = await prisma.oTP.update({
@@ -372,7 +370,14 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ error: 'Invalid code. Please try again.' }, { status: 400 })
       }
-      await prisma.oTP.update({ where: { id: otpRecord.id }, data: { isUsed: true } })
+    }
+
+    const consumed = await prisma.oTP.updateMany({
+      where: { id: otpRecord.id, isUsed: false },
+      data: { isUsed: true },
+    })
+    if (consumed.count !== 1) {
+      return NextResponse.json({ error: 'This login code was already used. Request a new one.' }, { status: 409 })
     }
 
     if (usedSyntheticTestOtp && user.role === 'TASKER' && isSyntheticCertAccount(user)) {
