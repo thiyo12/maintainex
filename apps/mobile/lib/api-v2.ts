@@ -160,6 +160,20 @@ export const v2Quotes = {
     const response = await v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`)
     return { quotes: response.quotes.map((quote) => normalizeQuoteMoney(quote) as V2Quote) }
   },
+  revise: (quoteId: string, data: {
+    companyId?: string
+    price: number
+    estimatedCompletionTime: string
+    message?: string
+    revisionReason: string
+  }) =>
+    v2Request<{ success: boolean; newQuoteId: string; revisionNumber: number }>(
+      `/api/mobile/v2/quotes/${quoteId}/revision`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ ...data, price: majorToMinorUnits(data.price) }),
+      },
+    ),
 }
 
 export const v2JobActions = {
@@ -210,6 +224,11 @@ export const v2JobActions = {
     v2Request<{ success: boolean; purpose: string }>(`/api/mobile/v2/jobs/${jobId}/pin/verify`, { method: 'POST', body: JSON.stringify({ pin, purpose }) }),
   getCustomerStatus: (jobId: string) =>
     v2Request<{ status: any }>(`/api/mobile/v2/jobs/${jobId}/customer-status`),
+  cancel: (jobId: string, data?: { reason?: string; pin?: string }) =>
+    v2Request<{ success: boolean; status: string; refunded?: boolean }>(
+      `/api/mobile/v2/jobs/${jobId}/cancel`,
+      { method: 'POST', body: JSON.stringify(data || {}) },
+    ),
 }
 
 export const v2Match = {
