@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notifyEscrowTimeout } from '@/lib/notifications'
-import { sendExpoPush } from '@/lib/push'
 import { expirePendingEscrow } from '@/lib/domain/job-lifecycle'
 import { markFailed } from '@/lib/payout-engine'
+import { reconcilePreviousWeekCommissions } from '@/lib/commission-weekly'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,19 +41,19 @@ export async function GET(request: NextRequest) {
       const { reverted } = await expirePendingEscrow(escrow.id, { actorId: 'system' })
       if (!reverted) continue
 
-      notifyEscrowTimeout(escrow.jobId, escrow.providerId)
-      const provider = await prisma.user.findUnique({
-        where: { id: escrow.providerId },
-        select: { pushToken: true },
+      const quote = await prisma.jobQuote.findUnique({
+        where: { id: escrow.quoteId },
+        select: { providerId: true, providerType: true },
       })
-      if (provider?.pushToken) {
-        void sendExpoPush(
-          provider.pushToken,
-          'Job Available Again',
-          'Customer did not fund escrow — job is available again',
-          { screen: '/(tasker)/jobs', id: escrow.jobId }
-        )
+      let notificationUserId = quote?.providerId || escrow.providerId
+      if (quote?.providerType === 'COMPANY') {
+        const company = await prisma.companyProfile.findUnique({
+          where: { id: quote.providerId },
+          select: { userId: true },
+        })
+        if (company) notificationUserId = company.userId
       }
+      await notifyEscrowTimeout(escrow.jobId, notificationUserId)
       escrowTimeouts++
     }
 
@@ -79,6 +79,12 @@ export async function GET(request: NextRequest) {
 
     const pendingPayoutCount = await prisma.payout.count({ where: { status: 'PENDING' } })
 
+    // Monday UTC: aggregate the previous full week's commissions that were
+    // already withheld at escrow release. This is reconciliation only.
+    const weeklyCommission = new Date().getUTCDay() === 1
+      ? await reconcilePreviousWeekCommissions()
+      : null
+
     return NextResponse.json({
       success: true,
       suspensionsLifted: suspendedUsers.length,
@@ -86,6 +92,14 @@ export async function GET(request: NextRequest) {
       payoutsProcessing: 0,
       payoutsFailed,
       pendingPayouts: pendingPayoutCount,
+      weeklyCommission: weeklyCommission
+        ? {
+            providers: weeklyCommission.providers,
+            settlements: weeklyCommission.settlements,
+            weekStart: weeklyCommission.weekStart.toISOString(),
+            weekEnd: weeklyCommission.weekEnd.toISOString(),
+          }
+        : null,
     })
   } catch (error) {
     console.error('[CRON] Daily maintenance error:', error)
