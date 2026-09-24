@@ -137,13 +137,14 @@ export async function GET(
         } else {
           const company = await prisma.companyProfile.findUnique({
             where: { id: q.providerId },
-            select: { id: true, companyName: true, rating: true, completedProjects: true, logo: true, isVerified: true },
+            select: { id: true, userId: true, companyName: true, rating: true, completedProjects: true, logo: true, isVerified: true },
           })
           if (company) {
             providerRating = company.rating
             completedJobs = company.completedProjects
             provider = {
               id: company.id,
+              userId: company.userId,
               name: company.companyName,
               profileImage: company.logo,
               isVerified: company.isVerified,
