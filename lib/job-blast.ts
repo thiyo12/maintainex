@@ -1,6 +1,5 @@
 import { prisma } from './prisma'
 import { createNotification } from './notifications'
-import { sendExpoPush } from './push'
 import { findCandidates } from './matching'
 
 /**
@@ -26,6 +25,33 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
 
   let individualCandidates = result.candidates.filter((candidate) => candidate.providerType === 'INDIVIDUAL')
   let companyCandidates = result.candidates.filter((candidate) => candidate.providerType === 'COMPANY')
+
+  // Immediate work should not interrupt an individual provider who is already
+  // inside an active job. Future scheduled work remains eligible so providers
+  // can build their next-day/week schedule.
+  const immediateWindowMs = 4 * 60 * 60 * 1000
+  const isImmediateJob = !job.preferredDate || job.preferredDate.getTime() <= Date.now() + immediateWindowMs
+  if (isImmediateJob && individualCandidates.length > 0) {
+    const activeJobs = await prisma.marketplaceJob.findMany({
+      where: {
+        status: 'IN_PROGRESS',
+        id: { not: job.id },
+      },
+      select: { id: true },
+    })
+    if (activeJobs.length > 0) {
+      const activeQuotes = await prisma.jobQuote.findMany({
+        where: {
+          jobId: { in: activeJobs.map(active => active.id) },
+          providerType: 'INDIVIDUAL',
+          status: 'ACCEPTED',
+        },
+        select: { providerId: true },
+      })
+      const busy = new Set(activeQuotes.map(quote => quote.providerId))
+      individualCandidates = individualCandidates.filter(candidate => !busy.has(candidate.userId || candidate.providerId))
+    }
+  }
 
   if (job.targetTaskerId) {
     const target = await prisma.taskerProfile.findFirst({
@@ -91,17 +117,19 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     await createNotification({
       userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (profile.user.pushToken) {
-      await sendExpoPush(profile.user.pushToken, pushTitle, pushBody, {
+      pushChannel: profile.isOnline ? 'job-offers' : 'default',
+      pushPriority: 'high',
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-      })
-    }
+        alertMode: profile.isOnline ? 'ring' : 'standard',
+        preferredDate: job.preferredDate?.toISOString() || null,
+      },
+    })
     matched += 1
   }
 
@@ -113,18 +141,20 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     await createNotification({
       userId: company.userId,
       title: pushTitle,
-      body: job.title,
+      body: pushBody,
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
-    })
-    if (company.user.pushToken) {
-      await sendExpoPush(company.user.pushToken, pushTitle, pushBody, {
+      pushChannel: 'default',
+      pushPriority: 'high',
+      pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
         companyId,
-      })
-    }
+        alertMode: 'standard',
+        preferredDate: job.preferredDate?.toISOString() || null,
+      },
+    })
     matched += 1
   }
 
