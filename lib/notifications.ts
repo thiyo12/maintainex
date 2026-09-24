@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { formatCurrency } from './currency-format'
 import type { Currency } from './money'
 import { sendExpoPush, type ExpoPushOptions } from './push'
+import { sendExpoPush, type ExpoPushOptions } from './push'
 
 export type NotificationInput = {
   userId: string
@@ -84,8 +85,47 @@ export async function createNotification(data: NotificationInput) {
   return notification
 }
 
+export async function createAndPushNotification(data: {
+  userId: string
+  title: string
+  body: string
+  titleKey?: string
+  bodyKey?: string
+  params?: Record<string, string>
+  referenceType?: string
+  referenceId?: string
+  pushData?: Record<string, unknown>
+  pushOptions?: ExpoPushOptions
+}) {
+  const notification = await createNotification(data)
+
+  try {
+    const recipient = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { pushToken: true },
+    })
+    if (recipient?.pushToken) {
+      await sendExpoPush(
+        recipient.pushToken,
+        data.title,
+        data.body,
+        {
+          ...(data.pushData || {}),
+          ...(data.referenceType ? { referenceType: data.referenceType } : {}),
+          ...(data.referenceId ? { referenceId: data.referenceId } : {}),
+        },
+        data.pushOptions,
+      )
+    }
+  } catch (error) {
+    console.error('Push notification delivery error:', error)
+  }
+
+  return notification
+}
+
 export async function notifyQuoteSubmitted(jobId: string, customerId: string, providerName: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'New Quote Received',
     body: `${providerName} submitted a quote for your job`,
@@ -100,7 +140,7 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
 }
 
 export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Revised Quote Received',
     body: `${providerName} updated their quote. Review the new price before booking.`,
@@ -113,7 +153,7 @@ export async function notifyQuoteRevised(jobId: string, customerId: string, prov
 }
 
 export async function notifyQuoteAccepted(jobId: string, providerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Quote Accepted',
     body: `Your quote for "${jobTitle}" was accepted`,
@@ -128,7 +168,7 @@ export async function notifyQuoteAccepted(jobId: string, providerId: string, job
 }
 
 export async function notifyEscrowDeposited(jobId: string, providerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Escrow Deposited',
     body: `Customer deposited escrow for "${jobTitle}"`,
@@ -143,7 +183,7 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
 }
 
 export async function notifyJobCompleted(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Job Completed',
     body: `Your job "${jobTitle}" has been completed`,
@@ -158,7 +198,7 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
 }
 
 export async function notifyCompletionRequested(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Completion Requested',
     body: `Provider marked "${jobTitle}" as complete. Please review and approve.`,
@@ -173,7 +213,7 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
 }
 
 export async function notifyJobStarted(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: 'Job Started',
     body: `Your provider has started work on "${jobTitle}"`,
@@ -196,7 +236,7 @@ export async function notifyPaymentReleased(
   countryCode: string = 'LK',
 ) {
   const formattedAmount = formatCurrency(BigInt(Math.round(amount * 100)), currency)
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Payment Released',
     body: `${formattedAmount} released for "${jobTitle}"`,
@@ -211,7 +251,7 @@ export async function notifyPaymentReleased(
 }
 
 export async function notifyEscrowTimeout(jobId: string, providerId: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: providerId,
     title: 'Job Available Again',
     body: 'Customer did not fund escrow — job is available again',
@@ -225,7 +265,7 @@ export async function notifyEscrowTimeout(jobId: string, providerId: string) {
 }
 
 export async function notifyPayoutProcessed(userId: string, title: string, body: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId,
     title,
     body,
@@ -241,7 +281,7 @@ export async function notifyJobCancelled(
   jobTitle: string,
   cancelledBy: string,
 ) {
-  return createNotification({
+  return createAndPushNotification({
     userId,
     title: 'Job Cancelled',
     body: `${cancelledBy} cancelled "${jobTitle}" before work started.`,
@@ -254,7 +294,7 @@ export async function notifyJobCancelled(
 }
 
 export async function notifyJobEscalated(jobId: string, customerId: string, jobTitle: string) {
-  return createNotification({
+  return createAndPushNotification({
     userId: customerId,
     title: '⚠️ Tasker Required — No Response for 2 Hours',
     body: `No tasker responded to "${jobTitle}" within the response window. Your job is still open.`,
