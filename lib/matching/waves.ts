@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import type { MatchingConfig, OpportunityStatus, WaveConfig, ProviderOpportunityRecord } from './types'
 import { getWaveConfig } from './config'
-import { createNotification } from '@/lib/notifications'
+import { createNotificationAndPush } from '@/lib/notifications'
 
 export interface WaveResult {
   waveNumber: number
@@ -60,16 +60,22 @@ export async function createMatchingWave(
       })
       opportunitiesCreated++
 
-      // Send notification
-      const notificationUserId = candidate.userId || candidate.providerId
-      const pushToken = await getPushToken(client, candidate.providerType, candidate.providerId)
-      if (pushToken) {
-        await createNotification({
+      // Always create the in-app notification; push is best-effort when a token exists.
+      const notificationUserId = candidate.userId || (
+        candidate.providerType === 'COMPANY'
+          ? await getCompanyOwnerUserId(client, candidate.providerId)
+          : candidate.providerId
+      )
+      if (notificationUserId) {
+        await createNotificationAndPush({
           userId: notificationUserId,
           title: 'New Job Match',
-          body: 'A new job matches your skills — tap to view',
+          body: 'A new job matches your services — tap to view',
           referenceType: 'JOB_MATCH',
           referenceId: jobId,
+          pushData: { type: 'NEW_JOB', jobId, providerType: candidate.providerType },
+          channelId: 'job-offers',
+          priority: 'high',
         })
         notificationsSent++
       }
@@ -209,6 +215,14 @@ export async function shouldStopWaves(
   if (accepted) return { stop: true, reason: 'Provider accepted' }
 
   return { stop: false }
+}
+
+async function getCompanyOwnerUserId(client: PrismaClient, companyId: string): Promise<string | null> {
+  const company = await client.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { userId: true },
+  })
+  return company?.userId || null
 }
 
 async function getPushToken(
