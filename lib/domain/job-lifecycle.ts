@@ -23,11 +23,22 @@ export async function resolveProviderActor(jobId: string, userId: string): Promi
   }
 
   if (acceptedQuote.providerType === 'COMPANY') {
-    const membership = await prisma.teamMember.findFirst({
-      where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: acceptedQuote.providerId },
+      select: { userId: true },
+    })
+    if (company?.userId === userId) return 'COMPANY'
+
+    const assignment = await prisma.companyJobAssignment.findFirst({
+      where: {
+        jobId,
+        companyId: acceptedQuote.providerId,
+        workerUserId: userId,
+        status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+      },
       select: { id: true },
     })
-    if (membership) return 'COMPANY'
+    if (assignment) return 'COMPANY'
   }
 
   return null
