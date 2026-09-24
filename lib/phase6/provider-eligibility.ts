@@ -162,6 +162,22 @@ export async function checkWorkerEligibility(
         }
       }
 
+      const immediateWindowMs = 4 * 60 * 60 * 1000
+      const isImmediate = !job.preferredDate || job.preferredDate.getTime() <= Date.now() + immediateWindowMs
+      if (isImmediate) {
+        const activeNow = await prisma.companyJobAssignment.findFirst({
+          where: {
+            workerUserId: userId,
+            status: 'IN_PROGRESS',
+            jobId: { not: requiredJobId },
+          },
+          select: { id: true },
+        })
+        if (activeNow) {
+          reasons.push('Worker is currently busy on another active job')
+        }
+      }
+
       if (job.preferredDate) {
         const conflictingAssignments = await prisma.companyJobAssignment.findMany({
           where: {

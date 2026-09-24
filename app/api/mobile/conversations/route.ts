@@ -1,6 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { scanChatMessage } from '@/lib/fraud-detection'
+import { sendExpoPush } from '@/lib/push'
+
+async function canOpenJobConversation(userId: string, participantId: string, jobId: string): Promise<boolean> {
+  if (userId === participantId) return false
+
+  const job = await prisma.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { customerId: true },
+  })
+  if (!job) return false
+
+  const quotes = await prisma.jobQuote.findMany({
+    where: {
+      jobId,
+      status: { in: ['PENDING', 'ACCEPTED', 'SUPERSEDED'] },
+    },
+    select: {
+      providerId: true,
+      providerType: true,
+      actorUserId: true,
+    },
+  })
+
+  const providerUserIds = new Set<string>()
+  const companyIds = quotes
+    .filter(quote => quote.providerType === 'COMPANY')
+    .map(quote => quote.providerId)
+
+  for (const quote of quotes) {
+    if (quote.providerType === 'INDIVIDUAL') providerUserIds.add(quote.providerId)
+    if (quote.actorUserId) providerUserIds.add(quote.actorUserId)
+  }
+
+  if (companyIds.length > 0) {
+    const companies = await prisma.companyProfile.findMany({
+      where: { id: { in: companyIds } },
+      select: { userId: true },
+    })
+    companies.forEach(company => providerUserIds.add(company.userId))
+  }
+
+  const userIsCustomer = userId === job.customerId
+  const participantIsCustomer = participantId === job.customerId
+
+  if (userIsCustomer) return providerUserIds.has(participantId)
+  if (participantIsCustomer) return providerUserIds.has(userId)
+  return false
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -79,7 +128,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'participantId required' }, { status: 400 })
     }
 
-    // Dedup scoped to job + the same two participants
+    const participant = await prisma.user.findUnique({
+      where: { id: participantId },
+      select: { id: true, pushToken: true },
+    })
+    if (!participant) {
+      return NextResponse.json({ error: 'Participant not found' }, { status: 404 })
+    }
+
+    if (jobId && !(await canOpenJobConversation(user.id, participantId, jobId))) {
+      return NextResponse.json({ error: 'Messaging is available after a provider has quoted on this job.' }, { status: 403 })
+    }
+
     const existingConversation = await prisma.conversation.findFirst({
       where: {
         AND: [
@@ -95,6 +155,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ id: existingConversation.id, existing: true })
     }
 
+    let safeInitialMessage: string | undefined
+    if (typeof initialMessage === 'string' && initialMessage.trim()) {
+      const raw = initialMessage.trim().slice(0, 2000)
+      const scan = await scanChatMessage(raw, user.id, `new:${jobId || 'general'}`)
+      safeInitialMessage = scan.sanitizedText || raw
+    }
+
     const conversation = await prisma.conversation.create({
       data: {
         jobId: jobId || null,
@@ -104,11 +171,11 @@ export async function POST(request: NextRequest) {
             { userId: participantId },
           ],
         },
-        ...(initialMessage ? {
+        ...(safeInitialMessage ? {
           messages: {
             create: {
               senderId: user.id,
-              text: initialMessage,
+              text: safeInitialMessage,
             },
           },
         } : {}),
@@ -122,6 +189,16 @@ export async function POST(request: NextRequest) {
         messages: { take: 1, orderBy: { createdAt: 'desc' } },
       },
     })
+
+    if (safeInitialMessage && participant.pushToken) {
+      void sendExpoPush(
+        participant.pushToken,
+        user.name || 'New message',
+        safeInitialMessage.substring(0, 120),
+        { screen: '/(chat)/[id]', id: conversation.id, type: 'CHAT_MESSAGE' },
+        { channelId: 'default', priority: 'high' },
+      )
+    }
 
     return NextResponse.json({
       id: conversation.id,

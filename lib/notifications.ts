@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { formatCurrency, getCurrencyForCountry } from './currency-format'
 import type { Currency } from './money'
+import { sendExpoPush, type PushChannel } from './push'
 
 export async function createNotification(data: {
   userId: string
@@ -11,9 +12,13 @@ export async function createNotification(data: {
   params?: Record<string, string>
   referenceType?: string
   referenceId?: string
+  push?: boolean
+  pushChannel?: PushChannel
+  pushPriority?: 'default' | 'normal' | 'high'
+  pushData?: Record<string, unknown>
 }) {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -35,6 +40,32 @@ export async function createNotification(data: {
             : null,
       },
     })
+
+    if (data.push !== false) {
+      const recipient = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { pushToken: true },
+      })
+      if (recipient?.pushToken) {
+        const pushData: Record<string, unknown> = {
+          ...(data.referenceType ? { referenceType: data.referenceType } : {}),
+          ...(data.referenceId ? { referenceId: data.referenceId } : {}),
+          ...(data.pushData || {}),
+        }
+        void sendExpoPush(
+          recipient.pushToken,
+          data.title,
+          data.body,
+          pushData,
+          {
+            channelId: data.pushChannel || 'default',
+            priority: data.pushPriority || 'high',
+          },
+        )
+      }
+    }
+
+    return notification
   } catch (error) {
     console.error('Create notification error:', error)
   }
@@ -196,4 +227,32 @@ export async function notifyTaskerAssigned(jobId: string, customerId: string, ta
       referenceId: jobId,
     }),
   ])
+}
+
+
+export async function notifyQuoteRevised(jobId: string, customerId: string, providerName: string, priceLabel: string) {
+  return createNotification({
+    userId: customerId,
+    title: 'Updated Quote Received',
+    body: `${providerName} updated the quote to ${priceLabel}. Open the job to review the new price.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'QUOTE_REVISED', jobId },
+  })
+}
+
+export async function notifyJobCancelled(
+  jobId: string,
+  userId: string,
+  title: string,
+  body: string,
+) {
+  return createNotification({
+    userId,
+    title,
+    body,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'JOB_CANCELLED', jobId },
+  })
 }

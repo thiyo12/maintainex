@@ -23,11 +23,22 @@ export async function resolveProviderActor(jobId: string, userId: string): Promi
   }
 
   if (acceptedQuote.providerType === 'COMPANY') {
-    const membership = await prisma.teamMember.findFirst({
-      where: { companyId: acceptedQuote.providerId, userId, status: 'ACTIVE' },
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: acceptedQuote.providerId },
+      select: { userId: true },
+    })
+    if (company?.userId === userId) return 'COMPANY'
+
+    const assignment = await prisma.companyJobAssignment.findFirst({
+      where: {
+        jobId,
+        companyId: acceptedQuote.providerId,
+        workerUserId: userId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
       select: { id: true },
     })
-    if (membership) return 'COMPANY'
+    if (assignment) return 'COMPANY'
   }
 
   return null
@@ -487,8 +498,25 @@ export async function releaseEscrow(
 export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
+  let providerPreStart = false
   if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') {
-    throw new Error('Only the customer or staff can refund escrow')
+    const providerActor = await resolveProviderActor(jobId, ctx.actorId)
+    const [workspace, activePin] = await Promise.all([
+      prisma.jobWorkspace.findUnique({ where: { jobId }, select: { progressStatus: true } }),
+      prisma.jobVerificationPin.findFirst({
+        where: { jobId, status: 'ACTIVE' },
+        orderBy: { version: 'desc' },
+        select: { workStartVerifiedAt: true },
+      }),
+    ])
+    providerPreStart = Boolean(
+      providerActor &&
+      workspace?.progressStatus === 'ACCEPTED' &&
+      !activePin?.workStartVerifiedAt
+    )
+    if (!providerPreStart) {
+      throw new Error('Only the customer, staff, or accepted provider before work start can refund escrow')
+    }
   }
 
   const escrow = await prisma.jobEscrow.findFirst({
@@ -856,6 +884,17 @@ export async function completeAndReleaseEscrow(
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: 'IN_PROGRESS' },
       data: { status: 'COMPLETED', updatedAt: new Date() },
+    })
+
+    await tx.companyJobAssignment.updateMany({
+      where: {
+        jobId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
     })
 
     if (commissionCents > 0n) {
