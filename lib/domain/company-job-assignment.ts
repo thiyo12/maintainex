@@ -1,6 +1,7 @@
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
+import { notifyWorkerAssigned } from '@/lib/notifications'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -33,7 +34,24 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
-  if (job.status !== 'QUOTE_ACCEPTED') return { success: false, error: 'Job must be in QUOTE_ACCEPTED status' }
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    return { success: false, error: 'Job must be accepted and not yet started' }
+  }
+
+  const [workspace, pinState] = await Promise.all([
+    prisma.jobWorkspace.findUnique({ where: { jobId }, select: { progressStatus: true } }),
+    prisma.jobVerificationPin.findFirst({
+      where: { jobId, status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+      select: { workStartVerifiedAt: true },
+    }),
+  ])
+  if (workspace && workspace.progressStatus !== 'ACCEPTED') {
+    return { success: false, error: 'Job has already started and cannot be newly assigned' }
+  }
+  if (pinState?.workStartVerifiedAt) {
+    return { success: false, error: 'Work-start PIN already verified; assignment is locked' }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -56,7 +74,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const assignment = await prisma.$transaction(async (tx) => {
     const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED', targetTaskerId: null },
+      where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] }, targetTaskerId: null },
       data: { targetTaskerId: workerUserId },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
@@ -91,6 +109,7 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     return record
   })
 
+  await notifyWorkerAssigned(jobId, workerUserId, job.title)
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -166,6 +185,7 @@ export async function reassignWorker(
     return newRecord
   })
 
+  await notifyWorkerAssigned(jobId, newWorkerUserId, job.title)
   return { success: true, assignmentId: assignment.id }
 }
 
