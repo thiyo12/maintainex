@@ -2,19 +2,44 @@ import { prisma } from './prisma'
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
 
-export async function sendExpoPush(to: string, title: string, body: string, data: Record<string, unknown>): Promise<void> {
+export type PushPriority = 'default' | 'normal' | 'high'
+
+export interface ExpoPushOptions {
+  sound?: string
+  priority?: PushPriority
+  channelId?: string
+}
+
+export async function sendExpoPush(
+  to: string,
+  title: string,
+  body: string,
+  data: Record<string, unknown>,
+  options: ExpoPushOptions = {},
+): Promise<void> {
   try {
+    const payload: Record<string, unknown> = {
+      to,
+      title,
+      body,
+      data,
+      sound: options.sound || 'default',
+      priority: options.priority || 'high',
+    }
+    if (options.channelId) payload.channelId = options.channelId
+
     const res = await fetch(EXPO_PUSH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify([{ to, title, body, data, sound: 'default' }]),
+      body: JSON.stringify([payload]),
     })
     if (!res.ok) return
+
     const result = await res.json()
     const ticket = result?.data?.[0]
     if (ticket?.status === 'error') {
-      // Expired / invalid token — drop it so we stop attempting
-      if (/DeviceNotRegistered|InvalidTokens|MessageTooBig/.test(ticket.details?.error || '')) {
+      const errorCode = ticket.details?.error || ''
+      if (/DeviceNotRegistered|InvalidTokens|MessageTooBig/.test(errorCode)) {
         await prisma.user.updateMany({
           where: { pushToken: to },
           data: { pushToken: null },
