@@ -59,14 +59,14 @@ export async function POST(
 
       if (quote.providerType === 'INDIVIDUAL') {
         await prisma.taskerProfile.updateMany({
-          where: { id: quote.providerId },
+          where: { userId: quote.providerId },
           data: { rating: Math.round(avgRating * 10) / 10, completedJobs: completedCount },
         })
         // Trigger reputation recalculation (fire-and-forget)
         recalculateReputation(quote.providerId).catch(err => console.error('Reputation recalc error:', err))
       } else {
         await prisma.companyProfile.updateMany({
-          where: { userId: quote.providerId },
+          where: { id: quote.providerId },
           data: { rating: Math.round(avgRating * 10) / 10, completedProjects: completedCount },
         })
       }
