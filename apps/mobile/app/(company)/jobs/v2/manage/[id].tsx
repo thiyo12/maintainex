@@ -25,6 +25,7 @@ import { getActiveCompanyId } from '../../../../../lib/api'
 import { v2JobActions, v2Jobs } from '../../../../../lib/api-v2'
 import { v3 } from '../../../../../theme/v3/tokens'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
+import CancelJobModal from '../../../../../components/jobs/CancelJobModal'
 
 export default function CompanyManageJobScreen() {
   const router = useRouter()
@@ -34,6 +35,7 @@ export default function CompanyManageJobScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
+  const [cancelVisible, setCancelVisible] = useState(false)
 
   const load = async () => {
     try {
@@ -184,6 +186,11 @@ export default function CompanyManageJobScreen() {
               label="Start work with PIN"
               onPress={() => router.push((`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`) as any)}
             />
+            <Action
+              label="Cancel booking"
+              outline
+              onPress={() => setCancelVisible(true)}
+            />
           </StepCard>
         ) : isInProgress ? (
           <StepCard
@@ -234,6 +241,14 @@ export default function CompanyManageJobScreen() {
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        onClose={() => setCancelVisible(false)}
+        jobId={id}
+        mode="PROVIDER"
+        onSuccess={() => router.replace('/(company)/jobs/v2/my-quotes' as any)}
+      />
 
       <NewChatModal
         visible={chatVisible}
