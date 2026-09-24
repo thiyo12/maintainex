@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { prisma, type PrismaClientOrTx } from '../prisma'
 import { hashPassword, verifyPassword } from '../security/password'
 import { emitSecurityEvent } from '../security/events'
+import { recordJobLifecycleEvent } from './job-lifecycle-audit'
 
 const PIN_LENGTH = 6
 const MAX_FAILED_ATTEMPTS = 5
@@ -280,6 +281,21 @@ export async function verifyJobPin(
         })
       }
     }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId,
+      actorType: verifierType,
+      action:
+        purpose === 'ARRIVAL'
+          ? 'ARRIVAL_VERIFIED'
+          : purpose === 'WORK_START'
+            ? 'WORK_STARTED'
+            : 'COMPLETION_PIN_VERIFIED',
+      fromState: purpose === 'WORK_START' ? 'ACCEPTED' : null,
+      toState: purpose === 'WORK_START' ? 'IN_PROGRESS' : null,
+      metadata: { purpose, pinVersion: pinRecord.version },
+    })
 
     // 10. Emit security events
     const eventType = purpose === 'ARRIVAL' ? 'job_pin_arrival_verified'
