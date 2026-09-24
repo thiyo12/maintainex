@@ -103,7 +103,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         alertMode: profile.isOnline ? 'urgent_foreground' : 'standard_push',
       }, {
         sound: 'default',
-        channelId: 'job-offers',
+        channelId: 'job_offers',
         priority: 'high',
       })
     }
@@ -131,7 +131,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         alertMode: 'company_dispatch',
       }, {
         sound: 'default',
-        channelId: 'job-offers',
+        channelId: 'job_offers',
         priority: 'high',
       })
     }
