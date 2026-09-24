@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { verifyJobPin } from '@/lib/domain/job-pin'
+import { prisma } from '@/lib/prisma'
+import { notifyJobStarted } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -31,6 +33,16 @@ export async function POST(
   if (!result.valid) {
     const status = result.locked ? 423 : 401
     return NextResponse.json({ error: result.error, locked: result.locked }, { status })
+  }
+
+  if (purpose === 'WORK_START') {
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id: jobId },
+      select: { customerId: true, title: true },
+    })
+    if (job) {
+      await notifyJobStarted(jobId, job.customerId, job.title)
+    }
   }
 
   return NextResponse.json({ success: true, purpose })
