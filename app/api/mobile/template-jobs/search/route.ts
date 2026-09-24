@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { storedListIncludes } from '@/lib/db-utils'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
+    const country = (searchParams.get('country') || 'LK').toUpperCase()
 
     if (!query.trim()) {
       return NextResponse.json([])
@@ -14,8 +16,8 @@ export async function GET(request: NextRequest) {
       where: {
         isActive: true,
         OR: [
-          { name: { contains: query } },
-          { description: { contains: query } },
+          { name: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
         ],
       },
       include: { category: true },
@@ -23,7 +25,9 @@ export async function GET(request: NextRequest) {
       orderBy: { name: 'asc' },
     })
 
-    return NextResponse.json(jobs.map(j => ({
+    const countryJobs = jobs.filter(j => storedListIncludes(j.countries, country))
+
+    return NextResponse.json(countryJobs.map(j => ({
       id: j.id,
       categoryId: j.categoryId,
       name: j.name,
