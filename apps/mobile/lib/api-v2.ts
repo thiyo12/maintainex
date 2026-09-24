@@ -101,6 +101,11 @@ export const v2JobActions = {
     v2Request<{ escrow: any }>(`/api/mobile/v2/jobs/${jobId}/escrow`),
   refundEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/escrow/refund`, { method: 'POST' }),
+  cancel: (jobId: string, reason?: string) =>
+    v2Request<{ success: boolean; status: string; refunded: boolean; cancelledBy: string }>(
+      `/api/mobile/v2/jobs/${jobId}/cancel`,
+      { method: 'POST', body: JSON.stringify({ reason: reason || 'Cancelled by user' }) }
+    ),
   shareAddress: (jobId: string, data: { street?: string; building?: string; apartment?: string; landmark?: string }) =>
     v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}/share-address`, { method: 'POST', body: JSON.stringify(data) }),
   getWorkspace: (jobId: string) =>
