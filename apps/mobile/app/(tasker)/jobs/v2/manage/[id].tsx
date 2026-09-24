@@ -10,6 +10,7 @@ import { fonts } from '../../../../../lib/fonts'
 import { v3 } from '../../../../../theme/v3/tokens'
 import { v2Jobs, v2JobActions, V2Job } from '../../../../../lib/api-v2'
 import NewChatModal from '../../../../../components/chat/NewChatModal'
+import CancelJobModal from '../../../../../components/jobs/CancelJobModal'
 import * as Location from 'expo-location'
 
 export default function V2ProviderManageJobScreen() {
@@ -43,6 +44,7 @@ export default function V2ProviderManageJobScreen() {
 
   const [locationSharing, setLocationSharing] = useState(false)
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
+  const [cancelVisible, setCancelVisible] = useState(false)
 
   const loadJob = async () => {
     try {
@@ -317,6 +319,14 @@ export default function V2ProviderManageJobScreen() {
               <Play size={16} color={v3.colors.paper} weight="fill" />
               <Text style={styles.primaryActionText}>Start work with PIN</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryAction}
+              activeOpacity={0.78}
+              onPress={() => setCancelVisible(true)}
+            >
+              <XCircle size={16} color={v3.colors.error} weight="fill" />
+              <Text style={[styles.secondaryActionText, { color: v3.colors.error }]}>Cancel booking</Text>
+            </TouchableOpacity>
           </>
         ) : null}
 
@@ -466,6 +476,14 @@ export default function V2ProviderManageJobScreen() {
           </TouchableOpacity>
         ) : null}
       </ScrollView>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        onClose={() => setCancelVisible(false)}
+        jobId={id}
+        mode="PROVIDER"
+        onSuccess={() => router.replace('/(tasker)/(tabs)/my-jobs' as any)}
+      />
 
       <NewChatModal
         visible={!!msgRecipient}
