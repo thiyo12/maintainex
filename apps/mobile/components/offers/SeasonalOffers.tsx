@@ -31,7 +31,7 @@ export default function SeasonalOffers({ onServicePress }: Props) {
   const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current
 
   const countryCode = selectedCountry?.code || 'LK'
-  const season = getCurrentSeason()
+  const season = getCurrentSeason(countryCode)
   const seasonColors = getSeasonColors(season)
   const serviceNames = getSeasonalServiceNames(countryCode, season)
 
