@@ -582,6 +582,86 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   return { refundAmount: refundMajor, refundCents }
 }
 
+export async function cancelJobBeforeWorkStart(
+  ctx: TransitionContext,
+  jobId: string,
+  reason?: string,
+): Promise<{ refundAmount: number; cancelledBy: ActorType }> {
+  const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
+  if (!job) throw new Error('Job not found')
+  if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
+    throw new Error('Job cannot be cancelled in its current status')
+  }
+
+  const [workspace, activePin, acceptedQuote] = await Promise.all([
+    prisma.jobWorkspace.findUnique({ where: { jobId }, select: { progressStatus: true } }),
+    prisma.jobVerificationPin.findFirst({
+      where: { jobId, status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+      select: { workStartVerifiedAt: true },
+    }),
+    prisma.jobQuote.findFirst({
+      where: { jobId, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
+    }),
+  ])
+
+  if (activePin?.workStartVerifiedAt) {
+    throw new Error('Work has already started; use dispute/support instead of cancellation')
+  }
+  if (workspace && workspace.progressStatus !== 'ACCEPTED') {
+    throw new Error('Work has already started; use dispute/support instead of cancellation')
+  }
+
+  const isCustomer = job.customerId === ctx.actorId
+  if (!isCustomer) {
+    if (!acceptedQuote) throw new Error('Only the customer can cancel an open job')
+    const providerActor = await resolveProviderActor(jobId, ctx.actorId)
+    if (!providerActor) throw new Error('You are not a participant in this job')
+  }
+
+  const escrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD'] } },
+    select: { id: true },
+  })
+
+  let refundAmount = 0
+  if (escrow) {
+    // Authorization is checked above. Refund always credits the customer's
+    // wallet, even when the accepted provider initiated cancellation.
+    const refunded = await refundEscrow(
+      { jobId, actorId: job.customerId, actorType: 'CUSTOMER', reason },
+      jobId,
+    )
+    refundAmount = refunded.refundAmount
+  } else {
+    await prisma.$transaction(async (tx) => {
+      await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+        data: { status: 'CANCELLED', isActive: false },
+      })
+      await tx.jobQuote.updateMany({
+        where: { jobId, status: { in: ['PENDING', 'ACCEPTED'] } },
+        data: { status: 'WITHDRAWN' },
+      })
+    })
+  }
+
+  await prisma.marketplaceJob.updateMany({
+    where: { id: jobId },
+    data: { isActive: false },
+  })
+  await prisma.providerOpportunity.updateMany({
+    where: { jobId, status: { in: ['PENDING', 'SENT', 'VIEWED', 'ACCEPTED'] } },
+    data: { status: 'CANCELLED' },
+  })
+
+  return {
+    refundAmount,
+    cancelledBy: isCustomer ? 'CUSTOMER' : (ctx.actorType === 'COMPANY' ? 'COMPANY' : 'PROVIDER'),
+  }
+}
+
 async function verifyDisputeAuthorization(
   job: { customerId: string },
   ctx: TransitionContext,
