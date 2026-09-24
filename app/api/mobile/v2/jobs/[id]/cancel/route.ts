@@ -27,11 +27,9 @@ async function getCancellationContext(jobId: string, userId: string) {
   })
   if (!job) return { error: 'Job not found', status: 404 as const }
 
-  if (!['OPEN', 'QUOTE_ACCEPTED'].includes(job.status)) {
+  if (!['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
     return {
-      error: job.status === 'IN_PROGRESS'
-        ? 'Work has already started. Use the dispute flow instead of cancellation.'
-        : 'This job cannot be cancelled in its current state.',
+      error: 'This job cannot be cancelled in its current state.',
       status: 409 as const,
     }
   }
@@ -61,7 +59,7 @@ async function getCancellationContext(jobId: string, userId: string) {
     return { job, actorType: 'CUSTOMER' as ActorType, actorLabel: 'customer' }
   }
 
-  if (job.status !== 'QUOTE_ACCEPTED') {
+  if (job.status === 'OPEN') {
     return { error: 'Only the customer can cancel an open job.', status: 403 as const }
   }
 
