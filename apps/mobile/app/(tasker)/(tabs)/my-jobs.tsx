@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { MagnifyingGlass } from 'phosphor-react-native'
-import { v2Jobs, v2Quotes } from '../../../lib/api-v2'
+import { Buildings, MagnifyingGlass } from 'phosphor-react-native'
+import { v2Jobs, v2Quotes, v2Request } from '../../../lib/api-v2'
 import { fonts } from '../../../lib/fonts'
 import { v3 } from '../../../theme/v3/tokens'
 
@@ -40,13 +40,18 @@ function formatDateLabel(job: any) {
 export default function TaskerMyJobs() {
   const router = useRouter()
   const [jobs, setJobs] = useState<any[]>([])
+  const [companyAssignments, setCompanyAssignments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
   const loadJobs = useCallback(async () => {
     try {
-      const res = await v2Jobs.list('myQuotes=true')
+      const [res, workerRes] = await Promise.all([
+        v2Jobs.list('myQuotes=true'),
+        v2Request<{ assignments: any[] }>('/api/mobile/worker/assignments').catch(() => ({ assignments: [] })),
+      ])
       const allJobs = res.jobs || []
+      setCompanyAssignments(workerRes.assignments || [])
       const hydrated = await Promise.all(
         allJobs.map(async (job: any) => {
           try {
@@ -109,13 +114,46 @@ export default function TaskerMyJobs() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadJobs() }} tintColor={v3.colors.ink} />}
       >
         <Text style={styles.hero}>Your work pipeline</Text>
-        <Text style={styles.subtitle}>Accepted, scheduled, quoted and completed jobs.</Text>
+        <Text style={styles.subtitle}>Direct marketplace work and jobs assigned by companies you work with.</Text>
+
+        {companyAssignments.length > 0 ? (
+          <View style={styles.companySection}>
+            <View style={styles.companySectionHead}>
+              <View style={styles.companySectionIcon}><Buildings size={17} color={v3.colors.ink} weight="fill" /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.companySectionTitle}>Company assignments</Text>
+                <Text style={styles.companySectionText}>Accept or continue work dispatched by your company.</Text>
+              </View>
+              <View style={styles.companyCount}><Text style={styles.companyCountText}>{companyAssignments.length}</Text></View>
+            </View>
+
+            {companyAssignments.map((assignment: any) => (
+              <TouchableOpacity
+                key={assignment.id}
+                style={styles.assignmentRow}
+                activeOpacity={0.72}
+                onPress={() => router.push((`/(tasker)/company-assignments/${assignment.id}`) as any)}
+              >
+                <View style={styles.assignmentBadge}>
+                  <Text style={styles.assignmentBadgeText}>{String(assignment.status).replaceAll('_', ' ')}</Text>
+                </View>
+                <View style={styles.assignmentCopy}>
+                  <Text style={styles.assignmentTitle} numberOfLines={1}>{assignment.job?.title || 'Company job'}</Text>
+                  <Text style={styles.assignmentMeta} numberOfLines={1}>
+                    {assignment.company?.companyName || 'Company'} · {assignment.job?.preferredDate ? new Date(assignment.job.preferredDate).toLocaleDateString() : 'Schedule in job'}
+                  </Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : null}
 
         {loading ? (
           <View style={styles.loading}>
             <ActivityIndicator size="small" color={v3.colors.ink} />
           </View>
-        ) : pipeline.length === 0 ? (
+        ) : pipeline.length === 0 && companyAssignments.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No jobs in your pipeline yet.</Text>
             <Text style={styles.emptyText}>Browse nearby work and send your first quote.</Text>
@@ -145,7 +183,7 @@ export default function TaskerMyJobs() {
           </View>
         )}
 
-        {pipeline.length > 0 ? (
+        {pipeline.length > 0 || companyAssignments.length > 0 ? (
           <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.76} onPress={() => router.push('/(tasker)/jobs/v2/browse' as any)}>
             <Text style={styles.secondaryButtonText}>Browse more jobs</Text>
           </TouchableOpacity>
@@ -204,6 +242,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  companySection: {
+    marginTop: 20,
+    backgroundColor: v3.colors.amberSoft,
+    borderRadius: 18,
+    padding: 12,
+  },
+  companySectionHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 9 },
+  companySectionIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: v3.colors.amber, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
+  companySectionTitle: { fontSize: 11.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  companySectionText: { marginTop: 1, fontSize: 8.8, lineHeight: 12, fontFamily: fonts.body, color: v3.colors.textSecondary },
+  companyCount: { minWidth: 28, height: 28, borderRadius: 14, backgroundColor: v3.colors.ink, alignItems: 'center', justifyContent: 'center' },
+  companyCountText: { fontSize: 10, fontFamily: fonts.headingBold, color: v3.colors.paper },
+  assignmentRow: { minHeight: 58, borderRadius: 14, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  assignmentBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 999, backgroundColor: v3.colors.surfaceGray },
+  assignmentBadgeText: { fontSize: 7.5, fontFamily: fonts.headingBold, color: v3.colors.textSecondary },
+  assignmentCopy: { flex: 1, marginLeft: 9 },
+  assignmentTitle: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.ink },
+  assignmentMeta: { marginTop: 2, fontSize: 8.2, fontFamily: fonts.body, color: v3.colors.textMuted },
   pipeline: {
     marginTop: 24,
     gap: 10,
