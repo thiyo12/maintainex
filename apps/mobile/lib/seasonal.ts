@@ -38,7 +38,7 @@ export const SEASON_EMOJI: Record<string, string> = {
   spring: '🌸',
   summer: '☀️',
   fall: '🍂',
-  hot_dry: '☀️',
+  hot_hot_dry: '☀️',
   southwest_monsoon: '🌧️',
   inter_monsoon: '⛈️',
   northeast_monsoon: '🌦️',
@@ -62,7 +62,7 @@ const SEASON_COLORS: Record<string, { bg: string; text: string }> = {
   southwest_monsoon: { bg: '#2563EB', text: '#FFFFFF' },
   northeast_monsoon: { bg: '#1D4ED8', text: '#FFFFFF' },
   inter_monsoon: { bg: '#475569', text: '#FFFFFF' },
-  dry: { bg: '#F59E0B', text: '#111111' },
+  hot_dry: { bg: '#F59E0B', text: '#111111' },
 }
 
 export function getSeasonColors(season: string) {
