@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client'
-import type { MatchingConfig, OpportunityStatus, WaveConfig, ProviderOpportunityRecord } from './types'
+import type { MatchingConfig, OpportunityStatus, ProviderOpportunityRecord } from './types'
 import { getWaveConfig } from './config'
-import { createNotification } from '@/lib/notifications'
+import { deliverNotification } from '@/lib/notifications'
 
 export interface WaveResult {
   waveNumber: number
@@ -9,30 +9,52 @@ export interface WaveResult {
   notificationsSent: number
 }
 
+async function resolveNotificationUser(
+  client: PrismaClient,
+  candidate: { providerId: string; providerType: 'INDIVIDUAL' | 'COMPANY'; userId?: string },
+): Promise<string | null> {
+  if (candidate.userId) return candidate.userId
+  if (candidate.providerType === 'INDIVIDUAL') return candidate.providerId
+
+  const company = await client.companyProfile.findUnique({
+    where: { id: candidate.providerId },
+    select: { userId: true },
+  })
+  return company?.userId || null
+}
+
 /**
- * Creates a new matching wave for a job.
- * Inserts ProviderOpportunity records and sends notifications.
- * Idempotent: checks for existing opportunities before creating.
+ * Create one provider opportunity wave and deliver a real in-app + push alert.
+ * Idempotent per job/provider via ProviderOpportunity.
  */
 export async function createMatchingWave(
   client: PrismaClient,
   jobId: string,
   waveNumber: number,
-  candidates: Array<{ providerId: string; providerType: 'INDIVIDUAL' | 'COMPANY'; score: number; rank: number; companyId?: string; userId?: string }>,
+  candidates: Array<{
+    providerId: string
+    providerType: 'INDIVIDUAL' | 'COMPANY'
+    score: number
+    rank: number
+    companyId?: string
+    userId?: string
+  }>,
   config: MatchingConfig,
 ): Promise<WaveResult> {
   const waveConfig = getWaveConfig(config, waveNumber)
   const now = new Date()
   const expiresAt = new Date(now.getTime() + waveConfig.expiryMinutes * 60 * 1000)
 
+  const job = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { title: true, categoryId: true },
+  })
+
   let opportunitiesCreated = 0
   let notificationsSent = 0
-
-  // Take only the top N candidates for this wave
   const waveCandidates = candidates.slice(0, waveConfig.size)
 
   for (const candidate of waveCandidates) {
-    // Idempotency: skip if opportunity already exists for this job+provider
     const existing = await client.providerOpportunity.findFirst({
       where: {
         jobId,
@@ -40,6 +62,7 @@ export async function createMatchingWave(
           ? { taskerId: candidate.providerId }
           : { companyId: candidate.providerId }),
       },
+      select: { id: true },
     })
     if (existing) continue
 
@@ -60,27 +83,36 @@ export async function createMatchingWave(
       })
       opportunitiesCreated++
 
-      // Send notification
-      const notificationUserId = candidate.userId || candidate.providerId
-      const pushToken = await getPushToken(client, candidate.providerType, candidate.providerId)
-      if (pushToken) {
-        await createNotification({
+      const notificationUserId = await resolveNotificationUser(client, candidate)
+      if (notificationUserId) {
+        await deliverNotification({
           userId: notificationUserId,
-          title: 'New Job Match',
-          body: 'A new job matches your skills — tap to view',
+          title: 'New job match',
+          body: job?.title
+            ? `${job.title} — review the request and send your price.`
+            : 'A new job matches your services — review it and send your price.',
           referenceType: 'JOB_MATCH',
           referenceId: jobId,
+        }, {
+          channelId: 'job_offers',
+          priority: 'high',
+          interruptionLevel: 'time-sensitive',
+          data: {
+            type: 'NEW_JOB',
+            jobId,
+            categoryId: job?.categoryId || null,
+            providerType: candidate.providerType,
+            waveNumber,
+          },
         })
         notificationsSent++
       }
     } catch (err) {
-      // Unique constraint violation = already exists, skip silently
       if ((err as any)?.code === 'P2002') continue
       throw err
     }
   }
 
-  // Update job wave state
   await client.marketplaceJob.update({
     where: { id: jobId },
     data: { currentWave: waveNumber, waveSentAt: now },
@@ -89,16 +121,11 @@ export async function createMatchingWave(
   return { waveNumber, opportunitiesCreated, notificationsSent }
 }
 
-/**
- * Expires opportunities that have passed their expiry time.
- * Returns job IDs that need wave advancement.
- */
 export async function expireOpportunities(
   client: PrismaClient,
 ): Promise<string[]> {
   const now = new Date()
 
-  // Find expired SENT/PENDING opportunities
   const expired = await client.providerOpportunity.findMany({
     where: {
       status: { in: ['SENT', 'PENDING'] },
@@ -109,25 +136,18 @@ export async function expireOpportunities(
 
   if (expired.length === 0) return []
 
-  // Batch update to EXPIRED
-  const expiredIds = expired.map(e => e.id)
   await client.providerOpportunity.updateMany({
-    where: { id: { in: expiredIds } },
+    where: { id: { in: expired.map(e => e.id) } },
     data: { status: 'EXPIRED' },
   })
 
-  // Return unique job IDs that need wave advancement
   return [...new Set(expired.map(e => e.jobId))]
 }
 
-/**
- * Advances a job to the next matching wave.
- * Checks if job still needs more providers.
- */
 export async function advanceMatchingWave(
   client: PrismaClient,
   jobId: string,
-  config: MatchingConfig,
+  _config: MatchingConfig,
 ): Promise<{ advanced: boolean; waveNumber: number }> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
@@ -136,7 +156,6 @@ export async function advanceMatchingWave(
 
   if (!job || job.status !== 'OPEN') return { advanced: false, waveNumber: 0 }
 
-  // Check if any provider has accepted
   const accepted = await client.providerOpportunity.findFirst({
     where: { jobId, status: 'ACCEPTED' },
   })
@@ -150,10 +169,6 @@ export async function advanceMatchingWave(
   return { advanced: true, waveNumber: nextWave }
 }
 
-/**
- * Handles provider response to an opportunity.
- * Concurrency-safe: uses atomic update.
- */
 export async function respondToOpportunity(
   client: PrismaClient,
   jobId: string,
@@ -187,9 +202,6 @@ export async function respondToOpportunity(
   return { success: true }
 }
 
-/**
- * Checks if a job should stop receiving new waves.
- */
 export async function shouldStopWaves(
   client: PrismaClient,
   jobId: string,
@@ -211,27 +223,4 @@ export async function shouldStopWaves(
   return { stop: false }
 }
 
-async function getPushToken(
-  client: PrismaClient,
-  providerType: string,
-  providerId: string,
-): Promise<string | null> {
-  if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  } else {
-    const company = await client.companyProfile.findUnique({
-      where: { id: providerId },
-      select: { userId: true },
-    })
-    if (!company) return null
-    const user = await client.user.findUnique({
-      where: { id: company.userId },
-      select: { pushToken: true },
-    })
-    return user?.pushToken || null
-  }
-}
+export type { OpportunityStatus, ProviderOpportunityRecord }
