@@ -126,7 +126,7 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
   } else if (targetStatus === 'DISPUTED') {
     await prisma.marketplaceJob.updateMany({
       where: { id: ctx.jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', isActive: false },
     })
   }
 
@@ -487,8 +487,19 @@ export async function releaseEscrow(
 export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF') {
-    throw new Error('Only the customer or staff can refund escrow')
+  let providerCancellationAuthorized = false
+  if (ctx.actorType === 'PROVIDER' || ctx.actorType === 'COMPANY') {
+    const resolved = await resolveProviderActor(jobId, ctx.actorId)
+    const activePin = await prisma.jobVerificationPin.findFirst({
+      where: { jobId, status: 'ACTIVE' },
+      orderBy: { version: 'desc' },
+      select: { workStartVerifiedAt: true },
+    })
+    providerCancellationAuthorized = resolved === ctx.actorType && !activePin?.workStartVerifiedAt
+  }
+
+  if (job.customerId !== ctx.actorId && ctx.actorType !== 'STAFF' && !providerCancellationAuthorized) {
+    throw new Error('Only the customer, accepted provider before work start, or staff can refund escrow')
   }
 
   const escrow = await prisma.jobEscrow.findFirst({
@@ -500,12 +511,12 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.jobEscrow.updateMany({
         where: { id: escrow.id, status: 'PENDING_PAYMENT' },
-        data: { status: 'CANCELLED' },
+        data: { status: 'CANCELLED', isActive: false },
       })
       if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
       await tx.marketplaceJob.updateMany({
         where: { id: jobId, status: { not: 'COMPLETED' } },
-        data: { status: 'CANCELLED' },
+        data: { status: 'CANCELLED', isActive: false },
       })
       await tx.jobQuote.updateMany({
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
@@ -571,7 +582,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
 
       await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { not: 'COMPLETED' } },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', isActive: false },
     })
     await tx.jobQuote.updateMany({
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
@@ -647,7 +658,7 @@ export async function raiseJobDispute(
 
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', isActive: false },
     })
 
     return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
@@ -667,7 +678,7 @@ export async function expirePendingEscrow(
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.jobEscrow.updateMany({
       where: { id: escrowId, status: 'PENDING_PAYMENT' },
-      data: { status: 'CANCELLED' },
+      data: { status: 'CANCELLED', isActive: false },
     })
     if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
 
