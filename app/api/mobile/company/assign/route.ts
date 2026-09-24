@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
       body: job?.title ? `You were assigned to "${job.title}"` : 'You have a new company job assignment',
       referenceType: 'JOB',
       referenceId: jobId,
-      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, assignmentId: result.assignmentId },
-      pushOptions: { channelId: 'job-alerts', priority: 'high', sound: 'default' },
+      pushData: { type: 'COMPANY_ASSIGNMENT', jobId, assignmentId: result.assignmentId, alertMode: 'ring' },
+      pushOptions: { channelId: 'job_offers', priority: 'high', sound: 'default' },
     })
 
     return NextResponse.json({ success: true, assignmentId: result.assignmentId, assignedTo: workerUserId })
