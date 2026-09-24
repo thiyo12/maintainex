@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { createNotification } from './notifications'
+import { createAndPushNotification } from './notifications'
 import { findCandidates } from './matching'
 
 /**
@@ -87,7 +87,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       continue
     }
 
-    await createNotification({
+    await createAndPushNotification({
       userId,
       title: pushTitle,
       body: pushBody,
@@ -111,7 +111,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     const company = companyById.get(companyId)
     if (!company) continue
 
-    await createNotification({
+    await createAndPushNotification({
       userId: company.userId,
       title: pushTitle,
       body: pushBody,
@@ -137,7 +137,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
   })
 
   if (matched === 0) {
-    await createNotification({
+    await createAndPushNotification({
       userId: job.customerId,
       title: 'No providers available right now',
       body: 'Try expanding your search or check back later. Your job is still posted.',
