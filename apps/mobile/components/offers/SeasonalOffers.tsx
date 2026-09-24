@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Dimensions, ScrollView } from 'react-native'
-import { Sun, Snowflake, Flower, Leaf } from 'phosphor-react-native'
+import { Sun, Snowflake, Flower, Leaf, CloudRain, CloudSun } from 'phosphor-react-native'
 import { useColors } from '../../lib/ThemeContext'
 import { useCountry } from '../../lib/country'
 import { serviceCategories } from '../../lib/api'
@@ -31,7 +31,7 @@ export default function SeasonalOffers({ onServicePress }: Props) {
   const slideAnim = useRef(new Animated.Value(SCREEN_WIDTH)).current
 
   const countryCode = selectedCountry?.code || 'LK'
-  const season = getCurrentSeason()
+  const season = getCurrentSeason(countryCode)
   const seasonColors = getSeasonColors(season)
   const serviceNames = getSeasonalServiceNames(countryCode, season)
 
@@ -86,7 +86,7 @@ export default function SeasonalOffers({ onServicePress }: Props) {
         >
           <SeasonIcon season={season} size={18} color={seasonColors.text} />
           <Text style={[styles.tabLabel, { color: seasonColors.text }]}>
-            {season.charAt(0).toUpperCase() + season.slice(1)}
+            {season.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -141,6 +141,10 @@ function SeasonIcon({ season, size, color }: { season: string; size: number; col
     winter: <Snowflake size={size} color={color} weight="bold" />,
     spring: <Flower size={size} color={color} weight="fill" />,
     fall: <Leaf size={size} color={color} weight="bold" />,
+    southwest_monsoon: <CloudRain size={size} color={color} weight="fill" />,
+    second_intermonsoon: <CloudRain size={size} color={color} weight="fill" />,
+    northeast_monsoon: <CloudRain size={size} color={color} weight="fill" />,
+    first_intermonsoon: <CloudSun size={size} color={color} weight="fill" />,
   }
   return <>{icons[season] || <Sun size={size} color={color} weight="fill" />}</>
 }
