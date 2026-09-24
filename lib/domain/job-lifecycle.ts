@@ -455,6 +455,20 @@ export async function releaseEscrow(
       })
     }
 
+    if (quote.providerType === 'COMPANY') {
+      await tx.companyJobAssignment.updateMany({
+        where: {
+          jobId,
+          companyId: quote.providerId,
+          status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+        },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+        },
+      })
+    }
+
     if (commissionCents > 0n) {
       await tx.commissionSettlement.create({
         data: {
