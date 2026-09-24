@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { scanChatMessage } from '@/lib/fraud-detection'
+import { sendExpoPush } from '@/lib/push'
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +80,60 @@ export async function POST(request: NextRequest) {
     if (!participantId) {
       return NextResponse.json({ error: 'participantId required' }, { status: 400 })
     }
+    if (participantId === user.id) {
+      return NextResponse.json({ error: 'Cannot start a conversation with yourself' }, { status: 400 })
+    }
+    if (!jobId) {
+      return NextResponse.json({ error: 'jobId is required to start a new conversation' }, { status: 400 })
+    }
+
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id: jobId },
+      select: { customerId: true, targetTaskerId: true },
+    })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+    const quotes = await prisma.jobQuote.findMany({
+      where: { jobId },
+      select: { providerId: true, providerType: true },
+    })
+    const companyIds = quotes.filter(q => q.providerType === 'COMPANY').map(q => q.providerId)
+    const companies = companyIds.length
+      ? await prisma.companyProfile.findMany({ where: { id: { in: companyIds } }, select: { id: true, userId: true } })
+      : []
+    const companyOwnerIds = new Set(companies.map(company => company.userId))
+    const individualProviderIds = new Set(quotes.filter(q => q.providerType === 'INDIVIDUAL').map(q => q.providerId))
+
+    const targetProfile = job.targetTaskerId
+      ? await prisma.taskerProfile.findFirst({
+          where: { OR: [{ id: job.targetTaskerId }, { userId: job.targetTaskerId }] },
+          select: { userId: true },
+        })
+      : null
+
+    const actorCompanyMembership = companyIds.length
+      ? await prisma.teamMember.findFirst({
+          where: { companyId: { in: companyIds }, userId: user.id, status: 'ACTIVE' },
+          select: { companyId: true },
+        })
+      : null
+
+    const actorIsProvider = individualProviderIds.has(user.id)
+      || targetProfile?.userId === user.id
+      || companyOwnerIds.has(user.id)
+      || Boolean(actorCompanyMembership)
+
+    const participantIsProvider = individualProviderIds.has(participantId)
+      || targetProfile?.userId === participantId
+      || companyOwnerIds.has(participantId)
+
+    const authorizedPair =
+      (user.id === job.customerId && participantIsProvider)
+      || (participantId === job.customerId && actorIsProvider)
+
+    if (!authorizedPair) {
+      return NextResponse.json({ error: 'Messaging is only available between this job customer and an eligible/quoting provider' }, { status: 403 })
+    }
 
     // Dedup scoped to job + the same two participants
     const existingConversation = await prisma.conversation.findFirst({
@@ -104,14 +160,6 @@ export async function POST(request: NextRequest) {
             { userId: participantId },
           ],
         },
-        ...(initialMessage ? {
-          messages: {
-            create: {
-              senderId: user.id,
-              text: initialMessage,
-            },
-          },
-        } : {}),
       },
       include: {
         participants: {
@@ -122,6 +170,28 @@ export async function POST(request: NextRequest) {
         messages: { take: 1, orderBy: { createdAt: 'desc' } },
       },
     })
+
+    if (initialMessage?.trim()) {
+      const raw = String(initialMessage).trim().slice(0, 2000)
+      const scan = await scanChatMessage(raw, user.id, conversation.id)
+      const messageText = scan.sanitizedText || raw
+      await prisma.message.create({
+        data: { conversationId: conversation.id, senderId: user.id, text: messageText },
+      })
+      const recipient = await prisma.user.findUnique({
+        where: { id: participantId },
+        select: { pushToken: true },
+      })
+      if (recipient?.pushToken) {
+        void sendExpoPush(
+          recipient.pushToken,
+          user.name || 'New message',
+          messageText.slice(0, 120),
+          { screen: '/(chat)/[id]', id: conversation.id, type: 'CHAT_MESSAGE', jobId },
+          { channelId: 'messages', priority: 'high' },
+        )
+      }
+    }
 
     return NextResponse.json({
       id: conversation.id,
