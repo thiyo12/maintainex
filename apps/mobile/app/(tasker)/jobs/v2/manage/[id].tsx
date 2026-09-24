@@ -196,6 +196,7 @@ export default function V2ProviderManageJobScreen() {
   const isWaiting = progressStatus === 'COMPLETION_REQUESTED' || job.status === 'COMPLETION_PENDING'
   const isCompleted = job.status === 'COMPLETED' || progressStatus === 'COMPLETED'
   const canDispute = job.status !== 'COMPLETED' && job.status !== 'CANCELLED'
+  const canOtpCancel = isAccepted && ['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)
 
   const customerName = job.customer?.name || 'Customer'
   const customerInitial = customerName.trim().charAt(0).toUpperCase() || 'C'
@@ -411,6 +412,20 @@ export default function V2ProviderManageJobScreen() {
           ) : null}
         </View>
 
+        {canOtpCancel ? (
+          <TouchableOpacity
+            style={styles.cancelAction}
+            activeOpacity={0.72}
+            onPress={() => router.push((`/(tasker)/jobs/v2/manage/${id}/cancel`) as any)}
+          >
+            <Flag size={17} color={v3.colors.error} weight="bold" />
+            <View style={styles.cancelActionCopy}>
+              <Text style={styles.cancelActionTitle}>Cancel before work starts</Text>
+              <Text style={styles.cancelActionText}>OTP confirmation required. Protected payment will be refunded to the customer.</Text>
+            </View>
+          </TouchableOpacity>
+        ) : null}
+
         {isCompleted && reviews?.providerReviews?.length === 0 ? (
           <View style={styles.reviewCard}>
             <Text style={styles.reviewEyebrow}>RATE CUSTOMER</Text>
@@ -577,6 +592,17 @@ const makeStyles = (_colors: any) => StyleSheet.create({
   reviewLabel: { marginTop: 10, marginBottom: 5, fontSize: 9, fontFamily: fonts.headingBold, color: v3.colors.textSecondary },
   reviewInput: { height: 48, borderRadius: 14, paddingHorizontal: 13, backgroundColor: v3.colors.surfaceGray, fontSize: 12, fontFamily: fonts.bodyMedium, color: v3.colors.ink },
   reviewNote: { height: 82, paddingTop: 12 },
+  cancelAction: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: v3.colors.errorSoft,
+    borderRadius: 18,
+    padding: 14,
+    marginTop: 12,
+  },
+  cancelActionCopy: { flex: 1, marginLeft: 9 },
+  cancelActionTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
+  cancelActionText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 16, marginTop: 2 },
   reviewedCard: { minHeight: 56, marginTop: 18, borderRadius: 15, paddingHorizontal: 14, backgroundColor: v3.colors.successSoft, flexDirection: 'row', alignItems: 'center', gap: 8 },
   reviewedText: { fontSize: 10.5, fontFamily: fonts.headingBold, color: v3.colors.success },
   nextCard: { minHeight: 62, marginTop: 14, borderRadius: 15, paddingHorizontal: 13, backgroundColor: v3.colors.paper, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center' },
