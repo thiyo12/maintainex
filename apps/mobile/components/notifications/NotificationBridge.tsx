@@ -80,7 +80,7 @@ export default function NotificationBridge() {
       notification => {
         const content = notification?.request?.content
         const data = (content?.data || {}) as Record<string, any>
-        if (data?.type !== 'NEW_JOB') return
+        if (!['NEW_JOB', 'COMPANY_ASSIGNMENT'].includes(String(data?.type || ''))) return
         if (data?.alertMode !== 'ring') return
 
         if (timerRef.current) clearTimeout(timerRef.current)
