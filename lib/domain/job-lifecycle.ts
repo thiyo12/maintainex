@@ -4,6 +4,7 @@ import { bigIntToSafeNumber, type Currency } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
 import { Prisma } from '@prisma/client'
+import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
@@ -76,18 +77,31 @@ export function canActorPerformWorkspaceTransition(actorType: ActorType, targetS
 }
 
 export async function transitionMarketplaceJob(ctx: TransitionContext, targetStatus: JobStatus) {
-  const job = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
-  if (!job) throw new Error('Job not found')
-  if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
-    throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
-  }
+  return prisma.$transaction(async tx => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
+    if (!job) throw new Error('Job not found')
+    if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
+      throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
+    }
 
-  const changed = await prisma.marketplaceJob.updateMany({
-    where: { id: ctx.jobId, status: job.status },
-    data: { status: targetStatus },
+    const changed = await tx.marketplaceJob.updateMany({
+      where: { id: ctx.jobId, status: job.status },
+      data: { status: targetStatus },
+    })
+    if (changed.count !== 1) throw new Error('Job state changed concurrently')
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_STATUS_CHANGED',
+      fromState: job.status,
+      toState: targetStatus,
+      metadata: ctx.reason ? { reason: ctx.reason, ...ctx.metadata } : ctx.metadata,
+    })
+
+    return tx.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
   })
-  if (changed.count !== 1) throw new Error('Job state changed concurrently')
-  return prisma.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
 }
 
 export async function transitionJobWorkspace(ctx: TransitionContext, targetStatus: WorkspaceStatus) {
@@ -117,6 +131,16 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
     },
   })
   if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
+
+  await recordJobLifecycleEvent(prisma, {
+    jobId: ctx.jobId,
+    actorId: ctx.actorId,
+    actorType: ctx.actorType,
+    action: 'WORKSPACE_STATUS_CHANGED',
+    fromState: workspace.progressStatus,
+    toState: targetStatus,
+    metadata: ctx.reason ? { reason: ctx.reason, ...ctx.metadata } : ctx.metadata,
+  })
 
   if (targetStatus === 'COMPLETED') {
     await prisma.marketplaceJob.updateMany({
