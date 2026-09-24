@@ -472,10 +472,13 @@ export interface SmartPriceEstimate {
 }
 
 export const v2SmartBooking = {
-  templates: (jobCategoryId?: string) =>
-    v2Request<SmartTemplate[]>(
-      `/api/mobile/v2/service-templates${jobCategoryId ? `?jobCategoryId=${encodeURIComponent(jobCategoryId)}` : ''}`
-    ),
+  templates: (jobCategoryId?: string, countryCode?: string) => {
+    const params = new URLSearchParams()
+    if (jobCategoryId) params.set('jobCategoryId', jobCategoryId)
+    if (countryCode) params.set('country', countryCode)
+    const query = params.toString()
+    return v2Request<SmartTemplate[]>(`/api/mobile/v2/service-templates${query ? `?${query}` : ''}`)
+  },
   priceEstimate: (data: {
     templateId: string
     answers: Record<string, any>
@@ -500,14 +503,14 @@ export interface SearchResult {
 }
 
 export const v2Search = {
-  categories: (q: string, lang?: string) =>
+  categories: (q: string, lang?: string, countryCode?: string) =>
     v2Request<{
       query: string; lang: string; correctedQuery?: string;
       categories: { id: string; name: string; icon: string; colorHex: string; score: number; correctedQuery?: string }[];
       subServices: { id: string; name: string; categoryId: string; categoryName: string; categoryIcon: string; categoryColor: string; score: number }[];
       totalResults: number;
     }>(
-      `/api/mobile/v2/search?q=${encodeURIComponent(q)}${lang ? `&lang=${lang}` : ''}`
+      `/api/mobile/v2/search?q=${encodeURIComponent(q)}${lang ? `&lang=${lang}` : ''}${countryCode ? `&country=${encodeURIComponent(countryCode)}` : ''}`
     ),
   popular: () =>
     v2Request<{ results: any[] }>('/api/mobile/v2/search?popular=true'),
