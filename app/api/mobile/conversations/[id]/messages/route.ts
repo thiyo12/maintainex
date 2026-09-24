@@ -97,7 +97,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         recipient.user.pushToken,
         user.name || 'New message',
         messageText.substring(0, 120),
-        { screen: '/(chat)/[id]', id }
+        { type: 'CHAT_MESSAGE', conversationId: id, id, screen: '/(chat)/[id]' },
+        { channelId: 'messages', priority: 'high' },
       )
     }
 
