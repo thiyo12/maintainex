@@ -1,6 +1,7 @@
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
+import { notifyUser } from '@/lib/notifications'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -91,6 +92,17 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     return record
   })
 
+  await notifyUser({
+    userId: workerUserId,
+    title: 'New company job assignment',
+    body: `You were assigned to "${job.title}". Open MaintainEX to review and accept it.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', assignmentId: assignment.id, jobId },
+    channelId: 'job-opportunities',
+    priority: 'high',
+  })
+
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -164,6 +176,17 @@ export async function reassignWorker(
     }, tx)
 
     return newRecord
+  })
+
+  await notifyUser({
+    userId: newWorkerUserId,
+    title: 'Company job reassigned to you',
+    body: `A company job has been reassigned to you. Open MaintainEX to review it.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+    pushData: { type: 'COMPANY_ASSIGNMENT', assignmentId: assignment.id, jobId },
+    channelId: 'job-opportunities',
+    priority: 'high',
   })
 
   return { success: true, assignmentId: assignment.id }
