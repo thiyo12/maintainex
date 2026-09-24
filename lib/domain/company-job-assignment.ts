@@ -130,6 +130,14 @@ export async function reassignWorker(
   })
   if (!acceptedQuote) return { success: false, error: 'Job does not belong to this company' }
 
+  const workspace = await prisma.jobWorkspace.findUnique({
+    where: { jobId },
+    select: { progressStatus: true },
+  })
+  if (workspace?.progressStatus && workspace.progressStatus !== 'ACCEPTED') {
+    return { success: false, error: 'Worker cannot be reassigned after secure work start' }
+  }
+
   const currentAssignment = await prisma.companyJobAssignment.findFirst({
     where: { jobId, companyId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
   })
