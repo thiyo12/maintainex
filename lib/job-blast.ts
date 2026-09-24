@@ -98,12 +98,13 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
       pushPriority: 'high',
-      pushChannelId: 'job-offers',
+      pushChannelId: 'job-alerts',
       pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
-        offerMode: recentlyOnline ? 'LIVE' : 'OFFLINE',
+        alertMode: recentlyOnline ? 'ring' : 'standard',
+        presence: recentlyOnline ? 'ONLINE' : 'OFFLINE',
       },
     })
     matched += 1
@@ -121,13 +122,14 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
       pushPriority: 'high',
-      pushChannelId: 'job-offers',
+      pushChannelId: 'job-alerts',
       pushData: {
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
         companyId,
-        offerMode: 'OFFLINE',
+        alertMode: 'ring',
+        presence: 'COMPANY',
       },
     })
     matched += 1
