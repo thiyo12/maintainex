@@ -48,6 +48,7 @@ export default function V2SubmitQuoteScreen() {
   const [price, setPrice] = useState('')
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState('')
   const [message, setMessage] = useState('')
+  const [existingQuoteId, setExistingQuoteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -62,10 +63,21 @@ export default function V2SubmitQuoteScreen() {
           const nextJob = jobRes.value.job
           setJob(nextJob)
 
-          const min = Number(nextJob?.smartBooking?.estimatedPriceMin ?? 0)
-          const max = Number(nextJob?.smartBooking?.estimatedPriceMax ?? nextJob?.budgetAmount ?? 0)
-          if (min > 0 && max > 0) setPrice(String(Math.round((min + max) / 2)))
-          else if (max > 0) setPrice(String(Math.round(max)))
+          const currentQuote = (nextJob.quotes || []).find(
+            quote => quote.providerType === 'INDIVIDUAL' && quote.status === 'PENDING'
+          )
+          if (currentQuote) {
+            setExistingQuoteId(currentQuote.id)
+            setPrice(String(currentQuote.price))
+            setEstimatedCompletionTime(currentQuote.estimatedCompletionTime || '')
+            setMessage(currentQuote.message || '')
+          } else {
+            setExistingQuoteId(null)
+            const min = Number(nextJob?.smartBooking?.estimatedPriceMin ?? 0)
+            const max = Number(nextJob?.smartBooking?.estimatedPriceMax ?? nextJob?.budgetAmount ?? 0)
+            if (min > 0 && max > 0) setPrice(String(Math.round((min + max) / 2)))
+            else if (max > 0) setPrice(String(Math.round(max)))
+          }
         } else {
           Alert.alert('Job unavailable', 'This opportunity is no longer available.')
           router.back()
@@ -130,16 +142,28 @@ export default function V2SubmitQuoteScreen() {
 
     setSubmitting(true)
     try {
-      await v2Quotes.submit({
-        jobId: id,
-        providerType: 'INDIVIDUAL',
-        price: numericPrice,
-        estimatedCompletionTime: estimatedCompletionTime.trim(),
-        message: message.trim(),
-      })
-      Alert.alert('Quote sent', 'The customer can now compare your offer.', [
-        { text: 'Done', onPress: () => router.replace('/(tasker)/(tabs)/my-jobs' as any) },
-      ])
+      if (existingQuoteId) {
+        await v2Quotes.revise(existingQuoteId, {
+          price: numericPrice,
+          estimatedCompletionTime: estimatedCompletionTime.trim(),
+          message: message.trim(),
+          revisionReason: 'Updated after customer discussion',
+        })
+        Alert.alert('Quote updated', 'Your revised price is now the active offer for the customer.', [
+          { text: 'Done', onPress: () => router.replace('/(tasker)/(tabs)/my-jobs' as any) },
+        ])
+      } else {
+        await v2Quotes.submit({
+          jobId: id,
+          providerType: 'INDIVIDUAL',
+          price: numericPrice,
+          estimatedCompletionTime: estimatedCompletionTime.trim(),
+          message: message.trim(),
+        })
+        Alert.alert('Quote sent', 'The customer can now compare your offer.', [
+          { text: 'Done', onPress: () => router.replace('/(tasker)/(tabs)/my-jobs' as any) },
+        ])
+      }
     } catch (e: any) {
       Alert.alert('Unable to send quote', e?.message || 'Please try again.')
     } finally {
@@ -164,13 +188,17 @@ export default function V2SubmitQuoteScreen() {
           <TouchableOpacity style={styles.circleButton} activeOpacity={0.72} onPress={() => setStage('opportunity')}>
             <CaretLeft size={18} color={v3.colors.ink} weight="bold" />
           </TouchableOpacity>
-          <Text style={styles.formTopTitle}>Send quote</Text>
+          <Text style={styles.formTopTitle}>{existingQuoteId ? 'Update quote' : 'Send quote'}</Text>
           <View style={styles.circlePlaceholder} />
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.formHero}>Your offer</Text>
-          <Text style={styles.formSubtitle}>Customer sees price, ETA, rating and your profile together.</Text>
+          <Text style={styles.formHero}>{existingQuoteId ? 'Revise your offer' : 'Your offer'}</Text>
+          <Text style={styles.formSubtitle}>
+            {existingQuoteId
+              ? 'After bargaining in chat, update the final price here. The old quote is replaced, not duplicated.'
+              : 'Customer sees price, ETA, rating and your profile together.'}
+          </Text>
 
           <View style={styles.fieldCard}>
             <Text style={styles.fieldLabel}>Price</Text>
@@ -220,7 +248,7 @@ export default function V2SubmitQuoteScreen() {
             {submitting ? (
               <ActivityIndicator size="small" color={v3.colors.paper} />
             ) : (
-              <Text style={styles.primaryButtonText}>Send quote</Text>
+              <Text style={styles.primaryButtonText}>{existingQuoteId ? 'Update quote' : 'Send quote'}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>
@@ -295,7 +323,7 @@ export default function V2SubmitQuoteScreen() {
         </View>
 
         <TouchableOpacity style={styles.primaryButton} activeOpacity={0.78} onPress={handleStartQuote}>
-          <Text style={styles.primaryButtonText}>Send a quote</Text>
+          <Text style={styles.primaryButtonText}>{existingQuoteId ? 'Review / update quote' : 'Send a quote'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
