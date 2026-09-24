@@ -85,7 +85,7 @@ export async function notifyQuoteSubmitted(jobId: string, customerId: string, pr
     params: { providerName },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -100,7 +100,7 @@ export async function notifyQuoteAccepted(jobId: string, providerId: string, job
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -115,7 +115,7 @@ export async function notifyEscrowDeposited(jobId: string, providerId: string, j
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -130,7 +130,7 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -145,7 +145,7 @@ export async function notifyCompletionRequested(jobId: string, customerId: strin
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -160,7 +160,7 @@ export async function notifyJobStarted(jobId: string, customerId: string, jobTit
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -183,7 +183,7 @@ export async function notifyPaymentReleased(
     params: { amount: formattedAmount, jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -197,7 +197,7 @@ export async function notifyEscrowTimeout(jobId: string, providerId: string) {
     bodyKey: 'notification.escrow_timeout.body',
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -221,7 +221,7 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
     params: { jobTitle },
     referenceType: 'JOB',
     referenceId: jobId,
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -265,7 +265,7 @@ export async function notifyQuoteRevised(
     referenceType: 'JOB',
     referenceId: jobId,
     pushData: { type: 'QUOTE_REVISED', jobId },
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
@@ -282,7 +282,7 @@ export async function notifyWorkerAssigned(
     referenceType: 'JOB',
     referenceId: jobId,
     pushData: { type: 'COMPANY_ASSIGNMENT', jobId },
-    channelId: 'job-offers',
+    channelId: 'job_offers',
     priority: 'high',
   })
 }
@@ -300,7 +300,7 @@ export async function notifyJobCancelled(
     referenceType: 'JOB',
     referenceId: jobId,
     pushData: { type: 'JOB_CANCELLED', jobId },
-    channelId: 'job-updates',
+    channelId: 'job_updates',
     priority: 'high',
   })
 }
