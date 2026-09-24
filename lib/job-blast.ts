@@ -100,6 +100,11 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         type: 'NEW_JOB',
         jobId,
         categoryId: job.categoryId,
+        alertMode: profile.isOnline ? 'urgent_foreground' : 'standard_push',
+      }, {
+        sound: 'default',
+        channelId: 'job-offers',
+        priority: 'high',
       })
     }
     matched += 1
@@ -123,6 +128,11 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
         jobId,
         categoryId: job.categoryId,
         companyId,
+        alertMode: 'company_dispatch',
+      }, {
+        sound: 'default',
+        channelId: 'job-offers',
+        priority: 'high',
       })
     }
     matched += 1
