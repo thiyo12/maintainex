@@ -510,12 +510,12 @@ export async function refundEscrow(
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.jobEscrow.updateMany({
         where: { id: escrow.id, status: 'PENDING_PAYMENT' },
-        data: { status: 'CANCELLED', isActive: false },
+        data: { status: 'CANCELLED' },
       })
       if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
       await tx.marketplaceJob.updateMany({
         where: { id: jobId, status: { not: 'COMPLETED' } },
-        data: { status: 'CANCELLED' },
+        data: { status: 'CANCELLED', isActive: false },
       })
       await tx.jobQuote.updateMany({
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
