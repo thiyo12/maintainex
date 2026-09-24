@@ -24,6 +24,7 @@ export default function CompanySubmitQuoteScreen() {
   const [price, setPrice] = useState('')
   const [eta, setEta] = useState('')
   const [message, setMessage] = useState('')
+  const [existingQuoteId, setExistingQuoteId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
@@ -33,6 +34,18 @@ export default function CompanySubmitQuoteScreen() {
         const [jobRes, activeCompanyId] = await Promise.all([v2Jobs.get(id), getActiveCompanyId()])
         setJob(jobRes.job)
         setCompanyId(activeCompanyId)
+
+        const currentQuote = (jobRes.job.quotes || []).find(
+          quote => quote.providerType === 'COMPANY' && quote.status === 'PENDING'
+        )
+        if (currentQuote) {
+          setExistingQuoteId(currentQuote.id)
+          setPrice(String(currentQuote.price))
+          setEta(currentQuote.estimatedCompletionTime || '')
+          setMessage(currentQuote.message || '')
+        } else {
+          setExistingQuoteId(null)
+        }
       } catch {
         Alert.alert('Unable to open job', 'This job is no longer available.', [{ text: 'Back', onPress: () => router.back() }])
       } finally {
@@ -53,17 +66,30 @@ export default function CompanySubmitQuoteScreen() {
     }
     setSubmitting(true)
     try {
-      await v2Quotes.submit({
-        jobId: id,
-        providerType: 'COMPANY',
-        companyId,
-        price: numeric,
-        estimatedCompletionTime: eta.trim(),
-        message: message.trim(),
-      })
-      Alert.alert('Quote sent', 'The customer can now compare your company offer with other providers.', [
-        { text: 'View company jobs', onPress: () => router.replace('/(company)/jobs/v2/my-quotes' as any) },
-      ])
+      if (existingQuoteId) {
+        await v2Quotes.revise(existingQuoteId, {
+          price: numeric,
+          estimatedCompletionTime: eta.trim(),
+          message: message.trim(),
+          revisionReason: 'Updated after customer discussion',
+          companyId,
+        })
+        Alert.alert('Quote updated', 'The revised company price is now the active offer.', [
+          { text: 'View company jobs', onPress: () => router.replace('/(company)/jobs/v2/my-quotes' as any) },
+        ])
+      } else {
+        await v2Quotes.submit({
+          jobId: id,
+          providerType: 'COMPANY',
+          companyId,
+          price: numeric,
+          estimatedCompletionTime: eta.trim(),
+          message: message.trim(),
+        })
+        Alert.alert('Quote sent', 'The customer can now compare your company offer with other providers.', [
+          { text: 'View company jobs', onPress: () => router.replace('/(company)/jobs/v2/my-quotes' as any) },
+        ])
+      }
     } catch (error: any) {
       Alert.alert('Unable to send quote', error?.message || 'Please try again.')
     } finally {
@@ -78,7 +104,7 @@ export default function CompanySubmitQuoteScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.back} onPress={() => router.back()}><CaretLeft size={18} color={v3.colors.ink} weight="bold" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Company quote</Text>
+        <Text style={styles.headerTitle}>{existingQuoteId ? 'Update company quote' : 'Company quote'}</Text>
         <View style={styles.back} />
       </View>
 
@@ -95,7 +121,10 @@ export default function CompanySubmitQuoteScreen() {
           <View style={{ flex: 1, marginLeft: 10 }}><Text style={styles.providerTitle}>Sending as your company</Text><Text style={styles.providerText}>The customer will see the company profile, rating and verification.</Text></View>
         </View>
 
-        <Text style={styles.sectionTitle}>Your offer</Text>
+        <Text style={styles.sectionTitle}>{existingQuoteId ? 'Revise your offer' : 'Your offer'}</Text>
+        {existingQuoteId ? (
+          <Text style={styles.revisionNote}>Use chat to agree the scope, then publish the final price here. The previous quote is replaced.</Text>
+        ) : null}
         <Text style={styles.label}>Price (LKR)</Text>
         <View style={styles.priceWrap}><Text style={styles.currency}>LKR</Text><TextInput style={styles.priceInput} value={price} onChangeText={setPrice} keyboardType="numeric" placeholder="0" placeholderTextColor={v3.colors.textPlaceholder} /></View>
 
@@ -111,7 +140,7 @@ export default function CompanySubmitQuoteScreen() {
         </View>
 
         <TouchableOpacity style={[styles.submit, submitting && { opacity: 0.55 }]} onPress={submit} disabled={submitting}>
-          {submitting ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.submitText}>Send company quote</Text>}
+          {submitting ? <ActivityIndicator size="small" color={v3.colors.paper} /> : <Text style={styles.submitText}>{existingQuoteId ? 'Update company quote' : 'Send company quote'}</Text>}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -135,6 +164,7 @@ const styles = StyleSheet.create({
   providerTitle: { ...v3.typography.bodyBold, color: v3.colors.ink },
   providerText: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 16, marginTop: 2 },
   sectionTitle: { ...v3.typography.title, color: v3.colors.ink, marginTop: 22, marginBottom: 2 },
+  revisionNote: { ...v3.typography.caption, color: v3.colors.textSecondary, lineHeight: 17, marginTop: 4, marginBottom: 4 },
   label: { ...v3.typography.captionBold, color: v3.colors.textSecondary, marginTop: 13, marginBottom: 6 },
   priceWrap: { height: 58, backgroundColor: v3.colors.paper, borderRadius: 16, borderWidth: 1, borderColor: v3.colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
   currency: { ...v3.typography.bodyBold, color: v3.colors.textMuted, marginRight: 10 },
