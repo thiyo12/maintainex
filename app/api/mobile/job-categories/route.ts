@@ -21,7 +21,13 @@ export async function GET(request: NextRequest) {
       orderBy: { sortOrder: 'asc' },
     })
 
-    const categories = allCategories.filter(c => storedListIncludes(c.countries, country))
+    const categories = allCategories
+      .filter(c => storedListIncludes(c.countries, country))
+      .map(c => ({
+        ...c,
+        jobs: c.jobs.filter(j => storedListIncludes(j.countries, country)),
+      }))
+      .filter(c => c.jobs.length > 0)
 
     return NextResponse.json(categories.map(c => ({
       id: c.id,
