@@ -135,12 +135,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
+
+    // Critical IDOR guard: only conversation participants can read messages.
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId: id, userId: user.id } },
+      select: { id: true },
+    })
+    if (!participant) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
     const { searchParams } = new URL(request.url)
     const after = searchParams.get('after')
 
     const where: any = { conversationId: id }
     if (after) {
-      where.createdAt = { gt: new Date(after) }
+      const afterDate = new Date(after)
+      if (Number.isNaN(afterDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid after timestamp' }, { status: 400 })
+      }
+      where.createdAt = { gt: afterDate }
     }
 
     const messages = await prisma.message.findMany({
