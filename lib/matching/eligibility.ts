@@ -166,7 +166,7 @@ export async function evaluateEligibility(
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -460,39 +460,160 @@ async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  incoming: MatchingInput,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const incomingJob = await client.marketplaceJob.findUnique({
+    where: { id: incoming.jobId },
+    select: {
+      preferredDate: true,
+      preferredTimeSlot: true,
+      estimatedDuration: true,
+      urgency: true,
+    },
+  })
 
-  let activeCount: number
-  if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
-  } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
+  const availability = await client.providerAvailability.findUnique({
+    where: { providerId },
+  })
+  if (availability && !availability.isAvailable) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: 'Provider is currently unavailable' }
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  const requestedAt = incomingJob?.preferredDate ?? null
+  if (availability && requestedAt) {
+    if (availability.vacationStart && availability.vacationEnd &&
+      requestedAt >= availability.vacationStart && requestedAt <= availability.vacationEnd) {
+      return { gate: 'NO_CONFLICT', passed: false, reason: 'Provider is on vacation for the requested date' }
+    }
+
+    const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'] as const
+    const dayKey = dayNames[requestedAt.getDay()]
+    if (!availability[dayKey]) {
+      return { gate: 'NO_CONFLICT', passed: false, reason: 'Provider is not available on the requested day' }
+    }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  const now = new Date()
+  const immediate = !requestedAt || requestedAt.getTime() <= now.getTime() + 4 * 60 * 60 * 1000
+
+  if (providerType === 'COMPANY') {
+    const capacity = await client.teamMember.count({
+      where: {
+        companyId: providerId,
+        status: 'ACTIVE',
+        userId: { not: null },
+        role: { in: ['COMPANY_OWNER', 'WORKER'] },
+      },
+    })
+    const effectiveCapacity = Math.max(1, capacity)
+
+    const activeAssignments = await client.companyJobAssignment.findMany({
+      where: {
+        companyId: providerId,
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      include: {
+        job: {
+          select: {
+            preferredDate: true,
+            preferredTimeSlot: true,
+            estimatedDuration: true,
+            status: true,
+          },
+        },
+      },
+    })
+
+    const conflicts = activeAssignments.filter(assignment =>
+      immediate
+        ? assignment.job.status === 'IN_PROGRESS' || assignment.job.status === 'QUOTE_ACCEPTED'
+        : schedulesOverlap(incomingJob, assignment.job)
+    ).length
+
+    if (conflicts >= effectiveCapacity) {
+      return {
+        gate: 'NO_CONFLICT',
+        passed: false,
+        reason: `Company capacity conflict: ${conflicts}/${effectiveCapacity} worker slot(s) occupied`,
+      }
+    }
+    return {
+      gate: 'NO_CONFLICT',
+      passed: true,
+      detail: `Company capacity available: ${Math.max(0, effectiveCapacity - conflicts)} slot(s)`,
+    }
+  }
+
+  const activeQuotes = await client.jobQuote.findMany({
+    where: {
+      providerId,
+      providerType: 'INDIVIDUAL',
+      status: 'ACCEPTED',
+      job: { status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
+    },
+    include: {
+      job: {
+        select: {
+          preferredDate: true,
+          preferredTimeSlot: true,
+          estimatedDuration: true,
+          status: true,
+        },
+      },
+    },
+  })
+
+  const conflict = activeQuotes.some(row =>
+    immediate
+      ? row.job.status === 'IN_PROGRESS' || row.job.status === 'QUOTE_ACCEPTED'
+      : schedulesOverlap(incomingJob, row.job)
+  )
+
+  if (conflict) {
+    return {
+      gate: 'NO_CONFLICT',
+      passed: false,
+      reason: immediate ? 'Provider is busy with an active job' : 'Provider has a scheduling conflict',
+    }
+  }
+
+  return {
+    gate: 'NO_CONFLICT',
+    passed: true,
+    detail: immediate ? 'Provider is available now' : 'Requested schedule is available',
+  }
+}
+
+function schedulesOverlap(
+  incoming: { preferredDate: Date | null; preferredTimeSlot: string | null; estimatedDuration: number | null } | null,
+  existing: { preferredDate: Date | null; preferredTimeSlot: string | null; estimatedDuration: number | null },
+): boolean {
+  if (!incoming?.preferredDate) return true
+  if (!existing.preferredDate) {
+    return existing.status === 'IN_PROGRESS'
+      && incoming.preferredDate.getTime() <= Date.now() + 4 * 60 * 60 * 1000
+  }
+
+  const a = scheduleWindow(incoming.preferredDate, incoming.preferredTimeSlot, incoming.estimatedDuration)
+  const b = scheduleWindow(existing.preferredDate, existing.preferredTimeSlot, existing.estimatedDuration)
+  return a.start < b.end && b.start < a.end
+}
+
+function scheduleWindow(date: Date, slot: string | null, durationHours: number | null) {
+  const start = new Date(date)
+  const normalized = (slot || 'anytime').toLowerCase()
+  const hour = normalized === 'morning' ? 8
+    : normalized === 'afternoon' ? 12
+    : normalized === 'evening' ? 17
+    : start.getHours() || 8
+  start.setHours(hour, 0, 0, 0)
+
+  const defaultHours = normalized === 'morning' ? 4
+    : normalized === 'afternoon' ? 5
+    : normalized === 'evening' ? 4
+    : 2
+  const hours = Math.max(0.5, Math.min(12, durationHours || defaultHours))
+  return { start, end: new Date(start.getTime() + hours * 60 * 60 * 1000) }
 }
 
 async function evaluateQualityFloor(
