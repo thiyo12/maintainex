@@ -241,6 +241,22 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         },
       })
     }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'QUOTE_ACCEPTED',
+      fromState: 'OPEN',
+      toState: 'QUOTE_ACCEPTED',
+      metadata: {
+        quoteId,
+        providerId: quote.providerId,
+        providerType: quote.providerType,
+        amountCents: quote.price,
+        currency: pricingConfig.defaultCurrency,
+      },
+    })
   })
 
   const committedJob = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
@@ -327,6 +343,22 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
       data: { status: 'IN_PROGRESS' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'ESCROW_FUNDED',
+      fromState: escrow.status,
+      toState: 'PROTECTED',
+      metadata: {
+        escrowId: escrow.id,
+        amountCents: totalAmount,
+        currency: escrowCurrency,
+        jobStateBefore: job.status,
+        jobStateAfter: 'IN_PROGRESS',
+      },
     })
   })
 
@@ -616,6 +648,22 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
         data: { status: 'WITHDRAWN' },
       })
+
+      await recordJobLifecycleEvent(tx, {
+        jobId,
+        actorId: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'JOB_CANCELLED',
+        fromState: job.status,
+        toState: 'CANCELLED',
+        metadata: {
+          reason: ctx.reason ?? null,
+          escrowId: escrow.id,
+          escrowFromState: 'PENDING_PAYMENT',
+          escrowToState: 'CANCELLED',
+          refundCents: 0,
+        },
+      })
     })
     return { refundAmount: 0, refundCents: 0n }
   }
@@ -681,6 +729,23 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     await tx.jobQuote.updateMany({
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
       data: { status: 'WITHDRAWN' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'ESCROW_REFUNDED',
+      fromState: job.status,
+      toState: 'CANCELLED',
+      metadata: {
+        reason: ctx.reason ?? null,
+        escrowId: escrow.id,
+        escrowFromState: escrow.status,
+        escrowToState: 'REFUNDED',
+        refundCents,
+        currency: escrow.currency,
+      },
     })
   })
 
@@ -753,6 +818,23 @@ export async function raiseJobDispute(
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
       data: { status: 'CANCELLED' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'DISPUTE_RAISED',
+      fromState: workspace.progressStatus,
+      toState: 'DISPUTED',
+      metadata: {
+        reason: ctx.reason ?? null,
+        jobStateBefore: job.status,
+        jobStateAfter: 'CANCELLED',
+        escrowId: escrow.id,
+        escrowFromState: 'PROTECTED',
+        escrowToState: 'ON_HOLD',
+      },
     })
 
     return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
@@ -988,6 +1070,24 @@ export async function completeAndReleaseEscrow(
       commissionCents,
       currency: escrowCurrency,
       countryCode: job.countryCode || 'LK',
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_COMPLETED',
+      fromState: job.status,
+      toState: 'COMPLETED',
+      metadata: {
+        releaseMode,
+        escrowId: escrow.id,
+        workspaceFromState: workspace.progressStatus,
+        workspaceToState: 'COMPLETED',
+        commissionCents,
+        providerNetCents: netCents,
+        currency: escrowCurrency,
+      },
     })
 
     return {
