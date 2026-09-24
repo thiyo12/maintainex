@@ -276,6 +276,17 @@ describe.skipIf(!isDB)('Phase 8 — Canonical Financial Flow Integration', () =>
       for (const entry of ledgerEntries) {
         expect(entry.currency).toBe('LKR')
       }
+
+      const lifecycle = await prisma.jobLifecycleEvent.findMany({
+        where: { jobId: lkJobId },
+        orderBy: { createdAt: 'asc' },
+      })
+      expect(lifecycle.map(event => event.action)).toEqual(
+        expect.arrayContaining(['QUOTE_ACCEPTED', 'ESCROW_FUNDED', 'JOB_COMPLETED'])
+      )
+      expect(lifecycle.every(event => !!event.actorType && !!event.createdAt)).toBe(true)
+      expect(lifecycle.find(event => event.action === 'QUOTE_ACCEPTED')?.actorId).toBe(lkCustomerId)
+      expect(lifecycle.find(event => event.action === 'JOB_COMPLETED')?.toState).toBe('COMPLETED')
     })
 
     it('CA: provider canonical CAD balance credited, legacy float NOT touched', async () => {
