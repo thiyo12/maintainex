@@ -366,7 +366,7 @@ async function resolvePinVerifierTx(
         jobId,
         workerUserId: userId,
         companyId: acceptedQuote.providerId,
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
       },
       select: { id: true },
     })
