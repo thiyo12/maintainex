@@ -98,7 +98,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
       pushPriority: 'high',
-      pushChannelId: 'job-alerts',
+      pushChannelId: 'job_offers',
       pushData: {
         type: 'NEW_JOB',
         jobId,
@@ -122,7 +122,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
       referenceType: 'JOB_MATCH',
       referenceId: jobId,
       pushPriority: 'high',
-      pushChannelId: 'job-alerts',
+      pushChannelId: 'job_offers',
       pushData: {
         type: 'NEW_JOB',
         jobId,
