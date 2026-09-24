@@ -166,7 +166,7 @@ export async function evaluateEligibility(
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.jobId)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -460,39 +460,80 @@ async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  jobId: string,
 ): Promise<EligibilityGate> {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-
-  let activeCount: number
-  if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
-  } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-    activeCount = Number(rows[0]?.cnt ?? 0)
+  type ActiveJob = {
+    id: string
+    status: string
+    preferredDate: Date | null
+    preferredTimeSlot: string | null
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: jobId },
+    select: { preferredDate: true, preferredTimeSlot: true },
+  })
+
+  const rows = providerType === 'INDIVIDUAL'
+    ? await client.$queryRaw<ActiveJob[]>`
+        SELECT mj.id, mj.status, mj."preferredDate", mj."preferredTimeSlot"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'INDIVIDUAL'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj.id <> ${jobId}
+      `
+    : await client.$queryRaw<ActiveJob[]>`
+        SELECT mj.id, mj.status, mj."preferredDate", mj."preferredTimeSlot"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'COMPANY'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj.id <> ${jobId}
+      `
+
+  if (rows.length === 0) {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  // Unscheduled/immediate requests remain conservative: an active job blocks them.
+  if (!target?.preferredDate) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${rows.length} active job(s)` }
+  }
+
+  const sameUtcDay = (a: Date, b: Date) =>
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+
+  const now = new Date()
+  const targetIsFutureDay =
+    Date.UTC(target.preferredDate.getUTCFullYear(), target.preferredDate.getUTCMonth(), target.preferredDate.getUTCDate()) >
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+
+  const conflicts = rows.filter(active => {
+    // A currently-running unscheduled job should not block a later-day booking.
+    if (!active.preferredDate) {
+      return !(active.status === 'IN_PROGRESS' && targetIsFutureDay)
+    }
+
+    if (!sameUtcDay(active.preferredDate, target.preferredDate!)) return false
+
+    const targetSlot = target.preferredTimeSlot
+    const activeSlot = active.preferredTimeSlot
+    if (!targetSlot || targetSlot === 'anytime' || !activeSlot || activeSlot === 'anytime') return true
+    return targetSlot === activeSlot
+  })
+
+  if (conflicts.length > 0) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: `Schedule conflict: ${conflicts.length} overlapping active job(s)` }
+  }
+
+  return { gate: 'NO_CONFLICT', passed: true, detail: 'No overlapping schedule conflict' }
 }
 
 async function evaluateQualityFloor(
