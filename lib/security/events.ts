@@ -40,6 +40,8 @@ export type SecurityEventType =
   | 'job_pin_arrival_verified'
   | 'job_pin_work_start_verified'
   | 'job_pin_completion_verified'
+  | 'job_cancel_otp_requested'
+  | 'job_cancelled_with_otp'
 
 export type RiskLevel = 'info' | 'low' | 'medium' | 'high' | 'critical'
 
@@ -96,6 +98,8 @@ const RISK_LEVEL_MAP: Record<SecurityEventType, RiskLevel> = {
   job_pin_arrival_verified: 'info',
   job_pin_work_start_verified: 'info',
   job_pin_completion_verified: 'info',
+  job_cancel_otp_requested: 'info',
+  job_cancelled_with_otp: 'medium',
 }
 
 export function emitSecurityEvent(event: Omit<SecurityEvent, 'timestamp' | 'riskLevel'>): void {
