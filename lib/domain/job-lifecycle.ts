@@ -77,56 +77,95 @@ export function canActorPerformWorkspaceTransition(actorType: ActorType, targetS
 }
 
 export async function transitionMarketplaceJob(ctx: TransitionContext, targetStatus: JobStatus) {
-  const job = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
-  if (!job) throw new Error('Job not found')
-  if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
-    throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
-  }
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
+    if (!job) throw new Error('Job not found')
+    if (!isValidJobTransition(job.status as JobStatus, targetStatus)) {
+      throw new Error(`Cannot transition job from ${job.status} to ${targetStatus}`)
+    }
 
-  const changed = await prisma.marketplaceJob.updateMany({
-    where: { id: ctx.jobId, status: job.status },
-    data: { status: targetStatus },
+    const changed = await tx.marketplaceJob.updateMany({
+      where: { id: ctx.jobId, status: job.status },
+      data: { status: targetStatus },
+    })
+    if (changed.count !== 1) throw new Error('Job state changed concurrently')
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_STATUS_CHANGED',
+      fromState: job.status,
+      toState: targetStatus,
+      metadata: ctx.reason ? { reason: ctx.reason, ...ctx.metadata } : ctx.metadata,
+    })
+
+    return tx.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
   })
-  if (changed.count !== 1) throw new Error('Job state changed concurrently')
-  return prisma.marketplaceJob.findUniqueOrThrow({ where: { id: ctx.jobId } })
 }
 
 export async function transitionJobWorkspace(ctx: TransitionContext, targetStatus: WorkspaceStatus) {
-  const job = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
-  if (!job) throw new Error('Job not found')
-  if (!canActorPerformWorkspaceTransition(ctx.actorType, targetStatus)) {
-    throw new Error(`Actor type ${ctx.actorType} cannot transition to ${targetStatus}`)
-  }
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
+    if (!job) throw new Error('Job not found')
+    if (!canActorPerformWorkspaceTransition(ctx.actorType, targetStatus)) {
+      throw new Error(`Actor type ${ctx.actorType} cannot transition to ${targetStatus}`)
+    }
 
-  if (PROVIDER_ONLY_WORKSPACE.includes(targetStatus)) {
-    const resolved = await resolveProviderActor(ctx.jobId, ctx.actorId)
-    if (!resolved) throw new Error('Unauthorized: not the accepted provider for this job')
-    if (resolved !== ctx.actorType) throw new Error(`Actor type ${ctx.actorType} does not match provider identity ${resolved}`)
-  }
+    if (PROVIDER_ONLY_WORKSPACE.includes(targetStatus)) {
+      const acceptedQuote = await tx.jobQuote.findFirst({
+        where: { jobId: ctx.jobId, status: 'ACCEPTED' },
+        select: { providerId: true, providerType: true },
+      })
+      if (!acceptedQuote) throw new Error('Unauthorized: no accepted provider for this job')
 
-  const workspace = await prisma.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })
-  if (!workspace) throw new Error('Workspace not found')
-  if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, targetStatus)) {
-    throw new Error(`Cannot transition workspace from ${workspace.progressStatus} to ${targetStatus}`)
-  }
+      let authorized = false
+      if (acceptedQuote.providerType === 'INDIVIDUAL') {
+        authorized = acceptedQuote.providerId === ctx.actorId && ctx.actorType === 'PROVIDER'
+      } else if (ctx.actorType === 'COMPANY') {
+        const membership = await tx.teamMember.findFirst({
+          where: { companyId: acceptedQuote.providerId, userId: ctx.actorId, status: 'ACTIVE' },
+          select: { id: true },
+        })
+        authorized = !!membership
+      }
+      if (!authorized) throw new Error('Unauthorized: not the accepted provider for this job')
+    }
 
-  const changed = await prisma.jobWorkspace.updateMany({
-    where: { jobId: ctx.jobId, progressStatus: workspace.progressStatus },
-    data: {
-      progressStatus: targetStatus,
-      ...(targetStatus === 'COMPLETION_REQUESTED' ? { completionRequestedAt: new Date() } : {}),
-    },
-  })
-  if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
+    const workspace = await tx.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })
+    if (!workspace) throw new Error('Workspace not found')
+    if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, targetStatus)) {
+      throw new Error(`Cannot transition workspace from ${workspace.progressStatus} to ${targetStatus}`)
+    }
 
-  if (targetStatus === 'COMPLETED') {
-    await prisma.marketplaceJob.updateMany({
-      where: { id: ctx.jobId, status: 'IN_PROGRESS' },
-      data: { status: 'COMPLETED' },
+    const changed = await tx.jobWorkspace.updateMany({
+      where: { jobId: ctx.jobId, progressStatus: workspace.progressStatus },
+      data: {
+        progressStatus: targetStatus,
+        ...(targetStatus === 'COMPLETION_REQUESTED' ? { completionRequestedAt: new Date() } : {}),
+      },
     })
-  }
+    if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
 
-  return prisma.jobWorkspace.findUniqueOrThrow({ where: { jobId: ctx.jobId } })
+    if (targetStatus === 'COMPLETED') {
+      await tx.marketplaceJob.updateMany({
+        where: { id: ctx.jobId, status: 'IN_PROGRESS' },
+        data: { status: 'COMPLETED' },
+      })
+    }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'WORKSPACE_STATUS_CHANGED',
+      fromState: workspace.progressStatus,
+      toState: targetStatus,
+      metadata: ctx.reason ? { reason: ctx.reason, ...ctx.metadata } : ctx.metadata,
+    })
+
+    return tx.jobWorkspace.findUniqueOrThrow({ where: { jobId: ctx.jobId } })
+  })
 }
 
 export async function cancelJob(
