@@ -266,20 +266,23 @@ export async function completeAssignment(
   assignmentId: string,
   companyId: string,
 ): Promise<AssignmentResult> {
-  const assignment = await prisma.companyJobAssignment.findUnique({ where: { id: assignmentId } })
+  const assignment = await prisma.companyJobAssignment.findUnique({
+    where: { id: assignmentId },
+    include: { job: { select: { status: true } } },
+  })
   if (!assignment) return { success: false, error: 'Assignment not found' }
   if (assignment.companyId !== companyId) return { success: false, error: 'Assignment does not belong to this company' }
-  if (assignment.status !== 'IN_PROGRESS' && assignment.status !== 'ACCEPTED') {
+  if (assignment.job.status !== 'COMPLETED') {
+    return { success: false, error: 'Assignment completes only after the customer-approved job is completed' }
+  }
+  if (assignment.status === 'COMPLETED') return { success: true, assignmentId }
+  if (assignment.status !== 'IN_PROGRESS') {
     return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
   }
 
-  await prisma.companyJobAssignment.update({
-    where: { id: assignmentId },
-    data: {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      startedAt: assignment.startedAt ?? new Date(),
-    },
+  await prisma.companyJobAssignment.updateMany({
+    where: { id: assignmentId, companyId, status: 'IN_PROGRESS' },
+    data: { status: 'COMPLETED', completedAt: new Date() },
   })
 
   return { success: true, assignmentId }
