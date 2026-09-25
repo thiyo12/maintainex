@@ -47,6 +47,39 @@ export function lkrRupees(rupees: number | string): MoneyAmount {
   return { amount: BigInt(cents), currency: 'LKR' };
 }
 
+export function parseMajorUnitsInput(value: unknown, currency: Currency = 'LKR'): bigint | null {
+  const exponent = CURRENCY_EXPONENTS[currency]
+  const factor = 10 ** exponent
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value <= 0) return null
+    const scaled = Math.round(value * factor)
+    if (!Number.isSafeInteger(scaled)) return null
+    if (Math.abs((scaled / factor) - value) > 1 / (factor * 1000)) return null
+    return BigInt(scaled)
+  }
+
+  if (typeof value === 'bigint') {
+    if (value <= 0n) return null
+    return value * BigInt(factor)
+  }
+
+  if (typeof value !== 'string') return null
+  const raw = value.trim()
+  if (!raw) return null
+
+  const match = raw.match(/^(\d+)(?:\.(\d+))?$/)
+  if (!match) return null
+
+  const whole = match[1]
+  const fraction = match[2] || ''
+  if (fraction.length > exponent) return null
+
+  const padded = fraction.padEnd(exponent, '0')
+  const minor = BigInt(whole) * BigInt(factor) + BigInt(padded || '0')
+  return minor > 0n ? minor : null
+}
+
 export function legacyToMinorUnits(legacyAmount: number, currency: Currency = 'LKR'): bigint {
   if (!Number.isFinite(legacyAmount)) {
     throw new Error('Legacy amount must be finite');
