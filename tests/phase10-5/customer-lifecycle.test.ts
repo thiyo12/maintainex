@@ -6,6 +6,8 @@ const prisma = new PrismaClient()
 let customerAId: string
 let providerId: string
 let jobId: string
+let quoteId: string
+let escrowId: string
 
 beforeAll(async () => {
   const cust = await prisma.user.upsert({
@@ -53,17 +55,40 @@ beforeAll(async () => {
   })
   jobId = job.id
 
-  await prisma.jobQuote.create({
+  const quote = await prisma.jobQuote.create({
     data: {
       jobId,
       providerId,
       providerType: 'INDIVIDUAL',
-      price: 5000n,
+      price: 500000n,
       estimatedCompletionTime: '2 hours',
-        attachments: '[]',
+      attachments: '[]',
       status: 'ACCEPTED',
     },
   })
+  quoteId = quote.id
+
+  await prisma.marketplaceJob.update({
+    where: { id: jobId },
+    data: { approvedQuoteId: quoteId },
+  })
+
+  const escrow = await prisma.jobEscrow.create({
+    data: {
+      jobId,
+      quoteId,
+      customerId: customerAId,
+      providerId,
+      amount: 500000n,
+      serviceFee: 0n,
+      totalAmount: 500000n,
+      currency: 'LKR',
+      paymentMethod: 'CARD',
+      status: 'PROTECTED',
+      heldAt: new Date(),
+    },
+  })
+  escrowId = escrow.id
 
   await prisma.jobWorkspace.create({
     data: {
@@ -75,6 +100,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.jobVerificationPin.deleteMany({ where: { jobId } })
+  await prisma.jobEscrow.deleteMany({ where: { id: escrowId } })
   await prisma.jobQuote.deleteMany({ where: { jobId } })
   await prisma.jobWorkspace.deleteMany({ where: { jobId } })
   await prisma.marketplaceJob.deleteMany({ where: { id: jobId } })
@@ -87,13 +113,17 @@ beforeEach(async () => {
     where: { id: jobId },
     data: {
       status: 'QUOTE_ACCEPTED',
-      approvedQuoteId: null,
+      approvedQuoteId: quoteId,
       finalAuthorizedAmountCents: null,
     },
   })
   await prisma.jobWorkspace.update({
     where: { jobId },
     data: { progressStatus: 'ACCEPTED' },
+  })
+  await prisma.jobEscrow.update({
+    where: { id: escrowId },
+    data: { status: 'PROTECTED', heldAt: new Date(), releasedAt: null, refundedAt: null },
   })
 })
 
