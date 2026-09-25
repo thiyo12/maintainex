@@ -66,7 +66,7 @@ export async function POST(
         recalculateReputation(quote.providerId).catch(err => console.error('Reputation recalc error:', err))
       } else {
         await prisma.companyProfile.updateMany({
-          where: { userId: quote.providerId },
+          where: { id: quote.providerId },
           data: { rating: Math.round(avgRating * 10) / 10, completedProjects: completedCount },
         })
       }
