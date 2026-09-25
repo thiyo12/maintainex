@@ -112,7 +112,7 @@ function resetMocks() {
   db.oTP.create.mockResolvedValue({})
   db.oTP.findFirst.mockResolvedValue(null)
   db.oTP.update.mockResolvedValue({})
-  db.oTP.updateMany.mockResolvedValue({ count: 0 })
+  db.oTP.updateMany.mockResolvedValue({ count: 1 })
   db.oTP.count.mockResolvedValue(0)
   db.securityAudit.create.mockResolvedValue({})
   db.customerProfile.upsert.mockResolvedValue({})
@@ -348,8 +348,24 @@ describe('OTP verify brute-force protection (cases 1-8)', () => {
     expect(body.accessToken).toBe('access-token')
     expect(body.token).toBe('access-token')
     expect(db.user.create).toHaveBeenCalled()
-    expect(db.oTP.update).toHaveBeenCalledWith({ where: { id: 'otp1' }, data: { isUsed: true } })
+    expect(db.oTP.updateMany).toHaveBeenCalledWith({
+      where: { id: 'otp1', isUsed: false },
+      data: { isUsed: true },
+    })
     expect(createMarketplaceAuthSession).toHaveBeenCalled()
+  })
+
+  it('case 4b: valid OTP replay loses the atomic consume race and creates no session', async () => {
+    db.user.findFirst.mockResolvedValue(ordinaryUser)
+    db.oTP.findFirst.mockResolvedValue({ id: 'otp1', attempts: 0, codeHash: HASH_RANDOM, isUsed: false })
+    db.oTP.updateMany.mockResolvedValue({ count: 0 })
+
+    const res = await POST(makeRequest({ phone: '+12025550999', code: '123456' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.error).toContain('already used')
+    expect(createMarketplaceAuthSession).not.toHaveBeenCalled()
   })
 
   it('case 5: verify limit is NOT bypassed for demo accounts (attempts >= 5 → 429)', async () => {
