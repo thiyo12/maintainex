@@ -22,6 +22,7 @@ export async function blastJobToTaskers(jobId: string): Promise<{ matched: numbe
     latitude: job.latitude,
     longitude: job.longitude,
     countryCode: job.countryCode || 'GLOBAL',
+    preferredDate: job.preferredDate,
   })
 
   let individualCandidates = result.candidates.filter((candidate) => candidate.providerType === 'INDIVIDUAL')

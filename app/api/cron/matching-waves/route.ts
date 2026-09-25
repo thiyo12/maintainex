@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       // Find candidates for next wave and create opportunities
       const job = await prisma.marketplaceJob.findUnique({
         where: { id: jobId },
-        select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+        select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
       })
       if (!job) continue
 
@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         countryCode: job.countryCode || 'GLOBAL',
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
+        preferredDate: job.preferredDate,
       })
 
       if (matchResult.candidates.length > 0) {

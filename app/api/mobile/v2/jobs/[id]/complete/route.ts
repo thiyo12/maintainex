@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, type ActorType } from '@/lib/domain/job-lifecycle'
-import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased } from '@/lib/notifications'
+import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
+import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,
@@ -18,8 +18,8 @@ export async function POST(
     const body = await request.json()
     const { action } = body
 
-    if (!action || !['MARK_COMPLETE', 'APPROVE_COMPLETION', 'DISPUTE'].includes(action)) {
-      return NextResponse.json({ error: 'action must be MARK_COMPLETE, APPROVE_COMPLETION, or DISPUTE' }, { status: 400 })
+    if (!action || !['MARK_COMPLETE', 'APPROVE_COMPLETION', 'DISPUTE', 'CANCEL'].includes(action)) {
+      return NextResponse.json({ error: 'action must be MARK_COMPLETE, APPROVE_COMPLETION, DISPUTE, or CANCEL' }, { status: 400 })
     }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
@@ -77,6 +77,49 @@ export async function POST(
       return NextResponse.json({ success: true, message: 'Dispute raised' })
     }
 
+    if (action === 'CANCEL') {
+      const isCustomer = job.customerId === user.id
+      const providerActor = isCustomer ? null : await resolveProviderActor(job.id, user.id)
+      if (!isCustomer && !providerActor) {
+        return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
+      }
+      if (job.status === 'CANCELLED') {
+        return NextResponse.json({ error: 'Job is already cancelled' }, { status: 409 })
+      }
+      if (job.status === 'COMPLETED') {
+        return NextResponse.json({ error: 'Cannot cancel a completed job' }, { status: 409 })
+      }
+      if (job.status === 'IN_PROGRESS') {
+        return NextResponse.json({ error: 'Cannot cancel after work has started' }, { status: 409 })
+      }
+
+      const reason =
+        typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : null
+      const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
+      await cancelJob({ jobId: job.id, actorId: user.id, actorType })
+
+      if (isCustomer) {
+        const accepted = await prisma.jobQuote.findFirst({
+          where: { jobId: job.id, status: 'ACCEPTED' },
+          select: { providerId: true, providerType: true },
+        })
+        if (accepted) {
+          const providerUserId =
+            accepted.providerType === 'INDIVIDUAL'
+              ? accepted.providerId
+              : (await prisma.companyProfile.findUnique({
+                  where: { id: accepted.providerId },
+                  select: { userId: true },
+                }))?.userId
+          if (providerUserId) notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
+        }
+      } else {
+        notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
+      }
+
+      return NextResponse.json({ success: true, message: 'Job cancelled' })
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error: any) {
     console.error('Complete job error:', error)
@@ -86,6 +129,19 @@ export async function POST(
     }
     if (message.includes('already released') || message.includes('concurrently')) {
       return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (
+      message.includes('not in progress') ||
+      message.includes('No protected escrow') ||
+      message.includes('No releasable') ||
+      message.includes('Workspace not found') ||
+      message.includes('Cannot dispute from workspace state') ||
+      message.includes('cannot be cancelled in its current state')
+    ) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (message.includes('Only the customer')) {
+      return NextResponse.json({ error: message }, { status: 403 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

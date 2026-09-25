@@ -37,6 +37,9 @@ export async function PUT(request: NextRequest) {
     await setProviderAvailability(user.id, body)
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Failed to update availability' }, { status: 500 })
+    const message = error?.message || 'Failed to update availability'
+    const isValidationError =
+      message.startsWith('Invalid availability field') || message === 'No valid availability fields provided'
+    return NextResponse.json({ error: message }, { status: isValidationError ? 400 : 500 })
   }
 }

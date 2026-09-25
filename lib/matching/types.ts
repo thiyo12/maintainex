@@ -95,6 +95,7 @@ export interface MatchingInput {
   latitude?: number | null
   longitude?: number | null
   countryCode?: string
+  preferredDate?: Date | string | null
 }
 
 export interface EligibilityGate {

@@ -59,7 +59,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     marketplaceJob: {
       count: vi.fn().mockResolvedValue(0),
     },
-    $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any
 }
@@ -77,6 +77,7 @@ function makeIndivInput(overrides: Record<string, any> = {}) {
       jobMode: 'QUOTE' as const,
       urgency: 'NORMAL' as const,
       countryCode: 'US',
+      preferredDate: undefined as Date | string | null | undefined,
     },
     client,
     ...overrides,
@@ -247,7 +248,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
             id: 'owner-1', isSuspended: false, isBanned: false,
           }),
         },
-        $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+        $queryRaw: vi.fn().mockResolvedValue([]),
       })
       const input = {
         providerType: 'COMPANY' as ProviderType,
@@ -562,12 +563,62 @@ describe('Phase 10.2 — Eligibility Engine', () => {
     it('fails NO_CONFLICT when provider has active jobs', async () => {
       const input = makeIndivInput({
         clientOverrides: {
-          $queryRaw: vi.fn().mockResolvedValue([{ cnt: 2n }]),
+          $queryRaw: vi.fn().mockResolvedValue([{ preferredDate: null }]),
         },
       })
       const result = await evaluateEligibility(input)
       expect(result.eligible).toBe(false)
       expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+    })
+
+    it('passes NO_CONFLICT when busy job is scheduled on a different day than the new job', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          $queryRaw: vi.fn().mockResolvedValue([{ preferredDate: new Date('2026-10-26T12:00:00') }]),
+        },
+      })
+      input.job.preferredDate = new Date('2026-11-25T12:00:00')
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(true)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
+    })
+
+    it('fails NO_CONFLICT when scheduled dates overlap on the same day', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          $queryRaw: vi.fn().mockResolvedValue([{ preferredDate: new Date('2026-10-25T09:00:00') }]),
+        },
+      })
+      input.job.preferredDate = new Date('2026-10-25T18:00:00')
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(false)
+      const gate = result.gates.find(g => g.gate === 'NO_CONFLICT')
+      expect(gate?.passed).toBe(false)
+      expect(gate?.reason).toContain('scheduled dates overlap')
+    })
+
+    it('fails NO_CONFLICT conservatively when busy job has no preferred date', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          $queryRaw: vi.fn().mockResolvedValue([{ preferredDate: null }]),
+        },
+      })
+      input.job.preferredDate = new Date('2026-10-25T12:00:00')
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(false)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+    })
+
+    it('passes NO_CONFLICT when provider has no active jobs regardless of date', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          $queryRaw: vi.fn().mockResolvedValue([]),
+        },
+      })
+      input.job.preferredDate = new Date('2026-10-25T12:00:00')
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(true)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
     })
   })
 

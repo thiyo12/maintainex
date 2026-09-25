@@ -363,7 +363,7 @@ export async function evaluateTaskerEligibility(
 ): Promise<EligibilityResult> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, preferredDate: true },
   })
   if (!job) {
     return {
@@ -384,6 +384,7 @@ export async function evaluateTaskerEligibility(
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
       countryCode: job.countryCode,
+      preferredDate: job.preferredDate,
     },
     client,
   })
@@ -399,7 +400,7 @@ export async function evaluateCompanyEligibility(
 ): Promise<EligibilityResult> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true },
+    select: { categoryId: true, serviceTemplateId: true, templateJobId: true, countryCode: true, preferredDate: true },
   })
   if (!job) {
     return {
@@ -420,6 +421,7 @@ export async function evaluateCompanyEligibility(
       jobMode: 'QUOTE',
       urgency: 'NORMAL',
       countryCode: job.countryCode,
+      preferredDate: job.preferredDate,
     },
     client,
   })
@@ -434,7 +436,7 @@ export async function getEligibleTaskers(
 ): Promise<Array<{ providerId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+    select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
   })
   if (!job) return []
 
@@ -459,6 +461,7 @@ export async function getEligibleTaskers(
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         countryCode: job.countryCode,
+        preferredDate: job.preferredDate,
       },
       client,
     })
@@ -478,7 +481,7 @@ export async function getEligibleCompanies(
 ): Promise<Array<{ companyId: string; eligibility: EligibilityResult }>> {
   const job = await client.marketplaceJob.findUnique({
     where: { id: jobId },
-    select: { categoryId: true, serviceTemplateId: true, countryCode: true },
+    select: { categoryId: true, serviceTemplateId: true, countryCode: true, preferredDate: true },
   })
   if (!job) return []
 
@@ -503,6 +506,7 @@ export async function getEligibleCompanies(
         jobMode: 'QUOTE',
         urgency: 'NORMAL',
         countryCode: job.countryCode,
+        preferredDate: job.preferredDate,
       },
       client,
     })

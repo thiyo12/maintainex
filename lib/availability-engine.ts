@@ -111,23 +111,53 @@ export async function calculateAcceptanceProbability(
   return Math.max(0.05, Math.min(0.99, Math.round(probability * 100) / 100))
 }
 
+const AVAILABILITY_DAY_KEYS = [
+  'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+] as const
+const AVAILABILITY_STRING_KEYS = ['startTime', 'endTime'] as const
+const AVAILABILITY_DATE_KEYS = ['vacationStart', 'vacationEnd'] as const
+
 export async function setProviderAvailability(
   providerId: string,
-  data: {
-    monday?: boolean; tuesday?: boolean; wednesday?: boolean;
-    thursday?: boolean; friday?: boolean; saturday?: boolean; sunday?: boolean;
-    startTime?: string; endTime?: string;
-    vacationStart?: Date; vacationEnd?: Date;
-    isAvailable?: boolean;
-  }
+  data: Record<string, unknown>
 ): Promise<void> {
+  const clean: Record<string, unknown> = {}
+
+  for (const key of AVAILABILITY_DAY_KEYS) {
+    if (key in data) {
+      if (typeof data[key] !== 'boolean') throw new Error(`Invalid availability field: ${key} must be a boolean`)
+      clean[key] = data[key]
+    }
+  }
+  if ('isAvailable' in data) {
+    if (typeof data.isAvailable !== 'boolean') throw new Error('Invalid availability field: isAvailable must be a boolean')
+    clean.isAvailable = data.isAvailable
+  }
+  for (const key of AVAILABILITY_STRING_KEYS) {
+    if (key in data) {
+      if (typeof data[key] !== 'string') throw new Error(`Invalid availability field: ${key} must be a string`)
+      clean[key] = data[key]
+    }
+  }
+  for (const key of AVAILABILITY_DATE_KEYS) {
+    if (key in data && data[key] != null) {
+      const date = data[key] instanceof Date ? (data[key] as Date) : new Date(String(data[key]))
+      if (Number.isNaN(date.getTime())) throw new Error(`Invalid availability field: ${key} must be a valid date`)
+      clean[key] = date
+    }
+  }
+
+  if (Object.keys(clean).length === 0) {
+    throw new Error('No valid availability fields provided')
+  }
+
   await prisma.providerAvailability.upsert({
     where: { providerId },
     create: {
       providerId,
       providerType: 'INDIVIDUAL',
-      ...data,
+      ...clean,
     },
-    update: data,
+    update: clean,
   })
 }

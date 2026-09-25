@@ -92,6 +92,25 @@ export async function notifyJobCompleted(jobId: string, customerId: string, jobT
   })
 }
 
+export async function notifyJobCancelled(
+  jobId: string,
+  userId: string,
+  jobTitle: string,
+  cancelledBy: 'customer' | 'provider',
+  reason?: string | null
+) {
+  return createNotification({
+    userId,
+    title: 'Job Cancelled',
+    body: `Job "${jobTitle}" was cancelled by the ${cancelledBy}${reason ? `: ${reason}` : ''}`,
+    titleKey: 'notification.job_cancelled.title',
+    bodyKey: 'notification.job_cancelled.body',
+    params: { jobTitle, cancelledBy, ...(reason ? { reason } : {}) },
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
 export async function notifyCompletionRequested(jobId: string, customerId: string, jobTitle: string) {
   return createNotification({
     userId: customerId,

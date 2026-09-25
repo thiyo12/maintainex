@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { aiSearch, getAutocompleteSuggestions } from '@/lib/ai-search'
 import { logSearch, getPopularSearches } from '@/lib/search-engine'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,10 +28,20 @@ export async function GET(request: NextRequest) {
 
     const results = aiSearch(q.trim())
 
+    const slugToId = new Map<string, string>()
+    try {
+      const dbCategories = await prisma.jobCategory.findMany({
+        where: { isActive: true },
+        select: { id: true, slug: true },
+      })
+      for (const c of dbCategories) if (c.slug) slugToId.set(c.slug, c.id)
+    } catch {}
+    const resolveId = (slugOrId: string) => slugToId.get(slugOrId) ?? slugOrId
+
     const categories = results
       .filter(r => r.type === 'category')
       .map(r => ({
-        id: r.categoryId,
+        id: resolveId(r.categoryId),
         name: r.categoryName,
         icon: r.categoryIcon,
         colorHex: r.categoryColor,
@@ -43,7 +54,7 @@ export async function GET(request: NextRequest) {
       .map(r => ({
         id: r.subServiceId,
         name: r.subServiceName,
-        categoryId: r.categoryId,
+        categoryId: resolveId(r.categoryId),
         categoryName: r.categoryName,
         categoryIcon: r.categoryIcon,
         categoryColor: r.categoryColor,
