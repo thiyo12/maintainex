@@ -133,9 +133,18 @@ export async function cancelJob(
 ): Promise<{ jobId: string; previousStatus: string }> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== ctx.actorId && ctx.actorType === 'CUSTOMER') {
-    throw new Error('Only the job owner can cancel this job')
+
+  if (ctx.actorType === 'CUSTOMER') {
+    if (job.customerId !== ctx.actorId) throw new Error('Only the job owner can cancel this job')
+  } else if (ctx.actorType === 'PROVIDER' || ctx.actorType === 'COMPANY') {
+    const resolvedActor = await resolveProviderActor(ctx.jobId, ctx.actorId)
+    if (!resolvedActor || resolvedActor !== ctx.actorType) {
+      throw new Error('Only the accepted provider can cancel this job')
+    }
+  } else if (ctx.actorType !== 'STAFF' && ctx.actorType !== 'SYSTEM') {
+    throw new Error('Actor is not authorized to cancel this job')
   }
+
   if (job.status === 'CANCELLED') throw new Error('Job is already cancelled')
   if (job.status === 'COMPLETED') throw new Error('Cannot cancel a completed job')
   if (job.status === 'IN_PROGRESS') throw new Error('Cannot cancel after work has started')
@@ -143,33 +152,47 @@ export async function cancelJob(
     throw new Error('Job cannot be cancelled in its current state')
   }
 
-  if (job.status === 'QUOTE_ACCEPTED') {
-    const protectedEscrow = await prisma.jobEscrow.findFirst({
-      where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'ON_HOLD'] } },
-      select: { id: true },
-    })
-    if (protectedEscrow) {
-      await refundEscrow(ctx, ctx.jobId)
-      return { jobId: ctx.jobId, previousStatus: job.status }
+  const prepared = await prisma.$transaction(async (tx) => {
+    const lockedRows = await tx.$queryRaw<{ id: string; status: string }[]>`
+      SELECT id, status
+      FROM "MarketplaceJob"
+      WHERE id = ${ctx.jobId}
+      FOR UPDATE
+    `
+    const lockedJob = lockedRows[0]
+    if (!lockedJob) throw new Error('Job not found')
+    if (lockedJob.status === 'IN_PROGRESS') throw new Error('Cannot cancel after work has started')
+    if (lockedJob.status === 'COMPLETED') throw new Error('Cannot cancel a completed job')
+    if (lockedJob.status === 'CANCELLED') throw new Error('Job is already cancelled')
+    if (!['OPEN', 'QUOTE_ACCEPTED'].includes(lockedJob.status)) {
+      throw new Error('Job cannot be cancelled in its current state')
     }
-  }
 
-  return prisma.$transaction(async (tx) => {
+    if (lockedJob.status === 'QUOTE_ACCEPTED') {
+      const protectedEscrow = await tx.jobEscrow.findFirst({
+        where: { jobId: ctx.jobId, status: 'PROTECTED' },
+        select: { id: true },
+      })
+      if (protectedEscrow) {
+        return { needsRefund: true, previousStatus: lockedJob.status }
+      }
+    }
+
     const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: ctx.jobId, status: job.status },
-      data: { status: 'CANCELLED' },
+      where: { id: ctx.jobId, status: lockedJob.status },
+      data: { status: 'CANCELLED', isActive: false, responseState: 'resolved' },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
 
-    const pendingEscrow = await tx.jobEscrow.findFirst({
-      where: { jobId: ctx.jobId, status: 'PENDING_PAYMENT' },
+    await tx.paymentIntent.updateMany({
+      where: { jobId: ctx.jobId, status: { in: ['CREATED', 'PENDING'] } },
+      data: { status: 'CANCELLED' },
     })
-    if (pendingEscrow) {
-      await tx.jobEscrow.updateMany({
-        where: { id: pendingEscrow.id, status: 'PENDING_PAYMENT' },
-        data: { status: 'CANCELLED' },
-      })
-    }
+
+    await tx.jobEscrow.updateMany({
+      where: { jobId: ctx.jobId, status: 'PENDING_PAYMENT' },
+      data: { status: 'CANCELLED' },
+    })
 
     await tx.jobQuote.updateMany({
       where: { jobId: ctx.jobId, status: 'PENDING' },
@@ -180,12 +203,22 @@ export async function cancelJob(
       data: { status: 'WITHDRAWN' },
     })
     await tx.companyJobAssignment.updateMany({
-      where: { jobId: ctx.jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
-      data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: 'Job cancelled before work start' },
+      where: { jobId: ctx.jobId, status: { in: ['ASSIGNED', 'ACCEPTED'] } },
+      data: {
+        status: 'REVOKED',
+        revokedAt: new Date(),
+        revokedReason: 'Job cancelled before work start',
+      },
     })
 
-    return { jobId: ctx.jobId, previousStatus: job.status }
+    return { needsRefund: false, previousStatus: lockedJob.status }
   })
+
+  if (prepared.needsRefund) {
+    await refundEscrow(ctx, ctx.jobId)
+  }
+
+  return { jobId: ctx.jobId, previousStatus: prepared.previousStatus }
 }
 
 export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
