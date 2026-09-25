@@ -502,7 +502,7 @@ async function evaluateConflict(
 
   const newJobDay = preferredDayKey(new Date(preferredDate))
   const overlapping = activeJobs.filter(
-    (job) => job.preferredDate == null || preferredDayKey(new Date(job.preferredDate)) === newJobDay
+    (job) => job.preferredDate != null && preferredDayKey(new Date(job.preferredDate)) === newJobDay
   )
 
   if (overlapping.length > 0) {

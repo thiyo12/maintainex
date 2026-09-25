@@ -597,7 +597,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       expect(gate?.reason).toContain('scheduled dates overlap')
     })
 
-    it('fails NO_CONFLICT conservatively when busy job has no preferred date', async () => {
+    it('passes NO_CONFLICT for a dated future job even when the busy job has no preferred date', async () => {
       const input = makeIndivInput({
         clientOverrides: {
           $queryRaw: vi.fn().mockResolvedValue([{ preferredDate: null }]),
@@ -605,8 +605,7 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       })
       input.job.preferredDate = new Date('2026-10-25T12:00:00')
       const result = await evaluateEligibility(input)
-      expect(result.eligible).toBe(false)
-      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(false)
+      expect(result.gates.find(g => g.gate === 'NO_CONFLICT')?.passed).toBe(true)
     })
 
     it('passes NO_CONFLICT when provider has no active jobs regardless of date', async () => {
