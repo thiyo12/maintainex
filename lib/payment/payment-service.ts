@@ -31,7 +31,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' }
   if (job.customerId !== customerId) return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
-  if (job.status !== 'QUOTE_ACCEPTED' && job.status !== 'IN_PROGRESS') {
+  if (job.status !== 'QUOTE_ACCEPTED') {
     return { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' }
   }
 
@@ -246,15 +246,6 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
       createdBy: paymentIntent.customerId,
     }, tx)
 
-    await tx.marketplaceJob.updateMany({
-      where: { id: paymentIntent.jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
-      data: { status: 'IN_PROGRESS' },
-    })
-
-    await tx.companyJobAssignment.updateMany({
-      where: { jobId: paymentIntent.jobId, status: 'ACCEPTED' },
-      data: { status: 'IN_PROGRESS', startedAt: new Date() },
-    })
   })
 
   return { success: true }
