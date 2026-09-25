@@ -243,9 +243,22 @@ async function evaluateTaskerProfession(
     return { gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No matching capability' }, matchedProfessionId: null, matchedSkills: [], preferredSkillsMatched: [] }
   }
 
-  // Get tasker's approved professions
+  const profileIdentity = await client.taskerProfile.findUnique({
+    where: { userId: taskerId },
+    select: { id: true },
+  })
+  if (!profileIdentity) {
+    return {
+      gate: { gate: 'PROFESSION_MATCH', passed: false, reason: 'No provider profile' },
+      matchedProfessionId: null,
+      matchedSkills: [],
+      preferredSkillsMatched: [],
+    }
+  }
+
+  // Get tasker's approved professions using the canonical TaskerProfile id.
   const taskerProfessions = await client.taskerProfession.findMany({
-    where: { taskerProfileId: taskerId, status: 'APPROVED' },
+    where: { taskerProfileId: profileIdentity.id, status: 'APPROVED' },
     include: {
       profession: { select: { id: true, isActive: true } },
       skills: { select: { professionSkill: { select: { id: true, slug: true } } } },
