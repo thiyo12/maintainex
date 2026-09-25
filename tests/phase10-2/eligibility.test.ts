@@ -227,6 +227,11 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       })
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'PROFESSION_MATCH')?.passed).toBe(true)
+      expect(input.client.taskerProfession.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ taskerProfileId: 'profile-1' }),
+        })
+      )
     })
   })
 
