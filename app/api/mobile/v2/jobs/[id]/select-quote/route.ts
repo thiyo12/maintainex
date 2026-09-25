@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { acceptJobQuote } from '@/lib/domain/job-lifecycle'
 import { notifyQuoteAccepted } from '@/lib/notifications'
+import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/money'
 
 async function resolveNotificationUser(providerId: string, providerType: string): Promise<string> {
   if (providerType === 'COMPANY') {
@@ -43,7 +44,10 @@ export async function POST(
       success: true,
       quote: {
         ...result.quote,
-        price: result.quote.price.toString(),
+        price: minorUnitsToMajorUnits(
+          result.quote.price,
+          getCurrencyForCountry(result.job.countryCode),
+        ),
       },
     })
   } catch (error: any) {
