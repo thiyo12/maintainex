@@ -8,16 +8,7 @@ import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
 import { findCandidates } from '@/lib/matching'
 import { validateQuotePrice } from '@/lib/pricing/engine'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
-
-function parsePositiveMinorUnits(value: unknown): bigint | null {
-  if (typeof value === 'bigint') return value > 0n ? value : null
-  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value)
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    const parsed = BigInt(value.trim())
-    return parsed > 0n ? parsed : null
-  }
-  return null
-}
+import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/money'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,9 +29,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { jobId, providerType, estimatedCompletionTime, message, attachments, companyId } = body
-    const priceMinor = parsePositiveMinorUnits(body.price)
 
-    if (!jobId || !['INDIVIDUAL', 'COMPANY'].includes(providerType) || priceMinor === null) {
+    if (!jobId || !['INDIVIDUAL', 'COMPANY'].includes(providerType)) {
       return NextResponse.json({ error: 'Missing or invalid required fields: jobId, providerType, price' }, { status: 400 })
     }
 
@@ -68,6 +58,12 @@ export async function POST(request: NextRequest) {
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+    const currency = getCurrencyForCountry(job.countryCode)
+    const priceMinor = parseMajorUnitsInput(body.price, currency)
+    if (priceMinor === null) {
+      return NextResponse.json({ error: 'Quote price must be a positive amount with at most 2 decimal places' }, { status: 400 })
+    }
     if (job.status !== 'OPEN') return NextResponse.json({ error: 'Job is not accepting quotes' }, { status: 400 })
     if (job.customerId === user.id) return NextResponse.json({ error: 'Cannot quote on your own job' }, { status: 400 })
 
@@ -149,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
-    return NextResponse.json({ quote: { ...quote, price: quote.price.toString() } }, { status: 201 })
+    return NextResponse.json({ quote: { ...quote, price: minorUnitsToMajorUnits(quote.price, currency) } }, { status: 201 })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
@@ -211,7 +207,7 @@ export async function GET(request: NextRequest) {
           if (companyProfile) { rating = companyProfile.rating; completedJobs = companyProfile.completedProjects }
         }
 
-        return { ...q, price: q.price.toString(), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
+        return { ...q, price: minorUnitsToMajorUnits(q.price, getCurrencyForCountry(job.countryCode)), provider: provider || { id: q.providerId }, providerRating: rating, completedJobs }
       })
     )
 
