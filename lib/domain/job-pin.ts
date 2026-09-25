@@ -39,6 +39,14 @@ export async function generateJobPin(
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== customerId) throw new Error('Only the job owner can generate a PIN')
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    throw new Error('PIN is only available for an accepted active booking')
+  }
+  const protectedEscrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+    select: { id: true },
+  })
+  if (!protectedEscrow) throw new Error('Payment must be protected before generating a PIN')
 
   const existingActive = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
@@ -82,6 +90,14 @@ export async function rotateJobPin(
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== customerId) throw new Error('Only the job owner can rotate a PIN')
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    throw new Error('PIN is only available for an accepted active booking')
+  }
+  const protectedEscrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+    select: { id: true },
+  })
+  if (!protectedEscrow) throw new Error('Payment must be protected before rotating a PIN')
 
   const currentActive = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
@@ -414,7 +430,9 @@ async function validatePurposeTx(
 
   switch (purpose) {
     case 'ARRIVAL':
-      return job.status === 'QUOTE_ACCEPTED'
+      return job.status === 'QUOTE_ACCEPTED' &&
+        workspace?.progressStatus === 'ACCEPTED' &&
+        !!protectedEscrow
 
     case 'WORK_START': {
       if (job.status !== 'QUOTE_ACCEPTED') return false
