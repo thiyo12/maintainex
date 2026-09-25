@@ -113,25 +113,32 @@ export async function POST(
       const reason =
         typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
-      await cancelJob({ jobId: job.id, actorId: user.id, actorType })
 
+      let providerUserId: string | null = null
       if (isCustomer) {
         const accepted = await prisma.jobQuote.findFirst({
           where: { jobId: job.id, status: 'ACCEPTED' },
           select: { providerId: true, providerType: true },
         })
         if (accepted) {
-          const providerUserId =
+          providerUserId =
             accepted.providerType === 'INDIVIDUAL'
               ? accepted.providerId
               : (await prisma.companyProfile.findUnique({
                   where: { id: accepted.providerId },
                   select: { userId: true },
-                }))?.userId
-          if (providerUserId) notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
+                }))?.userId ?? null
+        }
+      }
+
+      await cancelJob({ jobId: job.id, actorId: user.id, actorType, reason: reason || undefined })
+
+      if (isCustomer) {
+        if (providerUserId) {
+          await notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
         }
       } else {
-        notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
+        await notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
       }
 
       return NextResponse.json({ success: true, message: 'Job cancelled' })
