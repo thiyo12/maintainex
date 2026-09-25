@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { bigIntToSafeNumber, type Currency } from '@/lib/money'
@@ -29,11 +30,25 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     return { success: false, error: 'Payment gateway not configured', code: 'PAYHERE_NOT_CONFIGURED' }
   }
 
-  const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
+  const [job, user] = await Promise.all([
+    prisma.marketplaceJob.findUnique({ where: { id: jobId } }),
+    prisma.user.findUnique({
+      where: { id: customerId },
+      select: { name: true, email: true, phone: true },
+    }),
+  ])
+
   if (!job) return { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' }
   if (job.customerId !== customerId) return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
   if (job.status !== 'QUOTE_ACCEPTED') {
     return { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' }
+  }
+  if (!user?.email || !user?.phone) {
+    return {
+      success: false,
+      error: 'A verified email and phone number are required before card payment',
+      code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
+    }
   }
 
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId } })
@@ -42,68 +57,42 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     return { success: false, error: 'Escrow is not awaiting payment', code: 'ESCROW_NOT_FUNDABLE' }
   }
 
+  const buildResult = (intent: { id: string; merchantOrderId: string }): PaymentResult => ({
+    success: true,
+    paymentIntentId: intent.id,
+    checkoutUrl: buildHostedCheckoutUrl(baseUrl, intent.id, config.merchantSecret),
+    merchantOrderId: intent.merchantOrderId,
+  })
+
   const existingPending = await prisma.paymentIntent.findFirst({
     where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
   })
-  if (existingPending) {
-    const user = await prisma.user.findUnique({
-      where: { id: customerId },
-      select: { name: true, email: true, phone: true },
-    })
-    if (!user?.email || !user?.phone) {
-      return {
-        success: false,
-        error: 'A verified email and phone number are required before card payment',
-        code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
-      }
-    }
-    const checkoutUrl = buildHostedCheckoutUrl(baseUrl, existingPending.id, config.merchantSecret)
-    return {
-      success: true,
-      paymentIntentId: existingPending.id,
-      checkoutUrl,
-      merchantOrderId: existingPending.merchantOrderId,
-    }
-  }
+  if (existingPending) return buildResult(existingPending)
 
   const merchantOrderId = generateMerchantOrderId(jobId)
   const totalAmount = escrow.totalAmount ?? escrow.amount
-  const paymentIntent = await prisma.paymentIntent.create({
-    data: {
-      jobId,
-      customerId,
-      escrowId: escrow.id,
-      merchantOrderId,
-      amount: totalAmount,
-      currency: (escrow.currency || 'LKR') as Currency,
-      status: 'CREATED',
-    },
-  })
 
-  const user = await prisma.user.findUnique({
-    where: { id: customerId },
-    select: { name: true, email: true, phone: true },
-  })
-
-  if (!user?.email || !user?.phone) {
-    await prisma.paymentIntent.updateMany({
-      where: { id: paymentIntent.id, status: 'CREATED' },
-      data: { status: 'CANCELLED' },
+  try {
+    const paymentIntent = await prisma.paymentIntent.create({
+      data: {
+        jobId,
+        customerId,
+        escrowId: escrow.id,
+        merchantOrderId,
+        amount: totalAmount,
+        currency: (escrow.currency || 'LKR') as Currency,
+        status: 'CREATED',
+      },
     })
-    return {
-      success: false,
-      error: 'A verified email and phone number are required before card payment',
-      code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
+    return buildResult(paymentIntent)
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      const winner = await prisma.paymentIntent.findFirst({
+        where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
+      })
+      if (winner) return buildResult(winner)
     }
-  }
-
-  const checkoutUrl = buildHostedCheckoutUrl(baseUrl, paymentIntent.id, config.merchantSecret)
-
-  return {
-    success: true,
-    paymentIntentId: paymentIntent.id,
-    checkoutUrl,
-    merchantOrderId,
+    throw error
   }
 }
 
