@@ -362,6 +362,11 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     await acceptJobQuote({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, quote!.id)
     await fundEscrow({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, bookResult.job.id)
 
+    const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
+    const { pin } = await generateJobPin(bookResult.job.id, customerUserId)
+    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, pin, 'ARRIVAL')).valid).toBe(true)
+    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, pin, 'WORK_START')).valid).toBe(true)
+
     const holdResult = await holdEscrowForDispute(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
       bookResult.job.id
@@ -370,5 +375,9 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
 
     const escrow = await prisma.jobEscrow.findUnique({ where: { id: holdResult.escrowId } })
     expect(escrow?.status).toBe('ON_HOLD')
+    const disputedWorkspace = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
+    expect(disputedWorkspace?.progressStatus).toBe('DISPUTED')
+    const disputedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
+    expect(disputedJob?.status).toBe('IN_PROGRESS')
   })
 })
