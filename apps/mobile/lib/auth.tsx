@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { AppState } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
-import { auth, setAuthToken } from './api'
+import { auth, notifications as notificationApi, setAuthToken } from './api'
 import { User } from './types'
 
 const SESSION_DURATION = 18 * 24 * 60 * 60 * 1000
@@ -197,6 +197,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
+    try {
+      await notificationApi.unregisterPush()
+    } catch {
+      // Logout must still succeed if the device is offline.
+    }
     await setAuthToken(null)
     setUser(null)
     setSignupData(null)
