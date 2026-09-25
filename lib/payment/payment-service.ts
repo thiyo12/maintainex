@@ -391,7 +391,7 @@ export async function processPaymentFailure(notification: PayHereNotification): 
 
   if (statusCode === -3) {
     await prisma.$transaction(async (tx) => {
-      await tx.paymentIntent.updateMany({
+      const claimed = await tx.paymentIntent.updateMany({
         where: { id: paymentIntent.id, status: { not: 'CHARGEDBACK' } },
         data: {
           status: 'CHARGEDBACK',
@@ -399,6 +399,8 @@ export async function processPaymentFailure(notification: PayHereNotification): 
           gatewayResponse: JSON.stringify(notification),
         },
       })
+
+      if (claimed.count !== 1) return
 
       await tx.jobEscrow.updateMany({
         where: { id: paymentIntent.escrowId, status: 'PROTECTED' },
