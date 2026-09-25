@@ -49,7 +49,7 @@ function isSinhala(text: string): boolean { return /[\u0D80-\u0DFF]/.test(text) 
 
 const CATEGORIES: CategoryDef[] = [
   {
-    id: 'electrical', name: 'Electrical Works', icon: 'flash', colorHex: '#F59E0B',
+    id: 'electrical-works', name: 'Electrical Works', icon: 'flash', colorHex: '#F59E0B',
     keywords: [
       'electrical', 'electric', 'electrician', 'elec', 'electrik', 'elactrical', 'electrikan',
       'wiring', 'wire', 'wirring', 'circuit', 'breaker', 'fuse', 'switch', 'socket', 'plug',
@@ -104,7 +104,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'ac-refrigeration', name: 'AC and Refrigeration', icon: 'snowflake', colorHex: '#06B6D4',
+    id: 'ac-and-refrigeration', name: 'AC and Refrigeration', icon: 'snowflake', colorHex: '#06B6D4',
     keywords: [
       'ac', 'aircon', 'air condition', 'air conditioning', 'a/c', 'air conditioner',
       'ac service', 'ac repair', 'ac install', 'ac installation', 'ac gas', 'gas refill',
@@ -129,7 +129,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'painting', name: 'Painting and Decorating', icon: 'color-palette', colorHex: '#EC4899',
+    id: 'painting-and-decorating', name: 'Painting and Decorating', icon: 'color-palette', colorHex: '#EC4899',
     keywords: [
       'painting', 'paint', 'painter', 'paintir', 'pencel', 'pinting',
       'wall paint', 'ceiling paint', 'interior paint', 'exterior paint',
@@ -155,7 +155,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'carpentry', name: 'Carpentry and Furniture', icon: 'hammer', colorHex: '#92400E',
+    id: 'carpentry-and-furniture', name: 'Carpentry and Furniture', icon: 'hammer', colorHex: '#92400E',
     keywords: [
       'carpentry', 'carpenter', 'wood', 'timber', 'furniture', 'cabinet',
       'door', 'window', 'frame', 'woodwork', 'wooden',
@@ -179,7 +179,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'tiling', name: 'Tiling and Flooring', icon: 'grid', colorHex: '#7C3AED',
+    id: 'tiling-and-flooring', name: 'Tiling and Flooring', icon: 'grid', colorHex: '#7C3AED',
     keywords: [
       'tiling', 'tile', 'tiles', 'flooring', 'floor', 'floor tile', 'wall tile',
       'ceramic', 'porcelain', 'vitrified', 'mosaic', 'grout', 'adhesive',
@@ -202,7 +202,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'masonry', name: 'Masonry and Concrete', icon: 'construct', colorHex: '#78716C',
+    id: 'masonry-and-concrete', name: 'Masonry and Concrete', icon: 'construct', colorHex: '#78716C',
     keywords: [
       'masonry', 'brick', 'block', 'concrete', 'cement', 'mortar', 'plaster', 'render',
       'wall construction', 'pillar', 'column', 'driveway', 'paving', 'steps', 'stair',
@@ -223,7 +223,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'roofing', name: 'Roofing and Gutters', icon: 'home', colorHex: '#DC2626',
+    id: 'roofing-and-gutters', name: 'Roofing and Gutters', icon: 'home', colorHex: '#DC2626',
     keywords: [
       'roof', 'roofing', 'gutter', 'gutters', 'ceiling', 'leak',
       'roof leak', 'roof repair', 'roof tile', 'skylight', 'fascia', 'soffit',
@@ -243,7 +243,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'pest', name: 'Pest Control', icon: 'bug', colorHex: '#65A30D',
+    id: 'pest-control', name: 'Pest Control', icon: 'bug', colorHex: '#65A30D',
     keywords: [
       'pest', 'pest control', 'pestcontrol', 'insect', 'bug',
       'cockroach', 'cockroaches', 'roach', 'ant', 'ants',
@@ -269,7 +269,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'cleaning', name: 'Cleaning Services', icon: 'sparkles', colorHex: '#0EA5E9',
+    id: 'cleaning-services', name: 'Cleaning Services', icon: 'sparkles', colorHex: '#0EA5E9',
     keywords: [
       'cleaning', 'clean', 'cleaner', 'cleanin', 'clene', 'clening', 'clane',
       'maid', 'housekeeping', 'house clean', 'home clean', 'office clean',
@@ -295,7 +295,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'gardening', name: 'Gardening and Landscaping', icon: 'leaf', colorHex: '#16A34A',
+    id: 'gardening-and-landscaping', name: 'Gardening and Landscaping', icon: 'leaf', colorHex: '#16A34A',
     keywords: [
       'gardening', 'garden', 'gardan', 'graden', 'gardener', 'gardenir',
       'lawn', 'lawn mow', 'mowing', 'grass', 'grass cut',
@@ -320,7 +320,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'security', name: 'Home Security and Automation', icon: 'lock-closed', colorHex: '#1E293B',
+    id: 'home-security-and-automation', name: 'Home Security and Automation', icon: 'lock-closed', colorHex: '#1E293B',
     keywords: [
       'security', 'cctv', 'camera', 'surveillance', 'smart lock', 'alarm',
       'doorbell', 'video doorbell', 'smart home', 'automation',
@@ -343,7 +343,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'moving', name: 'Moving and Packing', icon: 'car', colorHex: '#F97316',
+    id: 'moving-and-packing', name: 'Moving and Packing', icon: 'car', colorHex: '#F97316',
     keywords: [
       'moving', 'move', 'mover', 'movers', 'shifting', 'shift',
       'relocation', 'relocate', 'transport', 'transportation',
@@ -367,7 +367,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'vehicle', name: 'Vehicle Care and Maintenance', icon: 'car-sport', colorHex: '#6366F1',
+    id: 'vehicle-care-and-maintenance', name: 'Vehicle Care and Maintenance', icon: 'car-sport', colorHex: '#6366F1',
     keywords: [
       'car', 'vehicle', 'auto', 'motor', 'motorcycle', 'bike',
       'car wash', 'detailing', 'wax', 'polish', 'interior clean',
@@ -390,7 +390,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'it-electronics', name: 'IT and Electronics Repair', icon: 'desktop', colorHex: '#8B5CF6',
+    id: 'it-and-electronics-repair', name: 'IT and Electronics Repair', icon: 'desktop', colorHex: '#8B5CF6',
     keywords: [
       'computer', 'laptop', 'desktop', 'pc', 'mac', 'macbook',
       'phone', 'smartphone', 'mobile', 'iphone', 'samsung', 'android',
@@ -418,7 +418,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'events', name: 'Event and Party Services', icon: 'musical-notes', colorHex: '#F43F5E',
+    id: 'event-and-party-services', name: 'Event and Party Services', icon: 'musical-notes', colorHex: '#F43F5E',
     keywords: [
       'event', 'events', 'party', 'parties', 'wedding', 'celebration',
       'decoration', 'decor', 'setup', 'arrangement',
@@ -444,7 +444,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'personal', name: 'Personal Care and Wellness', icon: 'body', colorHex: '#D946EF',
+    id: 'personal-care-and-wellness', name: 'Personal Care and Wellness', icon: 'body', colorHex: '#D946EF',
     keywords: [
       'personal', 'care', 'wellness', 'massage', 'therapy',
       'haircut', 'hair', 'styling', 'salon', 'barber',
@@ -469,7 +469,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'renovation', name: 'Home Renovation and Interiors', icon: 'business', colorHex: '#0D9488',
+    id: 'home-renovation-and-interiors', name: 'Home Renovation and Interiors', icon: 'business', colorHex: '#0D9488',
     keywords: [
       'renovation', 'renovate', 'remodel', 'upgrade', 'overhaul', 'refurbish',
       'interior', 'design', 'decoration', 'modern',
@@ -494,7 +494,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'solar', name: 'Solar and Energy Solutions', icon: 'sunny', colorHex: '#EAB308',
+    id: 'solar-and-energy-solutions', name: 'Solar and Energy Solutions', icon: 'sunny', colorHex: '#EAB308',
     keywords: [
       'solar', 'sun', 'energy', 'panel', 'solar panel',
       'inverter', 'battery', 'battery storage', 'backup power',
@@ -518,7 +518,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'handyman', name: 'Handyman and General Repairs', icon: 'wrench', colorHex: '#475569',
+    id: 'handyman-and-general-repairs', name: 'Handyman and General Repairs', icon: 'wrench', colorHex: '#475569',
     keywords: [
       'handyman', 'odd jobs', 'general repair', 'general repairs', 'general handyman',
       'fix', 'fixing', 'repair', 'assembly', 'assemble', 'furniture assembly', 'wardrobe assembly',
@@ -555,7 +555,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'glass-aluminium', name: 'Glass and Aluminium', icon: 'diamond', colorHex: '#0369A1',
+    id: 'glass-and-aluminium', name: 'Glass and Aluminium', icon: 'diamond', colorHex: '#0369A1',
     keywords: [
       'glass', 'glazing', 'glass repair', 'glass installation', 'window glass', 'glass door',
       'aluminium', 'aluminum', 'aluminium windows', 'aluminium doors', 'sliding door', 'partition',
@@ -579,7 +579,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'appliance', name: 'Appliance Installation and Repair', icon: 'hardware-chip', colorHex: '#B45309',
+    id: 'appliance-installation-and-repair', name: 'Appliance Installation and Repair', icon: 'hardware-chip', colorHex: '#B45309',
     keywords: [
       'appliance', 'appliances', 'appliance repair', 'appliance installation', 'washing machine',
       'refrigerator', 'fridge', 'dishwasher', 'microwave', 'oven', 'water purifier', 'water filter',
@@ -604,7 +604,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'locksmith', name: 'Locksmith Services', icon: 'key', colorHex: '#3F3F46',
+    id: 'locksmith-services', name: 'Locksmith Services', icon: 'key', colorHex: '#3F3F46',
     keywords: [
       'locksmith', 'lock', 'locks', 'key', 'keys', 'key duplication', 'duplicate key', 'unlock',
       'door lock', 'lock installation', 'lock repair', 'smart lock', 'digital lock', 'safe lock',
@@ -625,7 +625,7 @@ const CATEGORIES: CategoryDef[] = [
     ],
   },
   {
-    id: 'curtains', name: 'Curtains, Blinds and Upholstery', icon: 'shirt', colorHex: '#DB2777',
+    id: 'curtains-blinds-and-upholstery', name: 'Curtains, Blinds and Upholstery', icon: 'shirt', colorHex: '#DB2777',
     keywords: [
       'curtain', 'curtains', 'curtain installation', 'curtain rod', 'curtain track', 'blind', 'blinds',
       'roller blind', 'venetian', 'upholstery', 'sofa repair', 're-upholstery', 'reupholster',
@@ -674,7 +674,7 @@ export function aiSearch(query: string): SearchResult[] {
       const nkw = normalize(kw)
 
       if (nq === nkw) { catBestScore = Math.max(catBestScore, 100); continue }
-      if (nq.includes(nkw) || nkw.includes(nq)) { catBestScore = Math.max(catBestScore, 95); continue }
+      if (nkw.length >= 4 && nq.length <= nkw.length * 4 && (nq.includes(nkw) || nkw.includes(nq))) { catBestScore = Math.max(catBestScore, 95); continue }
 
       const dist = lev(nq, nkw)
       const maxLen = Math.max(nq.length, nkw.length)
@@ -719,7 +719,7 @@ export function aiSearch(query: string): SearchResult[] {
       for (const kw of sub.keywords) {
         const nkw = normalize(kw)
         if (nq === nkw) { subScore = Math.max(subScore, 100); continue }
-        if (nq.includes(nkw) || nkw.includes(nq)) { subScore = Math.max(subScore, 95); continue }
+        if (nkw.length >= 4 && nq.length <= nkw.length * 4 && (nq.includes(nkw) || nkw.includes(nq))) { subScore = Math.max(subScore, 95); continue }
 
         const dist = lev(nq, nkw)
         const maxLen = Math.max(nq.length, nkw.length)
