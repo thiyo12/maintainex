@@ -119,11 +119,12 @@ export async function GET(
       } else {
         const company = await prisma.companyProfile.findUnique({
           where: { id: acceptedQuote.providerId },
-          select: { id: true, companyName: true, logo: true, rating: true, latitude: true, longitude: true },
+          select: { id: true, userId: true, companyName: true, logo: true, rating: true, latitude: true, longitude: true },
         })
         if (company) {
           acceptedProvider = {
             id: company.id,
+            userId: company.userId,
             name: company.companyName,
             profileImage: company.logo,
             rating: company.rating,
@@ -172,12 +173,12 @@ export async function GET(
         } else {
           const company = await prisma.companyProfile.findUnique({
             where: { id: q.providerId },
-            select: { id: true, companyName: true, logo: true, rating: true, completedProjects: true },
+            select: { id: true, userId: true, companyName: true, logo: true, rating: true, completedProjects: true },
           })
           if (company) {
             providerRating = company.rating
             completedJobs = company.completedProjects
-            provider = { id: company.id, name: company.companyName, profileImage: company.logo }
+            provider = { id: company.id, userId: company.userId, name: company.companyName, profileImage: company.logo }
           }
         }
 
