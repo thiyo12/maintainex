@@ -2188,6 +2188,7 @@ model MarketplaceJob {
   riskEvents        MarketplaceRiskEvent[]
   verificationPins  JobVerificationPin[]
   assignments       CompanyJobAssignment[]
+  lifecycleEvents   JobLifecycleEvent[]
 
   @@index([customerId])
   @@index([categoryId])
@@ -3319,6 +3320,23 @@ model WalletBalance {
   @@index([walletType])
 }
 
+model JobLifecycleEvent {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actorType   String
+  action      String
+  fromState   String?
+  toState     String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([action])
+  @@index([actorId])
+}
+
 model JobVerificationPin {
   id                  String    @id @default(cuid())
   jobId               String
@@ -3386,7 +3404,7 @@ model PaymentIntent {
   paymentId       String?
   amount          BigInt
   currency        String    @default("LKR")
-  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED
+  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, CHARGEDBACK
   gatewayResponse String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
