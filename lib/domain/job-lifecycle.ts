@@ -288,7 +288,7 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== ctx.actorId) throw new Error('Only the customer can deposit escrow')
-  if (job.status !== 'QUOTE_ACCEPTED' && job.status !== 'IN_PROGRESS') throw new Error('Job not ready for escrow')
+  if (job.status !== 'QUOTE_ACCEPTED') throw new Error('Job not ready for escrow')
 
   const quote = await prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' } })
   if (!quote) throw new Error('No accepted quote found')
@@ -360,10 +360,6 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       })
     }
 
-    await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
-      data: { status: 'IN_PROGRESS' },
-    })
   })
 
   return { success: true, totalAmount, escrowId: escrow.id }
