@@ -33,6 +33,23 @@ export async function POST(
       const actorType = await resolveProviderActor(job.id, user.id)
       if (!actorType) return NextResponse.json({ error: 'Only the assigned provider can mark complete' }, { status: 403 })
 
+      if (actorType === 'COMPANY') {
+        const assignment = await prisma.companyJobAssignment.findFirst({
+          where: {
+            jobId: job.id,
+            workerUserId: user.id,
+            status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+          },
+          select: { id: true },
+        })
+        if (!assignment) {
+          return NextResponse.json(
+            { error: 'Only the employee assigned to this company job can mark work complete' },
+            { status: 403 }
+          )
+        }
+      }
+
       await transitionJobWorkspace(
         { jobId: job.id, actorId: user.id, actorType },
         'COMPLETION_REQUESTED'
