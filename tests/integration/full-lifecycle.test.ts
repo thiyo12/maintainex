@@ -222,6 +222,30 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
 
     const commission = await prisma.commissionSettlement.findFirst({ where: { jobId: bookResult.job.id } })
     expect(commission).toBeTruthy()
+
+    const lifecycle = await prisma.jobLifecycleEvent.findMany({
+      where: { jobId: bookResult.job.id },
+      orderBy: { createdAt: 'asc' },
+    })
+    expect(lifecycle.map((event) => event.action)).toEqual(
+      expect.arrayContaining([
+        'QUOTE_ACCEPTED',
+        'ESCROW_FUNDED',
+        'ARRIVAL_VERIFIED',
+        'WORK_STARTED',
+        'WORKSPACE_STATUS_CHANGED',
+        'JOB_COMPLETED',
+      ])
+    )
+    expect(
+      lifecycle.find(
+        (event) =>
+          event.action === 'WORKSPACE_STATUS_CHANGED' &&
+          event.toState === 'COMPLETION_REQUESTED'
+      )
+    ).toBeTruthy()
+    expect(lifecycle.find((event) => event.action === 'WORK_STARTED')?.actorId).toBe(individualProviderUserId)
+    expect(lifecycle.find((event) => event.action === 'JOB_COMPLETED')?.toState).toBe('COMPLETED')
   })
 
   it('COMPANY provider: full lifecycle from creation to completion', async () => {
@@ -379,5 +403,11 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(disputedWorkspace?.progressStatus).toBe('DISPUTED')
     const disputedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
     expect(disputedJob?.status).toBe('IN_PROGRESS')
+
+    const disputeEvents = await prisma.jobLifecycleEvent.findMany({
+      where: { jobId: bookResult.job.id, action: 'DISPUTE_RAISED' },
+    })
+    expect(disputeEvents).toHaveLength(1)
+    expect(disputeEvents[0]?.toState).toBe('DISPUTED')
   })
 })
