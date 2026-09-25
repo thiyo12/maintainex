@@ -109,7 +109,7 @@ export async function GET(
       if (acceptedQuote.providerType === 'INDIVIDUAL') {
         const providerUser = await prisma.user.findUnique({
           where: { id: acceptedQuote.providerId },
-          select: { id: true, name: true, phone: true },
+          select: { id: true, name: true },
         })
         const providerProfile = await prisma.taskerProfile.findUnique({
           where: { userId: acceptedQuote.providerId },
