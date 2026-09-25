@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "PaymentIntent" (
+CREATE TABLE IF NOT EXISTS "PaymentIntent" (
     "id" TEXT NOT NULL,
     "jobId" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
@@ -18,16 +18,16 @@ CREATE TABLE "PaymentIntent" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PaymentIntent_merchantOrderId_key" ON "PaymentIntent"("merchantOrderId");
+CREATE UNIQUE INDEX IF NOT EXISTS "PaymentIntent_merchantOrderId_key" ON "PaymentIntent"("merchantOrderId");
 
 -- CreateIndex
-CREATE INDEX "PaymentIntent_jobId_idx" ON "PaymentIntent"("jobId");
+CREATE INDEX IF NOT EXISTS "PaymentIntent_jobId_idx" ON "PaymentIntent"("jobId");
 
 -- CreateIndex
-CREATE INDEX "PaymentIntent_customerId_idx" ON "PaymentIntent"("customerId");
+CREATE INDEX IF NOT EXISTS "PaymentIntent_customerId_idx" ON "PaymentIntent"("customerId");
 
 -- CreateIndex
-CREATE INDEX "PaymentIntent_status_idx" ON "PaymentIntent"("status");
+CREATE INDEX IF NOT EXISTS "PaymentIntent_status_idx" ON "PaymentIntent"("status");
 
 -- CreateIndex
-CREATE INDEX "PaymentIntent_merchantOrderId_idx" ON "PaymentIntent"("merchantOrderId");
+CREATE INDEX IF NOT EXISTS "PaymentIntent_merchantOrderId_idx" ON "PaymentIntent"("merchantOrderId");
