@@ -179,15 +179,6 @@ export default function AssignmentDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {assignment.status === 'IN_PROGRESS' && (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.completeBtn]}
-              onPress={() => handleAction('complete')}
-              disabled={actionLoading}
-            >
-              <Text style={styles.actionBtnText}>{t('company.workforce.complete')}</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
