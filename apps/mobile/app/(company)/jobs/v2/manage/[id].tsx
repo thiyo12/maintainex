@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
@@ -22,11 +22,16 @@ export default function CompanyManageJobScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
+  const [pinState, setPinState] = useState<any>(null)
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id, 'company')
-      setJob(res.job)
+      const [jobRes, pinRes] = await Promise.all([
+        v2Jobs.get(id, 'company'),
+        v2JobActions.getPinState(id).catch(() => ({ pinState: null })),
+      ])
+      setJob(jobRes.job)
+      setPinState(pinRes.pinState)
     } catch {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
@@ -35,15 +40,19 @@ export default function CompanyManageJobScreen() {
     }
   }
 
-  useEffect(() => { loadJob() }, [id])
+  useFocusEffect(
+    useCallback(() => {
+      loadJob()
+    }, [id])
+  )
 
   const myQuote = job?.quotes?.[0] || null
 
-  const handleUpdateProgress = async (status: string) => {
-    setActionLoading(status)
+  const handleMarkComplete = async () => {
+    setActionLoading('complete')
     try {
-      await v2JobActions.updateProgress(id, status)
-      loadJob()
+      await v2JobActions.complete(id, 'MARK_COMPLETE')
+      await loadJob()
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
     } finally {
@@ -84,8 +93,20 @@ export default function CompanyManageJobScreen() {
 
   const qs = quoteStatusLabel(myQuote)
   const wsCard = worksCard(job.workspace)
-  const canStart = job.workspace?.progressStatus === 'ACCEPTED'
-  const canComplete = job.workspace?.progressStatus === 'IN_PROGRESS'
+  const assignment = job.companyAssignment
+  const isAssignedWorker =
+    !!user?.id &&
+    assignment?.workerUserId === user.id &&
+    ['ACCEPTED', 'IN_PROGRESS'].includes(assignment?.status)
+  const canStart =
+    isAssignedWorker &&
+    assignment?.status === 'ACCEPTED' &&
+    job.workspace?.progressStatus === 'ACCEPTED' &&
+    job.escrow?.status === 'PROTECTED'
+  const canComplete =
+    isAssignedWorker &&
+    assignment?.status === 'IN_PROGRESS' &&
+    job.workspace?.progressStatus === 'IN_PROGRESS'
 
   return (
     <SafeAreaView style={styles.container}>
@@ -143,7 +164,7 @@ export default function CompanyManageJobScreen() {
             <View style={styles.quoteCard}>
               <View style={styles.quoteRow}>
                 <Text style={styles.quoteLabel}>{t('quotes.price')}</Text>
-                <Text style={styles.quotePrice}>LKR {myQuote.price}</Text>
+                <Text style={styles.quotePrice}>LKR {myQuote.price.toLocaleString()}</Text>
               </View>
               <View style={styles.quoteRow}>
                 <Text style={styles.quoteLabel}>{t('quotes.estimatedTime')}</Text>
@@ -179,7 +200,7 @@ export default function CompanyManageJobScreen() {
             <View style={styles.escrowCard}>
               <View style={styles.quoteRow}>
                 <Text style={styles.quoteLabel}>{t('wallet.balance')}</Text>
-                <Text style={styles.quotePrice}>LKR {job.escrow.amount}</Text>
+                <Text style={styles.quotePrice}>{job.escrow.currency || 'LKR'} {job.escrow.totalAmount?.toLocaleString?.() ?? job.escrow.amount?.toLocaleString?.()}</Text>
               </View>
               {wsCard && (
                 <View style={[styles.statusPill, { backgroundColor: wsCard.bg }]}>
@@ -197,27 +218,51 @@ export default function CompanyManageJobScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('company.manageJob')}</Text>
           <View style={styles.actions}>
-            {canStart && (
+            {canStart && !pinState?.arrivalVerifiedAt && (
               <TouchableOpacity
                 style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
-                onPress={() => handleUpdateProgress('IN_PROGRESS')}
+                onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
+                disabled={actionLoading !== ''}
+              >
+                <Ionicons name="location-outline" size={18} color="#111827" />
+                <Text style={styles.actionBtnText}>Verify Arrival PIN</Text>
+              </TouchableOpacity>
+            )}
+            {canStart && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              <TouchableOpacity
+                style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
+                onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
                 disabled={actionLoading !== ''}
               >
                 <Ionicons name="play" size={18} color="#111827" />
-                <Text style={styles.actionBtnText}>{t('booking.statusInProgress')}</Text>
+                <Text style={styles.actionBtnText}>Start Work with PIN</Text>
               </TouchableOpacity>
             )}
             {canComplete && (
               <TouchableOpacity
                 style={[styles.actionBtn, styles.completeBtn, actionLoading !== '' && styles.btnDisabled]}
-                onPress={() => handleUpdateProgress('COMPLETION_REQUESTED')}
+                onPress={handleMarkComplete}
                 disabled={actionLoading !== ''}
               >
                 <Ionicons name="checkmark-done" size={18} color="#111827" />
                 <Text style={styles.actionBtnText}>{t('tracking.confirmComplete')}</Text>
               </TouchableOpacity>
             )}
-            {!canStart && !canComplete && (
+            {assignment && !isAssignedWorker && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Assigned worker</Text>
+                <Text style={styles.emptyDesc}>
+                  {assignment.worker?.name || 'A company employee'} is assigned to perform this job. Managers can monitor the booking, but only the assigned worker can start or complete the work.
+                </Text>
+              </View>
+            )}
+            {!assignment && myQuote?.status === 'ACCEPTED' && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Assign an employee</Text>
+                <Text style={styles.emptyDesc}>Assign and have an employee accept this job before work can start.</Text>
+              </View>
+            )}
+            {!canStart && !canComplete && !assignment && myQuote?.status !== 'ACCEPTED' && (
               <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(company)/jobs/v2/browse')}>
                 <Text style={styles.browseBtnText}>{t('company.browseJobs')} →</Text>
               </TouchableOpacity>
