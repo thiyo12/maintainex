@@ -4,6 +4,7 @@ import {
   lkrCents,
   lkrRupees,
   legacyToMinorUnits,
+  parseMajorUnitsInput,
   hasFractionalParts,
   toMinorUnitsSafe,
   minorUnitsToDisplay,
@@ -66,6 +67,20 @@ describe('Money Utility', () => {
       expect(m.amount).toBe(500000n);
     });
   });
+
+  describe('parseMajorUnitsInput', () => {
+    it('converts a mobile LKR quote of 5000 to canonical 500000 minor units', () => {
+      expect(parseMajorUnitsInput(5000, 'LKR')).toBe(500000n)
+      expect(parseMajorUnitsInput('5000.50', 'LKR')).toBe(500050n)
+    })
+
+    it('rejects invalid or over-precise major-unit values', () => {
+      expect(parseMajorUnitsInput(0, 'LKR')).toBeNull()
+      expect(parseMajorUnitsInput('-1', 'LKR')).toBeNull()
+      expect(parseMajorUnitsInput('12.345', 'LKR')).toBeNull()
+      expect(parseMajorUnitsInput('abc', 'LKR')).toBeNull()
+    })
+  })
 
   describe('legacyToMinorUnits', () => {
     it('converts whole number', () => {
