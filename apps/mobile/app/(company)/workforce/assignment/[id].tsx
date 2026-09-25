@@ -146,6 +146,18 @@ export default function AssignmentDetailScreen() {
         </View>
 
         <View style={styles.actions}>
+          {['ACCEPTED', 'IN_PROGRESS'].includes(assignment.status) && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.acceptBtn]}
+              onPress={() => router.push(`/(company)/jobs/v2/manage/${assignment.jobId}` as any)}
+              disabled={actionLoading}
+            >
+              <Text style={styles.actionBtnText}>
+                {assignment.status === 'IN_PROGRESS' ? 'Open Active Job' : 'Open Job & Verify PIN'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {assignment.status === 'ASSIGNED' && (
             <>
               <TouchableOpacity
