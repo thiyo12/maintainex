@@ -44,7 +44,7 @@ export interface TransitionContext {
 const JOB_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
   OPEN: ['QUOTE_ACCEPTED', 'CANCELLED'],
   QUOTE_ACCEPTED: ['IN_PROGRESS', 'CANCELLED'],
-  IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+  IN_PROGRESS: ['COMPLETED'],
   COMPLETED: [],
   CANCELLED: [],
 }
@@ -122,11 +122,6 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
     await prisma.marketplaceJob.updateMany({
       where: { id: ctx.jobId, status: 'IN_PROGRESS' },
       data: { status: 'COMPLETED' },
-    })
-  } else if (targetStatus === 'DISPUTED') {
-    await prisma.marketplaceJob.updateMany({
-      where: { id: ctx.jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
-      data: { status: 'CANCELLED' },
     })
   }
 
@@ -759,8 +754,8 @@ export async function raiseJobDispute(
   return prisma.$transaction(async (tx) => {
     const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) throw new Error('Job not found')
-    if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
-      throw new Error('Cannot dispute completed or cancelled jobs')
+    if (job.status !== 'IN_PROGRESS') {
+      throw new Error('Dispute is only available after work has started')
     }
 
     await verifyDisputeAuthorization(job, ctx, tx)
@@ -786,11 +781,6 @@ export async function raiseJobDispute(
       data: { progressStatus: 'DISPUTED' },
     })
     if (wsClaimed.count !== 1) throw new Error('Workspace state changed concurrently')
-
-    await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
-      data: { status: 'CANCELLED' },
-    })
 
     return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
   })
