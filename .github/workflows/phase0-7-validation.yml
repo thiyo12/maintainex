@@ -128,6 +128,10 @@ jobs:
           CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
             ON "JobQuote"("jobId", "providerId")
             WHERE status = 'PENDING';
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "PaymentIntent_one_active_per_job"
+            ON "PaymentIntent"("jobId")
+            WHERE status IN ('CREATED', 'PENDING');
           SQL
 
       - name: Verify migration deploy is no-op
