@@ -148,10 +148,16 @@ export default function V2JobDetailScreen() {
   const handleCancelWithReason = async () => {
     setCancelReasonVisible(false)
     setActionLoading('cancel')
-    removedJobs.add(id); emit('jobsChanged', id)
-    try { await v2JobActions.complete(id, 'CANCEL', cancelReason || ''); router.back() }
-    catch { router.back() }
-    finally { setActionLoading('') }
+    try {
+      await v2JobActions.complete(id, 'CANCEL', cancelReason || '')
+      removedJobs.add(id)
+      emit('jobsChanged', id)
+      router.back()
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message || 'Could not cancel this booking.')
+    } finally {
+      setActionLoading('')
+    }
   }
 
   const handleDepositEscrow = () => {
@@ -383,7 +389,7 @@ export default function V2JobDetailScreen() {
         )}
 
         {/* ─── Action Cards ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') || (job.status === 'IN_PROGRESS' && !escrow) ? (
+        {job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT' ? (
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
             <Lock size={32} color={colors.ink} weight="fill" />
             <Text style={styles.actionCardTitle}>Secure Payment</Text>
@@ -456,7 +462,7 @@ export default function V2JobDetailScreen() {
         )}
 
         {/* ─── Job PIN ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
+        {escrow?.status === 'PROTECTED' && (job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
           <TouchableOpacity
             style={[styles.disputeBtn, { borderColor: colors.amber }]}
             onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
