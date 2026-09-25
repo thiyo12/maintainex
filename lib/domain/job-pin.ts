@@ -48,13 +48,20 @@ export async function generateJobPin(
   const pin = generatePin()
   const pinHash = await hashPassword(pin)
 
+  const lastPin = await prisma.jobVerificationPin.findFirst({
+    where: { jobId },
+    orderBy: { version: 'desc' },
+    select: { version: true },
+  })
+  const nextVersion = (lastPin?.version ?? 0) + 1
+
   const record = await prisma.jobVerificationPin.create({
     data: {
       jobId,
       customerId,
       pinHash,
       status: 'ACTIVE',
-      version: 1,
+      version: nextVersion,
     },
   })
 
