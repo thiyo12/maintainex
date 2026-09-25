@@ -172,9 +172,16 @@ export default function V2JobDetailScreen() {
   }
 
   const handleApproveCompletion = () => {
-    if (!job || !escrow) return
+    if (!job || !escrow || workspace?.progressStatus !== 'COMPLETION_REQUESTED') return
     const aq = quotes.find(q => q.status === 'ACCEPTED')
-    router.push({ pathname: '/(customer)/payment/confirm-complete', params: { bookingId: id, jobTitle: job.title, taskerName: aq?.provider?.name || '', taskerPayout: String(Number(escrow.amount) - Number(escrow.serviceFee || 0)), platformFee: String(Number(escrow.serviceFee || 0)) } })
+    router.push({
+      pathname: '/(customer)/payment/confirm-complete',
+      params: {
+        bookingId: id,
+        jobTitle: job.title,
+        taskerName: aq?.provider?.name || 'Provider',
+      },
+    })
   }
 
   const handleDispute = () => {
