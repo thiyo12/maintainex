@@ -4,16 +4,18 @@ const mocks = vi.hoisted(() => {
   const tx: any = {
     paymentIntent: { updateMany: vi.fn() },
     jobEscrow: { updateMany: vi.fn() },
-    marketplaceJob: { updateMany: vi.fn() },
+    marketplaceJob: { updateMany: vi.fn(), findUnique: vi.fn() },
     companyJobAssignment: { updateMany: vi.fn() },
   }
   return {
     tx,
     paymentIntentFindFirst: vi.fn(),
     jobEscrowFindUnique: vi.fn(),
+    marketplaceJobFindUnique: vi.fn(),
     customerWalletUpsert: vi.fn(),
     transaction: vi.fn(async (fn: any) => fn(tx)),
     postLedgerTransaction: vi.fn(),
+    queryRaw: vi.fn(),
   }
 })
 
@@ -21,6 +23,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     paymentIntent: { findFirst: mocks.paymentIntentFindFirst },
     jobEscrow: { findUnique: mocks.jobEscrowFindUnique },
+    marketplaceJob: { findUnique: mocks.marketplaceJobFindUnique },
     customerWallet: { upsert: mocks.customerWalletUpsert },
     $transaction: mocks.transaction,
   },
@@ -60,6 +63,12 @@ describe('PayHere payment-to-work lifecycle', () => {
       status: 'PENDING',
     })
 
+    mocks.marketplaceJobFindUnique.mockResolvedValue({
+      id: 'job-1',
+      customerId: 'customer-1',
+      status: 'QUOTE_ACCEPTED',
+    })
+
     mocks.jobEscrowFindUnique.mockResolvedValue({
       id: 'escrow-1',
       jobId: 'job-1',
@@ -73,6 +82,9 @@ describe('PayHere payment-to-work lifecycle', () => {
     })
 
     mocks.customerWalletUpsert.mockResolvedValue({ id: 'wallet-1' })
+    mocks.tx.$queryRaw = vi.fn().mockResolvedValue([
+      { id: 'job-1', customerId: 'customer-1', status: 'QUOTE_ACCEPTED' },
+    ])
     mocks.tx.paymentIntent.updateMany.mockResolvedValue({ count: 1 })
     mocks.tx.jobEscrow.updateMany.mockResolvedValue({ count: 1 })
     mocks.tx.marketplaceJob.updateMany.mockResolvedValue({ count: 1 })
@@ -104,12 +116,73 @@ describe('PayHere payment-to-work lifecycle', () => {
 
     expect(mocks.tx.jobEscrow.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'escrow-1', status: { in: ['PENDING_PAYMENT', 'CANCELLED'] } },
+        where: {
+          id: 'escrow-1',
+          jobId: 'job-1',
+          customerId: 'customer-1',
+          status: 'PENDING_PAYMENT',
+        },
         data: expect.objectContaining({ status: 'PROTECTED' }),
       })
     )
 
     expect(mocks.tx.marketplaceJob.updateMany).not.toHaveBeenCalled()
     expect(mocks.tx.companyJobAssignment.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('rejects a late success callback after the booking was cancelled', async () => {
+    const { processPaymentSuccess } = await import('@/lib/payment/payment-service')
+
+    mocks.marketplaceJobFindUnique.mockResolvedValue({
+      id: 'job-1',
+      customerId: 'customer-1',
+      status: 'CANCELLED',
+    })
+    mocks.jobEscrowFindUnique.mockResolvedValue({
+      id: 'escrow-1',
+      jobId: 'job-1',
+      customerId: 'customer-1',
+      providerId: 'provider-1',
+      amount: 10000n,
+      serviceFee: 0n,
+      totalAmount: 10000n,
+      currency: 'LKR',
+      status: 'CANCELLED',
+    })
+
+    const result = await processPaymentSuccess({
+      merchant_id: 'test',
+      order_id: 'order-1',
+      payhere_amount: '100.00',
+      payhere_currency: 'LKR',
+      status_code: '2',
+      md5sig: 'sig',
+      payment_id: 'late-pay-1',
+      custom_1: 'job-1',
+    } as any)
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('no longer payable')
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects signed callbacks whose amount does not match the payment intent', async () => {
+    const { processPaymentSuccess } = await import('@/lib/payment/payment-service')
+
+    const result = await processPaymentSuccess({
+      merchant_id: 'test',
+      order_id: 'order-1',
+      payhere_amount: '99.00',
+      payhere_currency: 'LKR',
+      status_code: '2',
+      md5sig: 'sig',
+      payment_id: 'pay-wrong-amount',
+      custom_1: 'job-1',
+    } as any)
+
+    expect(result).toEqual({ success: false, error: 'Payment amount mismatch' })
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
   })
 })
