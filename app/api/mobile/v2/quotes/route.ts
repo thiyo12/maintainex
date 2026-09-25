@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { notifyQuoteSubmitted } from '@/lib/notifications'
@@ -150,6 +151,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ quote: { ...quote, price: quote.price.toString() } }, { status: 201 })
   } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
+    }
     console.error('Create quote error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
