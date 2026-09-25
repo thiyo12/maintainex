@@ -60,6 +60,9 @@ function mockPrisma(overrides: Record<string, any> = {}) {
       count: vi.fn().mockResolvedValue(0),
       findUnique: vi.fn().mockResolvedValue(null),
     },
+    providerAvailability: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     $queryRaw: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any
@@ -651,6 +654,68 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       input.job.countryCode = 'LK'
       const result = await evaluateEligibility(input)
       expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(false)
+    })
+  })
+
+  describe('evaluateEligibility — declared availability', () => {
+    it('rejects a provider explicitly marked unavailable', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          providerAvailability: {
+            findUnique: vi.fn().mockResolvedValue({
+              providerId: 'tasker-1',
+              isAvailable: false,
+              monday: true, tuesday: true, wednesday: true, thursday: true,
+              friday: true, saturday: true, sunday: true,
+              startTime: '08:00',
+              endTime: '18:00',
+              vacationStart: null,
+              vacationEnd: null,
+            }),
+          },
+        },
+      })
+
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(false)
+      expect(result.availabilityPassed).toBe(false)
+      expect(result.gates.find(g => g.gate === 'AVAILABILITY')?.reason).toContain('unavailable')
+    })
+
+    it('rejects a requested time slot outside configured working hours', async () => {
+      const day = new Date('2026-10-26T12:00:00')
+      const input = makeIndivInput({
+        clientOverrides: {
+          providerAvailability: {
+            findUnique: vi.fn().mockResolvedValue({
+              providerId: 'tasker-1',
+              isAvailable: true,
+              monday: true, tuesday: true, wednesday: true, thursday: true,
+              friday: true, saturday: true, sunday: true,
+              startTime: '08:00',
+              endTime: '12:00',
+              vacationStart: null,
+              vacationEnd: null,
+            }),
+          },
+          marketplaceJob: {
+            count: vi.fn().mockResolvedValue(0),
+            findUnique: vi.fn().mockResolvedValue({
+              areaId: null,
+              latitude: null,
+              longitude: null,
+              preferredDate: day,
+              preferredTimeSlot: 'evening',
+            }),
+          },
+        },
+      })
+      input.job.preferredDate = day
+
+      const result = await evaluateEligibility(input)
+      expect(result.eligible).toBe(false)
+      expect(result.availabilityPassed).toBe(false)
+      expect(result.gates.find(g => g.gate === 'AVAILABILITY')?.reason).toContain('outside provider working hours')
     })
   })
 
