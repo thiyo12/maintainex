@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { getLocationName } from '@/lib/locations'
 import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
+import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/money'
 
 function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<string, any> {
   if (_isOwner) return data
@@ -37,6 +38,7 @@ export async function GET(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    const currency = getCurrencyForCountry(job.countryCode)
 
     const isOwner = job.customerId === user.id
     const requestedContext = new URL(_request.url).searchParams.get('context')
@@ -179,7 +181,7 @@ export async function GET(
           }
         }
 
-        return { ...q, price: Number(q.price), provider, providerRating, completedJobs }
+        return { ...q, price: minorUnitsToMajorUnits(q.price, currency), provider, providerRating, completedJobs }
       })
     )
 
@@ -196,7 +198,7 @@ export async function GET(
         addressLandmark: canViewExactLocation ? job.addressLandmark : null,
         latitude: canViewExactLocation ? job.latitude : null,
         longitude: canViewExactLocation ? job.longitude : null,
-        budgetAmount: job.budgetAmount != null ? Number(job.budgetAmount) : null,
+        budgetAmount: job.budgetAmount != null ? minorUnitsToMajorUnits(job.budgetAmount, currency) : null,
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
         smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
         notifiedCount: job.notifiedCount,
@@ -206,10 +208,10 @@ export async function GET(
         customer: customer ? redactSensitive(customer, isOwner) : null,
         locationName,
         quotes: enrichedQuotes,
-        escrow: escrow ? { ...escrow, amount: Number(escrow.amount), serviceFee: Number(escrow.serviceFee), totalAmount: Number(escrow.totalAmount) } : null,
+        escrow: escrow ? { ...escrow, amount: minorUnitsToMajorUnits(escrow.amount, currency), serviceFee: minorUnitsToMajorUnits(escrow.serviceFee, currency), totalAmount: minorUnitsToMajorUnits(escrow.totalAmount, currency) } : null,
         workspace: workspace || null,
         reviews: { customerReviews, providerReviews },
-        acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: Number(acceptedQuote.price), provider: acceptedProvider } : null,
+        acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: minorUnitsToMajorUnits(acceptedQuote.price, currency), provider: acceptedProvider } : null,
       },
     })
   } catch (error) {
@@ -282,7 +284,7 @@ export async function PATCH(
     return NextResponse.json({
       job: {
         ...updated,
-        budgetAmount: updated.budgetAmount != null ? Number(updated.budgetAmount) : null,
+        budgetAmount: updated.budgetAmount != null ? minorUnitsToMajorUnits(updated.budgetAmount, getCurrencyForCountry(updated.countryCode)) : null,
       },
     })
   } catch (error) {
