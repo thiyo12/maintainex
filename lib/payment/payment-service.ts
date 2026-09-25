@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
+import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/money'
 import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, parsePayHereAmount, type PayHereNotification } from './payhere-adapter'
 
@@ -274,6 +275,18 @@ async function markCapturedPaymentForRefund(
         }),
       },
     })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: paymentIntent.jobId,
+      actorId: paymentIntent.customerId,
+      actorType: 'CUSTOMER',
+      action: 'PAYMENT_REFUND_REQUIRED',
+      metadata: {
+        paymentIntentId: paymentIntent.id,
+        paymentId: notification.payment_id || null,
+        reason,
+      },
+    })
   })
 
   return { success: true }
@@ -407,6 +420,22 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
       createdBy: paymentIntent.customerId,
     }, tx)
 
+    await recordJobLifecycleEvent(tx, {
+      jobId: paymentIntent.jobId,
+      actorId: paymentIntent.customerId,
+      actorType: 'CUSTOMER',
+      action: 'PAYMENT_PROTECTED',
+      fromState: 'PENDING_PAYMENT',
+      toState: 'PROTECTED',
+      metadata: {
+        paymentIntentId: paymentIntent.id,
+        paymentId: notification.payment_id || null,
+        escrowId: escrow.id,
+        amountMinor: totalAmount,
+        currency: escrowCurrency,
+      },
+    })
+
     return { success: true }
   })
 }
@@ -461,6 +490,20 @@ export async function processPaymentFailure(notification: PayHereNotification): 
             orderId: notification.order_id,
             statusMessage: notification.status_message || null,
           }),
+        },
+      })
+
+      await recordJobLifecycleEvent(tx, {
+        jobId: paymentIntent.jobId,
+        actorId: paymentIntent.customerId,
+        actorType: 'CUSTOMER',
+        action: 'PAYMENT_CHARGEDBACK',
+        fromState: paymentIntent.status,
+        toState: 'CHARGEDBACK',
+        metadata: {
+          paymentIntentId: paymentIntent.id,
+          paymentId: notification.payment_id || paymentIntent.paymentId,
+          escrowId: paymentIntent.escrowId,
         },
       })
     })
