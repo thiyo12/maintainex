@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2Quotes } from '../../../../../lib/api-v2'
+import { company } from '../../../../../lib/api'
 
 export default function CompanySubmitQuoteScreen() {
   const { t } = useTranslation()
@@ -21,14 +22,18 @@ export default function CompanySubmitQuoteScreen() {
   const [price, setPrice] = useState('')
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState('')
   const [message, setMessage] = useState('')
-  const [providerType, setProviderType] = useState('COMPANY')
+  const [companyId, setCompanyId] = useState<string | null>(null)
 
   useEffect(() => { loadJob() }, [id])
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
+      const [jobRes, companyProfile] = await Promise.all([
+        v2Jobs.get(id),
+        company.profile.get(),
+      ])
+      setJob(jobRes.job)
+      setCompanyId(companyProfile.id)
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
@@ -38,16 +43,19 @@ export default function CompanySubmitQuoteScreen() {
   }
 
   const handleSubmit = async () => {
-    if (!price || !estimatedCompletionTime) {
-      Alert.alert(t('common.error'), t('errors.fillAllFields'))
+    if (!price || !estimatedCompletionTime || !companyId) {
+      Alert.alert(t('common.error'), !companyId ? 'Company profile is not available.' : t('errors.fillAllFields'))
       return
     }
     setSubmitting(true)
     try {
       await v2Quotes.submit({
-        jobId: id, providerType,
+        jobId: id,
+        providerType: 'COMPANY',
+        companyId,
         price: parseFloat(price),
-        estimatedCompletionTime, message,
+        estimatedCompletionTime,
+        message,
       })
       Alert.alert(t('company.quoteSubmitSuccess'), t('company.quoteSubmitDesc'), [
         { text: t('common.ok'), onPress: () => router.back() },
@@ -96,21 +104,8 @@ export default function CompanySubmitQuoteScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('quotes.yourQuote')}</Text>
 
-          <Text style={styles.label}>{t('jobDetail.provider')} *</Text>
-          <View style={styles.typeRow}>
-            <TouchableOpacity
-              style={[styles.typeBtn, providerType === 'INDIVIDUAL' && styles.typeBtnSelected]}
-              onPress={() => setProviderType('INDIVIDUAL')}
-            >
-              <Text style={[styles.typeBtnText, providerType === 'INDIVIDUAL' && styles.typeBtnTextSelected]}>{t('postJob.step2.freelancer')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeBtn, providerType === 'COMPANY' && styles.typeBtnSelected]}
-              onPress={() => setProviderType('COMPANY')}
-            >
-              <Text style={[styles.typeBtnText, providerType === 'COMPANY' && styles.typeBtnTextSelected]}>{t('postJob.step2.company')}</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.label}>Company quote</Text>
+          <Text style={{ color: colors.muted, marginBottom: 4 }}>This quote will be submitted under your company profile.</Text>
 
           <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
           <View style={styles.priceInputRow}>
