@@ -9,18 +9,9 @@ import { getSetting } from '@/lib/settings'
 import { notifyTaskerAssigned } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
+import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/money'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
-
-function parseBigIntInput(value: unknown): bigint | null {
-  if (typeof value === 'bigint') return value > 0n ? value : null
-  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value)
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    const parsed = BigInt(value.trim())
-    return parsed > 0n ? parsed : null
-  }
-  return null
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,7 +57,7 @@ export async function POST(request: NextRequest) {
                 select: { id: true },
               })
               return NextResponse.json({
-                job: { ...replayJob, budgetAmount: replayJob.budgetAmount?.toString() ?? null },
+                job: { ...replayJob, budgetAmount: replayJob.budgetAmount != null ? minorUnitsToMajorUnits(replayJob.budgetAmount, getCurrencyForCountry(replayJob.countryCode)) : null },
                 notifiedCount: replayJob.notifiedCount,
                 conversationId: replayConversation?.id ?? null,
                 estimatedResponseTime: '5-30 minutes',
@@ -97,7 +88,6 @@ export async function POST(request: NextRequest) {
     if (typeof templateJobId === 'string') templateJobId = sanitize(templateJobId, 80)
     if (typeof targetTaskerId === 'string') targetTaskerId = sanitize(targetTaskerId, 80)
 
-    const budgetMinor = parseBigIntInput(budgetAmount)
     if (!title || !description || !categoryId || !budgetType) {
       return NextResponse.json({ error: 'Missing or invalid required fields: title, description, categoryId, budgetType' }, { status: 400 })
     }
@@ -151,6 +141,12 @@ export async function POST(request: NextRequest) {
 
     const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
     const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
+    const currency = getCurrencyForCountry(finalCountryCode)
+    const budgetProvided = budgetAmount !== undefined && budgetAmount !== null && budgetAmount !== ''
+    const budgetMinor = budgetProvided ? parseMajorUnitsInput(budgetAmount, currency) : null
+    if (budgetProvided && budgetMinor === null) {
+      return NextResponse.json({ error: 'budgetAmount must be a positive amount with at most 2 decimal places' }, { status: 400 })
+    }
 
     if (finalCountryCode !== user.countryCode) {
       return NextResponse.json({
@@ -275,7 +271,7 @@ export async function POST(request: NextRequest) {
             : null
           if (replayJob) {
             return NextResponse.json({
-              job: { ...replayJob, budgetAmount: replayJob.budgetAmount?.toString() ?? null },
+              job: { ...replayJob, budgetAmount: replayJob.budgetAmount != null ? minorUnitsToMajorUnits(replayJob.budgetAmount, getCurrencyForCountry(replayJob.countryCode)) : null },
               notifiedCount: replayJob.notifiedCount,
               conversationId: null,
               estimatedResponseTime: '5-30 minutes',
@@ -339,7 +335,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      job: { ...job, budgetAmount: job.budgetAmount?.toString() ?? null },
+      job: { ...job, budgetAmount: job.budgetAmount != null ? minorUnitsToMajorUnits(job.budgetAmount, getCurrencyForCountry(job.countryCode)) : null },
       notifiedCount,
       conversationId,
       estimatedResponseTime: '5-30 minutes',
@@ -505,7 +501,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       jobs: jobs.map((job) => ({
         ...job,
-        budgetAmount: job.budgetAmount?.toString() ?? null,
+        budgetAmount: job.budgetAmount != null ? minorUnitsToMajorUnits(job.budgetAmount, getCurrencyForCountry(job.countryCode)) : null,
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
         smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
       })),
