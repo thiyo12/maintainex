@@ -115,7 +115,8 @@ export const v2Quotes = {
 export interface V2PaymentStatus {
   id: string
   status: 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'
-  amount: string
+  amount: number
+  amountMinor: string
   currency: string
   merchantOrderId: string
   paymentId: string | null
