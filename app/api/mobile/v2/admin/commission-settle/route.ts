@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       settlementId: updated.id,
       actorId: user.id,
       amount: updated.commissionAmount,
-      currency: 'LKR',
+      currency: updated.currency,
     })
 
     return NextResponse.json({ settlement: serializeSettlement(updated) })
