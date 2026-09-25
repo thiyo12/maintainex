@@ -72,8 +72,10 @@ export const v2Jobs = {
     v2Request<{ job: V2Job }>('/api/mobile/v2/jobs', { method: 'POST', body: JSON.stringify(data) }),
   list: (params?: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs${params ? `?${params}` : ''}`),
-  get: (id: string) =>
-    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`),
+  get: (id: string, context?: 'company') =>
+    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(
+      `/api/mobile/v2/jobs/${id}${context ? `?context=${context}` : ''}`
+    ),
   pollNew: (since: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`),
   getTaskerLocation: (id: string) =>
