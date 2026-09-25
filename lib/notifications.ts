@@ -126,6 +126,20 @@ export async function notifyJobCancelled(
   })
 }
 
+export async function notifyDisputeRaised(
+  jobId: string,
+  recipientUserId: string,
+  jobTitle: string,
+) {
+  return createNotification({
+    userId: recipientUserId,
+    title: 'Job Dispute Raised',
+    body: `A dispute was raised for "${jobTitle}". Payment is on hold while it is reviewed.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
 export async function notifyCompletionRequested(jobId: string, customerId: string, jobTitle: string) {
   return createNotification({
     userId: customerId,
