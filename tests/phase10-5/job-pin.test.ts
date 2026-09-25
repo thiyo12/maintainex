@@ -212,10 +212,40 @@ beforeAll(async () => {
       progressStatus: 'IN_PROGRESS',
     },
   })
+
+  const acceptedQuotes = await prisma.jobQuote.findMany({
+    where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] }, status: 'ACCEPTED' },
+    select: { id: true, jobId: true, providerId: true, price: true },
+  })
+  const customersByJob = new Map([
+    [jobAId, customerAId],
+    [jobBId, customerBId],
+    [instantJobId, customerAId],
+    [inspectionFirstJobId, customerAId],
+  ])
+
+  await prisma.jobEscrow.createMany({
+    data: acceptedQuotes.map((quote) => ({
+      jobId: quote.jobId,
+      quoteId: quote.id,
+      customerId: customersByJob.get(quote.jobId)!,
+      providerId: quote.providerId,
+      amount: quote.price,
+      serviceFee: 0n,
+      totalAmount: quote.price,
+      paymentMethod: 'CARD',
+      currency: 'LKR',
+      status: 'PROTECTED',
+      heldAt: now,
+    })),
+  })
 })
 
 afterAll(async () => {
   await prisma.jobVerificationPin.deleteMany({
+    where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
+  })
+  await prisma.jobEscrow.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
   await prisma.jobQuote.deleteMany({
@@ -260,6 +290,26 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       expect(record).toBeTruthy()
       expect(record!.pinHash).not.toBe(result.pin)
       expect(record!.pinHash.length).toBeGreaterThan(20)
+    })
+
+    it('rejects PIN generation before escrow is protected', async () => {
+      const { generateJobPin } = await import('@/lib/domain/job-pin')
+      const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: jobAId } })
+      expect(escrow).toBeTruthy()
+
+      await prisma.jobEscrow.update({
+        where: { id: escrow!.id },
+        data: { status: 'PENDING_PAYMENT', heldAt: null },
+      })
+
+      try {
+        await expect(generateJobPin(jobAId, customerAId)).rejects.toThrow('Payment must be protected')
+      } finally {
+        await prisma.jobEscrow.update({
+          where: { id: escrow!.id },
+          data: { status: 'PROTECTED', heldAt: new Date() },
+        })
+      }
     })
 
     it('rejects generation by non-owner', async () => {
