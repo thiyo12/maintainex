@@ -724,6 +724,22 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
         data: { status: 'WITHDRAWN' },
       })
+
+      await recordJobLifecycleEvent(tx, {
+        jobId,
+        actorId: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'JOB_CANCELLED',
+        fromState: job.status,
+        toState: 'CANCELLED',
+        metadata: {
+          reason: ctx.reason ?? null,
+          escrowId: escrow.id,
+          escrowFromState: 'PENDING_PAYMENT',
+          escrowToState: 'CANCELLED',
+          refundMinor: 0,
+        },
+      })
     })
     return { refundAmount: 0, refundCents: 0n }
   }
@@ -789,6 +805,23 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     await tx.jobQuote.updateMany({
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
       data: { status: 'WITHDRAWN' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'ESCROW_REFUNDED',
+      fromState: job.status,
+      toState: 'CANCELLED',
+      metadata: {
+        reason: ctx.reason ?? null,
+        escrowId: escrow.id,
+        escrowFromState: escrow.status,
+        escrowToState: 'REFUNDED',
+        refundMinor: refundCents,
+        currency: escrow.currency,
+      },
     })
   })
 
@@ -857,6 +890,21 @@ export async function raiseJobDispute(
       data: { progressStatus: 'DISPUTED' },
     })
     if (wsClaimed.count !== 1) throw new Error('Workspace state changed concurrently')
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'DISPUTE_RAISED',
+      fromState: workspace.progressStatus,
+      toState: 'DISPUTED',
+      metadata: {
+        reason: ctx.reason ?? null,
+        escrowId: escrow.id,
+        escrowFromState: 'PROTECTED',
+        escrowToState: 'ON_HOLD',
+      },
+    })
 
     return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
   })
@@ -1105,6 +1153,24 @@ export async function completeAndReleaseEscrow(
       commissionCents,
       currency: escrowCurrency,
       countryCode: job.countryCode || 'LK',
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_COMPLETED',
+      fromState: job.status,
+      toState: 'COMPLETED',
+      metadata: {
+        releaseMode,
+        escrowId: escrow.id,
+        workspaceFromState: workspace.progressStatus,
+        workspaceToState: 'COMPLETED',
+        commissionMinor: commissionCents,
+        providerNetMinor: netCents,
+        currency: escrowCurrency,
+      },
     })
 
     return {
