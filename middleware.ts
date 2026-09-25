@@ -506,7 +506,8 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/api/industries') &&
     !pathname.startsWith('/api/testimonials') &&
     !pathname.startsWith('/api/booking') &&
-    !pathname.startsWith('/api/cron/')
+    !pathname.startsWith('/api/cron/') &&
+    !pathname.startsWith('/api/webhooks/')
   ) {
     const session = await getSession(request)
     if (!session) {
