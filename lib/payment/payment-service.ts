@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
-import { bigIntToSafeNumber, type Currency } from '@/lib/money'
+import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/money'
 import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, parsePayHereAmount, type PayHereNotification } from './payhere-adapter'
 
 export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'
@@ -215,7 +215,8 @@ export async function getPaymentStatus(jobId: string, customerId: string) {
   return {
     id: payment.id,
     status: payment.status,
-    amount: payment.amount.toString(),
+    amount: minorUnitsToMajorUnits(payment.amount, payment.currency as Currency),
+    amountMinor: payment.amount.toString(),
     currency: payment.currency,
     merchantOrderId: payment.merchantOrderId,
     paymentId: payment.paymentId,
