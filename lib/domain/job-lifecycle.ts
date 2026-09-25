@@ -4,6 +4,7 @@ import { bigIntToSafeNumber, type Currency } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
 import { Prisma } from '@prisma/client'
+import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
@@ -211,6 +212,16 @@ export async function cancelJob(
       },
     })
 
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'JOB_CANCELLED',
+      fromState: lockedJob.status,
+      toState: 'CANCELLED',
+      metadata: { reason: ctx.reason ?? null, refunded: false },
+    })
+
     return { needsRefund: false, previousStatus: lockedJob.status }
   })
 
@@ -305,6 +316,24 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         },
       })
     }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: ctx.jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'QUOTE_ACCEPTED',
+      fromState: 'OPEN',
+      toState: 'QUOTE_ACCEPTED',
+      metadata: {
+        quoteId,
+        providerId: quote.providerId,
+        providerType: quote.providerType,
+        quoteAmountMinor: quote.price,
+        serviceFeeMinor: serviceFee,
+        totalAmountMinor: totalAmount,
+        currency: pricingConfig.defaultCurrency,
+      },
+    })
   })
 
   const committedJob = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
@@ -388,6 +417,20 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       })
     }
 
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'ESCROW_FUNDED',
+      fromState: escrow.status,
+      toState: 'PROTECTED',
+      metadata: {
+        escrowId: escrow.id,
+        totalAmountMinor: totalAmount,
+        currency: escrowCurrency,
+        fundingMethod: 'WALLET',
+      },
+    })
   })
 
   return { success: true, totalAmount, escrowId: escrow.id }
