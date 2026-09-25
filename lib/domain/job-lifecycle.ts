@@ -555,11 +555,11 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
 
   if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
 
-  const customerWallet = await prisma.customerWallet.findUnique({
+  const customerWallet = await prisma.customerWallet.upsert({
     where: { userId: job.customerId },
-    select: { id: true },
+    update: {},
+    create: { userId: job.customerId },
   })
-  if (!customerWallet) throw new Error('Customer wallet not found')
 
     const refundCents = escrow.totalAmount
     const refundMajor = bigIntToSafeNumber(refundCents) / 100

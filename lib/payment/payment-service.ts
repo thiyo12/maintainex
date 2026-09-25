@@ -206,11 +206,11 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
     return { success: false, error: `Escrow not fundable: ${escrow.status}` }
   }
 
-  const customerWallet = await prisma.customerWallet.findUnique({
+  const customerWallet = await prisma.customerWallet.upsert({
     where: { userId: paymentIntent.customerId },
-    select: { id: true },
+    update: {},
+    create: { userId: paymentIntent.customerId },
   })
-  if (!customerWallet) return { success: false, error: 'Customer wallet not found' }
 
   const escrowCurrency = escrow.currency as Currency
   const totalAmount = escrow.totalAmount ?? escrow.amount
