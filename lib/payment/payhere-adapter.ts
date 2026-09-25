@@ -94,12 +94,19 @@ export function generateMerchantOrderId(jobId: string): string {
 }
 
 export function parsePayHereAmount(amountStr: string): bigint | null {
-  const cleaned = amountStr.replace(/[^0-9.]/g, '')
-  const num = parseFloat(cleaned)
-  if (isNaN(num) || num <= 0) return null
-  return BigInt(Math.round(num * 100))
+  const raw = amountStr.trim()
+  const match = raw.match(/^(\d+)(?:\.(\d{1,2}))?$/)
+  if (!match) return null
+
+  const whole = BigInt(match[1])
+  const fraction = (match[2] || '').padEnd(2, '0')
+  const minor = whole * 100n + BigInt(fraction || '0')
+  return minor > 0n ? minor : null
 }
 
 export function formatPayHereAmount(amountCents: bigint): string {
-  return (Number(amountCents) / 100).toFixed(2)
+  if (amountCents < 0n) throw new Error('PayHere amount cannot be negative')
+  const whole = amountCents / 100n
+  const fraction = (amountCents % 100n).toString().padStart(2, '0')
+  return `${whole.toString()}.${fraction}`
 }
