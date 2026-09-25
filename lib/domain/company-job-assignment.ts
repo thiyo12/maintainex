@@ -1,6 +1,7 @@
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
+import { notifyCompanyWorkerAssigned } from '@/lib/notifications'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -91,6 +92,17 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     return record
   })
 
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { companyName: true },
+  })
+  await notifyCompanyWorkerAssigned(
+    jobId,
+    workerUserId,
+    job.title,
+    company?.companyName || 'Your company',
+  )
+
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -165,6 +177,17 @@ export async function reassignWorker(
 
     return newRecord
   })
+
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { companyName: true },
+  })
+  await notifyCompanyWorkerAssigned(
+    jobId,
+    newWorkerUserId,
+    job.title,
+    company?.companyName || 'Your company',
+  )
 
   return { success: true, assignmentId: assignment.id }
 }
