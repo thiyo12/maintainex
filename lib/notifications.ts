@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { formatCurrency, getCurrencyForCountry } from './currency-format'
 import type { Currency } from './money'
+import { sendExpoPush } from './push'
 
 export async function createNotification(data: {
   userId: string
@@ -13,7 +14,7 @@ export async function createNotification(data: {
   referenceId?: string
 }) {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -35,6 +36,20 @@ export async function createNotification(data: {
             : null,
       },
     })
+
+    const recipient = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { pushToken: true },
+    })
+    if (recipient?.pushToken) {
+      await sendExpoPush(recipient.pushToken, data.title, data.body, {
+        notificationId: notification.id,
+        ...(data.referenceType ? { referenceType: data.referenceType } : {}),
+        ...(data.referenceId ? { referenceId: data.referenceId } : {}),
+      })
+    }
+
+    return notification
   } catch (error) {
     console.error('Create notification error:', error)
   }
