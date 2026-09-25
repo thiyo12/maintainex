@@ -25,6 +25,9 @@ export interface PinState {
   version: number | null
   locked: boolean
   lastSuccessfulUseAt: Date | null
+  arrivalVerifiedAt: Date | null
+  workStartVerifiedAt: Date | null
+  completionVerifiedAt: Date | null
 }
 
 function generatePin(): string {
@@ -368,11 +371,16 @@ export async function verifyJobPin(
 
 export async function getPinState(
   jobId: string,
-  customerId: string
+  actorId: string
 ): Promise<PinState> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== customerId) throw new Error('Only the job owner can view PIN state')
+
+  const isCustomer = job.customerId === actorId
+  const verifierType = isCustomer ? null : await resolvePinVerifierTx(prisma, jobId, actorId)
+  if (!isCustomer && !verifierType) {
+    throw new Error('Not authorized to view PIN state')
+  }
 
   const activePin = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
@@ -380,7 +388,15 @@ export async function getPinState(
   })
 
   if (!activePin) {
-    return { hasActivePin: false, version: null, locked: false, lastSuccessfulUseAt: null }
+    return {
+      hasActivePin: false,
+      version: null,
+      locked: false,
+      lastSuccessfulUseAt: null,
+      arrivalVerifiedAt: null,
+      workStartVerifiedAt: null,
+      completionVerifiedAt: null,
+    }
   }
 
   const locked = activePin.lockedUntil != null && activePin.lockedUntil > new Date()
@@ -390,6 +406,9 @@ export async function getPinState(
     version: activePin.version,
     locked,
     lastSuccessfulUseAt: activePin.lastSuccessfulUseAt,
+    arrivalVerifiedAt: activePin.arrivalVerifiedAt,
+    workStartVerifiedAt: activePin.workStartVerifiedAt,
+    completionVerifiedAt: activePin.completionVerifiedAt,
   }
 }
 
