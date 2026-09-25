@@ -558,6 +558,100 @@ describe('Phase 10.2 — Eligibility Engine', () => {
       expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(false)
       expect(result.serviceAreaPassed).toBe(false)
     })
+
+    it('fails SERVICE_AREA when configured local area does not include the job', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          taskerProfile: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'profile-1',
+              userId: 'tasker-1',
+              verificationStatus: 'VERIFIED',
+              isVerified: true,
+              skills: null,
+              taskerSkills: [{ job: { categoryId: 'cat-1' } }],
+              rating: 4.5,
+              completedJobs: 5,
+              countryCode: 'LK',
+              serviceAreas: JSON.stringify(['Colombo']),
+              latitude: null,
+              longitude: null,
+              serviceRadius: null,
+            }),
+          },
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'tasker-1',
+              isSuspended: false,
+              isBanned: false,
+              identityStatus: 'VERIFIED',
+              isActive: true,
+              countryCode: 'LK',
+            }),
+          },
+          marketplaceJob: {
+            count: vi.fn().mockResolvedValue(0),
+            findUnique: vi.fn().mockResolvedValue({
+              areaId: 'lk-jaffna-town',
+              latitude: null,
+              longitude: null,
+              preferredDate: null,
+              preferredTimeSlot: null,
+            }),
+          },
+        },
+      })
+      input.job.countryCode = 'LK'
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(false)
+    })
+
+    it('fails SERVICE_AREA when the job is outside the configured radius', async () => {
+      const input = makeIndivInput({
+        clientOverrides: {
+          taskerProfile: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'profile-1',
+              userId: 'tasker-1',
+              verificationStatus: 'VERIFIED',
+              isVerified: true,
+              skills: null,
+              taskerSkills: [{ job: { categoryId: 'cat-1' } }],
+              rating: 4.5,
+              completedJobs: 5,
+              countryCode: 'LK',
+              serviceAreas: null,
+              latitude: 9.6615,
+              longitude: 80.0255,
+              serviceRadius: 5,
+            }),
+          },
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: 'tasker-1',
+              isSuspended: false,
+              isBanned: false,
+              identityStatus: 'VERIFIED',
+              isActive: true,
+              countryCode: 'LK',
+            }),
+          },
+          marketplaceJob: {
+            count: vi.fn().mockResolvedValue(0),
+            findUnique: vi.fn().mockResolvedValue({
+              areaId: 'lk-colombo-wellawatte',
+              latitude: 6.8741,
+              longitude: 79.8608,
+              preferredDate: null,
+              preferredTimeSlot: null,
+            }),
+          },
+        },
+      })
+      input.job.countryCode = 'LK'
+      const result = await evaluateEligibility(input)
+      expect(result.gates.find(g => g.gate === 'SERVICE_AREA')?.passed).toBe(false)
+    })
   })
 
   describe('evaluateEligibility — conflict', () => {
