@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
-import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled } from '@/lib/notifications'
+import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
+import { getCurrencyForCountry } from '@/lib/money'
 
 export async function POST(
   request: NextRequest,
@@ -55,7 +56,7 @@ export async function POST(
         'COMPLETION_REQUESTED'
       )
 
-      notifyCompletionRequested(job.id, job.customerId, job.title)
+      await notifyCompletionRequested(job.id, job.customerId, job.title)
       return NextResponse.json({ success: true, message: 'Completion pending customer approval' })
     }
 
@@ -65,8 +66,15 @@ export async function POST(
         job.id
       )
 
-      notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
-      notifyJobCompleted(job.id, job.customerId, job.title)
+      await notifyPaymentReleased(
+        job.id,
+        result.providerId,
+        job.title,
+        result.netAmount,
+        getCurrencyForCountry(job.countryCode),
+        job.countryCode,
+      )
+      await notifyJobCompleted(job.id, job.customerId, job.title)
       return NextResponse.json({
         success: true,
         message: 'Job completed, funds released',
@@ -86,10 +94,32 @@ export async function POST(
       }
 
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
+      let disputeRecipientId: string | null = isCustomer ? null : job.customerId
+
+      if (isCustomer) {
+        const accepted = await prisma.jobQuote.findFirst({
+          where: { jobId: job.id, status: 'ACCEPTED' },
+          select: { providerId: true, providerType: true },
+        })
+        if (accepted) {
+          disputeRecipientId =
+            accepted.providerType === 'INDIVIDUAL'
+              ? accepted.providerId
+              : (await prisma.companyProfile.findUnique({
+                  where: { id: accepted.providerId },
+                  select: { userId: true },
+                }))?.userId ?? null
+        }
+      }
+
       await raiseJobDispute(
         { jobId: job.id, actorId: user.id, actorType },
         job.id
       )
+
+      if (disputeRecipientId) {
+        await notifyDisputeRaised(job.id, disputeRecipientId, job.title)
+      }
 
       return NextResponse.json({ success: true, message: 'Dispute raised' })
     }
