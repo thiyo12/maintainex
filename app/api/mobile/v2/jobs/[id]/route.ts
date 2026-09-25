@@ -73,6 +73,32 @@ export async function GET(
         if (userQuote && (job.status === 'OPEN' || userQuote.status === 'ACCEPTED')) {
           providerContextId = user.id
           providerContextType = 'INDIVIDUAL'
+        } else {
+          const workerAssignment = await prisma.companyJobAssignment.findFirst({
+            where: {
+              jobId: job.id,
+              workerUserId: user.id,
+              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+            },
+            orderBy: { assignedAt: 'desc' },
+            select: { companyId: true },
+          })
+
+          if (workerAssignment) {
+            const companyQuote = await prisma.jobQuote.findFirst({
+              where: {
+                jobId: job.id,
+                providerId: workerAssignment.companyId,
+                providerType: 'COMPANY',
+                status: 'ACCEPTED',
+              },
+              select: { providerId: true },
+            })
+            if (companyQuote) {
+              providerContextId = workerAssignment.companyId
+              providerContextType = 'COMPANY'
+            }
+          }
         }
       }
 
@@ -138,7 +164,7 @@ export async function GET(
     const [customerReviews, providerReviews, companyAssignment] = await Promise.all([
       prisma.jobReview.findMany({ where: { jobId: job.id } }),
       prisma.providerReview.findMany({ where: { jobId: job.id } }),
-      requestedContext === 'company' && providerContextType === 'COMPANY' && providerContextId
+      providerContextType === 'COMPANY' && providerContextId
         ? prisma.companyJobAssignment.findFirst({
             where: {
               jobId: job.id,
