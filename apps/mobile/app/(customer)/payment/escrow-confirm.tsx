@@ -19,15 +19,12 @@ export default function EscrowConfirmScreen() {
   const styles = makeStyles(colors)
 
   const amount = parseFloat(quotedAmount) || 0
-  const platformFee = Math.round(amount * 0.1 * 100) / 100
-  const totalAmount = amount + platformFee
 
   const handleConfirm = async () => {
     if (!quoteId) { Alert.alert('Error', 'Missing quote information'); return }
     setLoading(true)
     try {
       await v2JobActions.selectQuote(bookingId, quoteId)
-      await v2JobActions.depositEscrow(bookingId, totalAmount)
       router.replace(`/(customer)/jobs/v2/confirm/${bookingId}`)
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to accept quote.')
@@ -65,12 +62,12 @@ export default function EscrowConfirmScreen() {
           <Text style={styles.rowV}>{currency} {amount.toLocaleString()}</Text>
         </View>
         <View style={styles.row}>
-          <Text style={styles.rowL}>Platform fee (10%)</Text>
-          <Text style={styles.rowV}>{currency} {platformFee.toLocaleString()}</Text>
+          <Text style={styles.rowL}>Service fee</Text>
+          <Text style={styles.rowV}>Calculated securely after acceptance</Text>
         </View>
         <View style={styles.totalRow}>
-          <Text style={styles.totalL}>Total to secure</Text>
-          <Text style={styles.totalV}>{currency} {totalAmount.toLocaleString()}</Text>
+          <Text style={styles.totalL}>Quote amount</Text>
+          <Text style={styles.totalV}>{currency} {amount.toLocaleString()}</Text>
         </View>
       </View>
 
@@ -84,7 +81,7 @@ export default function EscrowConfirmScreen() {
       <TouchableOpacity style={styles.btn} onPress={handleConfirm} disabled={loading} activeOpacity={0.8}>
         <Ionicons name="lock-closed-outline" size={18} color="#111827" />
         <Text style={styles.btnTxt}>
-          {loading ? 'Securing...' : `Secure ${currency} ${totalAmount.toLocaleString()}`}
+          {loading ? 'Accepting...' : 'Accept Quote & Continue'}
         </Text>
       </TouchableOpacity>
 
