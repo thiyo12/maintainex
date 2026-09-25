@@ -277,14 +277,37 @@ export async function verifyJobPin(
       data: updateData,
     })
 
-    // 9. Execute canonical lifecycle transition for WORK_START (within same transaction)
+    // 9. Execute the single canonical WORK_START transition atomically.
+    // Payment only protects escrow; work does not begin until this PIN succeeds.
     if (purpose === 'WORK_START') {
-      const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
-      if (workspace && workspace.progressStatus === 'ACCEPTED') {
-        await tx.jobWorkspace.updateMany({
-          where: { jobId, progressStatus: 'ACCEPTED' },
-          data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
+      const jobClaimed = await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: 'QUOTE_ACCEPTED' },
+        data: { status: 'IN_PROGRESS' },
+      })
+      if (jobClaimed.count !== 1) {
+        throw new Error('Job state changed before work start')
+      }
+
+      const workspaceClaimed = await tx.jobWorkspace.updateMany({
+        where: { jobId, progressStatus: 'ACCEPTED' },
+        data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
+      })
+      if (workspaceClaimed.count !== 1) {
+        throw new Error('Workspace state changed before work start')
+      }
+
+      if (verifierType === 'COMPANY' || verifierType === 'ASSIGNED_WORKER') {
+        const assignmentClaimed = await tx.companyJobAssignment.updateMany({
+          where: {
+            jobId,
+            workerUserId: actorId,
+            status: 'ACCEPTED',
+          },
+          data: { status: 'IN_PROGRESS', startedAt: now },
         })
+        if (assignmentClaimed.count !== 1) {
+          throw new Error('Only the accepted assigned company worker can start work')
+        }
       }
     }
 
@@ -384,14 +407,21 @@ async function validatePurposeTx(
   if (!job) return false
 
   const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
+  const protectedEscrow = await tx.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+    select: { id: true },
+  })
 
   switch (purpose) {
     case 'ARRIVAL':
-      return job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS'
+      return job.status === 'QUOTE_ACCEPTED' &&
+        workspace?.progressStatus === 'ACCEPTED' &&
+        !!protectedEscrow
 
     case 'WORK_START': {
-      if (job.status !== 'IN_PROGRESS') return false
+      if (job.status !== 'QUOTE_ACCEPTED') return false
       if (workspace?.progressStatus !== 'ACCEPTED') return false
+      if (!protectedEscrow) return false
 
       const activePin = await tx.jobVerificationPin.findFirst({
         where: { jobId, status: 'ACTIVE' },
