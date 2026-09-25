@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  conversationFindFirst: vi.fn(),
+  participantFindUnique: vi.fn(),
   messageFindMany: vi.fn(),
   messageUpdateMany: vi.fn(),
   participantUpdateMany: vi.fn(),
@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    conversation: { findFirst: mocks.conversationFindFirst },
     message: { findMany: mocks.messageFindMany, updateMany: mocks.messageUpdateMany },
-    conversationParticipant: { updateMany: mocks.participantUpdateMany },
+    conversationParticipant: {
+      findUnique: mocks.participantFindUnique,
+      updateMany: mocks.participantUpdateMany,
+    },
   },
 }))
 
@@ -49,7 +51,7 @@ describe('GET /api/mobile/conversations/[id]/messages — participant isolation'
   it('returns 404 for a non-participant and never reads messages', async () => {
     const GET = await loadHandler()
     mocks.authenticateRequest.mockResolvedValue({ id: 'outsider-user', role: 'COMPANY' })
-    mocks.conversationFindFirst.mockResolvedValue(null)
+    mocks.participantFindUnique.mockResolvedValue(null)
 
     const res = await GET(makeRequest(), params)
 
@@ -63,7 +65,7 @@ describe('GET /api/mobile/conversations/[id]/messages — participant isolation'
   it('returns messages for a participant and marks received ones read', async () => {
     const GET = await loadHandler()
     mocks.authenticateRequest.mockResolvedValue({ id: 'participant-user', role: 'CUSTOMER' })
-    mocks.conversationFindFirst.mockResolvedValue({ id: 'conv-1' })
+    mocks.participantFindUnique.mockResolvedValue({ id: 'cp-1' })
     mocks.messageFindMany.mockResolvedValue([
       {
         id: 'm1',
@@ -89,14 +91,15 @@ describe('GET /api/mobile/conversations/[id]/messages — participant isolation'
     const body = await res.json()
     expect(body).toHaveLength(2)
     expect(body[1].text).toBe('hi there')
-    expect(mocks.conversationFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          id: 'conv-1',
-          participants: { some: { userId: 'participant-user' } },
+    expect(mocks.participantFindUnique).toHaveBeenCalledWith({
+      where: {
+        conversationId_userId: {
+          conversationId: 'conv-1',
+          userId: 'participant-user',
         },
-      }),
-    )
+      },
+      select: { id: true },
+    })
     expect(mocks.messageUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: { in: ['m2'] } } }),
     )
