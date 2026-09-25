@@ -29,7 +29,8 @@ export interface V2Job {
   areaId: string | null
   postalCode: string | null
   preferredDate: string | null
-  timeSlot: string | null
+  timeSlot?: string | null
+  preferredTimeSlot: string | null
   addressStreet: string | null
   addressBuilding: string | null
   addressApartment: string | null
@@ -376,7 +377,15 @@ export const v2SmartBooking = {
     v2Request<SmartTemplate[]>(
       `/api/mobile/v2/service-templates${jobCategoryId ? `?jobCategoryId=${encodeURIComponent(jobCategoryId)}` : ''}`
     ),
-  priceEstimate: (data: { templateId: string; answers: Record<string, any>; countryCode?: string; urgency?: string }) =>
+  priceEstimate: (data: {
+    templateId: string
+    answers: Record<string, any>
+    countryCode?: string
+    urgency?: string
+    durationMinutes?: number
+    city?: string
+    scheduledFor?: string
+  }) =>
     v2Request<SmartPriceEstimate>('/api/mobile/v2/price-estimate', {
       method: 'POST',
       body: JSON.stringify(data),
