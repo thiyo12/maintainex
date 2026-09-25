@@ -22,6 +22,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
   afterAll(async () => {
     for (const jid of jobIds) {
       await prisma.commissionSettlement.deleteMany({ where: { jobId: jid } })
+      await prisma.companyJobAssignment.deleteMany({ where: { jobId: jid } })
       await prisma.financialLedger.deleteMany({ where: { referenceId: jid } })
       await prisma.jobEscrow.deleteMany({ where: { jobId: jid } })
       await prisma.jobVerificationPin.deleteMany({ where: { jobId: jid } })
@@ -29,6 +30,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
       await prisma.jobQuote.deleteMany({ where: { jobId: jid } })
       await prisma.marketplaceJob.deleteMany({ where: { id: jid } })
     }
+    await prisma.weeklySettlement.deleteMany({ where: { providerId: { in: [individualProviderUserId, companyOwnerId] } } }).catch(() => {})
     await prisma.taskerSkill.deleteMany({ where: { jobId: templateJobId } })
     await prisma.companySpecialty.deleteMany({ where: { companyId: companyProfileId } })
     await prisma.teamMember.deleteMany({ where: { companyId: companyProfileId } })
@@ -166,7 +168,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(fundedEscrow?.status).toBe('PROTECTED')
 
     const fundedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
-    expect(fundedJob?.status).toBe('IN_PROGRESS')
+    expect(fundedJob?.status).toBe('QUOTE_ACCEPTED')
 
     const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
     const pinResult = await generateJobPin(bookResult.job.id, customerUserId)
@@ -175,10 +177,15 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const wsAfterPin = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAfterPin?.progressStatus).toBe('ACCEPTED')
 
-    await verifyJobPin(bookResult.job.id, individualProviderUserId, pinResult.pin, 'WORK_START')
+    const arrival = await verifyJobPin(bookResult.job.id, individualProviderUserId, pinResult.pin, 'ARRIVAL')
+    expect(arrival.valid).toBe(true)
+    const workStart = await verifyJobPin(bookResult.job.id, individualProviderUserId, pinResult.pin, 'WORK_START')
+    expect(workStart.valid).toBe(true)
 
     const wsAfterStart = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAfterStart?.progressStatus).toBe('IN_PROGRESS')
+    const jobAfterStart = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
+    expect(jobAfterStart?.status).toBe('IN_PROGRESS')
 
     const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
     await transitionJobWorkspace(
@@ -249,6 +256,19 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const wsAccepted = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAccepted?.progressStatus).toBe('ACCEPTED')
 
+    const { createAssignment, workerAcceptAssignment } = await import('@/lib/domain/company-job-assignment')
+    const assignmentResult = await createAssignment({
+      companyId: companyProfileId,
+      jobId: bookResult.job.id,
+      workerUserId: companyUserId,
+      assignedByUserId: companyOwnerId,
+      actorRole: 'COMPANY_OWNER',
+    })
+    expect(assignmentResult.success).toBe(true)
+    expect(assignmentResult.assignmentId).toBeTruthy()
+    const acceptedAssignment = await workerAcceptAssignment(assignmentResult.assignmentId!, companyUserId)
+    expect(acceptedAssignment.success).toBe(true)
+
     await fundEscrow(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
       bookResult.job.id
@@ -259,16 +279,26 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(fundedEscrow?.providerId).toBe(companyProfileId)
 
     const fundedJob = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
-    expect(fundedJob?.status).toBe('IN_PROGRESS')
+    expect(fundedJob?.status).toBe('QUOTE_ACCEPTED')
 
     const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
     const pinResult = await generateJobPin(bookResult.job.id, customerUserId)
     expect(pinResult.pin).toMatch(/^\d{6}$/)
 
-    await verifyJobPin(bookResult.job.id, companyUserId, pinResult.pin, 'WORK_START')
+    const arrival = await verifyJobPin(bookResult.job.id, companyUserId, pinResult.pin, 'ARRIVAL')
+    expect(arrival.valid).toBe(true)
+    const workStart = await verifyJobPin(bookResult.job.id, companyUserId, pinResult.pin, 'WORK_START')
+    expect(workStart.valid).toBe(true)
 
     const wsAfterPin = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAfterPin?.progressStatus).toBe('IN_PROGRESS')
+    const jobAfterPin = await prisma.marketplaceJob.findUnique({ where: { id: bookResult.job.id } })
+    expect(jobAfterPin?.status).toBe('IN_PROGRESS')
+    const assignmentAfterPin = await prisma.companyJobAssignment.findUnique({
+      where: { id: assignmentResult.assignmentId! },
+    })
+    expect(assignmentAfterPin?.status).toBe('IN_PROGRESS')
+    expect(assignmentAfterPin?.startedAt).toBeTruthy()
 
     const resolvedActorType = await resolveProviderActor(bookResult.job.id, companyUserId)
     expect(resolvedActorType).toBe('COMPANY')
