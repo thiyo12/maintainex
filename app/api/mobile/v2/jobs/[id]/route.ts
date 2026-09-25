@@ -135,9 +135,29 @@ export async function GET(
       }
     }
 
-    const [customerReviews, providerReviews] = await Promise.all([
+    const [customerReviews, providerReviews, companyAssignment] = await Promise.all([
       prisma.jobReview.findMany({ where: { jobId: job.id } }),
       prisma.providerReview.findMany({ where: { jobId: job.id } }),
+      requestedContext === 'company' && providerContextType === 'COMPANY' && providerContextId
+        ? prisma.companyJobAssignment.findFirst({
+            where: {
+              jobId: job.id,
+              companyId: providerContextId,
+              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+            },
+            orderBy: { assignedAt: 'desc' },
+            select: {
+              id: true,
+              workerUserId: true,
+              status: true,
+              assignedAt: true,
+              acceptedAt: true,
+              startedAt: true,
+              completedAt: true,
+              worker: { select: { id: true, name: true } },
+            },
+          })
+        : Promise.resolve(null),
     ])
 
     const locationName = job.areaId ? getLocationName(job.areaId) : null
@@ -212,6 +232,7 @@ export async function GET(
         escrow: escrow ? { ...escrow, amount: minorUnitsToMajorUnits(escrow.amount, currency), serviceFee: minorUnitsToMajorUnits(escrow.serviceFee, currency), totalAmount: minorUnitsToMajorUnits(escrow.totalAmount, currency) } : null,
         workspace: workspace || null,
         reviews: { customerReviews, providerReviews },
+        companyAssignment,
         acceptedQuote: acceptedQuote ? { ...acceptedQuote, price: minorUnitsToMajorUnits(acceptedQuote.price, currency), provider: acceptedProvider } : null,
       },
     })
