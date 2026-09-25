@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
-import { v2Jobs, v2JobActions } from '../../../../../lib/api-v2'
+import { v2Jobs, v2JobActions, v2Payments } from '../../../../../lib/api-v2'
 import Avatar from '../../../../../components/ui/Avatar'
 
-const TIME_SLOTS = ['08:00-10:00','10:00-12:00','12:00-14:00','14:00-16:00','16:00-18:00']
+const TIME_SLOTS = [
+  { value: 'morning', label: 'Morning (8 AM–12 PM)' },
+  { value: 'afternoon', label: 'Afternoon (12–5 PM)' },
+  { value: 'evening', label: 'Evening (5–9 PM)' },
+]
 
 export default function V2ConfirmBookingScreen() {
   const { t } = useTranslation()
@@ -23,8 +27,15 @@ export default function V2ConfirmBookingScreen() {
   const [actionLoading, setActionLoading] = useState('')
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleSlot, setScheduleSlot] = useState('')
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
 
   useEffect(() => { loadData() }, [id])
+
+  useEffect(() => {
+    if (!['CREATED', 'PENDING'].includes(paymentStatus || '')) return
+    const timer = setInterval(() => { loadData() }, 3000)
+    return () => clearInterval(timer)
+  }, [id, paymentStatus])
 
   useEffect(() => {
     if (!scheduleDate) {
@@ -34,9 +45,19 @@ export default function V2ConfirmBookingScreen() {
 
   const loadData = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
-      setEscrow(res.job.escrow || null)
+      const [jobRes, paymentRes] = await Promise.all([
+        v2Jobs.get(id),
+        v2Payments.status(id).catch(() => ({ payment: null })),
+      ])
+      setJob(jobRes.job)
+      setEscrow(jobRes.job.escrow || null)
+      setPaymentStatus(paymentRes.payment?.status || null)
+      if (jobRes.job.preferredTimeSlot && !scheduleSlot) {
+        setScheduleSlot(jobRes.job.preferredTimeSlot)
+      }
+      if (jobRes.job.preferredDate && !scheduleDate) {
+        setScheduleDate(String(jobRes.job.preferredDate).slice(0, 10))
+      }
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.generic'))
       router.back()
@@ -52,12 +73,14 @@ export default function V2ConfirmBookingScreen() {
     }
     setActionLoading('escrow')
     try {
-      await v2JobActions.update(id, { preferredDate: scheduleDate, timeSlot: scheduleSlot })
-      await v2JobActions.depositEscrow(id, job?.budgetAmount || 0)
-      Alert.alert(t('booking.paymentSecured'), t('jobDetail.escrowDepositedDesc'), [
-        { text: t('common.ok'), onPress: () => router.push(`/(customer)/jobs/v2/${id}`) },
-      ])
-      loadData()
+      await v2JobActions.update(id, {
+        preferredDate: scheduleDate,
+        preferredTimeSlot: scheduleSlot,
+      })
+      const payment = await v2Payments.start(id)
+      if (!payment.checkoutUrl) throw new Error('Secure checkout is not available')
+      setPaymentStatus('PENDING')
+      await Linking.openURL(payment.checkoutUrl)
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
     } finally {
@@ -74,10 +97,10 @@ export default function V2ConfirmBookingScreen() {
   }
 
   const steps = [
-    { label: t('booking.paymentSecured'), done: escrow !== null && escrow.status !== 'REFUNDED' },
-    { label: t('tracking.inProgress'), done: false },
-    { label: t('booking.confirmComplete'), done: false },
-    { label: t('tracking.completed'), done: false },
+    { label: t('booking.paymentSecured'), done: escrow?.status === 'PROTECTED' },
+    { label: t('tracking.inProgress'), done: job?.status === 'IN_PROGRESS' || job?.status === 'COMPLETED' },
+    { label: t('booking.confirmComplete'), done: job?.workspace?.progressStatus === 'COMPLETION_REQUESTED' || job?.status === 'COMPLETED' },
+    { label: t('tracking.completed'), done: job?.status === 'COMPLETED' },
   ]
 
   const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
@@ -121,7 +144,7 @@ export default function V2ConfirmBookingScreen() {
         )}
 
         {/* Schedule Selection */}
-        {!escrow && (
+        {escrow?.status === 'PENDING_PAYMENT' && (
         <View style={styles.scheduleSection}>
           <Text style={styles.sectionLabel}>{t('booking.selectDate')}</Text>
           <TextInput
@@ -135,17 +158,17 @@ export default function V2ConfirmBookingScreen() {
           <View style={styles.timeGrid}>
             {TIME_SLOTS.map((slot) => (
               <TouchableOpacity
-                key={slot}
+                key={slot.value}
                 style={[
                   styles.timeChip,
-                  scheduleSlot === slot && { backgroundColor: colors.amberBg, borderColor: colors.amber },
+                  scheduleSlot === slot.value && { backgroundColor: colors.amberBg, borderColor: colors.amber },
                   { borderColor: colors.border, backgroundColor: colors.white },
                 ]}
-                onPress={() => setScheduleSlot(slot)}
+                onPress={() => setScheduleSlot(slot.value)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.timeText, scheduleSlot === slot && { color: colors.amberDark, fontFamily: fonts.bodyMedium }]}>
-                  {slot}
+                <Text style={[styles.timeText, scheduleSlot === slot.value && { color: colors.amberDark, fontFamily: fonts.bodyMedium }]}>
+                  {slot.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -160,12 +183,12 @@ export default function V2ConfirmBookingScreen() {
           </View>
           <Text style={styles.freezeLabel}>{t('wallet.balance')}</Text>
           <Text style={styles.freezeAmount}>
-            LKR {(acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
+            {escrow?.currency || 'LKR'} {(escrow?.totalAmount || acceptedQuote?.price || job?.budgetAmount || 0).toLocaleString()}
           </Text>
           <Text style={styles.freezeDesc}>
             {t('booking.escrowInfo')}
           </Text>
-          {!escrow && (
+          {escrow?.status === 'PENDING_PAYMENT' && !['REFUND_REQUIRED', 'CHARGEDBACK'].includes(paymentStatus || '') && (
             <TouchableOpacity
               style={styles.depositBtn}
               onPress={handleDeposit}
@@ -174,7 +197,7 @@ export default function V2ConfirmBookingScreen() {
               {actionLoading === 'escrow' ? (
                 <ActivityIndicator color={colors.ink} />
               ) : (
-                <Text style={styles.depositBtnText}>{t('booking.paymentSecured')}</Text>
+                <Text style={styles.depositBtnText}>{paymentStatus === 'PENDING' ? 'Continue Secure Payment' : 'Pay Securely with PayHere'}</Text>
               )}
             </TouchableOpacity>
           )}
@@ -183,6 +206,16 @@ export default function V2ConfirmBookingScreen() {
               <Ionicons name="checkmark-circle" size={18} color={colors.success} />
               <Text style={styles.frozenBadgeText}>{t('booking.paymentSecured')}</Text>
             </View>
+          )}
+          {paymentStatus === 'REFUND_REQUIRED' && (
+            <Text style={[styles.freezeDesc, { color: colors.error }]}>
+              Payment was captured after the booking changed. MaintainEX has flagged it for refund review.
+            </Text>
+          )}
+          {paymentStatus === 'CHARGEDBACK' && (
+            <Text style={[styles.freezeDesc, { color: colors.error }]}>
+              This payment has a chargeback and the escrow is on hold.
+            </Text>
           )}
         </View>
 
