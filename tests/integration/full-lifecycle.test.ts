@@ -334,6 +334,12 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const commission = await prisma.commissionSettlement.findFirst({ where: { jobId: bookResult.job.id } })
     expect(commission).toBeTruthy()
     expect(commission?.providerId).toBe(companyOwnerId)
+
+    const completedAssignment = await prisma.companyJobAssignment.findUnique({
+      where: { id: assignmentResult.assignmentId! },
+    })
+    expect(completedAssignment?.status).toBe('COMPLETED')
+    expect(completedAssignment?.completedAt).toBeTruthy()
   })
 
   it('dispute path: hold escrow for dispute', async () => {
