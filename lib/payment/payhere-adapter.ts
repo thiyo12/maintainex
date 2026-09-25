@@ -54,19 +54,19 @@ export function generateCheckoutHash(
   currency: string,
   merchantSecret: string
 ): string {
-  const secretHash = crypto.createHash('md5').update(merchantSecret).digest('hex')
+  const secretHash = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase()
   const hashString = `${merchantId}${orderId}${amount}${currency}${secretHash}`
-  return crypto.createHash('md5').update(hashString).digest('hex')
+  return crypto.createHash('md5').update(hashString).digest('hex').toUpperCase()
 }
 
 export function verifyNotificationSignature(
   notification: PayHereNotification,
   merchantSecret: string
 ): boolean {
-  const secretHash = crypto.createHash('md5').update(merchantSecret).digest('hex')
+  const secretHash = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase()
   const hashString = `${notification.merchant_id}${notification.order_id}${notification.payhere_amount}${notification.payhere_currency}${notification.status_code}${secretHash}`
-  const expectedHash = crypto.createHash('md5').update(hashString).digest('hex')
-  return notification.md5sig === expectedHash
+  const expectedHash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase()
+  return notification.md5sig.toUpperCase() === expectedHash
 }
 
 export function getPayHereCheckoutUrl(sandbox: boolean): string {
