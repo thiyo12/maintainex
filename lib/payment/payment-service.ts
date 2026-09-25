@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { bigIntToSafeNumber, type Currency } from '@/lib/money'
@@ -52,17 +53,14 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     const nameParts = (user?.name || 'Customer').split(' ')
     const firstName = nameParts[0] || 'Customer'
     const lastName = nameParts.slice(1).join(' ') || 'User'
-    const checkoutUrl = buildCheckoutUrl(config, {
-      merchantOrderId: existingPending.merchantOrderId,
-      amount: formatPayHereAmount(existingPending.amount),
-      currency: existingPending.currency,
-      firstName,
-      lastName,
-      email: user?.email || undefined,
-      phone: user?.phone || undefined,
-      jobId,
-      jobTitle: job.title || 'Service',
-    }, baseUrl)
+    if (!user?.email || !user?.phone) {
+      return {
+        success: false,
+        error: 'A verified email and phone number are required before card payment',
+        code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
+      }
+    }
+    const checkoutUrl = buildHostedCheckoutUrl(baseUrl, existingPending.id, config.merchantSecret)
     return {
       success: true,
       paymentIntentId: existingPending.id,
@@ -96,17 +94,19 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   const firstName = nameParts[0] || 'Customer'
   const lastName = nameParts.slice(1).join(' ') || 'User'
 
-  const checkoutUrl = buildCheckoutUrl(config, {
-    merchantOrderId,
-    amount: amountFormatted,
-    currency: escrow.currency || 'LKR',
-    firstName,
-    lastName,
-    email: user?.email || undefined,
-    phone: user?.phone || undefined,
-    jobId,
-    jobTitle: job.title || 'Service',
-  }, baseUrl)
+  if (!user?.email || !user?.phone) {
+    await prisma.paymentIntent.updateMany({
+      where: { id: paymentIntent.id, status: 'CREATED' },
+      data: { status: 'CANCELLED' },
+    })
+    return {
+      success: false,
+      error: 'A verified email and phone number are required before card payment',
+      code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
+    }
+  }
+
+  const checkoutUrl = buildHostedCheckoutUrl(baseUrl, paymentIntent.id, config.merchantSecret)
 
   return {
     success: true,
@@ -116,51 +116,112 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
   }
 }
 
-function buildCheckoutUrl(
-  config: ReturnType<typeof getPayHereConfig> & {},
-  data: {
-    merchantOrderId: string
-    amount: string
-    currency: string
-    firstName: string
-    lastName: string
-    email?: string
-    phone?: string
-    jobId: string
-    jobTitle: string
-  },
-  baseUrl: string
-): string {
-  const params = new URLSearchParams()
-  params.set('merchant_id', config.merchantId)
-  params.set('return_url', getPayHereReturnUrl(baseUrl, data.jobId))
-  params.set('cancel_url', getPayHereCancelUrl(baseUrl, data.jobId))
-  params.set('notify_url', getPayHereNotifyUrl(baseUrl))
-  params.set('order_id', data.merchantOrderId)
-  params.set('items', data.jobTitle)
-  params.set('amount', data.amount)
-  params.set('currency', data.currency)
-  params.set('first_name', data.firstName)
-  params.set('last_name', data.lastName)
-  if (data.email) params.set('email', data.email)
-  if (data.phone) params.set('phone', data.phone)
-  params.set('country', 'Sri Lanka')
-  params.set('custom_1', data.jobId)
+function checkoutToken(intentId: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(`maintainex-payhere:${intentId}`).digest('hex')
+}
 
-  const hash = generateCheckoutHash(
-    config.merchantId,
-    data.merchantOrderId,
-    data.amount,
-    data.currency,
-    config.merchantSecret
-  )
-  params.set('hash', hash)
+function buildHostedCheckoutUrl(baseUrl: string, intentId: string, secret: string): string {
+  const origin = new URL(baseUrl).origin
+  const token = checkoutToken(intentId, secret)
+  return `${origin}/api/payments/payhere/${encodeURIComponent(intentId)}?token=${token}`
+}
 
-  const baseUrlStr = config.sandbox
-    ? 'https://sandbox.payhere.lk/pay/checkout'
-    : 'https://www.payhere.lk/pay/checkout'
+export function verifyHostedCheckoutToken(intentId: string, token: string, secret: string): boolean {
+  const expected = checkoutToken(intentId, secret)
+  if (token.length !== expected.length) return false
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token, 'utf8'), Buffer.from(expected, 'utf8'))
+  } catch {
+    return false
+  }
+}
 
-  return `${baseUrlStr}?${params.toString()}`
+export async function getPaymentCheckoutForm(
+  intentId: string,
+  token: string,
+  baseUrl: string,
+): Promise<{ actionUrl: string; fields: Record<string, string> } | null> {
+  const config = getPayHereConfig()
+  if (!config || !verifyHostedCheckoutToken(intentId, token, config.merchantSecret)) return null
+
+  const paymentIntent = await prisma.paymentIntent.findUnique({ where: { id: intentId } })
+  if (!paymentIntent || !['CREATED', 'PENDING'].includes(paymentIntent.status)) return null
+
+  const [job, user] = await Promise.all([
+    prisma.marketplaceJob.findUnique({ where: { id: paymentIntent.jobId } }),
+    prisma.user.findUnique({
+      where: { id: paymentIntent.customerId },
+      select: { name: true, email: true, phone: true },
+    }),
+  ])
+  if (!job || !user?.email || !user?.phone || job.customerId !== paymentIntent.customerId) return null
+  if (job.status !== 'QUOTE_ACCEPTED') return null
+
+  const escrow = await prisma.jobEscrow.findUnique({ where: { id: paymentIntent.escrowId } })
+  if (
+    !escrow ||
+    escrow.jobId !== job.id ||
+    escrow.customerId !== user.id && escrow.customerId !== paymentIntent.customerId ||
+    escrow.status !== 'PENDING_PAYMENT' ||
+    escrow.totalAmount !== paymentIntent.amount ||
+    escrow.currency !== paymentIntent.currency
+  ) {
+    return null
+  }
+
+  const area = job.areaId
+    ? await prisma.area.findUnique({
+        where: { id: job.areaId },
+        include: { city: true },
+      })
+    : null
+
+  const nameParts = (user.name || 'Customer').trim().split(/\s+/)
+  const firstName = nameParts[0] || 'Customer'
+  const lastName = nameParts.slice(1).join(' ') || 'User'
+  const address = [
+    job.addressStreet,
+    job.addressBuilding,
+    job.addressApartment,
+    job.addressLandmark,
+    area?.name,
+  ].filter(Boolean).join(', ') || 'Service booking'
+  const city = area?.city?.name || 'Sri Lanka'
+  const amount = formatPayHereAmount(paymentIntent.amount)
+
+  await prisma.paymentIntent.updateMany({
+    where: { id: paymentIntent.id, status: 'CREATED' },
+    data: { status: 'PENDING' },
+  })
+
+  return {
+    actionUrl: getPayHereCheckoutUrl(config.sandbox),
+    fields: {
+      merchant_id: config.merchantId,
+      return_url: getPayHereReturnUrl(baseUrl, job.id),
+      cancel_url: getPayHereCancelUrl(baseUrl, job.id),
+      notify_url: getPayHereNotifyUrl(baseUrl),
+      first_name: firstName,
+      last_name: lastName,
+      email: user.email,
+      phone: user.phone,
+      address,
+      city,
+      country: job.countryCode === 'LK' ? 'Sri Lanka' : job.countryCode,
+      order_id: paymentIntent.merchantOrderId,
+      items: job.title || 'MaintainEX service',
+      currency: paymentIntent.currency,
+      amount,
+      custom_1: job.id,
+      hash: generateCheckoutHash(
+        config.merchantId,
+        paymentIntent.merchantOrderId,
+        amount,
+        paymentIntent.currency,
+        config.merchantSecret,
+      ),
+    },
+  }
 }
 
 export async function getPaymentStatus(jobId: string, customerId: string) {
