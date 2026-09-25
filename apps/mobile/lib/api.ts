@@ -162,6 +162,8 @@ export const notifications = {
   list: () => request<Notification[]>('/api/mobile/notifications'),
   registerPush: (token: string) =>
     request<void>('/api/mobile/notifications', { method: 'POST', body: JSON.stringify({ token }) }),
+  unregisterPush: () =>
+    request<void>('/api/mobile/notifications', { method: 'DELETE' }),
   markRead: (id: string) =>
     request<void>(`/api/mobile/notifications/${id}`, { method: 'PUT' }),
   markAllRead: () =>
