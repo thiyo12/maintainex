@@ -118,7 +118,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
         categoryId,
         budgetType: 'FIXED',
         photos: '[]',
-        status: 'IN_PROGRESS',
+        status: 'QUOTE_ACCEPTED',
         countryCode: 'LK',
       },
     })
@@ -146,6 +146,22 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
       data: {
         jobId: workStartJobId,
         progressStatus: 'ACCEPTED',
+      },
+    })
+
+    await prisma.jobEscrow.create({
+      data: {
+        jobId: workStartJobId,
+        quoteId: workStartQuoteId,
+        customerId: customerAId,
+        providerId,
+        amount: 6000n,
+        serviceFee: 0n,
+        totalAmount: 6000n,
+        currency: 'LKR',
+        paymentMethod: 'CARD',
+        status: 'PROTECTED',
+        heldAt: new Date(),
       },
     })
 
@@ -178,6 +194,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
     if (prisma) {
       if (workStartJobId) {
         await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "jobId" = $1`, workStartJobId)
+        await prisma.$executeRawUnsafe(`DELETE FROM "JobEscrow" WHERE "jobId" = $1`, workStartJobId)
         await prisma.$executeRawUnsafe(`DELETE FROM "JobQuote" WHERE "jobId" = $1`, workStartJobId)
         await prisma.$executeRawUnsafe(`DELETE FROM "JobWorkspace" WHERE "jobId" = $1`, workStartJobId)
         await prisma.$executeRawUnsafe(`DELETE FROM "MarketplaceJob" WHERE "id" = $1`, workStartJobId)
@@ -190,6 +207,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
   beforeEach(async () => {
     if (!prisma) return
     await prisma.$executeRawUnsafe(`DELETE FROM "JobVerificationPin" WHERE "jobId" IN ($1, $2, $3)`, jobAId, jobBId, workStartJobId)
+    await prisma.$executeRawUnsafe(`UPDATE "MarketplaceJob" SET "status" = 'QUOTE_ACCEPTED' WHERE "id" = $1`, workStartJobId)
     await prisma.$executeRawUnsafe(`UPDATE "JobWorkspace" SET "progressStatus" = 'ACCEPTED' WHERE "jobId" = $1`, workStartJobId)
   })
 
@@ -267,6 +285,8 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
 
       const preWorkspace = await prisma.jobWorkspace.findUnique({ where: { jobId: workStartJobId } })
       expect(preWorkspace!.progressStatus).toBe('ACCEPTED')
+      const preJob = await prisma.marketplaceJob.findUnique({ where: { id: workStartJobId } })
+      expect(preJob!.status).toBe('QUOTE_ACCEPTED')
 
       const batch1 = await Promise.allSettled(
         Array.from({ length: 5 }, () =>
