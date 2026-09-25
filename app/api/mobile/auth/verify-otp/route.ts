@@ -5,6 +5,17 @@ import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/mark
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 import { isSyntheticCertAccount, isTestOtpAllowed } from '@/lib/test-cert'
 
+function inferPhoneCountries(phoneDigits: string): string[] {
+  if (phoneDigits.startsWith('94')) return ['LK']
+  if (phoneDigits.startsWith('41')) return ['CH']
+  if (phoneDigits.startsWith('49')) return ['DE']
+  if (phoneDigits.startsWith('44')) return ['GB']
+  if (phoneDigits.startsWith('91')) return ['IN']
+  if (phoneDigits.startsWith('61')) return ['AU']
+  if (phoneDigits.startsWith('1')) return ['CA', 'US']
+  return []
+}
+
 function accountBlocked(user: any): NextResponse | null {
   if (!user.isActive) {
     return NextResponse.json({ error: 'Account deactivated' }, { status: 401 })
@@ -61,9 +72,22 @@ export async function POST(request: NextRequest) {
     if (email) {
       user = await prisma.user.findUnique({ where: { email } })
     } else if (phone) {
-      const digits = phone.replace(/\D/g, '').slice(-9)
-      if (!digits) return NextResponse.json({ error: 'Valid email or phone required' }, { status: 400 })
-      user = await prisma.user.findFirst({ where: { phone: { endsWith: digits } } })
+      const allDigits = phone.replace(/\D/g, '')
+      if (!allDigits) return NextResponse.json({ error: 'Valid email or phone required' }, { status: 400 })
+
+      const normalized = `+${allDigits}`
+      user = await prisma.user.findFirst({ where: { phone: normalized } })
+
+      if (!user) {
+        const digits = allDigits.slice(-9)
+        const countries = inferPhoneCountries(allDigits)
+        user = await prisma.user.findFirst({
+          where: {
+            phone: { endsWith: digits },
+            ...(countries.length > 0 ? { countryCode: { in: countries } } : {}),
+          },
+        })
+      }
     } else {
       return NextResponse.json({ error: 'Email or phone required' }, { status: 400 })
     }
@@ -111,10 +135,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    await prisma.oTP.update({
-      where: { id: otpRecord.id },
+    const consumed = await prisma.oTP.updateMany({
+      where: { id: otpRecord.id, isUsed: false },
       data: { isUsed: true },
     })
+    if (consumed.count !== 1) {
+      return NextResponse.json({ error: 'This verification code was already used.' }, { status: 409 })
+    }
 
     if (otpPurpose === 'PHONE_VERIFICATION') {
       const certifySyntheticTasker =
