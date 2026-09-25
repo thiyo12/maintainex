@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
 import { prisma } from '@/lib/prisma'
 import {
   workerAcceptAssignment,
   workerRejectAssignment,
   revokeAssignment,
-  completeAssignment,
 } from '@/lib/domain/company-job-assignment'
 
 export async function GET(
@@ -24,7 +24,7 @@ export async function GET(
       where: { id },
       include: {
         job: { select: { id: true, title: true, status: true, createdAt: true } },
-        worker: { select: { id: true, name: true, email: true, phone: true } },
+        worker: { select: { id: true, name: true, email: true } },
         company: { select: { id: true, companyName: true, userId: true } },
       },
     })
@@ -33,14 +33,22 @@ export async function GET(
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
     }
 
-    if (assignment.workerUserId !== user.id && assignment.company.userId !== user.id) {
-      const membership = await prisma.teamMember.findFirst({
-        where: { companyId: assignment.companyId, userId: user.id, status: 'ACTIVE' },
-      })
-      if (!membership) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+    const isWorker = assignment.workerUserId === user.id
+    const isOwner = assignment.company.userId === user.id
+    const membership = isOwner
+      ? null
+      : await prisma.teamMember.findFirst({
+          where: { companyId: assignment.companyId, userId: user.id, status: 'ACTIVE' },
+          select: { role: true },
+        })
+
+    if (!isWorker && !isOwner && !membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    const canManageAssignment =
+      isOwner ||
+      (!!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:assign'))
 
     return NextResponse.json({
       id: assignment.id,
@@ -59,6 +67,10 @@ export async function GET(
       job: assignment.job,
       worker: assignment.worker,
       company: assignment.company,
+      capabilities: {
+        isAssignedWorker: isWorker,
+        canManageAssignment,
+      },
     })
   } catch (error) {
     console.error('Get assignment error:', error)
@@ -82,8 +94,8 @@ export async function POST(
     const body = await request.json()
     const { action, reason } = body
 
-    if (!action || !['accept', 'reject', 'revoke', 'complete'].includes(action)) {
-      return NextResponse.json({ error: 'action must be one of: accept, reject, revoke, complete' }, { status: 400 })
+    if (!action || !['accept', 'reject', 'revoke'].includes(action)) {
+      return NextResponse.json({ error: 'action must be one of: accept, reject, revoke' }, { status: 400 })
     }
 
     const assignment = await prisma.companyJobAssignment.findUnique({ where: { id } })
@@ -116,15 +128,6 @@ export async function POST(
         )
         if (error) return error
         result = await revokeAssignment(id, assignment.companyId, user.id, context!.role, reason)
-        break
-      }
-
-      case 'complete': {
-        const { context, error } = await resolveCompanyContext(
-          user.id, assignment.companyId, 'jobs:manage'
-        )
-        if (error) return error
-        result = await completeAssignment(id, assignment.companyId)
         break
       }
 
