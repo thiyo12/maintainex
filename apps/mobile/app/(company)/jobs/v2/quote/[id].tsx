@@ -23,17 +23,29 @@ export default function CompanySubmitQuoteScreen() {
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState('')
   const [message, setMessage] = useState('')
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [existingQuote, setExistingQuote] = useState<any>(null)
 
   useEffect(() => { loadJob() }, [id])
 
   const loadJob = async () => {
     try {
-      const [jobRes, companyProfile] = await Promise.all([
+      const companyProfile = await company.profile.get()
+      const [jobRes, quoteRes] = await Promise.all([
         v2Jobs.get(id),
-        company.profile.get(),
+        v2Quotes.list(id, companyProfile.id),
       ])
       setJob(jobRes.job)
       setCompanyId(companyProfile.id)
+
+      const pending = (quoteRes.quotes || [])
+        .filter((q: any) => q.status === 'PENDING')
+        .sort((a: any, b: any) => (b.revisionNumber || 1) - (a.revisionNumber || 1))[0]
+      if (pending) {
+        setExistingQuote(pending)
+        setPrice(String(pending.price))
+        setEstimatedCompletionTime(pending.estimatedCompletionTime || '')
+        setMessage(pending.message || '')
+      }
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
@@ -49,15 +61,28 @@ export default function CompanySubmitQuoteScreen() {
     }
     setSubmitting(true)
     try {
-      await v2Quotes.submit({
-        jobId: id,
-        providerType: 'COMPANY',
-        companyId,
-        price: parseFloat(price),
-        estimatedCompletionTime,
-        message,
-      })
-      Alert.alert(t('company.quoteSubmitSuccess'), t('company.quoteSubmitDesc'), [
+      if (existingQuote) {
+        await v2Quotes.revise(existingQuote.id, {
+          price: parseFloat(price),
+          estimatedCompletionTime,
+          message,
+          revisionReason: 'Company revised quote after customer negotiation',
+          companyId,
+        })
+      } else {
+        await v2Quotes.submit({
+          jobId: id,
+          providerType: 'COMPANY',
+          companyId,
+          price: parseFloat(price),
+          estimatedCompletionTime,
+          message,
+        })
+      }
+      Alert.alert(
+        existingQuote ? 'Quote revised' : t('company.quoteSubmitSuccess'),
+        existingQuote ? 'The customer can now accept the updated quote.' : t('company.quoteSubmitDesc'),
+        [
         { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (e: any) {
@@ -104,8 +129,10 @@ export default function CompanySubmitQuoteScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('quotes.yourQuote')}</Text>
 
-          <Text style={styles.label}>Company quote</Text>
-          <Text style={{ color: colors.muted, marginBottom: 4 }}>This quote will be submitted under your company profile.</Text>
+          <Text style={styles.label}>{existingQuote ? 'Revise company quote' : 'Company quote'}</Text>
+          <Text style={{ color: colors.muted, marginBottom: 4 }}>
+            {existingQuote ? 'Update the negotiated price or timing. The previous quote will be superseded.' : 'This quote will be submitted under your company profile.'}
+          </Text>
 
           <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
           <View style={styles.priceInputRow}>
@@ -148,7 +175,7 @@ export default function CompanySubmitQuoteScreen() {
             {submitting ? (
               <ActivityIndicator color="#0D0D0D" />
             ) : (
-              <Text style={styles.submitBtnText}>{t('tasker.submitQuote')}</Text>
+              <Text style={styles.submitBtnText}>{existingQuote ? 'Revise Quote' : t('tasker.submitQuote')}</Text>
             )}
           </TouchableOpacity>
         </View>
