@@ -167,6 +167,17 @@ export async function evaluateEligibility(
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
+  // Gate: Provider-declared availability schedule
+  const availabilityGate = await evaluateDeclaredAvailability(client, providerId, job)
+  gates.push(availabilityGate)
+  if (!availabilityGate.passed) {
+    return {
+      ...buildIneligibleResult(gates, matchedProfessionId, matchedSkills),
+      serviceAreaPassed,
+      availabilityPassed: false,
+    }
+  }
+
   // Gate: No blocking assignment conflict
   const conflictGate = await evaluateConflict(client, providerType, providerId, job)
   gates.push(conflictGate)
@@ -534,6 +545,98 @@ async function evaluateServiceArea(
   }
 
   return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
+}
+
+function timeToMinutes(value: string): number | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  return hours * 60 + minutes
+}
+
+function requestedSlotWindow(slot: string | null): { start: number; end: number } | null {
+  switch (slot) {
+    case 'morning': return { start: 8 * 60, end: 12 * 60 }
+    case 'afternoon': return { start: 12 * 60, end: 17 * 60 }
+    case 'evening': return { start: 17 * 60, end: 21 * 60 }
+    case 'anytime':
+    case null:
+      return null
+    default:
+      return null
+  }
+}
+
+async function evaluateDeclaredAvailability(
+  client: PrismaClient,
+  providerId: string,
+  job: MatchingInput,
+): Promise<EligibilityGate> {
+  const availability = await client.providerAvailability.findUnique({
+    where: { providerId },
+  })
+
+  if (!availability) {
+    return { gate: 'AVAILABILITY', passed: true, detail: 'No custom availability schedule configured' }
+  }
+  if (!availability.isAvailable) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider marked unavailable' }
+  }
+
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: job.jobId },
+    select: { preferredDate: true, preferredTimeSlot: true },
+  })
+  const requestedDate =
+    target?.preferredDate ??
+    (job.preferredDate ? new Date(job.preferredDate) : null)
+  const requestedSlot = target?.preferredTimeSlot ?? null
+
+  const checkDate = requestedDate ?? new Date()
+  if (Number.isNaN(checkDate.getTime())) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Requested date is invalid' }
+  }
+
+  if (availability.vacationStart && availability.vacationEnd) {
+    const start = new Date(availability.vacationStart)
+    const end = new Date(availability.vacationEnd)
+    const day = new Date(checkDate)
+    day.setHours(12, 0, 0, 0)
+    start.setHours(0, 0, 0, 0)
+    end.setHours(23, 59, 59, 999)
+    if (day >= start && day <= end) {
+      return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is on vacation for the requested date' }
+    }
+  }
+
+  const dayKeys = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'] as const
+  const dayKey = dayKeys[checkDate.getDay()]
+  if (!availability[dayKey]) {
+    return { gate: 'AVAILABILITY', passed: false, reason: `Provider is not available on ${dayKey}` }
+  }
+
+  const workStart = timeToMinutes(availability.startTime)
+  const workEnd = timeToMinutes(availability.endTime)
+  if (workStart === null || workEnd === null || workEnd <= workStart) {
+    return { gate: 'AVAILABILITY', passed: false, reason: 'Provider availability hours are invalid' }
+  }
+
+  const slotWindow = requestedSlotWindow(requestedSlot)
+  if (slotWindow) {
+    const overlaps = slotWindow.start < workEnd && workStart < slotWindow.end
+    if (!overlaps) {
+      return { gate: 'AVAILABILITY', passed: false, reason: 'Requested time slot is outside provider working hours' }
+    }
+  } else if (!requestedDate) {
+    const currentMinutes = checkDate.getHours() * 60 + checkDate.getMinutes()
+    if (currentMinutes < workStart || currentMinutes >= workEnd) {
+      return { gate: 'AVAILABILITY', passed: false, reason: 'Provider is outside configured working hours' }
+    }
+  }
+
+  return { gate: 'AVAILABILITY', passed: true, detail: 'Provider schedule covers the requested time' }
 }
 
 function preferredDayKey(date: Date): number {
