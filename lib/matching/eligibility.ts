@@ -6,6 +6,8 @@ import type {
   MatchExclusionReason,
   MatchingInput,
 } from './types'
+import { readStoredList } from '@/lib/db-utils'
+import { getLocationName } from '@/lib/locations'
 
 export interface ProviderEligibilityInput {
   providerType: ProviderType
@@ -159,14 +161,14 @@ export async function evaluateEligibility(
   }
 
   // Gate: Service area (country match)
-  const serviceAreaPassed = await evaluateServiceArea(client, providerType, providerId, job.countryCode)
+  const serviceAreaPassed = await evaluateServiceArea(client, providerType, providerId, job)
   gates.push({ gate: 'SERVICE_AREA', passed: serviceAreaPassed, detail: serviceAreaPassed ? 'Country match confirmed' : 'No matching country code' })
   if (!serviceAreaPassed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId, job.preferredDate)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -435,25 +437,103 @@ async function evaluateJurisdictionCredential(
   return { gate: { gate: 'JURISDICTION_CREDENTIAL', passed: true, detail: `Has ${validCerts} jurisdiction credential(s)` } }
 }
 
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (value: number) => value * Math.PI / 180
+  const earthRadiusKm = 6371
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function configuredAreaMatches(serviceAreas: string | null | undefined, areaId: string | null): boolean {
+  if (!serviceAreas || !areaId) return true
+  const configured = readStoredList(serviceAreas)
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean)
+  if (configured.length === 0) return true
+
+  const fullLocation = getLocationName(areaId).toLowerCase()
+  const normalizedAreaId = areaId.toLowerCase()
+
+  return configured.some(area =>
+    area === normalizedAreaId ||
+    fullLocation.includes(area)
+  )
+}
+
 async function evaluateServiceArea(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
-  jobCountryCode: string | undefined,
+  job: MatchingInput,
 ): Promise<boolean> {
-  if (!jobCountryCode) return true
+  if (!job.countryCode) return true
+
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: job.jobId },
+    select: { areaId: true, latitude: true, longitude: true },
+  })
+
   if (providerType === 'INDIVIDUAL') {
-    const user = await client.user.findUnique({
-      where: { id: providerId },
-      select: { countryCode: true },
-    })
-    return user?.countryCode === jobCountryCode
+    const [user, profile] = await Promise.all([
+      client.user.findUnique({
+        where: { id: providerId },
+        select: { countryCode: true },
+      }),
+      client.taskerProfile.findUnique({
+        where: { userId: providerId },
+        select: {
+          countryCode: true,
+          serviceAreas: true,
+          latitude: true,
+          longitude: true,
+          serviceRadius: true,
+        },
+      }),
+    ])
+
+    const providerCountry = profile?.countryCode || user?.countryCode
+    if (providerCountry !== job.countryCode) return false
+
+    if (
+      target?.latitude != null && target.longitude != null &&
+      profile?.latitude != null && profile.longitude != null &&
+      profile.serviceRadius != null && profile.serviceRadius > 0
+    ) {
+      return haversineKm(target.latitude, target.longitude, profile.latitude, profile.longitude) <= profile.serviceRadius
+    }
+
+    return configuredAreaMatches(profile?.serviceAreas, target?.areaId ?? null)
   }
+
   const company = await client.companyProfile.findUnique({
     where: { id: providerId },
-    select: { user: { select: { countryCode: true } } },
+    select: {
+      countryCode: true,
+      serviceAreas: true,
+      latitude: true,
+      longitude: true,
+      serviceRadius: true,
+      user: { select: { countryCode: true } },
+    },
   })
-  return company?.user?.countryCode === jobCountryCode
+  if (!company) return false
+
+  const providerCountry = company.countryCode || company.user?.countryCode
+  if (providerCountry !== job.countryCode) return false
+
+  if (
+    target?.latitude != null && target.longitude != null &&
+    company.latitude != null && company.longitude != null &&
+    company.serviceRadius != null && company.serviceRadius > 0
+  ) {
+    return haversineKm(target.latitude, target.longitude, company.latitude, company.longitude) <= company.serviceRadius
+  }
+
+  return configuredAreaMatches(company.serviceAreas, target?.areaId ?? null)
 }
 
 function preferredDayKey(date: Date): number {
@@ -464,59 +544,85 @@ async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
-  preferredDate?: Date | string | null,
+  job: MatchingInput,
 ): Promise<EligibilityGate> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const target = await client.marketplaceJob.findUnique({
+    where: { id: job.jobId },
+    select: { preferredDate: true, preferredTimeSlot: true },
+  })
 
-  let activeJobs: { preferredDate: Date | null }[]
-  if (providerType === 'INDIVIDUAL') {
-    activeJobs = await client.$queryRaw<{ preferredDate: Date | null }[]>`
-      SELECT mj."preferredDate"
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
-  } else {
-    activeJobs = await client.$queryRaw<{ preferredDate: Date | null }[]>`
-      SELECT mj."preferredDate"
-      FROM "MarketplaceJob" mj
-      JOIN "JobQuote" jq ON jq."jobId" = mj.id
-      WHERE jq."providerId" = ${providerId}
-        AND jq."providerType" = 'COMPANY'
-        AND jq.status = 'ACCEPTED'
-        AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
-        AND mj."createdAt" >= ${thirtyDaysAgo}
-    `
+  const requestedDate = target?.preferredDate ?? (job.preferredDate ? new Date(job.preferredDate) : null)
+  const requestedSlot = target?.preferredTimeSlot ?? null
+
+  type ActiveJob = {
+    id: string
+    status: string
+    preferredDate: Date | null
+    preferredTimeSlot: string | null
   }
+
+  const activeJobs = providerType === 'INDIVIDUAL'
+    ? await client.$queryRaw<ActiveJob[]>`
+        SELECT mj.id, mj.status, mj."preferredDate", mj."preferredTimeSlot"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'INDIVIDUAL'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj."createdAt" >= ${thirtyDaysAgo}
+          AND mj.id <> ${job.jobId}
+      `
+    : await client.$queryRaw<ActiveJob[]>`
+        SELECT mj.id, mj.status, mj."preferredDate", mj."preferredTimeSlot"
+        FROM "MarketplaceJob" mj
+        JOIN "JobQuote" jq ON jq."jobId" = mj.id
+        WHERE jq."providerId" = ${providerId}
+          AND jq."providerType" = 'COMPANY'
+          AND jq.status = 'ACCEPTED'
+          AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+          AND mj."createdAt" >= ${thirtyDaysAgo}
+          AND mj.id <> ${job.jobId}
+      `
 
   if (activeJobs.length === 0) {
     return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
   }
 
-  if (preferredDate == null) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeJobs.length} in-progress job(s)` }
+  if (!requestedDate) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeJobs.length} active job(s)` }
   }
 
-  const newJobDay = preferredDayKey(new Date(preferredDate))
-  const overlapping = activeJobs.filter(
-    (job) => job.preferredDate != null && preferredDayKey(new Date(job.preferredDate)) === newJobDay
-  )
+  const now = new Date()
+  const requestedDay = preferredDayKey(requestedDate)
+  const todayKey = preferredDayKey(now)
+  const requestedIsFutureDay = requestedDay > todayKey
 
-  if (overlapping.length > 0) {
+  const conflicts = activeJobs.filter(active => {
+    if (!active.preferredDate) {
+      return !(active.status === 'IN_PROGRESS' && requestedIsFutureDay)
+    }
+
+    if (preferredDayKey(new Date(active.preferredDate)) !== requestedDay) return false
+
+    const activeSlot = active.preferredTimeSlot
+    if (!requestedSlot || requestedSlot === 'anytime' || !activeSlot || activeSlot === 'anytime') return true
+    return activeSlot === requestedSlot
+  })
+
+  if (conflicts.length > 0) {
     return {
       gate: 'NO_CONFLICT',
       passed: false,
-      reason: `Active job conflict: scheduled dates overlap (${overlapping.length} of ${activeJobs.length} active job(s))`,
+      reason: `Schedule conflict: ${conflicts.length} overlapping active job(s)`,
     }
   }
 
   return {
     gate: 'NO_CONFLICT',
     passed: true,
-    detail: `Future scheduling allowed: no date overlap with ${activeJobs.length} active job(s)`,
+    detail: `Future scheduling allowed: no overlapping slot with ${activeJobs.length} active job(s)`,
   }
 }
 
