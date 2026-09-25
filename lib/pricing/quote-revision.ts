@@ -23,52 +23,64 @@ export async function createQuoteRevision(
     benchmarkId?: string
   },
 ): Promise<{ success: boolean; newQuoteId?: string; error?: string }> {
-  // Fetch original quote
-  const original = await client.jobQuote.findUnique({
-    where: { id: params.originalQuoteId },
-  })
+  try {
+    return await client.$transaction(async (tx) => {
+      const original = await tx.jobQuote.findUnique({
+        where: { id: params.originalQuoteId },
+      })
 
-  if (!original) return { success: false, error: 'Original quote not found' }
-  if (original.providerId !== params.providerId) return { success: false, error: 'Not your quote' }
-  if (original.status === 'ACCEPTED') return { success: false, error: 'Cannot revise an accepted quote' }
-  if (original.status === 'REJECTED') return { success: false, error: 'Cannot revise a rejected quote' }
-  if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
-  if (original.status === 'SUPERSEDED') return { success: false, error: 'Cannot revise a superseded quote' }
+      if (!original) return { success: false, error: 'Original quote not found' }
+      if (original.providerId !== params.providerId) return { success: false, error: 'Not your quote' }
+      if (original.status === 'ACCEPTED') return { success: false, error: 'Cannot revise an accepted quote' }
+      if (original.status === 'REJECTED') return { success: false, error: 'Cannot revise a rejected quote' }
+      if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
+      if (original.status === 'SUPERSEDED') return { success: false, error: 'Cannot revise a superseded quote' }
+      if (original.status !== 'PENDING') return { success: false, error: `Cannot revise quote in ${original.status} state` }
 
-  const newRevisionNumber = original.revisionNumber + 1
+      const claimed = await tx.jobQuote.updateMany({
+        where: {
+          id: params.originalQuoteId,
+          providerId: params.providerId,
+          status: 'PENDING',
+        },
+        data: { status: 'SUPERSEDED' },
+      })
+      if (claimed.count !== 1) {
+        return { success: false, error: 'Quote changed while revision was being submitted' }
+      }
 
-  // Mark original as SUPERSEDED
-  await client.jobQuote.update({
-    where: { id: params.originalQuoteId },
-    data: { status: 'SUPERSEDED' },
-  })
+      const newQuote = await tx.jobQuote.create({
+        data: {
+          jobId: original.jobId,
+          providerId: params.providerId,
+          providerType: original.providerType,
+          price: params.price,
+          actorUserId: original.actorUserId,
+          actorRole: original.actorRole,
+          estimatedCompletionTime: params.estimatedCompletionTime,
+          message: params.message ?? original.message,
+          attachments: params.attachments ?? original.attachments,
+          status: 'PENDING',
+          currency: params.currency ?? original.currency,
+          subtotalCents: params.subtotalCents ?? null,
+          taxCents: params.taxCents ?? null,
+          totalCents: params.totalCents ?? null,
+          benchmarkClassification: params.benchmarkClassification ?? null,
+          benchmarkId: params.benchmarkId ?? null,
+          revisionNumber: original.revisionNumber + 1,
+          parentQuoteId: params.originalQuoteId,
+          revisionReason: params.revisionReason,
+        },
+      })
 
-  // Create new revision
-  const newQuote = await client.jobQuote.create({
-    data: {
-      jobId: original.jobId,
-      providerId: params.providerId,
-      providerType: original.providerType,
-      price: params.price,
-      actorUserId: original.actorUserId,
-      actorRole: original.actorRole,
-      estimatedCompletionTime: params.estimatedCompletionTime,
-      message: params.message ?? original.message,
-      attachments: params.attachments ?? original.attachments,
-      status: 'PENDING',
-      currency: params.currency ?? original.currency,
-      subtotalCents: params.subtotalCents ?? null,
-      taxCents: params.taxCents ?? null,
-      totalCents: params.totalCents ?? null,
-      benchmarkClassification: params.benchmarkClassification ?? null,
-      benchmarkId: params.benchmarkId ?? null,
-      revisionNumber: newRevisionNumber,
-      parentQuoteId: params.originalQuoteId,
-      revisionReason: params.revisionReason,
-    },
-  })
-
-  return { success: true, newQuoteId: newQuote.id }
+      return { success: true, newQuoteId: newQuote.id }
+    })
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return { success: false, error: 'A quote revision is already active for this job' }
+    }
+    throw error
+  }
 }
 
 /**
