@@ -414,9 +414,7 @@ async function validatePurposeTx(
 
   switch (purpose) {
     case 'ARRIVAL':
-      return job.status === 'QUOTE_ACCEPTED' &&
-        workspace?.progressStatus === 'ACCEPTED' &&
-        !!protectedEscrow
+      return job.status === 'QUOTE_ACCEPTED'
 
     case 'WORK_START': {
       if (job.status !== 'QUOTE_ACCEPTED') return false
