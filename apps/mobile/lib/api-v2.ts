@@ -2,7 +2,7 @@ import { getAuthToken } from './api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
-async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
