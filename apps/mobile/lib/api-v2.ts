@@ -83,7 +83,7 @@ export const v2Jobs = {
 }
 
 export const v2Quotes = {
-  submit: (data: { jobId: string; providerType: string; price: number; estimatedCompletionTime?: string; message?: string }) =>
+  submit: (data: { jobId: string; providerType: string; price: number; estimatedCompletionTime?: string; message?: string; companyId?: string }) =>
     v2Request<{ quote: V2Quote }>('/api/mobile/v2/quotes', { method: 'POST', body: JSON.stringify(data) }),
   list: (jobId: string) =>
     v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`),
