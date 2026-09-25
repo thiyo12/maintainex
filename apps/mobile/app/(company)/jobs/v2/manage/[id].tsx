@@ -260,6 +260,12 @@ export default function CompanyManageJobScreen() {
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>Assign an employee</Text>
                 <Text style={styles.emptyDesc}>Assign and have an employee accept this job before work can start.</Text>
+                <TouchableOpacity
+                  style={styles.browseBtn}
+                  onPress={() => router.push(`/(company)/workforce/assign?jobId=${id}` as any)}
+                >
+                  <Text style={styles.browseBtnText}>Assign Worker →</Text>
+                </TouchableOpacity>
               </View>
             )}
             {!canStart && !canComplete && !assignment && myQuote?.status !== 'ACCEPTED' && (
