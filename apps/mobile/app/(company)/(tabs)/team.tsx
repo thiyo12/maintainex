@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
+import { useRouter } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
 import { company } from '../../../lib/api'
 
@@ -10,6 +11,7 @@ export default function CompanyTeam() {
   const { t } = useTranslation()
   const colors = useColors()
   const styles = makeStyles(colors)
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [members, setMembers] = useState<any[]>([])
 
@@ -49,7 +51,7 @@ export default function CompanyTeam() {
     <SafeAreaView style={styles.container}>
       <View style={styles.topBar}>
         <Text style={styles.heading}>{t('company.team')}</Text>
-        <TouchableOpacity style={styles.addBtn}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/(company)/team/invite')}>
           <Text style={styles.addBtnText}>+ {t('common.add')}</Text>
         </TouchableOpacity>
       </View>
