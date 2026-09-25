@@ -76,15 +76,15 @@ export function getPayHereCheckoutUrl(sandbox: boolean): string {
 }
 
 export function getPayHereReturnUrl(baseUrl: string, jobId: string): string {
-  return `${baseUrl}/jobs/${jobId}/payment-success`
+  return `${new URL(baseUrl).origin}/api/payments/payhere/return?jobId=${encodeURIComponent(jobId)}`
 }
 
 export function getPayHereCancelUrl(baseUrl: string, jobId: string): string {
-  return `${baseUrl}/jobs/${jobId}/payment-cancelled`
+  return `${new URL(baseUrl).origin}/api/payments/payhere/cancel?jobId=${encodeURIComponent(jobId)}`
 }
 
 export function getPayHereNotifyUrl(baseUrl: string): string {
-  return `${baseUrl}/api/webhooks/payhere`
+  return `${new URL(baseUrl).origin}/api/webhooks/payhere`
 }
 
 export function generateMerchantOrderId(jobId: string): string {
