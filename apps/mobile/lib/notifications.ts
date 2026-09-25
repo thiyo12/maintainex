@@ -51,6 +51,15 @@ export async function registerForPushNotifications() {
   }
 }
 
+export async function getLastNotificationResponse(): Promise<any | null> {
+  if (!Notifications?.getLastNotificationResponseAsync) return null
+  try {
+    return await Notifications.getLastNotificationResponseAsync()
+  } catch {
+    return null
+  }
+}
+
 export function addNotificationListeners(
   onReceived?: (notification: any) => void,
   onResponse?: (response: any) => void,
