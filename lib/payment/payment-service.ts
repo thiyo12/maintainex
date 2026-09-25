@@ -50,9 +50,6 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       where: { id: customerId },
       select: { name: true, email: true, phone: true },
     })
-    const nameParts = (user?.name || 'Customer').split(' ')
-    const firstName = nameParts[0] || 'Customer'
-    const lastName = nameParts.slice(1).join(' ') || 'User'
     if (!user?.email || !user?.phone) {
       return {
         success: false,
@@ -71,8 +68,6 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
 
   const merchantOrderId = generateMerchantOrderId(jobId)
   const totalAmount = escrow.totalAmount ?? escrow.amount
-  const amountFormatted = formatPayHereAmount(totalAmount)
-
   const paymentIntent = await prisma.paymentIntent.create({
     data: {
       jobId,
@@ -89,10 +84,6 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     where: { id: customerId },
     select: { name: true, email: true, phone: true },
   })
-
-  const nameParts = (user?.name || 'Customer').split(' ')
-  const firstName = nameParts[0] || 'Customer'
-  const lastName = nameParts.slice(1).join(' ') || 'User'
 
   if (!user?.email || !user?.phone) {
     await prisma.paymentIntent.updateMany({
@@ -161,7 +152,7 @@ export async function getPaymentCheckoutForm(
   if (
     !escrow ||
     escrow.jobId !== job.id ||
-    escrow.customerId !== user.id && escrow.customerId !== paymentIntent.customerId ||
+    escrow.customerId !== paymentIntent.customerId ||
     escrow.status !== 'PENDING_PAYMENT' ||
     escrow.totalAmount !== paymentIntent.amount ||
     escrow.currency !== paymentIntent.currency
