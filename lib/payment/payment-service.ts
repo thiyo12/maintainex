@@ -65,6 +65,16 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     merchantOrderId: intent.merchantOrderId,
   })
 
+  const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
+  await prisma.paymentIntent.updateMany({
+    where: {
+      jobId,
+      status: { in: ['CREATED', 'PENDING'] },
+      createdAt: { lt: expiryCutoff },
+    },
+    data: { status: 'EXPIRED' },
+  })
+
   const existingPending = await prisma.paymentIntent.findFirst({
     where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
   })
@@ -127,6 +137,14 @@ export async function getPaymentCheckoutForm(
 
   const paymentIntent = await prisma.paymentIntent.findUnique({ where: { id: intentId } })
   if (!paymentIntent || !['CREATED', 'PENDING'].includes(paymentIntent.status)) return null
+
+  if (paymentIntent.createdAt.getTime() < Date.now() - 30 * 60 * 1000) {
+    await prisma.paymentIntent.updateMany({
+      where: { id: paymentIntent.id, status: { in: ['CREATED', 'PENDING'] } },
+      data: { status: 'EXPIRED' },
+    })
+    return null
+  }
 
   const [job, user] = await Promise.all([
     prisma.marketplaceJob.findUnique({ where: { id: paymentIntent.jobId } }),
@@ -532,7 +550,7 @@ export async function processPaymentFailure(notification: PayHereNotification): 
 export async function expireOldPayments(): Promise<number> {
   const cutoff = new Date(Date.now() - 30 * 60 * 1000)
   const result = await prisma.paymentIntent.updateMany({
-    where: { status: 'CREATED', createdAt: { lt: cutoff } },
+    where: { status: { in: ['CREATED', 'PENDING'] }, createdAt: { lt: cutoff } },
     data: { status: 'EXPIRED' },
   })
   return result.count
