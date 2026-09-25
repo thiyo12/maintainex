@@ -269,11 +269,17 @@ export async function completeAssignment(
   const assignment = await prisma.companyJobAssignment.findUnique({ where: { id: assignmentId } })
   if (!assignment) return { success: false, error: 'Assignment not found' }
   if (assignment.companyId !== companyId) return { success: false, error: 'Assignment does not belong to this company' }
-  if (assignment.status !== 'IN_PROGRESS') return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
+  if (assignment.status !== 'IN_PROGRESS' && assignment.status !== 'ACCEPTED') {
+    return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
+  }
 
   await prisma.companyJobAssignment.update({
     where: { id: assignmentId },
-    data: { status: 'COMPLETED', completedAt: new Date() },
+    data: {
+      status: 'COMPLETED',
+      completedAt: new Date(),
+      startedAt: assignment.startedAt ?? new Date(),
+    },
   })
 
   return { success: true, assignmentId }

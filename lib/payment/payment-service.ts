@@ -250,6 +250,11 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
       where: { id: paymentIntent.jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
       data: { status: 'IN_PROGRESS' },
     })
+
+    await tx.companyJobAssignment.updateMany({
+      where: { jobId: paymentIntent.jobId, status: 'ACCEPTED' },
+      data: { status: 'IN_PROGRESS', startedAt: new Date() },
+    })
   })
 
   return { success: true }
