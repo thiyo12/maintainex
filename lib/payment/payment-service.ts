@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { bigIntToSafeNumber, type Currency } from '@/lib/money'
-import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, type PayHereNotification } from './payhere-adapter'
+import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, parsePayHereAmount, type PayHereNotification } from './payhere-adapter'
 
 export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED'
 
@@ -37,8 +37,8 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
 
   const escrow = await prisma.jobEscrow.findFirst({ where: { jobId } })
   if (!escrow) return { success: false, error: 'Escrow not initialized', code: 'ESCROW_NOT_INITIALIZED' }
-  if (!['PENDING_PAYMENT', 'CANCELLED'].includes(escrow.status)) {
-    return { success: false, error: 'Escrow already funded or completed', code: 'ESCROW_NOT_FUNDABLE' }
+  if (escrow.status !== 'PENDING_PAYMENT') {
+    return { success: false, error: 'Escrow is not awaiting payment', code: 'ESCROW_NOT_FUNDABLE' }
   }
 
   const existingPending = await prisma.paymentIntent.findFirst({
@@ -200,10 +200,31 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
     return { success: false, error: `Invalid payment status: ${paymentIntent.status}` }
   }
 
+  const job = await prisma.marketplaceJob.findUnique({ where: { id: paymentIntent.jobId } })
+  if (!job) return { success: false, error: 'Job not found' }
+  if (job.customerId !== paymentIntent.customerId || job.status !== 'QUOTE_ACCEPTED') {
+    return { success: false, error: 'Booking is no longer payable' }
+  }
+
   const escrow = await prisma.jobEscrow.findUnique({ where: { id: paymentIntent.escrowId } })
   if (!escrow) return { success: false, error: 'Escrow not found' }
-  if (escrow.status !== 'PENDING_PAYMENT' && escrow.status !== 'CANCELLED') {
+  if (
+    escrow.jobId !== paymentIntent.jobId ||
+    escrow.customerId !== paymentIntent.customerId ||
+    escrow.status !== 'PENDING_PAYMENT'
+  ) {
     return { success: false, error: `Escrow not fundable: ${escrow.status}` }
+  }
+
+  const notifiedAmount = parsePayHereAmount(notification.payhere_amount)
+  if (notifiedAmount === null || notifiedAmount !== paymentIntent.amount || notifiedAmount !== escrow.totalAmount) {
+    return { success: false, error: 'Payment amount mismatch' }
+  }
+  if (notification.payhere_currency !== paymentIntent.currency || notification.payhere_currency !== escrow.currency) {
+    return { success: false, error: 'Payment currency mismatch' }
+  }
+  if (notification.custom_1 && notification.custom_1 !== paymentIntent.jobId) {
+    return { success: false, error: 'Payment job reference mismatch' }
   }
 
   const customerWallet = await prisma.customerWallet.upsert({
@@ -216,6 +237,21 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
   const totalAmount = escrow.totalAmount ?? escrow.amount
 
   await prisma.$transaction(async (tx) => {
+    const lockedJobs = await tx.$queryRaw<{ id: string; customerId: string; status: string }[]>`
+      SELECT id, "customerId", status
+      FROM "MarketplaceJob"
+      WHERE id = ${paymentIntent.jobId}
+      FOR UPDATE
+    `
+    const lockedJob = lockedJobs[0]
+    if (
+      !lockedJob ||
+      lockedJob.customerId !== paymentIntent.customerId ||
+      lockedJob.status !== 'QUOTE_ACCEPTED'
+    ) {
+      throw new Error('Booking is no longer payable')
+    }
+
     const claimed = await tx.paymentIntent.updateMany({
       where: { id: paymentIntent.id, status: { in: ['CREATED', 'PENDING'] } },
       data: {
@@ -228,7 +264,12 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
     if (claimed.count !== 1) throw new Error('Payment intent already processed')
 
     const escrowClaimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: ['PENDING_PAYMENT', 'CANCELLED'] } },
+      where: {
+        id: escrow.id,
+        jobId: paymentIntent.jobId,
+        customerId: paymentIntent.customerId,
+        status: 'PENDING_PAYMENT',
+      },
       data: { status: 'PROTECTED', heldAt: new Date() },
     })
     if (escrowClaimed.count !== 1) throw new Error('Escrow already funded')
