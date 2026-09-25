@@ -89,6 +89,30 @@ export const v2Quotes = {
     v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`),
 }
 
+export interface V2PaymentStatus {
+  id: string
+  status: 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'
+  amount: string
+  currency: string
+  merchantOrderId: string
+  paymentId: string | null
+  createdAt: string
+  paidAt: string | null
+}
+
+export const v2Payments = {
+  start: (jobId: string) =>
+    v2Request<{
+      success: boolean
+      paymentIntentId: string
+      checkoutUrl: string
+      merchantOrderId: string
+    }>(`/api/mobile/v2/jobs/${jobId}/payment`, { method: 'POST' }),
+
+  status: (jobId: string) =>
+    v2Request<{ payment: V2PaymentStatus | null }>(`/api/mobile/v2/jobs/${jobId}/payment`),
+}
+
 export const v2JobActions = {
   update: (jobId: string, data: any) =>
     v2Request<{ job: V2Job }>(`/api/mobile/v2/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(data) }),
