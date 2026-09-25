@@ -86,6 +86,50 @@ jobs:
             npx prisma migrate resolve --applied "$name" 2>&1 | grep -E "marked|Error" || true
           done
 
+      - name: Restore raw production invariants omitted by Prisma schema baseline
+        run: |
+          psql "$DATABASE_URL" <<'SQL'
+          ALTER TABLE "ProviderOpportunity"
+            DROP CONSTRAINT IF EXISTS "ProviderOpportunity_xor_provider";
+          ALTER TABLE "ProviderOpportunity"
+            ADD CONSTRAINT "ProviderOpportunity_xor_provider"
+            CHECK (
+              ("taskerId" IS NOT NULL AND "companyId" IS NULL)
+              OR
+              ("taskerId" IS NULL AND "companyId" IS NOT NULL)
+            );
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "JobVerificationPin_one_active_per_job"
+            ON "JobVerificationPin"("jobId")
+            WHERE "status" = 'ACTIVE';
+
+          CREATE OR REPLACE FUNCTION check_job_review_owner()
+          RETURNS TRIGGER AS $
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM "MarketplaceJob"
+              WHERE id = NEW."jobId" AND "customerId" = NEW."customerId"
+            ) THEN
+              RAISE EXCEPTION 'Customer does not own this job';
+            END IF;
+            RETURN NEW;
+          END;
+          $ LANGUAGE plpgsql;
+
+          DROP TRIGGER IF EXISTS trg_job_review_owner_check ON "JobReview";
+          CREATE TRIGGER trg_job_review_owner_check
+            BEFORE INSERT ON "JobReview"
+            FOR EACH ROW EXECUTE FUNCTION check_job_review_owner();
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "CompanyJobAssignment_active_per_job_idx"
+            ON "CompanyJobAssignment"("jobId")
+            WHERE "status" IN ('ASSIGNED', 'ACCEPTED', 'IN_PROGRESS');
+
+          CREATE UNIQUE INDEX IF NOT EXISTS "JobQuote_one_pending_per_provider_job"
+            ON "JobQuote"("jobId", "providerId")
+            WHERE status = 'PENDING';
+          SQL
+
       - name: Verify migration deploy is no-op
         run: npx prisma migrate deploy
 
