@@ -11,8 +11,14 @@ async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promis
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers })
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(err || `API Error ${res.status}`)
+    const raw = await res.text()
+    let message = raw
+    try {
+      const parsed = raw ? JSON.parse(raw) : null
+      if (parsed && typeof parsed.error === 'string') message = parsed.error
+      else if (parsed && typeof parsed.message === 'string') message = parsed.message
+    } catch {}
+    throw new Error(message || `API Error ${res.status}`)
   }
   return res.json()
 }
@@ -86,8 +92,24 @@ export const v2Jobs = {
 export const v2Quotes = {
   submit: (data: { jobId: string; providerType: string; price: number; estimatedCompletionTime?: string; message?: string; companyId?: string }) =>
     v2Request<{ quote: V2Quote }>('/api/mobile/v2/quotes', { method: 'POST', body: JSON.stringify(data) }),
-  list: (jobId: string) =>
-    v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`),
+  list: (jobId: string, companyId?: string) =>
+    v2Request<{ quotes: V2Quote[] }>(
+      `/api/mobile/v2/quotes?jobId=${encodeURIComponent(jobId)}${companyId ? `&companyId=${encodeURIComponent(companyId)}` : ''}`
+    ),
+  revise: (
+    quoteId: string,
+    data: {
+      price: number
+      estimatedCompletionTime: string
+      message?: string
+      revisionReason: string
+      companyId?: string
+    }
+  ) =>
+    v2Request<{ success: boolean; newQuoteId: string; revisionNumber: number }>(
+      `/api/mobile/v2/quotes/${quoteId}/revision`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
 }
 
 export interface V2PaymentStatus {
