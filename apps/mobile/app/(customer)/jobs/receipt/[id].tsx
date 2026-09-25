@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Animated, ActivityIndicator, Share } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -55,9 +55,11 @@ export default function ReceiptScreen() {
   }
 
   const acceptedQuote = job?.quotes?.find((q: any) => q.status === 'ACCEPTED')
-  const subtotal = acceptedQuote?.price || job?.budgetAmount || 0
-  const fee = job?.escrow ? Number(job.escrow.serviceFee) : Math.round(subtotal * 0.1)
-  const total = subtotal + fee
+  const currency = job?.escrow?.currency || 'LKR'
+  const subtotal = Number(job?.escrow?.amount ?? acceptedQuote?.price ?? job?.budgetAmount ?? 0)
+  const fee = Number(job?.escrow?.serviceFee ?? 0)
+  const total = Number(job?.escrow?.totalAmount ?? subtotal + fee)
+  const alreadyReviewed = (job?.reviews?.customerReviews || []).length > 0
   const serviceDate = job?.preferredDate
     ? new Date(job.preferredDate).toLocaleDateString('en-US', {
         weekday: 'short',
@@ -66,8 +68,34 @@ export default function ReceiptScreen() {
         day: 'numeric',
       })
     : ''
-  const serviceTime = job?.timeSlot || ''
-  const dateDisplay = serviceTime ? `${serviceDate} at ${serviceTime}` : serviceDate
+  const slotLabels: Record<string, string> = {
+    morning: 'Morning',
+    afternoon: 'Afternoon',
+    evening: 'Evening',
+    anytime: 'Anytime',
+  }
+  const serviceTime = job?.preferredTimeSlot ? slotLabels[job.preferredTimeSlot] || job.preferredTimeSlot : ''
+  const dateDisplay = serviceTime ? `${serviceDate} · ${serviceTime}` : serviceDate
+
+  const paymentMethod =
+    job?.escrow?.paymentMethod === 'CASH'
+      ? 'Cash'
+      : job?.escrow?.paymentMethod === 'CARD'
+        ? 'PayHere / Card'
+        : job?.escrow?.paymentMethod || 'Protected payment'
+
+  const handleShare = async () => {
+    await Share.share({
+      message: [
+        'MaintainEX Receipt',
+        job?.title || 'Service',
+        `Invoice: ${id}`,
+        `Service amount: ${currency} ${subtotal.toLocaleString()}`,
+        `Service fee: ${currency} ${fee.toLocaleString()}`,
+        `Total: ${currency} ${total.toLocaleString()}`,
+      ].join('\n'),
+    })
+  }
   const locationDisplay = job?.locationName || ''
 
   return (
@@ -98,19 +126,19 @@ export default function ReceiptScreen() {
 
           <View style={styles.lineItem}>
             <Text style={styles.lineLabel}>{t('receipt.serviceAmount')}</Text>
-            <Text style={styles.lineValue}>LKR {subtotal.toLocaleString()}</Text>
+            <Text style={styles.lineValue}>{currency} {subtotal.toLocaleString()}</Text>
           </View>
           <View style={styles.lineItem}>
             <Text style={styles.lineLabel}>{t('receipt.platformFee')}</Text>
-            <Text style={styles.lineValue}>LKR {fee.toLocaleString()}</Text>
+            <Text style={styles.lineValue}>{currency} {fee.toLocaleString()}</Text>
           </View>
           <View style={styles.lineItem}>
             <Text style={styles.lineLabel}>{t('receipt.discount')}</Text>
-            <Text style={[styles.lineValue, { color: colors.green }]}>- LKR 0</Text>
+            <Text style={[styles.lineValue, { color: colors.green }]}>- {currency} 0</Text>
           </View>
           <View style={[styles.lineItem, styles.totalRow]}>
             <Text style={styles.totalLabel}>{t('receipt.totalCharged')}</Text>
-            <Text style={styles.totalValue}>LKR {total.toLocaleString()}</Text>
+            <Text style={styles.totalValue}>{currency} {total.toLocaleString()}</Text>
           </View>
 
           <View style={styles.divider} />
@@ -119,15 +147,15 @@ export default function ReceiptScreen() {
             <Text style={styles.paymentLabel}>{t('receipt.paymentMethod')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="card-outline" size={14} color={colors.dark} />
-              <Text style={styles.paymentValue}>{t('receipt.visa')}</Text>
+              <Text style={styles.paymentValue}>{paymentMethod}</Text>
             </View>
           </View>
           <View style={styles.paymentSection}>
             <Text style={styles.paymentLabel}>{t('receipt.paidOn')}</Text>
             <Text style={styles.paymentValue}>
-              {job?.createdAt
-                ? new Date(job.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                : new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+              {job?.escrow?.releasedAt || job?.escrow?.heldAt
+                ? new Date(job.escrow.releasedAt || job.escrow.heldAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                : '—'}
             </Text>
           </View>
 
@@ -140,17 +168,19 @@ export default function ReceiptScreen() {
         </Animated.View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.shareBtn}>
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
             <Ionicons name="share-outline" size={16} color={colors.dark} />
             <Text style={styles.shareBtnText}>{t('receipt.shareReceipt')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.reviewBtn}
-            onPress={() => router.push('/(customer)/jobs/review/' + id as any)}
-          >
-            <Ionicons name="star-outline" size={16} color={colors.white} />
-            <Text style={styles.reviewBtnText}>{t('receipt.leaveReview')}</Text>
-          </TouchableOpacity>
+          {!alreadyReviewed && (
+            <TouchableOpacity
+              style={styles.reviewBtn}
+              onPress={() => router.push(('/(customer)/jobs/review/' + id) as any)}
+            >
+              <Ionicons name="star-outline" size={16} color={colors.white} />
+              <Text style={styles.reviewBtnText}>{t('receipt.leaveReview')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 
