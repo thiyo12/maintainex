@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     },
     jobEscrow: { updateMany: vi.fn() },
     marketplaceRiskEvent: { create: vi.fn() },
+    jobLifecycleEvent: { create: vi.fn() },
     $queryRaw: vi.fn(),
   }
 
