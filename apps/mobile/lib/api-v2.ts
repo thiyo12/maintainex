@@ -168,7 +168,17 @@ export const v2JobActions = {
   dispute: (jobId: string) =>
     v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action: 'DISPUTE' }) }),
   getPinState: (jobId: string) =>
-    v2Request<{ pinState: { hasActivePin: boolean; version: number | null; locked: boolean; lastSuccessfulUseAt: string | null } }>(`/api/mobile/v2/jobs/${jobId}/pin`),
+    v2Request<{
+      pinState: {
+        hasActivePin: boolean
+        version: number | null
+        locked: boolean
+        lastSuccessfulUseAt: string | null
+        arrivalVerifiedAt: string | null
+        workStartVerifiedAt: string | null
+        completionVerifiedAt: string | null
+      }
+    }>(`/api/mobile/v2/jobs/${jobId}/pin`),
   generatePin: (jobId: string) =>
     v2Request<{ success: boolean; pin: string; version: number }>(`/api/mobile/v2/jobs/${jobId}/pin`, { method: 'POST' }),
   rotatePin: (jobId: string) =>
