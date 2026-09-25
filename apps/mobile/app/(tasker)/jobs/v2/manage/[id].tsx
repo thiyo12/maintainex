@@ -340,7 +340,19 @@ export default function V2ProviderManageJobScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.arrivalVerifiedAt && (
+              {job.companyAssignment?.status === 'ASSIGNED' && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="business-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>This is a company assignment. Accept it before verifying arrival.</Text>
+                  <TouchableOpacity
+                    style={styles.verifyPinBtn}
+                    onPress={() => router.push(`/(company)/workforce/assignment/${job.companyAssignment.id}` as any)}
+                  >
+                    <Text style={styles.verifyPinText}>Review & Accept Assignment</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && !pinState?.arrivalVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
@@ -349,7 +361,7 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.verifyPinText}>Verify Arrival PIN</Text>
                 </TouchableOpacity>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
