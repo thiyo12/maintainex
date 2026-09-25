@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
@@ -42,14 +42,19 @@ export default function V2ProviderManageJobScreen() {
 
   const [locationSharing, setLocationSharing] = useState(false)
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
+  const [pinState, setPinState] = useState<any>(null)
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
-      setWorkspace(res.job.workspace || null)
-      setEscrow(res.job.escrow || null)
-      setReviews(res.job.reviews || null)
+      const [jobRes, pinRes] = await Promise.all([
+        v2Jobs.get(id),
+        v2JobActions.getPinState(id).catch(() => ({ pinState: null })),
+      ])
+      setJob(jobRes.job)
+      setWorkspace(jobRes.job.workspace || null)
+      setEscrow(jobRes.job.escrow || null)
+      setReviews(jobRes.job.reviews || null)
+      setPinState(pinRes.pinState)
       loadNextJob()
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
@@ -74,7 +79,11 @@ export default function V2ProviderManageJobScreen() {
     } catch { setNextJob(null) }
   }
 
-  useEffect(() => { loadJob() }, [id])
+  useFocusEffect(
+    useCallback(() => {
+      loadJob()
+    }, [id])
+  )
 
   // Send tasker location every 30s while sharing. Foreground-only: updates
   // pause automatically when the app is backgrounded (acceptable by design).
@@ -109,7 +118,13 @@ export default function V2ProviderManageJobScreen() {
         return
       }
       setLocationSharing(true)
-      await handleUpdateProgress('IN_PROGRESS')
+      const loc = await Location.getCurrentPositionAsync({})
+      const token = await (await import('../../../../../lib/api')).getAuthToken()
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/taskers/location`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
+      })
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
     }
@@ -125,15 +140,6 @@ export default function V2ProviderManageJobScreen() {
       await v2JobActions.complete(id, 'MARK_COMPLETE')
       Alert.alert(t('common.done'), t('jobDetail.confirmedStartDesc'))
       await loadJob()
-    } catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
-  }
-
-  const handleUpdateProgress = async (status: string) => {
-    setActionLoading(status)
-    try {
-      await v2JobActions.updateProgress(id, status)
-      loadJob()
     } catch (e: any) { Alert.alert(t('common.error'), e.message) }
     finally { setActionLoading('') }
   }
@@ -334,14 +340,29 @@ export default function V2ProviderManageJobScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && (
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.arrivalVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
                 >
-                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
-                  <Text style={styles.verifyPinText}>{t('jobDetail.confirmArrivalDesc')}</Text>
+                  <Ionicons name="location-outline" size={20} color={colors.ink} />
+                  <Text style={styles.verifyPinText}>Verify Arrival PIN</Text>
                 </TouchableOpacity>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+                <TouchableOpacity
+                  style={[styles.verifyPinBtn]}
+                  onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
+                  <Text style={styles.verifyPinText}>Start Work with PIN</Text>
+                </TouchableOpacity>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status !== 'PROTECTED' && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Waiting for the customer payment to be secured.</Text>
+                </View>
               )}
               {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
                 <View style={styles.waitingCard}>
