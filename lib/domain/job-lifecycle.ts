@@ -133,6 +133,44 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
   return prisma.jobWorkspace.findUniqueOrThrow({ where: { jobId: ctx.jobId } })
 }
 
+export async function cancelJob(
+  ctx: TransitionContext
+): Promise<{ jobId: string; previousStatus: string }> {
+  return prisma.$transaction(async (tx) => {
+    const job = await tx.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
+    if (!job) throw new Error('Job not found')
+    if (job.customerId !== ctx.actorId && ctx.actorType === 'CUSTOMER') {
+      throw new Error('Only the job owner can cancel this job')
+    }
+    if (job.status === 'CANCELLED') throw new Error('Job is already cancelled')
+    if (job.status === 'COMPLETED') throw new Error('Cannot cancel a completed job')
+    if (job.status === 'IN_PROGRESS') throw new Error('Cannot cancel after work has started')
+
+    const claimed = await tx.marketplaceJob.updateMany({
+      where: { id: ctx.jobId, status: { in: ['OPEN', 'QUOTE_ACCEPTED'] } },
+      data: { status: 'CANCELLED' },
+    })
+    if (claimed.count !== 1) throw new Error('Job state changed concurrently')
+
+    const pendingEscrow = await tx.jobEscrow.findFirst({
+      where: { jobId: ctx.jobId, status: 'PENDING_PAYMENT' },
+    })
+    if (pendingEscrow) {
+      await tx.jobEscrow.updateMany({
+        where: { id: pendingEscrow.id, status: 'PENDING_PAYMENT' },
+        data: { status: 'CANCELLED' },
+      })
+    }
+
+    await tx.jobQuote.updateMany({
+      where: { jobId: ctx.jobId, status: 'PENDING' },
+      data: { status: 'REJECTED' },
+    })
+
+    return { jobId: ctx.jobId, previousStatus: job.status }
+  })
+}
+
 export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: ctx.jobId } })
   if (!job) throw new Error('Job not found')
