@@ -94,9 +94,9 @@ export default function CompanyManageJobScreen() {
   const qs = quoteStatusLabel(myQuote)
   const wsCard = worksCard(job.workspace)
   const assignment = job.companyAssignment
+  const isAssignmentWorker = !!user?.id && assignment?.workerUserId === user.id
   const isAssignedWorker =
-    !!user?.id &&
-    assignment?.workerUserId === user.id &&
+    isAssignmentWorker &&
     ['ACCEPTED', 'IN_PROGRESS'].includes(assignment?.status)
   const canStart =
     isAssignedWorker &&
@@ -248,7 +248,21 @@ export default function CompanyManageJobScreen() {
                 <Text style={styles.actionBtnText}>{t('tracking.confirmComplete')}</Text>
               </TouchableOpacity>
             )}
-            {assignment && !isAssignedWorker && (
+            {assignment?.status === 'ASSIGNED' && isAssignmentWorker && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Assignment waiting for your response</Text>
+                <Text style={styles.emptyDesc}>
+                  Accept this assignment before you can verify arrival or start the work.
+                </Text>
+                <TouchableOpacity
+                  style={styles.browseBtn}
+                  onPress={() => router.push(`/(company)/workforce/assignment/${assignment.id}` as any)}
+                >
+                  <Text style={styles.browseBtnText}>Review & Accept →</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {assignment && !isAssignmentWorker && (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>Assigned worker</Text>
                 <Text style={styles.emptyDesc}>
