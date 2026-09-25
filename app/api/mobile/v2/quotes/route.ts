@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
+    await notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
     return NextResponse.json({ quote: { ...quote, price: minorUnitsToMajorUnits(quote.price, currency) } }, { status: 201 })
   } catch (error) {
