@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { blastJobToTaskers } from '@/lib/job-blast'
@@ -35,6 +37,49 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.allowed) return rateLimit.response!
 
     const body = await request.json()
+    const idempotencyKey = request.headers.get('idempotency-key')?.trim() || null
+    const requestFingerprint = idempotencyKey
+      ? createHash('sha256').update(JSON.stringify(body)).digest('hex')
+      : null
+
+    if (idempotencyKey) {
+      const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+      if (existing && existing.expiresAt >= new Date()) {
+        if (
+          existing.userId !== user.id ||
+          existing.operation !== 'CREATE_MARKETPLACE_JOB' ||
+          existing.requestFingerprint !== requestFingerprint
+        ) {
+          return NextResponse.json({ error: 'Idempotency key was already used for a different request' }, { status: 409 })
+        }
+
+        if (existing.status === 'COMPLETED' && existing.resultPayload) {
+          const cached = JSON.parse(existing.resultPayload) as { jobId?: string }
+          if (cached.jobId) {
+            const replayJob = await prisma.marketplaceJob.findUnique({ where: { id: cached.jobId } })
+            if (replayJob) {
+              const replayConversation = await prisma.conversation.findFirst({
+                where: {
+                  jobId: replayJob.id,
+                  participants: { some: { userId: user.id } },
+                },
+                select: { id: true },
+              })
+              return NextResponse.json({
+                job: { ...replayJob, budgetAmount: replayJob.budgetAmount?.toString() ?? null },
+                notifiedCount: replayJob.notifiedCount,
+                conversationId: replayConversation?.id ?? null,
+                estimatedResponseTime: '5-30 minutes',
+                replayed: true,
+              })
+            }
+          }
+        }
+
+        return NextResponse.json({ error: 'An identical job creation request is already being processed' }, { status: 409 })
+      }
+    }
+
     let {
       title, description, categoryId, photos,
       budgetType, budgetAmount, areaId, postalCode, preferredDate,
@@ -152,8 +197,7 @@ export async function POST(request: NextRequest) {
       console.error('Canonical price estimate generation failed:', error)
     }
 
-    const job = await prisma.marketplaceJob.create({
-      data: {
+    const jobData = {
         customerId: user.id,
         title,
         description,
@@ -179,8 +223,71 @@ export async function POST(request: NextRequest) {
         smartBookingJson: finalSmartBookingJson,
         latitude: typeof latitude === 'number' && Number.isFinite(latitude) ? latitude : null,
         longitude: typeof longitude === 'number' && Number.isFinite(longitude) ? longitude : null,
-      },
-    })
+      }
+
+    let job
+    try {
+      if (idempotencyKey) {
+        job = await prisma.$transaction(async tx => {
+          await tx.idempotencyRecord.create({
+            data: {
+              idempotencyKey,
+              userId: user.id,
+              operation: 'CREATE_MARKETPLACE_JOB',
+              status: 'PENDING',
+              requestFingerprint,
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+          })
+
+          const created = await tx.marketplaceJob.create({ data: jobData })
+          await tx.idempotencyRecord.update({
+            where: { idempotencyKey },
+            data: {
+              status: 'COMPLETED',
+              resultPayload: JSON.stringify({ jobId: created.id }),
+            },
+          })
+          return created
+        })
+      } else {
+        job = await prisma.marketplaceJob.create({ data: jobData })
+      }
+    } catch (error) {
+      if (
+        idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+        if (
+          existing?.userId !== user.id ||
+          existing?.operation !== 'CREATE_MARKETPLACE_JOB' ||
+          existing?.requestFingerprint !== requestFingerprint
+        ) {
+          return NextResponse.json({ error: 'Idempotency key conflict' }, { status: 409 })
+        }
+
+        if (existing.status === 'COMPLETED' && existing.resultPayload) {
+          const cached = JSON.parse(existing.resultPayload) as { jobId?: string }
+          const replayJob = cached.jobId
+            ? await prisma.marketplaceJob.findUnique({ where: { id: cached.jobId } })
+            : null
+          if (replayJob) {
+            return NextResponse.json({
+              job: { ...replayJob, budgetAmount: replayJob.budgetAmount?.toString() ?? null },
+              notifiedCount: replayJob.notifiedCount,
+              conversationId: null,
+              estimatedResponseTime: '5-30 minutes',
+              replayed: true,
+            })
+          }
+        }
+
+        return NextResponse.json({ error: 'An identical job creation request is already being processed' }, { status: 409 })
+      }
+      throw error
+    }
 
     let notifiedCount = 0
     try {
