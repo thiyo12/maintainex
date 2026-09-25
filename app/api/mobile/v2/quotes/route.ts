@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
       latitude: job.latitude,
       longitude: job.longitude,
       countryCode: job.countryCode || 'GLOBAL',
+      preferredDate: job.preferredDate,
     })
     const eligible = matching.candidates.some(candidate =>
       candidate.providerType === resolvedProviderType && candidate.providerId === resolvedProviderId

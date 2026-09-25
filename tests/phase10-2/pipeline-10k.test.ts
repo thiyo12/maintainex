@@ -43,7 +43,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     certification: { count: vi.fn().mockResolvedValue(0) },
     teamMember: { count: vi.fn().mockResolvedValue(1) },
     marketplaceJob: { count: vi.fn().mockResolvedValue(0) },
-    $queryRaw: vi.fn().mockResolvedValue([{ cnt: 0n }]),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     providerOpportunity: {
       groupBy: vi.fn().mockResolvedValue([]),
       findMany: vi.fn().mockResolvedValue([]),

@@ -26,6 +26,7 @@ export async function GET(
       latitude: job.latitude,
       longitude: job.longitude,
       countryCode: job.countryCode || 'GLOBAL',
+      preferredDate: job.preferredDate,
     })
 
     const individualUserIds = result.candidates

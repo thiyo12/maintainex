@@ -166,7 +166,7 @@ export async function evaluateEligibility(
   }
 
   // Gate: No blocking assignment conflict
-  const conflictGate = await evaluateConflict(client, providerType, providerId)
+  const conflictGate = await evaluateConflict(client, providerType, providerId, job.preferredDate)
   gates.push(conflictGate)
   if (!conflictGate.passed) {
     return buildIneligibleResult(gates, matchedProfessionId, matchedSkills)
@@ -456,17 +456,22 @@ async function evaluateServiceArea(
   return company?.user?.countryCode === jobCountryCode
 }
 
+function preferredDayKey(date: Date): number {
+  return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate()
+}
+
 async function evaluateConflict(
   client: PrismaClient,
   providerType: ProviderType,
   providerId: string,
+  preferredDate?: Date | string | null,
 ): Promise<EligibilityGate> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-  let activeCount: number
+  let activeJobs: { preferredDate: Date | null }[]
   if (providerType === 'INDIVIDUAL') {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
+    activeJobs = await client.$queryRaw<{ preferredDate: Date | null }[]>`
+      SELECT mj."preferredDate"
       FROM "MarketplaceJob" mj
       JOIN "JobQuote" jq ON jq."jobId" = mj.id
       WHERE jq."providerId" = ${providerId}
@@ -474,10 +479,9 @@ async function evaluateConflict(
         AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
         AND mj."createdAt" >= ${thirtyDaysAgo}
     `
-    activeCount = Number(rows[0]?.cnt ?? 0)
   } else {
-    const rows = await client.$queryRaw<{ cnt: bigint }[]>`
-      SELECT COUNT(*) as cnt
+    activeJobs = await client.$queryRaw<{ preferredDate: Date | null }[]>`
+      SELECT mj."preferredDate"
       FROM "MarketplaceJob" mj
       JOIN "JobQuote" jq ON jq."jobId" = mj.id
       WHERE jq."providerId" = ${providerId}
@@ -486,13 +490,34 @@ async function evaluateConflict(
         AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
         AND mj."createdAt" >= ${thirtyDaysAgo}
     `
-    activeCount = Number(rows[0]?.cnt ?? 0)
   }
 
-  if (activeCount > 0) {
-    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeCount} in-progress job(s)` }
+  if (activeJobs.length === 0) {
+    return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
   }
-  return { gate: 'NO_CONFLICT', passed: true, detail: 'No active conflict' }
+
+  if (preferredDate == null) {
+    return { gate: 'NO_CONFLICT', passed: false, reason: `Active job conflict: ${activeJobs.length} in-progress job(s)` }
+  }
+
+  const newJobDay = preferredDayKey(new Date(preferredDate))
+  const overlapping = activeJobs.filter(
+    (job) => job.preferredDate == null || preferredDayKey(new Date(job.preferredDate)) === newJobDay
+  )
+
+  if (overlapping.length > 0) {
+    return {
+      gate: 'NO_CONFLICT',
+      passed: false,
+      reason: `Active job conflict: scheduled dates overlap (${overlapping.length} of ${activeJobs.length} active job(s))`,
+    }
+  }
+
+  return {
+    gate: 'NO_CONFLICT',
+    passed: true,
+    detail: `Future scheduling allowed: no date overlap with ${activeJobs.length} active job(s)`,
+  }
 }
 
 async function evaluateQualityFloor(
