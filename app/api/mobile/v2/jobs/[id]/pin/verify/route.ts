@@ -31,8 +31,17 @@ export async function POST(
   const result = await verifyJobPin(jobId, auth.id, pin, purpose)
 
   if (!result.valid) {
-    const status = result.locked ? 423 : 401
-    return NextResponse.json({ error: result.error, locked: result.locked }, { status })
+    const error = result.error || 'PIN verification failed'
+    const status = result.locked
+      ? 423
+      : error.includes('Not authorized')
+        ? 403
+        : error.includes('No active PIN') ||
+            error.includes('Cannot verify PIN') ||
+            error.includes('already verified')
+          ? 409
+          : 401
+    return NextResponse.json({ error, locked: result.locked }, { status })
   }
 
   if (purpose === 'WORK_START') {
