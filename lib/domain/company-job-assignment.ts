@@ -3,6 +3,7 @@ import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
 import { notifyCompanyWorkerAssigned } from '@/lib/notifications'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
+import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -49,6 +50,11 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
   if (job.status !== 'QUOTE_ACCEPTED') return { success: false, error: 'Job must be in QUOTE_ACCEPTED status' }
+
+  const eligibility = await checkWorkerEligibility(companyId, workerUserId, jobId)
+  if (!eligibility.eligible) {
+    return { success: false, error: 'Worker not eligible', reasons: eligibility.reasons }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -143,6 +149,12 @@ export async function reassignWorker(
 
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
+
+  const eligibility = await checkWorkerEligibility(companyId, newWorkerUserId, jobId)
+  if (!eligibility.eligible) {
+    return { success: false, error: 'Worker not eligible', reasons: eligibility.reasons }
+  }
+
   if (job.status === 'IN_PROGRESS') {
     return { success: false, error: 'Cannot reassign after work has started. Raise a dispute or contact support.' }
   }
