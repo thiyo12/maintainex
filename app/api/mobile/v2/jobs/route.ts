@@ -10,6 +10,7 @@ import { notifyTaskerAssigned } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/money'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -356,6 +357,25 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get('role')
     const myQuotes = searchParams.get('myQuotes')
     const areaId = searchParams.get('areaId')
+    const requestedContext = searchParams.get('context')
+    const requestedCompanyId = searchParams.get('companyId')
+
+    let companyContextId: string | null = null
+    if (requestedContext === 'company') {
+      const requiredPermission =
+        myQuotes === 'true'
+          ? 'quotes:read'
+          : role === 'provider'
+            ? 'quotes:submit'
+            : 'jobs:read'
+      const { context, error } = await resolveCompanyContext(
+        user.id,
+        requestedCompanyId,
+        requiredPermission,
+      )
+      if (error) return error
+      companyContextId = context!.companyId
+    }
 
     const where: any = { isActive: true }
 
@@ -363,7 +383,10 @@ export async function GET(request: NextRequest) {
       let providerId = user.id
       let providerType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
 
-      if (user.role === 'COMPANY') {
+      if (companyContextId) {
+        providerId = companyContextId
+        providerType = 'COMPANY'
+      } else if (user.role === 'COMPANY') {
         const companyProfile = await prisma.companyProfile.findUnique({
           where: { userId: user.id },
           select: { id: true },
@@ -391,14 +414,26 @@ export async function GET(request: NextRequest) {
 
       let allowedCategoryIds: string[] = []
 
-      if (user.role === 'COMPANY') {
-        const companyProfile = await prisma.companyProfile.findUnique({
-          where: { userId: user.id },
-          select: {
-            services: true,
-            specialties: { select: { categoryId: true, jobId: true } },
-          },
-        })
+      if (companyContextId || user.role === 'COMPANY') {
+        const companyProfile = companyContextId
+          ? await prisma.companyProfile.findUnique({
+              where: { id: companyContextId },
+              select: {
+                countryCode: true,
+                services: true,
+                specialties: { select: { categoryId: true, jobId: true } },
+              },
+            })
+          : await prisma.companyProfile.findUnique({
+              where: { userId: user.id },
+              select: {
+                countryCode: true,
+                services: true,
+                specialties: { select: { categoryId: true, jobId: true } },
+              },
+            })
+
+        if (companyProfile?.countryCode) where.countryCode = companyProfile.countryCode
 
         if (companyProfile) {
           const directCategoryIds = companyProfile.specialties
