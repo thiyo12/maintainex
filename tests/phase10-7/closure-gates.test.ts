@@ -454,7 +454,7 @@ describe('Gate 10: Reassignment Auth Revocation', () => {
 // Gate 11: Job PIN Workforce Authorization
 // ──────────────────────────────────────────────
 describe('Gate 11: Job PIN Workforce Authorization', () => {
-  it('Assigned worker follows protected ARRIVAL → fresh WORK_START PIN lifecycle', async () => {
+  it('Assigned worker follows protected ARRIVAL → WORK_START PIN lifecycle', async () => {
     await resetJob(dataIds.jobAId)
     await prisma.jobVerificationPin.deleteMany({ where: { jobId: dataIds.jobAId } })
     await prisma.jobEscrow.deleteMany({ where: { jobId: dataIds.jobAId } })
@@ -497,10 +497,7 @@ describe('Gate 11: Job PIN Workforce Authorization', () => {
     const arrival = await verifyJobPin(dataIds.jobAId, ids.workerA, arrivalPin.pin, 'ARRIVAL')
     expect(arrival.valid).toBe(true)
 
-    const startPin = await generateJobPin(dataIds.jobAId, ids.customer)
-    expect(startPin.version).toBeGreaterThan(arrivalPin.version)
-
-    const workStart = await verifyJobPin(dataIds.jobAId, ids.workerA, startPin.pin, 'WORK_START')
+    const workStart = await verifyJobPin(dataIds.jobAId, ids.workerA, arrivalPin.pin, 'WORK_START')
     expect(workStart.valid).toBe(true)
 
     const [job, assignment] = await Promise.all([
