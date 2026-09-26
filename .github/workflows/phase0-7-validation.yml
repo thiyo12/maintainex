@@ -151,6 +151,11 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit
 
+      - name: Mobile TypeScript
+        run: |
+          cd apps/mobile
+          npx tsc --noEmit
+
       - name: Schema integrity tests
         run: npx vitest run tests/phase0 --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
         if: always()
