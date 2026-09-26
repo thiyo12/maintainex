@@ -63,7 +63,12 @@ export async function generateJobPin(
   const lastPin = await prisma.jobVerificationPin.findFirst({
     where: { jobId },
     orderBy: { version: 'desc' },
-    select: { version: true },
+    select: {
+      version: true,
+      arrivalVerifiedAt: true,
+      workStartVerifiedAt: true,
+      completionVerifiedAt: true,
+    },
   })
   const nextVersion = (lastPin?.version ?? 0) + 1
 
@@ -74,6 +79,9 @@ export async function generateJobPin(
       pinHash,
       status: 'ACTIVE',
       version: nextVersion,
+      arrivalVerifiedAt: lastPin?.arrivalVerifiedAt ?? null,
+      workStartVerifiedAt: lastPin?.workStartVerifiedAt ?? null,
+      completionVerifiedAt: lastPin?.completionVerifiedAt ?? null,
     },
   })
 
@@ -107,8 +115,12 @@ export async function rotateJobPin(
     where: { jobId, status: 'ACTIVE' },
     orderBy: { version: 'desc' },
   })
+  const latestPin = currentActive ?? await prisma.jobVerificationPin.findFirst({
+    where: { jobId },
+    orderBy: { version: 'desc' },
+  })
 
-  const nextVersion = currentActive ? currentActive.version + 1 : 1
+  const nextVersion = (latestPin?.version ?? 0) + 1
 
   const pin = generatePin()
   const pinHash = await hashPassword(pin)
@@ -128,6 +140,9 @@ export async function rotateJobPin(
         pinHash,
         status: 'ACTIVE',
         version: nextVersion,
+        arrivalVerifiedAt: latestPin?.arrivalVerifiedAt ?? null,
+        workStartVerifiedAt: latestPin?.workStartVerifiedAt ?? null,
+        completionVerifiedAt: latestPin?.completionVerifiedAt ?? null,
       },
     })
   })
@@ -294,7 +309,10 @@ export async function verifyJobPin(
 
     await tx.jobVerificationPin.update({
       where: { id: pinRecord.id },
-      data: updateData,
+      data: {
+        ...updateData,
+        status: 'CONSUMED',
+      },
     })
 
     // 9. Execute the single canonical WORK_START transition atomically.
@@ -386,8 +404,12 @@ export async function getPinState(
     where: { jobId, status: 'ACTIVE' },
     orderBy: { version: 'desc' },
   })
+  const latestPin = activePin ?? await prisma.jobVerificationPin.findFirst({
+    where: { jobId },
+    orderBy: { version: 'desc' },
+  })
 
-  if (!activePin) {
+  if (!latestPin) {
     return {
       hasActivePin: false,
       version: null,
@@ -399,16 +421,16 @@ export async function getPinState(
     }
   }
 
-  const locked = activePin.lockedUntil != null && activePin.lockedUntil > new Date()
+  const locked = activePin?.lockedUntil != null && activePin.lockedUntil > new Date()
 
   return {
-    hasActivePin: true,
-    version: activePin.version,
+    hasActivePin: !!activePin,
+    version: latestPin.version,
     locked,
-    lastSuccessfulUseAt: activePin.lastSuccessfulUseAt,
-    arrivalVerifiedAt: activePin.arrivalVerifiedAt,
-    workStartVerifiedAt: activePin.workStartVerifiedAt,
-    completionVerifiedAt: activePin.completionVerifiedAt,
+    lastSuccessfulUseAt: latestPin.lastSuccessfulUseAt,
+    arrivalVerifiedAt: latestPin.arrivalVerifiedAt,
+    workStartVerifiedAt: latestPin.workStartVerifiedAt,
+    completionVerifiedAt: latestPin.completionVerifiedAt,
   }
 }
 
