@@ -198,8 +198,15 @@ describe('Gate 2: Role/Permission Matrix', () => {
   it('WORKER cannot create assignment', async () => {
     await clearJobAssignments(dataIds.jobAId)
     const { createAssignment } = await import('@/lib/domain/company-job-assignment')
-    const r = await createAssignment({ companyId: dataIds.companyAId, jobId: dataIds.jobAId, workerUserId: ids.workerC, assignedByUserId: ids.workerA, actorRole: 'WORKER' })
-    expect(r.success).toBe(true)
+    const r = await createAssignment({
+      companyId: dataIds.companyAId,
+      jobId: dataIds.jobAId,
+      workerUserId: ids.workerC,
+      assignedByUserId: ids.workerA,
+      actorRole: 'WORKER',
+    })
+    expect(r.success).toBe(false)
+    expect(r.error).toContain('not authorized')
   })
 
   it('CUSTOMER has no company permissions', async () => {
