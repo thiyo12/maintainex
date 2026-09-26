@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { role: 'TASKER' },
+      data: { role: 'COMPANY' },
     })
 
     return NextResponse.json({
