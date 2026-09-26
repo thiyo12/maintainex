@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
-import { taskers, getAuthToken, conversations, notifications, getActiveCompanyId } from '../../../lib/api'
+import { taskers, getAuthToken, conversations, notifications, getActiveCompanyContext } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import type { TaskerProfile } from '../../../lib/types'
 import ProfileHeader from '../../../components/ProfileHeader'
@@ -47,7 +47,7 @@ export default function TaskerProfile() {
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
   const [unreadMsgs, setUnreadMsgs] = useState(0)
   const [unreadNotifs, setUnreadNotifs] = useState(0)
-  const [hasCompanyMembership, setHasCompanyMembership] = useState(false)
+  const [companyRole, setCompanyRole] = useState<string | null>(null)
 
   const cardAnim = useSlideUp(0)
   const sectionAnim2 = useSlideUp(80)
@@ -72,9 +72,9 @@ export default function TaskerProfile() {
   useEffect(() => {
     loadProfile()
     loadIdentity()
-    getActiveCompanyId()
-      .then((companyId) => setHasCompanyMembership(!!companyId))
-      .catch(() => setHasCompanyMembership(false))
+    getActiveCompanyContext()
+      .then((context) => setCompanyRole(context?.role || null))
+      .catch(() => setCompanyRole(null))
   }, [])
 
   useEffect(() => {
@@ -291,15 +291,22 @@ export default function TaskerProfile() {
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('readiness.title')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </TouchableOpacity>
-            {hasCompanyMembership && (
+            {companyRole && (
               <TouchableOpacity
                 style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-                onPress={() => router.push('/(tasker)/company-assignments' as any)}
+                onPress={() => {
+                  if (companyRole === 'WORKER') router.push('/(tasker)/company-assignments' as any)
+                  else if (companyRole === 'DISPATCHER') router.push('/(company)/(tabs)/dispatch' as any)
+                  else if (companyRole === 'FINANCE') router.push('/(company)/(tabs)/earnings-list' as any)
+                  else router.push('/(company)' as any)
+                }}
               >
                 <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
                   <Ionicons name="business-outline" size={16} color="#6D28D9" />
                 </View>
-                <Text style={[styles.menuTitle, { color: colors.ink }]}>Company Assignments</Text>
+                <Text style={[styles.menuTitle, { color: colors.ink }]}>
+                  {companyRole === 'WORKER' ? 'Company Assignments' : 'Company Workspace'}
+                </Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.muted} />
               </TouchableOpacity>
             )}
