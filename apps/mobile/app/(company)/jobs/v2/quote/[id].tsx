@@ -31,7 +31,7 @@ export default function CompanySubmitQuoteScreen() {
     try {
       const companyProfile = await company.profile.get()
       const [jobRes, quoteRes] = await Promise.all([
-        v2Jobs.get(id),
+        v2Jobs.get(id, 'company'),
         v2Quotes.list(id, companyProfile.id),
       ])
       setJob(jobRes.job)
