@@ -89,10 +89,14 @@ export async function POST(
       if (!isCustomer && !providerActor) {
         return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
       }
-      if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
-        return NextResponse.json({ error: 'Cannot dispute completed or cancelled jobs' }, { status: 400 })
+      if (job.status !== 'IN_PROGRESS') {
+        return NextResponse.json({ error: 'Dispute is only available after work has started' }, { status: 409 })
       }
 
+      const reason =
+        typeof body.reason === 'string' && body.reason.trim()
+          ? body.reason.trim().slice(0, 1000)
+          : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
       let disputeRecipientId: string | null = isCustomer ? null : job.customerId
 
@@ -113,7 +117,7 @@ export async function POST(
       }
 
       await raiseJobDispute(
-        { jobId: job.id, actorId: user.id, actorType },
+        { jobId: job.id, actorId: user.id, actorType, reason: reason || undefined },
         job.id
       )
 
