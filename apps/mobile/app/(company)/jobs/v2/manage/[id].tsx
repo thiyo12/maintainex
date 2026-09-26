@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -23,6 +23,10 @@ export default function CompanyManageJobScreen() {
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
   const [pinState, setPinState] = useState<any>(null)
+  const [reviewCoop, setReviewCoop] = useState('5')
+  const [reviewComm, setReviewComm] = useState('5')
+  const [reviewExp, setReviewExp] = useState('5')
+  const [reviewComment, setReviewComment] = useState('')
 
   const loadJob = async () => {
     try {
@@ -55,6 +59,31 @@ export default function CompanyManageJobScreen() {
       await loadJob()
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
+    } finally {
+      setActionLoading('')
+    }
+  }
+
+  const handleSubmitReview = async () => {
+    const ratings = [reviewCoop, reviewComm, reviewExp].map((value) => Number.parseInt(value, 10))
+    if (ratings.some((value) => !Number.isInteger(value) || value < 1 || value > 5)) {
+      Alert.alert(t('common.error'), 'Ratings must be whole numbers from 1 to 5.')
+      return
+    }
+
+    setActionLoading('review')
+    try {
+      await v2JobActions.createReview(id, {
+        reviewType: 'PROVIDER_REVIEWS_CUSTOMER',
+        cooperation: ratings[0],
+        communication: ratings[1],
+        overallExperience: ratings[2],
+        comment: reviewComment.trim() || undefined,
+      })
+      Alert.alert(t('receipt.reviewSubmitted'), t('receipt.reviewSubmittedDesc'))
+      await loadJob()
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message || 'Could not submit review.')
     } finally {
       setActionLoading('')
     }
@@ -214,6 +243,65 @@ export default function CompanyManageJobScreen() {
           </View>
         )}
 
+        {job.status === 'COMPLETED' && (job.reviews?.providerReviews || []).length === 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review Customer</Text>
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewLabel}>Cooperation (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewCoop}
+                onChangeText={setReviewCoop}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Communication (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewComm}
+                onChangeText={setReviewComm}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Overall experience (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewExp}
+                onChangeText={setReviewExp}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Comment</Text>
+              <TextInput
+                style={[styles.reviewInput, styles.reviewTextArea]}
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                multiline
+                maxLength={1000}
+                textAlignVertical="top"
+              />
+              <TouchableOpacity
+                style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
+                onPress={handleSubmitReview}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === 'review'
+                  ? <ActivityIndicator color="#111827" />
+                  : <Text style={styles.actionBtnText}>Submit Review</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {job.status === 'COMPLETED' && (job.reviews?.providerReviews || []).length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.reviewedCard}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={styles.reviewedText}>Customer review submitted</Text>
+            </View>
+          </View>
+        )}
+
         {/* Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('company.manageJob')}</Text>
@@ -364,4 +452,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   completeBtn: { backgroundColor: colors.success },
   actionBtnText: { fontSize: 15, fontWeight: '800', color: '#111827' },
   btnDisabled: { opacity: 0.5 },
+
+  reviewCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, gap: 8 },
+  reviewLabel: { fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 4 },
+  reviewInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.ink, backgroundColor: colors.white },
+  reviewTextArea: { minHeight: 84 },
+  reviewedCard: { backgroundColor: colors.successBg, borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  reviewedText: { fontSize: 14, fontWeight: '600', color: colors.success },
 })
