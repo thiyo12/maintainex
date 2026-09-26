@@ -3342,7 +3342,7 @@ model JobVerificationPin {
   jobId               String
   customerId          String
   pinHash             String    // bcrypt hash via hashPassword() (SHA-256+pepper+bcrypt)
-  status              String    @default("ACTIVE") // ACTIVE, ROTATED, REVOKED
+  status              String    @default("ACTIVE") // ACTIVE, CONSUMED, ROTATED, REVOKED
   version             Int       @default(1)
   failedAttempts      Int       @default(0)
   lockedUntil         DateTime?
