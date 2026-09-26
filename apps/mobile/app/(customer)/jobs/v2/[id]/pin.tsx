@@ -34,6 +34,7 @@ export default function JobPinScreen() {
     try {
       const res = await v2JobActions.getPinState(id)
       setPinState(res.pinState)
+      if (!res.pinState.hasActivePin) setGeneratedPin(null)
     } catch {
       setPinState(null)
     } finally {
@@ -41,7 +42,11 @@ export default function JobPinScreen() {
     }
   }
 
-  useEffect(() => { loadPinState() }, [id])
+  useEffect(() => {
+    loadPinState()
+    const timer = setInterval(loadPinState, 3000)
+    return () => clearInterval(timer)
+  }, [id])
 
   const handleGenerate = async () => {
     setActionLoading('generate')
