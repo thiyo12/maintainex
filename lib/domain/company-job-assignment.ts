@@ -2,6 +2,7 @@ import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
 import { notifyCompanyWorkerAssigned } from '@/lib/notifications'
+import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -31,6 +32,19 @@ export interface AssignmentResult {
 
 export async function createAssignment(params: AssignmentCreateParams): Promise<AssignmentResult> {
   const { companyId, jobId, workerUserId, assignedByUserId, actorRole } = params
+
+  const actorMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: assignedByUserId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  if (
+    !actorMembership ||
+    !isValidCompanyRole(actorMembership.role) ||
+    actorMembership.role !== actorRole ||
+    !hasCompanyPermission(actorMembership.role, 'workers:assign')
+  ) {
+    return { success: false, error: 'Actor is not authorized to assign workers for this company' }
+  }
 
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
@@ -114,6 +128,19 @@ export async function reassignWorker(
   actorRole: string,
   reason?: string
 ): Promise<AssignmentResult> {
+  const actorMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: actorUserId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  if (
+    !actorMembership ||
+    !isValidCompanyRole(actorMembership.role) ||
+    actorMembership.role !== actorRole ||
+    !hasCompanyPermission(actorMembership.role, 'workers:assign')
+  ) {
+    return { success: false, error: 'Actor is not authorized to reassign workers for this company' }
+  }
+
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
   if (job.status === 'IN_PROGRESS') {
@@ -259,6 +286,19 @@ export async function revokeAssignment(
   actorRole: string,
   reason?: string,
 ): Promise<AssignmentResult> {
+  const actorMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: actorUserId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  if (
+    !actorMembership ||
+    !isValidCompanyRole(actorMembership.role) ||
+    actorMembership.role !== actorRole ||
+    !hasCompanyPermission(actorMembership.role, 'workers:assign')
+  ) {
+    return { success: false, error: 'Actor is not authorized to revoke assignments for this company' }
+  }
+
   const assignment = await prisma.companyJobAssignment.findUnique({ where: { id: assignmentId } })
   if (!assignment) return { success: false, error: 'Assignment not found' }
   if (assignment.companyId !== companyId) return { success: false, error: 'Assignment does not belong to this company' }
