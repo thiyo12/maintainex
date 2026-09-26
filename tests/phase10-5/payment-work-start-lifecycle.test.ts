@@ -17,8 +17,12 @@ const mocks = vi.hoisted(() => {
     paymentIntentFindFirst: vi.fn(),
     paymentIntentUpdateMany: vi.fn(),
     jobEscrowFindUnique: vi.fn(),
+    marketplaceJobFindUnique: vi.fn(),
+    jobQuoteFindFirst: vi.fn(),
+    companyProfileFindUnique: vi.fn(),
     transaction: vi.fn(async (fn: any) => fn(tx)),
     postLedgerTransaction: vi.fn(),
+    notifyEscrowDeposited: vi.fn(),
   }
 })
 
@@ -29,12 +33,19 @@ vi.mock('@/lib/prisma', () => ({
       updateMany: mocks.paymentIntentUpdateMany,
     },
     jobEscrow: { findUnique: mocks.jobEscrowFindUnique },
+    marketplaceJob: { findUnique: mocks.marketplaceJobFindUnique },
+    jobQuote: { findFirst: mocks.jobQuoteFindFirst },
+    companyProfile: { findUnique: mocks.companyProfileFindUnique },
     $transaction: mocks.transaction,
   },
 }))
 
 vi.mock('@/lib/ledger', () => ({
   postLedgerTransaction: mocks.postLedgerTransaction,
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  notifyEscrowDeposited: mocks.notifyEscrowDeposited,
 }))
 
 vi.mock('@/lib/payment/payhere-adapter', () => ({
@@ -86,6 +97,16 @@ describe('PayHere payment-to-work lifecycle', () => {
       status: 'PENDING',
     })
 
+    mocks.marketplaceJobFindUnique.mockResolvedValue({
+      id: 'job-1',
+      title: 'Payment lifecycle job',
+    })
+    mocks.jobQuoteFindFirst.mockResolvedValue({
+      providerId: 'provider-1',
+      providerType: 'INDIVIDUAL',
+    })
+    mocks.companyProfileFindUnique.mockResolvedValue(null)
+
     mocks.jobEscrowFindUnique.mockResolvedValue({
       id: 'escrow-1',
       jobId: 'job-1',
@@ -133,6 +154,11 @@ describe('PayHere payment-to-work lifecycle', () => {
       })
     )
     expect(mocks.postLedgerTransaction).toHaveBeenCalledTimes(1)
+    expect(mocks.notifyEscrowDeposited).toHaveBeenCalledWith(
+      'job-1',
+      'provider-1',
+      'Payment lifecycle job',
+    )
   })
 
   it('records a late captured payment as REFUND_REQUIRED after cancellation', async () => {
@@ -172,6 +198,27 @@ describe('PayHere payment-to-work lifecycle', () => {
       })
     )
     expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+  })
+
+  it('does not send a duplicate funded notification for a repeated SUCCESS callback', async () => {
+    const { processPaymentSuccess } = await import('@/lib/payment/payment-service')
+    mocks.paymentIntentFindFirst.mockResolvedValue({
+      id: 'pi-1',
+      jobId: 'job-1',
+      customerId: 'customer-1',
+      escrowId: 'escrow-1',
+      merchantOrderId: 'order-1',
+      paymentId: 'pay-1',
+      amount: 10000n,
+      currency: 'LKR',
+      status: 'SUCCESS',
+    })
+
+    const result = await processPaymentSuccess(notification())
+
+    expect(result).toEqual({ success: true })
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.notifyEscrowDeposited).not.toHaveBeenCalled()
   })
 
   it('rejects callbacks whose amount does not match the payment intent', async () => {
