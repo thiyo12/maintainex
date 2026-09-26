@@ -231,7 +231,7 @@ export async function notifyCompanyWorkerAssigned(
     userId: workerUserId,
     title: 'New Company Assignment',
     body: `${companyName} assigned you to "${jobTitle}". Review and accept the assignment before starting work.`,
-    referenceType: 'JOB',
+    referenceType: 'COMPANY_JOB',
     referenceId: jobId,
   })
 }
