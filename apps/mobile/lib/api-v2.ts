@@ -96,6 +96,7 @@ export interface V2Job {
   title: string
   description: string
   categoryId: string
+  countryCode: string
   photos: string[]
   budgetType: string
   budgetAmount: number | null
