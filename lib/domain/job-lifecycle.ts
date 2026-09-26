@@ -757,11 +757,23 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
       if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
       await tx.marketplaceJob.updateMany({
         where: { id: jobId, status: { not: 'COMPLETED' } },
+        data: { status: 'CANCELLED', isActive: false, responseState: 'resolved' },
+      })
+      await tx.paymentIntent.updateMany({
+        where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
         data: { status: 'CANCELLED' },
       })
       await tx.jobQuote.updateMany({
         where: { id: escrow.quoteId, status: 'ACCEPTED' },
         data: { status: 'WITHDRAWN' },
+      })
+      await tx.companyJobAssignment.updateMany({
+        where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
+        data: {
+          status: 'REVOKED',
+          revokedAt: new Date(),
+          revokedReason: ctx.reason ?? 'Booking cancelled/refunded',
+        },
       })
 
       await recordJobLifecycleEvent(tx, {
@@ -839,11 +851,23 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
 
       await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { not: 'COMPLETED' } },
+      data: { status: 'CANCELLED', isActive: false, responseState: 'resolved' },
+    })
+    await tx.paymentIntent.updateMany({
+      where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
       data: { status: 'CANCELLED' },
     })
     await tx.jobQuote.updateMany({
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
       data: { status: 'WITHDRAWN' },
+    })
+    await tx.companyJobAssignment.updateMany({
+      where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
+      data: {
+        status: 'REVOKED',
+        revokedAt: new Date(),
+        revokedReason: ctx.reason ?? 'Booking refunded',
+      },
     })
 
     await recordJobLifecycleEvent(tx, {
