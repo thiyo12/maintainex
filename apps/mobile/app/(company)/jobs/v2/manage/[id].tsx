@@ -338,6 +338,16 @@ export default function CompanyManageJobScreen() {
                 <Text style={styles.emptyDesc}>Arrival is confirmed. The customer must generate a fresh one-time PIN before work can start.</Text>
               </View>
             )}
+            {canStart && !pinState?.hasActivePin && !pinState?.workStartVerifiedAt && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Waiting for customer PIN</Text>
+                <Text style={styles.emptyDesc}>
+                  {pinState?.arrivalVerifiedAt
+                    ? 'Arrival is verified. Ask the customer to generate the fresh Start Work PIN.'
+                    : 'Ask the customer to generate the Arrival PIN when you reach the service address.'}
+                </Text>
+              </View>
+            )}
             {canComplete && (
               <TouchableOpacity
                 style={[styles.actionBtn, styles.completeBtn, actionLoading !== '' && styles.btnDisabled]}
