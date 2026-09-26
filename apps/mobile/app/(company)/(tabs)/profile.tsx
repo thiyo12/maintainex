@@ -9,7 +9,6 @@ import { company, conversations, notifications, getAuthToken } from '../../../li
 import { useAuth } from '../../../lib/auth'
 import ProfileHeader from '../../../components/ProfileHeader'
 import { fonts } from '../../../lib/fonts'
-import OfferProgramSection from '../../../components/offers/OfferProgramSection'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
 
@@ -362,8 +361,6 @@ export default function CompanyProfile() {
             </TouchableOpacity>
           </View>
         </Animated.View>
-
-        <OfferProgramSection variant="company" companyId={profile?.id} />
       </ScrollView>
     </SafeAreaView>
   )
