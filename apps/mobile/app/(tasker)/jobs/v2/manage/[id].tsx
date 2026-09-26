@@ -441,8 +441,8 @@ export default function V2ProviderManageJobScreen() {
             <Text style={styles.highlightDesc}>{nextJob.title}</Text>
             {nextJob.preferredDate && (
               <Text style={[styles.scheduleText, { color: colors.amberDark, marginBottom: 12 }]}>
-                {nextJob.timeSlot
-                  ? t('booking.scheduledFor', { date: nextJob.preferredDate, timeSlot: nextJob.timeSlot })
+                {nextJob.preferredTimeSlot
+                  ? t('booking.scheduledFor', { date: nextJob.preferredDate, timeSlot: nextJob.preferredTimeSlot })
                   : nextJob.preferredDate}
               </Text>
             )}
@@ -456,7 +456,7 @@ export default function V2ProviderManageJobScreen() {
         )}
 
         {/* Dispute */}
-        {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+        {job.status === 'IN_PROGRESS' && workspace?.progressStatus !== 'DISPUTED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
             <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
           </TouchableOpacity>
