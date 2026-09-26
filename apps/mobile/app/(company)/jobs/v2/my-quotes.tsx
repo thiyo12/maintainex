@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { fonts } from '../../../../lib/fonts'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
+import { getActiveCompanyId } from '../../../../lib/api'
 
 export default function CompanyMyQuotesScreen() {
   const { t } = useTranslation()
@@ -19,7 +20,9 @@ export default function CompanyMyQuotesScreen() {
 
   const loadJobs = useCallback(async () => {
     try {
-      const res = await v2Jobs.list('myQuotes=true')
+      const companyId = await getActiveCompanyId()
+      if (!companyId) throw new Error('No active company membership')
+      const res = await v2Jobs.list(`myQuotes=true&context=company&companyId=${encodeURIComponent(companyId)}`)
       setJobs(res.jobs)
     } catch {
       // fail silently
