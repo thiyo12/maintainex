@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
         providerId: resolvedProviderId,
         providerType: resolvedProviderType,
         price: priceMinor,
+        currency,
         actorUserId,
         actorRole,
         estimatedCompletionTime: typeof estimatedCompletionTime === 'string' ? estimatedCompletionTime.slice(0, 200) : '',
