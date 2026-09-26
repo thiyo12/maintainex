@@ -224,8 +224,11 @@ export const v2JobActions = {
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
-  dispute: (jobId: string) =>
-    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action: 'DISPUTE' }) }),
+  dispute: (jobId: string, reason?: string) =>
+    v2Request<{ success: boolean; message: string }>(
+      `/api/mobile/v2/jobs/${jobId}/complete`,
+      { method: 'POST', body: JSON.stringify({ action: 'DISPUTE', reason }) },
+    ),
   getPinState: (jobId: string) =>
     v2Request<{
       pinState: {
