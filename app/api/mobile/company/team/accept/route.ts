@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       token,
       userId: user.id,
       userEmail: user.email,
+      userPhone: user.phone,
     })
 
     if (!result.success) {
