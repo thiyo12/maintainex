@@ -17,6 +17,8 @@ export interface User {
   completedJobs?: number
   totalSpent?: number
   phoneVerified?: boolean
+  availableProfiles?: UserRole[]
+  activeCompany?: { companyId: string; role: string } | null
   birthday?: string
   gender?: 'MALE' | 'FEMALE' | 'OTHER'
   language?: 'EN' | 'TA' | 'SI'
