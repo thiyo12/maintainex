@@ -102,11 +102,6 @@ export default function V2JobDetailScreen() {
     }, [id])
   )
 
-  const canCancelWithin30 = () => {
-    if (!job?.createdAt) return false
-    return (Date.now() - new Date(job.createdAt).getTime()) < 30 * 60 * 1000
-  }
-
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
@@ -222,7 +217,7 @@ export default function V2JobDetailScreen() {
           <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
-              <Text style={styles.cancelBtnText}>{canCancelWithin30() ? 'Cancel this mission' : 'Request cancellation'}</Text>
+              <Text style={styles.cancelBtnText}>Cancel Booking</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -462,7 +457,7 @@ export default function V2JobDetailScreen() {
               <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>Protected</Text></View>
             </View>
             <Text style={[styles.escrowAmount, { color: colors.ink }]}>
-              {escrow.currency || 'LKR'} {Number(escrow.amount || 0).toLocaleString()}
+              {escrow.currency || 'LKR'} {Number(escrow.totalAmount || escrow.amount || 0).toLocaleString()}
             </Text>
             <Text style={[styles.actionCardDesc, { marginBottom: 0 }]}>
               Payment stays protected until you approve completed work. Before work starts, use the booking cancellation action above.
