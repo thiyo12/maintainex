@@ -247,10 +247,18 @@ export async function workerAcceptAssignment(
   if (assignment.workerUserId !== workerUserId) return { success: false, error: 'Not your assignment' }
   if (assignment.status !== 'ASSIGNED') return { success: false, error: `Cannot accept: current status is ${assignment.status}` }
 
-  await prisma.companyJobAssignment.update({
-    where: { id: assignmentId },
+  const eligibility = await checkWorkerEligibility(assignment.companyId, workerUserId, assignment.jobId)
+  if (!eligibility.eligible) {
+    return { success: false, error: 'Worker is no longer eligible for this assignment', reasons: eligibility.reasons }
+  }
+
+  const claimed = await prisma.companyJobAssignment.updateMany({
+    where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
     data: { status: 'ACCEPTED', acceptedAt: new Date() },
   })
+  if (claimed.count !== 1) {
+    return { success: false, error: 'Assignment changed before it could be accepted' }
+  }
 
   return { success: true, assignmentId }
 }
@@ -266,13 +274,14 @@ export async function workerRejectAssignment(
   if (assignment.status !== 'ASSIGNED') return { success: false, error: `Cannot reject: current status is ${assignment.status}` }
 
   await prisma.$transaction(async (tx) => {
-    await tx.companyJobAssignment.update({
-      where: { id: assignmentId },
+    const claimed = await tx.companyJobAssignment.updateMany({
+      where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
       data: { status: 'REJECTED', rejectedAt: new Date(), rejectReason: reason || undefined },
     })
+    if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
-    await tx.marketplaceJob.update({
-      where: { id: assignment.jobId },
+    await tx.marketplaceJob.updateMany({
+      where: { id: assignment.jobId, targetTaskerId: workerUserId },
       data: { targetTaskerId: null },
     })
 
