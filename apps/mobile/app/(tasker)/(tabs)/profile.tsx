@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../lib/ThemeContext'
-import { taskers, getAuthToken, conversations, notifications } from '../../../lib/api'
+import { taskers, getAuthToken, conversations, notifications, getActiveCompanyId } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import type { TaskerProfile } from '../../../lib/types'
 import ProfileHeader from '../../../components/ProfileHeader'
@@ -47,6 +47,7 @@ export default function TaskerProfile() {
   const [identityStatus, setIdentityStatus] = useState<string>('NOT_SUBMITTED')
   const [unreadMsgs, setUnreadMsgs] = useState(0)
   const [unreadNotifs, setUnreadNotifs] = useState(0)
+  const [hasCompanyMembership, setHasCompanyMembership] = useState(false)
 
   const cardAnim = useSlideUp(0)
   const sectionAnim2 = useSlideUp(80)
@@ -71,6 +72,9 @@ export default function TaskerProfile() {
   useEffect(() => {
     loadProfile()
     loadIdentity()
+    getActiveCompanyId()
+      .then((companyId) => setHasCompanyMembership(!!companyId))
+      .catch(() => setHasCompanyMembership(false))
   }, [])
 
   useEffect(() => {
@@ -287,6 +291,18 @@ export default function TaskerProfile() {
               <Text style={[styles.menuTitle, { color: colors.ink }]}>{t('readiness.title')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </TouchableOpacity>
+            {hasCompanyMembership && (
+              <TouchableOpacity
+                style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                onPress={() => router.push('/(tasker)/company-assignments' as any)}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: '#EDE9FE' }]}>
+                  <Ionicons name="business-outline" size={16} color="#6D28D9" />
+                </View>
+                <Text style={[styles.menuTitle, { color: colors.ink }]}>Company Assignments</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={[styles.menuRow, { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               onPress={() => router.push('/(tasker)/(tabs)/earnings')}
