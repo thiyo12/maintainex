@@ -10,7 +10,6 @@ import { useAuth } from '../../../lib/auth'
 import type { TaskerProfile } from '../../../lib/types'
 import ProfileHeader from '../../../components/ProfileHeader'
 import { fonts } from '../../../lib/fonts'
-import OfferProgramSection from '../../../components/offers/OfferProgramSection'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
 
@@ -295,8 +294,6 @@ export default function TaskerProfile() {
             ))}
           </View>
         </Animated.View>
-
-        <OfferProgramSection variant="tasker" taskerId={user?.id} />
 
         <Animated.View style={[styles.card, { marginBottom: 24 }]}>
           <View style={styles.section}>
