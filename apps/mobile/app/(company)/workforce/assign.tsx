@@ -52,7 +52,7 @@ export default function AssignWorkerScreen() {
       const [teamData, assignmentsData, quotedJobs] = await Promise.all([
         v2Request<{ members: TeamMember[] }>(`/api/mobile/company/team?companyId=${companyId}`),
         v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${companyId}`),
-        v2Jobs.list('myQuotes=true'),
+        v2Jobs.list(`myQuotes=true&context=company&companyId=${encodeURIComponent(companyId)}`),
       ])
 
       const assignedJobIds = new Set(
