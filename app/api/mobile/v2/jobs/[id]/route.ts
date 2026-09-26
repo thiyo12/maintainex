@@ -50,7 +50,7 @@ export async function GET(
     if (!isOwner) {
       if (requestedContext === 'company') {
         readableCompanyIds = await getReadableCompanyIds(user.id)
-        const companyQuote = readableCompanyIds.length > 0
+        let companyQuote = readableCompanyIds.length > 0
           ? await prisma.jobQuote.findFirst({
               where: {
                 jobId: job.id,
@@ -60,6 +60,29 @@ export async function GET(
               orderBy: { createdAt: 'desc' },
             })
           : null
+
+        if (!companyQuote) {
+          const workerAssignment = await prisma.companyJobAssignment.findFirst({
+            where: {
+              jobId: job.id,
+              workerUserId: user.id,
+              status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+            },
+            orderBy: { assignedAt: 'desc' },
+            select: { companyId: true },
+          })
+          if (workerAssignment) {
+            companyQuote = await prisma.jobQuote.findFirst({
+              where: {
+                jobId: job.id,
+                providerType: 'COMPANY',
+                providerId: workerAssignment.companyId,
+                status: 'ACCEPTED',
+              },
+              orderBy: { createdAt: 'desc' },
+            })
+          }
+        }
 
         if (companyQuote && (job.status === 'OPEN' || companyQuote.status === 'ACCEPTED')) {
           providerContextId = companyQuote.providerId
@@ -110,7 +133,7 @@ export async function GET(
 
     const customer = await prisma.user.findUnique({
       where: { id: job.customerId },
-      select: { id: true, name: true, phone: true, email: true },
+      select: { id: true, name: true },
     })
 
     const quotes = isOwner
@@ -204,7 +227,7 @@ export async function GET(
           const [providerUser, profile] = await Promise.all([
             prisma.user.findUnique({
               where: { id: q.providerId },
-              select: { id: true, name: true, phone: true, email: true },
+              select: { id: true, name: true },
             }),
             prisma.taskerProfile.findUnique({
               where: { userId: q.providerId },
