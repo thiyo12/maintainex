@@ -52,7 +52,12 @@ beforeAll(async () => {
 
   const prov = await prisma.user.upsert({
     where: { email: `${TEST_PROVIDER}@test.com` },
-    update: {},
+    update: {
+      identityStatus: 'VERIFIED',
+      isActive: true,
+      isSuspended: false,
+      isBanned: false,
+    },
     create: {
       email: `${TEST_PROVIDER}@test.com`,
       passwordHash: 'dummy',
@@ -60,13 +65,19 @@ beforeAll(async () => {
       phone: '+94770000003',
       role: 'TASKER',
       countryCode: 'LK',
+      identityStatus: 'VERIFIED',
     },
   })
   providerId = prov.id
 
   const compUser = await prisma.user.upsert({
     where: { email: `${TEST_COMPANY_PROVIDER}@test.com` },
-    update: {},
+    update: {
+      identityStatus: 'VERIFIED',
+      isActive: true,
+      isSuspended: false,
+      isBanned: false,
+    },
     create: {
       email: `${TEST_COMPANY_PROVIDER}@test.com`,
       passwordHash: 'dummy',
@@ -74,6 +85,7 @@ beforeAll(async () => {
       phone: '+94770000004',
       role: 'COMPANY',
       countryCode: 'LK',
+      identityStatus: 'VERIFIED',
     },
   })
   companyUserId = compUser.id
