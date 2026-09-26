@@ -116,6 +116,12 @@ export async function reassignWorker(
 ): Promise<AssignmentResult> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
+  if (job.status === 'IN_PROGRESS') {
+    return { success: false, error: 'Cannot reassign after work has started. Raise a dispute or contact support.' }
+  }
+  if (job.status !== 'QUOTE_ACCEPTED') {
+    return { success: false, error: `Cannot reassign: job status is ${job.status}` }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -149,10 +155,11 @@ export async function reassignWorker(
       }, tx)
     }
 
-    await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
+    const claimed = await tx.marketplaceJob.updateMany({
+      where: { id: jobId, status: 'QUOTE_ACCEPTED' },
       data: { targetTaskerId: newWorkerUserId },
     })
+    if (claimed.count !== 1) throw new Error('Job state changed before reassignment')
 
     const newRecord = await tx.companyJobAssignment.create({
       data: {
@@ -255,7 +262,10 @@ export async function revokeAssignment(
   const assignment = await prisma.companyJobAssignment.findUnique({ where: { id: assignmentId } })
   if (!assignment) return { success: false, error: 'Assignment not found' }
   if (assignment.companyId !== companyId) return { success: false, error: 'Assignment does not belong to this company' }
-  if (!['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(assignment.status)) {
+  if (assignment.status === 'IN_PROGRESS') {
+    return { success: false, error: 'Cannot revoke an assignment after work has started. Raise a dispute or contact support.' }
+  }
+  if (!['ASSIGNED', 'ACCEPTED'].includes(assignment.status)) {
     return { success: false, error: `Cannot revoke: current status is ${assignment.status}` }
   }
 
