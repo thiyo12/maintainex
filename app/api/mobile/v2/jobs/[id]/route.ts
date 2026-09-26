@@ -323,11 +323,24 @@ export async function PATCH(
       return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
     }
 
-    if (!['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    if (!['OPEN', 'QUOTE_ACCEPTED'].includes(job.status)) {
       return NextResponse.json(
-        { error: 'Job cannot be updated in its current status' },
-        { status: 400 }
+        { error: 'Job details are locked after work starts' },
+        { status: 409 }
       )
+    }
+
+    if (job.status === 'QUOTE_ACCEPTED') {
+      const protectedEscrow = await prisma.jobEscrow.findFirst({
+        where: { jobId: id, status: 'PROTECTED' },
+        select: { id: true },
+      })
+      if (protectedEscrow) {
+        return NextResponse.json(
+          { error: 'Booking details are locked after payment is secured' },
+          { status: 409 }
+        )
+      }
     }
 
     const body = await request.json()
@@ -343,8 +356,19 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
+    if ('preferredTimeSlot' in data) {
+      const allowedSlots = ['morning', 'afternoon', 'evening', 'anytime', null]
+      if (!allowedSlots.includes(data.preferredTimeSlot)) {
+        return NextResponse.json({ error: 'Invalid preferredTimeSlot' }, { status: 400 })
+      }
+    }
+
     if (data.preferredDate) {
-      data.preferredDate = new Date(data.preferredDate)
+      const parsedDate = new Date(data.preferredDate)
+      if (Number.isNaN(parsedDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid preferredDate' }, { status: 400 })
+      }
+      data.preferredDate = parsedDate
     }
 
     const updated = await prisma.marketplaceJob.update({
