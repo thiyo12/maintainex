@@ -135,10 +135,15 @@ export default function CompanyProfile() {
   const name = profile?.companyName || profile?.name || t('profile.company')
   const initials = name ? (name.split(' ').map((s: string) => s[0]).join('').slice(0, 2) || '').toUpperCase() : 'CO'
   const services = profile?.services || []
-  const rating = profile?.rating || 0
-  const activeContracts = profile?.activeContracts || profile?.activeContractCount || 0
-  const teamMembers = profile?.teamMembers || profile?.teamCount || 0
-  const inBusiness = profile?.inBusiness || profile?.yearsInBusiness || '2yr'
+  const rating = Number(profile?.rating || 0)
+  const contracts = Array.isArray(profile?.recentContracts) ? profile.recentContracts : []
+  const activeContracts = contracts.filter((contract: any) =>
+    ['ACTIVE', 'IN_PROGRESS', 'In progress', 'active'].includes(contract.status)
+  ).length
+  const teamMembers = Array.isArray(profile?.teamMembers) ? profile.teamMembers.length : 0
+  const createdYear = profile?.createdAt ? new Date(profile.createdAt).getFullYear() : new Date().getFullYear()
+  const yearsInBusiness = Math.max(0, new Date().getFullYear() - createdYear)
+  const inBusiness = yearsInBusiness === 0 ? '<1yr' : `${yearsInBusiness}yr`
 
   if (loading) {
     return (
@@ -150,11 +155,17 @@ export default function CompanyProfile() {
     )
   }
 
-  const activeJobs = [
-    { icon: 'water-outline', title: t('company.sampleJob1'), sub: t('company.sampleJobSub1'), status: 'open' as const },
-    { icon: 'snow-outline', title: t('company.sampleJob2'), sub: t('company.sampleJobSub2'), status: 'progress' as const },
-    { icon: 'flash-outline', title: t('company.sampleJob3'), sub: t('company.sampleJobSub3'), status: 'done' as const },
-  ]
+  const activeJobs = contracts.map((contract: any) => ({
+    icon: 'briefcase-outline',
+    title: contract.title || t('jobs.contract'),
+    sub: contract.clientName || '',
+    status:
+      ['COMPLETED', 'done'].includes(contract.status)
+        ? 'done' as const
+        : ['IN_PROGRESS', 'In progress', 'active', 'ACTIVE'].includes(contract.status)
+          ? 'progress' as const
+          : 'open' as const,
+  }))
 
   const statusStyles: Record<string, { bg: string; text: string }> = {
     open: { bg: '#D1FAE5', text: '#059669' },
@@ -168,9 +179,7 @@ export default function CompanyProfile() {
     done: t('common.done'),
   }
 
-  const reviews = [
-    { initials: t('company.sampleReviewInitials'), name: t('company.sampleReviewName'), stars: 5, text: t('company.sampleReviewText') },
-  ]
+  const reviews: Array<{ initials: string; name: string; stars: number; text: string }> = []
 
   const verifications = [
     { icon: 'business-outline', title: t('company.verificationTitle1'), sub: t('company.verificationSub1'), done: true },
@@ -199,7 +208,7 @@ export default function CompanyProfile() {
 
         <Animated.View style={[styles.card, cardAnim]}>
           <View style={styles.statsRow}>
-            {[{ val: activeContracts || 86, lbl: t('profile.jobsPosted') }, { val: rating || '4.7', lbl: t('profile.rating') }, { val: teamMembers || 24, lbl: t('company.teamMembers') }, { val: inBusiness, lbl: t('company.inBusiness') }].map((s) => (
+            {[{ val: activeContracts, lbl: t('profile.jobsPosted') }, { val: rating.toFixed(1), lbl: t('profile.rating') }, { val: teamMembers, lbl: t('company.teamMembers') }, { val: inBusiness, lbl: t('company.inBusiness') }].map((s) => (
               <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
                 <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
@@ -266,7 +275,9 @@ export default function CompanyProfile() {
               <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
-            {reviews.map((rev, i) => (
+            {reviews.length === 0 ? (
+              <Text style={[styles.revText, { color: colors.muted }]}>No customer reviews yet.</Text>
+            ) : reviews.map((rev, i) => (
               <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
@@ -280,7 +291,7 @@ export default function CompanyProfile() {
                       ))}
                     </View>
                   </View>
-                  <Text style={[styles.revText, { color: colors.muted }]}>"{rev.text}"</Text>
+                  <Text style={[styles.revText, { color: colors.muted }]}>{rev.text}</Text>
                 </View>
               </View>
             ))}
