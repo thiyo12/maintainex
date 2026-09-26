@@ -146,18 +146,43 @@ export default function TaskerProfile() {
   const nickname = profile?.user?.nickname || user?.nickname || ''
   const initials = name.split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase() || 'T'
   const skills = profile?.skills || []
-  const rating = profile?.rating || 0
+  const serviceAreas = profile?.serviceAreas || []
+  const rating = Number(profile?.rating || 0)
   const completedJobs = profile?.completedJobs || 0
+  const completionRate = Math.max(0, Math.min(100, Number((profile as any)?.completionRate || 0)))
+  const avgResponseMin = Math.max(0, Math.round(Number((profile as any)?.avgResponseMin || 0)))
+  const reviews = Array.isArray((profile as any)?.reviews)
+    ? (profile as any).reviews.map((review: any) => {
+        const reviewerName = review.reviewerName || 'Customer'
+        const initials = reviewerName
+          .split(' ')
+          .map((part: string) => part[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase()
+        return {
+          initials,
+          name: reviewerName,
+          stars: Number(review.rating || 0),
+          text: review.comment || '',
+        }
+      })
+    : []
 
-  const reviews = [
-    { initials: 'PK', name: 'Priya K.', stars: 5, text: 'Fixed our wiring issue quickly and explained everything clearly. Highly recommend!' },
-    { initials: 'RJ', name: 'Ruwan J.', stars: 4, text: 'On time and professional. Slightly higher price but worth it.' },
-  ]
-
+  const identityDone = identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'
   const verifications = [
-    { icon: 'card-outline', title: 'National ID Verified', sub: 'Checked against NIC database', done: true },
-    { icon: 'ribbon-outline', title: 'Trade Certificate', sub: 'Vocational Training Authority', done: true },
-    { icon: 'shield-outline', title: 'Skill Test', sub: 'Take a quick assessment', done: false },
+    {
+      icon: 'card-outline',
+      title: 'Identity Verification',
+      sub: identityDone ? 'Identity approved by MaintainEX' : 'Complete identity verification to build customer trust',
+      done: identityDone,
+    },
+    {
+      icon: 'construct-outline',
+      title: 'Tasker Profile',
+      sub: profile?.isVerified ? 'Provider profile approved' : 'Profile approval is still pending',
+      done: !!profile?.isVerified,
+    },
   ] as const
 
   return (
@@ -167,7 +192,7 @@ export default function TaskerProfile() {
           initials={initials}
           name={name}
           nickname={nickname}
-          roleLabel={`Electrician · Colombo 6`}
+          roleLabel={`${skills[0] || 'Tasker'}${serviceAreas[0] ? ` · ${serviceAreas[0]}` : ''}`}
           variant="tasker"
           verified={identityStatus === 'APPROVED' || identityStatus === 'VERIFIED'}
           onEdit={() => router.push('/(tasker)/settings/edit-profile')}
@@ -176,7 +201,12 @@ export default function TaskerProfile() {
 
         <Animated.View style={[styles.card, cardAnim]}>
           <View style={styles.statsRow}>
-            {[{ val: completedJobs, lbl: t('tasker.jobsDone') }, { val: rating.toFixed(1), lbl: t('tasker.rating') }, { val: '98%', lbl: t('tasker.active') }, { val: '3yr', lbl: t('profile.experience') }].map((s) => (
+            {[
+              { val: completedJobs, lbl: t('tasker.jobsDone') },
+              { val: rating.toFixed(1), lbl: t('tasker.rating') },
+              { val: `${completionRate}%`, lbl: 'Completion' },
+              { val: avgResponseMin > 0 ? `${avgResponseMin}m` : '—', lbl: 'Response' },
+            ].map((s) => (
               <Animated.View key={s.lbl} style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
                 <Text style={[styles.statValue, { color: colors.ink }]}>{s.val}</Text>
                 <Text style={[styles.statLabel, { color: colors.muted }]}>{s.lbl}</Text>
@@ -198,14 +228,7 @@ export default function TaskerProfile() {
                   <Text style={[styles.chipText, { color: colors.amberDark }]}>{s}</Text>
                 </Animated.View>
               )) : (
-                <>
-                  {[{ icon: 'flash-outline', label: 'Wiring' }, { icon: 'bulb-outline', label: 'Lighting' }, { icon: 'power-outline', label: 'Inverters' }, { icon: 'flash-outline', label: 'Wiring Repairs' }].map((s) => (
-                    <Animated.View key={s.label} style={[styles.chip, { backgroundColor: colors.amberBg }, popIns[popInIdx++]]}>
-                      <Ionicons name={s.icon as any} size={12} color={colors.amberDark} />
-                      <Text style={[styles.chipText, { color: colors.amberDark }]}>{s.label}</Text>
-                    </Animated.View>
-                  ))}
-                </>
+                <Text style={[styles.revText, { color: colors.muted }]}>No services added yet.</Text>
               )}
             </View>
           </View>
@@ -217,13 +240,7 @@ export default function TaskerProfile() {
               <Ionicons name="images-outline" size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.yourSkills')}</Text>
             </View>
-            <View style={styles.portGrid}>
-              {[1, 2, 3].map((i) => (
-                <Animated.View key={i} style={[styles.portItem, { backgroundColor: colors.surface, borderColor: colors.border }, popIns[popInIdx++]]}>
-                  <Ionicons name="image-outline" size={22} color={colors.muted} />
-                </Animated.View>
-              ))}
-            </View>
+            <Text style={[styles.revText, { color: colors.muted }]}>No portfolio photos added yet.</Text>
           </View>
         </Animated.View>
 
@@ -233,7 +250,9 @@ export default function TaskerProfile() {
               <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.amberDark} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.reviews')}</Text>
             </View>
-            {reviews.map((rev, i) => (
+            {reviews.length === 0 ? (
+              <Text style={[styles.revText, { color: colors.muted }]}>No customer reviews yet.</Text>
+            ) : reviews.map((rev: any, i: number) => (
               <View key={i} style={[styles.revItem, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
                 <View style={[styles.revAvt, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.revAvtText, { color: colors.ink }]}>{rev.initials}</Text>
@@ -247,7 +266,7 @@ export default function TaskerProfile() {
                       ))}
                     </View>
                   </View>
-                  <Text style={[styles.revText, { color: colors.muted }]}>"{rev.text}"</Text>
+                  <Text style={[styles.revText, { color: colors.muted }]}>{rev.text || 'No written comment.'}</Text>
                 </View>
               </View>
             ))}
