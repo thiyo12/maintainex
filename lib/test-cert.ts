@@ -2,7 +2,8 @@
  * Beta and interactive certification test account utilities.
  *
  * 000000 is never accepted for ordinary users. Interactive demo accounts and
- * beta certification accounts are enabled only when ALLOW_TEST_OTP=true.
+ * beta certification accounts are enabled only when ALLOW_TEST_OTP=true
+ * outside production. Public production can never accept the test code.
  */
 
 export const CERT_TAG = 'BETA_CERT_2026_09'
@@ -15,12 +16,16 @@ export const INTERACTIVE_TEST_PHONES = {
 
 export type InteractiveTestRole = keyof typeof INTERACTIVE_TEST_PHONES
 
+function testOtpEnabled(): boolean {
+  return process.env.ALLOW_TEST_OTP === 'true' && process.env.NODE_ENV !== 'production'
+}
+
 function normalizedPhone(value?: string | null): string {
   return (value || '').replace(/\D/g, '')
 }
 
 export function getInteractiveTestRole(phone?: string | null): InteractiveTestRole | null {
-  if (process.env.ALLOW_TEST_OTP !== 'true') return null
+  if (!testOtpEnabled()) return null
   const digits = normalizedPhone(phone)
   for (const [role, value] of Object.entries(INTERACTIVE_TEST_PHONES) as Array<[InteractiveTestRole, string]>) {
     if (normalizedPhone(value) === digits) return role
@@ -33,7 +38,7 @@ export function isInteractiveTestPhone(phone?: string | null): boolean {
 }
 
 export function isSyntheticCertAccount(user: { email?: string | null; phone?: string | null; name?: string | null }): boolean {
-  if (process.env.ALLOW_TEST_OTP !== 'true') return false
+  if (!testOtpEnabled()) return false
 
   if (isInteractiveTestPhone(user.phone)) return true
 
