@@ -1,66 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = await authenticateRequest(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const blocked = assertNotSuspended(user)
-    if (blocked) return blocked
-
-    const { jobId, taskerId, date, timeSlot, address, district, notes, budgetMin, budgetMax } = await request.json()
-
-    if (!jobId || !taskerId || !date || !timeSlot || !address || !district) {
-      return NextResponse.json({ error: 'Missing required fields: jobId, taskerId, date, timeSlot, address, district' }, { status: 400 })
-    }
-
-    const templateJob = await prisma.templateJob.findUnique({ where: { id: jobId } })
-    if (!templateJob) {
-      return NextResponse.json({ error: 'Template job not found' }, { status: 404 })
-    }
-
-    const tasker = await prisma.taskerProfile.findUnique({ where: { id: taskerId } })
-    if (!tasker) {
-      return NextResponse.json({ error: 'Tasker not found' }, { status: 404 })
-    }
-
-    const totalPrice = templateJob.priceMax
-
-    const booking = await prisma.booking.create({
-      data: {
-        userId: user.id,
-        taskerId,
-        templateJobId: jobId,
-        name: user.name || user.email,
-        phone: user.phone || '',
-        district,
-        address,
-        date: new Date(date),
-        timeSlot,
-        totalPrice,
-        budgetMin: budgetMin ? parseFloat(budgetMin) : null,
-        budgetMax: budgetMax ? parseFloat(budgetMax) : null,
-        status: 'PENDING',
-        notes: notes || null,
-      },
-    })
-
-    return NextResponse.json({
-      id: booking.id,
-      jobId,
-      taskerId,
-      customerId: user.id,
-      date: booking.date.toISOString(),
-      timeSlot: booking.timeSlot,
-      status: booking.status,
-      totalPrice: booking.totalPrice,
-      createdAt: booking.createdAt.toISOString(),
-    })
-  } catch (error) {
-    console.error('Quick booking error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
-  }
+export async function POST(_request: NextRequest) {
+  return NextResponse.json(
+    {
+      error: 'Legacy quick booking is disabled. Create a marketplace job through /api/mobile/v2/jobs.',
+      code: 'LEGACY_BOOKING_DISABLED',
+    },
+    { status: 410 }
+  )
 }
