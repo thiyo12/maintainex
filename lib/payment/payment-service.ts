@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
+import { notifyEscrowDeposited } from '@/lib/notifications'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/money'
 import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, parsePayHereAmount, type PayHereNotification } from './payhere-adapter'
 
@@ -359,7 +360,7 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
   const escrowCurrency = escrow.currency as Currency
   const totalAmount = escrow.totalAmount ?? escrow.amount
 
-  return prisma.$transaction(async (tx) => {
+  const transition = await prisma.$transaction(async (tx) => {
     const lockedJobs = await tx.$queryRaw<{ id: string; customerId: string; status: string }[]>`
       SELECT id, "customerId", status
       FROM "MarketplaceJob"
@@ -398,7 +399,7 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
           },
         })
       }
-      return { success: true }
+      return { success: true, newlyProtected: false }
     }
 
     const claimed = await tx.paymentIntent.updateMany({
@@ -454,8 +455,37 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
       },
     })
 
-    return { success: true }
+    return { success: true, newlyProtected: true }
   })
+
+  if (transition.newlyProtected) {
+    const [job, acceptedQuote] = await Promise.all([
+      prisma.marketplaceJob.findUnique({
+        where: { id: paymentIntent.jobId },
+        select: { title: true },
+      }),
+      prisma.jobQuote.findFirst({
+        where: { jobId: paymentIntent.jobId, status: 'ACCEPTED' },
+        select: { providerId: true, providerType: true },
+      }),
+    ])
+
+    if (job && acceptedQuote) {
+      const providerUserId =
+        acceptedQuote.providerType === 'INDIVIDUAL'
+          ? acceptedQuote.providerId
+          : (await prisma.companyProfile.findUnique({
+              where: { id: acceptedQuote.providerId },
+              select: { userId: true },
+            }))?.userId
+
+      if (providerUserId) {
+        await notifyEscrowDeposited(paymentIntent.jobId, providerUserId, job.title)
+      }
+    }
+  }
+
+  return { success: transition.success }
 }
 
 export async function processPaymentFailure(notification: PayHereNotification): Promise<{ success: boolean; error?: string }> {
