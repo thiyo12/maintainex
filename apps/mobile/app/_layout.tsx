@@ -60,6 +60,11 @@ function NotificationBootstrap() {
       const referenceId = data.referenceId as string | undefined
       if (!referenceType || !referenceId) return
 
+      if (referenceType === 'COMPANY_JOB') {
+        router.push(`/(company)/jobs/v2/manage/${referenceId}` as any)
+        return
+      }
+
       if (referenceType === 'JOB' || referenceType === 'QUOTE') {
         if (user.role === 'TASKER') {
           router.push(`/(tasker)/jobs/v2/manage/${referenceId}` as any)
