@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Share,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -17,7 +17,7 @@ export default function InviteTeamMember() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [role, setRole] = useState('MEMBER')
+  const [role, setRole] = useState('WORKER')
   const [sending, setSending] = useState(false)
 
   const handleSend = async () => {
@@ -31,15 +31,32 @@ export default function InviteTeamMember() {
     }
     setSending(true)
     try {
-      await v2Team.invite({
+      const result = await v2Team.invite({
         name,
         email: email || undefined,
         phone: phone || undefined,
         role,
       })
-      Alert.alert(t('common.success'), t('common.success'), [
-        { text: t('common.ok'), onPress: () => router.back() },
-      ])
+      const token = result.invite?.token
+      const inviteLink = token ? `maintainex://company-invite?token=${encodeURIComponent(token)}` : null
+
+      Alert.alert(
+        t('common.success'),
+        inviteLink
+          ? 'Invitation created. Share the secure invite link with this team member.'
+          : 'Invitation created.',
+        [
+          ...(inviteLink ? [{
+            text: 'Share Invite',
+            onPress: () => {
+              Share.share({
+                message: `You have been invited to join our MaintainEX company team. Open this link after installing MaintainEX: ${inviteLink}`,
+              }).catch(() => {})
+            },
+          }] : []),
+          { text: t('common.done'), onPress: () => router.back() },
+        ]
+      )
     } catch (err: any) {
       Alert.alert(t('common.error'), err.message || t('errors.generic'))
     } finally {
@@ -90,18 +107,22 @@ export default function InviteTeamMember() {
 
       <Text style={styles.label}>{t('profile.role')}</Text>
       <View style={styles.roleRow}>
-        <TouchableOpacity
-          style={[styles.rolePill, role === 'MEMBER' && styles.rolePillActive]}
-          onPress={() => setRole('MEMBER')}
-        >
-            <Text style={[styles.roleText, role === 'MEMBER' && styles.roleTextActive]}>{t('team.memberRole')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.rolePill, role === 'ADMIN' && styles.rolePillActive]}
-          onPress={() => setRole('ADMIN')}
-        >
-          <Text style={[styles.roleText, role === 'ADMIN' && styles.roleTextActive]}>{t('team.adminRole')}</Text>
-        </TouchableOpacity>
+        {[
+          { id: 'WORKER', label: 'Worker' },
+          { id: 'DISPATCHER', label: 'Dispatcher' },
+          { id: 'MANAGER', label: 'Manager' },
+          { id: 'FINANCE', label: 'Finance' },
+        ].map((option) => (
+          <TouchableOpacity
+            key={option.id}
+            style={[styles.rolePill, role === option.id && styles.rolePillActive]}
+            onPress={() => setRole(option.id)}
+          >
+            <Text style={[styles.roleText, role === option.id && styles.roleTextActive]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <TouchableOpacity
@@ -134,7 +155,7 @@ const makeStyles = (colors: any) => StyleSheet.create({
     fontFamily: fonts.body, color: colors.ink, marginBottom: 16,
     borderWidth: 1, borderColor: colors.border,
   },
-  roleRow: { flexDirection: 'row', gap: 10, marginBottom: 32 },
+  roleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 32 },
   rolePill: {
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12,
     backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.border,
