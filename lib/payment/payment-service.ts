@@ -1,5 +1,4 @@
 import crypto from 'crypto'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
@@ -32,31 +31,16 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     return { success: false, error: 'Payment gateway not configured', code: 'PAYHERE_NOT_CONFIGURED' }
   }
 
-  const [job, user] = await Promise.all([
-    prisma.marketplaceJob.findUnique({ where: { id: jobId } }),
-    prisma.user.findUnique({
-      where: { id: customerId },
-      select: { name: true, email: true, phone: true },
-    }),
-  ])
-
-  if (!job) return { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' }
-  if (job.customerId !== customerId) return { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' }
-  if (job.status !== 'QUOTE_ACCEPTED') {
-    return { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' }
-  }
+  const user = await prisma.user.findUnique({
+    where: { id: customerId },
+    select: { name: true, email: true, phone: true },
+  })
   if (!user?.email || !user?.phone) {
     return {
       success: false,
       error: 'A verified email and phone number are required before card payment',
       code: 'CUSTOMER_PAYMENT_DETAILS_REQUIRED',
     }
-  }
-
-  const escrow = await prisma.jobEscrow.findFirst({ where: { jobId } })
-  if (!escrow) return { success: false, error: 'Escrow not initialized', code: 'ESCROW_NOT_INITIALIZED' }
-  if (escrow.status !== 'PENDING_PAYMENT') {
-    return { success: false, error: 'Escrow is not awaiting payment', code: 'ESCROW_NOT_FUNDABLE' }
   }
 
   const buildResult = (intent: { id: string; merchantOrderId: string }): PaymentResult => ({
@@ -66,46 +50,92 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     merchantOrderId: intent.merchantOrderId,
   })
 
-  const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
-  await prisma.paymentIntent.updateMany({
-    where: {
-      jobId,
-      status: { in: ['CREATED', 'PENDING'] },
-      createdAt: { lt: expiryCutoff },
-    },
-    data: { status: 'EXPIRED' },
-  })
+  type IntentDecision = {
+    intent: { id: string; merchantOrderId: string } | null
+    failure: PaymentResult | null
+  }
 
-  const existingPending = await prisma.paymentIntent.findFirst({
-    where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
-  })
-  if (existingPending) return buildResult(existingPending)
+  const decision: IntentDecision = await prisma.$transaction(async (tx) => {
+    const lockedJobs = await tx.$queryRaw<{ id: string; customerId: string; status: string }[]>`
+      SELECT id, "customerId", status
+      FROM "MarketplaceJob"
+      WHERE id = ${jobId}
+      FOR UPDATE
+    `
+    const job = lockedJobs[0]
+    if (!job) {
+      return {
+        intent: null,
+        failure: { success: false, error: 'Job not found', code: 'JOB_NOT_FOUND' },
+      }
+    }
+    if (job.customerId !== customerId) {
+      return {
+        intent: null,
+        failure: { success: false, error: 'Unauthorized', code: 'UNAUTHORIZED' },
+      }
+    }
+    if (job.status !== 'QUOTE_ACCEPTED') {
+      return {
+        intent: null,
+        failure: { success: false, error: 'Job is not payable', code: 'JOB_NOT_PAYABLE' },
+      }
+    }
 
-  const merchantOrderId = generateMerchantOrderId(jobId)
-  const totalAmount = escrow.totalAmount ?? escrow.amount
+    const escrow = await tx.jobEscrow.findFirst({ where: { jobId } })
+    if (!escrow) {
+      return {
+        intent: null,
+        failure: { success: false, error: 'Escrow not initialized', code: 'ESCROW_NOT_INITIALIZED' },
+      }
+    }
+    if (escrow.status !== 'PENDING_PAYMENT') {
+      return {
+        intent: null,
+        failure: { success: false, error: 'Escrow is not awaiting payment', code: 'ESCROW_NOT_FUNDABLE' },
+      }
+    }
 
-  try {
-    const paymentIntent = await prisma.paymentIntent.create({
+    const expiryCutoff = new Date(Date.now() - 30 * 60 * 1000)
+    await tx.paymentIntent.updateMany({
+      where: {
+        jobId,
+        status: { in: ['CREATED', 'PENDING'] },
+        createdAt: { lt: expiryCutoff },
+      },
+      data: { status: 'EXPIRED' },
+    })
+
+    const existingPending = await tx.paymentIntent.findFirst({
+      where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
+      select: { id: true, merchantOrderId: true },
+    })
+    if (existingPending) {
+      return { intent: existingPending, failure: null }
+    }
+
+    const totalAmount = escrow.totalAmount ?? escrow.amount
+    const paymentIntent = await tx.paymentIntent.create({
       data: {
         jobId,
         customerId,
         escrowId: escrow.id,
-        merchantOrderId,
+        merchantOrderId: generateMerchantOrderId(jobId),
         amount: totalAmount,
         currency: (escrow.currency || 'LKR') as Currency,
         status: 'CREATED',
       },
+      select: { id: true, merchantOrderId: true },
     })
-    return buildResult(paymentIntent)
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const winner = await prisma.paymentIntent.findFirst({
-        where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
-      })
-      if (winner) return buildResult(winner)
-    }
-    throw error
+
+    return { intent: paymentIntent, failure: null }
+  })
+
+  if (decision.failure) return decision.failure
+  if (!decision.intent) {
+    return { success: false, error: 'Could not create payment session', code: 'PAYMENT_INTENT_FAILED' }
   }
+  return buildResult(decision.intent)
 }
 
 function checkoutToken(intentId: string, secret: string): string {
