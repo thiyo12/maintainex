@@ -91,8 +91,19 @@ export async function POST(
           return NextResponse.json({ error: 'Only the assigned provider can review' }, { status: 403 })
         }
       } else {
-        const { error } = await resolveCompanyContext(user.id, quote.providerId, 'quotes:read')
-        if (error) return NextResponse.json({ error: 'Only the accepted company can review' }, { status: 403 })
+        const assignment = await prisma.companyJobAssignment.findFirst({
+          where: {
+            jobId: job.id,
+            companyId: quote.providerId,
+            workerUserId: user.id,
+            status: 'COMPLETED',
+          },
+          select: { id: true },
+        })
+        if (!assignment) {
+          const { error } = await resolveCompanyContext(user.id, quote.providerId, 'quotes:read')
+          if (error) return NextResponse.json({ error: 'Only the accepted company or assigned worker can review' }, { status: 403 })
+        }
       }
 
       const canonicalProviderId = quote.providerId
@@ -150,8 +161,21 @@ export async function GET(
     if (!canRead && acceptedQuote?.providerType === 'INDIVIDUAL') {
       canRead = acceptedQuote.providerId === user.id
     } else if (!canRead && acceptedQuote?.providerType === 'COMPANY') {
-      const companyAccess = await resolveCompanyContext(user.id, acceptedQuote.providerId, 'quotes:read')
-      canRead = !companyAccess.error
+      const assignment = await prisma.companyJobAssignment.findFirst({
+        where: {
+          jobId: id,
+          companyId: acceptedQuote.providerId,
+          workerUserId: user.id,
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+        },
+        select: { id: true },
+      })
+      if (assignment) {
+        canRead = true
+      } else {
+        const companyAccess = await resolveCompanyContext(user.id, acceptedQuote.providerId, 'quotes:read')
+        canRead = !companyAccess.error
+      }
     }
 
     if (!canRead) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
