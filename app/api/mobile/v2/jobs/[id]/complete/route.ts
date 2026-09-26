@@ -198,7 +198,16 @@ export async function POST(
     ) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
-    if (message.includes('Only the customer')) {
+    if (
+      message.includes('Only the customer') ||
+      message.includes('Only the accepted provider') ||
+      message.includes('Only an authorized company manager') ||
+      message.includes('Only the assigned worker') ||
+      message.includes('assigned worker or an authorized company manager') ||
+      message.includes('Actor is not a participant') ||
+      message.includes('Unauthorized:') ||
+      message.includes('not authorized')
+    ) {
       return NextResponse.json({ error: message }, { status: 403 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
