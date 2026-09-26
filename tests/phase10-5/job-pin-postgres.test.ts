@@ -77,7 +77,7 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
         name: 'PG Provider',
         phone: `+9477900${String(TS).slice(-4)}3`,
         role: 'TASKER',
-        countryCode: 'LK',
+        countryCode: 'LK', identityStatus: 'VERIFIED',
       },
     })
     providerId = prov.id
