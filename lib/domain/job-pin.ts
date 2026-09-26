@@ -439,6 +439,25 @@ async function resolvePinVerifierTx(
   jobId: string,
   userId: string
 ): Promise<'INDIVIDUAL' | 'COMPANY' | 'ASSIGNED_WORKER' | null> {
+  const actor = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      isActive: true,
+      isSuspended: true,
+      isBanned: true,
+      identityStatus: true,
+    },
+  })
+  if (
+    !actor ||
+    !actor.isActive ||
+    actor.isSuspended ||
+    actor.isBanned ||
+    actor.identityStatus !== 'VERIFIED'
+  ) {
+    return null
+  }
+
   const acceptedQuote = await tx.jobQuote.findFirst({
     where: { jobId, status: 'ACCEPTED' },
     select: { providerId: true, providerType: true },
@@ -450,16 +469,26 @@ async function resolvePinVerifierTx(
   }
 
   if (acceptedQuote.providerType === 'COMPANY') {
-    const assignment = await tx.companyJobAssignment.findFirst({
-      where: {
-        jobId,
-        workerUserId: userId,
-        companyId: acceptedQuote.providerId,
-        status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
-      },
-      select: { id: true },
-    })
-    if (!assignment) return null
+    const [assignment, membership] = await Promise.all([
+      tx.companyJobAssignment.findFirst({
+        where: {
+          jobId,
+          workerUserId: userId,
+          companyId: acceptedQuote.providerId,
+          status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+        },
+        select: { id: true },
+      }),
+      tx.teamMember.findFirst({
+        where: {
+          companyId: acceptedQuote.providerId,
+          userId,
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      }),
+    ])
+    if (!assignment || !membership) return null
 
     const companyProfile = await tx.companyProfile.findFirst({
       where: { userId, id: acceptedQuote.providerId },
