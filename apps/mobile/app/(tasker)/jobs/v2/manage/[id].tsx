@@ -370,6 +370,18 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.verifyPinText}>Start Work with PIN</Text>
                 </TouchableOpacity>
               )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="time-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Waiting for the customer to generate the one-time arrival PIN.</Text>
+                </View>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="time-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Arrival is confirmed. Waiting for the customer to generate a fresh Start Work PIN.</Text>
+                </View>
+              )}
               {workspace.progressStatus === 'ACCEPTED' && escrow?.status !== 'PROTECTED' && (
                 <View style={styles.waitingCard}>
                   <Ionicons name="lock-closed-outline" size={20} color={colors.amberDark} />
