@@ -171,15 +171,19 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(fundedJob?.status).toBe('QUOTE_ACCEPTED')
 
     const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
-    const pinResult = await generateJobPin(bookResult.job.id, customerUserId)
-    expect(pinResult.pin).toMatch(/^\d{6}$/)
+    const arrivalPin = await generateJobPin(bookResult.job.id, customerUserId)
+    expect(arrivalPin.pin).toMatch(/^\d{6}$/)
 
     const wsAfterPin = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
     expect(wsAfterPin?.progressStatus).toBe('ACCEPTED')
 
-    const arrival = await verifyJobPin(bookResult.job.id, individualProviderUserId, pinResult.pin, 'ARRIVAL')
+    const arrival = await verifyJobPin(bookResult.job.id, individualProviderUserId, arrivalPin.pin, 'ARRIVAL')
     expect(arrival.valid).toBe(true)
-    const workStart = await verifyJobPin(bookResult.job.id, individualProviderUserId, pinResult.pin, 'WORK_START')
+    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, arrivalPin.pin, 'WORK_START')).valid).toBe(false)
+
+    const startPin = await generateJobPin(bookResult.job.id, customerUserId)
+    expect(startPin.version).toBe(arrivalPin.version + 1)
+    const workStart = await verifyJobPin(bookResult.job.id, individualProviderUserId, startPin.pin, 'WORK_START')
     expect(workStart.valid).toBe(true)
 
     const wsAfterStart = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
@@ -306,12 +310,15 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(fundedJob?.status).toBe('QUOTE_ACCEPTED')
 
     const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
-    const pinResult = await generateJobPin(bookResult.job.id, customerUserId)
-    expect(pinResult.pin).toMatch(/^\d{6}$/)
+    const arrivalPin = await generateJobPin(bookResult.job.id, customerUserId)
+    expect(arrivalPin.pin).toMatch(/^\d{6}$/)
 
-    const arrival = await verifyJobPin(bookResult.job.id, companyUserId, pinResult.pin, 'ARRIVAL')
+    const arrival = await verifyJobPin(bookResult.job.id, companyUserId, arrivalPin.pin, 'ARRIVAL')
     expect(arrival.valid).toBe(true)
-    const workStart = await verifyJobPin(bookResult.job.id, companyUserId, pinResult.pin, 'WORK_START')
+    expect((await verifyJobPin(bookResult.job.id, companyUserId, arrivalPin.pin, 'WORK_START')).valid).toBe(false)
+
+    const startPin = await generateJobPin(bookResult.job.id, customerUserId)
+    const workStart = await verifyJobPin(bookResult.job.id, companyUserId, startPin.pin, 'WORK_START')
     expect(workStart.valid).toBe(true)
 
     const wsAfterPin = await prisma.jobWorkspace.findUnique({ where: { jobId: bookResult.job.id } })
@@ -387,9 +394,10 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     await fundEscrow({ jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' }, bookResult.job.id)
 
     const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
-    const { pin } = await generateJobPin(bookResult.job.id, customerUserId)
-    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, pin, 'ARRIVAL')).valid).toBe(true)
-    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, pin, 'WORK_START')).valid).toBe(true)
+    const arrivalPin = await generateJobPin(bookResult.job.id, customerUserId)
+    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, arrivalPin.pin, 'ARRIVAL')).valid).toBe(true)
+    const startPin = await generateJobPin(bookResult.job.id, customerUserId)
+    expect((await verifyJobPin(bookResult.job.id, individualProviderUserId, startPin.pin, 'WORK_START')).valid).toBe(true)
 
     const holdResult = await holdEscrowForDispute(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
