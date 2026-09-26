@@ -106,6 +106,8 @@ export default function V2SubmitQuoteScreen() {
 
   if (!job) return null
 
+  const currencyCode = job.countryCode === 'CA' ? 'CAD' : 'LKR'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -115,7 +117,7 @@ export default function V2SubmitQuoteScreen() {
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
-            <Text style={styles.previewBudget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={styles.previewBudget}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={styles.previewType}>{job.budgetType}</Text>
           </View>
         </View>
@@ -153,7 +155,7 @@ export default function V2SubmitQuoteScreen() {
             {job.smartBooking.estimatedPriceMin != null ? (
               <View style={styles.smartRow}>
                 <Text style={styles.smartLabel}>Est. budget</Text>
-                <Text style={styles.smartValue}>LKR {job.smartBooking.estimatedPriceMin.toLocaleString()} – {job.smartBooking.estimatedPriceMax?.toLocaleString?.() ?? ''}</Text>
+                <Text style={styles.smartValue}>{currencyCode} {job.smartBooking.estimatedPriceMin.toLocaleString()} – {job.smartBooking.estimatedPriceMax?.toLocaleString?.() ?? ''}</Text>
               </View>
             ) : null}
             <View style={styles.smartRow}>
@@ -210,9 +212,9 @@ export default function V2SubmitQuoteScreen() {
               {existingQuote ? 'Update the price or timing agreed in chat. The previous quote will be superseded.' : 'Submit this quote as your individual provider profile.'}
             </Text>
 
-            <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
+            <Text style={styles.label}>{t('quotes.price')} ({currencyCode}) *</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.currencySign}>LKR</Text>
+              <Text style={styles.currencySign}>{currencyCode}</Text>
               <TextInput
                 style={[styles.input, styles.priceInput]}
                 value={price}
