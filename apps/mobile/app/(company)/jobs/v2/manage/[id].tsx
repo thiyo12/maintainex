@@ -218,7 +218,7 @@ export default function CompanyManageJobScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('company.manageJob')}</Text>
           <View style={styles.actions}>
-            {canStart && !pinState?.arrivalVerifiedAt && (
+            {canStart && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
               <TouchableOpacity
                 style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
                 onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
@@ -228,7 +228,7 @@ export default function CompanyManageJobScreen() {
                 <Text style={styles.actionBtnText}>Verify Arrival PIN</Text>
               </TouchableOpacity>
             )}
-            {canStart && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+            {canStart && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
               <TouchableOpacity
                 style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
                 onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
@@ -237,6 +237,18 @@ export default function CompanyManageJobScreen() {
                 <Ionicons name="play" size={18} color="#111827" />
                 <Text style={styles.actionBtnText}>Start Work with PIN</Text>
               </TouchableOpacity>
+            )}
+            {canStart && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Waiting for Arrival PIN</Text>
+                <Text style={styles.emptyDesc}>The customer must generate a one-time arrival PIN before you can verify arrival.</Text>
+              </View>
+            )}
+            {canStart && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Waiting for Start Work PIN</Text>
+                <Text style={styles.emptyDesc}>Arrival is confirmed. The customer must generate a fresh one-time PIN before work can start.</Text>
+              </View>
             )}
             {canComplete && (
               <TouchableOpacity
