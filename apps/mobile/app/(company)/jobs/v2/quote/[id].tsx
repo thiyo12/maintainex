@@ -102,6 +102,8 @@ export default function CompanySubmitQuoteScreen() {
 
   if (!job) return null
 
+  const currencyCode = job.countryCode === 'CA' ? 'CAD' : 'LKR'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -120,7 +122,7 @@ export default function CompanySubmitQuoteScreen() {
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
-            <Text style={styles.previewBudget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={styles.previewBudget}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={styles.previewType}>{job.budgetType}</Text>
           </View>
         </View>
@@ -134,9 +136,9 @@ export default function CompanySubmitQuoteScreen() {
             {existingQuote ? 'Update the negotiated price or timing. The previous quote will be superseded.' : 'This quote will be submitted under your company profile.'}
           </Text>
 
-          <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
+          <Text style={styles.label}>{t('quotes.price')} ({currencyCode}) *</Text>
           <View style={styles.priceInputRow}>
-            <Text style={styles.currencySign}>LKR</Text>
+            <Text style={styles.currencySign}>{currencyCode}</Text>
             <TextInput
               style={[styles.input, styles.priceInput]}
               value={price}
