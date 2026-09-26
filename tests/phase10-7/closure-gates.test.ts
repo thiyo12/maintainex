@@ -139,6 +139,7 @@ afterAll(async () => {
     { customerId: { in: testUserIds } },
   ] } })
   const jids = [dataIds.jobAId, dataIds.jobBId].filter(Boolean)
+  if (jids.length) await prisma.jobEscrow.deleteMany({ where: { jobId: { in: jids } } })
   if (jids.length) await prisma.jobQuote.deleteMany({ where: { jobId: { in: jids } } })
   if (jids.length) await prisma.marketplaceJob.deleteMany({ where: { id: { in: jids } } })
   const cids = [dataIds.companyAId, dataIds.companyBId].filter(Boolean)
@@ -449,26 +450,65 @@ describe('Gate 10: Reassignment Auth Revocation', () => {
 // Gate 11: Job PIN Workforce Authorization
 // ──────────────────────────────────────────────
 describe('Gate 11: Job PIN Workforce Authorization', () => {
-  it('Assigned worker resolves as ASSIGNED_WORKER verifier type', async () => {
-    await clearJobAssignments(dataIds.jobAId)
+  it('Assigned worker follows protected ARRIVAL → fresh WORK_START PIN lifecycle', async () => {
+    await resetJob(dataIds.jobAId)
     await prisma.jobVerificationPin.deleteMany({ where: { jobId: dataIds.jobAId } })
+    await prisma.jobEscrow.deleteMany({ where: { jobId: dataIds.jobAId } })
 
-    const { createAssignment } = await import('@/lib/domain/company-job-assignment')
+    const { createAssignment, workerAcceptAssignment } = await import('@/lib/domain/company-job-assignment')
     const { verifyJobPin, generateJobPin } = await import('@/lib/domain/job-pin')
 
-    const a = await createAssignment({ companyId: dataIds.companyAId, jobId: dataIds.jobAId, workerUserId: ids.workerA, assignedByUserId: ids.ownerA, actorRole: 'COMPANY_OWNER' })
+    const quote = await prisma.jobQuote.findFirst({
+      where: { jobId: dataIds.jobAId, providerId: dataIds.companyAId, status: 'ACCEPTED' },
+    })
+    expect(quote).toBeTruthy()
+
+    await prisma.jobEscrow.create({
+      data: {
+        jobId: dataIds.jobAId,
+        quoteId: quote!.id,
+        customerId: ids.customer,
+        providerId: dataIds.companyAId,
+        amount: quote!.price,
+        serviceFee: 0n,
+        totalAmount: quote!.price,
+        currency: 'LKR',
+        paymentMethod: 'CARD',
+        status: 'PROTECTED',
+        heldAt: new Date(),
+      },
+    })
+
+    const a = await createAssignment({
+      companyId: dataIds.companyAId,
+      jobId: dataIds.jobAId,
+      workerUserId: ids.workerA,
+      assignedByUserId: ids.ownerA,
+      actorRole: 'COMPANY_OWNER',
+    })
     expect(a.success).toBe(true)
+    expect((await workerAcceptAssignment(a.assignmentId!, ids.workerA)).success).toBe(true)
 
-    const pinResult = await generateJobPin(dataIds.jobAId, ids.customer)
-    const pin = pinResult.pin
+    const arrivalPin = await generateJobPin(dataIds.jobAId, ids.customer)
+    const arrival = await verifyJobPin(dataIds.jobAId, ids.workerA, arrivalPin.pin, 'ARRIVAL')
+    expect(arrival.valid).toBe(true)
 
-    await prisma.marketplaceJob.update({ where: { id: dataIds.jobAId }, data: { status: 'IN_PROGRESS' } })
-    await prisma.jobWorkspace.upsert({ where: { jobId: dataIds.jobAId }, create: { jobId: dataIds.jobAId, progressStatus: 'ACCEPTED' }, update: { progressStatus: 'ACCEPTED' } })
+    const startPin = await generateJobPin(dataIds.jobAId, ids.customer)
+    expect(startPin.version).toBeGreaterThan(arrivalPin.version)
 
-    const result = await verifyJobPin(dataIds.jobAId, ids.workerA, pin, 'ARRIVAL')
-    expect(result.valid).toBe(true)
+    const workStart = await verifyJobPin(dataIds.jobAId, ids.workerA, startPin.pin, 'WORK_START')
+    expect(workStart.valid).toBe(true)
 
-    await prisma.marketplaceJob.update({ where: { id: dataIds.jobAId }, data: { status: 'QUOTE_ACCEPTED' } })
+    const [job, assignment] = await Promise.all([
+      prisma.marketplaceJob.findUnique({ where: { id: dataIds.jobAId } }),
+      prisma.companyJobAssignment.findUnique({ where: { id: a.assignmentId! } }),
+    ])
+    expect(job?.status).toBe('IN_PROGRESS')
+    expect(assignment?.status).toBe('IN_PROGRESS')
+
+    await prisma.jobVerificationPin.deleteMany({ where: { jobId: dataIds.jobAId } })
+    await prisma.jobEscrow.deleteMany({ where: { jobId: dataIds.jobAId } })
+    await resetJob(dataIds.jobAId)
   })
 })
 
