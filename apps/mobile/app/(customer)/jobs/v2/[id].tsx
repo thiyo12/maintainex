@@ -80,6 +80,8 @@ export default function V2JobDetailScreen() {
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
+  const currencyCode = job?.countryCode === 'CA' ? 'CAD' : 'LKR'
+
   const loadJob = async () => {
     try {
       const res = await v2Jobs.get(id)
@@ -105,7 +107,7 @@ export default function V2JobDetailScreen() {
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
-    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), quoteId } })
+    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), currency: currencyCode, quoteId } })
   }
 
   const handleBargain = () => {
@@ -130,7 +132,7 @@ export default function V2JobDetailScreen() {
       name: bargainModal.provider?.name || 'Provider',
     })
     setMsgPrefill(
-      `Counter offer: LKR ${price.toLocaleString()}. If you agree, please revise your quote in MaintainEX so I can accept the updated price.`
+      `Counter offer: ${currencyCode} ${price.toLocaleString()}. If you agree, please revise your quote in MaintainEX so I can accept the updated price.`
     )
     setBargainModal(null)
     setBargainPrice('')
@@ -248,7 +250,7 @@ export default function V2JobDetailScreen() {
           <View style={[styles.infoCard, { backgroundColor: colors.white }]}>
             <Wallet size={20} color={colors.amber} weight="fill" />
             <Text style={styles.infoLabel}>Budget</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={[styles.infoValue, { color: colors.ink }]}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={[styles.infoSub, { color: colors.muted }]}>{job.budgetType}</Text>
           </View>
           {job.locationName && (
@@ -307,7 +309,7 @@ export default function V2JobDetailScreen() {
                     <Text style={[styles.quoteMeta, { color: colors.muted }]}>{q.providerType} • {q.estimatedCompletionTime}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.quotePrice}>LKR {q.price.toLocaleString()}</Text>
+                    <Text style={styles.quotePrice}>{currencyCode} {q.price.toLocaleString()}</Text>
                     {quoteTag && (
                       <View style={[styles.quoteTag, { backgroundColor: quoteTag.bg }]}>
                         <Text style={[styles.quoteTagText, { color: quoteTag.color }]}>{quoteTag.label}</Text>
@@ -376,7 +378,7 @@ export default function V2JobDetailScreen() {
                     {p.completedJobs > 0 && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.completedJobs} jobs</Text>}
                     {p.distance && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.distance}</Text>}
                   </View>
-                  {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.fixedRate}</Text> : null}
+                  {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>{currencyCode} {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>{currencyCode} {p.fixedRate}</Text> : null}
                 </View>
                 <TouchableOpacity
                   hitSlop={8}
@@ -501,7 +503,7 @@ export default function V2JobDetailScreen() {
             <Text style={[styles.modalSub, { color: colors.muted }]}>Propose your price to {bargainModal?.provider?.name || 'the hero'}</Text>
             <TextInput
               style={[styles.modalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-              value={bargainPrice} onChangeText={setBargainPrice} placeholder="LKR 0" placeholderTextColor={colors.muted} keyboardType="numeric" />
+              value={bargainPrice} onChangeText={setBargainPrice} placeholder={`${currencyCode} 0`} placeholderTextColor={colors.muted} keyboardType="numeric" />
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.border }]} onPress={() => setBargainModal(null)}>
                 <Text style={[styles.modalBtnText, { color: colors.ink }]}>Cancel</Text>
