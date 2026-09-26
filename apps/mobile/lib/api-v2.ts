@@ -23,6 +23,73 @@ export async function v2Request<T>(endpoint: string, options: RequestInit = {}):
   return res.json()
 }
 
+export interface V2Escrow {
+  id: string
+  jobId: string
+  quoteId: string
+  customerId: string
+  providerId: string
+  amount: number
+  serviceFee: number
+  totalAmount: number
+  currency: string
+  paymentMethod: string
+  status: string
+  heldAt?: string | null
+  releasedAt?: string | null
+  refundedAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface V2Workspace {
+  id?: string
+  jobId?: string
+  progressStatus: string
+  completionRequestedAt?: string | null
+  completedAt?: string | null
+  updatedAt?: string
+}
+
+export interface V2CompanyAssignment {
+  id: string
+  workerUserId: string
+  status: 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
+  assignedAt: string
+  acceptedAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  worker?: { id: string; name: string | null } | null
+}
+
+export interface V2ProviderSummary {
+  id: string
+  userId?: string
+  name?: string | null
+  profileImage?: string | null
+  rating?: number | null
+  completedJobs?: number
+}
+
+export interface V2Quote {
+  id: string
+  jobId: string
+  providerId: string
+  providerType: 'INDIVIDUAL' | 'COMPANY'
+  price: number
+  estimatedCompletionTime: string
+  message?: string | null
+  attachments: string[]
+  status: string
+  revisionNumber?: number
+  parentQuoteId?: string | null
+  revisionReason?: string | null
+  createdAt: string
+  provider?: V2ProviderSummary | null
+  providerRating?: number
+  completedJobs?: number
+}
+
 export interface V2Job {
   id: string
   customerId: string
@@ -49,26 +116,13 @@ export interface V2Job {
   customer?: any
   locationName?: string | null
   quotes?: V2Quote[]
-  escrow?: any
-  workspace?: any
+  escrow?: V2Escrow | null
+  workspace?: V2Workspace | null
   reviews?: any
+  companyAssignment?: V2CompanyAssignment | null
+  acceptedQuote?: (V2Quote & { provider?: V2ProviderSummary | null }) | null
 }
 
-export interface V2Quote {
-  id: string
-  jobId: string
-  providerId: string
-  providerType: string
-  price: number
-  estimatedCompletionTime: string
-  message: string
-  attachments: string[]
-  status: string
-  createdAt: string
-  provider?: any
-  providerRating?: number
-  completedJobs?: number
-}
 
 export const v2Locations = {
   get: () => v2Request<{ countries: any[] }>('/api/mobile/v2/locations'),
