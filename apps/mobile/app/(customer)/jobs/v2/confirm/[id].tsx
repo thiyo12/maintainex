@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Linking, AppState } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -42,6 +42,13 @@ export default function V2ConfirmBookingScreen() {
       setScheduleDate(new Date().toISOString().split('T')[0])
     }
   }, [])
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadData()
+    })
+    return () => subscription.remove()
+  }, [id])
 
   const loadData = async () => {
     try {
