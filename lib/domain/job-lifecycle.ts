@@ -3,7 +3,7 @@ import { postLedgerTransaction } from '@/lib/ledger'
 import { bigIntToSafeNumber, type Currency } from '@/lib/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
-import { Prisma } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 
