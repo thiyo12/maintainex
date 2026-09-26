@@ -5,6 +5,7 @@ import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { getCommissionRate } from '@/lib/mxid'
 import { Prisma } from '@prisma/client'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
+import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'
@@ -32,6 +33,45 @@ export async function resolveProviderActor(jobId: string, userId: string): Promi
   }
 
   return null
+}
+
+async function hasCompanyJobManagement(
+  db: PrismaClient | Prisma.TransactionClient,
+  companyId: string,
+  userId: string,
+): Promise<boolean> {
+  const member = await db.teamMember.findFirst({
+    where: { companyId, userId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  return !!member &&
+    isValidCompanyRole(member.role) &&
+    hasCompanyPermission(member.role, 'jobs:manage')
+}
+
+async function isAssignedCompanyWorker(
+  db: PrismaClient | Prisma.TransactionClient,
+  companyId: string,
+  jobId: string,
+  userId: string,
+  statuses: string[],
+): Promise<boolean> {
+  const assignment = await db.companyJobAssignment.findFirst({
+    where: {
+      companyId,
+      jobId,
+      workerUserId: userId,
+      status: { in: statuses },
+    },
+    select: { id: true },
+  })
+  if (!assignment) return false
+
+  const member = await db.teamMember.findFirst({
+    where: { companyId, userId, status: 'ACTIVE' },
+    select: { id: true },
+  })
+  return !!member
 }
 
 export interface TransitionContext {
@@ -123,11 +163,13 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
       if (acceptedQuote.providerType === 'INDIVIDUAL') {
         authorized = acceptedQuote.providerId === ctx.actorId && ctx.actorType === 'PROVIDER'
       } else if (ctx.actorType === 'COMPANY') {
-        const membership = await tx.teamMember.findFirst({
-          where: { companyId: acceptedQuote.providerId, userId: ctx.actorId, status: 'ACTIVE' },
-          select: { id: true },
-        })
-        authorized = !!membership
+        authorized = await isAssignedCompanyWorker(
+          tx,
+          acceptedQuote.providerId,
+          ctx.jobId,
+          ctx.actorId,
+          ['IN_PROGRESS'],
+        )
       }
       if (!authorized) throw new Error('Unauthorized: not the accepted provider for this job')
     }
@@ -176,10 +218,24 @@ export async function cancelJob(
 
   if (ctx.actorType === 'CUSTOMER') {
     if (job.customerId !== ctx.actorId) throw new Error('Only the job owner can cancel this job')
-  } else if (ctx.actorType === 'PROVIDER' || ctx.actorType === 'COMPANY') {
-    const resolvedActor = await resolveProviderActor(ctx.jobId, ctx.actorId)
-    if (!resolvedActor || resolvedActor !== ctx.actorType) {
+  } else if (ctx.actorType === 'PROVIDER') {
+    const acceptedQuote = await prisma.jobQuote.findFirst({
+      where: { jobId: ctx.jobId, status: 'ACCEPTED', providerType: 'INDIVIDUAL' },
+      select: { providerId: true },
+    })
+    if (!acceptedQuote || acceptedQuote.providerId !== ctx.actorId) {
       throw new Error('Only the accepted provider can cancel this job')
+    }
+  } else if (ctx.actorType === 'COMPANY') {
+    const acceptedQuote = await prisma.jobQuote.findFirst({
+      where: { jobId: ctx.jobId, status: 'ACCEPTED', providerType: 'COMPANY' },
+      select: { providerId: true },
+    })
+    if (
+      !acceptedQuote ||
+      !(await hasCompanyJobManagement(prisma, acceptedQuote.providerId, ctx.actorId))
+    ) {
+      throw new Error('Only an authorized company manager can cancel this job')
     }
   } else if (ctx.actorType !== 'STAFF' && ctx.actorType !== 'SYSTEM') {
     throw new Error('Actor is not authorized to cancel this job')
@@ -906,9 +962,19 @@ async function verifyDisputeAuthorization(
 
   if (ctx.actorType === 'COMPANY') {
     if (acceptedQuote.providerType !== 'COMPANY') throw new Error('Quote is not a company quote')
-    const { checkWorkerEligibility } = await import('@/lib/phase6/provider-eligibility')
-    const eligibility = await checkWorkerEligibility(acceptedQuote.providerId, ctx.actorId, ctx.jobId)
-    if (!eligibility.eligible) throw new Error(`Worker not authorized: ${eligibility.reasons.join('; ')}`)
+    const [assignedWorker, manager] = await Promise.all([
+      isAssignedCompanyWorker(
+        db,
+        acceptedQuote.providerId,
+        ctx.jobId,
+        ctx.actorId,
+        ['IN_PROGRESS'],
+      ),
+      hasCompanyJobManagement(db, acceptedQuote.providerId, ctx.actorId),
+    ])
+    if (!assignedWorker && !manager) {
+      throw new Error('Only the assigned worker or an authorized company manager can dispute this job')
+    }
   } else {
     if (acceptedQuote.providerId !== ctx.actorId) throw new Error('Actor is not a participant in this job')
   }
