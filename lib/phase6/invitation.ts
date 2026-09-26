@@ -99,6 +99,7 @@ export async function acceptCompanyInvite(params: {
   token: string
   userId: string
   userEmail: string
+  userPhone?: string | null
   ipAddress?: string
 }): Promise<{ success: boolean; memberName?: string; companyName?: string; error?: string }> {
   const invite = await prisma.teamInvite.findUnique({
@@ -122,8 +123,16 @@ export async function acceptCompanyInvite(params: {
     return { success: false, error: 'Invitation has expired' }
   }
 
-  if (invite.email && invite.email !== params.userEmail) {
+  if (invite.email && invite.email.toLowerCase() !== params.userEmail.toLowerCase()) {
     return { success: false, error: 'This invitation was sent to a different email address' }
+  }
+
+  if (invite.phone) {
+    const invitedDigits = invite.phone.replace(/\D/g, '')
+    const userDigits = (params.userPhone || '').replace(/\D/g, '')
+    if (!userDigits || invitedDigits !== userDigits) {
+      return { success: false, error: 'This invitation was sent to a different phone number' }
+    }
   }
 
   try {
