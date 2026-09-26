@@ -450,22 +450,22 @@ async function resolvePinVerifierTx(
   }
 
   if (acceptedQuote.providerType === 'COMPANY') {
-    const companyProfile = await tx.companyProfile.findFirst({
-      where: { userId, id: acceptedQuote.providerId },
-      select: { id: true },
-    })
-    if (companyProfile) return 'COMPANY'
-
     const assignment = await tx.companyJobAssignment.findFirst({
       where: {
         jobId,
         workerUserId: userId,
         companyId: acceptedQuote.providerId,
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+        status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
       },
       select: { id: true },
     })
-    if (assignment) return 'ASSIGNED_WORKER'
+    if (!assignment) return null
+
+    const companyProfile = await tx.companyProfile.findFirst({
+      where: { userId, id: acceptedQuote.providerId },
+      select: { id: true },
+    })
+    return companyProfile ? 'COMPANY' : 'ASSIGNED_WORKER'
   }
 
   return null
