@@ -157,6 +157,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tasker)" />
           <Stack.Screen name="(company)" />
           <Stack.Screen name="(chat)" />
+          <Stack.Screen name="company-invite" />
         </Stack>
       </I18nextProvider>
       </CountryProvider>
