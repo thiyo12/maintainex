@@ -272,6 +272,31 @@ describe.skipIf(!isPostgres)('Phase 10.5 — PostgreSQL Job PIN', () => {
     })
   })
 
+  describe('One-time PIN step handoff', () => {
+    it('consumes arrival PIN and carries arrival proof into a fresh start PIN', async () => {
+      const { generateJobPin, getPinState, verifyJobPin } = await import('@/lib/domain/job-pin')
+
+      const arrivalPin = await generateJobPin(workStartJobId, customerAId)
+      expect((await getPinState(workStartJobId, customerAId)).hasActivePin).toBe(true)
+
+      const arrival = await verifyJobPin(workStartJobId, providerId, arrivalPin.pin, 'ARRIVAL')
+      expect(arrival.valid).toBe(true)
+
+      const afterArrival = await getPinState(workStartJobId, customerAId)
+      expect(afterArrival.hasActivePin).toBe(false)
+      expect(afterArrival.arrivalVerifiedAt).toBeTruthy()
+      expect(afterArrival.workStartVerifiedAt).toBeNull()
+
+      const startPin = await generateJobPin(workStartJobId, customerAId)
+      expect(startPin.version).toBe(arrivalPin.version + 1)
+
+      const freshState = await getPinState(workStartJobId, customerAId)
+      expect(freshState.hasActivePin).toBe(true)
+      expect(freshState.arrivalVerifiedAt).toBeTruthy()
+      expect(freshState.workStartVerifiedAt).toBeNull()
+    })
+  })
+
   describe('WORK_START Atomicity (PIN + Lifecycle Transition)', () => {
     it('10 concurrent WORK_START PIN verifications produce exactly one lifecycle transition', { timeout: 30000 }, async () => {
       const { generateJobPin, verifyJobPin } = await import('@/lib/domain/job-pin')
