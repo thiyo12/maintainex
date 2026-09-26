@@ -35,7 +35,6 @@ export default function V2ProviderManageJobScreen() {
   const [actionLoading, setActionLoading] = useState('')
   const [nextJob, setNextJob] = useState<V2Job | null>(null)
 
-  const [reviewQuality, setReviewQuality] = useState('5')
   const [reviewComm, setReviewComm] = useState('5')
   const [reviewExp, setReviewExp] = useState('5')
   const [reviewComment, setReviewComment] = useState('')
@@ -222,8 +221,8 @@ export default function V2ProviderManageJobScreen() {
             <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
               <Ionicons name="calendar-outline" size={16} color={colors.amberDark} />
               <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
-                {job.timeSlot
-                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.timeSlot })
+                {job.preferredTimeSlot
+                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.preferredTimeSlot })
                   : `${job.preferredDate}`}
               </Text>
             </View>
@@ -286,7 +285,7 @@ export default function V2ProviderManageJobScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('jobDetail.escrow')}</Text>
             <View style={styles.escrowCard}>
-              <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
+              <Text style={styles.escrowAmount}>{escrow.currency || 'LKR'} {(escrow.totalAmount || escrow.amount || 0).toLocaleString()}</Text>
               <View style={[styles.escrowBadge, escrow.status === 'PROTECTED' ? styles.escrowActive : styles.escrowInactive]}>
                 <Text style={styles.escrowBadgeText}>{escrow.status}</Text>
               </View>
@@ -352,7 +351,7 @@ export default function V2ProviderManageJobScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && !pinState?.arrivalVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
@@ -361,7 +360,7 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.verifyPinText}>Verify Arrival PIN</Text>
                 </TouchableOpacity>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
@@ -380,16 +379,6 @@ export default function V2ProviderManageJobScreen() {
                 <View style={styles.waitingCard}>
                   <Ionicons name="time-outline" size={20} color={colors.amberDark} />
                   <Text style={styles.waitingText}>Arrival is confirmed. Waiting for the customer to generate a fresh Start Work PIN.</Text>
-                </View>
-              )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && !pinState?.workStartVerifiedAt && (
-                <View style={styles.waitingCard}>
-                  <Ionicons name="time-outline" size={20} color={colors.amberDark} />
-                  <Text style={styles.waitingText}>
-                    {pinState?.arrivalVerifiedAt
-                      ? 'Arrival is verified. Waiting for the customer to generate the Start Work PIN.'
-                      : 'Waiting for the customer to generate the Arrival PIN.'}
-                  </Text>
                 </View>
               )}
               {workspace.progressStatus === 'ACCEPTED' && escrow?.status !== 'PROTECTED' && (
