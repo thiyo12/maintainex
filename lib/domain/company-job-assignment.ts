@@ -351,7 +351,7 @@ export async function getWorkerActiveAssignments(workerUserId: string, companyId
       status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
     },
     include: {
-      job: { select: { id: true, title: true, status: true, preferredDate: true, preferredTimeSlot: true, addressStreet: true } },
+      job: { select: { id: true, title: true, status: true, preferredDate: true, preferredTimeSlot: true } },
     },
     orderBy: { assignedAt: 'desc' },
   })
