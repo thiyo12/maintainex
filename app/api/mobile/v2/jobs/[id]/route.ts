@@ -371,9 +371,32 @@ export async function PATCH(
       data.preferredDate = parsedDate
     }
 
-    const updated = await prisma.marketplaceJob.update({
-      where: { id },
-      data,
+    const updated = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string; customerId: string; status: string }[]>`
+        SELECT id, "customerId", status
+        FROM "MarketplaceJob"
+        WHERE id = ${id}
+        FOR UPDATE
+      `
+      const current = locked[0]
+      if (!current) throw new Error('EDIT_JOB_NOT_FOUND')
+      if (current.customerId !== user.id) throw new Error('EDIT_FORBIDDEN')
+      if (!['OPEN', 'QUOTE_ACCEPTED'].includes(current.status)) {
+        throw new Error('EDIT_WORK_STARTED')
+      }
+
+      if (current.status === 'QUOTE_ACCEPTED') {
+        const protectedEscrow = await tx.jobEscrow.findFirst({
+          where: { jobId: id, status: 'PROTECTED' },
+          select: { id: true },
+        })
+        if (protectedEscrow) throw new Error('EDIT_PAYMENT_SECURED')
+      }
+
+      return tx.marketplaceJob.update({
+        where: { id },
+        data,
+      })
     })
 
     return NextResponse.json({
@@ -383,6 +406,20 @@ export async function PATCH(
       },
     })
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'EDIT_JOB_NOT_FOUND') {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      if (error.message === 'EDIT_FORBIDDEN') {
+        return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
+      }
+      if (error.message === 'EDIT_WORK_STARTED') {
+        return NextResponse.json({ error: 'Job details are locked after work starts' }, { status: 409 })
+      }
+      if (error.message === 'EDIT_PAYMENT_SECURED') {
+        return NextResponse.json({ error: 'Booking details are locked after payment is secured' }, { status: 409 })
+      }
+    }
     console.error('PATCH job error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
