@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '../../../lib/ThemeContext'
-import { company } from '../../../lib/api'
+import { company, getActiveCompanyContext } from '../../../lib/api'
 import { useAuth } from '../../../lib/auth'
 import StatsCard from '../../../components/ui/StatsCard'
 import JobCard from '../../../components/ui/JobCard'
@@ -31,6 +31,16 @@ export default function CompanyDashboard() {
 
   const fetchData = useCallback(async () => {
     try {
+      const context = await getActiveCompanyContext()
+      if (context?.role === 'WORKER' || context?.role === 'DISPATCHER') {
+        router.replace('/(company)/(tabs)/dispatch' as any)
+        return
+      }
+      if (context?.role === 'FINANCE') {
+        router.replace('/(company)/(tabs)/earnings-list' as any)
+        return
+      }
+
       const [earningsRes, contractsRes] = await Promise.all([
         company.earnings.get(),
         company.contracts.list(),
