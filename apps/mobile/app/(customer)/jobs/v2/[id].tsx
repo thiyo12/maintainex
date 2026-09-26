@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Animated } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { XCircle, CalendarBlank, MapPin, Lock, ShieldCheck, CheckCircle, Users, CaretRight, Clock, Wallet, Star, Envelope, Wrench, Handshake, WarningCircle, FileText, ChatCircle, Hourglass, Note, Clipboard } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
@@ -96,7 +96,11 @@ export default function V2JobDetailScreen() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { loadJob() }, [id])
+  useFocusEffect(
+    useCallback(() => {
+      loadJob()
+    }, [id])
+  )
 
   const canCancelWithin30 = () => {
     if (!job?.createdAt) return false
@@ -427,15 +431,18 @@ export default function V2JobDetailScreen() {
         )}
 
         {workspace?.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}
-            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
-          >
+          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
             <ShieldCheck size={28} color={colors.amber} weight="fill" />
-            <Text style={styles.actionCardTitle}>Confirm Arrival</Text>
-            <Text style={styles.actionCardDesc}>Enter the verification PIN from your hero</Text>
-            <ActionBtn label="Verify PIN" loadingKey="" onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)} />
-          </TouchableOpacity>
+            <Text style={styles.actionCardTitle}>Arrival & Work Start Verification</Text>
+            <Text style={styles.actionCardDesc}>
+              Generate a one-time arrival PIN when the provider reaches you. After arrival is confirmed, generate a fresh PIN only when you are ready for work to start.
+            </Text>
+            <ActionBtn
+              label="Open Verification PIN"
+              loadingKey=""
+              onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
+            />
+          </View>
         )}
 
         {workspace?.progressStatus === 'COMPLETION_REQUESTED' && (
@@ -454,7 +461,9 @@ export default function V2JobDetailScreen() {
               <Text style={[styles.escrowTitle, { color: colors.ink }]}>Escrow</Text>
               <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>Protected</Text></View>
             </View>
-            <Text style={[styles.escrowAmount, { color: colors.ink }]}>LKR {escrow.amount}</Text>
+            <Text style={[styles.escrowAmount, { color: colors.ink }]}>
+              {escrow.currency || 'LKR'} {Number(escrow.amount || 0).toLocaleString()}
+            </Text>
             <Text style={[styles.actionCardDesc, { marginBottom: 0 }]}>
               Payment stays protected until you approve completed work. Before work starts, use the booking cancellation action above.
             </Text>
@@ -465,17 +474,6 @@ export default function V2JobDetailScreen() {
         {job.status === 'IN_PROGRESS' && workspace?.progressStatus !== 'DISPUTED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
             <Text style={styles.disputeBtnText}>Raise a Dispute</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* ─── Job PIN ─── */}
-        {escrow?.status === 'PROTECTED' && (job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
-          <TouchableOpacity
-            style={[styles.disputeBtn, { borderColor: colors.amber }]}
-            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
-          >
-            <ShieldCheck size={16} color={colors.amber} />
-            <Text style={[styles.disputeBtnText, { color: colors.amber, marginLeft: 8 }]}>Job Verification PIN</Text>
           </TouchableOpacity>
         )}
 
