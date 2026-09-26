@@ -202,6 +202,17 @@ export const disputes = {
     request<any>(`/api/mobile/disputes/${id}`),
 }
 
+// Resolve the user's active company membership. This works for owners,
+// managers, dispatchers, and workers without changing their global account role.
+export async function getActiveCompanyId(): Promise<string | null> {
+  try {
+    const context = await request<{ companyId: string }>('/api/mobile/company/context')
+    return context.companyId || null
+  } catch {
+    return null
+  }
+}
+
 // Company
 export const company = {
   profile: {
