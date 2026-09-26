@@ -52,6 +52,9 @@ export function validateRequiredSecrets(): { valid: boolean; errors: string[] } 
     if (marketplace && staff && marketplace === staff) {
       errors.push('[CRITICAL] MARKETPLACE_JWT_SECRET and STAFF_JWT_SECRET must be independent')
     }
+    if (process.env.ALLOW_TEST_OTP === 'true') {
+      errors.push('[CRITICAL] ALLOW_TEST_OTP must not be enabled in production')
+    }
   }
 
   if (errors.length > 0) {
