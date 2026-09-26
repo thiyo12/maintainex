@@ -122,11 +122,15 @@ beforeAll(async () => {
   })
   dataIds.jobBId = jobB.id
 
-  await prisma.jobQuote.create({
+  const acceptedQuote = await prisma.jobQuote.create({
     data: {
       jobId: dataIds.jobAId, providerId: dataIds.companyAId, providerType: 'COMPANY',
       price: BigInt(5000), estimatedCompletionTime: '2d', attachments: '[]', status: 'ACCEPTED',
     },
+  })
+  await prisma.marketplaceJob.update({
+    where: { id: dataIds.jobAId },
+    data: { approvedQuoteId: acceptedQuote.id },
   })
 })
 
