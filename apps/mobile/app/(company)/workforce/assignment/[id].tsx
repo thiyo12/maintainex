@@ -185,7 +185,7 @@ export default function AssignmentDetailScreen() {
             </>
           )}
 
-          {assignment.capabilities?.canManageAssignment && ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(assignment.status) && (
+          {assignment.capabilities?.canManageAssignment && ['ASSIGNED', 'ACCEPTED'].includes(assignment.status) && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.revokeBtn]}
               onPress={() => confirmAction('revoke', t('company.workforce.confirmRevoke'))}
