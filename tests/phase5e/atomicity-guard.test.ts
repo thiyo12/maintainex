@@ -14,7 +14,7 @@ describe('Phase 5E — Financial Atomicity Guard', () => {
   const cashPayment = readFile('app/api/mobile/v2/jobs/[id]/cash-payment/route.ts')
   const boostRoute = readFile('app/api/properties/[id]/boost/route.ts')
   const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
-  const ledger = readFile('lib/ledger.ts')
+  const ledger = readFile('lib/finance/ledger/ledger-service.ts')
 
   describe('Reachable routes use canonical financial writers', () => {
     it('legacy customer withdrawal fails closed without balance mutation', () => {

@@ -15,7 +15,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
   const boost = readFile('app/api/properties/[id]/boost/route.ts')
   const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
   const payout = readFile('lib/finance/payouts/payout-engine.ts')
-  const ledger = readFile('lib/ledger.ts')
+  const ledger = readFile('lib/finance/ledger/ledger-service.ts')
   const money = readFile('lib/shared/money/money.ts')
   const financialRead = readFile('lib/financial-read.ts')
 

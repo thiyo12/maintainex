@@ -154,7 +154,7 @@ describe('Part W — Negative Security Tests', () => {
 
   describe('Ledger fingerprint includes currency', () => {
     it('ledger fingerprint computation includes currency', () => {
-      const ledger = readFile('lib/ledger.ts')
+      const ledger = readFile('lib/finance/ledger/ledger-service.ts')
       expect(ledger).toContain('currency:')
       expect(ledger).toContain('normalized')
     })
