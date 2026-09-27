@@ -147,7 +147,7 @@ describe('Part W — Negative Security Tests', () => {
 
   describe('Payout idempotency includes currency', () => {
     it('payout engine includes currency in payload hash', () => {
-      const engine = readFile('lib/payout-engine.ts')
+      const engine = readFile('lib/finance/payouts/payout-engine.ts')
       expect(engine).toContain('`${userId}:${amountCents.toString()}:${method}:${currency}`')
     })
   })
