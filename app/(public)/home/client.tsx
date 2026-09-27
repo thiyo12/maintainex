@@ -386,7 +386,7 @@ export default function HomeClient() {
             <p className="mt-3 text-sm leading-6 text-white/55">
               Use the company path for team-based service delivery, worker assignment and business job operations.
             </p>
-            <Link href="/waitlist?role=COMPANY" className="mt-7 inline-flex items-center gap-2 font-black text-amber-400">
+            <Link href="/waitlist?role=AGENCY" className="mt-7 inline-flex items-center gap-2 font-black text-amber-400">
               Join as a company <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
