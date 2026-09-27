@@ -16,7 +16,7 @@ describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {
   const lifecycle = readFile('lib/domain/job-lifecycle.ts')
   const payout = readFile('lib/payout-engine.ts')
   const ledger = readFile('lib/ledger.ts')
-  const money = readFile('lib/money.ts')
+  const money = readFile('lib/shared/money/money.ts')
   const financialRead = readFile('lib/financial-read.ts')
 
   it('provider withdrawal uses payout-engine with required idempotency', () => {
