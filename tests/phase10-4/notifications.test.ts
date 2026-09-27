@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock the notifications module
-vi.mock('@/lib/notifications', () => ({
+// Mock the notifications service module
+vi.mock('@/lib/notifications/notification-service', () => ({
   createNotification: vi.fn().mockResolvedValue({ id: 'notif-1' }),
 }))
 
