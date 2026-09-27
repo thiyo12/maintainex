@@ -143,8 +143,8 @@ beforeEach(() => {
 afterEach(() => {
   if (originalAllowTestOtp === undefined) delete process.env.ALLOW_TEST_OTP
   else process.env.ALLOW_TEST_OTP = originalAllowTestOtp
-  if (originalNodeEnv === undefined) delete process.env.NODE_ENV
-  else process.env.NODE_ENV = originalNodeEnv
+  if (originalNodeEnv === undefined) delete (process.env as Record<string, string | undefined>).NODE_ENV
+  else (process.env as Record<string, string | undefined>).NODE_ENV = originalNodeEnv
 })
 
 describe('OTP demo rate-limit bypass — source guard', () => {
@@ -419,7 +419,7 @@ describe('OTP verify brute-force protection (cases 1-8)', () => {
   })
 
   it('case 7b: production rejects 000000 even when ALLOW_TEST_OTP=true', async () => {
-    process.env.NODE_ENV = 'production'
+    (process.env as Record<string, string | undefined>).NODE_ENV = 'production'
     process.env.ALLOW_TEST_OTP = 'true'
     db.user.findFirst.mockResolvedValue(demoUser('TASKER'))
     db.oTP.findFirst.mockResolvedValue({ id: 'otp-prod', attempts: 0, codeHash: HASH_RANDOM, isUsed: false })
