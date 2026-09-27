@@ -6,9 +6,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Star, ChatCircleText, SealCheck, MapPin, PaperPlaneTilt, X, User, CalendarCheck } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
-import { taskers, conversations } from '../../../../lib/api'
+import { taskers } from '../../../../lib/api'
 import { useAuth } from '../../../../lib/auth'
-import { buildSampleProfile } from '../../../../lib/sampleTaskers'
 import { colors, spacing, radius, typography, shadows } from '../../../../lib/design'
 import PressableScale from '../../../../components/ui/PressableScale'
 
@@ -50,11 +49,7 @@ export default function TaskerProfileScreen() {
       const data = await taskers.get(taskerId)
       setTasker(data)
     } catch {
-      if (taskerId.startsWith('sample-')) {
-        setTasker(buildSampleProfile(taskerId, jobId))
-      } else {
-        setError(true)
-      }
+      setError(true)
     } finally {
       setLoading(false)
     }
@@ -72,36 +67,39 @@ export default function TaskerProfileScreen() {
   const initial = (name || 'T').charAt(0).toUpperCase()
   const rate = tasker?.hourlyRate || 0
 
-  const openThread = async (text: string) => {
-    try {
-      const c = await conversations.create({ participantId: tasker.userId, initialMessage: text })
-      if (c?.id) {
-        if (c.existing) {
-          await conversations.sendMessage(c.id, text).catch(() => {})
-        }
-        router.push(`/(chat)/${c.id}`)
-      } else {
-        router.push(`/(chat)/demo_${Date.now()}?testMsg=${encodeURIComponent(text)}&testUser=${encodeURIComponent(name)}`)
-      }
-    } catch {
-      router.push(`/(chat)/demo_${Date.now()}?testMsg=${encodeURIComponent(text)}&testUser=${encodeURIComponent(name)}`)
-    }
-  }
-
   const sendMessage = () => {
-    const msg = `Hi ${name}, I'm interested in your services. Are you available this week?`
-    openThread(msg)
+    Alert.alert(
+      'Create a service request first',
+      'For safety and privacy, MaintainEX chat opens after a provider is connected to a marketplace job. Create a targeted request for this Tasker first.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: 'Create Request', onPress: bookNow },
+      ]
+    )
   }
 
   const sendQuoteReq = async () => {
+    if (!jobId) {
+      Alert.alert(t('common.error'), 'Select a service before requesting a quote.')
+      return
+    }
     if (!qDate || !qSlot) {
       Alert.alert(t('common.error'), t('taskerProfile.pickDateSlot'))
       return
     }
+
     setSending(true)
-    const text = `Quote Request\nDate: ${qDate}\nTime: ${qSlot}${qMsg ? `\n\nMessage:\n${qMsg}` : ''}`
     setShowQuote(false)
-    await openThread(text)
+    router.push({
+      pathname: '/(customer)/jobs/v2/create',
+      params: {
+        templateJobId: jobId,
+        taskerId: taskerId as string,
+        preferredDate: qDate,
+        preferredTimeSlot: qSlot,
+        notes: qMsg || '',
+      },
+    } as any)
     setSending(false)
   }
 

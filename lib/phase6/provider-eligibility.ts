@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { readStoredList } from '@/lib/db-utils'
 
 export interface ProviderEligibility {
   eligible: boolean
@@ -120,46 +121,54 @@ export async function checkWorkerEligibility(
     if (!job) {
       reasons.push('Job not found')
     } else {
-      const profile = await prisma.taskerProfile.findUnique({
-        where: { userId },
-        select: { id: true, skills: true },
-      })
-      if (!profile) {
-        reasons.push('Worker profile not found')
-      } else {
-        const hasCapability = await prisma.taskerSkill.findFirst({
-          where: {
-            taskerId: profile.id,
-            job: {
-              serviceTemplates: {
-                some: { id: job.serviceTemplateId || undefined },
-              },
-            },
-          },
-        })
-
-        if (!hasCapability) {
-          const templateMatch = job.serviceTemplateId
-            ? await prisma.serviceTemplate.findUnique({
-                where: { id: job.serviceTemplateId },
-                select: { jobCategoryId: true },
-              })
-            : null
-
-          if (templateMatch) {
-            const categoryMatch = await prisma.taskerSkill.findFirst({
-              where: {
-                taskerId: profile.id,
-                job: { categoryId: templateMatch.jobCategoryId },
-              },
+      const [profile, category, template] = await Promise.all([
+        prisma.taskerProfile.findUnique({
+          where: { userId },
+          select: { id: true, skills: true },
+        }),
+        prisma.jobCategory.findUnique({
+          where: { id: job.categoryId },
+          select: { id: true, name: true, slug: true },
+        }),
+        job.serviceTemplateId
+          ? prisma.serviceTemplate.findUnique({
+              where: { id: job.serviceTemplateId },
+              select: { id: true, jobCategoryId: true },
             })
-            if (!categoryMatch) {
-              reasons.push('Worker lacks required capability for this job')
-            }
-          } else {
-            reasons.push('Worker lacks required capability for this job')
-          }
-        }
+          : Promise.resolve(null),
+      ])
+
+      const requiredCategoryId = template?.jobCategoryId || job.categoryId
+      const relationalCapability = profile
+        ? await prisma.taskerSkill.findFirst({
+            where: {
+              taskerId: profile.id,
+              job: { categoryId: requiredCategoryId },
+            },
+            select: { id: true },
+          })
+        : null
+
+      const capabilityTokens = new Set(
+        readStoredList(member.skills)
+          .concat(profile ? readStoredList(profile.skills) : [])
+          .map(value => value.trim().toLowerCase())
+          .filter(Boolean)
+      )
+      const categoryTokens = [
+        requiredCategoryId,
+        category?.id,
+        category?.name,
+        category?.slug,
+        job.serviceTemplateId,
+      ]
+        .filter((value): value is string => !!value)
+        .map(value => value.trim().toLowerCase())
+
+      const declaredCapability = categoryTokens.some(token => capabilityTokens.has(token))
+
+      if (!relationalCapability && !declaredCapability) {
+        reasons.push('Worker lacks required capability for this job')
       }
 
       if (job.preferredDate) {

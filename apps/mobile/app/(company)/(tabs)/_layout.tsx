@@ -1,9 +1,11 @@
 import { Tabs } from 'expo-router'
+import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
 import { colors } from '../../../lib/design'
+import { getActiveCompanyContext } from '../../../lib/api'
 import { SquaresFour, FileText, ChatCircleDots, Flag, Users, CurrencyCircleDollar, User, Truck } from 'phosphor-react-native'
 
 const tabConfigs = [
@@ -21,6 +23,23 @@ export default function CompanyTabs() {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const bottomPad = Math.max(insets.bottom, 4)
+  const [companyRole, setCompanyRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    getActiveCompanyContext()
+      .then((context) => setCompanyRole(context?.role || null))
+      .catch(() => setCompanyRole(null))
+  }, [])
+
+  const visibleTabs = new Set(
+    companyRole === 'WORKER'
+      ? ['dispatch', 'inbox', 'profile']
+      : companyRole === 'DISPATCHER'
+        ? ['dispatch', 'inbox', 'team', 'profile']
+        : companyRole === 'FINANCE'
+          ? ['earnings-list', 'team', 'profile']
+          : tabConfigs.map((tab) => tab.name)
+  )
 
   return (
     <Tabs
@@ -50,6 +69,7 @@ export default function CompanyTabs() {
           name={tab.name}
           options={{
             title: t(tab.key),
+            tabBarButton: visibleTabs.has(tab.name) ? undefined : () => null,
             tabBarIcon: ({ focused }) => (
               <TabIcon icon={tab.icon} focused={focused} activeColor={colors.accent} />
             ),

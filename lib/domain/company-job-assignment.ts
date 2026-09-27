@@ -1,6 +1,9 @@
 import { prisma, type PrismaClientOrTx } from '@/lib/prisma'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { emitSecurityEvent } from '@/lib/security/events'
+import { notifyCompanyWorkerAssigned } from '@/lib/notifications'
+import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
+import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
 
 export type AssignmentStatus = 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
 
@@ -31,9 +34,27 @@ export interface AssignmentResult {
 export async function createAssignment(params: AssignmentCreateParams): Promise<AssignmentResult> {
   const { companyId, jobId, workerUserId, assignedByUserId, actorRole } = params
 
+  const actorMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: assignedByUserId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  if (
+    !actorMembership ||
+    !isValidCompanyRole(actorMembership.role) ||
+    actorMembership.role !== actorRole ||
+    !hasCompanyPermission(actorMembership.role, 'workers:assign')
+  ) {
+    return { success: false, error: 'Actor is not authorized to assign workers for this company' }
+  }
+
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
   if (job.status !== 'QUOTE_ACCEPTED') return { success: false, error: 'Job must be in QUOTE_ACCEPTED status' }
+
+  const eligibility = await checkWorkerEligibility(companyId, workerUserId, jobId)
+  if (!eligibility.eligible) {
+    return { success: false, error: 'Worker not eligible', reasons: eligibility.reasons }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -91,6 +112,17 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     return record
   })
 
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { companyName: true },
+  })
+  await notifyCompanyWorkerAssigned(
+    jobId,
+    workerUserId,
+    job.title,
+    company?.companyName || 'Your company',
+  )
+
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -102,8 +134,33 @@ export async function reassignWorker(
   actorRole: string,
   reason?: string
 ): Promise<AssignmentResult> {
+  const actorMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: actorUserId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  if (
+    !actorMembership ||
+    !isValidCompanyRole(actorMembership.role) ||
+    actorMembership.role !== actorRole ||
+    !hasCompanyPermission(actorMembership.role, 'workers:assign')
+  ) {
+    return { success: false, error: 'Actor is not authorized to reassign workers for this company' }
+  }
+
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) return { success: false, error: 'Job not found' }
+
+  const eligibility = await checkWorkerEligibility(companyId, newWorkerUserId, jobId)
+  if (!eligibility.eligible) {
+    return { success: false, error: 'Worker not eligible', reasons: eligibility.reasons }
+  }
+
+  if (job.status === 'IN_PROGRESS') {
+    return { success: false, error: 'Cannot reassign after work has started. Raise a dispute or contact support.' }
+  }
+  if (job.status !== 'QUOTE_ACCEPTED') {
+    return { success: false, error: `Cannot reassign: job status is ${job.status}` }
+  }
 
   const acceptedQuote = await prisma.jobQuote.findFirst({
     where: { jobId, providerId: companyId, providerType: 'COMPANY', status: 'ACCEPTED' },
@@ -137,10 +194,11 @@ export async function reassignWorker(
       }, tx)
     }
 
-    await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: { in: ['QUOTE_ACCEPTED', 'IN_PROGRESS'] } },
+    const claimed = await tx.marketplaceJob.updateMany({
+      where: { id: jobId, status: 'QUOTE_ACCEPTED' },
       data: { targetTaskerId: newWorkerUserId },
     })
+    if (claimed.count !== 1) throw new Error('Job state changed before reassignment')
 
     const newRecord = await tx.companyJobAssignment.create({
       data: {
@@ -166,6 +224,17 @@ export async function reassignWorker(
     return newRecord
   })
 
+  const company = await prisma.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { companyName: true },
+  })
+  await notifyCompanyWorkerAssigned(
+    jobId,
+    newWorkerUserId,
+    job.title,
+    company?.companyName || 'Your company',
+  )
+
   return { success: true, assignmentId: assignment.id }
 }
 
@@ -178,10 +247,18 @@ export async function workerAcceptAssignment(
   if (assignment.workerUserId !== workerUserId) return { success: false, error: 'Not your assignment' }
   if (assignment.status !== 'ASSIGNED') return { success: false, error: `Cannot accept: current status is ${assignment.status}` }
 
-  await prisma.companyJobAssignment.update({
-    where: { id: assignmentId },
+  const eligibility = await checkWorkerEligibility(assignment.companyId, workerUserId, assignment.jobId)
+  if (!eligibility.eligible) {
+    return { success: false, error: 'Worker is no longer eligible for this assignment', reasons: eligibility.reasons }
+  }
+
+  const claimed = await prisma.companyJobAssignment.updateMany({
+    where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
     data: { status: 'ACCEPTED', acceptedAt: new Date() },
   })
+  if (claimed.count !== 1) {
+    return { success: false, error: 'Assignment changed before it could be accepted' }
+  }
 
   return { success: true, assignmentId }
 }
@@ -197,13 +274,14 @@ export async function workerRejectAssignment(
   if (assignment.status !== 'ASSIGNED') return { success: false, error: `Cannot reject: current status is ${assignment.status}` }
 
   await prisma.$transaction(async (tx) => {
-    await tx.companyJobAssignment.update({
-      where: { id: assignmentId },
+    const claimed = await tx.companyJobAssignment.updateMany({
+      where: { id: assignmentId, workerUserId, status: 'ASSIGNED' },
       data: { status: 'REJECTED', rejectedAt: new Date(), rejectReason: reason || undefined },
     })
+    if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
-    await tx.marketplaceJob.update({
-      where: { id: assignment.jobId },
+    await tx.marketplaceJob.updateMany({
+      where: { id: assignment.jobId, targetTaskerId: workerUserId },
       data: { targetTaskerId: null },
     })
 
@@ -229,10 +307,26 @@ export async function revokeAssignment(
   actorRole: string,
   reason?: string,
 ): Promise<AssignmentResult> {
+  const actorMembership = await prisma.teamMember.findFirst({
+    where: { companyId, userId: actorUserId, status: 'ACTIVE' },
+    select: { role: true },
+  })
+  if (
+    !actorMembership ||
+    !isValidCompanyRole(actorMembership.role) ||
+    actorMembership.role !== actorRole ||
+    !hasCompanyPermission(actorMembership.role, 'workers:assign')
+  ) {
+    return { success: false, error: 'Actor is not authorized to revoke assignments for this company' }
+  }
+
   const assignment = await prisma.companyJobAssignment.findUnique({ where: { id: assignmentId } })
   if (!assignment) return { success: false, error: 'Assignment not found' }
   if (assignment.companyId !== companyId) return { success: false, error: 'Assignment does not belong to this company' }
-  if (!['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(assignment.status)) {
+  if (assignment.status === 'IN_PROGRESS') {
+    return { success: false, error: 'Cannot revoke an assignment after work has started. Raise a dispute or contact support.' }
+  }
+  if (!['ASSIGNED', 'ACCEPTED'].includes(assignment.status)) {
     return { success: false, error: `Cannot revoke: current status is ${assignment.status}` }
   }
 
@@ -266,13 +360,22 @@ export async function completeAssignment(
   assignmentId: string,
   companyId: string,
 ): Promise<AssignmentResult> {
-  const assignment = await prisma.companyJobAssignment.findUnique({ where: { id: assignmentId } })
+  const assignment = await prisma.companyJobAssignment.findUnique({
+    where: { id: assignmentId },
+    include: { job: { select: { status: true } } },
+  })
   if (!assignment) return { success: false, error: 'Assignment not found' }
   if (assignment.companyId !== companyId) return { success: false, error: 'Assignment does not belong to this company' }
-  if (assignment.status !== 'IN_PROGRESS') return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
+  if (assignment.job.status !== 'COMPLETED') {
+    return { success: false, error: 'Assignment completes only after the customer-approved job is completed' }
+  }
+  if (assignment.status === 'COMPLETED') return { success: true, assignmentId }
+  if (assignment.status !== 'IN_PROGRESS') {
+    return { success: false, error: `Cannot complete: current status is ${assignment.status}` }
+  }
 
-  await prisma.companyJobAssignment.update({
-    where: { id: assignmentId },
+  await prisma.companyJobAssignment.updateMany({
+    where: { id: assignmentId, companyId, status: 'IN_PROGRESS' },
     data: { status: 'COMPLETED', completedAt: new Date() },
   })
 
@@ -319,7 +422,7 @@ export async function getWorkerActiveAssignments(workerUserId: string, companyId
       status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
     },
     include: {
-      job: { select: { id: true, title: true, status: true, preferredDate: true, preferredTimeSlot: true, addressStreet: true } },
+      job: { select: { id: true, title: true, status: true, preferredDate: true, preferredTimeSlot: true } },
     },
     orderBy: { assignedAt: 'desc' },
   })

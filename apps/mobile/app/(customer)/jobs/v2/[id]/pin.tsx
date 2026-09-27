@@ -16,7 +16,15 @@ export default function JobPinScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
 
-  const [pinState, setPinState] = useState<{ hasActivePin: boolean; version: number | null; locked: boolean; lastSuccessfulUseAt: string | null } | null>(null)
+  const [pinState, setPinState] = useState<{
+    hasActivePin: boolean
+    version: number | null
+    locked: boolean
+    lastSuccessfulUseAt: string | null
+    arrivalVerifiedAt: string | null
+    workStartVerifiedAt: string | null
+    completionVerifiedAt: string | null
+  } | null>(null)
   const [generatedPin, setGeneratedPin] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
@@ -26,6 +34,7 @@ export default function JobPinScreen() {
     try {
       const res = await v2JobActions.getPinState(id)
       setPinState(res.pinState)
+      if (!res.pinState.hasActivePin) setGeneratedPin(null)
     } catch {
       setPinState(null)
     } finally {
@@ -33,14 +42,26 @@ export default function JobPinScreen() {
     }
   }
 
-  useEffect(() => { loadPinState() }, [id])
+  useEffect(() => {
+    loadPinState()
+    const timer = setInterval(loadPinState, 3000)
+    return () => clearInterval(timer)
+  }, [id])
 
   const handleGenerate = async () => {
     setActionLoading('generate')
     try {
       const res = await v2JobActions.generatePin(id)
       setGeneratedPin(res.pin)
-      setPinState({ hasActivePin: true, version: res.version, locked: false, lastSuccessfulUseAt: null })
+      setPinState((prev) => ({
+        hasActivePin: true,
+        version: res.version,
+        locked: false,
+        lastSuccessfulUseAt: null,
+        arrivalVerifiedAt: prev?.arrivalVerifiedAt ?? null,
+        workStartVerifiedAt: prev?.workStartVerifiedAt ?? null,
+        completionVerifiedAt: prev?.completionVerifiedAt ?? null,
+      }))
     } catch (err: any) {
       const msg = err?.message || t('common.error')
       if (msg.includes('already exists')) {
@@ -67,7 +88,15 @@ export default function JobPinScreen() {
             try {
               const res = await v2JobActions.rotatePin(id)
               setGeneratedPin(res.pin)
-              setPinState({ hasActivePin: true, version: res.version, locked: false, lastSuccessfulUseAt: null })
+              setPinState((prev) => ({
+                hasActivePin: true,
+                version: res.version,
+                locked: false,
+                lastSuccessfulUseAt: null,
+                arrivalVerifiedAt: prev?.arrivalVerifiedAt ?? null,
+                workStartVerifiedAt: prev?.workStartVerifiedAt ?? null,
+                completionVerifiedAt: prev?.completionVerifiedAt ?? null,
+              }))
             } catch (err: any) {
               Alert.alert(t('common.error'), err?.message || t('common.error'))
             } finally {
@@ -93,7 +122,15 @@ export default function JobPinScreen() {
             try {
               await v2JobActions.revokePin(id)
               setGeneratedPin(null)
-              setPinState({ hasActivePin: false, version: null, locked: false, lastSuccessfulUseAt: null })
+              setPinState((prev) => ({
+                hasActivePin: false,
+                version: prev?.version ?? null,
+                locked: false,
+                lastSuccessfulUseAt: prev?.lastSuccessfulUseAt ?? null,
+                arrivalVerifiedAt: prev?.arrivalVerifiedAt ?? null,
+                workStartVerifiedAt: prev?.workStartVerifiedAt ?? null,
+                completionVerifiedAt: prev?.completionVerifiedAt ?? null,
+              }))
               Alert.alert(t('jobPin.title'), t('jobPin.revoked'))
             } catch (err: any) {
               Alert.alert(t('common.error'), err?.message || t('common.error'))
@@ -121,6 +158,18 @@ export default function JobPinScreen() {
     )
   }
 
+  const nextPurpose = !pinState?.arrivalVerifiedAt
+    ? 'Arrival PIN'
+    : !pinState?.workStartVerifiedAt
+      ? 'Start Work PIN'
+      : 'Verification PIN'
+
+  const nextPurposeHint = !pinState?.arrivalVerifiedAt
+    ? 'Give this one-time PIN to the provider only when they have arrived.'
+    : !pinState?.workStartVerifiedAt
+      ? 'Arrival is confirmed. Generate a fresh one-time PIN only when you are ready for work to start.'
+      : 'Work has already started. No additional start PIN is required.'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -129,9 +178,9 @@ export default function JobPinScreen() {
 
         {generatedPin && (
           <View style={styles.pinReveal}>
-            <Text style={styles.pinLabel}>{t('jobPin.yourPin')}</Text>
+            <Text style={styles.pinLabel}>{nextPurpose}</Text>
             <Text style={styles.pinValue}>{generatedPin}</Text>
-            <Text style={styles.pinWarning}>{t('jobPin.saveWarning')}</Text>
+            <Text style={styles.pinWarning}>{nextPurposeHint}</Text>
             <TouchableOpacity style={styles.copyBtn} onPress={handleCopyPin}>
               {copied ? (
                 <CheckCircle size={18} color={colors.success} />
@@ -170,14 +219,20 @@ export default function JobPinScreen() {
 
         {!pinState?.hasActivePin && !generatedPin && (
           <View style={styles.emptyState}>
-            <ShieldSlash size={48} color={colors.muted} />
-            <Text style={styles.emptyTitle}>{t('jobPin.noPin')}</Text>
-            <Text style={styles.emptySubtitle}>{t('jobPin.noPinBody')}</Text>
+            {pinState?.workStartVerifiedAt ? (
+              <CheckCircle size={48} color={colors.success} />
+            ) : (
+              <ShieldSlash size={48} color={colors.muted} />
+            )}
+            <Text style={styles.emptyTitle}>
+              {pinState?.workStartVerifiedAt ? 'Work start verified' : nextPurpose}
+            </Text>
+            <Text style={styles.emptySubtitle}>{nextPurposeHint}</Text>
           </View>
         )}
 
         <View style={styles.actions}>
-          {!pinState?.hasActivePin && !generatedPin && (
+          {!pinState?.hasActivePin && !generatedPin && !pinState?.workStartVerifiedAt && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.primaryBtn]}
               onPress={handleGenerate}

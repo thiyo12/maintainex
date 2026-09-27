@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { prisma, type PrismaClientOrTx } from '../prisma'
 import { hashPassword, verifyPassword } from '../security/password'
 import { emitSecurityEvent } from '../security/events'
+import { recordJobLifecycleEvent } from './job-lifecycle-audit'
 
 const PIN_LENGTH = 6
 const MAX_FAILED_ATTEMPTS = 5
@@ -24,6 +25,9 @@ export interface PinState {
   version: number | null
   locked: boolean
   lastSuccessfulUseAt: Date | null
+  arrivalVerifiedAt: Date | null
+  workStartVerifiedAt: Date | null
+  completionVerifiedAt: Date | null
 }
 
 function generatePin(): string {
@@ -39,6 +43,14 @@ export async function generateJobPin(
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== customerId) throw new Error('Only the job owner can generate a PIN')
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    throw new Error('PIN is only available for an accepted active booking')
+  }
+  const protectedEscrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+    select: { id: true },
+  })
+  if (!protectedEscrow) throw new Error('Payment must be protected before generating a PIN')
 
   const existingActive = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
@@ -51,7 +63,12 @@ export async function generateJobPin(
   const lastPin = await prisma.jobVerificationPin.findFirst({
     where: { jobId },
     orderBy: { version: 'desc' },
-    select: { version: true },
+    select: {
+      version: true,
+      arrivalVerifiedAt: true,
+      workStartVerifiedAt: true,
+      completionVerifiedAt: true,
+    },
   })
   const nextVersion = (lastPin?.version ?? 0) + 1
 
@@ -62,6 +79,9 @@ export async function generateJobPin(
       pinHash,
       status: 'ACTIVE',
       version: nextVersion,
+      arrivalVerifiedAt: lastPin?.arrivalVerifiedAt ?? null,
+      workStartVerifiedAt: lastPin?.workStartVerifiedAt ?? null,
+      completionVerifiedAt: lastPin?.completionVerifiedAt ?? null,
     },
   })
 
@@ -82,13 +102,25 @@ export async function rotateJobPin(
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
   if (job.customerId !== customerId) throw new Error('Only the job owner can rotate a PIN')
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)) {
+    throw new Error('PIN is only available for an accepted active booking')
+  }
+  const protectedEscrow = await prisma.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+    select: { id: true },
+  })
+  if (!protectedEscrow) throw new Error('Payment must be protected before rotating a PIN')
 
   const currentActive = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
     orderBy: { version: 'desc' },
   })
+  const latestPin = currentActive ?? await prisma.jobVerificationPin.findFirst({
+    where: { jobId },
+    orderBy: { version: 'desc' },
+  })
 
-  const nextVersion = currentActive ? currentActive.version + 1 : 1
+  const nextVersion = (latestPin?.version ?? 0) + 1
 
   const pin = generatePin()
   const pinHash = await hashPassword(pin)
@@ -108,6 +140,9 @@ export async function rotateJobPin(
         pinHash,
         status: 'ACTIVE',
         version: nextVersion,
+        arrivalVerifiedAt: latestPin?.arrivalVerifiedAt ?? null,
+        workStartVerifiedAt: latestPin?.workStartVerifiedAt ?? null,
+        completionVerifiedAt: latestPin?.completionVerifiedAt ?? null,
       },
     })
   })
@@ -274,19 +309,60 @@ export async function verifyJobPin(
 
     await tx.jobVerificationPin.update({
       where: { id: pinRecord.id },
-      data: updateData,
+      data: {
+        ...updateData,
+        status: 'CONSUMED',
+      },
     })
 
-    // 9. Execute canonical lifecycle transition for WORK_START (within same transaction)
+    // 9. Execute the single canonical WORK_START transition atomically.
+    // Payment only protects escrow; work does not begin until this PIN succeeds.
     if (purpose === 'WORK_START') {
-      const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
-      if (workspace && workspace.progressStatus === 'ACCEPTED') {
-        await tx.jobWorkspace.updateMany({
-          where: { jobId, progressStatus: 'ACCEPTED' },
-          data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
+      const jobClaimed = await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: 'QUOTE_ACCEPTED' },
+        data: { status: 'IN_PROGRESS' },
+      })
+      if (jobClaimed.count !== 1) {
+        throw new Error('Job state changed before work start')
+      }
+
+      const workspaceClaimed = await tx.jobWorkspace.updateMany({
+        where: { jobId, progressStatus: 'ACCEPTED' },
+        data: { progressStatus: 'IN_PROGRESS', updatedAt: now },
+      })
+      if (workspaceClaimed.count !== 1) {
+        throw new Error('Workspace state changed before work start')
+      }
+
+      if (verifierType === 'COMPANY' || verifierType === 'ASSIGNED_WORKER') {
+        const assignmentClaimed = await tx.companyJobAssignment.updateMany({
+          where: {
+            jobId,
+            workerUserId: actorId,
+            status: 'ACCEPTED',
+          },
+          data: { status: 'IN_PROGRESS', startedAt: now },
         })
+        if (assignmentClaimed.count !== 1) {
+          throw new Error('Only the accepted assigned company worker can start work')
+        }
       }
     }
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId,
+      actorType: verifierType,
+      action:
+        purpose === 'ARRIVAL'
+          ? 'ARRIVAL_VERIFIED'
+          : purpose === 'WORK_START'
+            ? 'WORK_STARTED'
+            : 'COMPLETION_PIN_VERIFIED',
+      fromState: purpose === 'WORK_START' ? 'QUOTE_ACCEPTED' : null,
+      toState: purpose === 'WORK_START' ? 'IN_PROGRESS' : null,
+      metadata: { purpose, pinVersion: pinRecord.version },
+    })
 
     // 10. Emit security events
     const eventType = purpose === 'ARRIVAL' ? 'job_pin_arrival_verified'
@@ -313,28 +389,48 @@ export async function verifyJobPin(
 
 export async function getPinState(
   jobId: string,
-  customerId: string
+  actorId: string
 ): Promise<PinState> {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
-  if (job.customerId !== customerId) throw new Error('Only the job owner can view PIN state')
+
+  const isCustomer = job.customerId === actorId
+  const verifierType = isCustomer ? null : await resolvePinVerifierTx(prisma, jobId, actorId)
+  if (!isCustomer && !verifierType) {
+    throw new Error('Not authorized to view PIN state')
+  }
 
   const activePin = await prisma.jobVerificationPin.findFirst({
     where: { jobId, status: 'ACTIVE' },
     orderBy: { version: 'desc' },
   })
+  const latestPin = activePin ?? await prisma.jobVerificationPin.findFirst({
+    where: { jobId },
+    orderBy: { version: 'desc' },
+  })
 
-  if (!activePin) {
-    return { hasActivePin: false, version: null, locked: false, lastSuccessfulUseAt: null }
+  if (!latestPin) {
+    return {
+      hasActivePin: false,
+      version: null,
+      locked: false,
+      lastSuccessfulUseAt: null,
+      arrivalVerifiedAt: null,
+      workStartVerifiedAt: null,
+      completionVerifiedAt: null,
+    }
   }
 
-  const locked = activePin.lockedUntil != null && activePin.lockedUntil > new Date()
+  const locked = activePin?.lockedUntil != null && activePin.lockedUntil > new Date()
 
   return {
-    hasActivePin: true,
-    version: activePin.version,
+    hasActivePin: !!activePin,
+    version: latestPin.version,
     locked,
-    lastSuccessfulUseAt: activePin.lastSuccessfulUseAt,
+    lastSuccessfulUseAt: latestPin.lastSuccessfulUseAt,
+    arrivalVerifiedAt: latestPin.arrivalVerifiedAt,
+    workStartVerifiedAt: latestPin.workStartVerifiedAt,
+    completionVerifiedAt: latestPin.completionVerifiedAt,
   }
 }
 
@@ -343,6 +439,25 @@ async function resolvePinVerifierTx(
   jobId: string,
   userId: string
 ): Promise<'INDIVIDUAL' | 'COMPANY' | 'ASSIGNED_WORKER' | null> {
+  const actor = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      isActive: true,
+      isSuspended: true,
+      isBanned: true,
+      identityStatus: true,
+    },
+  })
+  if (
+    !actor ||
+    !actor.isActive ||
+    actor.isSuspended ||
+    actor.isBanned ||
+    actor.identityStatus !== 'VERIFIED'
+  ) {
+    return null
+  }
+
   const acceptedQuote = await tx.jobQuote.findFirst({
     where: { jobId, status: 'ACCEPTED' },
     select: { providerId: true, providerType: true },
@@ -354,22 +469,32 @@ async function resolvePinVerifierTx(
   }
 
   if (acceptedQuote.providerType === 'COMPANY') {
+    const [assignment, membership] = await Promise.all([
+      tx.companyJobAssignment.findFirst({
+        where: {
+          jobId,
+          workerUserId: userId,
+          companyId: acceptedQuote.providerId,
+          status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+        },
+        select: { id: true },
+      }),
+      tx.teamMember.findFirst({
+        where: {
+          companyId: acceptedQuote.providerId,
+          userId,
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      }),
+    ])
+    if (!assignment || !membership) return null
+
     const companyProfile = await tx.companyProfile.findFirst({
       where: { userId, id: acceptedQuote.providerId },
       select: { id: true },
     })
-    if (companyProfile) return 'COMPANY'
-
-    const assignment = await tx.companyJobAssignment.findFirst({
-      where: {
-        jobId,
-        workerUserId: userId,
-        companyId: acceptedQuote.providerId,
-        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
-      },
-      select: { id: true },
-    })
-    if (assignment) return 'ASSIGNED_WORKER'
+    return companyProfile ? 'COMPANY' : 'ASSIGNED_WORKER'
   }
 
   return null
@@ -384,14 +509,21 @@ async function validatePurposeTx(
   if (!job) return false
 
   const workspace = await tx.jobWorkspace.findUnique({ where: { jobId } })
+  const protectedEscrow = await tx.jobEscrow.findFirst({
+    where: { jobId, status: 'PROTECTED' },
+    select: { id: true },
+  })
 
   switch (purpose) {
     case 'ARRIVAL':
-      return job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS'
+      return job.status === 'QUOTE_ACCEPTED' &&
+        workspace?.progressStatus === 'ACCEPTED' &&
+        !!protectedEscrow
 
     case 'WORK_START': {
-      if (job.status !== 'IN_PROGRESS') return false
+      if (job.status !== 'QUOTE_ACCEPTED') return false
       if (workspace?.progressStatus !== 'ACCEPTED') return false
+      if (!protectedEscrow) return false
 
       const activePin = await tx.jobVerificationPin.findFirst({
         where: { jobId, status: 'ACTIVE' },

@@ -45,14 +45,30 @@ export default function CompanyDispatch() {
       const companyId = await getActiveCompanyId()
       if (!companyId) return
       const params = new URLSearchParams({ companyId })
-      if (filter === 'active') params.set('status', 'ASSIGNED')
-      else if (filter === 'in_progress') params.set('status', 'IN_PROGRESS')
+      if (filter === 'in_progress') params.set('status', 'IN_PROGRESS')
       else if (filter === 'completed') params.set('status', 'COMPLETED')
 
-      const data = await v2Request<{ assignments: Assignment[] }>(
-        `/api/mobile/company/assignments?${params.toString()}`
-      )
-      setAssignments(data.assignments || [])
+      try {
+        const data = await v2Request<{ assignments: Assignment[] }>(
+          `/api/mobile/company/assignments?${params.toString()}`
+        )
+        const visible = filter === 'active'
+          ? (data.assignments || []).filter((a) => ['ASSIGNED', 'ACCEPTED'].includes(a.status))
+          : (data.assignments || [])
+        setAssignments(visible)
+      } catch {
+        const own = await v2Request<{ assignments: Assignment[] }>(
+          `/api/mobile/worker/assignments?companyId=${encodeURIComponent(companyId)}`
+        )
+        const visible = (own.assignments || []).filter((a) =>
+          filter === 'active'
+            ? ['ASSIGNED', 'ACCEPTED'].includes(a.status)
+            : filter === 'in_progress'
+              ? a.status === 'IN_PROGRESS'
+              : false
+        )
+        setAssignments(visible)
+      }
     } catch {
       setAssignments([])
     } finally {

@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useColors } from '../../../lib/ThemeContext'
-import { v2Request } from '../../../lib/api-v2'
+import { v2Request, v2Jobs } from '../../../lib/api-v2'
 import { getActiveCompanyId } from '../../../lib/api'
 
 interface TeamMember {
@@ -31,6 +31,7 @@ export default function AssignWorkerScreen() {
   const colors = useColors()
   const styles = makeStyles(colors)
   const router = useRouter()
+  const { jobId: requestedJobId } = useLocalSearchParams<{ jobId?: string }>()
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -41,25 +42,46 @@ export default function AssignWorkerScreen() {
 
   useEffect(() => {
     loadData()
-  }, [])
+  }, [requestedJobId])
 
   const loadData = async () => {
     try {
       const companyId = await getActiveCompanyId()
       if (!companyId) return
 
-      const [teamData, assignmentsData] = await Promise.all([
+      const [teamData, assignmentsData, quotedJobs] = await Promise.all([
         v2Request<{ members: TeamMember[] }>(`/api/mobile/company/team?companyId=${companyId}`),
-        v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${companyId}&status=ASSIGNED`),
+        v2Request<{ assignments: any[] }>(`/api/mobile/company/assignments?companyId=${companyId}`),
+        v2Jobs.list(`myQuotes=true&context=company&companyId=${encodeURIComponent(companyId)}`),
       ])
 
-      const assignedJobIds = new Set(assignmentsData.assignments.map((a: any) => a.jobId))
+      const assignedJobIds = new Set(
+        (assignmentsData.assignments || [])
+          .filter((a: any) => ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(a.status))
+          .map((a: any) => a.jobId)
+      )
 
       setWorkers(
         (teamData.members || []).filter(
           (m) => m.role === 'WORKER' || m.role === 'DISPATCHER'
         )
       )
+
+      const eligibleJobs = (quotedJobs.jobs || [])
+        .filter((job: any) => job.status === 'QUOTE_ACCEPTED' && !assignedJobIds.has(job.id))
+        .map((job: any) => ({
+          id: job.id,
+          title: job.title,
+          status: job.status,
+          preferredDate: job.preferredDate,
+        }))
+      setAvailableJobs(eligibleJobs)
+
+      if (requestedJobId && eligibleJobs.some((job: any) => job.id === requestedJobId)) {
+        setSelectedJob(requestedJobId)
+      } else if (eligibleJobs.length === 1) {
+        setSelectedJob(eligibleJobs[0].id)
+      }
     } catch {
     } finally {
       setLoading(false)
@@ -130,6 +152,34 @@ export default function AssignWorkerScreen() {
                 </View>
               </View>
               {selectedWorker === w.userId && (
+                <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
+              )}
+            </TouchableOpacity>
+          ))
+        )}
+
+        <Text style={styles.label}>Accepted Job</Text>
+        {availableJobs.length === 0 ? (
+          <Text style={styles.emptyText}>No accepted company jobs are waiting for assignment.</Text>
+        ) : (
+          availableJobs.map((job) => (
+            <TouchableOpacity
+              key={job.id}
+              style={[styles.optionCard, selectedJob === job.id && styles.optionCardActive]}
+              onPress={() => setSelectedJob(job.id)}
+            >
+              <View style={styles.optionLeft}>
+                <View style={[styles.avatar, { backgroundColor: colors.companyAccent || colors.amber }]}>
+                  <Ionicons name="briefcase-outline" size={20} color={colors.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.optionName}>{job.title}</Text>
+                  <Text style={styles.optionMeta}>
+                    {job.preferredDate ? new Date(job.preferredDate).toLocaleDateString() : 'Schedule not set'}
+                  </Text>
+                </View>
+              </View>
+              {selectedJob === job.id && (
                 <Ionicons name="checkmark-circle" size={22} color={colors.amber} />
               )}
             </TouchableOpacity>

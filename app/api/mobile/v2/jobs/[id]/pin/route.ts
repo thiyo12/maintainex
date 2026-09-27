@@ -16,7 +16,7 @@ export async function GET(
     return NextResponse.json({ pinState: state })
   } catch (error: any) {
     if (error.message === 'Job not found') return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    if (error.message === 'Only the job owner can view PIN state') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (error.message === 'Not authorized to view PIN state') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -40,7 +40,13 @@ export async function POST(
   } catch (error: any) {
     if (error.message === 'Job not found') return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (error.message.includes('Only the job owner')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    if (error.message.includes('active PIN already exists')) return NextResponse.json({ error: error.message }, { status: 409 })
+    if (
+      error.message.includes('active PIN already exists') ||
+      error.message.includes('Payment must be protected') ||
+      error.message.includes('PIN is only available')
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

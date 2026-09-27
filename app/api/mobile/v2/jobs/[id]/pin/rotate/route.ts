@@ -21,6 +21,14 @@ export async function POST(
   } catch (error: any) {
     if (error.message === 'Job not found') return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     if (error.message.includes('Only the job owner')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (
+      error.message.includes('Payment must be protected') ||
+      error.message.includes('PIN is only available') ||
+      error.message.includes('No active PIN found') ||
+      error.message.includes('Cannot rotate')
+    ) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

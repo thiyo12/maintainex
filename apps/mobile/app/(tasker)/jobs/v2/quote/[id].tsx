@@ -19,15 +19,16 @@ export default function V2SubmitQuoteScreen() {
   const [price, setPrice] = useState('')
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState('')
   const [message, setMessage] = useState('')
-  const [providerType, setProviderType] = useState('INDIVIDUAL')
+  const [existingQuote, setExistingQuote] = useState<any>(null)
 
   useEffect(() => { load() }, [id])
 
   const load = async () => {
     try {
-      const [jobRes, idRes] = await Promise.allSettled([
+      const [jobRes, idRes, quoteRes] = await Promise.allSettled([
         v2Jobs.get(id),
         v2Identity.getStatus(),
+        v2Quotes.list(id),
       ])
       if (jobRes.status === 'fulfilled') {
         const j = jobRes.value.job
@@ -44,6 +45,17 @@ export default function V2SubmitQuoteScreen() {
         return
       }
       if (idRes.status === 'fulfilled') setIdentity(idRes.value.identityStatus)
+      if (quoteRes.status === 'fulfilled') {
+        const pending = (quoteRes.value.quotes || [])
+          .filter((q: any) => q.status === 'PENDING')
+          .sort((a: any, b: any) => (b.revisionNumber || 1) - (a.revisionNumber || 1))[0]
+        if (pending) {
+          setExistingQuote(pending)
+          setPrice(String(pending.price))
+          setEstimatedCompletionTime(pending.estimatedCompletionTime || '')
+          setMessage(pending.message || '')
+        }
+      }
     } finally {
       setLoading(false)
     }
@@ -58,12 +70,23 @@ export default function V2SubmitQuoteScreen() {
     }
     setSubmitting(true)
     try {
-      await v2Quotes.submit({
-        jobId: id, providerType,
-        price: parseFloat(price),
-        estimatedCompletionTime, message,
-      })
-      Alert.alert('Quote sent!', 'Customer has been notified.', [
+      if (existingQuote) {
+        await v2Quotes.revise(existingQuote.id, {
+          price: parseFloat(price),
+          estimatedCompletionTime,
+          message,
+          revisionReason: 'Provider revised quote after customer negotiation',
+        })
+      } else {
+        await v2Quotes.submit({
+          jobId: id,
+          providerType: 'INDIVIDUAL',
+          price: parseFloat(price),
+          estimatedCompletionTime,
+          message,
+        })
+      }
+      Alert.alert(existingQuote ? 'Quote revised!' : 'Quote sent!', 'Customer has been notified.', [
         { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (e: any) {
@@ -83,6 +106,8 @@ export default function V2SubmitQuoteScreen() {
 
   if (!job) return null
 
+  const currencyCode = job.countryCode === 'CA' ? 'CAD' : 'LKR'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -92,7 +117,7 @@ export default function V2SubmitQuoteScreen() {
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
-            <Text style={styles.previewBudget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={styles.previewBudget}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={styles.previewType}>{job.budgetType}</Text>
           </View>
         </View>
@@ -130,7 +155,7 @@ export default function V2SubmitQuoteScreen() {
             {job.smartBooking.estimatedPriceMin != null ? (
               <View style={styles.smartRow}>
                 <Text style={styles.smartLabel}>Est. budget</Text>
-                <Text style={styles.smartValue}>LKR {job.smartBooking.estimatedPriceMin.toLocaleString()} – {job.smartBooking.estimatedPriceMax?.toLocaleString?.() ?? ''}</Text>
+                <Text style={styles.smartValue}>{currencyCode} {job.smartBooking.estimatedPriceMin.toLocaleString()} – {job.smartBooking.estimatedPriceMax?.toLocaleString?.() ?? ''}</Text>
               </View>
             ) : null}
             <View style={styles.smartRow}>
@@ -182,25 +207,14 @@ export default function V2SubmitQuoteScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('quotes.yourQuote')}</Text>
 
-            <Text style={styles.label}>{t('jobDetail.provider')} *</Text>
-            <View style={styles.typeRow}>
-              <TouchableOpacity
-                style={[styles.typeBtn, providerType === 'INDIVIDUAL' && styles.typeBtnSelected]}
-                onPress={() => setProviderType('INDIVIDUAL')}
-              >
-                <Text style={[styles.typeBtnText, providerType === 'INDIVIDUAL' && styles.typeBtnTextSelected]}>{t('postJob.step2.freelancer')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.typeBtn, providerType === 'COMPANY' && styles.typeBtnSelected]}
-                onPress={() => setProviderType('COMPANY')}
-              >
-                <Text style={[styles.typeBtnText, providerType === 'COMPANY' && styles.typeBtnTextSelected]}>{t('postJob.step2.company')}</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.label}>{existingQuote ? 'Revise your quote' : 'Your quote'}</Text>
+            <Text style={{ color: colors.textSecondary, marginBottom: 4 }}>
+              {existingQuote ? 'Update the price or timing agreed in chat. The previous quote will be superseded.' : 'Submit this quote as your individual provider profile.'}
+            </Text>
 
-            <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
+            <Text style={styles.label}>{t('quotes.price')} ({currencyCode}) *</Text>
             <View style={styles.priceInputRow}>
-              <Text style={styles.currencySign}>LKR</Text>
+              <Text style={styles.currencySign}>{currencyCode}</Text>
               <TextInput
                 style={[styles.input, styles.priceInput]}
                 value={price}
@@ -239,7 +253,7 @@ export default function V2SubmitQuoteScreen() {
               {submitting ? (
                 <ActivityIndicator color={colors.background} />
               ) : (
-                <Text style={styles.submitBtnText}>{t('tasker.submitQuote')}</Text>
+                <Text style={styles.submitBtnText}>{existingQuote ? 'Revise Quote' : t('tasker.submitQuote')}</Text>
               )}
             </TouchableOpacity>
           </View>

@@ -46,6 +46,7 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
     switch (refType) {
       case 'JOB':
       case 'QUOTE':
+      case 'COMPANY_JOB':
         return { icon: 'construct-outline', tint: colors.blue, bg: colors.blueBg }
       case 'WALLET':
         return { icon: 'wallet-outline', tint: colors.success, bg: colors.successBg }
@@ -59,6 +60,8 @@ export default function NotificationsScreen({ showBack = true, titleKey = 'profi
   const routeFor = (refType?: string | null, refId?: string | null): any => {
     const role = user?.role
     switch (refType) {
+      case 'COMPANY_JOB':
+        return `/(company)/jobs/v2/manage/${refId}`
       case 'JOB':
       case 'QUOTE':
         if (role === 'TASKER') return `/(tasker)/jobs/v2/manage/${refId}`

@@ -2188,6 +2188,7 @@ model MarketplaceJob {
   riskEvents        MarketplaceRiskEvent[]
   verificationPins  JobVerificationPin[]
   assignments       CompanyJobAssignment[]
+  lifecycleEvents   JobLifecycleEvent[]
 
   @@index([customerId])
   @@index([categoryId])
@@ -3319,12 +3320,29 @@ model WalletBalance {
   @@index([walletType])
 }
 
+model JobLifecycleEvent {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         MarketplaceJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actorId     String?
+  actorType   String
+  action      String
+  fromState   String?
+  toState     String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([action])
+  @@index([actorId])
+}
+
 model JobVerificationPin {
   id                  String    @id @default(cuid())
   jobId               String
   customerId          String
   pinHash             String    // bcrypt hash via hashPassword() (SHA-256+pepper+bcrypt)
-  status              String    @default("ACTIVE") // ACTIVE, ROTATED, REVOKED
+  status              String    @default("ACTIVE") // ACTIVE, CONSUMED, ROTATED, REVOKED
   version             Int       @default(1)
   failedAttempts      Int       @default(0)
   lockedUntil         DateTime?
@@ -3375,4 +3393,25 @@ model CompanyJobAssignment {
   @@index([workerUserId])
   @@index([jobId])
   @@index([status])
+}
+
+model PaymentIntent {
+  id              String    @id @default(cuid())
+  jobId           String
+  customerId      String
+  escrowId        String
+  merchantOrderId String    @unique
+  paymentId       String?
+  amount          BigInt
+  currency        String    @default("LKR")
+  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, CHARGEDBACK
+  gatewayResponse String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  paidAt          DateTime?
+
+  @@index([jobId])
+  @@index([customerId])
+  @@index([status])
+  @@index([merchantOrderId])
 }

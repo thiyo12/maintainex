@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
@@ -35,21 +35,25 @@ export default function V2ProviderManageJobScreen() {
   const [actionLoading, setActionLoading] = useState('')
   const [nextJob, setNextJob] = useState<V2Job | null>(null)
 
-  const [reviewQuality, setReviewQuality] = useState('5')
   const [reviewComm, setReviewComm] = useState('5')
   const [reviewExp, setReviewExp] = useState('5')
   const [reviewComment, setReviewComment] = useState('')
 
   const [locationSharing, setLocationSharing] = useState(false)
   const [msgRecipient, setMsgRecipient] = useState<{ id: string; name: string } | null>(null)
+  const [pinState, setPinState] = useState<any>(null)
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
-      setWorkspace(res.job.workspace || null)
-      setEscrow(res.job.escrow || null)
-      setReviews(res.job.reviews || null)
+      const [jobRes, pinRes] = await Promise.all([
+        v2Jobs.get(id),
+        v2JobActions.getPinState(id).catch(() => ({ pinState: null })),
+      ])
+      setJob(jobRes.job)
+      setWorkspace(jobRes.job.workspace || null)
+      setEscrow(jobRes.job.escrow || null)
+      setReviews(jobRes.job.reviews || null)
+      setPinState(pinRes.pinState)
       loadNextJob()
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
@@ -74,7 +78,11 @@ export default function V2ProviderManageJobScreen() {
     } catch { setNextJob(null) }
   }
 
-  useEffect(() => { loadJob() }, [id])
+  useFocusEffect(
+    useCallback(() => {
+      loadJob()
+    }, [id])
+  )
 
   // Send tasker location every 30s while sharing. Foreground-only: updates
   // pause automatically when the app is backgrounded (acceptable by design).
@@ -109,7 +117,13 @@ export default function V2ProviderManageJobScreen() {
         return
       }
       setLocationSharing(true)
-      await handleUpdateProgress('IN_PROGRESS')
+      const loc = await Location.getCurrentPositionAsync({})
+      const token = await (await import('../../../../../lib/api')).getAuthToken()
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/taskers/location`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ latitude: loc.coords.latitude, longitude: loc.coords.longitude }),
+      })
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
     }
@@ -125,15 +139,6 @@ export default function V2ProviderManageJobScreen() {
       await v2JobActions.complete(id, 'MARK_COMPLETE')
       Alert.alert(t('common.done'), t('jobDetail.confirmedStartDesc'))
       await loadJob()
-    } catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
-  }
-
-  const handleUpdateProgress = async (status: string) => {
-    setActionLoading(status)
-    try {
-      await v2JobActions.updateProgress(id, status)
-      loadJob()
     } catch (e: any) { Alert.alert(t('common.error'), e.message) }
     finally { setActionLoading('') }
   }
@@ -216,8 +221,8 @@ export default function V2ProviderManageJobScreen() {
             <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
               <Ionicons name="calendar-outline" size={16} color={colors.amberDark} />
               <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
-                {job.timeSlot
-                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.timeSlot })
+                {job.preferredTimeSlot
+                  ? t('booking.scheduledFor', { date: job.preferredDate, timeSlot: job.preferredTimeSlot })
                   : `${job.preferredDate}`}
               </Text>
             </View>
@@ -280,7 +285,7 @@ export default function V2ProviderManageJobScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('jobDetail.escrow')}</Text>
             <View style={styles.escrowCard}>
-              <Text style={styles.escrowAmount}>LKR {escrow.amount}</Text>
+              <Text style={styles.escrowAmount}>{escrow.currency || 'LKR'} {(escrow.totalAmount || escrow.amount || 0).toLocaleString()}</Text>
               <View style={[styles.escrowBadge, escrow.status === 'PROTECTED' ? styles.escrowActive : styles.escrowInactive]}>
                 <Text style={styles.escrowBadgeText}>{escrow.status}</Text>
               </View>
@@ -334,14 +339,53 @@ export default function V2ProviderManageJobScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && (
+              {job.companyAssignment?.status === 'ASSIGNED' && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="business-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>This is a company assignment. Accept it before verifying arrival.</Text>
+                  <TouchableOpacity
+                    style={styles.verifyPinBtn}
+                    onPress={() => router.push(`/(company)/workforce/assignment/${job.companyAssignment.id}` as any)}
+                  >
+                    <Text style={styles.verifyPinText}>Review & Accept Assignment</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
                 >
-                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
-                  <Text style={styles.verifyPinText}>{t('jobDetail.confirmArrivalDesc')}</Text>
+                  <Ionicons name="location-outline" size={20} color={colors.ink} />
+                  <Text style={styles.verifyPinText}>Verify Arrival PIN</Text>
                 </TouchableOpacity>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+                <TouchableOpacity
+                  style={[styles.verifyPinBtn]}
+                  onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
+                >
+                  <Ionicons name="shield-checkmark-outline" size={20} color={colors.ink} />
+                  <Text style={styles.verifyPinText}>Start Work with PIN</Text>
+                </TouchableOpacity>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="time-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Waiting for the customer to generate the one-time arrival PIN.</Text>
+                </View>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="time-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Arrival is confirmed. Waiting for the customer to generate a fresh Start Work PIN.</Text>
+                </View>
+              )}
+              {workspace.progressStatus === 'ACCEPTED' && escrow?.status !== 'PROTECTED' && (
+                <View style={styles.waitingCard}>
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.amberDark} />
+                  <Text style={styles.waitingText}>Waiting for the customer payment to be secured.</Text>
+                </View>
               )}
               {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
                 <View style={styles.waitingCard}>
@@ -396,8 +440,8 @@ export default function V2ProviderManageJobScreen() {
             <Text style={styles.highlightDesc}>{nextJob.title}</Text>
             {nextJob.preferredDate && (
               <Text style={[styles.scheduleText, { color: colors.amberDark, marginBottom: 12 }]}>
-                {nextJob.timeSlot
-                  ? t('booking.scheduledFor', { date: nextJob.preferredDate, timeSlot: nextJob.timeSlot })
+                {nextJob.preferredTimeSlot
+                  ? t('booking.scheduledFor', { date: nextJob.preferredDate, timeSlot: nextJob.preferredTimeSlot })
                   : nextJob.preferredDate}
               </Text>
             )}
@@ -411,7 +455,7 @@ export default function V2ProviderManageJobScreen() {
         )}
 
         {/* Dispute */}
-        {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+        {job.status === 'IN_PROGRESS' && workspace?.progressStatus !== 'DISPUTED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
             <Text style={styles.disputeBtnText}>{t('jobDetail.raiseDispute')}</Text>
           </TouchableOpacity>

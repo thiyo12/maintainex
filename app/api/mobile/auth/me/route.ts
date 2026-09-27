@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     const [taskerPresence, ownedCompany, companyMembership] = await Promise.all([
       prisma.taskerProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
       prisma.companyProfile.findUnique({ where: { userId: user.id }, select: { id: true } }),
-      prisma.teamMember.findFirst({ where: { userId: user.id, status: 'ACTIVE' }, select: { companyId: true } }),
+      prisma.teamMember.findFirst({ where: { userId: user.id, status: 'ACTIVE' }, select: { companyId: true, role: true } }),
     ])
     const profileSet = new Set<string>(['CUSTOMER', fullUser.role])
     if (taskerPresence) profileSet.add('TASKER')
@@ -65,7 +65,14 @@ export async function GET(request: NextRequest) {
         where: { userId: user.id },
         select: { id: true },
       })
-      needsOnboarding = !profile
+      needsOnboarding = !profile && !companyMembership
+      extra = {
+        activeCompany: companyMembership
+          ? { companyId: companyMembership.companyId, role: companyMembership.role }
+          : profile
+            ? { companyId: profile.id, role: 'COMPANY_OWNER' }
+            : null,
+      }
     } else if (fullUser.role === 'CUSTOMER') {
       const agg = await prisma.marketplaceJob.aggregate({
         where: { customerId: user.id, status: 'COMPLETED' },

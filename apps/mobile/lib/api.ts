@@ -162,6 +162,8 @@ export const notifications = {
   list: () => request<Notification[]>('/api/mobile/notifications'),
   registerPush: (token: string) =>
     request<void>('/api/mobile/notifications', { method: 'POST', body: JSON.stringify({ token }) }),
+  unregisterPush: () =>
+    request<void>('/api/mobile/notifications', { method: 'DELETE' }),
   markRead: (id: string) =>
     request<void>(`/api/mobile/notifications/${id}`, { method: 'PUT' }),
   markAllRead: () =>
@@ -198,6 +200,27 @@ export const disputes = {
     request<{ id: string; jobTitle: string; reason: string; status: string; createdAt: string }[]>('/api/mobile/disputes'),
   get: (id: string) =>
     request<any>(`/api/mobile/disputes/${id}`),
+}
+
+// Resolve the user's active company membership. This works for owners,
+// managers, dispatchers, and workers without changing their global account role.
+export type ActiveCompanyContext = {
+  companyId: string
+  role: 'COMPANY_OWNER' | 'MANAGER' | 'DISPATCHER' | 'WORKER' | 'FINANCE'
+  membershipId: string
+}
+
+export async function getActiveCompanyContext(): Promise<ActiveCompanyContext | null> {
+  try {
+    return await request<ActiveCompanyContext>('/api/mobile/company/context')
+  } catch {
+    return null
+  }
+}
+
+export async function getActiveCompanyId(): Promise<string | null> {
+  const context = await getActiveCompanyContext()
+  return context?.companyId || null
 }
 
 // Company

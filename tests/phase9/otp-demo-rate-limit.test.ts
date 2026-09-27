@@ -37,6 +37,7 @@ import { INTERACTIVE_TEST_PHONES } from '@/lib/test-cert'
 
 const db = prisma as any
 const originalAllowTestOtp = process.env.ALLOW_TEST_OTP
+const originalNodeEnv = process.env.NODE_ENV
 
 let HASH_ZERO: string
 let HASH_RANDOM: string
@@ -112,7 +113,7 @@ function resetMocks() {
   db.oTP.create.mockResolvedValue({})
   db.oTP.findFirst.mockResolvedValue(null)
   db.oTP.update.mockResolvedValue({})
-  db.oTP.updateMany.mockResolvedValue({ count: 0 })
+  db.oTP.updateMany.mockResolvedValue({ count: 1 })
   db.oTP.count.mockResolvedValue(0)
   db.securityAudit.create.mockResolvedValue({})
   db.customerProfile.upsert.mockResolvedValue({})
@@ -142,6 +143,8 @@ beforeEach(() => {
 afterEach(() => {
   if (originalAllowTestOtp === undefined) delete process.env.ALLOW_TEST_OTP
   else process.env.ALLOW_TEST_OTP = originalAllowTestOtp
+  if (originalNodeEnv === undefined) delete process.env.NODE_ENV
+  else process.env.NODE_ENV = originalNodeEnv
 })
 
 describe('OTP demo rate-limit bypass — source guard', () => {
@@ -348,8 +351,24 @@ describe('OTP verify brute-force protection (cases 1-8)', () => {
     expect(body.accessToken).toBe('access-token')
     expect(body.token).toBe('access-token')
     expect(db.user.create).toHaveBeenCalled()
-    expect(db.oTP.update).toHaveBeenCalledWith({ where: { id: 'otp1' }, data: { isUsed: true } })
+    expect(db.oTP.updateMany).toHaveBeenCalledWith({
+      where: { id: 'otp1', isUsed: false },
+      data: { isUsed: true },
+    })
     expect(createMarketplaceAuthSession).toHaveBeenCalled()
+  })
+
+  it('case 4b: valid OTP replay loses the atomic consume race and creates no session', async () => {
+    db.user.findFirst.mockResolvedValue(ordinaryUser)
+    db.oTP.findFirst.mockResolvedValue({ id: 'otp1', attempts: 0, codeHash: HASH_RANDOM, isUsed: false })
+    db.oTP.updateMany.mockResolvedValue({ count: 0 })
+
+    const res = await POST(makeRequest({ phone: '+12025550999', code: '123456' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.error).toContain('already used')
+    expect(createMarketplaceAuthSession).not.toHaveBeenCalled()
   })
 
   it('case 5: verify limit is NOT bypassed for demo accounts (attempts >= 5 → 429)', async () => {
@@ -396,6 +415,21 @@ describe('OTP verify brute-force protection (cases 1-8)', () => {
 
     expect(res.status).toBe(400)
     expect(body.error).toBe('No valid code found. Request a new one.')
+    expect(createMarketplaceAuthSession).not.toHaveBeenCalled()
+  })
+
+  it('case 7b: production rejects 000000 even when ALLOW_TEST_OTP=true', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.ALLOW_TEST_OTP = 'true'
+    db.user.findFirst.mockResolvedValue(demoUser('TASKER'))
+    db.oTP.findFirst.mockResolvedValue({ id: 'otp-prod', attempts: 0, codeHash: HASH_RANDOM, isUsed: false })
+
+    const res = await POST(makeRequest({ phone: INTERACTIVE_TEST_PHONES.TASKER, code: '000000' }))
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body.error).toBe('Invalid code. Please try again.')
+    expect(db.user.create).not.toHaveBeenCalled()
     expect(createMarketplaceAuthSession).not.toHaveBeenCalled()
   })
 

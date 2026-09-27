@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { blastJobToTaskers } from '@/lib/job-blast'
@@ -7,18 +9,10 @@ import { getSetting } from '@/lib/settings'
 import { notifyTaskerAssigned } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
+import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/money'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
-
-function parseBigIntInput(value: unknown): bigint | null {
-  if (typeof value === 'bigint') return value > 0n ? value : null
-  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value)
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    const parsed = BigInt(value.trim())
-    return parsed > 0n ? parsed : null
-  }
-  return null
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +29,49 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.allowed) return rateLimit.response!
 
     const body = await request.json()
+    const idempotencyKey = request.headers.get('idempotency-key')?.trim() || null
+    const requestFingerprint = idempotencyKey
+      ? createHash('sha256').update(JSON.stringify(body)).digest('hex')
+      : null
+
+    if (idempotencyKey) {
+      const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+      if (existing && existing.expiresAt >= new Date()) {
+        if (
+          existing.userId !== user.id ||
+          existing.operation !== 'CREATE_MARKETPLACE_JOB' ||
+          existing.requestFingerprint !== requestFingerprint
+        ) {
+          return NextResponse.json({ error: 'Idempotency key was already used for a different request' }, { status: 409 })
+        }
+
+        if (existing.status === 'COMPLETED' && existing.resultPayload) {
+          const cached = JSON.parse(existing.resultPayload) as { jobId?: string }
+          if (cached.jobId) {
+            const replayJob = await prisma.marketplaceJob.findUnique({ where: { id: cached.jobId } })
+            if (replayJob) {
+              const replayConversation = await prisma.conversation.findFirst({
+                where: {
+                  jobId: replayJob.id,
+                  participants: { some: { userId: user.id } },
+                },
+                select: { id: true },
+              })
+              return NextResponse.json({
+                job: { ...replayJob, budgetAmount: replayJob.budgetAmount != null ? minorUnitsToMajorUnits(replayJob.budgetAmount, getCurrencyForCountry(replayJob.countryCode)) : null },
+                notifiedCount: replayJob.notifiedCount,
+                conversationId: replayConversation?.id ?? null,
+                estimatedResponseTime: '5-30 minutes',
+                replayed: true,
+              })
+            }
+          }
+        }
+
+        return NextResponse.json({ error: 'An identical job creation request is already being processed' }, { status: 409 })
+      }
+    }
+
     let {
       title, description, categoryId, photos,
       budgetType, budgetAmount, areaId, postalCode, preferredDate,
@@ -52,7 +89,6 @@ export async function POST(request: NextRequest) {
     if (typeof templateJobId === 'string') templateJobId = sanitize(templateJobId, 80)
     if (typeof targetTaskerId === 'string') targetTaskerId = sanitize(targetTaskerId, 80)
 
-    const budgetMinor = parseBigIntInput(budgetAmount)
     if (!title || !description || !categoryId || !budgetType) {
       return NextResponse.json({ error: 'Missing or invalid required fields: title, description, categoryId, budgetType' }, { status: 400 })
     }
@@ -106,6 +142,12 @@ export async function POST(request: NextRequest) {
 
     const finalPreferredTimeSlot = ['morning', 'afternoon', 'evening', 'anytime'].includes(preferredTimeSlot) ? preferredTimeSlot : null
     const finalCountryCode = typeof countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(countryCode) ? countryCode.toUpperCase() : 'LK'
+    const currency = getCurrencyForCountry(finalCountryCode)
+    const budgetProvided = budgetAmount !== undefined && budgetAmount !== null && budgetAmount !== ''
+    const budgetMinor = budgetProvided ? parseMajorUnitsInput(budgetAmount, currency) : null
+    if (budgetProvided && budgetMinor === null) {
+      return NextResponse.json({ error: 'budgetAmount must be a positive amount with at most 2 decimal places' }, { status: 400 })
+    }
 
     if (finalCountryCode !== user.countryCode) {
       return NextResponse.json({
@@ -152,8 +194,7 @@ export async function POST(request: NextRequest) {
       console.error('Canonical price estimate generation failed:', error)
     }
 
-    const job = await prisma.marketplaceJob.create({
-      data: {
+    const jobData = {
         customerId: user.id,
         title,
         description,
@@ -179,8 +220,71 @@ export async function POST(request: NextRequest) {
         smartBookingJson: finalSmartBookingJson,
         latitude: typeof latitude === 'number' && Number.isFinite(latitude) ? latitude : null,
         longitude: typeof longitude === 'number' && Number.isFinite(longitude) ? longitude : null,
-      },
-    })
+      }
+
+    let job
+    try {
+      if (idempotencyKey) {
+        job = await prisma.$transaction(async tx => {
+          await tx.idempotencyRecord.create({
+            data: {
+              idempotencyKey,
+              userId: user.id,
+              operation: 'CREATE_MARKETPLACE_JOB',
+              status: 'PENDING',
+              requestFingerprint,
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            },
+          })
+
+          const created = await tx.marketplaceJob.create({ data: jobData })
+          await tx.idempotencyRecord.update({
+            where: { idempotencyKey },
+            data: {
+              status: 'COMPLETED',
+              resultPayload: JSON.stringify({ jobId: created.id }),
+            },
+          })
+          return created
+        })
+      } else {
+        job = await prisma.marketplaceJob.create({ data: jobData })
+      }
+    } catch (error) {
+      if (
+        idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existing = await prisma.idempotencyRecord.findUnique({ where: { idempotencyKey } })
+        if (
+          existing?.userId !== user.id ||
+          existing?.operation !== 'CREATE_MARKETPLACE_JOB' ||
+          existing?.requestFingerprint !== requestFingerprint
+        ) {
+          return NextResponse.json({ error: 'Idempotency key conflict' }, { status: 409 })
+        }
+
+        if (existing.status === 'COMPLETED' && existing.resultPayload) {
+          const cached = JSON.parse(existing.resultPayload) as { jobId?: string }
+          const replayJob = cached.jobId
+            ? await prisma.marketplaceJob.findUnique({ where: { id: cached.jobId } })
+            : null
+          if (replayJob) {
+            return NextResponse.json({
+              job: { ...replayJob, budgetAmount: replayJob.budgetAmount != null ? minorUnitsToMajorUnits(replayJob.budgetAmount, getCurrencyForCountry(replayJob.countryCode)) : null },
+              notifiedCount: replayJob.notifiedCount,
+              conversationId: null,
+              estimatedResponseTime: '5-30 minutes',
+              replayed: true,
+            })
+          }
+        }
+
+        return NextResponse.json({ error: 'An identical job creation request is already being processed' }, { status: 409 })
+      }
+      throw error
+    }
 
     let notifiedCount = 0
     try {
@@ -232,7 +336,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      job: { ...job, budgetAmount: job.budgetAmount?.toString() ?? null },
+      job: { ...job, budgetAmount: job.budgetAmount != null ? minorUnitsToMajorUnits(job.budgetAmount, getCurrencyForCountry(job.countryCode)) : null },
       notifiedCount,
       conversationId,
       estimatedResponseTime: '5-30 minutes',
@@ -253,6 +357,25 @@ export async function GET(request: NextRequest) {
     const role = searchParams.get('role')
     const myQuotes = searchParams.get('myQuotes')
     const areaId = searchParams.get('areaId')
+    const requestedContext = searchParams.get('context')
+    const requestedCompanyId = searchParams.get('companyId')
+
+    let companyContextId: string | null = null
+    if (requestedContext === 'company') {
+      const requiredPermission =
+        myQuotes === 'true'
+          ? 'quotes:read'
+          : role === 'provider'
+            ? 'quotes:submit'
+            : 'jobs:read'
+      const { context, error } = await resolveCompanyContext(
+        user.id,
+        requestedCompanyId,
+        requiredPermission,
+      )
+      if (error) return error
+      companyContextId = context!.companyId
+    }
 
     const where: any = { isActive: true }
 
@@ -260,7 +383,10 @@ export async function GET(request: NextRequest) {
       let providerId = user.id
       let providerType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
 
-      if (user.role === 'COMPANY') {
+      if (companyContextId) {
+        providerId = companyContextId
+        providerType = 'COMPANY'
+      } else if (user.role === 'COMPANY') {
         const companyProfile = await prisma.companyProfile.findUnique({
           where: { userId: user.id },
           select: { id: true },
@@ -288,14 +414,26 @@ export async function GET(request: NextRequest) {
 
       let allowedCategoryIds: string[] = []
 
-      if (user.role === 'COMPANY') {
-        const companyProfile = await prisma.companyProfile.findUnique({
-          where: { userId: user.id },
-          select: {
-            services: true,
-            specialties: { select: { categoryId: true, jobId: true } },
-          },
-        })
+      if (companyContextId || user.role === 'COMPANY') {
+        const companyProfile = companyContextId
+          ? await prisma.companyProfile.findUnique({
+              where: { id: companyContextId },
+              select: {
+                countryCode: true,
+                services: true,
+                specialties: { select: { categoryId: true, jobId: true } },
+              },
+            })
+          : await prisma.companyProfile.findUnique({
+              where: { userId: user.id },
+              select: {
+                countryCode: true,
+                services: true,
+                specialties: { select: { categoryId: true, jobId: true } },
+              },
+            })
+
+        if (companyProfile?.countryCode) where.countryCode = companyProfile.countryCode
 
         if (companyProfile) {
           const directCategoryIds = companyProfile.specialties
@@ -398,7 +536,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       jobs: jobs.map((job) => ({
         ...job,
-        budgetAmount: job.budgetAmount?.toString() ?? null,
+        budgetAmount: job.budgetAmount != null ? minorUnitsToMajorUnits(job.budgetAmount, getCurrencyForCountry(job.countryCode)) : null,
         aiEstimate: job.aiEstimateJson ? JSON.parse(job.aiEstimateJson) : null,
         smartBooking: job.smartBookingJson ? JSON.parse(job.smartBookingJson) : null,
       })),

@@ -14,7 +14,7 @@ echo ""
 echo "=== Phase 1: rsync delta transfer ==="
 RSYNC_START=$(date +%s)
 
-rsync -av --partial --compress --compress-level=6 --timeout=60 --stats \
+rsync -av --delete --partial --compress --compress-level=6 --timeout=60 --stats \
   --exclude='.next/' \
   --exclude='node_modules/' \
   --exclude='.git/' \
@@ -42,13 +42,15 @@ echo "Container: $CONTAINER"
 
 ssh -i "$SSH_KEY" -o ConnectTimeout=30 "$VPS" "CONTAINER=$CONTAINER && cd /root/maintainex-src && \
   for d in lib app prisma public components hooks scripts types; do \
-    docker exec -w /app \$CONTAINER rm -rf \$d 2>/dev/null; \
+    docker exec -u 0 -w /app \$CONTAINER rm -rf \$d 2>/dev/null; \
     if [ -d \$d ]; then docker cp \$d \$CONTAINER:/app/; fi; \
   done && \
-  for f in package.json package-lock.json tsconfig.json next.config.js vitest.config.mts; do \
-    docker exec -w /app \$CONTAINER rm -f \$f 2>/dev/null; \
+  for f in package.json package-lock.json tsconfig.json next.config.js vitest.config.mts middleware.ts tailwind.config.ts postcss.config.js next-env.d.ts; do \
+    docker exec -u 0 -w /app \$CONTAINER rm -f \$f 2>/dev/null; \
     if [ -f \$f ]; then docker cp \$f \$CONTAINER:/app/; fi; \
-  done && echo CP_DONE"
+  done && \
+  docker exec -u 0 -w /app \$CONTAINER sh -c 'chown -R appuser:appgroup /app/lib /app/app /app/prisma /app/public /app/components /app/hooks /app/scripts /app/types /app/package.json /app/package-lock.json /app/tsconfig.json /app/next.config.js /app/vitest.config.mts /app/middleware.ts /app/tailwind.config.ts /app/postcss.config.js /app/next-env.d.ts 2>/dev/null; true' && \
+  echo CP_DONE"
 
 COPY_END=$(date +%s)
 COPY_DURATION=$((COPY_END - COPY_START))

@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       token,
       userId: user.id,
       userEmail: user.email,
+      userPhone: user.phone,
     })
 
     if (!result.success) {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { role: 'TASKER' },
+      data: { role: 'COMPANY' },
     })
 
     return NextResponse.json({

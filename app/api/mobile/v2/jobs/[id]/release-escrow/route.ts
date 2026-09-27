@@ -40,8 +40,8 @@ export async function POST(
       currency: escrow?.currency ?? 'LKR',
     })
 
-    notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
-    notifyJobCompleted(job.id, job.customerId, job.title)
+    await notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
+    await notifyJobCompleted(job.id, job.customerId, job.title)
 
     return NextResponse.json({
       success: true,

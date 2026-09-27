@@ -5,6 +5,7 @@ import { fundEscrow } from '@/lib/domain/job-lifecycle'
 import { notifyEscrowDeposited } from '@/lib/notifications'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditEscrowFund } from '@/lib/financial-audit'
+import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/money'
 
 async function resolveProviderNotificationUser(providerId: string, providerType: string): Promise<string> {
   if (providerType === 'COMPANY') {
@@ -108,12 +109,13 @@ export async function GET(
     if (!isParticipant) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
+    const currency = getCurrencyForCountry(job.countryCode)
     return NextResponse.json({
       escrow: escrow ? {
         ...escrow,
-        amount: escrow.amount.toString(),
-        serviceFee: escrow.serviceFee.toString(),
-        totalAmount: escrow.totalAmount.toString(),
+        amount: minorUnitsToMajorUnits(escrow.amount, currency),
+        serviceFee: minorUnitsToMajorUnits(escrow.serviceFee, currency),
+        totalAmount: minorUnitsToMajorUnits(escrow.totalAmount, currency),
       } : null,
     })
   } catch (error) {

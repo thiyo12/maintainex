@@ -1,6 +1,7 @@
 import { prisma } from './prisma'
 import { formatCurrency, getCurrencyForCountry } from './currency-format'
 import type { Currency } from './money'
+import { sendExpoPush } from './push'
 
 export async function createNotification(data: {
   userId: string
@@ -13,7 +14,7 @@ export async function createNotification(data: {
   referenceId?: string
 }) {
   try {
-    return await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: data.userId,
         title: data.title,
@@ -35,6 +36,20 @@ export async function createNotification(data: {
             : null,
       },
     })
+
+    const recipient = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { pushToken: true },
+    })
+    if (recipient?.pushToken) {
+      await sendExpoPush(recipient.pushToken, data.title, data.body, {
+        notificationId: notification.id,
+        ...(data.referenceType ? { referenceType: data.referenceType } : {}),
+        ...(data.referenceId ? { referenceId: data.referenceId } : {}),
+      })
+    }
+
+    return notification
   } catch (error) {
     console.error('Create notification error:', error)
   }
@@ -106,6 +121,20 @@ export async function notifyJobCancelled(
     titleKey: 'notification.job_cancelled.title',
     bodyKey: 'notification.job_cancelled.body',
     params: { jobTitle, cancelledBy, ...(reason ? { reason } : {}) },
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
+export async function notifyDisputeRaised(
+  jobId: string,
+  recipientUserId: string,
+  jobTitle: string,
+) {
+  return createNotification({
+    userId: recipientUserId,
+    title: 'Job Dispute Raised',
+    body: `A dispute was raised for "${jobTitle}". Payment is on hold while it is reviewed.`,
     referenceType: 'JOB',
     referenceId: jobId,
   })
@@ -188,6 +217,21 @@ export async function notifyJobEscalated(jobId: string, customerId: string, jobT
     bodyKey: 'notification.job_escalated.body',
     params: { jobTitle },
     referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
+export async function notifyCompanyWorkerAssigned(
+  jobId: string,
+  workerUserId: string,
+  jobTitle: string,
+  companyName: string,
+) {
+  return createNotification({
+    userId: workerUserId,
+    title: 'New Company Assignment',
+    body: `${companyName} assigned you to "${jobTitle}". Review and accept the assignment before starting work.`,
+    referenceType: 'COMPANY_JOB',
     referenceId: jobId,
   })
 }

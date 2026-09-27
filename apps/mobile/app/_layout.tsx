@@ -1,6 +1,6 @@
-import { useEffect, useState, Component, ReactNode } from 'react'
+import { useEffect, useState, useRef, Component, ReactNode } from 'react'
 import { Text } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { I18nextProvider } from 'react-i18next'
@@ -11,45 +11,11 @@ import {
   Outfit_800ExtraBold, Outfit_900Black,
 } from '@expo-google-fonts/outfit'
 
-import { AuthProvider } from '../lib/auth'
+import { AuthProvider, useAuth } from '../lib/auth'
 import i18next, { initI18n } from '../lib/i18n'
 import { ThemeProvider } from '../lib/theme'
 import { CountryProvider } from '../lib/country'
-import { getAuthToken } from '../lib/api'
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
-
-async function registerForPushNotifications() {
-  try {
-    let Notifications: any
-    try { Notifications = require('expo-notifications') } catch { return null }
-    let Device: any
-    try { Device = require('expo-device') } catch { return null }
-    if (!Device.isDevice) return null
-    const { status: existingStatus } = await Notifications.getPermissionsAsync()
-    let finalStatus = existingStatus
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync()
-      finalStatus = status
-    }
-    if (finalStatus !== 'granted') return null
-    const tokenData = await Notifications.getExpoPushTokenAsync()
-    const token = tokenData.data
-    try {
-      const authToken = await getAuthToken()
-      if (authToken) {
-        await fetch(`${API_URL}/api/mobile/notifications`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-          body: JSON.stringify({ token }),
-        })
-      }
-    } catch {}
-    return token
-  } catch {
-    return null
-  }
-}
+import { registerForPushNotifications, addNotificationListeners, getLastNotificationResponse } from '../lib/notifications'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -71,6 +37,66 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: any }> {
     }
     return this.props.children
   }
+}
+
+function NotificationBootstrap() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const handledResponseId = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    registerForPushNotifications().catch(() => {})
+
+    const openNotification = (response: any) => {
+      const request = response?.notification?.request
+      const responseId = request?.identifier || null
+      if (responseId && handledResponseId.current === responseId) return
+      if (responseId) handledResponseId.current = responseId
+
+      const data = request?.content?.data || {}
+      const referenceType = data.referenceType as string | undefined
+      const referenceId = data.referenceId as string | undefined
+      if (!referenceType || !referenceId) return
+
+      if (referenceType === 'COMPANY_JOB') {
+        router.push(`/(company)/jobs/v2/manage/${referenceId}` as any)
+        return
+      }
+
+      if (referenceType === 'JOB' || referenceType === 'QUOTE') {
+        if (user.role === 'TASKER') {
+          router.push(`/(tasker)/jobs/v2/manage/${referenceId}` as any)
+        } else if (user.role === 'COMPANY') {
+          router.push(`/(company)/jobs/v2/manage/${referenceId}` as any)
+        } else {
+          router.push(`/(customer)/jobs/v2/${referenceId}` as any)
+        }
+        return
+      }
+
+      if (referenceType === 'CHAT') {
+        router.push(`/(chat)/${referenceId}` as any)
+        return
+      }
+
+      if (referenceType === 'WALLET') {
+        if (user.role === 'TASKER') router.push('/(tasker)/wallet/withdraw' as any)
+        else if (user.role === 'COMPANY') router.push('/(company)/(tabs)/earnings-list' as any)
+        else router.push('/(customer)/wallet' as any)
+      }
+    }
+
+    const unsubscribe = addNotificationListeners(undefined, openNotification)
+    getLastNotificationResponse().then((response) => {
+      if (response) openNotification(response)
+    }).catch(() => {})
+
+    return unsubscribe
+  }, [router, user?.id, user?.role])
+
+  return null
 }
 
 const ebStyles = {
@@ -96,7 +122,6 @@ export default function RootLayout() {
         if (saved && saved !== 'en') await i18next.changeLanguage(saved)
       } catch {}
       setI18nReady(true)
-      registerForPushNotifications()
     })()
   }, [])
 
@@ -121,6 +146,7 @@ export default function RootLayout() {
     <ErrorBoundary>
     <ThemeProvider>
       <AuthProvider>
+        <NotificationBootstrap />
         <CountryProvider>
         <I18nextProvider i18n={i18next}>
           <StatusBar style="light" />
@@ -131,6 +157,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tasker)" />
           <Stack.Screen name="(company)" />
           <Stack.Screen name="(chat)" />
+          <Stack.Screen name="company-invite" />
         </Stack>
       </I18nextProvider>
       </CountryProvider>

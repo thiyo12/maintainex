@@ -52,7 +52,12 @@ beforeAll(async () => {
 
   const prov = await prisma.user.upsert({
     where: { email: `${TEST_PROVIDER}@test.com` },
-    update: {},
+    update: {
+      identityStatus: 'VERIFIED',
+      isActive: true,
+      isSuspended: false,
+      isBanned: false,
+    },
     create: {
       email: `${TEST_PROVIDER}@test.com`,
       passwordHash: 'dummy',
@@ -60,13 +65,19 @@ beforeAll(async () => {
       phone: '+94770000003',
       role: 'TASKER',
       countryCode: 'LK',
+      identityStatus: 'VERIFIED',
     },
   })
   providerId = prov.id
 
   const compUser = await prisma.user.upsert({
     where: { email: `${TEST_COMPANY_PROVIDER}@test.com` },
-    update: {},
+    update: {
+      identityStatus: 'VERIFIED',
+      isActive: true,
+      isSuspended: false,
+      isBanned: false,
+    },
     create: {
       email: `${TEST_COMPANY_PROVIDER}@test.com`,
       passwordHash: 'dummy',
@@ -74,6 +85,7 @@ beforeAll(async () => {
       phone: '+94770000004',
       role: 'COMPANY',
       countryCode: 'LK',
+      identityStatus: 'VERIFIED',
     },
   })
   companyUserId = compUser.id
@@ -212,10 +224,40 @@ beforeAll(async () => {
       progressStatus: 'IN_PROGRESS',
     },
   })
+
+  const acceptedQuotes = await prisma.jobQuote.findMany({
+    where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] }, status: 'ACCEPTED' },
+    select: { id: true, jobId: true, providerId: true, price: true },
+  })
+  const customersByJob = new Map([
+    [jobAId, customerAId],
+    [jobBId, customerBId],
+    [instantJobId, customerAId],
+    [inspectionFirstJobId, customerAId],
+  ])
+
+  await prisma.jobEscrow.createMany({
+    data: acceptedQuotes.map((quote) => ({
+      jobId: quote.jobId,
+      quoteId: quote.id,
+      customerId: customersByJob.get(quote.jobId)!,
+      providerId: quote.providerId,
+      amount: quote.price,
+      serviceFee: 0n,
+      totalAmount: quote.price,
+      paymentMethod: 'CARD',
+      currency: 'LKR',
+      status: 'PROTECTED',
+      heldAt: now,
+    })),
+  })
 })
 
 afterAll(async () => {
   await prisma.jobVerificationPin.deleteMany({
+    where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
+  })
+  await prisma.jobEscrow.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
   })
   await prisma.jobQuote.deleteMany({
@@ -236,6 +278,17 @@ afterAll(async () => {
 beforeEach(async () => {
   await prisma.jobVerificationPin.deleteMany({
     where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
+  })
+  await prisma.jobLifecycleEvent.deleteMany({
+    where: { jobId: { in: [jobAId, jobBId, instantJobId, inspectionFirstJobId] } },
+  }).catch(() => {})
+  await prisma.marketplaceJob.update({
+    where: { id: jobAId },
+    data: { status: 'QUOTE_ACCEPTED' },
+  })
+  await prisma.jobWorkspace.update({
+    where: { jobId: jobAId },
+    data: { progressStatus: 'ACCEPTED', completionRequestedAt: null },
   })
 })
 
@@ -260,6 +313,26 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       expect(record).toBeTruthy()
       expect(record!.pinHash).not.toBe(result.pin)
       expect(record!.pinHash.length).toBeGreaterThan(20)
+    })
+
+    it('rejects PIN generation before escrow is protected', async () => {
+      const { generateJobPin } = await import('@/lib/domain/job-pin')
+      const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: jobAId } })
+      expect(escrow).toBeTruthy()
+
+      await prisma.jobEscrow.update({
+        where: { id: escrow!.id },
+        data: { status: 'PENDING_PAYMENT', heldAt: null },
+      })
+
+      try {
+        await expect(generateJobPin(jobAId, customerAId)).rejects.toThrow('Payment must be protected')
+      } finally {
+        await prisma.jobEscrow.update({
+          where: { id: escrow!.id },
+          data: { status: 'PROTECTED', heldAt: new Date() },
+        })
+      }
     })
 
     it('rejects generation by non-owner', async () => {
@@ -304,7 +377,7 @@ describe('Phase 10.5 — Job Verification PIN', () => {
 
     it('rejects state view by non-owner', async () => {
       const { getPinState } = await import('@/lib/domain/job-pin')
-      await expect(getPinState(jobAId, customerBId)).rejects.toThrow('Only the job owner')
+      await expect(getPinState(jobAId, customerBId)).rejects.toThrow('Not authorized to view PIN state')
     })
   })
 
@@ -314,6 +387,50 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       const { pin } = await generateJobPin(jobAId, customerAId)
       const result = await verifyJobPin(jobAId, providerId, pin, 'ARRIVAL')
       expect(result.valid).toBe(true)
+    })
+
+    it('requires a fresh PIN after ARRIVAL before WORK_START', async () => {
+      const { generateJobPin, getPinState, verifyJobPin } = await import('@/lib/domain/job-pin')
+
+      const arrivalPin = await generateJobPin(jobAId, customerAId)
+      expect(arrivalPin.version).toBe(1)
+
+      const arrival = await verifyJobPin(jobAId, providerId, arrivalPin.pin, 'ARRIVAL')
+      expect(arrival.valid).toBe(true)
+
+      const afterArrivalCustomer = await getPinState(jobAId, customerAId)
+      const afterArrivalProvider = await getPinState(jobAId, providerId)
+      expect(afterArrivalCustomer.hasActivePin).toBe(false)
+      expect(afterArrivalCustomer.arrivalVerifiedAt).toBeTruthy()
+      expect(afterArrivalCustomer.workStartVerifiedAt).toBeNull()
+      expect(afterArrivalProvider.arrivalVerifiedAt).toBeTruthy()
+
+      const oldPinStart = await verifyJobPin(jobAId, providerId, arrivalPin.pin, 'WORK_START')
+      expect(oldPinStart.valid).toBe(false)
+      expect(oldPinStart.error).toBe('No active PIN for this job')
+
+      const startPin = await generateJobPin(jobAId, customerAId)
+      expect(startPin.version).toBe(2)
+      expect(startPin.pin).not.toBe(arrivalPin.pin)
+
+      const readyForStart = await getPinState(jobAId, providerId)
+      expect(readyForStart.hasActivePin).toBe(true)
+      expect(readyForStart.arrivalVerifiedAt).toBeTruthy()
+      expect(readyForStart.workStartVerifiedAt).toBeNull()
+
+      const started = await verifyJobPin(jobAId, providerId, startPin.pin, 'WORK_START')
+      expect(started.valid).toBe(true)
+
+      const [job, workspace, finalState] = await Promise.all([
+        prisma.marketplaceJob.findUnique({ where: { id: jobAId } }),
+        prisma.jobWorkspace.findUnique({ where: { jobId: jobAId } }),
+        getPinState(jobAId, customerAId),
+      ])
+      expect(job?.status).toBe('IN_PROGRESS')
+      expect(workspace?.progressStatus).toBe('IN_PROGRESS')
+      expect(finalState.hasActivePin).toBe(false)
+      expect(finalState.arrivalVerifiedAt).toBeTruthy()
+      expect(finalState.workStartVerifiedAt).toBeTruthy()
     })
 
     it('rejects wrong PIN', async () => {
@@ -393,9 +510,12 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       expect(result.valid).toBe(true)
 
       const record = await prisma.jobVerificationPin.findFirst({
-        where: { jobId: jobAId, status: 'ACTIVE' },
+        where: { jobId: jobAId },
+        orderBy: { version: 'desc' },
       })
+      expect(record!.status).toBe('CONSUMED')
       expect(record!.failedAttempts).toBe(0)
+      expect(record!.arrivalVerifiedAt).toBeTruthy()
     })
   })
 
@@ -495,9 +615,13 @@ describe('Phase 10.5 — Job Verification PIN', () => {
       expect(validCount).toBe(1)
 
       const record = await prisma.jobVerificationPin.findFirst({
-        where: { jobId: jobAId, status: 'ACTIVE' },
+        where: { jobId: jobAId },
+        orderBy: { version: 'desc' },
       })
+      expect(record).toBeTruthy()
+      expect(record!.status).toBe('CONSUMED')
       expect(record!.lastSuccessfulUseAt).toBeTruthy()
+      expect(record!.arrivalVerifiedAt).toBeTruthy()
     })
 
     it('10 concurrent invalid PIN attempts result in consistent lockout', { timeout: 30000 }, async () => {

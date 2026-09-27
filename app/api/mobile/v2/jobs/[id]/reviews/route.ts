@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { recalculateReputation } from '@/lib/reputation-engine'
 import { recoverPenaltyPoints } from '@/lib/reputation-engine'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
+
+function isValidRating(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5
+}
 
 export async function POST(
   request: NextRequest,
@@ -33,8 +38,8 @@ export async function POST(
       })
       if (existing) return NextResponse.json({ error: 'Already reviewed' }, { status: 409 })
 
-      if (!quality || !communication || !timeliness) {
-        return NextResponse.json({ error: 'quality, communication, timeliness (1-5) required' }, { status: 400 })
+      if (![quality, communication, timeliness].every(isValidRating)) {
+        return NextResponse.json({ error: 'quality, communication, timeliness must each be integers from 1 to 5' }, { status: 400 })
       }
 
       const review = await prisma.jobReview.create({
@@ -66,7 +71,7 @@ export async function POST(
         recalculateReputation(quote.providerId).catch(err => console.error('Reputation recalc error:', err))
       } else {
         await prisma.companyProfile.updateMany({
-          where: { userId: quote.providerId },
+          where: { id: quote.providerId },
           data: { rating: Math.round(avgRating * 10) / 10, completedProjects: completedCount },
         })
       }
@@ -76,23 +81,48 @@ export async function POST(
 
     if (reviewType === 'PROVIDER_REVIEWS_CUSTOMER') {
       const quote = await prisma.jobQuote.findFirst({
-        where: { jobId: job.id, providerId: user.id, status: 'ACCEPTED' },
+        where: { jobId: job.id, status: 'ACCEPTED' },
+        select: { providerId: true, providerType: true },
       })
-      if (!quote) return NextResponse.json({ error: 'Only the assigned provider can review' }, { status: 403 })
+      if (!quote) return NextResponse.json({ error: 'No accepted provider found' }, { status: 400 })
 
+      if (quote.providerType === 'INDIVIDUAL') {
+        if (quote.providerId !== user.id) {
+          return NextResponse.json({ error: 'Only the assigned provider can review' }, { status: 403 })
+        }
+      } else {
+        const assignment = await prisma.companyJobAssignment.findFirst({
+          where: {
+            jobId: job.id,
+            companyId: quote.providerId,
+            workerUserId: user.id,
+            status: 'COMPLETED',
+          },
+          select: { id: true },
+        })
+        if (!assignment) {
+          const { error } = await resolveCompanyContext(user.id, quote.providerId, 'quotes:read')
+          if (error) return NextResponse.json({ error: 'Only the accepted company or assigned worker can review' }, { status: 403 })
+        }
+      }
+
+      const canonicalProviderId = quote.providerId
       const existing = await prisma.providerReview.findUnique({
-        where: { jobId_providerId: { jobId: job.id, providerId: user.id } },
+        where: { jobId_providerId: { jobId: job.id, providerId: canonicalProviderId } },
       })
       if (existing) return NextResponse.json({ error: 'Already reviewed' }, { status: 409 })
 
-      if (!cooperation || !communication || !overallExperience) {
-        return NextResponse.json({ error: 'cooperation, communication, overallExperience (1-5) required' }, { status: 400 })
+      if (![cooperation, communication, overallExperience].every(isValidRating)) {
+        return NextResponse.json(
+          { error: 'cooperation, communication, overallExperience must each be integers from 1 to 5' },
+          { status: 400 }
+        )
       }
 
       const review = await prisma.providerReview.create({
         data: {
           jobId: job.id,
-          providerId: user.id,
+          providerId: canonicalProviderId,
           customerId: job.customerId,
           cooperation,
           communication,
@@ -122,11 +152,33 @@ export async function GET(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id }, select: { customerId: true } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId: id, status: 'ACCEPTED' }, select: { providerId: true } })
-    const isProvider = acceptedQuote?.providerId === user.id
-    if (job.customerId !== user.id && !isProvider) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const acceptedQuote = await prisma.jobQuote.findFirst({
+      where: { jobId: id, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
+    })
+
+    let canRead = job.customerId === user.id
+    if (!canRead && acceptedQuote?.providerType === 'INDIVIDUAL') {
+      canRead = acceptedQuote.providerId === user.id
+    } else if (!canRead && acceptedQuote?.providerType === 'COMPANY') {
+      const assignment = await prisma.companyJobAssignment.findFirst({
+        where: {
+          jobId: id,
+          companyId: acceptedQuote.providerId,
+          workerUserId: user.id,
+          status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+        },
+        select: { id: true },
+      })
+      if (assignment) {
+        canRead = true
+      } else {
+        const companyAccess = await resolveCompanyContext(user.id, acceptedQuote.providerId, 'quotes:read')
+        canRead = !companyAccess.error
+      }
     }
+
+    if (!canRead) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     const [customerReview, providerReview] = await Promise.all([
       prisma.jobReview.findMany({ where: { jobId: id } }),

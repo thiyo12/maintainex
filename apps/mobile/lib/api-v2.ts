@@ -2,7 +2,7 @@ import { getAuthToken } from './api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
-async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAuthToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -11,10 +11,83 @@ async function v2Request<T>(endpoint: string, options: RequestInit = {}): Promis
   if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers })
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(err || `API Error ${res.status}`)
+    const raw = await res.text()
+    let message = raw
+    try {
+      const parsed = raw ? JSON.parse(raw) : null
+      if (parsed && typeof parsed.error === 'string') message = parsed.error
+      else if (parsed && typeof parsed.message === 'string') message = parsed.message
+    } catch {}
+    throw new Error(message || `API Error ${res.status}`)
   }
   return res.json()
+}
+
+export interface V2Escrow {
+  id: string
+  jobId: string
+  quoteId: string
+  customerId: string
+  providerId: string
+  amount: number
+  serviceFee: number
+  totalAmount: number
+  currency: string
+  paymentMethod: string
+  status: string
+  heldAt?: string | null
+  releasedAt?: string | null
+  refundedAt?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface V2Workspace {
+  id?: string
+  jobId?: string
+  progressStatus: string
+  completionRequestedAt?: string | null
+  completedAt?: string | null
+  updatedAt?: string
+}
+
+export interface V2CompanyAssignment {
+  id: string
+  workerUserId: string
+  status: 'ASSIGNED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED' | 'REVOKED'
+  assignedAt: string
+  acceptedAt: string | null
+  startedAt: string | null
+  completedAt: string | null
+  worker?: { id: string; name: string | null } | null
+}
+
+export interface V2ProviderSummary {
+  id: string
+  userId?: string
+  name?: string | null
+  profileImage?: string | null
+  rating?: number | null
+  completedJobs?: number
+}
+
+export interface V2Quote {
+  id: string
+  jobId: string
+  providerId: string
+  providerType: 'INDIVIDUAL' | 'COMPANY'
+  price: number
+  estimatedCompletionTime: string
+  message?: string | null
+  attachments: string[]
+  status: string
+  revisionNumber?: number
+  parentQuoteId?: string | null
+  revisionReason?: string | null
+  createdAt: string
+  provider?: V2ProviderSummary | null
+  providerRating?: number
+  completedJobs?: number
 }
 
 export interface V2Job {
@@ -23,13 +96,15 @@ export interface V2Job {
   title: string
   description: string
   categoryId: string
+  countryCode: string
   photos: string[]
   budgetType: string
   budgetAmount: number | null
   areaId: string | null
   postalCode: string | null
   preferredDate: string | null
-  timeSlot: string | null
+  timeSlot?: string | null
+  preferredTimeSlot: string | null
   addressStreet: string | null
   addressBuilding: string | null
   addressApartment: string | null
@@ -42,26 +117,13 @@ export interface V2Job {
   customer?: any
   locationName?: string | null
   quotes?: V2Quote[]
-  escrow?: any
-  workspace?: any
+  escrow?: V2Escrow | null
+  workspace?: V2Workspace | null
   reviews?: any
+  companyAssignment?: V2CompanyAssignment | null
+  acceptedQuote?: (V2Quote & { provider?: V2ProviderSummary | null }) | null
 }
 
-export interface V2Quote {
-  id: string
-  jobId: string
-  providerId: string
-  providerType: string
-  price: number
-  estimatedCompletionTime: string
-  message: string
-  attachments: string[]
-  status: string
-  createdAt: string
-  provider?: any
-  providerRating?: number
-  completedJobs?: number
-}
 
 export const v2Locations = {
   get: () => v2Request<{ countries: any[] }>('/api/mobile/v2/locations'),
@@ -72,8 +134,10 @@ export const v2Jobs = {
     v2Request<{ job: V2Job }>('/api/mobile/v2/jobs', { method: 'POST', body: JSON.stringify(data) }),
   list: (params?: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs${params ? `?${params}` : ''}`),
-  get: (id: string) =>
-    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(`/api/mobile/v2/jobs/${id}`),
+  get: (id: string, context?: 'company') =>
+    v2Request<{ job: V2Job & { quotes: V2Quote[] } }>(
+      `/api/mobile/v2/jobs/${id}${context ? `?context=${context}` : ''}`
+    ),
   pollNew: (since: string) =>
     v2Request<{ jobs: V2Job[] }>(`/api/mobile/v2/jobs?role=provider&after=${encodeURIComponent(since)}`),
   getTaskerLocation: (id: string) =>
@@ -81,10 +145,51 @@ export const v2Jobs = {
 }
 
 export const v2Quotes = {
-  submit: (data: { jobId: string; providerType: string; price: number; estimatedCompletionTime?: string; message?: string }) =>
+  submit: (data: { jobId: string; providerType: string; price: number; estimatedCompletionTime?: string; message?: string; companyId?: string }) =>
     v2Request<{ quote: V2Quote }>('/api/mobile/v2/quotes', { method: 'POST', body: JSON.stringify(data) }),
-  list: (jobId: string) =>
-    v2Request<{ quotes: V2Quote[] }>(`/api/mobile/v2/quotes?jobId=${jobId}`),
+  list: (jobId: string, companyId?: string) =>
+    v2Request<{ quotes: V2Quote[] }>(
+      `/api/mobile/v2/quotes?jobId=${encodeURIComponent(jobId)}${companyId ? `&companyId=${encodeURIComponent(companyId)}` : ''}`
+    ),
+  revise: (
+    quoteId: string,
+    data: {
+      price: number
+      estimatedCompletionTime: string
+      message?: string
+      revisionReason: string
+      companyId?: string
+    }
+  ) =>
+    v2Request<{ success: boolean; newQuoteId: string; revisionNumber: number }>(
+      `/api/mobile/v2/quotes/${quoteId}/revision`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+}
+
+export interface V2PaymentStatus {
+  id: string
+  status: 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'
+  amount: number
+  amountMinor: string
+  currency: string
+  merchantOrderId: string
+  paymentId: string | null
+  createdAt: string
+  paidAt: string | null
+}
+
+export const v2Payments = {
+  start: (jobId: string) =>
+    v2Request<{
+      success: boolean
+      paymentIntentId: string
+      checkoutUrl: string
+      merchantOrderId: string
+    }>(`/api/mobile/v2/jobs/${jobId}/payment`, { method: 'POST' }),
+
+  status: (jobId: string) =>
+    v2Request<{ payment: V2PaymentStatus | null }>(`/api/mobile/v2/jobs/${jobId}/payment`),
 }
 
 export const v2JobActions = {
@@ -106,7 +211,12 @@ export const v2JobActions = {
   updateProgress: (jobId: string, progressStatus: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`, { method: 'PATCH', body: JSON.stringify({ progressStatus }) }),
   complete: (jobId: string, action: string, reason?: string) =>
-    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
+    v2Request<{
+      success: boolean
+      message: string
+      commission?: number
+      netAmount?: number
+    }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
   confirmCashPayment: (jobId: string) =>
@@ -115,10 +225,23 @@ export const v2JobActions = {
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
-  dispute: (jobId: string) =>
-    v2Request<{ success: boolean; message: string }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action: 'DISPUTE' }) }),
+  dispute: (jobId: string, reason?: string) =>
+    v2Request<{ success: boolean; message: string }>(
+      `/api/mobile/v2/jobs/${jobId}/complete`,
+      { method: 'POST', body: JSON.stringify({ action: 'DISPUTE', reason }) },
+    ),
   getPinState: (jobId: string) =>
-    v2Request<{ pinState: { hasActivePin: boolean; version: number | null; locked: boolean; lastSuccessfulUseAt: string | null } }>(`/api/mobile/v2/jobs/${jobId}/pin`),
+    v2Request<{
+      pinState: {
+        hasActivePin: boolean
+        version: number | null
+        locked: boolean
+        lastSuccessfulUseAt: string | null
+        arrivalVerifiedAt: string | null
+        workStartVerifiedAt: string | null
+        completionVerifiedAt: string | null
+      }
+    }>(`/api/mobile/v2/jobs/${jobId}/pin`),
   generatePin: (jobId: string) =>
     v2Request<{ success: boolean; pin: string; version: number }>(`/api/mobile/v2/jobs/${jobId}/pin`, { method: 'POST' }),
   rotatePin: (jobId: string) =>
@@ -350,7 +473,15 @@ export const v2SmartBooking = {
     v2Request<SmartTemplate[]>(
       `/api/mobile/v2/service-templates${jobCategoryId ? `?jobCategoryId=${encodeURIComponent(jobCategoryId)}` : ''}`
     ),
-  priceEstimate: (data: { templateId: string; answers: Record<string, any>; countryCode?: string; urgency?: string }) =>
+  priceEstimate: (data: {
+    templateId: string
+    answers: Record<string, any>
+    countryCode?: string
+    urgency?: string
+    durationMinutes?: number
+    city?: string
+    scheduledFor?: string
+  }) =>
     v2Request<SmartPriceEstimate>('/api/mobile/v2/price-estimate', {
       method: 'POST',
       body: JSON.stringify(data),

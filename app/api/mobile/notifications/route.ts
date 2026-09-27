@@ -46,10 +46,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Push token required' }, { status: 400 })
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { pushToken: token },
-    })
+    await prisma.$transaction([
+      prisma.user.updateMany({
+        where: { pushToken: token, id: { not: user.id } },
+        data: { pushToken: null },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { pushToken: token },
+      }),
+    ])
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -74,6 +80,24 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true, updated: updated.count })
   } catch (error) {
     console.error('Notifications mark-all error:', error)
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await authenticateRequest(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    await prisma.user.updateMany({
+      where: { id: user.id },
+      data: { pushToken: null },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Push unregister error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

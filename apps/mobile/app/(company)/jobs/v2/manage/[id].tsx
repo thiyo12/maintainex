@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useState, useCallback } from 'react'
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
@@ -22,11 +22,20 @@ export default function CompanyManageJobScreen() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState('')
   const [chatVisible, setChatVisible] = useState(false)
+  const [pinState, setPinState] = useState<any>(null)
+  const [reviewCoop, setReviewCoop] = useState('5')
+  const [reviewComm, setReviewComm] = useState('5')
+  const [reviewExp, setReviewExp] = useState('5')
+  const [reviewComment, setReviewComment] = useState('')
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
+      const [jobRes, pinRes] = await Promise.all([
+        v2Jobs.get(id, 'company'),
+        v2JobActions.getPinState(id).catch(() => ({ pinState: null })),
+      ])
+      setJob(jobRes.job)
+      setPinState(pinRes.pinState)
     } catch {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
@@ -35,17 +44,46 @@ export default function CompanyManageJobScreen() {
     }
   }
 
-  useEffect(() => { loadJob() }, [id])
-
-  const myQuote = job?.quotes?.find((q: any) => q.providerId === user?.id) || null
-
-  const handleUpdateProgress = async (status: string) => {
-    setActionLoading(status)
-    try {
-      await v2JobActions.updateProgress(id, status)
+  useFocusEffect(
+    useCallback(() => {
       loadJob()
+    }, [id])
+  )
+
+  const myQuote = job?.quotes?.[0] || null
+
+  const handleMarkComplete = async () => {
+    setActionLoading('complete')
+    try {
+      await v2JobActions.complete(id, 'MARK_COMPLETE')
+      await loadJob()
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message)
+    } finally {
+      setActionLoading('')
+    }
+  }
+
+  const handleSubmitReview = async () => {
+    const ratings = [reviewCoop, reviewComm, reviewExp].map((value) => Number.parseInt(value, 10))
+    if (ratings.some((value) => !Number.isInteger(value) || value < 1 || value > 5)) {
+      Alert.alert(t('common.error'), 'Ratings must be whole numbers from 1 to 5.')
+      return
+    }
+
+    setActionLoading('review')
+    try {
+      await v2JobActions.createReview(id, {
+        reviewType: 'PROVIDER_REVIEWS_CUSTOMER',
+        cooperation: ratings[0],
+        communication: ratings[1],
+        overallExperience: ratings[2],
+        comment: reviewComment.trim() || undefined,
+      })
+      Alert.alert(t('receipt.reviewSubmitted'), t('receipt.reviewSubmittedDesc'))
+      await loadJob()
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message || 'Could not submit review.')
     } finally {
       setActionLoading('')
     }
@@ -84,8 +122,20 @@ export default function CompanyManageJobScreen() {
 
   const qs = quoteStatusLabel(myQuote)
   const wsCard = worksCard(job.workspace)
-  const canStart = job.workspace?.progressStatus === 'ACCEPTED'
-  const canComplete = job.workspace?.progressStatus === 'IN_PROGRESS'
+  const assignment = job.companyAssignment
+  const isAssignmentWorker = !!user?.id && assignment?.workerUserId === user.id
+  const isAssignedWorker =
+    isAssignmentWorker &&
+    ['ACCEPTED', 'IN_PROGRESS'].includes(assignment?.status)
+  const canStart =
+    isAssignedWorker &&
+    assignment?.status === 'ACCEPTED' &&
+    job.workspace?.progressStatus === 'ACCEPTED' &&
+    job.escrow?.status === 'PROTECTED'
+  const canComplete =
+    isAssignedWorker &&
+    assignment?.status === 'IN_PROGRESS' &&
+    job.workspace?.progressStatus === 'IN_PROGRESS'
 
   return (
     <SafeAreaView style={styles.container}>
@@ -143,7 +193,7 @@ export default function CompanyManageJobScreen() {
             <View style={styles.quoteCard}>
               <View style={styles.quoteRow}>
                 <Text style={styles.quoteLabel}>{t('quotes.price')}</Text>
-                <Text style={styles.quotePrice}>LKR {myQuote.price}</Text>
+                <Text style={styles.quotePrice}>LKR {myQuote.price.toLocaleString()}</Text>
               </View>
               <View style={styles.quoteRow}>
                 <Text style={styles.quoteLabel}>{t('quotes.estimatedTime')}</Text>
@@ -179,7 +229,7 @@ export default function CompanyManageJobScreen() {
             <View style={styles.escrowCard}>
               <View style={styles.quoteRow}>
                 <Text style={styles.quoteLabel}>{t('wallet.balance')}</Text>
-                <Text style={styles.quotePrice}>LKR {job.escrow.amount}</Text>
+                <Text style={styles.quotePrice}>{job.escrow.currency || 'LKR'} {job.escrow.totalAmount?.toLocaleString?.() ?? job.escrow.amount?.toLocaleString?.()}</Text>
               </View>
               {wsCard && (
                 <View style={[styles.statusPill, { backgroundColor: wsCard.bg }]}>
@@ -193,31 +243,146 @@ export default function CompanyManageJobScreen() {
           </View>
         )}
 
+        {job.status === 'COMPLETED' && (job.reviews?.providerReviews || []).length === 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Review Customer</Text>
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewLabel}>Cooperation (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewCoop}
+                onChangeText={setReviewCoop}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Communication (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewComm}
+                onChangeText={setReviewComm}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Overall experience (1–5)</Text>
+              <TextInput
+                style={styles.reviewInput}
+                value={reviewExp}
+                onChangeText={setReviewExp}
+                keyboardType="number-pad"
+                maxLength={1}
+              />
+              <Text style={styles.reviewLabel}>Comment</Text>
+              <TextInput
+                style={[styles.reviewInput, styles.reviewTextArea]}
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                multiline
+                maxLength={1000}
+                textAlignVertical="top"
+              />
+              <TouchableOpacity
+                style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
+                onPress={handleSubmitReview}
+                disabled={actionLoading !== ''}
+              >
+                {actionLoading === 'review'
+                  ? <ActivityIndicator color="#111827" />
+                  : <Text style={styles.actionBtnText}>Submit Review</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {job.status === 'COMPLETED' && (job.reviews?.providerReviews || []).length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.reviewedCard}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={styles.reviewedText}>Customer review submitted</Text>
+            </View>
+          </View>
+        )}
+
         {/* Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('company.manageJob')}</Text>
           <View style={styles.actions}>
-            {canStart && (
+            {canStart && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
               <TouchableOpacity
                 style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
-                onPress={() => handleUpdateProgress('IN_PROGRESS')}
+                onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
+                disabled={actionLoading !== ''}
+              >
+                <Ionicons name="location-outline" size={18} color="#111827" />
+                <Text style={styles.actionBtnText}>Verify Arrival PIN</Text>
+              </TouchableOpacity>
+            )}
+            {canStart && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              <TouchableOpacity
+                style={[styles.actionBtn, actionLoading !== '' && styles.btnDisabled]}
+                onPress={() => router.push(`/(company)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
                 disabled={actionLoading !== ''}
               >
                 <Ionicons name="play" size={18} color="#111827" />
-                <Text style={styles.actionBtnText}>{t('booking.statusInProgress')}</Text>
+                <Text style={styles.actionBtnText}>Start Work with PIN</Text>
               </TouchableOpacity>
+            )}
+            {canStart && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Waiting for Arrival PIN</Text>
+                <Text style={styles.emptyDesc}>The customer must generate a one-time arrival PIN before you can verify arrival.</Text>
+              </View>
+            )}
+            {canStart && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Waiting for Start Work PIN</Text>
+                <Text style={styles.emptyDesc}>Arrival is confirmed. The customer must generate a fresh one-time PIN before work can start.</Text>
+              </View>
             )}
             {canComplete && (
               <TouchableOpacity
                 style={[styles.actionBtn, styles.completeBtn, actionLoading !== '' && styles.btnDisabled]}
-                onPress={() => handleUpdateProgress('COMPLETION_REQUESTED')}
+                onPress={handleMarkComplete}
                 disabled={actionLoading !== ''}
               >
                 <Ionicons name="checkmark-done" size={18} color="#111827" />
                 <Text style={styles.actionBtnText}>{t('tracking.confirmComplete')}</Text>
               </TouchableOpacity>
             )}
-            {!canStart && !canComplete && (
+            {assignment?.status === 'ASSIGNED' && isAssignmentWorker && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Assignment waiting for your response</Text>
+                <Text style={styles.emptyDesc}>
+                  Accept this assignment before you can verify arrival or start the work.
+                </Text>
+                <TouchableOpacity
+                  style={styles.browseBtn}
+                  onPress={() => router.push(`/(company)/workforce/assignment/${assignment.id}` as any)}
+                >
+                  <Text style={styles.browseBtnText}>Review & Accept →</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {assignment && !isAssignmentWorker && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Assigned worker</Text>
+                <Text style={styles.emptyDesc}>
+                  {assignment.worker?.name || 'A company employee'} is assigned to perform this job. Managers can monitor the booking, but only the assigned worker can start or complete the work.
+                </Text>
+              </View>
+            )}
+            {!assignment && myQuote?.status === 'ACCEPTED' && (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Assign an employee</Text>
+                <Text style={styles.emptyDesc}>Assign and have an employee accept this job before work can start.</Text>
+                <TouchableOpacity
+                  style={styles.browseBtn}
+                  onPress={() => router.push(`/(company)/workforce/assign?jobId=${id}` as any)}
+                >
+                  <Text style={styles.browseBtnText}>Assign Worker →</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {!canStart && !canComplete && !assignment && myQuote?.status !== 'ACCEPTED' && (
               <TouchableOpacity style={styles.browseBtn} onPress={() => router.push('/(company)/jobs/v2/browse')}>
                 <Text style={styles.browseBtnText}>{t('company.browseJobs')} →</Text>
               </TouchableOpacity>
@@ -287,4 +452,11 @@ const makeStyles = (colors: any) => StyleSheet.create({
   completeBtn: { backgroundColor: colors.success },
   actionBtnText: { fontSize: 15, fontWeight: '800', color: '#111827' },
   btnDisabled: { opacity: 0.5 },
+
+  reviewCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, gap: 8 },
+  reviewLabel: { fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 4 },
+  reviewInput: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.ink, backgroundColor: colors.white },
+  reviewTextArea: { minHeight: 84 },
+  reviewedCard: { backgroundColor: colors.successBg, borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  reviewedText: { fontSize: 14, fontWeight: '600', color: colors.success },
 })

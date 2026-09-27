@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
-import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled } from '@/lib/notifications'
+import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
+import { getCurrencyForCountry } from '@/lib/money'
 
 export async function POST(
   request: NextRequest,
@@ -33,12 +34,29 @@ export async function POST(
       const actorType = await resolveProviderActor(job.id, user.id)
       if (!actorType) return NextResponse.json({ error: 'Only the assigned provider can mark complete' }, { status: 403 })
 
+      if (actorType === 'COMPANY') {
+        const assignment = await prisma.companyJobAssignment.findFirst({
+          where: {
+            jobId: job.id,
+            workerUserId: user.id,
+            status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+          },
+          select: { id: true },
+        })
+        if (!assignment) {
+          return NextResponse.json(
+            { error: 'Only the employee assigned to this company job can mark work complete' },
+            { status: 403 }
+          )
+        }
+      }
+
       await transitionJobWorkspace(
         { jobId: job.id, actorId: user.id, actorType },
         'COMPLETION_REQUESTED'
       )
 
-      notifyCompletionRequested(job.id, job.customerId, job.title)
+      await notifyCompletionRequested(job.id, job.customerId, job.title)
       return NextResponse.json({ success: true, message: 'Completion pending customer approval' })
     }
 
@@ -48,8 +66,15 @@ export async function POST(
         job.id
       )
 
-      notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
-      notifyJobCompleted(job.id, job.customerId, job.title)
+      await notifyPaymentReleased(
+        job.id,
+        result.providerId,
+        job.title,
+        result.netAmount,
+        getCurrencyForCountry(job.countryCode),
+        job.countryCode,
+      )
+      await notifyJobCompleted(job.id, job.customerId, job.title)
       return NextResponse.json({
         success: true,
         message: 'Job completed, funds released',
@@ -64,15 +89,41 @@ export async function POST(
       if (!isCustomer && !providerActor) {
         return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
       }
-      if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
-        return NextResponse.json({ error: 'Cannot dispute completed or cancelled jobs' }, { status: 400 })
+      if (job.status !== 'IN_PROGRESS') {
+        return NextResponse.json({ error: 'Dispute is only available after work has started' }, { status: 409 })
       }
 
+      const reason =
+        typeof body.reason === 'string' && body.reason.trim()
+          ? body.reason.trim().slice(0, 1000)
+          : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
+      let disputeRecipientId: string | null = isCustomer ? null : job.customerId
+
+      if (isCustomer) {
+        const accepted = await prisma.jobQuote.findFirst({
+          where: { jobId: job.id, status: 'ACCEPTED' },
+          select: { providerId: true, providerType: true },
+        })
+        if (accepted) {
+          disputeRecipientId =
+            accepted.providerType === 'INDIVIDUAL'
+              ? accepted.providerId
+              : (await prisma.companyProfile.findUnique({
+                  where: { id: accepted.providerId },
+                  select: { userId: true },
+                }))?.userId ?? null
+        }
+      }
+
       await raiseJobDispute(
-        { jobId: job.id, actorId: user.id, actorType },
+        { jobId: job.id, actorId: user.id, actorType, reason: reason || undefined },
         job.id
       )
+
+      if (disputeRecipientId) {
+        await notifyDisputeRaised(job.id, disputeRecipientId, job.title)
+      }
 
       return NextResponse.json({ success: true, message: 'Dispute raised' })
     }
@@ -96,25 +147,32 @@ export async function POST(
       const reason =
         typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
-      await cancelJob({ jobId: job.id, actorId: user.id, actorType })
 
+      let providerUserId: string | null = null
       if (isCustomer) {
         const accepted = await prisma.jobQuote.findFirst({
           where: { jobId: job.id, status: 'ACCEPTED' },
           select: { providerId: true, providerType: true },
         })
         if (accepted) {
-          const providerUserId =
+          providerUserId =
             accepted.providerType === 'INDIVIDUAL'
               ? accepted.providerId
               : (await prisma.companyProfile.findUnique({
                   where: { id: accepted.providerId },
                   select: { userId: true },
-                }))?.userId
-          if (providerUserId) notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
+                }))?.userId ?? null
+        }
+      }
+
+      await cancelJob({ jobId: job.id, actorId: user.id, actorType, reason: reason || undefined })
+
+      if (isCustomer) {
+        if (providerUserId) {
+          await notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
         }
       } else {
-        notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
+        await notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
       }
 
       return NextResponse.json({ success: true, message: 'Job cancelled' })
@@ -140,7 +198,16 @@ export async function POST(
     ) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
-    if (message.includes('Only the customer')) {
+    if (
+      message.includes('Only the customer') ||
+      message.includes('Only the accepted provider') ||
+      message.includes('Only an authorized company manager') ||
+      message.includes('Only the assigned worker') ||
+      message.includes('assigned worker or an authorized company manager') ||
+      message.includes('Actor is not a participant') ||
+      message.includes('Unauthorized:') ||
+      message.includes('not authorized')
+    ) {
       return NextResponse.json({ error: message }, { status: 403 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })

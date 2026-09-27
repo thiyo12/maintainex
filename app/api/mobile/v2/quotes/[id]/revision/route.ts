@@ -6,16 +6,7 @@ import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
-
-function parsePositiveMinorUnits(value: unknown): bigint | null {
-  if (typeof value === 'bigint') return value > 0n ? value : null
-  if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) return BigInt(value)
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    const parsed = BigInt(value.trim())
-    return parsed > 0n ? parsed : null
-  }
-  return null
-}
+import { getCurrencyForCountry, parseMajorUnitsInput } from '@/lib/money'
 
 export async function POST(
   request: NextRequest,
@@ -30,7 +21,6 @@ export async function POST(
     const { id: originalQuoteId } = await params
     const body = await request.json()
     const { estimatedCompletionTime, message, attachments, companyId, revisionReason, lineItems, currency } = body
-    const priceMinor = parsePositiveMinorUnits(body.price)
 
     if (!estimatedCompletionTime || !revisionReason) {
       return NextResponse.json({ error: 'Missing required fields: price, estimatedCompletionTime, revisionReason' }, { status: 400 })
@@ -70,7 +60,10 @@ export async function POST(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
-    if (originalQuote.providerId !== resolvedProviderId) {
+    if (
+      originalQuote.providerId !== resolvedProviderId ||
+      originalQuote.providerType !== resolvedProviderType
+    ) {
       return NextResponse.json({ error: 'Not your quote' }, { status: 403 })
     }
 
@@ -81,12 +74,32 @@ export async function POST(
       )
     }
 
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id: originalQuote.jobId },
+      select: { countryCode: true, categoryId: true },
+    })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
+    const canonicalCurrency = getCurrencyForCountry(job.countryCode)
+    if (currency && currency !== canonicalCurrency) {
+      return NextResponse.json({ error: 'Quote currency does not match the job market' }, { status: 400 })
+    }
+
+    const priceProvided = body.price !== undefined && body.price !== null && body.price !== ''
+    const priceMinor = priceProvided ? parseMajorUnitsInput(body.price, canonicalCurrency) : null
+    if (priceProvided && priceMinor === null) {
+      return NextResponse.json(
+        { error: 'Quote price must be a positive amount with at most 2 decimal places' },
+        { status: 400 }
+      )
+    }
+
     // Validate line items if provided
     let validatedLineItems: Array<QuoteLineItemInput & { totalAmountCents: bigint; sortOrder: number }> = []
     let serverTotalCents = priceMinor ?? originalQuote.price
 
     if (lineItems && Array.isArray(lineItems) && lineItems.length > 0) {
-      const quoteCurrency = currency ?? originalQuote.currency
+      const quoteCurrency = canonicalCurrency
       const validated = validateLineItems(lineItems as QuoteLineItemInput[], quoteCurrency)
       if (!validated.valid) {
         return NextResponse.json({ error: 'Line item validation failed', errors: validated.errors }, { status: 400 })
@@ -104,18 +117,13 @@ export async function POST(
     }
 
     // Resolve benchmark for classification
-    const job = await prisma.marketplaceJob.findUnique({
-      where: { id: originalQuote.jobId },
-      select: { countryCode: true, categoryId: true },
-    })
-
     let classification = 'INSUFFICIENT_DATA'
     let benchmarkId: string | null = null
     if (job) {
       const benchmark = await resolveBenchmark(prisma, {
         serviceTemplateId: job.categoryId,
         countryCode: job.countryCode,
-        currency: currency ?? originalQuote.currency,
+        currency: canonicalCurrency,
         pricingMode: 'SMART_QUOTE',
       })
       if (benchmark) {
@@ -133,7 +141,7 @@ export async function POST(
       message,
       attachments: attachments ? JSON.stringify(attachments) : undefined,
       revisionReason,
-      currency: currency ?? originalQuote.currency,
+      currency: canonicalCurrency,
       subtotalCents: validatedLineItems.length > 0 ? validatedLineItems.reduce((s, i) => s + i.totalAmountCents, 0n) : undefined,
       taxCents: undefined,
       totalCents: serverTotalCents,

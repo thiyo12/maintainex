@@ -18,10 +18,8 @@ if (Notifications) {
   })
 }
 
-let registered = false
-
 export async function registerForPushNotifications() {
-  if (registered || !Notifications) return
+  if (!Notifications) return
   try {
     const { status: existing } = await Notifications.getPermissionsAsync()
     let finalStatus = existing
@@ -38,7 +36,6 @@ export async function registerForPushNotifications() {
     const token = tokenData.data
 
     await api.registerPush(token)
-    registered = true
     console.log('[push] registered with backend')
 
     if (Platform.OS === 'android') {
@@ -48,6 +45,15 @@ export async function registerForPushNotifications() {
       })
     }
   } catch (_e) {
+  }
+}
+
+export async function getLastNotificationResponse(): Promise<any | null> {
+  if (!Notifications?.getLastNotificationResponseAsync) return null
+  try {
+    return await Notifications.getLastNotificationResponseAsync()
+  } catch {
+    return null
   }
 }
 

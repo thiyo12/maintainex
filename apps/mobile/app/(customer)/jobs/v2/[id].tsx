@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Animated } from 'react-native'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { XCircle, CalendarBlank, MapPin, Lock, ShieldCheck, CheckCircle, Users, CaretRight, Clock, Wallet, Star, Envelope, Wrench, Handshake, WarningCircle, FileText, ChatCircle, Hourglass, Note, Clipboard } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
@@ -80,6 +80,8 @@ export default function V2JobDetailScreen() {
   const [cancelReasonVisible, setCancelReasonVisible] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
+  const currencyCode = job?.countryCode === 'CA' ? 'CAD' : 'LKR'
+
   const loadJob = async () => {
     try {
       const res = await v2Jobs.get(id)
@@ -96,29 +98,44 @@ export default function V2JobDetailScreen() {
     } finally { setLoading(false) }
   }
 
-  useEffect(() => { loadJob() }, [id])
-
-  const canCancelWithin30 = () => {
-    if (!job?.createdAt) return false
-    return (Date.now() - new Date(job.createdAt).getTime()) < 30 * 60 * 1000
-  }
+  useFocusEffect(
+    useCallback(() => {
+      loadJob()
+    }, [id])
+  )
 
   const handleSelectQuote = (quoteId: string) => {
     const quote = quotes.find(q => q.id === quoteId)
     if (!quote || !job) return
-    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), quoteId } })
+    router.push({ pathname: '/(customer)/payment/escrow-confirm', params: { bookingId: id, jobTitle: job.title, taskerName: quote.provider?.name || '', quotedAmount: String(quote.price), currency: currencyCode, quoteId } })
   }
 
-  const handleBargain = async () => {
+  const handleBargain = () => {
     if (!bargainModal || !bargainPrice) return
-    const price = parseInt(bargainPrice, 10)
-    if (!price || price < 100) { Alert.alert(t('common.error'), t('errors.enterValidPrice')); return }
-    setActionLoading('bargain')
-    try {
-      await v2JobActions.complete(id, 'CANCEL')
-      setBargainModal(null); setBargainPrice(''); loadJob()
-    } catch { setBargainModal(null); setBargainPrice(''); loadJob()
-    } finally { setActionLoading('') }
+    const price = Number.parseFloat(bargainPrice)
+    if (!Number.isFinite(price) || price < 100) {
+      Alert.alert(t('common.error'), t('errors.enterValidPrice'))
+      return
+    }
+
+    const contactUserId = bargainModal.providerType === 'COMPANY'
+      ? bargainModal.provider?.userId
+      : bargainModal.providerId
+
+    if (!contactUserId) {
+      Alert.alert(t('common.error'), 'Provider chat is not available for this quote.')
+      return
+    }
+
+    setMsgRecipient({
+      id: contactUserId,
+      name: bargainModal.provider?.name || 'Provider',
+    })
+    setMsgPrefill(
+      `Counter offer: ${currencyCode} ${price.toLocaleString()}. If you agree, please revise your quote in MaintainEX so I can accept the updated price.`
+    )
+    setBargainModal(null)
+    setBargainPrice('')
   }
 
   const cancelReasons = [
@@ -132,18 +149,20 @@ export default function V2JobDetailScreen() {
   const handleCancelWithReason = async () => {
     setCancelReasonVisible(false)
     setActionLoading('cancel')
-    removedJobs.add(id); emit('jobsChanged', id)
-    try { await v2JobActions.complete(id, 'CANCEL', cancelReason || ''); router.back() }
-    catch { router.back() }
-    finally { setActionLoading('') }
+    try {
+      await v2JobActions.complete(id, 'CANCEL', cancelReason || '')
+      removedJobs.add(id)
+      emit('jobsChanged', id)
+      router.back()
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message || 'Could not cancel this booking.')
+    } finally {
+      setActionLoading('')
+    }
   }
 
-  const handleDepositEscrow = async () => {
-    if (!job) return
-    setActionLoading('escrow')
-    try { await v2JobActions.depositEscrow(id, job.budgetAmount ?? 0); Alert.alert(t('jobDetail.escrowDeposited'), t('jobDetail.escrowDepositedDesc')); loadJob() }
-    catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
+  const handleDepositEscrow = () => {
+    router.push(`/(customer)/jobs/v2/confirm/${id}`)
   }
 
   const handleShareAddress = async () => {
@@ -154,28 +173,16 @@ export default function V2JobDetailScreen() {
   }
 
   const handleApproveCompletion = () => {
-    if (!job || !escrow) return
+    if (!job || !escrow || workspace?.progressStatus !== 'COMPLETION_REQUESTED') return
     const aq = quotes.find(q => q.status === 'ACCEPTED')
-    router.push({ pathname: '/(customer)/payment/confirm-complete', params: { bookingId: id, jobTitle: job.title, taskerName: aq?.provider?.name || '', taskerPayout: String(Number(escrow.amount) - Number(escrow.serviceFee || 0)), platformFee: String(Number(escrow.serviceFee || 0)) } })
-  }
-
-  const handleReleaseEscrow = async () => {
-    setActionLoading('release')
-    try { await v2JobActions.releaseEscrow(id); Alert.alert(t('jobDetail.escrowReleased'), ''); loadJob() }
-    catch (e: any) { Alert.alert(t('common.error'), e.message) }
-    finally { setActionLoading('') }
-  }
-
-  const handleRefundEscrow = async () => {
-    Alert.alert(t('jobDetail.refundEscrow'), '', [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('jobDetail.yesRefund'), style: 'destructive', onPress: async () => {
-        setActionLoading('refund')
-        try { await v2JobActions.refundEscrow(id); Alert.alert(t('jobDetail.refunded'), ''); loadJob() }
-        catch (e: any) { Alert.alert(t('common.error'), e.message) }
-        finally { setActionLoading('') }
-      }},
-    ])
+    router.push({
+      pathname: '/(customer)/payment/confirm-complete',
+      params: {
+        bookingId: id,
+        jobTitle: job.title,
+        taskerName: aq?.provider?.name || 'Provider',
+      },
+    })
   }
 
   const handleDispute = () => {
@@ -212,7 +219,7 @@ export default function V2JobDetailScreen() {
           <View style={{ paddingHorizontal: 16, marginTop: 4 }}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setCancelReasonVisible(true)} disabled={actionLoading !== ''}>
               <XCircle size={16} color={colors.error} weight="fill" />
-              <Text style={styles.cancelBtnText}>{canCancelWithin30() ? 'Cancel this mission' : 'Request cancellation'}</Text>
+              <Text style={styles.cancelBtnText}>Cancel Booking</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -232,7 +239,7 @@ export default function V2JobDetailScreen() {
             <View style={[styles.scheduleCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
               <CalendarBlank size={18} color={colors.amberDark} weight="fill" />
               <Text style={[styles.scheduleText, { color: colors.amberDark }]}>
-                {job.timeSlot ? `${job.preferredDate} at ${job.timeSlot}` : job.preferredDate}
+                {job.preferredTimeSlot ? `${job.preferredDate} at ${job.preferredTimeSlot}` : job.preferredDate}
               </Text>
             </View>
           </View>
@@ -243,7 +250,7 @@ export default function V2JobDetailScreen() {
           <View style={[styles.infoCard, { backgroundColor: colors.white }]}>
             <Wallet size={20} color={colors.amber} weight="fill" />
             <Text style={styles.infoLabel}>Budget</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={[styles.infoValue, { color: colors.ink }]}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={[styles.infoSub, { color: colors.muted }]}>{job.budgetType}</Text>
           </View>
           {job.locationName && (
@@ -269,7 +276,7 @@ export default function V2JobDetailScreen() {
           <View style={styles.section}>
             {(job as any).aiEstimate && (
               <View style={[styles.aiEstimateBanner, { backgroundColor: '#FFFBEB', borderColor: '#FCD34D' }]}>
-                <Warning size={16} color="#D48900" weight="fill" />
+                <WarningCircle size={16} color="#D48900" weight="fill" />
                 <Text style={[styles.aiEstimateBannerText, { color: '#92400E' }]}>
                   AI estimate was {((job as any).aiEstimate.symbol || 'LKR')} {((job as any).aiEstimate.priceRange?.min || 0).toLocaleString()}–{((job as any).aiEstimate.priceRange?.max || 0).toLocaleString()}
                   {((job as any).aiEstimate.materialHandling === 'tasker_brings') ? ' with materials' : ''}. Quotes below show how taskers compare.
@@ -302,7 +309,7 @@ export default function V2JobDetailScreen() {
                     <Text style={[styles.quoteMeta, { color: colors.muted }]}>{q.providerType} • {q.estimatedCompletionTime}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.quotePrice}>LKR {q.price}</Text>
+                    <Text style={styles.quotePrice}>{currencyCode} {q.price.toLocaleString()}</Text>
                     {quoteTag && (
                       <View style={[styles.quoteTag, { backgroundColor: quoteTag.bg }]}>
                         <Text style={[styles.quoteTagText, { color: quoteTag.color }]}>{quoteTag.label}</Text>
@@ -371,7 +378,7 @@ export default function V2JobDetailScreen() {
                     {p.completedJobs > 0 && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.completedJobs} jobs</Text>}
                     {p.distance && <Text style={[styles.providerMetaText, { color: colors.muted }]}>{p.distance}</Text>}
                   </View>
-                  {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>LKR {p.fixedRate}</Text> : null}
+                  {p.hourlyRate ? <Text style={[styles.providerRate, { color: colors.success }]}>{currencyCode} {p.hourlyRate}/hr</Text> : p.fixedRate ? <Text style={[styles.providerRate, { color: colors.success }]}>{currencyCode} {p.fixedRate}</Text> : null}
                 </View>
                 <TouchableOpacity
                   hitSlop={8}
@@ -390,15 +397,14 @@ export default function V2JobDetailScreen() {
         )}
 
         {/* ─── Action Cards ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT') || (job.status === 'IN_PROGRESS' && !escrow) ? (
+        {job.status === 'QUOTE_ACCEPTED' && escrow?.status === 'PENDING_PAYMENT' ? (
           <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amberLight }]}>
             <Lock size={32} color={colors.ink} weight="fill" />
-            <Text style={styles.actionCardTitle}>Fund Escrow</Text>
+            <Text style={styles.actionCardTitle}>Secure Payment</Text>
             <Text style={styles.actionCardDesc}>
-              Deposit LKR {escrow?.amount || job.budgetAmount} into escrow to start the work
-              {escrow?.createdAt ? ` — fund within 24 hours or the job will reopen` : ''}
+              Secure {escrow?.currency || 'LKR'} {(escrow?.totalAmount || escrow?.amount || job.budgetAmount || 0).toLocaleString()} through PayHere before work starts.
             </Text>
-            <ActionBtn label="Deposit Now" loadingKey="escrow" onPress={handleDepositEscrow} />
+            <ActionBtn label="Pay Securely" loadingKey="escrow" onPress={handleDepositEscrow} />
           </View>
         ) : null}
 
@@ -422,15 +428,18 @@ export default function V2JobDetailScreen() {
         )}
 
         {workspace?.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && (
-          <TouchableOpacity
-            style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}
-            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
-          >
+          <View style={[styles.actionCard, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}>
             <ShieldCheck size={28} color={colors.amber} weight="fill" />
-            <Text style={styles.actionCardTitle}>Confirm Arrival</Text>
-            <Text style={styles.actionCardDesc}>Enter the verification PIN from your hero</Text>
-            <ActionBtn label="Verify PIN" loadingKey="" onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)} />
-          </TouchableOpacity>
+            <Text style={styles.actionCardTitle}>Arrival & Work Start Verification</Text>
+            <Text style={styles.actionCardDesc}>
+              Generate a one-time arrival PIN when the provider reaches you. After arrival is confirmed, generate a fresh PIN only when you are ready for work to start.
+            </Text>
+            <ActionBtn
+              label="Open Verification PIN"
+              loadingKey=""
+              onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
+            />
+          </View>
         )}
 
         {workspace?.progressStatus === 'COMPLETION_REQUESTED' && (
@@ -449,29 +458,19 @@ export default function V2JobDetailScreen() {
               <Text style={[styles.escrowTitle, { color: colors.ink }]}>Escrow</Text>
               <View style={styles.escrowBadge}><Text style={styles.escrowBadgeText}>Protected</Text></View>
             </View>
-            <Text style={[styles.escrowAmount, { color: colors.ink }]}>LKR {escrow.amount}</Text>
-            <View style={styles.escrowActions}>
-              <ActionBtn label="Release to Hero" loadingKey="release" onPress={handleReleaseEscrow} color={colors.amber} />
-              <ActionBtn label="Refund & Cancel" loadingKey="refund" onPress={handleRefundEscrow} color={colors.error} />
-            </View>
+            <Text style={[styles.escrowAmount, { color: colors.ink }]}>
+              {escrow.currency || 'LKR'} {Number(escrow.totalAmount || escrow.amount || 0).toLocaleString()}
+            </Text>
+            <Text style={[styles.actionCardDesc, { marginBottom: 0 }]}>
+              Payment stays protected until you approve completed work. Before work starts, use the booking cancellation action above.
+            </Text>
           </View>
         )}
 
         {/* ─── Dispute ─── */}
-        {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+        {job.status === 'IN_PROGRESS' && workspace?.progressStatus !== 'DISPUTED' && (
           <TouchableOpacity style={styles.disputeBtn} onPress={handleDispute}>
             <Text style={styles.disputeBtnText}>Raise a Dispute</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* ─── Job PIN ─── */}
-        {(job.status === 'QUOTE_ACCEPTED' || job.status === 'IN_PROGRESS') && (
-          <TouchableOpacity
-            style={[styles.disputeBtn, { borderColor: colors.amber }]}
-            onPress={() => router.push(`/(customer)/jobs/v2/${id}/pin`)}
-          >
-            <ShieldCheck size={16} color={colors.amber} />
-            <Text style={[styles.disputeBtnText, { color: colors.amber, marginLeft: 8 }]}>Job Verification PIN</Text>
           </TouchableOpacity>
         )}
 
@@ -504,7 +503,7 @@ export default function V2JobDetailScreen() {
             <Text style={[styles.modalSub, { color: colors.muted }]}>Propose your price to {bargainModal?.provider?.name || 'the hero'}</Text>
             <TextInput
               style={[styles.modalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.ink }]}
-              value={bargainPrice} onChangeText={setBargainPrice} placeholder="LKR 0" placeholderTextColor={colors.muted} keyboardType="numeric" />
+              value={bargainPrice} onChangeText={setBargainPrice} placeholder={`${currencyCode} 0`} placeholderTextColor={colors.muted} keyboardType="numeric" />
             <View style={styles.modalActions}>
               <TouchableOpacity style={[styles.modalBtn, { backgroundColor: colors.border }]} onPress={() => setBargainModal(null)}>
                 <Text style={[styles.modalBtnText, { color: colors.ink }]}>Cancel</Text>

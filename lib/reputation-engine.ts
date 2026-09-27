@@ -11,12 +11,24 @@ export async function recalculateReputation(taskerId: string): Promise<{
   completionRate: number
   compositeScore: number
 }> {
-  // 1. Weighted rolling average rating
-  const reviews = await prisma.taskerReview.findMany({
+  // 1. Weighted rolling average rating (legacy TaskerReview + v2 JobReview)
+  const legacyReviews = await prisma.taskerReview.findMany({
     where: { taskerId: taskerId },
     orderBy: { createdAt: 'desc' },
     select: { rating: true, createdAt: true },
   })
+  const marketplaceReviews = await prisma.jobReview.findMany({
+    where: { providerId: taskerId },
+    orderBy: { createdAt: 'desc' },
+    select: { quality: true, communication: true, timeliness: true, createdAt: true },
+  })
+  const reviews = [
+    ...legacyReviews,
+    ...marketplaceReviews.map((r) => ({
+      rating: (r.quality + r.communication + r.timeliness) / 3,
+      createdAt: r.createdAt,
+    })),
+  ]
 
   let weightedSum = 0
   let weightTotal = 0

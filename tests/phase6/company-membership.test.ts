@@ -170,6 +170,28 @@ describe.skipIf(!requiresPostgres())('Phase 6 — Company Membership', () => {
       expect(result.success).toBe(false)
       expect(result.error).toContain('different email')
     })
+
+    it('rejects phone invitation acceptance by a different phone number', async () => {
+      const invitedPhone = '+94771234567'
+      const result2 = await createCompanyInvite({
+        companyId,
+        inviterUserId: ownerUserId,
+        inviterRole: 'COMPANY_OWNER',
+        name: 'Phone Test',
+        phone: invitedPhone,
+        role: 'WORKER',
+      })
+      expect(result2.success).toBe(true)
+
+      const result = await acceptCompanyInvite({
+        token: result2.token!,
+        userId: workerUserId,
+        userEmail: 'worker@test.com',
+        userPhone: '+94770000000',
+      })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('different phone')
+    })
   })
 
   describe('Member removal safety', () => {

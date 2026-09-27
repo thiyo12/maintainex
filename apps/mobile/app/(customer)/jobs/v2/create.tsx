@@ -195,6 +195,7 @@ function CreateJobScreenInner() {
   const [postSuccess, setPostSuccess] = useState(false)
   const [createdJobId, setCreatedJobId] = useState<string | null>(null)
   const [createdConversationId, setCreatedConversationId] = useState<string | null>(null)
+  const jobCreateKeyRef = useRef<string | null>(null)
 
   const [categories, setCategories] = useState<Category[]>(FALLBACK_CATEGORIES)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
@@ -516,9 +517,18 @@ function CreateJobScreenInner() {
         longitude: coords?.longitude ?? null,
       }
 
+      if (!jobCreateKeyRef.current) {
+        jobCreateKeyRef.current = `job-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`
+      }
+      const idempotencyKey = jobCreateKeyRef.current
+
       const res = await fetch(`${API_URL}/api/mobile/v2/jobs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Idempotency-Key': idempotencyKey,
+        },
         body: JSON.stringify({
           title: autoTitle,
           description: autoDescription + (notes ? `\n\nNotes: ${notes}` : ''),
@@ -544,11 +554,18 @@ function CreateJobScreenInner() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) { Alert.alert(t('common.error'), data.error || t('postJob.failed')); return }
+      if (!res.ok) {
+        jobCreateKeyRef.current = null
+        Alert.alert(t('common.error'), data.error || t('postJob.failed'))
+        return
+      }
       setCreatedJobId(data.job?.id || null)
       setCreatedConversationId(data.conversationId || null)
+      jobCreateKeyRef.current = null
       setPostSuccess(true)
-    } catch { Alert.alert(t('common.error'), t('postJob.networkError'))
+    } catch {
+      // Preserve the key after a network failure so retrying cannot create a duplicate job.
+      Alert.alert(t('common.error'), t('postJob.networkError'))
     } finally { setSubmitting(false) }
   }
 

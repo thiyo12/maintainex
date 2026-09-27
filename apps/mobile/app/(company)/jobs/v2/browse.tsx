@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../lib/ThemeContext'
 import { v2Jobs, V2Job } from '../../../../lib/api-v2'
-import { getAuthToken } from '../../../../lib/api'
+import { getAuthToken, getActiveCompanyId } from '../../../../lib/api'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 
@@ -24,8 +24,10 @@ export default function CompanyBrowseJobsScreen() {
 
   const loadJobs = useCallback(async (area?: string | null) => {
     try {
-      let params = 'role=provider'
-      if (area) params += `&areaId=${area}`
+      const companyId = await getActiveCompanyId()
+      if (!companyId) throw new Error('No active company membership')
+      let params = `role=provider&context=company&companyId=${encodeURIComponent(companyId)}`
+      if (area) params += `&areaId=${encodeURIComponent(area)}`
       const res = await v2Jobs.list(params)
       setJobs(res.jobs)
     } catch (e) {

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { createAssignment, reassignWorker, revokeAssignment, workerAcceptAssignment, workerRejectAssignment } from '../../lib/domain/company-job-assignment'
+import { resolveCompanyContext } from '../../lib/phase6/company-context'
 
 const prisma = new PrismaClient()
 
@@ -261,6 +262,22 @@ describe('Phase 10.7 — Cross-Worker IDOR Protection', () => {
     const rejectResult = await workerRejectAssignment(createResult.assignmentId!, workerBUserId)
     expect(rejectResult.success).toBe(false)
     expect(rejectResult.error).toContain('Not your assignment')
+  })
+})
+
+describe('Phase 10.7 — Membership Company Context', () => {
+  it('global TASKER worker resolves its company through TeamMember membership', async () => {
+    const user = await prisma.user.findUnique({ where: { id: workerAUserId } })
+    expect(user?.role).toBe('TASKER')
+
+    const own = await resolveCompanyContext(workerAUserId, companyAId, 'quotes:read')
+    expect(own.error).toBeUndefined()
+    expect(own.context?.companyId).toBe(companyAId)
+    expect(own.context?.role).toBe('WORKER')
+
+    const other = await resolveCompanyContext(workerAUserId, companyBId, 'quotes:read')
+    expect(other.context).toBeNull()
+    expect(other.error).toBeTruthy()
   })
 })
 

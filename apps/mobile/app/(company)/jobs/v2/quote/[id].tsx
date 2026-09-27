@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '../../../../../lib/ThemeContext'
 import { fonts } from '../../../../../lib/fonts'
 import { v2Jobs, v2Quotes } from '../../../../../lib/api-v2'
+import { company } from '../../../../../lib/api'
 
 export default function CompanySubmitQuoteScreen() {
   const { t } = useTranslation()
@@ -21,14 +22,30 @@ export default function CompanySubmitQuoteScreen() {
   const [price, setPrice] = useState('')
   const [estimatedCompletionTime, setEstimatedCompletionTime] = useState('')
   const [message, setMessage] = useState('')
-  const [providerType, setProviderType] = useState('COMPANY')
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [existingQuote, setExistingQuote] = useState<any>(null)
 
   useEffect(() => { loadJob() }, [id])
 
   const loadJob = async () => {
     try {
-      const res = await v2Jobs.get(id)
-      setJob(res.job)
+      const companyProfile = await company.profile.get()
+      const [jobRes, quoteRes] = await Promise.all([
+        v2Jobs.get(id, 'company'),
+        v2Quotes.list(id, companyProfile.id),
+      ])
+      setJob(jobRes.job)
+      setCompanyId(companyProfile.id)
+
+      const pending = (quoteRes.quotes || [])
+        .filter((q: any) => q.status === 'PENDING')
+        .sort((a: any, b: any) => (b.revisionNumber || 1) - (a.revisionNumber || 1))[0]
+      if (pending) {
+        setExistingQuote(pending)
+        setPrice(String(pending.price))
+        setEstimatedCompletionTime(pending.estimatedCompletionTime || '')
+        setMessage(pending.message || '')
+      }
     } catch (e) {
       Alert.alert(t('common.error'), t('errors.jobNotFound'))
       router.back()
@@ -38,18 +55,34 @@ export default function CompanySubmitQuoteScreen() {
   }
 
   const handleSubmit = async () => {
-    if (!price || !estimatedCompletionTime) {
-      Alert.alert(t('common.error'), t('errors.fillAllFields'))
+    if (!price || !estimatedCompletionTime || !companyId) {
+      Alert.alert(t('common.error'), !companyId ? 'Company profile is not available.' : t('errors.fillAllFields'))
       return
     }
     setSubmitting(true)
     try {
-      await v2Quotes.submit({
-        jobId: id, providerType,
-        price: parseFloat(price),
-        estimatedCompletionTime, message,
-      })
-      Alert.alert(t('company.quoteSubmitSuccess'), t('company.quoteSubmitDesc'), [
+      if (existingQuote) {
+        await v2Quotes.revise(existingQuote.id, {
+          price: parseFloat(price),
+          estimatedCompletionTime,
+          message,
+          revisionReason: 'Company revised quote after customer negotiation',
+          companyId,
+        })
+      } else {
+        await v2Quotes.submit({
+          jobId: id,
+          providerType: 'COMPANY',
+          companyId,
+          price: parseFloat(price),
+          estimatedCompletionTime,
+          message,
+        })
+      }
+      Alert.alert(
+        existingQuote ? 'Quote revised' : t('company.quoteSubmitSuccess'),
+        existingQuote ? 'The customer can now accept the updated quote.' : t('company.quoteSubmitDesc'),
+        [
         { text: t('common.ok'), onPress: () => router.back() },
       ])
     } catch (e: any) {
@@ -69,6 +102,8 @@ export default function CompanySubmitQuoteScreen() {
 
   if (!job) return null
 
+  const currencyCode = job.countryCode === 'CA' ? 'CAD' : 'LKR'
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -87,7 +122,7 @@ export default function CompanySubmitQuoteScreen() {
           <Text style={styles.previewTitle}>{job.title}</Text>
           <Text style={styles.previewDesc} numberOfLines={3}>{job.description}</Text>
           <View style={styles.previewMeta}>
-            <Text style={styles.previewBudget}>LKR {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
+            <Text style={styles.previewBudget}>{currencyCode} {job.budgetAmount?.toLocaleString() ?? 'Not set'}</Text>
             <Text style={styles.previewType}>{job.budgetType}</Text>
           </View>
         </View>
@@ -96,25 +131,14 @@ export default function CompanySubmitQuoteScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('quotes.yourQuote')}</Text>
 
-          <Text style={styles.label}>{t('jobDetail.provider')} *</Text>
-          <View style={styles.typeRow}>
-            <TouchableOpacity
-              style={[styles.typeBtn, providerType === 'INDIVIDUAL' && styles.typeBtnSelected]}
-              onPress={() => setProviderType('INDIVIDUAL')}
-            >
-              <Text style={[styles.typeBtnText, providerType === 'INDIVIDUAL' && styles.typeBtnTextSelected]}>{t('postJob.step2.freelancer')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeBtn, providerType === 'COMPANY' && styles.typeBtnSelected]}
-              onPress={() => setProviderType('COMPANY')}
-            >
-              <Text style={[styles.typeBtnText, providerType === 'COMPANY' && styles.typeBtnTextSelected]}>{t('postJob.step2.company')}</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.label}>{existingQuote ? 'Revise company quote' : 'Company quote'}</Text>
+          <Text style={{ color: colors.muted, marginBottom: 4 }}>
+            {existingQuote ? 'Update the negotiated price or timing. The previous quote will be superseded.' : 'This quote will be submitted under your company profile.'}
+          </Text>
 
-          <Text style={styles.label}>{t('quotes.price')} (LKR) *</Text>
+          <Text style={styles.label}>{t('quotes.price')} ({currencyCode}) *</Text>
           <View style={styles.priceInputRow}>
-            <Text style={styles.currencySign}>LKR</Text>
+            <Text style={styles.currencySign}>{currencyCode}</Text>
             <TextInput
               style={[styles.input, styles.priceInput]}
               value={price}
@@ -153,7 +177,7 @@ export default function CompanySubmitQuoteScreen() {
             {submitting ? (
               <ActivityIndicator color="#0D0D0D" />
             ) : (
-              <Text style={styles.submitBtnText}>{t('tasker.submitQuote')}</Text>
+              <Text style={styles.submitBtnText}>{existingQuote ? 'Revise Quote' : t('tasker.submitQuote')}</Text>
             )}
           </TouchableOpacity>
         </View>

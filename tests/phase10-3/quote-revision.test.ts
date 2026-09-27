@@ -10,7 +10,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     quoteStore.set(overrides.originalQuote.id, { ...overrides.originalQuote })
   }
 
-  return {
+  const prisma: any = {
     jobQuote: {
       findUnique: vi.fn().mockImplementation(({ where }: any) => {
         return Promise.resolve(quoteStore.get(where.id) ?? overrides.findUnique ?? null)
@@ -29,10 +29,20 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         }
         return Promise.resolve({ ...data, id: where.id })
       }),
+      updateMany: vi.fn().mockImplementation(({ where, data }: any) => {
+        const existing = quoteStore.get(where.id)
+        if (!existing) return Promise.resolve({ count: 0 })
+        if (where.providerId && existing.providerId !== where.providerId) return Promise.resolve({ count: 0 })
+        if (where.status && existing.status !== where.status) return Promise.resolve({ count: 0 })
+        Object.assign(existing, data)
+        return Promise.resolve({ count: 1 })
+      }),
       findFirst: vi.fn().mockResolvedValue(overrides.firstChild ?? null),
     },
     _quoteStore: quoteStore,
-  } as any
+  }
+  prisma.$transaction = vi.fn(async (fn: any) => fn(prisma))
+  return prisma as any
 }
 
 describe('Phase 10.3 — Quote Revision Lifecycle', () => {
@@ -67,7 +77,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
       expect(result.newQuoteId).toBeDefined()
 
       // Verify original was superseded
-      const originalUpdate = prisma.jobQuote.update.mock.calls.find(
+      const originalUpdate = prisma.jobQuote.updateMany.mock.calls.find(
         (call: any) => call[0].where.id === 'orig-1'
       )
       expect(originalUpdate).toBeDefined()
@@ -103,7 +113,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
       })
 
       // Original quote's price should NOT be modified
-      const updateCall = prisma.jobQuote.update.mock.calls.find(
+      const updateCall = prisma.jobQuote.updateMany.mock.calls.find(
         (call: any) => call[0].where.id === 'orig-1'
       )
       expect(updateCall![0].data).not.toHaveProperty('price')
