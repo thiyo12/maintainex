@@ -27,7 +27,7 @@ Importer counts = files with import statements at baseline (`dbae2f73`).
 | **Payouts** | `Payout` vs `PayoutRequest` models; `lib/payout-engine.ts` (4) | `Payout` + payout-engine | `PayoutRequest` (0 meaningful callers — verify) | RESERVED-never-completes gap is a known finance bug (separate fix) |
 | **Disputes** | old `Dispute` model vs v2 dispute lifecycle | `MarketplaceDispute` (target entity) | old `Dispute` | canonical dispute module → calls finance services |
 | **Notifications** | `lib/notifications.ts` (18) vs `lib/notifications-phase10-4.ts` (5) | `lib/notifications.ts` | phase10-4 copy | merge phase10-4 (5 files) into canonical |
-| **Pricing** | `lib/pricing/*` (23) vs `lib/pricing-engine.ts` (0), `lib/smart-pricing.ts` (0), `lib/pricing-countries.ts` (0), root `pricing-types.ts` | `lib/pricing/*` | 3 dead files + `docs/architecture/pricing-engine.md` describes old engine | retire via ladder |
+| **Pricing** | `lib/pricing/*` (23) canonical; Phase C removed dead `lib/pricing-engine.ts`, `lib/smart-pricing.ts`, `lib/pricing-countries.ts`, root `lib/pricing-types.ts` | `lib/pricing/*` | none — `docs/architecture/pricing-engine.md` already documents `lib/pricing/` | done (Phase C) |
 | **Admin alert/work-queue** | `AdminAlert` model + auto-assignment logic | `AdminAlert` → CRM work queue (Section 21) | — | add category/SLA fields later |
 | **Audit** | `lib/admin-rbac.ts` audit logging (per AGENTS.md) + `AuditLog` | `AuditLog` via admin module | scattered audit calls | centralize in `lib/modules/admin/audit` |
 | **i18n** | `apps/mobile/lib/i18n/locales/{en,si,ta}` — parity tests failing (ta/si missing hundreds of keys) | all three locales, parity-enforced | — | fix as mobile-phase task (baseline failure) |

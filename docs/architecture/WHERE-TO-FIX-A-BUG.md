@@ -31,7 +31,7 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 | Notification not sent | `lib/notifications.ts` (canonical; `notifications-phase10-4.ts` is the merge copy) → target `lib/modules/communications/notifications` |
 | Push / outbox retry bug | outbox/retry logic near notifications → target `lib/modules/communications/outbox` |
 | SMS/OTP delivery bug | SMS provider infra + OTP routes → target `lib/modules/communications/sms` |
-| Pricing wrong quote | `lib/pricing/*` (canonical; `pricing-engine.ts`/`smart-pricing.ts` are dead) |
+| Pricing wrong quote | `lib/pricing/*` (canonical; `pricing-engine.ts`/`smart-pricing.ts` removed in Phase C) |
 | Admin page (CRM UI) bug | `app/admin/**` pages (thin) + `app/api/admin/**` → target `app/(admin)/admin/**` + `lib/modules/admin` |
 | Admin API data bug | `app/api/admin/**` route → thin controller over module service |
 | Mobile screen bug | `apps/mobile/app/**` → logic belongs in `apps/mobile/features/**` (target) |
@@ -49,5 +49,5 @@ grep -rn "from ['\"].*lib/domain/job-lifecycle" --include='*.ts*' app lib compon
 grep -rln "authenticateStaffRequest\|requireAdminAuth\|verifyMarketplaceToken" app/api
 
 # is this file dead? (retirement ladder requires more than this)
-grep -rn "lib/pricing-engine" --include='*.ts*' app lib components tests scripts
+grep -rn "lib/demand-engine" --include='*.ts*' app lib components tests scripts
 ```

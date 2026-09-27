@@ -24,15 +24,16 @@ Rules:
 
 | Artifact | Class | Evidence | Next step |
 |---|---|---|---|
-| `lib/pricing-engine.ts` | SAFE_TO_REMOVE | 0 importers | confirm → ladder step "TEST PASS" → remove (Phase C/H) |
-| `lib/smart-pricing.ts` | SAFE_TO_REMOVE | 0 importers | same |
-| `lib/pricing-countries.ts` | SAFE_TO_REMOVE | 0 importers | same |
+| `lib/pricing-engine.ts` | REMOVED | 0 importers; pricing suite green pre-delete | done (Phase C removal commit) |
+| `lib/smart-pricing.ts` | REMOVED | 0 importers; pricing suite green pre-delete | done (Phase C removal commit) |
+| `lib/pricing-countries.ts` | REMOVED | 0 importers; pricing suite green pre-delete | done (Phase C removal commit) |
+| root `lib/pricing-types.ts` | REMOVED | 0 importers; pricing suite green pre-delete | done (Phase C removal commit) |
 | `lib/demand-engine.ts` | SAFE_TO_REMOVE | 0 importers | same |
 | `lib/bi-engine.ts` | SAFE_TO_REMOVE | 0 importers | same |
 | `lib/branch-assignment.ts` | SAFE_TO_REMOVE | 0 importers | same |
 | `apps/mobile/lib/icons.tsx` | SAFE_TO_REMOVE | 0 importers; JSX-in-ts bug fixed by rename | mobile-phase candidate |
 | `createStaffSession` + unused rotation helpers | MIGRATION_REQUIRED → REMOVE | 0 callers; login creates sessions directly | remove with Phase D auth consolidation |
-| `lib/notifications-phase10-4.ts` | MIGRATION_REQUIRED | 5 importers → merge | Phase C merge, then remove |
+| `lib/notifications-phase10-4.ts` | COMPATIBILITY (shim) | merged into `lib/notifications/` (Phase C); 4 route importers + 1 test mock still on shim path | retire shim in Phase H |
 | `lib/job-matcher.ts`, `lib/matching-engine.ts` | MIGRATION_REQUIRED | 0 statement-level importers; source-string assertions in `tests/phase8/negative-security.test.ts`; referenced in `docs/correction/00-MARKETPLACE-GENERATIONS.md` | map route-level callers (dynamic require?) → rewrite test assertions → remove |
 | `lib/admin-auth.ts` (simple-token) | COMPATIBILITY | 37 live admin routes | supersede in Phase D, then ladder |
 | `lib/mobile-auth.ts` | COMPATIBILITY | 86 live importers | gradual migrate to marketplace-auth/module |

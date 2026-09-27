@@ -38,7 +38,7 @@ payout RESERVED completion, `mobile/earnings` wrong-model reads, vacuous phase1 
 |---|---|---|---|---|
 | `lib/notifications-phase10-4.ts` (5 importers) | merge into `lib/notifications.ts` → `lib/modules/communications/notifications/` | ONE notification system | low | notifications tests |
 | outbox/retry scattered | `lib/modules/communications/outbox/` | one retry path | med | notification retry tests |
-| `lib/pricing-engine.ts`, `lib/smart-pricing.ts`, `lib/pricing-countries.ts`, root `pricing-types.ts` (all 0 importers) | retirement ladder → delete | SAFE_TO_REMOVE candidates | low | pricing suite must stay green first |
+| `lib/pricing-engine.ts`, `lib/smart-pricing.ts`, `lib/pricing-countries.ts`, root `pricing-types.ts` (all 0 importers) | retirement ladder → delete (done, Phase C) | REMOVED; pricing suite green pre-delete | low | complete |
 
 ## Phase D — auth + RBAC consolidation (Sections 16–17)
 

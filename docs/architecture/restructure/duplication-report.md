@@ -107,12 +107,12 @@ Outbox/retry logic scattered; target `lib/modules/communications/{notifications,
 | Impl | Importers | Status |
 |---|---|---|
 | `lib/pricing/*` | 23 | CANONICAL |
-| `lib/pricing-engine.ts` | 0 | SAFE_TO_REMOVE (ladder) |
-| `lib/smart-pricing.ts` | 0 | SAFE_TO_REMOVE (ladder) |
-| `lib/pricing-countries.ts` | 0 | SAFE_TO_REMOVE (ladder) |
-| root `lib/pricing-types.ts` | check | align with `lib/pricing/types` |
+| `lib/pricing-engine.ts` | 0 | REMOVED (Phase C, ladder complete) |
+| `lib/smart-pricing.ts` | 0 | REMOVED (Phase C, ladder complete) |
+| `lib/pricing-countries.ts` | 0 | REMOVED (Phase C, ladder complete) |
+| root `lib/pricing-types.ts` | 0 | REMOVED (Phase C; type surface aligned with `lib/pricing/types`) |
 
-Note `docs/architecture/pricing-engine.md` documents the old engine — update docs on retire.
+Note: `docs/architecture/pricing-engine.md` already documents canonical `lib/pricing/` — no doc update needed on retire.
 
 ## Matching
 
