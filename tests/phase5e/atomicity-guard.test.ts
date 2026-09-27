@@ -13,7 +13,7 @@ describe('Phase 5E — Financial Atomicity Guard', () => {
   const cronRelease = readFile('app/api/cron/escrow-release/route.ts')
   const cashPayment = readFile('app/api/mobile/v2/jobs/[id]/cash-payment/route.ts')
   const boostRoute = readFile('app/api/properties/[id]/boost/route.ts')
-  const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+  const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
   const ledger = readFile('lib/ledger.ts')
 
   describe('Reachable routes use canonical financial writers', () => {

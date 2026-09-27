@@ -56,12 +56,12 @@ describe('Part W — Negative Security Tests', () => {
 
   describe('CAD financial request cannot touch LKR wallet', () => {
     it('fundEscrow fails closed if canonical WalletBalance missing for escrow currency', () => {
-      const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+      const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
       expect(lifecycle).toContain('WALLET_CURRENCY_NOT_FOUND')
     })
 
     it('fundEscrow only updates legacy CustomerWallet for LKR', () => {
-      const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+      const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
       const fundIdx = lifecycle.indexOf('export async function fundEscrow')
       const lkrGuard = lifecycle.indexOf('escrowCurrency === \'LKR\'', fundIdx)
       expect(fundIdx).toBeGreaterThan(-1)
@@ -69,7 +69,7 @@ describe('Part W — Negative Security Tests', () => {
     })
 
     it('releaseEscrow only updates legacy ProviderWallet for LKR', () => {
-      const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+      const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
       const releaseIdx = lifecycle.indexOf('export async function releaseEscrow')
       const lkrGuard = lifecycle.indexOf('escrowCurrency === \'LKR\'', releaseIdx)
       expect(releaseIdx).toBeGreaterThan(-1)
@@ -77,7 +77,7 @@ describe('Part W — Negative Security Tests', () => {
     })
 
     it('refundEscrow only updates legacy CustomerWallet for LKR', () => {
-      const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+      const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
       const refundIdx = lifecycle.indexOf('export async function refundEscrow')
       const lkrGuard = lifecycle.indexOf('escrowCurrency === \'LKR\'', refundIdx)
       expect(refundIdx).toBeGreaterThan(-1)

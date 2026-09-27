@@ -11,7 +11,7 @@ describe('Legacy Bypass Closure — 4 HIGH Findings', () => {
   const mobileDisputes = readFile('app/api/mobile/disputes/route.ts')
   const adminDisputes = readFile('app/api/admin/disputes/route.ts')
   const adminCommission = readFile('app/api/admin/commission/route.ts')
-  const lifecycle = readFile('lib/domain/job-lifecycle.ts')
+  const lifecycle = readFile('lib/finance/escrow/escrow-service.ts')
   const payoutEngine = readFile('lib/payout-engine.ts')
 
   describe('FIX 1 — Company worker assignment routes through canonical lifecycle', () => {
