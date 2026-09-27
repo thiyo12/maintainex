@@ -1,26 +1,3 @@
-import { RateLimitStore } from './store'
-import { MemoryRateLimitStore } from './memory-store'
-import { RedisRateLimitStore } from './redis-store'
-
-let sharedStore: RateLimitStore | null = null
-
-export function createRateLimitStore(): RateLimitStore {
-  if (sharedStore) return sharedStore
-
-  const redisUrl = process.env.REDIS_URL
-  if (redisUrl) {
-    try {
-      sharedStore = new RedisRateLimitStore(redisUrl)
-      return sharedStore
-    } catch {
-      // Fall through to memory
-    }
-  }
-
-  sharedStore = new MemoryRateLimitStore()
-  return sharedStore
-}
-
-export function resetRateLimitStore(): void {
-  sharedStore = null
-}
+// Compatibility re-export — implementation lives in lib/shared/rate-limit/.
+// Legacy import path kept stable for Phase A; retirement belongs to Phase H.
+export * from '@/lib/shared/rate-limit/index'
