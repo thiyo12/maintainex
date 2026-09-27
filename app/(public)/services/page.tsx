@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: `${baseUrl}/services` },
     openGraph: {
       title: `Our Services | Maintainex ${c}`,
-      description: `Professional cleaning and home services in ${c}. Book online today.`,
+      description: `Explore professional services in ${c}, then continue with MaintainEX mobile access.`,
     },
   }
 }
