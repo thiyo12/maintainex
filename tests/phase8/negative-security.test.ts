@@ -87,7 +87,7 @@ describe('Part W — Negative Security Tests', () => {
 
   describe('Zero-country admin sees zero data', () => {
     it('getCountryFilter returns __NONE__ sentinel for zero-country admin', () => {
-      const rbac = readFile('lib/admin-rbac.ts')
+      const rbac = readFile('lib/auth/authorization/admin-rbac.ts')
       expect(rbac).toContain('__NONE__')
       expect(rbac).toContain('assignedCountries.length === 0')
     })

@@ -5,3 +5,7 @@ export * from './authentication/auth-utils'
 export * from './authentication/admin-auth'
 // Admin JWT access/refresh issuance and verification (login/2FA/refresh):
 export * from './authentication/admin-jwt'
+// Admin session extraction, country scoping, audit logging helpers:
+export * from './authorization/admin-rbac'
+// Canonical role + permission vocabulary:
+export * from './rbac/permissions'

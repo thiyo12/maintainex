@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getInMemoryRateLimit } from '@/lib/shared/rate-limit/ip-fixed-window'
+import { ADMIN_ROLES } from '@/lib/auth/rbac/permissions'
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
@@ -366,7 +367,7 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    const validWebRoles = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL']
+    const validWebRoles = Object.keys(ADMIN_ROLES)
 
     if (!validWebRoles.includes(session.role)) {
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
