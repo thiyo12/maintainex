@@ -1,12 +1,3 @@
-export { logger, childLogger, type AppLogger } from './logger'
-export { redactObject, redactString } from './redaction'
-export {
-  generateRequestId,
-  runWithContext,
-  getRequestContext,
-  setRequestContext,
-  getRequestId,
-  getCorrelationId,
-  parseIncomingRequestId,
-  type RequestContext,
-} from './request-context'
+// Compatibility re-export — implementation lives in lib/shared/observability/.
+// Legacy import path kept stable for Phase A; retirement belongs to Phase H.
+export * from '@/lib/shared/observability/index'
