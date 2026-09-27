@@ -53,6 +53,13 @@ payout RESERVED completion, `mobile/earnings` wrong-model reads, vacuous phase1 
 
 Gate: full suite + security tests + no route loses authentication (route-inventory diff).
 
+Phase D execution status: canonical boundary + shims + vocabulary + middleware allowlist DONE
+(commits `9a9c9808`..`561f6f5e`); route inventory diff = identical (209 guarded / 47 public, same sets).
+Deferred with documented conflicts: mobile↔marketplace verifier unification (`session.isValid`),
+middleware verifier delegation (edge runtime + legacy scheme divergence), `createStaffSession`
+removal (test-coupled → Phase H), `requirePermission()` route migration (per-route status/payload
+variance → incremental).
+
 ## Phase E — mobile consolidation (Section 18)
 
 | CURRENT | TARGET | REASON | RISK | TEST |

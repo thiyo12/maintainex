@@ -32,12 +32,17 @@ Rules:
 | `lib/bi-engine.ts` | SAFE_TO_REMOVE | 0 importers | same |
 | `lib/branch-assignment.ts` | SAFE_TO_REMOVE | 0 importers | same |
 | `apps/mobile/lib/icons.tsx` | SAFE_TO_REMOVE | 0 importers; JSX-in-ts bug fixed by rename | mobile-phase candidate |
-| `createStaffSession` + unused rotation helpers | MIGRATION_REQUIRED → REMOVE | 0 callers; login creates sessions directly | remove with Phase D auth consolidation |
+| `createStaffSession` + unused rotation helpers | MIGRATION_REQUIRED → REMOVE (ladder-blocked) | 0 production callers; login creates sessions directly; BUT phase3 unit tests cover them — deletion would change frozen test identity | Phase D: classified; remove in Phase H together with test restructuring |
 | `lib/notifications-phase10-4.ts` | COMPATIBILITY (shim) | merged into `lib/notifications/` (Phase C); 4 route importers + 1 test mock still on shim path | retire shim in Phase H |
 | `lib/job-matcher.ts`, `lib/matching-engine.ts` | MIGRATION_REQUIRED | 0 statement-level importers; source-string assertions in `tests/phase8/negative-security.test.ts`; referenced in `docs/correction/00-MARKETPLACE-GENERATIONS.md` | map route-level callers (dynamic require?) → rewrite test assertions → remove |
-| `lib/admin-auth.ts` (simple-token) | COMPATIBILITY | 37 live admin routes | supersede in Phase D, then ladder |
-| `lib/mobile-auth.ts` | COMPATIBILITY | 86 live importers | gradual migrate to marketplace-auth/module |
-| `lib/auth-utils.ts` | READ_ONLY_LEGACY (website) | 51 importers | wrap, migrate gradually |
+| `lib/admin-auth.ts` (simple-token) | COMPATIBILITY (Phase D: root file is now a re-export shim; impl at `lib/auth/authentication/admin-auth.ts`) | 37 live admin routes | supersede with staff-session system, then ladder |
+| `lib/mobile-auth.ts` | COMPATIBILITY (Phase D: root file is now a re-export shim; impl at `lib/auth/compatibility/mobile-auth.ts`) | 86 live importers | gradual migrate to marketplace-auth/module |
+| `lib/auth-utils.ts` | COMPATIBILITY (Phase D: root file is now a re-export shim; impl at `lib/auth/authentication/auth-utils.ts`) | 51 importers | migrate gradually |
+| `lib/admin-jwt.ts`, `lib/admin-rbac.ts` | COMPATIBILITY (Phase D: root files are re-export shims; impls at `lib/auth/authentication/admin-jwt.ts`, `lib/auth/authorization/admin-rbac.ts`) | 5 + 22 importers | retire shims in Phase H |
+| `createSimpleToken` | SAFE_TO_REMOVE_LATER | 0 callers (issuer of legacy 2-part HMAC-hex tokens) | ladder; needs legacy-scheme decision first (see source-of-truth admin-simple-token conflict) |
+| `adminAuthorize`, `getSessionFromCookie` (`admin-rbac`) | SAFE_TO_REMOVE_LATER | 0 callers | ladder (Phase H) |
+| `requireMarketplaceAuth` | SAFE_TO_REMOVE_LATER | 0 callers | ladder (Phase H) |
+| `revokeStaffTokenFamily`, `isStaffTokenClaims` | SAFE_TO_REMOVE_LATER | 0 callers | ladder (Phase H) |
 | `JobPosting` model | READ_ONLY_LEGACY | legacy data path | data migration decision (out of scope) |
 | old `Dispute` model | READ_ONLY_LEGACY | superseded by v2 lifecycle | data migration decision |
 | `ProviderWallet` / `CustomerWallet` | MIGRATION_REQUIRED | wallet reads | migrate to `WalletBalance` service |

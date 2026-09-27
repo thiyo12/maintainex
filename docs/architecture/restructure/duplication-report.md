@@ -4,6 +4,13 @@ Measured at baseline `dbae2f73`. "Importers" = files importing the module (state
 
 ## Auth (worst duplication)
 
+Phase D status: canonical boundary established at `lib/auth/{authentication,authorization,rbac,compatibility}`
+(root paths are re-export shims); two documented conflicts block further unification —
+(1) `mobile-auth` checks `session.isValid`, `marketplace-auth` does not (no current writer of `isValid=false`);
+(2) middleware's legacy 2-part signature scheme (`base64(secret+payload).slice(0,32)`) differs from canonical
+HMAC-hex, and middleware cannot import node crypto/jsonwebtoken (edge runtime). Characterization tests:
+`tests/phaseD/auth-characterization.test.ts`.
+
 Five parallel systems:
 
 | System | File | Importers | Role today |
@@ -34,8 +41,11 @@ one permission checker. Migrate by wrappers, not by deletion.
 - Frontend: page-level role arrays in admin pages.
 - No single permission source; no `can()` helper shared with backend.
 
-**Decision**: `lib/modules/admin/rbac/` single permission vocabulary; `requirePermission()`
-backend, `can()` frontend; country scope server-side.
+**Phase D status**: vocabulary centralized at `lib/auth/rbac/permissions.ts` (prompt path over
+`lib/modules/admin/rbac/`); `lib/admin-types.ts` re-exports so all importers unchanged;
+middleware admin allowlist derives from `ADMIN_ROLES`. Enforcement migration (`requirePermission()`
+backend, `can()` frontend) stays incremental — inline checks have per-route 401/403 and payload
+variance that forbids big-bang replacement.
 
 ## Mobile APIs
 
