@@ -79,7 +79,7 @@ describe('Gate 4 — Quote Country Eligibility (Server-Side Enforcement)', () =>
 
   describe('Type system enforcement', () => {
     it('AuthenticatedUser type includes countryCode', () => {
-      const authPath = resolve(process.cwd(), 'lib/mobile-auth.ts')
+      const authPath = resolve(process.cwd(), 'lib/auth/compatibility/mobile-auth.ts')
       const authSource = readFileSync(authPath, 'utf-8')
       expect(authSource).toContain('countryCode: string')
     })
