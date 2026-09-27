@@ -273,7 +273,7 @@ function ServicesContent({ cityName }: { cityName?: string }) {
                                 }}
                                 className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2.5 rounded-full transition-colors text-sm`}
                               >
-                                Book Now
+                                Continue in app
                               </button>
                             </div>
                           </div>
