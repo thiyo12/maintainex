@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCategoryIcon } from '../category-icons'
+import { getCategoryIcon } from '../../../apps/mobile/lib/category-icons'
 
 describe('getCategoryIcon', () => {
   it('maps flash to flash-outline', () => {
