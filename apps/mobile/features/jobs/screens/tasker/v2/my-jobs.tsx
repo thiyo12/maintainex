@@ -7,7 +7,9 @@ import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '@/lib/i18n'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Jobs, v2Quotes, v2JobActions, V2Job } from '@/lib/api-v2'
+import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
+import { v2Quotes } from '@/api/v2-quotes'
+import { V2Job } from '@/api/v2-types'
 import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
 
 const getToday = () => new Date().toISOString().split('T')[0]

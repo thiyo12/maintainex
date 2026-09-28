@@ -6,7 +6,7 @@ import { ShieldCheck, ArrowLeft } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2JobActions } from '@/lib/api-v2'
+import { v2JobActions } from '@/api/v2-jobs'
 import PinInput from '@/components/ui/PinInput'
 
 export default function CompanyPinVerifyScreen() {

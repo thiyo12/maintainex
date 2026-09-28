@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '@/lib/i18n'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Jobs, v2JobActions, V2Job } from '@/lib/api-v2'
+import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
+import { V2Job } from '@/api/v2-types'
 import NewChatModal from '@/features/messaging/components/NewChatModal'
 import * as Location from 'expo-location'
 
@@ -91,7 +92,7 @@ export default function V2ProviderManageJobScreen() {
     const interval = setInterval(async () => {
       try {
         const loc = await Location.getCurrentPositionAsync({})
-        const token = await (await import('@/lib/api')).getAuthToken()
+        const token = await (await import('@/api/token')).getAuthToken()
         await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/taskers/location`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -118,7 +119,7 @@ export default function V2ProviderManageJobScreen() {
       }
       setLocationSharing(true)
       const loc = await Location.getCurrentPositionAsync({})
-      const token = await (await import('@/lib/api')).getAuthToken()
+      const token = await (await import('@/api/token')).getAuthToken()
       await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'}/api/mobile/taskers/location`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

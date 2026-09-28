@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import Reanimated, { ZoomIn } from 'react-native-reanimated'
 
 import { useColors } from '@/lib/ThemeContext'
-import { v2Jobs } from '@/lib/api-v2'
+import { v2Jobs } from '@/api/v2-jobs'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 
 import AvatarCircle from '@/components/ui/AvatarCircle'

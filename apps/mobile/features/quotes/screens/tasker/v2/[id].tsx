@@ -4,7 +4,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { Ionicons } from '@expo/vector-icons'
-import { v2Jobs, v2Quotes, v2Identity } from '@/lib/api-v2'
+import { v2Jobs } from '@/api/v2-jobs'
+import { v2Quotes } from '@/api/v2-quotes'
+import { v2Identity } from '@/api/v2-identity'
 import { colors, spacing, radius, typography } from '@/lib/design'
 
 export default function V2SubmitQuoteScreen() {

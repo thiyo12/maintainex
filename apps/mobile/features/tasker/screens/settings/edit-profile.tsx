@@ -8,7 +8,10 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { fontSizes } from '@/lib/tokens'
-import { taskers, auth, upload, resolveImageUri } from '@/lib/api'
+import { taskers } from '@/api/taskers'
+import { auth } from '@/api/auth'
+import { upload } from '@/api/upload'
+import { resolveImageUri } from '@/api/client'
 import { useAuth } from '@/features/auth/context/auth'
 
 export default function TaskerEditProfile() {

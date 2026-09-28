@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
-import { v2Jobs } from '@/lib/api-v2'
-import type { V2Job } from '@/lib/api-v2'
+import { v2Jobs } from '@/api/v2-jobs'
+import type { V2Job } from '@/api/v2-types'
 
 export default function ReceiptScreen() {
   const { t } = useTranslation()

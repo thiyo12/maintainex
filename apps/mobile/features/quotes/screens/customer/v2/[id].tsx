@@ -6,7 +6,8 @@ import { Timer, Star, CheckCircle, User, XCircle, MapPin, Wrench } from 'phospho
 import { useTranslation } from 'react-i18next'
 import { ReanimatedSwipeable } from 'react-native-gesture-handler/ReanimatedSwipeable'
 
-import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '@/lib/api-v2'
+import { v2Jobs, v2JobActions, v2Match } from '@/api/v2-jobs'
+import { V2Job, V2Quote } from '@/api/v2-types'
 import { translateJobStatus } from '@/lib/i18n'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 import { CATEGORY_VISUALS, categoryIcon } from '@/lib/categoryVisuals'

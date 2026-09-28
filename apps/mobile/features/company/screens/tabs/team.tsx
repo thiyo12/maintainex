@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
-import { company } from '@/lib/api'
+import { company } from '@/api/companies'
 
 export default function CompanyTeam() {
   const { t } = useTranslation()

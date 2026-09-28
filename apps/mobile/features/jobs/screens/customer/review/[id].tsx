@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import StarRating from '@/components/ui/StarRating'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
-import { v2Jobs, v2JobActions } from '@/lib/api-v2'
+import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
 
 export default function ReviewScreen() {
   const { t } = useTranslation()

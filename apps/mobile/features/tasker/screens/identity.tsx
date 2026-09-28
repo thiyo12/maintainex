@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import { v2Identity } from '@/lib/api-v2'
-import { upload } from '@/lib/api'
+import { v2Identity } from '@/api/v2-identity'
+import { upload } from '@/api/upload'
 
 export default function IdentityVerificationScreen() {
   const colors = useColors()

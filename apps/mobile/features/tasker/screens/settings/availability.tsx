@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Availability } from '@/lib/api-v2'
+import { v2Availability } from '@/api/v2-taskers'
 
 const DAYS = [
   { key: 'monday', labelKey: 'availabilitySettings.monday' },

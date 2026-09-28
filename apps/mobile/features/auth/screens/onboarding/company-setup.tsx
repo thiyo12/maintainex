@@ -10,8 +10,8 @@ import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { fonts } from '@/lib/fonts'
 import { getCategoryI18nKey } from '@/lib/categories'
-import { getAuthToken } from '@/lib/api'
-import { v2Team } from '@/lib/api-v2'
+import { getAuthToken } from '@/api/token'
+import { v2Team } from '@/api/v2-companies'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 

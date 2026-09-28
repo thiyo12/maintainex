@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
-import { v2Request } from '@/lib/api-v2'
-import { getActiveCompanyId } from '@/lib/api'
+import { v2Request } from '@/api/v2-client'
+import { getActiveCompanyId } from '@/api/companies'
 
 interface Assignment {
   id: string

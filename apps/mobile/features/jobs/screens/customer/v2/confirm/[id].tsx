@@ -6,7 +6,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Jobs, v2JobActions, v2Payments } from '@/lib/api-v2'
+import { v2Jobs, v2JobActions } from '@/api/v2-jobs'
+import { v2Payments } from '@/api/v2-payments'
 import Avatar from '@/components/ui/Avatar'
 
 const TIME_SLOTS = [

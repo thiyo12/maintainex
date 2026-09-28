@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { upload } from '@/lib/api'
-import { v2Evidence } from '@/lib/api-v2'
+import { upload } from '@/api/upload'
+import { v2Evidence } from '@/api/v2-jobs'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function EvidenceScreen() {

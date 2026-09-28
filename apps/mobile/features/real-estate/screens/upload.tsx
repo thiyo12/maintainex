@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@/lib/ThemeContext'
 import { useCountry } from '@/lib/country'
-import { realEstate } from '@/lib/api'
+import { realEstate } from '@/api/real-estate'
 import { fonts } from '@/lib/fonts'
 import { spacing, fontSizes } from '@/lib/tokens'
 

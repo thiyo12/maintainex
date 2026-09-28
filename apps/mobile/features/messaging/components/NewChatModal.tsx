@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, TextInput, Modal, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { conversations } from '@/lib/api'
+import { conversations } from '@/api/messaging'
 import { useTheme } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 

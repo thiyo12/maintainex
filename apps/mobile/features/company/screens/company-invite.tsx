@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/features/auth/context/auth'
-import { v2Team } from '@/lib/api-v2'
+import { v2Team } from '@/api/v2-companies'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 

@@ -5,8 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import { v2Jobs, V2Job } from '@/lib/api-v2'
-import { getAuthToken, getActiveCompanyId } from '@/lib/api'
+import { v2Jobs } from '@/api/v2-jobs'
+import { V2Job } from '@/api/v2-types'
+import { getAuthToken } from '@/api/token'
+import { getActiveCompanyId } from '@/api/companies'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 

@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '@/features/auth/context/auth'
-import { auth } from '@/lib/api'
+import { auth } from '@/api/auth'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { fonts } from '@/lib/fonts'

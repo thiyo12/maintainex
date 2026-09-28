@@ -4,9 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Wallet } from '@/lib/api-v2'
-import { formatCurrency, getCurrencyForCountry } from '@/lib/shared/money/format'
-import { Currency } from '@/lib/shared/money/money'
+import { v2Wallet } from '@/api/v2-wallet'
+import { formatCurrency, getCurrencyForCountry } from '@/lib/currency-format'
+import { Currency } from '@/lib/money'
 import { useCountry } from '@/lib/country'
 
 const METHODS = [

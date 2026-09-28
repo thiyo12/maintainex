@@ -5,7 +5,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Subscription } from '@/lib/api-v2'
+import { v2Subscription } from '@/api/v2-companies'
 import { useTranslation } from 'react-i18next'
 
 export default function SubscriptionScreen() {

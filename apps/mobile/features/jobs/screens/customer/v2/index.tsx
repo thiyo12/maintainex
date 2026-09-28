@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { translateJobStatus } from '@/lib/i18n'
-import { v2Jobs, V2Job } from '@/lib/api-v2'
+import { v2Jobs } from '@/api/v2-jobs'
+import { V2Job } from '@/api/v2-types'
 
 export default function V2MyJobsScreen() {
   const { t } = useTranslation()

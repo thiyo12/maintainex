@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import { company } from '@/lib/api'
+import { company } from '@/api/companies'
 
 export default function CompanyMilestones() {
   const { t } = useTranslation()

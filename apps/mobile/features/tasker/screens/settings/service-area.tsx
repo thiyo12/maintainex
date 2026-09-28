@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import * as Location from 'expo-location'
-import { v2TaskerProfile } from '@/lib/api-v2'
+import { v2TaskerProfile } from '@/api/v2-taskers'
 import { LOCATIONS, getLocationName, type LocationArea } from '@/lib/locations'
 
 const SERVICE_RADII = [

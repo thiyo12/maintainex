@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Lock, Eye, EyeSlash } from 'phosphor-react-native'
-import { auth } from '@/lib/api'
+import { auth } from '@/api/auth'
 import { useAuth } from '@/features/auth/context/auth'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'

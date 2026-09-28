@@ -6,8 +6,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { MapPin, ClockAfternoon, Wallet } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import { v2Jobs, V2Job } from '@/lib/api-v2'
-import { getAuthToken } from '@/lib/api'
+import { v2Jobs } from '@/api/v2-jobs'
+import { V2Job } from '@/api/v2-types'
+import { getAuthToken } from '@/api/token'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 

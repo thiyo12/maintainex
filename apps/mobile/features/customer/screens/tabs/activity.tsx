@@ -7,7 +7,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 import { CaretRight, Plus } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
-import { v2Jobs } from '@/lib/api-v2'
+import { v2Jobs } from '@/api/v2-jobs'
 import { translateJobStatus } from '@/lib/i18n'
 import { colors, spacing, radius, typography } from '@/lib/design'
 import { categoryIcon } from '@/lib/categoryVisuals'

@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { EnvelopeSimple, ArrowRight, CaretLeft } from 'phosphor-react-native'
-import { auth } from '@/lib/api'
+import { auth } from '@/api/auth'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { fonts } from '@/lib/fonts'

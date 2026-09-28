@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { getActiveCompanyId } from '@/lib/api'
-import { v2Request } from '@/lib/api-v2'
+import { getActiveCompanyId } from '@/api/companies'
+import { v2Request } from '@/api/v2-client'
 
 interface CompanyAssignment {
   id: string

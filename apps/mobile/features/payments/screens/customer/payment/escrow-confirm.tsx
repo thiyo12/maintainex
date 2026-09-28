@@ -5,7 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2JobActions } from '@/lib/api-v2'
+import { v2JobActions } from '@/api/v2-jobs'
 
 export default function EscrowConfirmScreen() {
   const colors = useColors()

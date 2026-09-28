@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Inspection } from '@/lib/api-v2'
-import { upload } from '@/lib/api'
+import { v2Inspection } from '@/api/v2-jobs'
+import { upload } from '@/api/upload'
 import * as ImagePicker from 'expo-image-picker'
 
 export default function InspectionScreen() {

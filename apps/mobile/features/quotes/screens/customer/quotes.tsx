@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Timer, Star, MapPin, ChatDots } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
-import { jobs } from '@/lib/api'
+import { jobs } from '@/api/jobs'
 import type { JobPosting } from '@/lib/types'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 

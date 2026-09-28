@@ -6,7 +6,7 @@ import Animated, { FadeInUp } from 'react-native-reanimated'
 import { Briefcase, Money, ChatCircle, Info, Checks, BellSlash, CaretRight } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
-import { notifications } from '@/lib/api'
+import { notifications } from '@/api/notifications'
 import { colors, spacing, radius, typography } from '@/lib/design'
 
 import PressableScale from '@/components/ui/PressableScale'

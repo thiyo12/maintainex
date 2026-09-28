@@ -6,8 +6,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Jobs, v2Quotes } from '@/lib/api-v2'
-import { company } from '@/lib/api'
+import { v2Jobs } from '@/api/v2-jobs'
+import { v2Quotes } from '@/api/v2-quotes'
+import { company } from '@/api/companies'
 
 export default function CompanySubmitQuoteScreen() {
   const { t } = useTranslation()

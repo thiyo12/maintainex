@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Hourglass, UsersThree, ChatCircleDots, MapPin, Wallet, CheckCircle, ArrowRight, CaretLeft, Sparkle, Star, WarningCircle } from 'phosphor-react-native'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { getAuthToken } from '@/lib/api'
+import { getAuthToken } from '@/api/token'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://maintainex.lk'
 

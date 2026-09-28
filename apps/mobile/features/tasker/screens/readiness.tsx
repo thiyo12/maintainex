@@ -6,7 +6,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Identity, v2Availability, v2TaskerProfile } from '@/lib/api-v2'
+import { v2Identity } from '@/api/v2-identity'
+import { v2Availability, v2TaskerProfile } from '@/api/v2-taskers'
 
 interface ReadinessStep {
   key: string

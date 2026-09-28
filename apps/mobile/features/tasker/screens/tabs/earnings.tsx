@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { earnings } from '@/lib/api'
+import { earnings } from '@/api/payments'
 
 type Period = 'weekly' | 'monthly' | 'yearly'
 

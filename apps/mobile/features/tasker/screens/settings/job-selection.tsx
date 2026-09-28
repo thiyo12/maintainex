@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { skillsApi } from '@/lib/api'
+import { skillsApi } from '@/api/taskers'
 
 type JobItem = {
   id: string

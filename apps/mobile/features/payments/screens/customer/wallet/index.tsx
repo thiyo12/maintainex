@@ -6,9 +6,9 @@ import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { useRouter } from 'expo-router'
 import { fonts } from '@/lib/fonts'
-import { v2Wallet } from '@/lib/api-v2'
-import { formatCurrency, getCurrencyForCountry } from '@/lib/shared/money/format'
-import { Currency } from '@/lib/shared/money/money'
+import { v2Wallet } from '@/api/v2-wallet'
+import { formatCurrency, getCurrencyForCountry } from '@/lib/currency-format'
+import { Currency } from '@/lib/money'
 import { useCountry } from '@/lib/country'
 
 const TX_ICONS: Record<string, { name: string; bg: string }> = {

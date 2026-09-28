@@ -12,7 +12,8 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import { useAuth } from '@/features/auth/context/auth'
-import { auth, upload } from '@/lib/api'
+import { auth } from '@/api/auth'
+import { upload } from '@/api/upload'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 import { tierById } from '@/lib/tiers'
 import { useTheme } from '@/lib/ThemeContext'

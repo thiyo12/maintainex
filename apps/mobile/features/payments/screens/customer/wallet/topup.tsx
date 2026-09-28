@@ -5,9 +5,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
-import { v2Wallet } from '@/lib/api-v2'
-import { formatCurrency, getCurrencyForCountry } from '@/lib/shared/money/format'
-import { Currency } from '@/lib/shared/money/money'
+import { v2Wallet } from '@/api/v2-wallet'
+import { formatCurrency, getCurrencyForCountry } from '@/lib/currency-format'
+import { Currency } from '@/lib/money'
 import { useCountry } from '@/lib/country'
 
 const PRESETS = [500, 1000, 2500, 5000, 10000, 25000]
@@ -45,7 +45,7 @@ export default function TopUpScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await (await import('@/lib/api')).getAuthToken()}`,
+          'Authorization': `Bearer ${await (await import('@/api/token')).getAuthToken()}`,
         },
         body: JSON.stringify({ amount: amt }),
       })

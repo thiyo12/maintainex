@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import { company } from '@/lib/api'
+import { company } from '@/api/companies'
 
 type Period = 'monthly' | 'quarterly' | 'yearly'
 
