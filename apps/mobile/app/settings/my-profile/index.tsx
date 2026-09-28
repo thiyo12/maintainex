@@ -1,5 +1,1 @@
-import ProfileContent from '../../../components/ProfileContent'
-
-export default function MyProfileScreen() {
-  return <ProfileContent />
-}
+export { default } from '@/features/profile/screens/my-profile/index'
