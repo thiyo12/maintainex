@@ -90,7 +90,7 @@ describe('Phase 10.3 — Optional Customer Budget', () => {
 
   describe('Bi-engine null safety', () => {
     it('revenue calculation handles null budgetAmount', () => {
-      // Simulates bi-engine reduce with null budgetAmount
+      // Simulates legacy reduce with null budgetAmount (bi-engine retired in Phase H)
       const jobs = [
         { budgetAmount: 10000n },
         { budgetAmount: null },

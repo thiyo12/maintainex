@@ -70,7 +70,7 @@ Rules:
 5. Full gate: tsc (web 0 / mobile ≤491 baseline) + build + vitest ≥ baseline.
 6. Commit: `refactor(<domain>): remove <artifact> after zero-caller verification`.
 
-## Phase H execution record (H1–H9 complete; verdict after H10 final regression)
+## Phase H execution status: DONE
 
 Branch `architecture/10of10-restructure`, start `960d2b8e`, commits:
 
