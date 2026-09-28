@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { REGIONS, getRegionFromHost } from '@/lib/regions'
-import Client from './(public)/home/client'
+import Client from './home/client'
 
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers()
