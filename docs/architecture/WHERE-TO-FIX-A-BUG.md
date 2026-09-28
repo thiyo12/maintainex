@@ -51,6 +51,36 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 | Website page / SEO bug | `app/**` pages + `components/**` → target `app/(public)/**` + `components/public` |
 | Test fails | `tests/phaseN/**` today → `tests/{unit,integration,concurrency,security,e2e,release-gate}/<domain>` (Phase F) |
 
+## Test ownership (Phase F)
+
+Every implementation area has an obvious home for its tests (see
+`restructure/testing-map.md` for the full tree):
+
+| Bug area | Implementation | Tests |
+|---|---|---|
+| Auth / sessions / JWT | `lib/auth/**` | `tests/auth/` (+ `tests/auth/auth-characterization` guards root shims) |
+| RBAC / permissions | `lib/auth/rbac/**`, `lib/admin-rbac.ts` | `tests/rbac/` |
+| Security (IDOR, rate limit, isolation, redaction) | `lib/security/**`, route guards | `tests/security/` |
+| Escrow | `lib/finance/escrow/**` (job-lifecycle escrow) | `tests/finance/escrow/` |
+| Ledger / money | `lib/ledger.ts`, `lib/money` | `tests/finance/ledger/` |
+| Payments / webhooks | `lib/payment/**`, `app/api/payments/**` | `tests/finance/payments/` |
+| Payouts | `lib/payout-engine.ts` | `tests/finance/payouts/` |
+| Commission / fees | job-lifecycle + pricing fees | `tests/finance/` (root files) |
+| Pricing | `lib/pricing/**` | `tests/pricing/` |
+| Jobs / matching / lifecycle | `lib/matching/**`, `lib/domain/**` | `tests/jobs/` |
+| Quotes / change orders | `lib/domain/quotes/**`, v2 quotes routes | `tests/quotes/` |
+| Notifications | `lib/notifications*` | `tests/notifications/` |
+| Admin review queues | `app/admin/**`, `app/api/admin/**` | `tests/admin/` |
+| Company / KYC / invites | company routes + membership services | `tests/company/` |
+| Tasker / professions | profession routes + matching eligibility | `tests/tasker/` |
+| Mobile app (any feature) | `apps/mobile/features/**` | `tests/mobile/` (lib units; i18n retained under `apps/mobile/lib/i18n/__tests__`) |
+| Schema / migrations | `prisma/schema.prisma` | `tests/structural/` |
+| Cross-domain flows | multiple | `tests/integration/` |
+| Compatibility shims (Phase H) | root shims (`lib/auth-utils.ts`, `lib/admin-rbac.ts`, `lib/notifications.ts`, `apps/mobile/lib/api*.ts`) | `tests/legacy/` + characterization suites — do not delete before Phase H |
+
+Fast discovery: `npx vitest run tests/<domain>/`. The shared DB guard lives in
+`tests/helpers/test-guard.ts`.
+
 ## Fast lookup commands
 
 ```bash

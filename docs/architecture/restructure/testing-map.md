@@ -57,23 +57,45 @@ disputes, wallet; homepage/SEO/sitemap; login/2FA/RBAC/360s/work-queue) — exec
 phase boundaries touching those surfaces, using existing suites first, manual/runtime
 checks where suites don't exist (runtime checks against the VPS need explicit approval).
 
-## Target test layout (Section 24 — Phase F, gradual; phase-based tests stay until migrated)
+## Test layout — ACTUAL (Phase F complete; phase-number directories retired)
 
 ```
 tests/
-├── unit/{auth,marketplace,finance,trust,admin}/
-├── integration/{auth,marketplace,finance,crm}/
-├── concurrency/{quotes,escrow,payout,pins}/
-├── security/{auth,rbac,idor}/
-├── e2e/{customer-tasker,customer-company,dispute,cancellation}/
-└── release-gate/
+├── auth/           authentication, sessions, JWT/refresh/rotation (+ manual usersession.{sh,sql})
+├── rbac/           permission boundaries, admin/consistency RBAC
+├── security/       idor, rate limits, isolation, redaction, bypass closure, privacy, risk-scoring
+├── finance/        commission, fees, financial-audit, money-precision, currency invariants
+│   ├── escrow/     escrow concurrency + release
+│   ├── ledger/     ledger/money/balance/atomicity + financial-truth-closure (source guard)
+│   ├── payments/   payhere, invoice, withdrawal, intent/concurrency (postgres)
+│   └── payouts/    payout-engine
+├── pricing/        pricing engine/bounds/idempotency/snapshot/zero-config
+├── jobs/           matching, scoring, wave, booking, job-pin, gates, pipeline-10k
+├── quotes/         quote acceptance/revision/change-order/inspection/line-items + benchmark
+├── notifications/  inspection + booking notification suites
+├── admin/          audit-rollback, market-config, credential/risk-event review, pdf-generation
+├── company/        membership, invites, ownership, KYC, workforce, provider eligibility
+├── tasker/         professions, skills, provider suspension/deactivation
+├── customer/       customer lifecycle
+├── mobile/         apps/mobile lib unit tests (category-icons/identity/payment/quotes)
+├── structural/     schema, migration, idempotency-key, deployment-safety guards
+├── integration/    cross-domain lifecycle, postgres, persona-switch, canonical integration
+├── e2e/            e2e-fix-batch
+├── legacy/         backward-compatibility (auth; Phase H decides)
+├── helpers/        test-guard (assertNotProductionDb / isPostgres / requiresPostgres)
+└── retained in place: apps/mobile/lib/i18n/__tests__ — i18next is a mobile-only dependency
+   and their locale imports would surface pre-existing TS1117 errors into the web tsc program
 ```
+
+Historical phase directories are gone; git history preserves phase attribution.
+Discovery invariant: 159 test files / 1960 logical tests before and after Phase F.
 
 ## Critical financial tests (Section 37) — coverage inventory
 
-Existing guards: `release-gate/quote-concurrency-postgres`, `payment-intent-concurrency-postgres`,
-`cancellation-payment-postgres`, `phase10-5/payhere-adapter`, `payment-work-start-lifecycle`,
-`phase4/quote-acceptance` (failing baseline), `phase5f/payout-engine` (failing baseline).
+Existing guards: `quotes/quote-concurrency-postgres`, `finance/payments/payment-intent-concurrency-postgres`,
+`finance/payments/cancellation-payment-postgres`, `finance/payments/payhere-adapter`,
+`finance/payments/payment-work-start-lifecycle`, `quotes/quote-acceptance` (failing baseline),
+`finance/payouts/payout-engine` (failing baseline). (Paths = Phase F layout.)
 Gaps to add later (own change sets): duplicate refund/release/payout idempotency,
 wrong amount/currency webhook, ledger reconciliation, payout failure restoration.
 Target tolerances: 0 duplicate charges/refunds/releases/payouts, 0 negative wallet via
@@ -81,6 +103,18 @@ concurrency, 0 unexplained ledger difference.
 
 ## Security tests (Section 38) — existing
 
-`phase8/negative-security.test.ts`, `phase9/*` (chat-isolation failing baseline),
-`phase10-5/phase10-6-security`, `phase10-7/workforce-security`, `phase10-8/risk-event-review`,
-`phase8/admin-country-rbac`, `phase8/matching-isolation`. Keep green through Phases D–E.
+`security/negative-security`, `security/chat-isolation` (failing baseline),
+`security/phase10-6-security` (+ `-duplicate`), `security/workforce-security`,
+`admin/risk-event-review`, `rbac/admin-country-rbac`, `security/matching-isolation`.
+All discoverable under tests/{security,rbac,admin}/ (Phase F paths).
+
+
+## Phase F status (DONE)
+
+Domain-oriented migration completed from `PHASE_F_START_SHA = da3172aeb2ad61842048e31038fc00dc987d5813`
+with **zero test semantic change**: 159/159 files, 1960/1960 tests, 1209/85/666 status counts,
+and all 85 failing-test messages identical after path normalization (raw paths changed by design).
+Baseline failure clusters above: counts unchanged; directory names updated to Phase F paths.
+Retention rules: mobile i18n suites stay under `apps/mobile` (reasons in the layout block);
+`legacy/backward-compatibility` is labelled for Phase H. See WHERE-TO-FIX-A-BUG.md for the
+implementation → test ownership table.
