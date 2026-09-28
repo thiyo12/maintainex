@@ -1,6 +1,6 @@
 'use client'
 
-import '@/lib/bigint-polyfill'
+import '@/lib/shared/utils/bigint-polyfill'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RegionProvider } from '@/lib/region-context'
 import { TooltipProvider } from '@/components/ui/tooltip'

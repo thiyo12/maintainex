@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
 import { getLocationName } from '@/lib/locations'
 import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
-import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/money'
+import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 
 function redactSensitive(data: Record<string, any>, _isOwner: boolean): Record<string, any> {
   if (_isOwner) return data

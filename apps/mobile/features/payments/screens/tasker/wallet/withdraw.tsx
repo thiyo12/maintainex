@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Wallet } from '@/lib/api-v2'
-import { formatCurrency, getCurrencyForCountry } from '@/lib/currency-format'
-import { Currency } from '@/lib/money'
+import { formatCurrency, getCurrencyForCountry } from '@/lib/shared/money/format'
+import { Currency } from '@/lib/shared/money/money'
 import { useCountry } from '@/lib/country'
 
 const METHODS = [

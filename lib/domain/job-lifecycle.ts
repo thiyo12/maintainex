@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { type Currency } from '@/lib/money'
+import { type Currency } from '@/lib/shared/money/money'
 import { resolvePricingConfig } from '@/lib/pricing/rules'
 import { Prisma, PrismaClient } from '@prisma/client'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'

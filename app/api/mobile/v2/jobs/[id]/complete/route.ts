@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
-import { getCurrencyForCountry } from '@/lib/money'
+import { getCurrencyForCountry } from '@/lib/shared/money/money'
 
 export async function POST(
   request: NextRequest,

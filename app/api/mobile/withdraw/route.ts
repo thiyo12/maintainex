@@ -4,7 +4,7 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
 import { requestPayout } from '@/lib/payout-engine'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditPayoutRequest } from '@/lib/financial-audit'
-import type { Currency } from '@/lib/money'
+import type { Currency } from '@/lib/shared/money/money'
 
 function parseMajorAmountToMinor(value: unknown): bigint | null {
   let raw: string

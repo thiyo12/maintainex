@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { formatCurrency, formatCurrencyCode, getCurrencyForCountry } from '@/lib/currency-format'
-import type { Currency } from '@/lib/money'
-import { CURRENCY_EXPONENTS, CURRENCY_SYMBOLS } from '@/lib/money'
+import { formatCurrency, formatCurrencyCode, getCurrencyForCountry } from '@/lib/shared/money/format'
+import type { Currency } from '@/lib/shared/money/money'
+import { CURRENCY_EXPONENTS, CURRENCY_SYMBOLS } from '@/lib/shared/money/money'
 
 describe('Gate 5 — Financial Currency Invariants', () => {
   describe('Currency type completeness', () => {
@@ -160,8 +160,8 @@ describe('Gate 12 — Payout Minimums', () => {
 
 describe('Gate 13 — Currency Utility Dedup', () => {
   it('lib/money.ts getCurrencyForCountry matches lib/currency-format.ts', async () => {
-    const { getCurrencyForCountry: fromMoney } = await import('@/lib/money')
-    const { getCurrencyForCountry: fromFormat } = await import('@/lib/currency-format')
+    const { getCurrencyForCountry: fromMoney } = await import('@/lib/shared/money/money')
+    const { getCurrencyForCountry: fromFormat } = await import('@/lib/shared/money/format')
     expect(fromMoney('LK')).toBe(fromFormat('LK'))
     expect(fromMoney('CA')).toBe(fromFormat('CA'))
     expect(fromMoney('XX')).toBe(fromFormat('XX'))
@@ -178,38 +178,38 @@ describe('Gate 14 — Country Parameter Naming', () => {
 
 describe('Gate 15 — Phone Validation', () => {
   it('toE164 normalizes Sri Lanka phone', async () => {
-    const { toE164 } = await import('@/lib/phone')
+    const { toE164 } = await import('@/lib/shared/utils/phone')
     expect(toE164('0771234567')).toBe('+94771234567')
   })
 
   it('toE164 normalizes Canada phone', async () => {
-    const { toE164 } = await import('@/lib/phone')
+    const { toE164 } = await import('@/lib/shared/utils/phone')
     expect(toE164('4161234567', '1')).toBe('+14161234567')
   })
 
   it('toE164 is idempotent for E.164 input', async () => {
-    const { toE164 } = await import('@/lib/phone')
+    const { toE164 } = await import('@/lib/shared/utils/phone')
     expect(toE164('+94771234567')).toBe('+94771234567')
   })
 
   it('getCountryFromPhone maps +94 to LK', async () => {
-    const { getCountryFromPhone } = await import('@/lib/phone')
+    const { getCountryFromPhone } = await import('@/lib/shared/utils/phone')
     expect(getCountryFromPhone('+94771234567')).toBe('LK')
   })
 
   it('getCountryFromPhone maps +1 to CA', async () => {
-    const { getCountryFromPhone } = await import('@/lib/phone')
+    const { getCountryFromPhone } = await import('@/lib/shared/utils/phone')
     expect(getCountryFromPhone('+14161234567')).toBe('CA')
   })
 
   it('formatWhatsAppPhone handles LK format', async () => {
-    const { formatWhatsAppPhone } = await import('@/lib/phone')
+    const { formatWhatsAppPhone } = await import('@/lib/shared/utils/phone')
     const result = formatWhatsAppPhone('0771234567', 'LK')
     expect(result).toBe('94771234567@c.us')
   })
 
   it('formatWhatsAppPhone handles CA format', async () => {
-    const { formatWhatsAppPhone } = await import('@/lib/phone')
+    const { formatWhatsAppPhone } = await import('@/lib/shared/utils/phone')
     const result = formatWhatsAppPhone('4161234567', 'CA')
     expect(result).toBe('14161234567@c.us')
   })

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { notifyEscrowDeposited } from '@/lib/notifications'
-import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/money'
+import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, parsePayHereAmount, type PayHereNotification } from '@/lib/payment/payhere-adapter'
 
 export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'

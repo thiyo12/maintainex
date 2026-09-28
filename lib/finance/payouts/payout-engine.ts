@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
-import { bigIntToSafeNumber, type Currency, getCurrencyForCountry } from '@/lib/money'
+import { bigIntToSafeNumber, type Currency, getCurrencyForCountry } from '@/lib/shared/money/money'
 
 export type PayoutStatus =
   | 'REQUESTED'

@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { legacyToMinorUnits, hasFractionalParts, type Currency } from './money';
+import { legacyToMinorUnits, hasFractionalParts, type Currency } from '@/lib/shared/money/money';
 
 interface BackfillResult {
   table: string;

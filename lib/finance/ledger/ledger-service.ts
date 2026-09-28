@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { type Currency } from '@/lib/money';
+import { type Currency } from '@/lib/shared/money/money';
 import { createHash, randomUUID } from 'crypto';
 
 function serializeBigInt(obj: unknown): string {

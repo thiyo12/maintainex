@@ -9,7 +9,7 @@ import {
   postEscrowRefund,
   getLedgerBalance,
 } from '@/lib/ledger';
-import { legacyToMinorUnits } from '@/lib/money';
+import { legacyToMinorUnits } from '@/lib/shared/money/money';
 import { isPostgres, requiresPostgres } from '../../helpers/test-guard';
 
 async function ensureWalletBalance(walletId: string, walletType: string, balance: number) {

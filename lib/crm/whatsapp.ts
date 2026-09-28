@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { formatWhatsAppPhone } from '@/lib/phone'
+import { formatWhatsAppPhone } from '@/lib/shared/utils/phone'
 
 interface WhatsAppMessage {
   phone: string

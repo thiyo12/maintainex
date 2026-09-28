@@ -6,7 +6,7 @@ import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
-import { getCurrencyForCountry, parseMajorUnitsInput } from '@/lib/money'
+import { getCurrencyForCountry, parseMajorUnitsInput } from '@/lib/shared/money/money'
 
 export async function POST(
   request: NextRequest,

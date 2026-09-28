@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { bigIntToSafeNumber } from '@/lib/money'
+import { bigIntToSafeNumber } from '@/lib/shared/money/money'
 import { Prisma } from '@prisma/client'
 
 export async function resolvePayoutIdentity(providerId: string, providerType: string) {

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/ledger'
-import { bigIntToSafeNumber, type Currency } from '@/lib/money'
+import { bigIntToSafeNumber, type Currency } from '@/lib/shared/money/money'
 import { getCommissionRate } from '@/lib/mxid'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { resolveProviderActor } from '@/lib/domain/job-actors'

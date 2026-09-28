@@ -9,7 +9,7 @@ import { getSetting } from '@/lib/settings'
 import { notifyTaskerAssigned } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
-import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/money'
+import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)

@@ -1,6 +1,6 @@
 import { createNotification } from './notification-service'
-import { formatCurrency, getCurrencyForCountry } from '@/lib/currency-format'
-import type { Currency } from '@/lib/money'
+import { formatCurrency, getCurrencyForCountry } from '@/lib/shared/money/format'
+import type { Currency } from '@/lib/shared/money/money'
 
 export async function notifyQuoteSubmitted(jobId: string, customerId: string, providerName: string) {
   return createNotification({

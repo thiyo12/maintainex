@@ -8,7 +8,7 @@ import { resolveQuoteVisibility } from '@/lib/phase6/quote-visibility'
 import { findCandidates } from '@/lib/matching'
 import { validateQuotePrice } from '@/lib/pricing/engine'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
-import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/money'
+import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
 
 export async function POST(request: NextRequest) {
   try {

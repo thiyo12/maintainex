@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { acceptJobQuote } from '@/lib/domain/job-lifecycle'
 import { fundEscrow } from '@/lib/domain/job-lifecycle'
 import { releaseEscrow } from '@/lib/domain/job-lifecycle'
-import { bigIntToSafeNumber, type Currency } from '@/lib/money'
+import { bigIntToSafeNumber, type Currency } from '@/lib/shared/money/money'
 
 const TEST_DB_URL = process.env.DATABASE_URL
 const isDB = TEST_DB_URL && (TEST_DB_URL.includes('maintainex_test') || TEST_DB_URL.includes('_ci'))

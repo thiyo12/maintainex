@@ -5,7 +5,7 @@ import { fundEscrow } from '@/lib/domain/job-lifecycle'
 import { notifyEscrowDeposited } from '@/lib/notifications'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditEscrowFund } from '@/lib/financial-audit'
-import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/money'
+import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
 
 async function resolveProviderNotificationUser(providerId: string, providerType: string): Promise<string> {
   if (providerType === 'COMPANY') {

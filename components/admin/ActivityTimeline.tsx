@@ -1,7 +1,7 @@
 'use client'
 
 import { FiCalendar, FiPhone, FiMail, FiMessageCircle, FiFileText, FiUser, FiStar, FiClock } from 'react-icons/fi'
-import { formatDistanceToNow } from '@/lib/utils'
+import { formatDistanceToNow } from '@/lib/shared/utils'
 
 export interface Activity {
   id: string

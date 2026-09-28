@@ -24,7 +24,7 @@ import {
   validatePositive,
   validateNonNegative,
   ZERO_LKR,
-} from '@/lib/money';
+} from '@/lib/shared/money/money';
 
 describe('Money Utility', () => {
   describe('createMoney', () => {
