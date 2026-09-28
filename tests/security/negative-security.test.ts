@@ -161,14 +161,14 @@ describe('Part W — Negative Security Tests', () => {
   })
 
   describe('Matching engine filters by country at DB level', () => {
-    it('matching-engine applies countryCode in Prisma where clause', () => {
-      const engine = readFile('lib/matching-engine.ts')
-      expect(engine).toContain('countryCode: jobCountry')
+    it('canonical matching filters provider candidates by countryCode in Prisma where', () => {
+      const engine = readFile('lib/matching/index.ts')
+      expect(engine).toContain('user: input.countryCode ? { countryCode: input.countryCode } : undefined')
     })
 
-    it('job-matcher applies countryCode in Prisma where clause', () => {
-      const matcher = readFile('lib/job-matcher.ts')
-      expect(matcher).toContain('countryCode: jobCountry')
+    it('canonical matching applies job countryCode to scoped queries in Prisma where', () => {
+      const matcher = readFile('lib/matching/index.ts')
+      expect(matcher).toContain('user: job.countryCode ? { countryCode: job.countryCode } : undefined')
     })
   })
 })
