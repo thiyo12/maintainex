@@ -3,7 +3,7 @@
  * PostgreSQL 10K Benchmark Resolution Performance Test
  * 
  * Run on VPS against a disposable PostgreSQL database:
- *   node tests/phase10-3/pg-10k-benchmark-test.mjs <DATABASE_URL>
+ *   node tests/quotes/pg-10k-benchmark-test.js <DATABASE_URL>
  * 
  * Creates 10K PriceBenchmark rows and tests resolveBenchmark() performance.
  * Cleans up after itself.
