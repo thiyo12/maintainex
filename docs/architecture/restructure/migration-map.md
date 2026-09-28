@@ -88,6 +88,18 @@ variance → incremental).
 
 Route-group moves under `app/` are LAST and only with redirect tests.
 
+Phase G execution status (DONE — route-group separation only):
+`app/` surfaces separated with zero URL/method/layout changes: homepage →
+`app/(public)/page.tsx`; admin login → `app/(auth)/admin/login/**` (no group layout —
+nesting identical); CRM group renamed `app/(web)` → `app/(admin)` (23 pages +
+AdminLayout wrapper, `/admin/**` unchanged); system pages `app/setup`,
+`app/maintenance` intentionally left at root; `app/api/**` untouched (256 routes).
+Route manifest: 0 URL additions/removals/changes, 0 dynamic-param changes, 0 method
+changes, 0 collisions, 0 empty groups; 26 files moved 100% byte-identical (+1 import
+fix in homepage). Guards: `tests/structural/route-surface.test.ts`. Component rows
+below (`components/admin`, `components/public`) and fat-API thinning are NOT part of
+this surface move and remain open.
+
 ## Phase H — legacy retirement (Section 40 ladder)
 
 Only after `CALLERS MAPPED → REPLACEMENT READY → CALLERS MIGRATED → READ ONLY →

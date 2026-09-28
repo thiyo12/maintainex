@@ -32,7 +32,8 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 | Push / outbox retry bug | outbox/retry logic near notifications → target `lib/modules/communications/outbox` |
 | SMS/OTP delivery bug | SMS provider infra + OTP routes → target `lib/modules/communications/sms` |
 | Pricing wrong quote | `lib/pricing/*` (canonical; `pricing-engine.ts`/`smart-pricing.ts` removed in Phase C) |
-| Admin page (CRM UI) bug | `app/admin/**` pages (thin) + `app/api/admin/**` → target `app/(admin)/admin/**` + `lib/modules/admin` |
+| Admin page (CRM UI) bug | `app/(admin)/admin/**` pages (thin) + `app/api/admin/**` → target `lib/modules/admin` |
+| Admin login page bug (UI) | `app/(auth)/admin/login/**` (page + layout; middleware guards `/admin/login`) |
 | Admin API data bug | `app/api/admin/**` route → thin controller over module service |
 | Mobile auth / OTP / session bug (app) | `apps/mobile/features/auth/` (screens `features/auth/screens/**`, context `features/auth/context/auth.tsx`) |
 | Customer booking / find-a-tasker bug | `apps/mobile/features/customer/` (screens + components) |
@@ -48,8 +49,8 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 | Mobile screen bug (any) | `apps/mobile/app/<route>.tsx` is a THIN route wrapper — implementation lives in `apps/mobile/features/**` |
 | Mobile API call bug | `apps/mobile/api/*` (Phase E: `api/client.ts` v1 transport, `api/v2-client.ts` v2 transport, domain adapters `api/jobs|quotes|auth|...`; root `lib/api.ts`/`lib/api-v2.ts` = COMPATIBILITY shims, Phase H) |
 | Mobile shared UI bug | `apps/mobile/components/` (ui primitives, AISearchBar, ProfileHeader, PropertyCard) |
-| Website page / SEO bug | `app/**` pages + `components/**` → target `app/(public)/**` + `components/public` |
-| Test fails | `tests/phaseN/**` today → `tests/{unit,integration,concurrency,security,e2e,release-gate}/<domain>` (Phase F) |
+| Website page / SEO bug | `app/(public)/**` pages (homepage = `app/(public)/page.tsx`) + `components/**` → target `components/public`; system pages `app/setup`, `app/maintenance` stay at root |
+| Test fails | `tests/<domain>/**` (Phase F layout: auth rbac security finance pricing jobs quotes notifications admin company tasker customer mobile structural integration e2e legacy helpers) |
 
 ## Test ownership (Phase F)
 
@@ -70,7 +71,7 @@ Every implementation area has an obvious home for its tests (see
 | Jobs / matching / lifecycle | `lib/matching/**`, `lib/domain/**` | `tests/jobs/` |
 | Quotes / change orders | `lib/domain/quotes/**`, v2 quotes routes | `tests/quotes/` |
 | Notifications | `lib/notifications*` | `tests/notifications/` |
-| Admin review queues | `app/admin/**`, `app/api/admin/**` | `tests/admin/` |
+| Admin review queues | `app/(admin)/admin/**`, `app/api/admin/**` | `tests/admin/` |
 | Company / KYC / invites | company routes + membership services | `tests/company/` |
 | Tasker / professions | profession routes + matching eligibility | `tests/tasker/` |
 | Mobile app (any feature) | `apps/mobile/features/**` | `tests/mobile/` (lib units; i18n retained under `apps/mobile/lib/i18n/__tests__`) |

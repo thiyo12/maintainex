@@ -7,8 +7,9 @@ Snapshot at baseline: `origin/main` = `dbae2f73`.
 | Surface | Location | Scale |
 |---|---|---|
 | **Mobile App** (customer/tasker/company) | `apps/mobile/` | 116 screens in `app/`, 38 lib files, 2 API clients, no `features/` layer |
-| **Public Website** | `app/` (pages) + `components/` | 57 page/tsx files, 69 components, marketing/SEO/services pages |
-| **CRM / Admin (web)** | `app/admin` pages + `app/api/admin` | 50 admin API routes; pages are thin (0 direct prisma imports) |
+| **Public Website** | `app/(public)/**` (pages incl. homepage `app/(public)/page.tsx`) + `components/` | 18 pages in the `(public)` group; system pages `app/setup`, `app/maintenance` at root |
+| **CRM / Admin (web)** | `app/(admin)/admin/**` pages (+ `app/(admin)/layout.tsx` AdminLayout wrapper) + `app/api/admin` | 50 admin API routes; pages are thin (0 direct prisma imports) |
+| **Website admin login** | `app/(auth)/admin/login/**` | standalone auth surface — no group layout above it (nesting: root → login layout) |
 | **Shared Backend** | `lib/` (flat) | 173 ts files, no domain structure |
 | **API surface** | `app/api/` | **256 route.ts files** — see generations below |
 | **Database** | `prisma/schema.prisma` | postgresql; 3 release-gate migrations added at sync; 395 unique/index rules |
