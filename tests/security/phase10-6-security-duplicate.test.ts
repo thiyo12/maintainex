@@ -1,3 +1,6 @@
+// Byte-identical historical duplicate of tests/security/phase10-6-security.test.ts
+// (originally tests/phase10-5/phase10-6-security.test.ts). Retained so no test is
+// lost from discovery; Phase H decides its fate together with the guarded code.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import crypto from 'crypto'
