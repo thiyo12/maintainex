@@ -8,7 +8,7 @@ import {
   cancelPayout,
   isValidTransition,
 } from '../../lib/payout-engine'
-import { assertNotProductionDb } from '../test-guard'
+import { assertNotProductionDb } from '../helpers/test-guard'
 
 assertNotProductionDb()
 

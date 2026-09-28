@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction, type LedgerEntry } from '@/lib/ledger'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const SKIP = !requiresPostgres()
 const TEST_USER_ID = `test-underflow-${Date.now()}`

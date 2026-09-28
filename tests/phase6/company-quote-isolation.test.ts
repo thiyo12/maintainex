@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { hasCompanyPermission } from '@/lib/phase6/rbac'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 

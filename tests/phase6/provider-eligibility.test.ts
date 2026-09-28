@@ -5,7 +5,7 @@ import {
   checkCompanyEligibility,
   checkWorkerEligibility,
 } from '@/lib/phase6/provider-eligibility'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 

@@ -10,7 +10,7 @@ import {
   getLedgerBalance,
 } from '@/lib/ledger';
 import { legacyToMinorUnits } from '@/lib/money';
-import { isPostgres, requiresPostgres } from '../test-guard';
+import { isPostgres, requiresPostgres } from '../helpers/test-guard';
 
 async function ensureWalletBalance(walletId: string, walletType: string, balance: number) {
   await prisma.$executeRawUnsafe(

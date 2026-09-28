@@ -14,7 +14,7 @@ import {
   acceptCompanyInvite,
   cancelInvite,
 } from '@/lib/phase6/invitation'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 

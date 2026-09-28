@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { PATCH } from '@/app/api/admin/companies/[id]/verification/route'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 

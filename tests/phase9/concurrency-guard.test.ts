@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 describe.skipIf(!requiresPostgres())('Concurrency Guard — Escrow Serialization', () => {
   it('concurrent escrow deposits must be serialized', async () => {

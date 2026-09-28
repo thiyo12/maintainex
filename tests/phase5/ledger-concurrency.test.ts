@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { prisma } from '@/lib/prisma';
 import { postLedgerTransaction } from '@/lib/ledger';
-import { requiresPostgres } from '../test-guard';
+import { requiresPostgres } from '../helpers/test-guard';
 
 describe.skipIf(!requiresPostgres())('Ledger Concurrency (Real PostgreSQL)', () => {
   it('2-way duplicate posting - exactly 1 durable transaction', async () => {

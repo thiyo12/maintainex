@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { checkWorkerEligibility } from '@/lib/phase6/provider-eligibility'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 

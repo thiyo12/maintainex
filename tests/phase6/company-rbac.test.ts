@@ -13,7 +13,7 @@ import {
   COMPANY_ROLES,
   COMPANY_PERMISSIONS,
 } from '@/lib/phase6/rbac'
-import { requiresPostgres } from '../test-guard'
+import { requiresPostgres } from '../helpers/test-guard'
 
 const prisma = new PrismaClient()
 
