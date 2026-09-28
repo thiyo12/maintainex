@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { hash } from 'bcryptjs'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN']
 

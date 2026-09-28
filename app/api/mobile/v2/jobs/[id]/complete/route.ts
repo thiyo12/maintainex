@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { transitionJobWorkspace, raiseJobDispute, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
 import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { resolveProviderActor } from '@/lib/domain/job-actors'

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth-utils'
+import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'

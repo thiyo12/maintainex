@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'USER_MANAGEMENT']

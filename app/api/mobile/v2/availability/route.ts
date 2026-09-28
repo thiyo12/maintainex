@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkProviderAvailability, setProviderAvailability, calculateAcceptanceProbability } from '@/lib/availability-engine'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
 export async function GET(request: NextRequest) {
   try {

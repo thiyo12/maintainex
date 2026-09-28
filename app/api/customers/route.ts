@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession, SessionUser } from '@/lib/auth-utils'
+import { getSession, SessionUser } from '@/lib/auth/authentication/auth-utils'
 import { checkRateLimit } from '@/lib/crm/rate-limit'
 import { createAuditLog } from '@/lib/crm/audit'
 import { customerSearchSchema, customerCreateSchema, sanitizeInput, sanitizePhone, validateEmail, validatePhone } from '@/lib/crm/validation'

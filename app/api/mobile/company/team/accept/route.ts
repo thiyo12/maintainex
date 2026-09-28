@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
-import { assertNotSuspended } from '@/lib/mobile-auth'
+import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { acceptCompanyInvite } from '@/lib/phase6/invitation'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'
 import { prisma } from '@/lib/prisma'

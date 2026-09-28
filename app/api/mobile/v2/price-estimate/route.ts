@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculatePrice, PriceBoundsError, PricingInputError } from '@/lib/pricing/engine'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { CURRENCY_SYMBOLS, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 
 export async function POST(request: NextRequest) {

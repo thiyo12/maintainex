@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyRefreshToken, signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefreshToken } from '@/lib/admin-jwt'
-import { getIp } from '@/lib/admin-rbac'
+import { verifyRefreshToken, signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefreshToken } from '@/lib/auth/authentication/admin-jwt'
+import { getIp } from '@/lib/auth/authorization/admin-rbac'
 import type { AdminRole } from '@/lib/admin-types'
 
 function parseCountries(val: string): string[] {

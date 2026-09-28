@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth-utils'
+import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { getActivityLogs, getStatsForPeriod } from '@/lib/activity-log'
 import { prisma } from '@/lib/prisma'
 

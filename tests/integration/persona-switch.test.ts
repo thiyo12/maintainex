@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   buildAuthResponse: vi.fn(),
 }))
 
-vi.mock('@/lib/mobile-auth', () => ({
+vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
   authenticateRequest: mocks.authenticateRequest,
   assertNotSuspended: mocks.assertNotSuspended,
 }))

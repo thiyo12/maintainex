@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { transitionJobWorkspace, type ActorType, type WorkspaceStatus } from '@/lib/domain/job-lifecycle'
 
 async function resolveJobActor(jobId: string, customerId: string, userId: string): Promise<ActorType | null> {

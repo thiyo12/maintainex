@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculatePrice, PriceBoundsError, PricingInputError } from '@/lib/pricing/engine'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
 function parsePositiveNumber(value: unknown): number | undefined | null {
   if (value === undefined || value === null || value === '') return undefined

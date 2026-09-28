@@ -16,7 +16,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-vi.mock('@/lib/auth-utils', () => ({
+vi.mock('@/lib/auth/authentication/auth-utils', () => ({
   getSession: vi.fn(),
 }))
 
@@ -35,7 +35,7 @@ vi.mock('@/lib/observability/logger', () => ({
 import { GET as invoiceGET } from '@/app/api/invoices/[id]/pdf/route'
 import { GET as reportGET } from '@/app/api/reports/export/route'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth-utils'
+import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { NextRequest } from 'next/server'
 
 function makeRequest(url: string, headers?: Record<string, string>): NextRequest {

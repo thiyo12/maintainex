@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { detectMaterials } from '@/lib/materials-detect'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
 export async function POST(request: NextRequest) {
   try {

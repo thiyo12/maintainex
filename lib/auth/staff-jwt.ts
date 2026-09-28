@@ -52,6 +52,3 @@ export function verifyStaffAccessToken(token: string): StaffAccessTokenClaims | 
   }
 }
 
-export function isStaffTokenClaims(claims: any): claims is StaffAccessTokenClaims {
-  return claims?.type === STAFF_TOKEN_TYPE && claims?.aud === STAFF_AUDIENCE && claims?.iss === STAFF_ISSUER
-}

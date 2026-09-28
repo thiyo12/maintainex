@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyMarketplaceAccessToken } from '@/lib/auth/marketplace-jwt'
-import { AuthenticatedUser, assertNotSuspended } from '@/lib/mobile-auth'
+import { AuthenticatedUser, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
 export { assertNotSuspended }
 
@@ -47,16 +47,3 @@ export async function authenticateMarketplaceUser(request: NextRequest): Promise
   return user
 }
 
-export function requireMarketplaceAuth(request: NextRequest): { user: AuthenticatedUser; error?: NextResponse } | Promise<{ user: AuthenticatedUser; error?: NextResponse }> {
-  return (async () => {
-    const user = await authenticateMarketplaceUser(request)
-    if (!user) {
-      return { user: null as any, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-    }
-    const blocked = assertNotSuspended(user)
-    if (blocked) {
-      return { user, error: blocked }
-    }
-    return { user }
-  })()
-}

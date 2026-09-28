@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { revokeSession, revokeAllUserSessions } from '@/lib/auth/sessions'
 import { verifyMarketplaceAccessToken } from '@/lib/auth/marketplace-jwt'
 import { parseRefreshToken } from '@/lib/auth/refresh'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getCountryFilter } from '@/lib/admin-rbac'
+import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
 import type { AdminSession } from '@/lib/admin-types'
 
 function makeSession(overrides: Partial<AdminSession> = {}): AdminSession {

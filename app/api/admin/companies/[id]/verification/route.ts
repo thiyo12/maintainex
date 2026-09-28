@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
-import { getCountryFilter } from '@/lib/admin-rbac'
+import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
 import { transitionCompanyVerification } from '@/lib/phase6/kyc-writer'
 import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 

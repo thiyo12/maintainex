@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
-import { assertNotSuspended } from '@/lib/mobile-auth'
+import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { safeParseJsonArr } from '@/lib/db-utils'
 import { canRemoveMemberSafe } from '@/lib/phase6/company-ownership'
 import { writeCompanyAuditLog } from '@/lib/phase6/audit'

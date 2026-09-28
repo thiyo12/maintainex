@@ -54,7 +54,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-vi.mock('@/lib/mobile-auth', () => ({
+vi.mock('@/lib/auth/compatibility/mobile-auth', () => ({
   authenticateRequest: mocks.authenticateRequest,
   assertNotSuspended: () => null,
 }))

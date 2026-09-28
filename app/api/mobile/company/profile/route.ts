@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
-import { assertNotSuspended } from '@/lib/mobile-auth'
+import { assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 function safeParseJson(val: string | null | undefined): string[] {

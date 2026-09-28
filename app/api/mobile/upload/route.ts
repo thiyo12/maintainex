@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { writeFile, mkdir } from 'fs/promises'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import path from 'path'

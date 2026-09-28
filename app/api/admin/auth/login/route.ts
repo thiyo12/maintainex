@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import jwt from 'jsonwebtoken'
-import { signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefreshToken } from '@/lib/admin-jwt'
-import { createAuditLog, getIp } from '@/lib/admin-rbac'
+import { signAccessToken, signRefreshToken, generateRefreshTokenValue, hashRefreshToken } from '@/lib/auth/authentication/admin-jwt'
+import { createAuditLog, getIp } from '@/lib/auth/authorization/admin-rbac'
 import { verifyPasswordWithMigration } from '@/lib/security/password'
 import type { AdminRole } from '@/lib/admin-types'
 
