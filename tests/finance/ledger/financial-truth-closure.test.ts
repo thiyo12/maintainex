@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-const ROOT = join(__dirname, '..', '..')
+const ROOT = join(__dirname, '..', '..', '..')
 const readFile = (relPath: string) => readFileSync(join(ROOT, relPath), 'utf-8')
 
 describe('Phase 5E.1 — Canonical Financial Truth Closure', () => {

@@ -5,7 +5,7 @@ import {
   readCanonicalCustomerBalance,
   reconcileWalletBalance,
 } from '@/lib/financial-read';
-import { requiresPostgres } from '../helpers/test-guard';
+import { requiresPostgres } from '../../helpers/test-guard';
 
 const testPrefix = `read-mig-${Date.now()}`
 const testProviderUserId = `${testPrefix}-prov`

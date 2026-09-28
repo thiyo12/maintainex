@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { prisma } from '../../lib/prisma'
-import { postLedgerTransaction, getLedgerBalance } from '../../lib/ledger'
-import { readCanonicalCustomerBalance } from '../../lib/financial-read'
+import { prisma } from '../../../lib/prisma'
+import { postLedgerTransaction, getLedgerBalance } from '../../../lib/ledger'
+import { readCanonicalCustomerBalance } from '../../../lib/financial-read'
 import { randomUUID } from 'crypto'
-import { requiresPostgres } from '../helpers/test-guard'
+import { requiresPostgres } from '../../helpers/test-guard'
 
 const PREFIX = `lmoney-${randomUUID().slice(0, 8)}`
 const userId = `${PREFIX}-user`
