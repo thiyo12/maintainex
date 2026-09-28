@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { CaretLeft, User, Wrench, ArrowRight } from 'phosphor-react-native'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import CountryPicker, { COUNTRIES, Country } from '@/components/ui/CountryPicker'
 import OtpInput from '@/components/ui/OtpInput'
 import PressableScale from '@/components/ui/PressableScale'

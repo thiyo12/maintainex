@@ -9,7 +9,7 @@ import { translateJobStatus } from '@/lib/i18n'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 import { v2Jobs, v2Quotes, v2JobActions } from '@/lib/api-v2'
 import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
-import NewChatModal from '@/components/chat/NewChatModal'
+import NewChatModal from '@/features/messaging/components/NewChatModal'
 
 const getToday = () => new Date().toISOString().split('T')[0]
 

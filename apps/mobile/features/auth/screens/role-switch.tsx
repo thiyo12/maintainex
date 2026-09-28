@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'rea
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { useTranslation } from 'react-i18next'
 import { spacing, borderRadius } from '@/lib/tokens'
 

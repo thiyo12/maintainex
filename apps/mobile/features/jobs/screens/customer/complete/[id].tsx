@@ -7,7 +7,7 @@ import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { jobs } from '@/lib/api'
 import { v2Jobs, v2JobActions } from '@/lib/api-v2'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { JobPosting } from '@/lib/types'
 
 export default function JobCompleteScreen() {

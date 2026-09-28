@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Dimensions, ScrollView } from 'react-native'
 import { Wrench, Sparkle, Thermometer, Leaf, Truck, ShieldCheck, Car, Monitor, Lightning, Drop, Palette, Bug, Toolbox, Sun, Basketball, Heart } from 'phosphor-react-native'
-import { useTheme } from '../../lib/ThemeContext'
-import { useCountry } from '../../lib/country'
-import { serviceCategories } from '../../lib/api'
-import { fonts } from '../../lib/fonts'
+import { useTheme } from '@/lib/ThemeContext'
+import { useCountry } from '@/lib/country'
+import { serviceCategories } from '@/lib/api'
+import { fonts } from '@/lib/fonts'
 
 const DUPLICATE_CATEGORIES = new Set(['home repairs', 'cleaning', 'hvac', 'gardening', 'moving & delivery', 'security', 'automotive', 'it services'])
 

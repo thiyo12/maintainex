@@ -11,7 +11,7 @@ import { fonts } from '@/lib/fonts'
 import { v2Jobs, v2JobActions, v2Match, V2Job, V2Quote } from '@/lib/api-v2'
 import JobLifecycleTracker from '@/components/ui/JobLifecycleTracker'
 import { emit, removedJobs } from '@/lib/events'
-import NewChatModal from '@/components/chat/NewChatModal'
+import NewChatModal from '@/features/messaging/components/NewChatModal'
 
 function usePulse() {
   const anim = useRef(new Animated.Value(0)).current

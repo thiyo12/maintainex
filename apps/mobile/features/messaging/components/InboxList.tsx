@@ -3,9 +3,9 @@ import { View, Text, TextInput, FlatList, StyleSheet, ActivityIndicator, Refresh
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { conversations, resolveImageUri } from '../../lib/api'
-import { useColors } from '../../lib/ThemeContext'
-import PressScale from '../find/PressScale'
+import { conversations, resolveImageUri } from '@/lib/api'
+import { useColors } from '@/lib/ThemeContext'
+import PressScale from '@/components/ui/PressScale'
 
 export default function InboxList({ onTotalUnread }: { onTotalUnread?: (n: number) => void }) {
   const { t } = useTranslation()

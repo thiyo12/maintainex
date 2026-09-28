@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Star, ChatCircleText, SealCheck, MapPin, PaperPlaneTilt, X, User, CalendarCheck } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import { taskers } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 import PressableScale from '@/components/ui/PressableScale'
 

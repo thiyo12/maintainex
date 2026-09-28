@@ -8,7 +8,7 @@ import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { fontSizes } from '@/lib/tokens'
 import { auth, upload, company as companyApi } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { useTranslation } from 'react-i18next'
 
 export default function CompanyEditProfile() {

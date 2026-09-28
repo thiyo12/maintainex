@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { fonts } from '@/lib/fonts'
 import { useTranslation } from 'react-i18next'
 

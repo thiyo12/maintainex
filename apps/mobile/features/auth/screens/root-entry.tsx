@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { View, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import * as SecureStore from 'expo-secure-store'
 
 export default function EntryScreen() {

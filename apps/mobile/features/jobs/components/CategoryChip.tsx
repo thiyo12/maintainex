@@ -1,6 +1,6 @@
 import { TouchableOpacity, Text, StyleSheet } from 'react-native'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
+import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
 
 interface Props {
   icon: string

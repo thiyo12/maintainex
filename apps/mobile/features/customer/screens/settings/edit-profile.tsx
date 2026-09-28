@@ -5,7 +5,7 @@ import {
 import { useRouter } from 'expo-router'
 import { Camera, ShieldCheck, CheckCircle, CalendarBlank } from 'phosphor-react-native'
 import * as ImagePicker from 'expo-image-picker'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { auth, upload } from '@/lib/api'
 import { useTranslation } from 'react-i18next'
 import { colors, spacing, radius, typography } from '@/lib/design'

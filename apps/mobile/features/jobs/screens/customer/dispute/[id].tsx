@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { jobs, disputes } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { JobPosting } from '@/lib/types'
 
 export default function DisputeScreen() {

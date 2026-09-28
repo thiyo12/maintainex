@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { fonts } from '../../lib/fonts'
-import { useColors } from '../../lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
+import { useColors } from '@/lib/ThemeContext'
 
 interface Props {
   icon?: keyof typeof Ionicons.glyphMap

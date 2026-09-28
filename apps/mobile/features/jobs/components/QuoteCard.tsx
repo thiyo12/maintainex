@@ -1,10 +1,10 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
-import Avatar from '../ui/Avatar'
-import Badge from '../ui/Badge'
+import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
+import Avatar from '@/components/ui/Avatar'
+import Badge from '@/components/ui/Badge'
 
 interface Props {
   providerName: string

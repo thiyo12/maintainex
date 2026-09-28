@@ -11,7 +11,7 @@ import {
 } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { auth, upload } from '@/lib/api'
 import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 import { tierById } from '@/lib/tiers'

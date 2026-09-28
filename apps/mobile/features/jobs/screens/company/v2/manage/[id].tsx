@@ -7,9 +7,9 @@ import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Jobs, v2JobActions } from '@/lib/api-v2'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import Avatar from '@/components/ui/Avatar'
-import NewChatModal from '@/components/chat/NewChatModal'
+import NewChatModal from '@/features/messaging/components/NewChatModal'
 
 export default function CompanyManageJobScreen() {
   const { t } = useTranslation()

@@ -8,7 +8,7 @@ import { Bell, MapPin, Star, CaretRight, Plus, PaperPlaneTilt, BuildingOffice, H
 import { useTranslation } from 'react-i18next'
 import Animated, { FadeInUp } from 'react-native-reanimated'
 
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { v2Jobs, v2Quotes, v2Match } from '@/lib/api-v2'
 import { taskers, notifications } from '@/lib/api'
 import { translateJobStatus } from '@/lib/i18n'

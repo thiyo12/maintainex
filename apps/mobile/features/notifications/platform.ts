@@ -1,5 +1,5 @@
 import { Platform } from 'react-native'
-import { notifications as api } from './api'
+import { notifications as api } from '@/lib/api'
 
 let Notifications: any = null
 try {

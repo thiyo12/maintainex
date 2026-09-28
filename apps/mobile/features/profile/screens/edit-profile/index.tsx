@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { fontSizes } from '@/lib/tokens'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 
 export default function EditProfileOverview() {
   const router = useRouter()

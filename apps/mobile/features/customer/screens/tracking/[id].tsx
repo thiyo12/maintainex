@@ -15,7 +15,7 @@ import { colors, spacing, radius, typography, shadows } from '@/lib/design'
 
 import AvatarCircle from '@/components/ui/AvatarCircle'
 import PressableScale from '@/components/ui/PressableScale'
-import NewChatModal from '@/components/chat/NewChatModal'
+import NewChatModal from '@/features/messaging/components/NewChatModal'
 
 const AnimatedMarker = Animated.createAnimatedComponent(Marker) as any
 

@@ -1,9 +1,9 @@
 import { View, Text, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import PressScale from './PressScale'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
+import PressScale from '@/components/ui/PressScale'
+import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
 
 interface Props {
   name: string

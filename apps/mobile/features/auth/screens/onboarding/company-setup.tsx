@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { fonts } from '@/lib/fonts'

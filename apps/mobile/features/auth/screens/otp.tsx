@@ -4,7 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { auth } from '@/lib/api'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'

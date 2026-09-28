@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { AppState } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
-import { auth, notifications as notificationApi, setAuthToken } from './api'
-import { User } from './types'
+import { auth, notifications as notificationApi, setAuthToken } from '@/lib/api'
+import { User } from '@/lib/types'
 
 const SESSION_DURATION = 18 * 24 * 60 * 60 * 1000
 

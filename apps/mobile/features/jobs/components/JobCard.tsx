@@ -1,9 +1,9 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { translateJobStatus } from '../../lib/i18n'
-import { useColors } from '../../lib/ThemeContext'
-import { fonts } from '../../lib/fonts'
-import Badge from '../ui/Badge'
+import { translateJobStatus } from '@/lib/i18n'
+import { useColors } from '@/lib/ThemeContext'
+import { fonts } from '@/lib/fonts'
+import Badge from '@/components/ui/Badge'
 
 type StatusVariant = 'open' | 'pending' | 'inProgress' | 'completed' | 'cancelled'
 

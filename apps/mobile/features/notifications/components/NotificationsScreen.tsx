@@ -3,11 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { useColors } from '../../lib/ThemeContext'
-import { notifications } from '../../lib/api'
-import { useAuth } from '../../lib/auth'
+import { useColors } from '@/lib/ThemeContext'
+import { notifications } from '@/lib/api'
+import { useAuth } from '@/features/auth/context/auth'
 import { useTranslation } from 'react-i18next'
-import { fonts } from '../../lib/fonts'
+import { fonts } from '@/lib/fonts'
 
 export default function NotificationsScreen({ showBack = true, titleKey = 'profile.notifications' }: { showBack?: boolean; titleKey?: string }) {
   const { t } = useTranslation()

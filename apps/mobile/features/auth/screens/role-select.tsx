@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { colors } from '@/lib/colors'
-import PressScale from '@/components/find/PressScale'
+import PressScale from '@/components/ui/PressScale'
 import { useTranslation } from 'react-i18next'
 
 export default function RoleSelectScreen() {

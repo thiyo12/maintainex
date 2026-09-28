@@ -8,7 +8,7 @@ import { translateJobStatus } from '@/lib/i18n'
 import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { v2Jobs, v2JobActions, V2Job } from '@/lib/api-v2'
-import NewChatModal from '@/components/chat/NewChatModal'
+import NewChatModal from '@/features/messaging/components/NewChatModal'
 import * as Location from 'expo-location'
 
 export default function V2ProviderManageJobScreen() {

@@ -1,6 +1,6 @@
 import { View, Animated, StyleSheet, useWindowDimensions } from 'react-native'
 import { useEffect, useRef } from 'react'
-import { useColors } from '../../lib/ThemeContext'
+import { useColors } from '@/lib/ThemeContext'
 
 interface Props {
   count?: number

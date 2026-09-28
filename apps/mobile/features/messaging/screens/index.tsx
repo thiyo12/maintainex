@@ -2,7 +2,7 @@ import { View, Text, StyleSheet } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { useColors } from '@/lib/ThemeContext'
-import InboxList from '@/components/chat/InboxList'
+import InboxList from '@/features/messaging/components/InboxList'
 
 export default function ChatListScreen() {
   const { t } = useTranslation()

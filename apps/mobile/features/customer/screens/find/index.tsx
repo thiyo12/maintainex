@@ -5,9 +5,9 @@ import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
 import { jobCategories } from '@/lib/api'
 import { useCountry } from '@/lib/country'
-import CategoryCard from '@/components/find/CategoryCard'
-import SkeletonLoader from '@/components/find/SkeletonLoader'
-import EmptyState from '@/components/find/EmptyState'
+import CategoryCard from '@/features/customer/components/CategoryCard'
+import SkeletonLoader from '@/features/customer/components/SkeletonLoader'
+import EmptyState from '@/features/customer/components/EmptyState'
 import AISearchBar from '@/components/shared/AISearchBar'
 
 export default function FindJobCategories() {

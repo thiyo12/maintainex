@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { View, Text, TouchableOpacity, Switch, StyleSheet, Animated, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useTranslation } from 'react-i18next'
-import { useColors } from '../../lib/ThemeContext'
-import { offerProgram } from '../../lib/api-v2'
+import { useColors } from '@/lib/ThemeContext'
+import { offerProgram } from '@/lib/api-v2'
 
 interface Props {
   variant: 'tasker' | 'company'

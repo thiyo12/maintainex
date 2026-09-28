@@ -1,14 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Animated, Dimensions, ScrollView } from 'react-native'
 import { Sun, Snowflake, Flower, Leaf } from 'phosphor-react-native'
-import { useColors } from '../../lib/ThemeContext'
-import { useCountry } from '../../lib/country'
-import { serviceCategories } from '../../lib/api'
+import { useColors } from '@/lib/ThemeContext'
+import { useCountry } from '@/lib/country'
+import { serviceCategories } from '@/lib/api'
 import {
   getCurrentSeason, getSeasonColors,
   getSeasonalServiceNames, getSeasonalTitle, getSeasonBadge,
-} from '../../lib/seasonal'
-import { fonts } from '../../lib/fonts'
+} from '@/lib/seasonal'
+import { fonts } from '@/lib/fonts'
 
 interface Props {
   onServicePress?: (jobId: string, jobName: string) => void

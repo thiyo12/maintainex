@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useColors } from '@/lib/ThemeContext'
 import { templateJobs } from '@/lib/api'
-import StickyBottomBar from '@/components/find/StickyBottomBar'
-import SkeletonLoader from '@/components/find/SkeletonLoader'
+import StickyBottomBar from '@/features/customer/components/StickyBottomBar'
+import SkeletonLoader from '@/features/customer/components/SkeletonLoader'
 import { useTranslation } from 'react-i18next'
 
 export default function JobDetail() {

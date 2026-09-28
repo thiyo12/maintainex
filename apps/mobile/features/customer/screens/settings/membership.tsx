@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { CaretRight } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 import { colors, spacing, radius, typography } from '@/lib/design'
 import { tierById, nextTier, TIERS } from '@/lib/tiers'
 

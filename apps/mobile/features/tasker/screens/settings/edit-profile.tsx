@@ -9,7 +9,7 @@ import { useColors } from '@/lib/ThemeContext'
 import { fonts } from '@/lib/fonts'
 import { fontSizes } from '@/lib/tokens'
 import { taskers, auth, upload, resolveImageUri } from '@/lib/api'
-import { useAuth } from '@/lib/auth'
+import { useAuth } from '@/features/auth/context/auth'
 
 export default function TaskerEditProfile() {
   const { t } = useTranslation()
