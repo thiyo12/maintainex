@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { prisma } from '@/lib/prisma'
-import { postLedgerTransaction, type LedgerEntry } from '@/lib/ledger'
+import { postLedgerTransaction, type LedgerEntry } from '@/lib/finance/ledger/ledger-service'
 import { requiresPostgres } from '../../helpers/test-guard'
 
 const SKIP = !requiresPostgres()

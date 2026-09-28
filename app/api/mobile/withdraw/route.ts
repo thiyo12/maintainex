@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { requestPayout } from '@/lib/payout-engine'
+import { requestPayout } from '@/lib/finance/payouts/payout-engine'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditPayoutRequest } from '@/lib/financial-audit'
 import type { Currency } from '@/lib/shared/money/money'

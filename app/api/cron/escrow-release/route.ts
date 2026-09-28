@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSetting } from '@/lib/settings'
 import { createNotification } from '@/lib/notifications'
-import { completeAndReleaseEscrow } from '@/lib/domain/job-lifecycle'
+import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 
 export const dynamic = 'force-dynamic'
 

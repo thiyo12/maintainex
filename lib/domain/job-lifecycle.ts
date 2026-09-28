@@ -7,8 +7,6 @@ import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { fundEscrow, releaseEscrow, refundEscrow, expirePendingEscrow, completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 
-export { resolveProviderActor, fundEscrow, releaseEscrow, refundEscrow, expirePendingEscrow, completeAndReleaseEscrow }
-export type { ReleaseMode } from '@/lib/finance/escrow/escrow-service'
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN'

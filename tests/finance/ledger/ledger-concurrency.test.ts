@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { prisma } from '@/lib/prisma';
-import { postLedgerTransaction } from '@/lib/ledger';
+import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service';
 import { requiresPostgres } from '../../helpers/test-guard';
 
 describe.skipIf(!requiresPostgres())('Ledger Concurrency (Real PostgreSQL)', () => {

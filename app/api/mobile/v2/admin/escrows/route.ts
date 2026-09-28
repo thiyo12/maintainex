@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/mobile-auth'
-import { releaseEscrow, refundEscrow } from '@/lib/domain/job-lifecycle'
+import { releaseEscrow, refundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 
 function serializeEscrow<T extends { amount: bigint; serviceFee: bigint; totalAmount: bigint }>(escrow: T) {

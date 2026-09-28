@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
-import { postLedgerTransaction } from '@/lib/ledger'
+import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { notifyEscrowDeposited } from '@/lib/notifications'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'

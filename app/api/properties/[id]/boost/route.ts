@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth-utils'
-import { postLedgerTransaction } from '@/lib/ledger'
+import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 
 const BOOST_TIERS = {
   basic: { durationDays: 7, lkr: 500, cad: 5 },

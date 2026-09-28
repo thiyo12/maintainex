@@ -113,8 +113,7 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
 
   it('two customer releases → exactly one succeeds', async () => {
     const f = await createFixtures('dual-release')
-    const { completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
-
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const results = await Promise.allSettled([
       completeAndReleaseEscrow({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
       completeAndReleaseEscrow({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
@@ -141,8 +140,8 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
 
   it('release vs dispute → dispute prevents release', async () => {
     const f = await createFixtures('release-dispute')
-    const { completeAndReleaseEscrow, holdEscrowForDispute } = await import('@/lib/domain/job-lifecycle')
-
+    const { holdEscrowForDispute } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const results = await Promise.allSettled([
       completeAndReleaseEscrow({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
       holdEscrowForDispute({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
@@ -166,8 +165,7 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
 
   it('release vs refund → one terminal state', async () => {
     const f = await createFixtures('release-refund')
-    const { completeAndReleaseEscrow, refundEscrow } = await import('@/lib/domain/job-lifecycle')
-
+    const { completeAndReleaseEscrow, refundEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const results = await Promise.allSettled([
       completeAndReleaseEscrow({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
       refundEscrow({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id),
@@ -183,8 +181,8 @@ describe.skipIf(!isVPS)('Phase 5E.2 — Escrow Release Concurrency', () => {
 
   it('disputed job → customer approval cannot release', async () => {
     const f = await createFixtures('disputed-approval')
-    const { holdEscrowForDispute, completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
-
+    const { holdEscrowForDispute } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
     await holdEscrowForDispute({ jobId: f.job.id, actorId: f.custId, actorType: 'CUSTOMER' }, f.job.id)
 
     await expect(

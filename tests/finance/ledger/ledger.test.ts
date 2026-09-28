@@ -8,7 +8,7 @@ import {
   postEscrowRelease,
   postEscrowRefund,
   getLedgerBalance,
-} from '@/lib/ledger';
+} from '@/lib/finance/ledger/ledger-service';
 import { legacyToMinorUnits } from '@/lib/shared/money/money';
 import { isPostgres, requiresPostgres } from '../../helpers/test-guard';
 

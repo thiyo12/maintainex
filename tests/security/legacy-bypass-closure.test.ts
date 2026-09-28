@@ -42,7 +42,7 @@ describe('Legacy Bypass Closure — 4 HIGH Findings', () => {
 
   describe('FIX 2A — Escrow timeout uses canonical expirePendingEscrow()', () => {
     it('daily-maintenance imports expirePendingEscrow from domain lifecycle', () => {
-      expect(dailyMaintenance).toContain("import { expirePendingEscrow } from '@/lib/domain/job-lifecycle'")
+      expect(dailyMaintenance).toContain("import { expirePendingEscrow } from '@/lib/finance/escrow/escrow-service'")
     })
 
     it('daily-maintenance calls expirePendingEscrow instead of raw transaction', () => {
@@ -67,7 +67,7 @@ describe('Legacy Bypass Closure — 4 HIGH Findings', () => {
 
   describe('FIX 2B — Payout failure uses markFailed() for wallet restoration', () => {
     it('daily-maintenance imports markFailed from payout-engine', () => {
-      expect(dailyMaintenance).toContain("import { markFailed } from '@/lib/payout-engine'")
+      expect(dailyMaintenance).toContain("import { markFailed } from '@/lib/finance/payouts/payout-engine'")
     })
 
     it('daily-maintenance calls markFailed instead of direct prisma.payout.update', () => {

@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { acceptJobQuote } from '@/lib/domain/job-lifecycle'
-import { fundEscrow } from '@/lib/domain/job-lifecycle'
-import { releaseEscrow } from '@/lib/domain/job-lifecycle'
+import { fundEscrow, releaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { bigIntToSafeNumber, type Currency } from '@/lib/shared/money/money'
 
 const TEST_DB_URL = process.env.DATABASE_URL

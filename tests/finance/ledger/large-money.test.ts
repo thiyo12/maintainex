@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { prisma } from '../../../lib/prisma'
-import { postLedgerTransaction, getLedgerBalance } from '../../../lib/ledger'
+import { postLedgerTransaction, getLedgerBalance } from '@/lib/finance/ledger/ledger-service'
 import { readCanonicalCustomerBalance } from '../../../lib/financial-read'
 import { randomUUID } from 'crypto'
 import { requiresPostgres } from '../../helpers/test-guard'

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PrismaClient } from '@prisma/client'
-import { postLedgerTransaction, getLedgerBalance } from '../../../lib/ledger'
+import { postLedgerTransaction, getLedgerBalance } from '@/lib/finance/ledger/ledger-service'
 import { isPostgres, requiresPostgres } from '../../helpers/test-guard'
 
 const prisma = new PrismaClient()

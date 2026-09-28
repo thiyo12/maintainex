@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { fundEscrow } from '@/lib/domain/job-lifecycle'
+import { fundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { notifyEscrowDeposited } from '@/lib/notifications'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditEscrowFund } from '@/lib/financial-audit'

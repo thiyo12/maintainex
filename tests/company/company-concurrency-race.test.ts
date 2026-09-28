@@ -108,8 +108,8 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   async function createReadyJob(label: string, providerId: string, providerType: 'INDIVIDUAL' | 'COMPANY') {
     const { createBookNowJob } = await import('@/lib/domain/book-now')
-    const { acceptJobQuote, fundEscrow, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
+    const { acceptJobQuote, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { fundEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const bookResult = await createBookNowJob({
       customerId: customerUserId,
       templateJobId,
@@ -131,7 +131,9 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   }
 
   it('dispute vs auto-release: only one terminal state', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace, raiseJobDispute } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
 
     const { jobId } = await createReadyJob('disc-auto', companyProfileId, 'COMPANY')
 
@@ -166,7 +168,9 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('concurrent release vs refund: exactly one terminal state', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow, refundEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow, refundEscrow } = await import('@/lib/finance/escrow/escrow-service')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
 
     const { jobId } = await createReadyJob('rel-ref', companyProfileId, 'COMPANY')
     const resolved = await resolveProviderActor(jobId, companyWorkerId)
@@ -187,8 +191,8 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('concurrent release vs dispute on individual job: exactly one terminal state', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute } = await import('@/lib/domain/job-lifecycle')
-
+    const { transitionJobWorkspace, raiseJobDispute } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const { jobId } = await createReadyJob('ind-disc', providerUserId, 'INDIVIDUAL')
     await transitionJobWorkspace({ jobId, actorId: providerUserId, actorType: 'PROVIDER' }, 'COMPLETION_REQUESTED')
 
@@ -218,7 +222,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     )
 
     const debitAmount = 1000n
-    const { postLedgerTransaction } = await import('@/lib/ledger')
+    const { postLedgerTransaction } = await import('@/lib/finance/ledger/ledger-service')
 
     const results = await Promise.allSettled(
       Array.from({ length: 5 }, (_, i) =>
@@ -260,7 +264,7 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
     )
 
     const debitAmount = 1500n
-    const { postLedgerTransaction } = await import('@/lib/ledger')
+    const { postLedgerTransaction } = await import('@/lib/finance/ledger/ledger-service')
 
     const results = await Promise.allSettled(
       Array.from({ length: 3 }, (_, i) =>
@@ -290,13 +294,14 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   it('ledger entries are always balanced after concurrent operations', async () => {
     const { jobId } = await createReadyJob('balanced', companyProfileId, 'COMPANY')
-    const { transitionJobWorkspace, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
     const resolved = await resolveProviderActor(jobId, companyWorkerId)
     await transitionJobWorkspace({ jobId, actorId: companyWorkerId, actorType: resolved! }, 'COMPLETION_REQUESTED')
 
     const ledgerBefore = await prisma.financialLedger.findMany({ where: { referenceId: { contains: prefix } } })
 
-    const { completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
     await completeAndReleaseEscrow({ jobId, actorId: customerUserId, actorType: 'CUSTOMER' }, jobId)
 
     const allEntries = await prisma.financialLedger.findMany({
@@ -309,7 +314,9 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('idempotency: duplicate release attempt returns same result', async () => {
-    const { transitionJobWorkspace, completeAndReleaseEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
 
     const { jobId } = await createReadyJob('idemp', companyProfileId, 'COMPANY')
     const resolved = await resolveProviderActor(jobId, companyWorkerId)
@@ -331,8 +338,8 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('COMPANY authorization: active authorized worker → allowed', async () => {
-    const { resolveProviderActor, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
     const { jobId } = await createReadyJob('auth-active', companyProfileId, 'COMPANY')
 
     const actorType = await resolveProviderActor(jobId, companyWorkerId)
@@ -345,8 +352,8 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('COMPANY authorization: unrelated user → denied', async () => {
-    const { resolveProviderActor, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
     const { jobId } = await createReadyJob('auth-unrelated', companyProfileId, 'COMPANY')
 
     const actorType = await resolveProviderActor(jobId, unrelatedUserId)
@@ -358,8 +365,8 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
   })
 
   it('COMPANY authorization: inactive TeamMember → denied', async () => {
-    const { resolveProviderActor, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
+    const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
     const inactiveWorkerId = `${prefix}-inactive-worker`
     await prisma.user.create({
       data: { id: inactiveWorkerId, email: `${inactiveWorkerId}@test.com`, passwordHash: 'h', name: 'Inactive Worker', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },
@@ -383,7 +390,6 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   it('COMPANY authorization: unrelated user + actorType COMPANY → denied at domain level', async () => {
     const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
     const { jobId } = await createReadyJob('auth-unrelated-co', companyProfileId, 'COMPANY')
 
     await expect(
@@ -393,7 +399,6 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   it('PROVIDER authorization: individual provider with wrong actorType → denied', async () => {
     const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
     const { jobId } = await createReadyJob('auth-wrong-type', providerUserId, 'INDIVIDUAL')
 
     await expect(
@@ -403,7 +408,6 @@ describe.skipIf(!isVPS)('Phase 5E — Company Concurrency + Dispute Race + Rever
 
   it('multi-quote job: only ACCEPTED quote controls authorization', async () => {
     const { transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
-
     const otherProviderId = `${prefix}-other-prov`
     await prisma.user.create({
       data: { id: otherProviderId, email: `${otherProviderId}@test.com`, passwordHash: 'h', name: 'Other Provider', role: 'TASKER', isActive: true, updatedAt: new Date(), identityStatus: 'VERIFIED' },

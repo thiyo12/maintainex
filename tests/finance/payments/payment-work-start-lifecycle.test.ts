@@ -40,7 +40,7 @@ vi.mock('@/lib/prisma', () => ({
   },
 }))
 
-vi.mock('@/lib/ledger', () => ({
+vi.mock('@/lib/finance/ledger/ledger-service', () => ({
   postLedgerTransaction: mocks.postLedgerTransaction,
 }))
 

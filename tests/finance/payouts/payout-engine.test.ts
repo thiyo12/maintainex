@@ -7,7 +7,7 @@ import {
   markFailed,
   cancelPayout,
   isValidTransition,
-} from '../../../lib/payout-engine'
+} from '@/lib/finance/payouts/payout-engine'
 import { assertNotProductionDb } from '../../helpers/test-guard'
 
 assertNotProductionDb()

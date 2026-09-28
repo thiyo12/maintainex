@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { transitionJobWorkspace, completeAndReleaseEscrow, raiseJobDispute, resolveProviderActor, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
+import { transitionJobWorkspace, raiseJobDispute, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
+import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
+import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
 

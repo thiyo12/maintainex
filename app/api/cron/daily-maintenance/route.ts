@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notifyEscrowTimeout } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
-import { expirePendingEscrow } from '@/lib/domain/job-lifecycle'
-import { markFailed } from '@/lib/payout-engine'
+import { expirePendingEscrow } from '@/lib/finance/escrow/escrow-service'
+import { markFailed } from '@/lib/finance/payouts/payout-engine'
 
 export const dynamic = 'force-dynamic'
 

@@ -1,5 +1,5 @@
 import { prisma, type PrismaClientOrTx } from './prisma'
-import { postWalletCredit } from './ledger'
+import { postWalletCredit } from '@/lib/finance/ledger/ledger-service'
 import type { InteractiveTestRole } from './test-cert'
 
 const DEMO_EMAIL_DOMAIN = '@maintainex-test.lk'
