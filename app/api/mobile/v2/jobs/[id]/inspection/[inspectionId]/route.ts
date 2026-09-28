@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { transitionInspection, completeInspection, scheduleInspection, verifyInspectionArrival } from '@/lib/domain/inspection'
-import { notifyInspectionArrived, notifyInspectionCompleted } from '@/lib/notifications-phase10-4'
+import { notifyInspectionArrived, notifyInspectionCompleted } from '@/lib/notifications'
 
 export async function PATCH(
   request: NextRequest,

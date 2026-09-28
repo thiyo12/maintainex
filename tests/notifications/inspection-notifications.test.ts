@@ -14,7 +14,7 @@ import {
   notifyChangeOrderApproved,
   notifyChangeOrderRejected,
   notifyRiskEventDetected,
-} from '@/lib/notifications-phase10-4'
+} from '@/lib/notifications'
 
 beforeEach(() => {
   vi.clearAllMocks()
