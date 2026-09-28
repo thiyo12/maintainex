@@ -6,11 +6,11 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 
 | Symptom | Where to fix |
 |---|---|
-| Login / OTP / session bug (website) | `lib/auth-utils.ts` → target `lib/modules/auth` |
+| Login / OTP / session bug (website) | `lib/auth/authentication/auth-utils.ts` (Phase D canonical; root `lib/auth-utils.ts` = shim) |
 | Login / 2FA / refresh bug (admin) | `lib/admin-jwt.ts` + `app/api/admin/auth/login` → target `lib/modules/admin/auth` |
-| Admin route rejects/accepts wrongly (simple-token) | `lib/admin-auth.ts` → Phase D target `lib/modules/auth` |
+| Admin route rejects/accepts wrongly (simple-token) | `lib/auth/authentication/admin-auth.ts` (Phase D canonical; root `lib/admin-auth.ts` = shim) |
 | Staff session validation bug (7 routes) | `lib/auth/staff-sessions.ts` (`authenticateStaffRequest`) |
-| Permission / role / country-scope bug | `lib/admin-rbac.ts` + inline role arrays → target `lib/modules/admin/rbac` |
+| Permission / role / country-scope bug | `lib/auth/authorization/admin-rbac.ts` + `lib/auth/rbac/permissions.ts` (Phase D canonical) + inline role arrays in routes |
 | Mobile token / suspension bug | `lib/mobile-auth.ts` → migrating to `lib/auth/marketplace-auth.ts` |
 | Job lifecycle / state transition bug | `lib/domain/job-lifecycle.ts` → target `lib/modules/marketplace/jobs` |
 | Quote bug (create/accept/concurrency) | `app/api/mobile/v2/jobs/.../quotes` + `JobQuote` service → target `lib/modules/marketplace/quotes` |
@@ -34,8 +34,20 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 | Pricing wrong quote | `lib/pricing/*` (canonical; `pricing-engine.ts`/`smart-pricing.ts` removed in Phase C) |
 | Admin page (CRM UI) bug | `app/admin/**` pages (thin) + `app/api/admin/**` → target `app/(admin)/admin/**` + `lib/modules/admin` |
 | Admin API data bug | `app/api/admin/**` route → thin controller over module service |
-| Mobile screen bug | `apps/mobile/app/**` → logic belongs in `apps/mobile/features/**` (target) |
-| Mobile API call bug | `apps/mobile/lib/api.ts` (old) or `api-v2.ts` (new) → target `apps/mobile/api/*` |
+| Mobile auth / OTP / session bug (app) | `apps/mobile/features/auth/` (screens `features/auth/screens/**`, context `features/auth/context/auth.tsx`) |
+| Customer booking / find-a-tasker bug | `apps/mobile/features/customer/` (screens + components) |
+| Job lifecycle screen bug (any role) | `apps/mobile/features/jobs/screens/{customer,tasker,company}/**` |
+| Quote flow screen bug | `apps/mobile/features/quotes/screens/{customer,tasker,company}/**` |
+| Tasker screen bug (availability, identity, discovery) | `apps/mobile/features/tasker/` |
+| Company screen bug (team, workforce, dispatch) | `apps/mobile/features/company/` |
+| Chat / messaging screen bug | `apps/mobile/features/messaging/` |
+| Wallet / payment screen bug | `apps/mobile/features/payments/screens/**` |
+| Notification screen bug (app) | `apps/mobile/features/notifications/` (platform push setup: `features/notifications/platform.ts`) |
+| Profile / settings screen bug (app) | `apps/mobile/features/profile/` + role settings under `features/{customer,tasker,company}/screens/settings` |
+| Real-estate screen bug | `apps/mobile/features/real-estate/` |
+| Mobile screen bug (any) | `apps/mobile/app/<route>.tsx` is a THIN route wrapper — implementation lives in `apps/mobile/features/**` |
+| Mobile API call bug | `apps/mobile/api/*` (Phase E: `api/client.ts` v1 transport, `api/v2-client.ts` v2 transport, domain adapters `api/jobs|quotes|auth|...`; root `lib/api.ts`/`lib/api-v2.ts` = COMPATIBILITY shims, Phase H) |
+| Mobile shared UI bug | `apps/mobile/components/` (ui primitives, AISearchBar, ProfileHeader, PropertyCard) |
 | Website page / SEO bug | `app/**` pages + `components/**` → target `app/(public)/**` + `components/public` |
 | Test fails | `tests/phaseN/**` today → `tests/{unit,integration,concurrency,security,e2e,release-gate}/<domain>` (Phase F) |
 

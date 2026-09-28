@@ -43,6 +43,10 @@ Rules:
 | `adminAuthorize`, `getSessionFromCookie` (`admin-rbac`) | SAFE_TO_REMOVE_LATER | 0 callers | ladder (Phase H) |
 | `requireMarketplaceAuth` | SAFE_TO_REMOVE_LATER | 0 callers | ladder (Phase H) |
 | `revokeStaffTokenFamily`, `isStaffTokenClaims` | SAFE_TO_REMOVE_LATER | 0 callers | ladder (Phase H) |
+| `apps/mobile/lib/api.ts`, `lib/api-v2.ts` | COMPATIBILITY (Phase E: explicit exact-set shims over `apps/mobile/api/*`) | 57 + 49 mobile callers | migrate callers to `@/api/<domain>`, then remove (Phase H) |
+| `apps/mobile/lib/icons.tsx` | SAFE_TO_REMOVE | 0 importers (Phase E: verified, left in place) | Phase H |
+| `apps/mobile/components/CountryChangeBanner.tsx`, `components/shared/BottomNav.tsx`, `components/ui/{BottomNav,Button,Card,CategoryPills,LoadingScreen,Logo,PhotoUploader,PremiumCard,ProgressSteps,SafeContainer,ScreenHeader,SuccessAnimation}.tsx` | SAFE_TO_REMOVE | 0 importers (Phase E verified) | Phase H |
+| `apps/mobile/features/jobs/components/*`, `features/offers/components/*` | SAFE_TO_REMOVE (moved from `components/{jobs,offers}`, still 0 importers) | 0 importers | Phase H |
 | `JobPosting` model | READ_ONLY_LEGACY | legacy data path | data migration decision (out of scope) |
 | old `Dispute` model | READ_ONLY_LEGACY | superseded by v2 lifecycle | data migration decision |
 | `ProviderWallet` / `CustomerWallet` | MIGRATION_REQUIRED | wallet reads | migrate to `WalletBalance` service |

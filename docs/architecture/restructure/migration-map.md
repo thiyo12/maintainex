@@ -106,3 +106,14 @@ candidates (see `legacy-retirement.md`): `job-matcher.ts`, `matching-engine.ts`,
 - Dependency upgrades (locked at baseline).
 - Mobile theme/type debt (491 errors) — recorded baseline; bulk-fix only as its own
   approved task.
+
+Phase E execution status (DONE): `apps/mobile/api/*` transport boundary established
+(two behaviorally distinct clients preserved: v1 raw-text errors + localhost default,
+v2 JSON error normalization + maintainex.lk default; shared SecureStore token, key
+`auth_token` unchanged); `lib/api.ts`/`lib/api-v2.ts` = exact-set COMPATIBILITY shims
+(callers deliberately retained: 106 → Phase H). All 108 non-layout route screens
+extracted to `apps/mobile/features/**` as thin default re-exports; layouts untouched;
+route manifest identical (108/108, 27 dynamic params). Feature ownership: auth,
+customer, tasker, company, jobs, quotes, messaging, notifications, payments, profile,
+real-estate, offers. Dead clusters moved not deleted (`features/jobs/components`,
+`features/offers/components`) — deletion stays Phase H.
