@@ -6,29 +6,29 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 
 | Symptom | Where to fix |
 |---|---|
-| Login / OTP / session bug (website) | `lib/auth/authentication/auth-utils.ts` (Phase D canonical; root `lib/auth-utils.ts` = shim) |
-| Login / 2FA / refresh bug (admin) | `lib/admin-jwt.ts` + `app/api/admin/auth/login` → target `lib/modules/admin/auth` |
-| Admin route rejects/accepts wrongly (simple-token) | `lib/auth/authentication/admin-auth.ts` (Phase D canonical; root `lib/admin-auth.ts` = shim) |
+| Login / OTP / session bug (website) | `lib/auth/authentication/auth-utils.ts` (root shim retired in Phase H) |
+| Login / 2FA / refresh bug (admin) | `lib/auth/authentication/admin-jwt.ts` + `app/api/admin/auth/login` → target `lib/modules/admin/auth` |
+| Admin route rejects/accepts wrongly (simple-token) | `lib/auth/authentication/admin-auth.ts` (root shim retired in Phase H) |
 | Staff session validation bug (7 routes) | `lib/auth/staff-sessions.ts` (`authenticateStaffRequest`) |
 | Permission / role / country-scope bug | `lib/auth/authorization/admin-rbac.ts` + `lib/auth/rbac/permissions.ts` (Phase D canonical) + inline role arrays in routes |
-| Mobile token / suspension bug | `lib/mobile-auth.ts` → migrating to `lib/auth/marketplace-auth.ts` |
+| Mobile token / suspension bug | `lib/auth/compatibility/mobile-auth.ts` (kept, DEFERRED_AFTER_H) → migrating to `lib/auth/marketplace-auth.ts` |
 | Job lifecycle / state transition bug | `lib/domain/job-lifecycle.ts` → target `lib/modules/marketplace/jobs` |
 | Quote bug (create/accept/concurrency) | `app/api/mobile/v2/jobs/.../quotes` + `JobQuote` service → target `lib/modules/marketplace/quotes` |
-| Matching / who-gets-the-job bug | `lib/matching-engine.ts` / `lib/job-matcher.ts` (both 0 importers — verify route callers first) → target `lib/modules/marketplace/matching` |
-| Company assignment / workforce bug | `CompanyJobAssignment` routes + `lib/branch-assignment.ts` (dead?) → target `lib/modules/marketplace/assignments` |
+| Matching / who-gets-the-job bug | `lib/matching/index.ts` (canonical; legacy engines retired in Phase H) → target `lib/modules/marketplace/matching` |
+| Company assignment / workforce bug | `CompanyJobAssignment` routes (legacy `lib/branch-assignment.ts` retired in Phase H) → target `lib/modules/marketplace/assignments` |
 | Payment bug (intent, gateway, webhook) | `lib/payment/payment-service.ts`, `lib/payment/payhere-adapter.ts`, `app/api/payments/payhere/*`, webhooks → target `lib/modules/finance/payments` |
-| Escrow bug (PROTECTED/RELEASE/REFUND) | `lib/domain/job-lifecycle.ts` escrow section + `lib/ledger.ts` → target `lib/modules/finance/escrow` |
-| Ledger / double-entry bug | `lib/ledger.ts` → target `lib/modules/finance/ledger` |
+| Escrow bug (PROTECTED/RELEASE/REFUND) | `lib/finance/escrow/escrow-service.ts` + `lib/domain/job-lifecycle.ts` (escrow re-exports retired in Phase H) → target `lib/modules/finance/escrow` |
+| Ledger / double-entry bug | `lib/finance/ledger/ledger-service.ts` (root shim retired in Phase H) → target `lib/modules/finance/ledger` |
 | Commission bug | commission code in job-lifecycle/payout paths → target `lib/modules/finance/commission` |
 | Wallet balance bug | `WalletBalance` / `lib/financial-read.ts` → target `lib/modules/finance/wallets` |
 | Refund bug | `escrow/refund` route + ledger `postEscrowRefund` → target `lib/modules/finance/refunds` |
-| Payout bug | `lib/payout-engine.ts` → target `lib/modules/finance/payouts` |
+| Payout bug | `lib/finance/payouts/payout-engine.ts` (root shim retired in Phase H) → target `lib/modules/finance/payouts` |
 | Reconciliation / ledger mismatch | `lib/financial-audit.ts` → target `lib/modules/finance/reconciliation` |
 | KYC / identity verification bug | KYC routes + `identityStatus` gating → target `lib/modules/trust/kyc` |
 | Dispute bug | legacy `Dispute` vs v2 lifecycle (check model!) → target `lib/modules/trust/disputes` |
-| Risk / suspension bug | `assertNotSuspended()` in `lib/mobile-auth.ts` + risk routes → target `lib/modules/trust/risk` |
+| Risk / suspension bug | `assertNotSuspended()` in `lib/auth/compatibility/mobile-auth.ts` + risk routes → target `lib/modules/trust/risk` |
 | Chat bug | chat routes + participant checks → target `lib/modules/communications/chat` |
-| Notification not sent | `lib/notifications.ts` (canonical; `notifications-phase10-4.ts` is the merge copy) → target `lib/modules/communications/notifications` |
+| Notification not sent | `lib/notifications/index.ts` (both root shims retired in Phase H) → target `lib/modules/communications/notifications` |
 | Push / outbox retry bug | outbox/retry logic near notifications → target `lib/modules/communications/outbox` |
 | SMS/OTP delivery bug | SMS provider infra + OTP routes → target `lib/modules/communications/sms` |
 | Pricing wrong quote | `lib/pricing/*` (canonical; `pricing-engine.ts`/`smart-pricing.ts` removed in Phase C) |
@@ -47,7 +47,7 @@ Symptom → owning location. During migration, follow the arrow chain to the cur
 | Profile / settings screen bug (app) | `apps/mobile/features/profile/` + role settings under `features/{customer,tasker,company}/screens/settings` |
 | Real-estate screen bug | `apps/mobile/features/real-estate/` |
 | Mobile screen bug (any) | `apps/mobile/app/<route>.tsx` is a THIN route wrapper — implementation lives in `apps/mobile/features/**` |
-| Mobile API call bug | `apps/mobile/api/*` (Phase E: `api/client.ts` v1 transport, `api/v2-client.ts` v2 transport, domain adapters `api/jobs|quotes|auth|...`; root `lib/api.ts`/`lib/api-v2.ts` = COMPATIBILITY shims, Phase H) |
+| Mobile API call bug | `apps/mobile/api/*` (`api/client.ts` v1 transport, `api/v2-client.ts` v2 transport, domain adapters `api/jobs|quotes|auth|...`; root shims retired in Phase H) |
 | Mobile shared UI bug | `apps/mobile/components/` (ui primitives, AISearchBar, ProfileHeader, PropertyCard) |
 | Website page / SEO bug | `app/(public)/**` pages (homepage = `app/(public)/page.tsx`) + `components/**` → target `components/public`; system pages `app/setup`, `app/maintenance` stay at root |
 | Test fails | `tests/<domain>/**` (Phase F layout: auth rbac security finance pricing jobs quotes notifications admin company tasker customer mobile structural integration e2e legacy helpers) |
@@ -59,25 +59,25 @@ Every implementation area has an obvious home for its tests (see
 
 | Bug area | Implementation | Tests |
 |---|---|---|
-| Auth / sessions / JWT | `lib/auth/**` | `tests/auth/` (+ `tests/auth/auth-characterization` guards root shims) |
-| RBAC / permissions | `lib/auth/rbac/**`, `lib/admin-rbac.ts` | `tests/rbac/` |
+| Auth / sessions / JWT | `lib/auth/**` | `tests/auth/` (characterization retargeted to canonical in Phase H) |
+| RBAC / permissions | `lib/auth/rbac/**`, `lib/auth/authorization/admin-rbac.ts` | `tests/rbac/` |
 | Security (IDOR, rate limit, isolation, redaction) | `lib/security/**`, route guards | `tests/security/` |
 | Escrow | `lib/finance/escrow/**` (job-lifecycle escrow) | `tests/finance/escrow/` |
-| Ledger / money | `lib/ledger.ts`, `lib/money` | `tests/finance/ledger/` |
+| Ledger / money | `lib/finance/ledger/ledger-service.ts`, `lib/money` | `tests/finance/ledger/` |
 | Payments / webhooks | `lib/payment/**`, `app/api/payments/**` | `tests/finance/payments/` |
-| Payouts | `lib/payout-engine.ts` | `tests/finance/payouts/` |
+| Payouts | `lib/finance/payouts/payout-engine.ts` | `tests/finance/payouts/` |
 | Commission / fees | job-lifecycle + pricing fees | `tests/finance/` (root files) |
 | Pricing | `lib/pricing/**` | `tests/pricing/` |
 | Jobs / matching / lifecycle | `lib/matching/**`, `lib/domain/**` | `tests/jobs/` |
 | Quotes / change orders | `lib/domain/quotes/**`, v2 quotes routes | `tests/quotes/` |
-| Notifications | `lib/notifications*` | `tests/notifications/` |
+| Notifications | `lib/notifications/**` | `tests/notifications/` |
 | Admin review queues | `app/(admin)/admin/**`, `app/api/admin/**` | `tests/admin/` |
 | Company / KYC / invites | company routes + membership services | `tests/company/` |
 | Tasker / professions | profession routes + matching eligibility | `tests/tasker/` |
 | Mobile app (any feature) | `apps/mobile/features/**` | `tests/mobile/` (lib units; i18n retained under `apps/mobile/lib/i18n/__tests__`) |
 | Schema / migrations | `prisma/schema.prisma` | `tests/structural/` |
 | Cross-domain flows | multiple | `tests/integration/` |
-| Compatibility shims (Phase H) | root shims (`lib/auth-utils.ts`, `lib/admin-rbac.ts`, `lib/notifications.ts`, `apps/mobile/lib/api*.ts`) | `tests/legacy/` + characterization suites — do not delete before Phase H |
+| Compatibility shims | **all retired in Phase H** (root auth/finance/notification/mobile shims deleted) | remaining DEFERRED_AFTER_H items: `createStaffSession`, `rotateStaffTokenFamily`, `createSimpleToken`, mobile-auth/marketplace-auth `session.isValid` divergence, middleware legacy verifier (see `restructure/source-of-truth.md`) |
 
 Fast discovery: `npx vitest run tests/<domain>/`. The shared DB guard lives in
 `tests/helpers/test-guard.ts`.
@@ -92,5 +92,5 @@ grep -rn "from ['\"].*lib/domain/job-lifecycle" --include='*.ts*' app lib compon
 grep -rln "authenticateStaffRequest\|requireAdminAuth\|verifyMarketplaceToken" app/api
 
 # is this file dead? (retirement ladder requires more than this)
-grep -rn "lib/demand-engine" --include='*.ts*' app lib components tests scripts
+git grep -n "lib/some-module" -- app lib components tests scripts
 ```

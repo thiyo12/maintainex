@@ -31,7 +31,7 @@ apps/mobile/
 ├── components/ hooks/ providers/ state/ types/ utils/ config/ assets/
 ```
 
-Migration style: screen-by-screen (Section 18); `lib/api.ts` retired only when its 57
+Migration style: screen-by-screen (Section 18); `lib/api.ts` retired in Phase H when its 57
 importers are migrated to `api/`.
 
 ## B. Public Website — `app/(public)/` + `components/public/`

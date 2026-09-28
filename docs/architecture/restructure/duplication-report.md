@@ -15,6 +15,15 @@ Five parallel systems:
 
 | System | File | Importers | Role today |
 |---|---|---|---|
+> **Phase H resolutions (branch `architecture/10of10-restructure`)**: the path-level
+> duplications below are RESOLVED where marked — root shims for auth (auth-utils,
+> admin-auth, admin-jwt, admin-rbac, mobile-auth), finance (ledger, payout-engine),
+> notifications (incl. phase10-4), and mobile api/api-v2 were retired; callers now
+> import `lib/auth/*`, `lib/finance/*`, `lib/notifications/`, `apps/mobile/api/*`
+> directly. Remaining rows are behavior-level duplications (still open):
+> mobile-auth vs marketplace-auth `session.isValid`, middleware verifier,
+> inline route role arrays, JobPosting/Dispute/PayoutRequest models.
+
 | Website session | `lib/auth-utils.ts` | 51 | `getSession()` for legacy website pages/APIs |
 | Mobile JWT | `lib/mobile-auth.ts` | 86 | mobile token verify + `assertNotSuspended()` |
 | Marketplace v2 | `lib/auth/marketplace-auth.ts` | 24 | v2 marketplace routes |

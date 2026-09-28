@@ -72,7 +72,7 @@ This directory contains architecture documentation following the C4 model and do
 
 1. **Domain-Driven State Machines** — Job lifecycle, escrow, and workspace progress are governed by explicit state machines with validated transitions (`lib/domain/job-lifecycle.ts:44-59`).
 
-2. **Double-Entry Financial Ledger** — All monetary movements are recorded as balanced debit/credit entries with idempotency guarantees (`lib/ledger.ts:11-16`).
+2. **Double-Entry Financial Ledger** — All monetary movements are recorded as balanced debit/credit entries with idempotency guarantees (`lib/finance/ledger/ledger-service.ts` (root `lib/ledger.ts` retired Phase H)).
 
 3. **Multi-Tenant Matching** — Provider matching is country-aware with configurable weights, wave-based distribution, and fairness scoring (`lib/matching/config.ts:15-27`).
 

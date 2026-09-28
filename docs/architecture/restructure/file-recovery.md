@@ -37,7 +37,7 @@ tests/release-gate/quote-concurrency-postgres.test.ts
 ```
 
 94 further files were brought up to origin/main state (29 `app/api/mobile`, 27
-`apps/mobile/app`, `prisma/schema.prisma`, `lib/payment/*`, `lib/notifications.ts`, 16 tests).
+`apps/mobile/app`, `prisma/schema.prisma`, `lib/payment/*`, `lib/notifications/`, 16 tests).
 
 ## The gitignore bug (root-cause fix, commit `b00f221f` + `da139852`)
 

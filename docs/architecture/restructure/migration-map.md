@@ -19,10 +19,10 @@ Gate: `tsc` 0 · build PASS · vitest ≥ baseline (1184 passed / 85 failed).
 
 | CURRENT | TARGET | REASON | RISK | TEST |
 |---|---|---|---|---|
-| `lib/ledger.ts` | `lib/modules/finance/ledger/` | canonical ledger, import-path only at first | med | ledger tests + reconciliation |
+| `lib/ledger.ts` | `lib/finance/ledger/ledger-service.ts` (shim retired Phase H `187ce68d`; `lib/modules/finance/ledger/` remains future target) | canonical ledger, import-path only | med | ledger tests + reconciliation |
 | `lib/payment/*` | `lib/modules/finance/payments/` | canonical payments (PayHere adapter) | med | payhere-adapter, webhook tests |
 | escrow rules inside `lib/domain/job-lifecycle.ts` (926 ln) | `lib/modules/finance/escrow/` + lifecycle keeps transitions only | ONE escrow system (Section 45); removes duplicate escrow knowledge | **HIGH** | escrow concurrency, cancellation-payment, refund path |
-| `lib/payout-engine.ts` | `lib/modules/finance/payouts/` | canonical payouts | med | payout-engine tests (2 known failures baseline) |
+| `lib/payout-engine.ts` | `lib/finance/payouts/payout-engine.ts` (shim retired Phase H `187ce68d`) | canonical payouts | med | payout-engine tests (2 known failures baseline) |
 | commission calc (in job-lifecycle / engine) | `lib/modules/finance/commission/` | one commission system | med | commission tests |
 | 5 legacy Float shadow-wallet writes (audit finding) | wallet application service | no direct balance writes (Section 19) | med | wallet tests |
 | `ProviderWallet`/`CustomerWallet` read paths | `WalletBalance` reads via service | one balance source | med | wallet/payout tests |
@@ -36,7 +36,7 @@ payout RESERVED completion, `mobile/earnings` wrong-model reads, vacuous phase1 
 
 | CURRENT | TARGET | REASON | RISK | TEST |
 |---|---|---|---|---|
-| `lib/notifications-phase10-4.ts` (5 importers) | merge into `lib/notifications.ts` → `lib/modules/communications/notifications/` | ONE notification system | low | notifications tests |
+| `lib/notifications-phase10-4.ts` (5 importers) | merged into `lib/notifications/` — both root shims retired Phase H `afc6ebd0` | ONE notification system | low | notifications tests (identity exact) |
 | outbox/retry scattered | `lib/modules/communications/outbox/` | one retry path | med | notification retry tests |
 | `lib/pricing-engine.ts`, `lib/smart-pricing.ts`, `lib/pricing-countries.ts`, root `pricing-types.ts` (all 0 importers) | retirement ladder → delete (done, Phase C) | REMOVED; pricing suite green pre-delete | low | complete |
 
@@ -48,7 +48,7 @@ payout RESERVED completion, `mobile/earnings` wrong-model reads, vacuous phase1 
 | `lib/admin-auth.ts` simple-token (37 routes) | compatibility wrapper over canonical session | one system without breaking routes | **HIGH** | admin route tests |
 | unused `createStaffSession`/rotation helpers (0 callers) | retired via ladder | dead code | low | tsc |
 | role arrays scattered in routes/pages | `requirePermission`/`can` single source | one RBAC source (Section 17) | **HIGH** | admin-country-rbac, rbac suites |
-| `lib/auth-utils.ts` (51) + `lib/mobile-auth.ts` (86) + `marketplace-auth` (24) | `lib/modules/auth/` wrappers, callers migrate gradually | one auth module, no big-bang rewrite | med | all auth tests |
+| `lib/auth-utils.ts` (52) + `lib/mobile-auth.ts` (89) + `marketplace-auth` (24) | root shims retired Phase H `c9db65a8` → callers on `lib/auth/*` canonical; `lib/modules/auth/` remains future target | one auth module, no big-bang rewrite | med | all auth tests |
 | `middleware.ts` (545 ln duplication) | thin middleware (token parse + rate limit only) | stop re-implementing guards | med | security suites |
 
 Gate: full suite + security tests + no route loses authentication (route-inventory diff).
@@ -64,7 +64,7 @@ variance → incremental).
 
 | CURRENT | TARGET | REASON | RISK | TEST |
 |---|---|---|---|---|
-| `apps/mobile/lib/api.ts` (57 files) + `api-v2.ts` (48) | `apps/mobile/api/{client,auth,jobs,quotes,companies,payments,disputes,notifications,wallet}.ts` | ONE transport client (auth, refresh, requestId, timeout, error normalization, retry, idempotency) | med | mobile tsc + screen-by-screen manual gates |
+| `apps/mobile/lib/api.ts` (57 files) + `api-v2.ts` (48) | `apps/mobile/api/*` — shims retired Phase H `a7530c6f` (114 sites on `@/api/<domain>`) | ONE transport client (auth, refresh, requestId, timeout, error normalization, retry, idempotency) | med | mobile tsc + screen-by-screen manual gates |
 | fat screens (1329 ln max) | `apps/mobile/features/<domain>/` logic extraction | screens are clients (Section 9A) | med | mobile tsc (baseline 491 — must not grow) |
 | `lib/icons.tsx` (0 importers) | retirement ladder | SAFE_TO_REMOVE | low | mobile tsc |
 
@@ -105,10 +105,18 @@ this surface move and remain open.
 Only after `CALLERS MAPPED → REPLACEMENT READY → CALLERS MIGRATED → READ ONLY →
 ZERO CALLERS → TEST PASS`:
 
-candidates (see `legacy-retirement.md`): `job-matcher.ts`, `matching-engine.ts`,
-`pricing-engine.ts`, `smart-pricing.ts`, `pricing-countries.ts`, `demand-engine.ts`,
-`bi-engine.ts`, `branch-assignment.ts`, `PayoutRequest`, `JobPosting`, old `Dispute`,
-`lib/icons.tsx`, `notifications-phase10-4.ts` (after merge).
+Phase H retirement record (start `960d2b8e`): batches H2–H8 committed
+(`e3540c60` shared shims, `afc6ebd0` notification shims, `187ce68d` finance shims +
+job-lifecycle re-exports, `c9db65a8` auth shims + 5 dead functions, `a7530c6f` mobile
+shims + 24 dead files, `b642bad3` test retarget + 9 dead prod files). Retired: root
+shims for money/utils/phone/currency, notifications (incl. phase10-4), ledger,
+payout-engine, auth-utils/admin-auth/admin-jwt/admin-rbac/mobile-auth, mobile
+api/api-v2, `lib/{admin-audit,admin-schemas,backfill,bi-engine,branch-assignment,
+demand-engine,property-search,matching-engine,job-matcher}.ts`, mobile `lib/icons.tsx`
++ 24 dead components, 5 dead auth functions. Kept (DEFERRED_AFTER_H): `PayoutRequest`,
+`JobPosting`, old `Dispute`, `createStaffSession`/rotation, `createSimpleToken`,
+mobile-auth caller base, middleware legacy verifier — see `legacy-retirement.md`.
+Full verdict after H10 final regression.
 
 ## Non-goals of this program
 

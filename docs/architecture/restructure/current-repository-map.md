@@ -33,28 +33,28 @@ Snapshot at baseline: `origin/main` = `dbae2f73`.
 
 | File(s) | Importers | Note |
 |---|---|---|
-| `lib/mobile-auth.ts` | 86 files | mobile JWT + suspension assert |
-| `lib/auth-utils.ts` | 51 files | website session (`getSession`) |
-| `lib/admin-auth.ts` | 37 files | HMAC simple-token (37 admin routes) |
+| `lib/auth/compatibility/mobile-auth.ts` | 89 files | mobile JWT + suspension assert (root shim retired Phase H) |
+| `lib/auth/authentication/auth-utils.ts` | 51 files | website session (`getSession`) (root shim retired Phase H) |
+| `lib/auth/authentication/admin-auth.ts` | 37 files | HMAC simple-token (37 admin routes) (root shim retired Phase H) |
 | `lib/auth/marketplace-auth.ts` | 24 files | v2 marketplace auth |
 | `lib/pricing/*` (dir) | 23 files | canonical pricing |
-| `lib/notifications.ts` | 18 files | canonical notifications |
-| `lib/domain/job-lifecycle.ts` (926 ln) | 17 files | **fuses job transitions + escrow** |
-| `lib/ledger.ts` | 10 files | canonical ledger writes |
-| `lib/auth/staff-sessions.ts` | 9 files | `authenticateStaffRequest` used by 7 admin routes |
+| `lib/notifications/` (dir) | ~26 files | canonical notifications (both root shims retired Phase H) |
+| `lib/domain/job-lifecycle.ts` | 17 files | job transitions (escrow re-exports removed Phase H) |
+| `lib/finance/ledger/ledger-service.ts` | 13 files | canonical ledger writes (root shim retired Phase H) |
+| `lib/auth/staff-sessions.ts` | 7 files | `authenticateStaffRequest` used by 7 admin routes |
 | `lib/payment/*` (dir) | 5 files | payment service + PayHere adapter |
-| `lib/admin-jwt.ts` | 5 files | login/refresh/2FA token issuance |
-| `lib/notifications-phase10-4.ts` | 5 files | merge candidate |
-| `lib/payout-engine.ts` | 4 files | payouts |
+| `lib/auth/authentication/admin-jwt.ts` | 5 files | login/refresh/2FA token issuance (root shim retired Phase H) |
+| `lib/finance/payouts/payout-engine.ts` | 4 files | payouts (root shim retired Phase H) |
 
 ## Mobile
 
-- Two transport clients: `lib/api.ts` (57 importing files) vs `lib/api-v2.ts` (48).
+- Two transport clients `apps/mobile/api/{client,v2-client}.ts`; root shims
+  `lib/api.ts`/`lib/api-v2.ts` retired Phase H (114 call sites on `@/api/<domain>`).
 - Screens up to 1329 lines (`app/(customer)/jobs/v2/create.tsx`); business logic lives in screens.
 - Route groups exist: `(auth)`, `(customer)`, `(tasker)`, `(company)` — but no `features/`,
   `api/`, `hooks/`, `state/` layers.
-- `apps/mobile/lib/icons.ts` had JSX in a `.ts` file; its parse errors had been masking the
-  whole program's type checking (renamed to `.tsx` at baseline; zero importers).
+- `apps/mobile/lib/icons.tsx` had JSX in a `.ts` file (renamed at baseline; removed
+  Phase H — zero importers).
 
 ## Tests
 

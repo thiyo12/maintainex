@@ -22,7 +22,7 @@ By directory: `tests/phase10-5` (16 files), `phase10-1` (10), `phase10-8` (8), `
 
 Failure clusters observed:
 1. **i18n locale parity** — `ta`/`si` missing hundreds of keys (parity tests assert `[]`).
-2. **Notification creation** — `PrismaClientInitializationError` in `lib/notifications.ts:17`
+2. **Notification creation** — `PrismaClientInitializationError` in `lib/notifications/index.ts`
    under test env (3 occurrences).
 3. **Assertion drift** — PIN messaging ("PIN is only available for an accepted job"),
    escrow state ("Job is not in progress"), authorization ("Only the customer can approve"),
@@ -81,7 +81,7 @@ tests/
 ├── structural/     schema, migration, idempotency-key, deployment-safety guards
 ├── integration/    cross-domain lifecycle, postgres, persona-switch, canonical integration
 ├── e2e/            e2e-fix-batch
-├── legacy/         backward-compatibility (auth; Phase H decides)
+├── legacy/         backward-compatibility (auth; kept — DEFERRED_AFTER_H, proves live behavior)
 ├── helpers/        test-guard (assertNotProductionDb / isPostgres / requiresPostgres)
 └── retained in place: apps/mobile/lib/i18n/__tests__ — i18next is a mobile-only dependency
    and their locale imports would surface pre-existing TS1117 errors into the web tsc program
