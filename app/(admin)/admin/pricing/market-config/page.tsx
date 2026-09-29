@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiDollarSign, FiSave, FiRefreshCw, FiAlertTriangle } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface MarketConfig {
   id: string
@@ -65,7 +64,7 @@ const EDITABLE_FIELDS = [
 ]
 
 export default function MarketConfigPage() {
-  return <AdminLayout><MarketConfigContent /></AdminLayout>
+  return <><MarketConfigContent /></>
 }
 
 function MarketConfigContent() {
@@ -125,12 +124,12 @@ function MarketConfigContent() {
   }
 
   if (loading) return (
-    <AdminLayout>
+    <>
       <div className="flex items-center justify-center py-20">
         <FiRefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
         <span className="ml-2 text-gray-400">Loading configuration...</span>
       </div>
-    </AdminLayout>
+    </>
   )
 
   return (

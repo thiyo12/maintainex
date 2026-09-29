@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiTool, FiEye, FiXCircle, FiSearch, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Job {
   id: string
@@ -129,7 +128,7 @@ export default function JobsPage() {
     new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR', minimumFractionDigits: 0 }).format(amount)
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -366,6 +365,6 @@ export default function JobsPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

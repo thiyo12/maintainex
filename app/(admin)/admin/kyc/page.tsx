@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface KYCDocument {
   id: string
@@ -161,7 +160,7 @@ export default function KYCPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -434,6 +433,6 @@ export default function KYCPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }
