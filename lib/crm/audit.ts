@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { redactCrmSensitiveData } from '@/lib/crm/security'
 
 interface AuditLogParams {
   action: string
@@ -35,8 +36,8 @@ export async function createAuditLog(params: AuditLogParams) {
         entityId: params.entityId,
         entityName: params.entityName,
         description: params.description,
-        oldValue: params.oldValue ? JSON.stringify(params.oldValue) : null,
-        newValue: params.newValue ? JSON.stringify(params.newValue) : null,
+        oldValue: params.oldValue ? JSON.stringify(redactCrmSensitiveData(params.oldValue)) : null,
+        newValue: params.newValue ? JSON.stringify(redactCrmSensitiveData(params.newValue)) : null,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
         sessionId: params.sessionId,
