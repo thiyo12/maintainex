@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { updateMarketConfig } from '@/lib/domain/market-config'
-import { assertCrmCountryAllowed, guardCrmRequest } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, guardCrmRequest, type CrmSecurityContext } from '@/lib/crm/security'
 import type { AdminSession } from '@/lib/admin-types'
 
-function sessionFromGuard(context: Awaited<ReturnType<typeof guardCrmRequest>> extends infer _T ? any : never): AdminSession {
+function sessionFromGuard(context: CrmSecurityContext): AdminSession {
   return {
     id: context.adminId,
     email: context.email,
