@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiDollarSign, FiSave, FiRefreshCw, FiAlertTriangle } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 
 interface MarketConfig {
   id: string
@@ -68,6 +69,11 @@ export default function MarketConfigPage() {
 }
 
 function MarketConfigContent() {
+  const { user } = useAdminSession()
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const allowedCountries = isSuperAdmin
+    ? ['LK', 'CA', 'GLOBAL']
+    : (user?.assignedCountries || [])
   const [config, setConfig] = useState<MarketConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [changes, setChanges] = useState<Record<string, number>>({})
@@ -88,7 +94,14 @@ function MarketConfigContent() {
     finally { setLoading(false) }
   }, [countryCode])
 
-  useEffect(() => { fetchConfig() }, [fetchConfig])
+  useEffect(() => {
+    if (!allowedCountries.length) return
+    if (!allowedCountries.includes(countryCode)) {
+      setCountryCode(allowedCountries[0])
+      return
+    }
+    fetchConfig()
+  }, [fetchConfig, allowedCountries.join('|'), countryCode])
 
   const handleChange = (key: string, value: string) => {
     const num = parseFloat(value)
@@ -142,9 +155,11 @@ function MarketConfigContent() {
         <div className="flex items-center space-x-3">
           <select value={countryCode} onChange={e => setCountryCode(e.target.value)}
             className="bg-[#1A1B26] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm">
-            <option value="LK">Sri Lanka (LK)</option>
-            <option value="GLOBAL">Global Defaults</option>
-            <option value="CA">Canada (CA)</option>
+            {allowedCountries.map(code => (
+              <option key={code} value={code}>
+                {code === 'LK' ? 'Sri Lanka (LK)' : code === 'CA' ? 'Canada (CA)' : code === 'GLOBAL' ? 'Global Defaults' : code}
+              </option>
+            ))}
           </select>
           <button onClick={fetchConfig} className="flex items-center space-x-2 px-3 py-2 bg-[#1A1B26] text-gray-300 rounded-lg hover:bg-[#24263a]">
             <FiRefreshCw className="w-4 h-4" /><span>Refresh</span>
