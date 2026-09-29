@@ -1,34 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
-import { listPendingSubmissions } from '@/lib/profession'
+import { guardCrmRequest } from '@/lib/crm/security'
 
-// GET: List pending profession submissions
 export async function GET(request: NextRequest) {
   try {
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'professions:read',
+      level: 'read',
+      requireCountryScope: true,
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
+    if (!guard.ok) return guard.response
+    const security = guard.context
+
+    let submitterIds: string[] | undefined
+    if (!security.isSuperAdmin) {
+      submitterIds = (await prisma.user.findMany({
+        where: { countryCode: { in: security.assignedCountries } },
+        select: { id: true },
+      })).map(user => user.id)
     }
 
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('professions:read')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const submissions = await prisma.professionSubmission.findMany({
+      where: {
+        status: { in: ['SUBMITTED', 'UNDER_REVIEW'] },
+        ...(submitterIds ? { submittedById: { in: submitterIds } } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 500,
+    })
 
-    const submissions = await listPendingSubmissions(prisma)
-    return NextResponse.json({ submissions })
+    return NextResponse.json(
+      { submissions },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Admin submissions list error:', error)
+    console.error('CRM profession submissions GET error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
