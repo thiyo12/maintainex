@@ -13,7 +13,7 @@ export interface ProfessionCreateInput {
 export interface ProfessionUpdateInput {
   slug?: string
   i18nKey?: string
-  description?: string
+  description?: string | null
   isActive?: boolean
   sortOrder?: number
 }
