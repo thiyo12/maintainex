@@ -95,8 +95,8 @@ export default function MobileManagementPage() {
                       <FiMapPin className="text-amber-600" size={15}/>
                       <div className="font-semibold text-slate-900">{config.countryCode}</div>
                     </div>
-                    <span className={`text-[10px] px-2 py-1 rounded-full border ${config.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                      {config.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    <span className="text-[10px] px-2 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
+                      CONFIGURED
                     </span>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
