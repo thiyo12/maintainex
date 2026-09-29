@@ -66,6 +66,7 @@ export async function getActivityLogs(options?: {
   action?: string
   entityType?: string
   branchId?: string | null
+  branchIds?: string[] | null
   region?: string | null
   startDate?: Date
   endDate?: Date
@@ -83,7 +84,14 @@ export async function getActivityLogs(options?: {
     if (options.endDate) where.createdAt.lte = options.endDate
   }
 
-  if (options?.region) {
+  // Branch scoping precedence: explicit branch set > single branch > region fallback.
+  // Exactly one branchId condition is ever applied, so a branch filter can never be
+  // overwritten by a later one. An explicitly passed empty set matches nothing.
+  if (options?.branchIds) {
+    where.branchId = { in: options.branchIds }
+  } else if (options?.branchId) {
+    where.branchId = options.branchId
+  } else if (options?.region) {
     const regionBranchIds = await prisma.branch.findMany({
       where: { region: options.region },
       select: { id: true }
@@ -106,32 +114,45 @@ export async function getActivityLogs(options?: {
   return { logs, total }
 }
 
-export async function getStatsForPeriod(startDate: Date, endDate: Date, branchId?: string | null, region?: string | null) {
+export async function getStatsForPeriod(
+  startDate: Date,
+  endDate: Date,
+  branchId?: string | null,
+  region?: string | null,
+  branchIds?: string[] | null
+) {
+  // Branch scoping precedence: explicit branch set > single branch > region fallback.
+  // The branch filter is applied at most once per where-clause, so a region lookup can
+  // never overwrite an already-applied branch condition.
+  const hasBranchScope = Boolean(branchIds) || Boolean(branchId)
+
+  const applyBranchScope = (where: any) => {
+    if (branchIds) where.branchId = { in: branchIds }
+    else if (branchId) where.branchId = branchId
+  }
+
+  const regionBranchIds = !hasBranchScope && region
+    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
+    : null
+  const regionBranchFilter = regionBranchIds && regionBranchIds.length > 0 ? regionBranchIds : null
+
   const bookingWhere: any = {
     createdAt: { gte: startDate, lte: endDate },
   }
-  if (branchId) bookingWhere.branchId = branchId
-  if (region) bookingWhere.region = region
-
-  const appBranchFilter = region
-    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
-    : null
+  applyBranchScope(bookingWhere)
+  if (!hasBranchScope && region) bookingWhere.region = region
 
   const appWhere: any = {
     createdAt: { gte: startDate, lte: endDate },
   }
-  if (branchId) appWhere.branchId = branchId
-  if (appBranchFilter && appBranchFilter.length > 0) appWhere.branchId = { in: appBranchFilter }
-
-  const activityBranchFilter = region
-    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
-    : null
+  applyBranchScope(appWhere)
+  if (!hasBranchScope && regionBranchFilter) appWhere.branchId = { in: regionBranchFilter }
 
   const activityWhere: any = {
     createdAt: { gte: startDate, lte: endDate },
   }
-  if (branchId) activityWhere.branchId = branchId
-  if (activityBranchFilter && activityBranchFilter.length > 0) activityWhere.branchId = { in: activityBranchFilter }
+  applyBranchScope(activityWhere)
+  if (!hasBranchScope && regionBranchFilter) activityWhere.branchId = { in: regionBranchFilter }
 
   const [
     bookingStats,

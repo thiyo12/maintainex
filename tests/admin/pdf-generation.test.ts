@@ -20,6 +20,12 @@ vi.mock('@/lib/auth/authentication/auth-utils', () => ({
   getSession: vi.fn(),
 }))
 
+// The reports routes authenticate through the canonical admin session (role +
+// assignedCountries) rather than the legacy session helper used by the invoice PDF route.
+vi.mock('@/lib/auth/authentication/admin-auth', () => ({
+  getAdminSession: vi.fn(),
+}))
+
 vi.mock('@/lib/activity-log', () => ({
   getStatsForPeriod: vi.fn().mockResolvedValue({
     bookings: { total: 10, pending: 2, confirmed: 3, inProgress: 1, completed: 3, cancelled: 1 },
@@ -36,6 +42,7 @@ import { GET as invoiceGET } from '@/app/api/invoices/[id]/pdf/route'
 import { GET as reportGET } from '@/app/api/reports/export/route'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 import { NextRequest } from 'next/server'
 
 function makeRequest(url: string, headers?: Record<string, string>): NextRequest {
@@ -237,15 +244,16 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
 
   describe('Reports PDF route', () => {
     it('returns 401 for unauthenticated request', async () => {
-      vi.mocked(getSession).mockResolvedValue(null)
+      vi.mocked(getAdminSession).mockResolvedValue(null)
       const req = makeRequest('http://localhost:3000/api/reports/export?period=month')
       const res = await reportGET(req)
       expect(res.status).toBe(401)
     })
 
     it('returns valid PDF for authorized request', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN', branchId: null,
+      vi.mocked(getAdminSession).mockResolvedValue({
+        sub: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN',
+        firstName: 'Admin', lastName: 'User', assignedCountries: [], type: 'access',
       } as any)
       const req = makeRequest('http://localhost:3000/api/reports/export?period=month')
       const res = await reportGET(req)
@@ -261,8 +269,9 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
     })
 
     it('handles weekly period', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN', branchId: null,
+      vi.mocked(getAdminSession).mockResolvedValue({
+        sub: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN',
+        firstName: 'Admin', lastName: 'User', assignedCountries: [], type: 'access',
       } as any)
       const req = makeRequest('http://localhost:3000/api/reports/export?period=week')
       const res = await reportGET(req)
@@ -272,8 +281,9 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
     })
 
     it('handles yearly period', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN', branchId: null,
+      vi.mocked(getAdminSession).mockResolvedValue({
+        sub: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN',
+        firstName: 'Admin', lastName: 'User', assignedCountries: [], type: 'access',
       } as any)
       const req = makeRequest('http://localhost:3000/api/reports/export?period=year')
       const res = await reportGET(req)
@@ -283,8 +293,9 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
     })
 
     it('handles activities with long descriptions', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN', branchId: null,
+      vi.mocked(getAdminSession).mockResolvedValue({
+        sub: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN',
+        firstName: 'Admin', lastName: 'User', assignedCountries: [], type: 'access',
       } as any)
       vi.mocked(prisma.activityLog.findMany).mockResolvedValue([
         {
@@ -306,8 +317,9 @@ describe('PDF Generation — jsPDF 4.x + autotable 5.x', () => {
     })
 
     it('handles many activities (multi-page)', async () => {
-      vi.mocked(getSession).mockResolvedValue({
-        id: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN', branchId: null,
+      vi.mocked(getAdminSession).mockResolvedValue({
+        sub: 'admin-1', email: 'admin@test.com', role: 'SUPER_ADMIN',
+        firstName: 'Admin', lastName: 'User', assignedCountries: [], type: 'access',
       } as any)
       vi.mocked(prisma.activityLog.findMany).mockResolvedValue(
         Array.from({ length: 100 }, (_, i) => ({
