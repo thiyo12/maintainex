@@ -10,6 +10,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Offer ID is required' }, { status: 400 })
     }
 
+    const existing = await prisma.flashOffer.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
+    }
+    if (existing.currentClaims >= existing.maxClaims) {
+      return NextResponse.json({ error: 'Offer is fully claimed' }, { status: 409 })
+    }
+
     const offer = await prisma.flashOffer.update({
       where: { id },
       data: {

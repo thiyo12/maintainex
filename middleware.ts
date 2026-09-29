@@ -458,6 +458,9 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/api/admin/') &&
     !pathname.startsWith('/api/internal/') &&
     pathname !== '/api/seed/auto' &&
+    pathname !== '/api/contact' &&
+    pathname !== '/api/applications' &&
+    !pathname.startsWith('/api/flash-offers') &&
     pathname !== '/api/seed/test-data' &&
     pathname !== '/api/seed/real-estate' &&
     pathname !== '/api/real-estate' &&
