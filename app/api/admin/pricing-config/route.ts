@@ -1,66 +1,115 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
+import { updateMarketConfig } from '@/lib/domain/market-config'
+import {
+  assertCrmCountryAllowed,
+  guardCrmRequest,
+  type CrmSecurityContext,
+} from '@/lib/crm/security'
+import type { AdminSession } from '@/lib/admin-types'
+
+const ALLOWED_FIELDS = new Set([
+  'minBenchmarkSample',
+  'benchmarkPercentileLow',
+  'benchmarkPercentileHigh',
+  'benchmarkOutlierIqrMult',
+  'benchmarkFallbackEnabled',
+  'benchmarkResearchIntervalMonths',
+])
+
+function sessionFromGuard(context: CrmSecurityContext): AdminSession {
+  return {
+    id: context.adminId,
+    email: context.email,
+    role: context.role,
+    firstName: '',
+    lastName: '',
+    assignedCountries: context.assignedCountries,
+    authType: 'adminUser',
+  }
+}
+
+function assertMarketAccess(context: CrmSecurityContext, countryCode: string) {
+  if (countryCode === 'GLOBAL') return context.isSuperAdmin
+  return assertCrmCountryAllowed(context, countryCode)
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !['SUPER_ADMIN', 'FINANCE'].includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'pricing_config:read',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
-    const countryCode = searchParams.get('countryCode')
+    const countryCode = (searchParams.get('countryCode') || 'GLOBAL').trim().toUpperCase()
 
-    const config = await prisma.marketConfig.findUnique({
-      where: { countryCode: countryCode ?? 'GLOBAL' },
-    })
+    if (!assertMarketAccess(security, countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
-    return NextResponse.json({ config })
+    const config = await prisma.marketConfig.findUnique({ where: { countryCode } })
+    return NextResponse.json({ config }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
-    console.error('Pricing config GET error:', error)
+    console.error('CRM pricing config GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !['SUPER_ADMIN', 'FINANCE'].includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'pricing_config:write',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
-    const body = await request.json()
-    const { countryCode, ...updates } = body
+    const body = await request.json().catch(() => ({}))
+    const countryCode = typeof body?.countryCode === 'string'
+      ? body.countryCode.trim().toUpperCase()
+      : ''
+    const reason = typeof body?.reason === 'string'
+      ? body.reason.trim().slice(0, 2000)
+      : 'Pricing intelligence configuration updated'
 
     if (!countryCode) {
       return NextResponse.json({ error: 'countryCode is required' }, { status: 400 })
     }
+    if (!assertMarketAccess(security, countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
-    const config = await prisma.marketConfig.upsert({
-      where: { countryCode },
-      create: {
-        countryCode,
-        minBenchmarkSample: updates.minBenchmarkSample ?? 5,
-        benchmarkPercentileLow: updates.benchmarkPercentileLow ?? 25,
-        benchmarkPercentileHigh: updates.benchmarkPercentileHigh ?? 75,
-        benchmarkOutlierIqrMult: updates.benchmarkOutlierIqrMult ?? 1.5,
-        benchmarkFallbackEnabled: updates.benchmarkFallbackEnabled ?? true,
-        benchmarkResearchIntervalMonths: updates.benchmarkResearchIntervalMonths ?? 3,
-      },
-      update: {
-        ...(updates.minBenchmarkSample !== undefined && { minBenchmarkSample: updates.minBenchmarkSample }),
-        ...(updates.benchmarkPercentileLow !== undefined && { benchmarkPercentileLow: updates.benchmarkPercentileLow }),
-        ...(updates.benchmarkPercentileHigh !== undefined && { benchmarkPercentileHigh: updates.benchmarkPercentileHigh }),
-        ...(updates.benchmarkOutlierIqrMult !== undefined && { benchmarkOutlierIqrMult: updates.benchmarkOutlierIqrMult }),
-        ...(updates.benchmarkFallbackEnabled !== undefined && { benchmarkFallbackEnabled: updates.benchmarkFallbackEnabled }),
-        ...(updates.benchmarkResearchIntervalMonths !== undefined && { benchmarkResearchIntervalMonths: updates.benchmarkResearchIntervalMonths }),
-      },
+    const changes: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(body || {})) {
+      if (ALLOWED_FIELDS.has(key)) changes[key] = value
+    }
+
+    const result = await updateMarketConfig(prisma, {
+      countryCode,
+      changes,
+      reason,
+      session: sessionFromGuard(security),
+      ipAddress: security.ipAddress,
     })
 
-    return NextResponse.json({ config })
+    return NextResponse.json({ config: result.config })
   } catch (error) {
-    console.error('Pricing config PATCH error:', error)
+    const message = error instanceof Error ? error.message : 'Server error'
+    if (message.includes('Validation failed') || message.includes('No valid fields')) {
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+    if (message.includes('not found')) {
+      return NextResponse.json({ error: message }, { status: 404 })
+    }
+    if (message.includes('Concurrent modification')) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    console.error('CRM pricing config PATCH error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
