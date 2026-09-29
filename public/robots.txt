@@ -1,9 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /api/
-Disallow: /booking/confirmation
-Disallow: /maintenance
-
-Sitemap: https://maintainex.lk/sitemap.xml
-Sitemap: https://ca.maintainex.lk/sitemap.xml
