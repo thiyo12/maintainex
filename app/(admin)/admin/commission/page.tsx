@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Settlement {
   id: string
@@ -97,7 +96,7 @@ export default function CommissionPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-6">Commission Management</h1>
 
@@ -199,6 +198,6 @@ export default function CommissionPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

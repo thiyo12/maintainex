@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiCalendar, FiDownload, FiRefreshCw, FiFilter } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Settlement {
   id: string
@@ -96,7 +95,7 @@ export default function SettlementsPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-4 md:p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -239,6 +238,6 @@ export default function SettlementsPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

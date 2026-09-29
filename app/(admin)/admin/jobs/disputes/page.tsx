@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiEye, FiCheck, FiX, FiSearch } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Dispute {
   id: string
@@ -140,7 +139,7 @@ export default function DisputesPage() {
     new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -340,6 +339,6 @@ export default function DisputesPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

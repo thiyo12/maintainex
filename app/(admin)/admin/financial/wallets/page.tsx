@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiCreditCard, FiUser, FiDollarSign, FiRefreshCw, FiLock, FiUnlock, FiArrowUp, FiArrowDown, FiSearch } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface ProviderWallet {
   id: string
@@ -140,7 +139,7 @@ export default function WalletsPage() {
   )
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-4 md:p-6 space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Wallets & Payouts</h1>
@@ -371,6 +370,6 @@ export default function WalletsPage() {
           )
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

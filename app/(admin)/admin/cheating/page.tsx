@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface CheatingReport {
   id: string
@@ -102,7 +101,7 @@ export default function CheatingPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-6">Off-Platform Deal Reports</h1>
 
@@ -256,6 +255,6 @@ export default function CheatingPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }
