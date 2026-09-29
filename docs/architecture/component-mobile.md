@@ -66,6 +66,49 @@ graph TB
 
 ---
 
+## Source Structure (Phase E)
+
+```text
+apps/mobile/
+├── app/                     # Expo Router entries ONLY — every non-layout file is a
+│                            # thin `export { default } from '@/features/...'` wrapper;
+│                            # route paths/params/layout hierarchy are runtime contracts
+├── features/
+│   ├── auth/                # screens/, context/auth.tsx (AuthProvider/useAuth)
+│   ├── customer/            # browse/booking/tracking/tabs/settings + components/
+│   ├── tasker/              # availability/identity/tabs/settings + wallet routing
+│   ├── company/             # team/workforce/dispatch/tabs/settings
+│   ├── jobs/                # screens/{customer,tasker,company}/** + dead component cluster
+│   ├── quotes/              # screens/{customer,tasker,company}/**
+│   ├── messaging/           # chat screens + InboxList/NewChatModal components
+│   ├── notifications/       # notification center + platform.ts (push handler setup)
+│   ├── payments/            # wallet/topup/withdraw screens by role
+│   ├── profile/             # root settings area + ProfileContent
+│   ├── real-estate/         # property screens
+│   └── offers/              # offer program components (currently unimported)
+├── components/              # genuinely shared UI only (ui/*, AISearchBar, ProfileHeader, PropertyCard)
+├── api/                     # transport + domain adapters (see below)
+└── lib/                     # cross-cutting infra: theme/ThemeContext, colors/fonts/tokens,
+                             # i18n, country context, types, category data (shims: none needed)
+```
+
+### API transport
+
+`apps/mobile/api/` owns all HTTP transport. **Two request clients are intentionally
+kept separate** — they differ in observable behavior:
+
+| | `api/client.ts` (v1) | `api/v2-client.ts` (v2) |
+|---|---|---|
+| Error handling | raw text body | JSON `error`/`message` extraction |
+| Default base URL | `http://localhost:3000` | `https://maintainex.lk` |
+| Auth token | shared `api/token.ts` (SecureStore key `auth_token`) | same |
+
+Domain adapters (`api/jobs.ts`, `api/quotes.ts`, `api/auth.ts`, `api/companies.ts`, …)
+group endpoint methods; `lib/api.ts` and `lib/api-v2.ts` are exact-set COMPATIBILITY
+shims (Phase H retirement).
+
+---
+
 ## Auth Module
 
 ### OTP-Based Flow

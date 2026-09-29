@@ -158,7 +158,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: bookResult.job.id } })
     expect(escrow).toBeTruthy()
 
-    const { fundEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { fundEscrow } = await import('@/lib/finance/escrow/escrow-service')
     await fundEscrow(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
       bookResult.job.id
@@ -201,7 +201,7 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     expect(wsAfterComplete?.progressStatus).toBe('COMPLETION_REQUESTED')
     expect(wsAfterComplete?.completionRequestedAt).toBeTruthy()
 
-    const { completeAndReleaseEscrow } = await import('@/lib/domain/job-lifecycle')
+    const { completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const releaseResult = await completeAndReleaseEscrow(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
       bookResult.job.id
@@ -274,8 +274,11 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
     const quote = await prisma.jobQuote.findFirst({ where: { jobId: bookResult.job.id } })
     expect(quote?.providerType).toBe('COMPANY')
 
-    const { acceptJobQuote, fundEscrow, transitionJobWorkspace, completeAndReleaseEscrow, resolveProviderActor } = await import('@/lib/domain/job-lifecycle')
+    const { acceptJobQuote, transitionJobWorkspace } = await import('@/lib/domain/job-lifecycle')
 
+    const { fundEscrow, completeAndReleaseEscrow } = await import('@/lib/finance/escrow/escrow-service')
+
+    const { resolveProviderActor } = await import('@/lib/domain/job-actors')
     await acceptJobQuote(
       { jobId: bookResult.job.id, actorId: customerUserId, actorType: 'CUSTOMER' },
       quote!.id
@@ -375,8 +378,8 @@ describe.skipIf(!isVPS)('Phase 1-7 — Full Lifecycle Integration', () => {
 
   it('dispute path: hold escrow for dispute', async () => {
     const { createBookNowJob } = await import('@/lib/domain/book-now')
-    const { acceptJobQuote, fundEscrow, holdEscrowForDispute } = await import('@/lib/domain/job-lifecycle')
-
+    const { acceptJobQuote, holdEscrowForDispute } = await import('@/lib/domain/job-lifecycle')
+    const { fundEscrow } = await import('@/lib/finance/escrow/escrow-service')
     const bookResult = await createBookNowJob({
       customerId: customerUserId,
       templateJobId,

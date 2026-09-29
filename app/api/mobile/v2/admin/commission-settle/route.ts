@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditCommissionSettlement } from '@/lib/financial-audit'
 

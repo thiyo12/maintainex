@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createBookNowJob } from '@/lib/domain/book-now'
 
 export async function POST(request: NextRequest) {

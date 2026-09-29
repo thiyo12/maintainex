@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { legacyToMinorUnits, type Currency } from './money';
+import { legacyToMinorUnits, type Currency } from '@/lib/shared/money/money';
 
 export interface CanonicalWalletBalance {
   walletId: string;

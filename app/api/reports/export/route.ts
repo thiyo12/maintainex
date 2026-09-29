@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth-utils'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 import { getStatsForPeriod } from '@/lib/activity-log'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { prisma } from '@/lib/prisma'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import type { AdminSession } from '@/lib/admin-types'
 
 function getDateRange(period: string): { start: Date; end: Date } {
   const end = new Date()
@@ -28,31 +30,31 @@ function getDateRange(period: string): { start: Date; end: Date } {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await getAdminSession(request)
     
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const userBranchId = session.branchId
 
     const searchParams = request.nextUrl.searchParams
     const period = searchParams.get('period') || 'month'
-    const branchId = searchParams.get('branchId') || undefined
+    const requestedBranchId = searchParams.get('branchId') || undefined
+
+    // Same canonical country scoping as /api/reports. Authorization is enforced before
+    // any PDF is generated, so a non-super-admin can never export unscoped activity.
+    const scopeResult = await resolveReportBranchScope(session as AdminSession, requestedBranchId ?? null)
+    if (!scopeResult.ok) {
+      return NextResponse.json({ error: scopeResult.error }, { status: scopeResult.status })
+    }
+    const { branchIds, branchId: filterBranchId } = scopeResult.scope
 
     const { start, end } = getDateRange(period)
 
-    let filterBranchId = undefined
-    if (!isSuper && userBranchId) {
-      filterBranchId = userBranchId
-    } else if (branchId) {
-      filterBranchId = branchId
-    }
+    const stats = await getStatsForPeriod(start, end, filterBranchId, null, branchIds)
 
-    const stats = await getStatsForPeriod(start, end, filterBranchId)
-
-    let branchName = 'All Branches'
+    let branchName = isSuper ? 'All Branches' : 'Assigned Countries'
     if (filterBranchId) {
       const branch = await prisma.branch.findUnique({ where: { id: filterBranchId } })
       branchName = branch?.name || 'Branch'
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
     const allActivities = await prisma.activityLog.findMany({
       where: {
         createdAt: { gte: start, lte: end },
-        ...(filterBranchId ? { branchId: filterBranchId } : {})
+        ...(branchIds ? { branchId: { in: branchIds } } : filterBranchId ? { branchId: filterBranchId } : {})
       },
       orderBy: { createdAt: 'desc' }
     })

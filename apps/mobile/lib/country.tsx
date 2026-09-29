@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { v2Locations } from './api-v2'
+import { v2Locations } from '@/api/v2-jobs'
 
 const COUNTRY_KEY = 'user_country'
 const LAST_COUNTRY_KEY = 'last_seen_country'

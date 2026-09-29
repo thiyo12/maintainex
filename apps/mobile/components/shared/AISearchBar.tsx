@@ -4,8 +4,8 @@ import { Sparkle, ArrowRight, X, MagnifyingGlass, Lightning, Drop, Snowflake, Pa
 import { useTranslation } from 'react-i18next'
 import { useColors } from '../../lib/ThemeContext'
 import { fonts } from '../../lib/fonts'
-import { v2Search } from '../../lib/api-v2'
-import { taskers } from '../../lib/api'
+import { v2Search } from '@/api/v2-search'
+import { taskers } from '@/api/taskers'
 import { buildSampleTaskers } from '../../lib/sampleTaskers'
 
 const SAMPLE_TASKER_RESULTS: TaskerResult[] = buildSampleTaskers(null).map((s, i) => ({

@@ -53,7 +53,7 @@ uploads/
 
 # Logs
 *.log
-logs/
+/logs/
 
 # Agent reference (contains infra details, never commit)
 AGENTS.md

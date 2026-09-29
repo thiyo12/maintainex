@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/admin-auth'
-import { getCountryFilter } from '@/lib/admin-rbac'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
+import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
 
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'MANAGER', 'SUPPORT']
 

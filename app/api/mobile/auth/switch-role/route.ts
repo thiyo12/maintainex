@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createMarketplaceAuthSession, buildAuthResponse } from '@/lib/auth/marketplace-session'
 
 const ALLOWED_ROLES = ['CUSTOMER', 'TASKER', 'COMPANY']

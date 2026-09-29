@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateProviderQuality } from '@/lib/quality-engine'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 
 export async function GET(request: NextRequest) {
   try {

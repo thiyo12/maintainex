@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { House, ClockCounterClockwise, Bell, User } from 'phosphor-react-native'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
-import { notifications } from '../../../lib/api'
+import { notifications } from '@/api/notifications'
 import { colors, typography } from '../../../lib/design'
 
 const tabConfigs = [

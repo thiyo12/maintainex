@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { recalculateReputation } from '@/lib/reputation-engine'
 import { recoverPenaltyPoints } from '@/lib/reputation-engine'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'

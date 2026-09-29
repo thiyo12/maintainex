@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { toE164 } from '@/lib/phone'
+import { toE164 } from '@/lib/shared/utils/phone'
 
 export const customerSearchSchema = z.object({
   query: z.string().min(1).max(100).optional(),

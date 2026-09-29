@@ -11,7 +11,7 @@ import {
   notifyChangeOrderApproved,
   notifyChangeOrderRejected,
   notifyChangeOrderSubmitted,
-} from '@/lib/notifications-phase10-4'
+} from '@/lib/notifications'
 
 export async function PATCH(
   request: NextRequest,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAccessToken } from '@/lib/admin-jwt'
+import { verifyAccessToken } from '@/lib/auth/authentication/admin-jwt'
 import { generateTotpSecret, generateTotpUri } from '@/lib/admin-2fa'
 
 export async function POST(request: NextRequest) {

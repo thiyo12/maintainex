@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { createInspection } from '@/lib/domain/inspection'
-import { notifyInspectionRequested } from '@/lib/notifications-phase10-4'
+import { notifyInspectionRequested } from '@/lib/notifications'
 
 export async function POST(
   request: NextRequest,

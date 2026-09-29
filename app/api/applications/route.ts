@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth-utils'
+import { getSession } from '@/lib/auth/authentication/auth-utils'
 import { getProvinceFromDistrict } from '@/lib/provinces'
 
 function sanitizeString(str: string): string {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
 import { createChangeOrder } from '@/lib/domain/change-order'
-import { notifyChangeOrderSubmitted } from '@/lib/notifications-phase10-4'
+import { notifyChangeOrderSubmitted } from '@/lib/notifications'
 
 function parseBigInt(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value

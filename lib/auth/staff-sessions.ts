@@ -97,15 +97,6 @@ export async function revokeAllStaffSessions(
   })
 }
 
-export async function revokeStaffTokenFamily(
-  adminUserId: string,
-  familyId: string
-): Promise<void> {
-  await prisma.adminSession.updateMany({
-    where: { adminUserId, tokenFamilyId: familyId, isRevoked: false },
-    data: { isRevoked: true, revokedAt: new Date() },
-  })
-}
 
 export async function getActiveStaffSession(
   sessionId: string

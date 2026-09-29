@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { createProfessionSubmission } from '@/lib/profession'
 
 // POST: Submit a new profession request

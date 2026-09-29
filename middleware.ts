@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getInMemoryRateLimit } from '@/lib/shared/rate-limit/ip-fixed-window'
+import { ADMIN_ROLES } from '@/lib/auth/rbac/permissions'
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
@@ -27,12 +29,6 @@ const coconutSecurityHeaders: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
   'Pragma': 'no-cache',
-}
-
-const RATE_LIMITS: Record<string, { maxRequests: number; windowSeconds: number }> = {
-  default: { maxRequests: 100, windowSeconds: 60 },
-  auth: { maxRequests: 5, windowSeconds: 60 },
-  admin: { maxRequests: 200, windowSeconds: 60 },
 }
 
 function b64UrlDecode(str: string): string {
@@ -232,39 +228,6 @@ function applyCoconutHeaders(response: NextResponse, remaining: number, resetAt:
   return response
 }
 
-const inMemoryRateLimit = new Map<string, { count: number; windowStart: number }>()
-
-function getInMemoryRateLimit(ip: string, limitType: string): { remaining: number; resetAt: Date; limited: boolean } {
-  const config = RATE_LIMITS[limitType] || RATE_LIMITS.default
-  const now = Date.now()
-  const windowMs = config.windowSeconds * 1000
-  const windowStart = now - (now % windowMs)
-  const key = `${ip}:${limitType}:${windowStart}`
-  const entry = inMemoryRateLimit.get(key)
-  if (!entry || entry.windowStart !== windowStart) {
-    inMemoryRateLimit.set(key, { count: 1, windowStart })
-    return { remaining: config.maxRequests - 1, resetAt: new Date(windowStart + windowMs), limited: false }
-  }
-  entry.count++
-  const remaining = Math.max(0, config.maxRequests - entry.count)
-  return { remaining, resetAt: new Date(windowStart + windowMs), limited: remaining <= 0 }
-}
-
-if (typeof globalThis.__rateLimitCleanup === 'undefined') {
-  globalThis.__rateLimitCleanup = setInterval(() => {
-    const now = Date.now()
-    for (const [key, entry] of inMemoryRateLimit.entries()) {
-      if (now - entry.windowStart > 120000) {
-        inMemoryRateLimit.delete(key)
-      }
-    }
-  }, 60000)
-}
-
-declare global {
-  var __rateLimitCleanup: ReturnType<typeof setInterval> | undefined
-}
-
 function generateRequestId(): string {
   return crypto.randomUUID()
 }
@@ -404,7 +367,7 @@ export async function middleware(request: NextRequest) {
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
 
-    const validWebRoles = ['SUPER_ADMIN', 'MANAGER', 'FINANCE', 'USER_MANAGEMENT', 'SUPPORT', 'TECHNICAL']
+    const validWebRoles = Object.keys(ADMIN_ROLES)
 
     if (!validWebRoles.includes(session.role)) {
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
@@ -495,6 +458,9 @@ export async function middleware(request: NextRequest) {
     !pathname.startsWith('/api/admin/') &&
     !pathname.startsWith('/api/internal/') &&
     pathname !== '/api/seed/auto' &&
+    pathname !== '/api/contact' &&
+    pathname !== '/api/applications' &&
+    !pathname.startsWith('/api/flash-offers') &&
     pathname !== '/api/seed/test-data' &&
     pathname !== '/api/seed/real-estate' &&
     pathname !== '/api/real-estate' &&

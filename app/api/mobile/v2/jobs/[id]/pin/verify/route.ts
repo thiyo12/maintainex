@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { verifyJobPin } from '@/lib/domain/job-pin'
 import { prisma } from '@/lib/prisma'
 import { notifyJobStarted } from '@/lib/notifications'

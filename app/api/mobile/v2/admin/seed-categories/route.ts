@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { seedJobCategories } from '@/lib/v2-job-categories'
 
 export async function POST(_request: NextRequest) {

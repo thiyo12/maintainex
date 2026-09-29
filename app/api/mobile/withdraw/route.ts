@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
-import { requestPayout } from '@/lib/payout-engine'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
+import { requestPayout } from '@/lib/finance/payouts/payout-engine'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditPayoutRequest } from '@/lib/financial-audit'
-import type { Currency } from '@/lib/money'
+import type { Currency } from '@/lib/shared/money/money'
 
 function parseMajorAmountToMinor(value: unknown): bigint | null {
   let raw: string

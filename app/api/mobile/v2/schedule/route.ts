@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { clusterJobsByProximity, optimizeRoute, getProviderScheduleRecommendations } from '@/lib/schedule-engine'
-import { authenticateRequest } from '@/lib/mobile-auth'
+import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {

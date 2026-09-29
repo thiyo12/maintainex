@@ -3,7 +3,7 @@ import type { MetadataRoute } from 'next'
 
 export const dynamic = 'force-dynamic'
 
-const STATIC_PATHS = ['/', '/about', '/contact', '/booking', '/services', '/careers', '/vision', '/waitlist']
+const STATIC_PATHS = ['/', '/about', '/contact', '/services', '/careers', '/vision', '/waitlist']
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const headersList = await headers()

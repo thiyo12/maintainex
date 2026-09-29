@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { notifyAllAdmins } from '@/lib/admin-notifications'
 import { createWorkItem } from '@/lib/work-queue'
 import { raiseJobDispute } from '@/lib/domain/job-lifecycle'

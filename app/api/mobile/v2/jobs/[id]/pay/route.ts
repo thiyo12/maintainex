@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateRequest, assertNotSuspended } from '@/lib/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { createPaymentIntent } from '@/lib/payment/payment-service'
 

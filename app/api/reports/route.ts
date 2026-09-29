@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth-utils'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 import { getActivityLogs, getStatsForPeriod } from '@/lib/activity-log'
+import { resolveReportBranchScope } from '@/lib/reports/branch-scope'
 import { prisma } from '@/lib/prisma'
+import type { AdminSession } from '@/lib/admin-types'
 
 function getDateRange(period: string): { start: Date; end: Date } {
   const end = new Date()
@@ -26,46 +28,47 @@ function getDateRange(period: string): { start: Date; end: Date } {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession(request)
+    const session = await getAdminSession(request)
     
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const isSuper = session.role === 'SUPER_ADMIN'
-    const userBranchId = session.branchId
-    const userRegion = session.region
 
     const searchParams = request.nextUrl.searchParams
     const period = searchParams.get('period') || 'month'
     const entityType = searchParams.get('entityType') || undefined
     const adminId = searchParams.get('adminId') || undefined
-    const filterBranchId = searchParams.get('branchId') || undefined
+    const requestedBranchId = searchParams.get('branchId') || undefined
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
+    // Canonical country scoping: SUPER_ADMIN keeps broad access, every other role is
+    // restricted to the branches inside the admin's assignedCountries. A branchId query
+    // is never trusted on its own.
+    const scopeResult = await resolveReportBranchScope(session as AdminSession, requestedBranchId ?? null)
+    if (!scopeResult.ok) {
+      return NextResponse.json({ error: scopeResult.error }, { status: scopeResult.status })
+    }
+    const { branchIds, branchId } = scopeResult.scope
+
     const { start, end } = getDateRange(period)
 
-    let branchId = undefined
-    if (!isSuper && userBranchId) {
-      branchId = userBranchId
-    } else if (filterBranchId) {
-      branchId = filterBranchId
-    }
-
     const [currentPeriodStats, previousPeriodStats, recentActivity, activityTotal] = await Promise.all([
-      getStatsForPeriod(start, end, branchId, userRegion),
+      getStatsForPeriod(start, end, branchId, null, branchIds),
       getStatsForPeriod(
         new Date(start.getTime() - (end.getTime() - start.getTime())),
         new Date(start.getTime() - 1),
         branchId,
-        userRegion
+        null,
+        branchIds
       ),
       getActivityLogs({
         adminId,
         entityType,
         branchId,
-        region: userRegion,
+        branchIds,
         startDate: start,
         endDate: end,
         limit,
@@ -75,7 +78,7 @@ export async function GET(request: NextRequest) {
         adminId,
         entityType,
         branchId,
-        region: userRegion,
+        branchIds,
         startDate: start,
         endDate: end,
         limit: 10000
@@ -102,27 +105,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Single branch condition, computed once: a branch filter can never be overwritten here.
+    const activityBranchFilter = branchIds
+      ? { branchId: { in: branchIds } }
+      : branchId
+        ? { branchId }
+        : {}
+
     const adminList = await prisma.activityLog.groupBy({
       by: ['adminId', 'adminEmail', 'adminName'],
       where: {
         createdAt: { gte: start, lte: end },
-        ...(branchId ? { branchId } : {}),
-        ...(userRegion ? {
-          branchId: {
-            in: await prisma.branch.findMany({ where: { region: userRegion }, select: { id: true } }).then(b => b.map(x => x.id))
-          }
-        } : {})
+        ...activityBranchFilter
       },
       _count: true,
       orderBy: { _count: { createdAt: 'desc' } }
     })
 
-    const branches = isSuper ? await prisma.branch.findMany({
-      where: { isActive: true, ...(userRegion ? { region: userRegion } : {}) },
+    const branches = await prisma.branch.findMany({
+      where: {
+        isActive: true,
+        ...scopeResult.scope.branchCountryFilter
+      },
       select: { id: true, name: true, location: true }
-    }) : []
+    })
 
-    const dailyStats = await getDailyStats(start, end, branchId, userRegion)
+    const dailyStats = await getDailyStats(start, end, branchId, branchIds)
 
     return NextResponse.json({
       period,
@@ -138,7 +146,7 @@ export async function GET(request: NextRequest) {
         activityCount: a._count
       })),
       branches,
-      currentBranch: userBranchId,
+      currentBranch: branchId,
       isSuperAdmin: isSuper,
       pagination: {
         page,
@@ -153,23 +161,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getDailyStats(start: Date, end: Date, branchId?: string | null, region?: string | null) {
+async function getDailyStats(start: Date, end: Date, branchId?: string | null, branchIds?: string[] | null) {
   const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  
+
+  // Branch scoping precedence: explicit branch set > single branch. No region fallback,
+  // so a branch condition can never be replaced by a second one.
   const bookingWhere: any = {
     createdAt: { gte: start, lte: end },
-    ...(branchId ? { branchId } : {}),
-    ...(region ? { region } : {})
+    ...(branchIds ? { branchId: { in: branchIds } } : branchId ? { branchId } : {})
   }
-
-  const appBranchFilter = region
-    ? await prisma.branch.findMany({ where: { region }, select: { id: true } }).then(b => b.map(x => x.id))
-    : null
 
   const appWhere: any = {
     createdAt: { gte: start, lte: end },
-    ...(branchId ? { branchId } : {}),
-    ...(appBranchFilter && appBranchFilter.length > 0 ? { branchId: { in: appBranchFilter } } : {})
+    ...(branchIds ? { branchId: { in: branchIds } } : branchId ? { branchId } : {})
   }
 
   const bookings = await prisma.booking.groupBy({

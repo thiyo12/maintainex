@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import TabIcon from '../../../components/ui/TabIcon'
 import { colors } from '../../../lib/design'
-import { getActiveCompanyContext } from '../../../lib/api'
+import { getActiveCompanyContext } from '@/api/companies'
 import { SquaresFour, FileText, ChatCircleDots, Flag, Users, CurrencyCircleDollar, User, Truck } from 'phosphor-react-native'
 
 const tabConfigs = [

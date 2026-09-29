@@ -11,11 +11,11 @@ import {
   Outfit_800ExtraBold, Outfit_900Black,
 } from '@expo-google-fonts/outfit'
 
-import { AuthProvider, useAuth } from '../lib/auth'
+import { AuthProvider, useAuth } from '@/features/auth/context/auth'
 import i18next, { initI18n } from '../lib/i18n'
 import { ThemeProvider } from '../lib/theme'
 import { CountryProvider } from '../lib/country'
-import { registerForPushNotifications, addNotificationListeners, getLastNotificationResponse } from '../lib/notifications'
+import { registerForPushNotifications, addNotificationListeners, getLastNotificationResponse } from '@/features/notifications/platform'
 
 SplashScreen.preventAutoHideAsync()
 
