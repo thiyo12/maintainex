@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
+import { guardCrmRequest, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
+import { createAuditLog } from '@/lib/crm/audit'
 import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
 
 interface UnifiedJob {
@@ -31,10 +31,13 @@ function normalizeQuery(value: string | null): string | null {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !['SUPER_ADMIN', 'MANAGER'].includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'jobs:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest) {
     const fetchWindow = skip + limit
 
     const statusFilter = status && status !== 'ALL' ? { status } : {}
-    const countryFilter = getCountryFilter(session)
+    const countryFilter = getCrmCountryFilter(security)
 
     let matchingV2CustomerIds: string[] = []
     if (query) {
@@ -81,11 +84,11 @@ export async function GET(request: NextRequest) {
     const v1Filters: any[] = []
     if (status && status !== 'ALL') v1Filters.push({ status })
 
-    if (session.role !== 'SUPER_ADMIN') {
-      if (session.assignedCountries.length === 0) {
+    if (!security.isSuperAdmin) {
+      if (security.assignedCountries.length === 0) {
         v1Filters.push({ id: '__NONE__' })
       } else {
-        v1Filters.push({ customer: { countryCode: { in: session.assignedCountries } } })
+        v1Filters.push({ customer: { countryCode: { in: security.assignedCountries } } })
       }
     }
 
@@ -230,10 +233,13 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !['SUPER_ADMIN', 'MANAGER'].includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'jobs:manage',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const body = await request.json()
     const { jobId, status, source } = body
@@ -253,21 +259,33 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Job not found' }, { status: 404 })
       }
 
-      if (session.role !== 'SUPER_ADMIN') {
-        const countryFilter = getCountryFilter(session)
-        if (countryFilter.id === '__NONE__') {
-          return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
-        }
-        if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(job.countryCode || 'LK')) {
+      if (!security.isSuperAdmin) {
+        if (!assertCrmCountryAllowed(security, job.countryCode || 'LK')) {
           return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
         }
       }
 
       try {
         const updated = await transitionMarketplaceJob(
-          { jobId, actorId: session.adminUserId, actorType: 'STAFF' },
+          { jobId, actorId: security.adminId, actorType: 'STAFF' },
           status as JobStatus
         )
+        await createAuditLog({
+          action: 'UPDATE',
+          category: 'JOB',
+          userId: security.adminId,
+          userEmail: security.email,
+          userRole: security.role,
+          entityType: 'MarketplaceJob',
+          entityId: job.id,
+          entityName: job.title,
+          description: `CRM job status changed from ${job.status} to ${status}`,
+          oldValue: { status: job.status },
+          newValue: { status },
+          ipAddress: security.ipAddress,
+          userAgent: security.userAgent || undefined,
+          riskLevel: status === 'CANCELLED' ? 'MEDIUM' : 'LOW',
+        })
         return NextResponse.json({ job: { ...updated, source: 'V2' } })
       } catch (error) {
         return NextResponse.json(
@@ -289,11 +307,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    if (session.role !== 'SUPER_ADMIN') {
-      if (session.assignedCountries.length === 0) {
+    if (!security.isSuperAdmin) {
+      if (security.assignedCountries.length === 0) {
         return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
       }
-      if (!session.assignedCountries.includes(job.customer.countryCode || 'LK')) {
+      if (!assertCrmCountryAllowed(security, job.customer.countryCode || 'LK')) {
         return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
       }
     }
@@ -301,6 +319,22 @@ export async function PATCH(request: NextRequest) {
     const updated = await prisma.jobPosting.update({
       where: { id: jobId },
       data: { status },
+    })
+    await createAuditLog({
+      action: 'UPDATE',
+      category: 'JOB',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'JobPosting',
+      entityId: job.id,
+      entityName: job.title,
+      description: `CRM job status changed from ${job.status} to ${status}`,
+      oldValue: { status: job.status },
+      newValue: { status },
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent || undefined,
+      riskLevel: status === 'CANCELLED' ? 'MEDIUM' : 'LOW',
     })
     return NextResponse.json({ job: { ...updated, source: 'V1' } })
   } catch (error) {
