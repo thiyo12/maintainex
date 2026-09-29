@@ -7,6 +7,7 @@ import {
   guardCrmRequest,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
+import { transitionCompanyVerification, transitionUserKyc } from '@/lib/phase6/kyc-writer'
 
 const USER_ACTIONS = new Set([
   'suspend',
@@ -243,16 +244,15 @@ export async function PATCH(request: NextRequest) {
       }
 
       const nextStatus = action === 'verify_tasker' ? 'VERIFIED' : 'REJECTED'
-      await prisma.taskerProfile.update({
-        where: { id: targetUser.taskerProfile.id },
-        data: {
-          verificationStatus: nextStatus,
-          verificationNote: action === 'reject_tasker' ? reason : null,
-          verifiedBy: security.adminId,
-          verifiedAt: new Date(),
-          isVerified: action === 'verify_tasker',
-        },
+      const transition = await transitionUserKyc(prisma, {
+        userId: targetUser.id,
+        action: action === 'verify_tasker' ? 'APPROVE' : 'REJECT',
+        reviewNote: action === 'reject_tasker' ? reason || undefined : undefined,
+        reviewedBy: security.adminId,
       })
+      if (!transition.success) {
+        return NextResponse.json({ error: transition.error }, { status: 409 })
+      }
 
       await createAuditLog({
         action: 'UPDATE',
@@ -280,16 +280,17 @@ export async function PATCH(request: NextRequest) {
       }
 
       const nextStatus = action === 'verify_company' ? 'VERIFIED' : 'REJECTED'
-      await prisma.companyProfile.update({
-        where: { id: targetUser.companyProfile.id },
-        data: {
-          verificationStatus: nextStatus,
-          verificationNote: action === 'reject_company' ? reason : null,
-          verifiedBy: security.adminId,
-          verifiedAt: new Date(),
-          isVerified: action === 'verify_company',
-        },
+      const transition = await transitionCompanyVerification(prisma, {
+        companyId: targetUser.companyProfile.id,
+        action: action === 'verify_company' ? 'APPROVE' : 'REJECT',
+        reviewNote: action === 'reject_company' ? reason || undefined : undefined,
+        reviewedBy: security.adminId,
+        actorId: security.adminId,
+        actorRole: security.role,
       })
+      if (!transition.success) {
+        return NextResponse.json({ error: transition.error }, { status: 409 })
+      }
 
       await createAuditLog({
         action: 'UPDATE',
