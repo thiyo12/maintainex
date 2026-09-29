@@ -16,21 +16,6 @@ const nextConfig = {
         destination: '/waitlist',
         permanent: true,
       },
-      {
-        source: '/services',
-        destination: '/waitlist',
-        permanent: true,
-      },
-        {
-          source: '/services/:slug/:city',
-          destination: '/waitlist',
-          permanent: true,
-        },
-        {
-          source: '/services/:slug',
-          destination: '/waitlist',
-          permanent: true,
-        },
         {
           source: '/booking/confirmation',
           destination: '/waitlist',
