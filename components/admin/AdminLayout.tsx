@@ -8,7 +8,6 @@ import {
   FiActivity,
   FiAlertTriangle,
   FiBarChart2,
-  FiBell,
   FiBriefcase,
   FiChevronDown,
   FiChevronRight,
@@ -30,6 +29,7 @@ import {
 import { AdminSessionProvider, useAdminSession } from './AdminSessionProvider'
 import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 import CrmGlobalSearch from '@/components/crm/CrmGlobalSearch'
+import CrmNotificationBell from '@/components/crm/CrmNotificationBell'
 
 interface NavItem {
   name: string
@@ -347,13 +347,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 <span className="text-xs font-medium text-slate-700">{marketLabel}</span>
               </div>
 
-              <button
-                type="button"
-                className="relative w-10 h-10 rounded-xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                aria-label="Notifications"
-              >
-                <FiBell size={18} />
-              </button>
+              <CrmNotificationBell />
 
               <div className="flex items-center gap-2 pl-1">
                 <div className="w-9 h-9 rounded-full bg-slate-900 text-amber-300 flex items-center justify-center text-sm font-semibold">
