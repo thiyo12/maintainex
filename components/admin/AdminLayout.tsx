@@ -20,7 +20,6 @@ import {
   FiLayers,
   FiLogOut,
   FiMenu,
-  FiSearch,
   FiSettings,
   FiShield,
   FiTool,
@@ -30,6 +29,7 @@ import {
 } from 'react-icons/fi'
 import { AdminSessionProvider, useAdminSession } from './AdminSessionProvider'
 import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
+import CrmGlobalSearch from '@/components/crm/CrmGlobalSearch'
 
 interface NavItem {
   name: string
@@ -338,15 +338,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex-1 max-w-2xl">
-              <div className="h-10 rounded-xl border border-slate-200 bg-slate-50 flex items-center px-3 gap-2 text-slate-400">
-                <FiSearch size={17} />
-                <input
-                  aria-label="Global CRM search"
-                  placeholder="Search jobs, customers, taskers, companies..."
-                  className="w-full bg-transparent outline-none text-sm text-slate-700 placeholder:text-slate-400"
-                />
-                <span className="hidden sm:inline text-[10px] border border-slate-200 bg-white px-1.5 py-0.5 rounded text-slate-400">⌘K</span>
-              </div>
+              <CrmGlobalSearch />
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
