@@ -111,7 +111,7 @@ const NAVIGATION: NavItem[] = [
     href: '/admin/trust-safety',
     icon: FiShield,
     children: [
-      { name: 'Trust Overview', href: '/admin/trust-safety', icon: FiShield, permission: 'queue:view' },
+      { name: 'Trust Overview', href: '/admin/trust-safety', icon: FiShield, permission: 'trust:view' },
       { name: 'Credentials', href: '/admin/trust-safety/credentials', icon: FiFileText, permission: 'credentials:read' },
       { name: 'Risk Events', href: '/admin/trust-safety/risk-events', icon: FiAlertTriangle, permission: 'risk_events:read' },
       { name: 'Cheating Reports', href: '/admin/cheating', icon: FiAlertTriangle, permission: 'cheating:view' },
