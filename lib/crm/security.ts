@@ -275,7 +275,12 @@ export async function guardCrmRequest(
   }
 }
 
-export function getCrmCountryFilter(context: CrmSecurityContext): Record<string, unknown> {
+export type CrmCountryFilter = {
+  id?: string
+  countryCode?: { in: string[] }
+}
+
+export function getCrmCountryFilter(context: CrmSecurityContext): CrmCountryFilter {
   if (context.isSuperAdmin) return {}
   if (context.assignedCountries.length === 0) return { id: '__NONE__' }
   return { countryCode: { in: context.assignedCountries } }
