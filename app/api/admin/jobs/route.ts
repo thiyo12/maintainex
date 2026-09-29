@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const query = normalizeQuery(searchParams.get('q'))
+    const source = (searchParams.get('source') || 'ALL').toUpperCase()
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '25')))
     const skip = (page - 1) * limit
@@ -109,8 +110,12 @@ export async function GET(request: NextRequest) {
     // Pull only the leading window needed for the requested combined page.
     // Fetching each source from offset 0 avoids the previous double-offset bug
     // where page > 1 skipped records once in each table and then again after merge.
+    if (!['ALL', 'V1', 'V2'].includes(source)) {
+      return NextResponse.json({ error: 'Invalid source filter' }, { status: 400 })
+    }
+
     const [v1Jobs, v1Total, v2Jobs, v2Total] = await Promise.all([
-      prisma.jobPosting.findMany({
+      source === 'V2' ? Promise.resolve([]) : prisma.jobPosting.findMany({
         where: v1Where,
         include: {
           customer: {
@@ -125,13 +130,13 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         take: fetchWindow,
       }),
-      prisma.jobPosting.count({ where: v1Where }),
-      prisma.marketplaceJob.findMany({
+      source === 'V2' ? Promise.resolve(0) : prisma.jobPosting.count({ where: v1Where }),
+      source === 'V1' ? Promise.resolve([]) : prisma.marketplaceJob.findMany({
         where: v2Where,
         orderBy: { createdAt: 'desc' },
         take: fetchWindow,
       }),
-      prisma.marketplaceJob.count({ where: v2Where }),
+      source === 'V1' ? Promise.resolve(0) : prisma.marketplaceJob.count({ where: v2Where }),
     ])
 
     const totalCombined = v1Total + v2Total
