@@ -17,7 +17,13 @@ function saveIndex(idx: Record<string, string>) {
   try { writeFileSync(INDEX_FILE, JSON.stringify(idx, null, 2)) } catch {}
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!process.env.CRON_SECRET) throw new Error('[SECURITY] CRON_SECRET env var is required')
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     if (!existsSync(UPLOAD_DIR)) return NextResponse.json({ deleted: 0 })
     const now = Date.now()
