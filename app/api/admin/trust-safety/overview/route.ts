@@ -9,6 +9,7 @@ import {
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
+      permission: 'trust:view',
       level: 'read',
       requireCountryScope: true,
     })
