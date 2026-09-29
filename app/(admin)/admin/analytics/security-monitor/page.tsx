@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
 import {
   FiShield, FiLock, FiUnlock, FiAlertTriangle, FiClock, FiGlobe,
   FiActivity, FiArrowUp, FiArrowDown, FiRefreshCw, FiX, FiPlus,
@@ -72,6 +73,8 @@ const DURATION_OPTIONS = [
 ]
 
 export default function SecurityMonitorPage() {
+  const { user } = useAdminSession()
+  const canManageBlocks = user?.role === 'SUPER_ADMIN'
   const [data, setData] = useState<SecurityData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showBlockModal, setShowBlockModal] = useState(false)
@@ -305,12 +308,14 @@ export default function SecurityMonitorPage() {
                     <FiLock className="text-amber-400" size={18} />
                     <h3 className="text-white font-semibold">Blocked IPs</h3>
                   </div>
-                  <button
-                    onClick={() => setShowBlockModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-[#0B0C12] rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors"
-                  >
-                    <FiPlus size={14} /> Block IP
-                  </button>
+                  {canManageBlocks && (
+                    <button
+                      onClick={() => setShowBlockModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-[#0B0C12] rounded-lg text-sm font-medium hover:bg-amber-400 transition-colors"
+                    >
+                      <FiPlus size={14} /> Block IP
+                    </button>
+                  )}
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -334,12 +339,16 @@ export default function SecurityMonitorPage() {
                             <td className="px-3 py-2 text-gray-500 text-xs hidden md:table-cell">{formatDate(b.blockedAt)}</td>
                             <td className="px-3 py-2 text-gray-500 text-xs hidden lg:table-cell">{formatDate(b.expiresAt)}</td>
                             <td className="px-3 py-2 text-right">
-                              <button
-                                onClick={() => handleUnblockIP(b.ip)}
-                                className="text-green-400 hover:text-green-300 text-xs font-medium transition-colors"
-                              >
-                                Unblock
-                              </button>
+                              {canManageBlocks ? (
+                                <button
+                                  onClick={() => handleUnblockIP(b.ip)}
+                                  className="text-green-400 hover:text-green-300 text-xs font-medium transition-colors"
+                                >
+                                  Unblock
+                                </button>
+                              ) : (
+                                <span className="text-xs text-gray-600">View only</span>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -382,7 +391,7 @@ export default function SecurityMonitorPage() {
               </div>
             </div>
 
-            {showBlockModal && (
+            {canManageBlocks && showBlockModal && (
               <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
                 <div className="bg-[#15161E] border border-white/10 rounded-xl w-full max-w-md p-6">
                   <div className="flex items-center justify-between mb-5">
