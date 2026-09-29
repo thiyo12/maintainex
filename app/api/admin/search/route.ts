@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { guardCrmRequest, getCrmCountryFilter } from '@/lib/crm/security'
+import { crmHasPermission, guardCrmRequest, getCrmCountryFilter } from '@/lib/crm/security'
 
 const VALID_TYPES = new Set(['all', 'users', 'companies', 'jobs'])
 
@@ -32,7 +32,15 @@ export async function GET(request: NextRequest) {
     const results: Record<string, unknown[]> = {}
     let total = 0
 
-    if (type === 'all' || type === 'users') {
+    const canUsers = crmHasPermission(security.role, 'users:view') || crmHasPermission(security.role, 'taskers:view')
+    const canCompanies = crmHasPermission(security.role, 'companies:view')
+    const canJobs = crmHasPermission(security.role, 'jobs:view')
+
+    if (type === 'users' && !canUsers) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (type === 'companies' && !canCompanies) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (type === 'jobs' && !canJobs) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+    if ((type === 'all' || type === 'users') && canUsers) {
       const userWhere: any = {
         ...countryFilter,
         OR: [
@@ -66,7 +74,7 @@ export async function GET(request: NextRequest) {
       if (type === 'users') total = userTotal
     }
 
-    if (type === 'all' || type === 'companies') {
+    if ((type === 'all' || type === 'companies') && canCompanies) {
       const companyWhere: any = {
         ...countryFilter,
         OR: [
@@ -96,7 +104,7 @@ export async function GET(request: NextRequest) {
       if (type === 'companies') total = companyTotal
     }
 
-    if (type === 'all' || type === 'jobs') {
+    if ((type === 'all' || type === 'jobs') && canJobs) {
       const jobWhere: any = {
         ...countryFilter,
         OR: [
