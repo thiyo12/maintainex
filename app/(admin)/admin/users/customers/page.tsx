@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
@@ -312,13 +313,13 @@ function CustomerPageContent() {
                         <td className="px-6 py-4 text-gray-400 text-sm">{formatDate(customer.createdAt)}</td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setViewUser(customer)}
+                            <Link
+                              href={`/admin/users/${customer.id}`}
                               className="p-1.5 text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
-                              title="View Details"
+                              title="Open 360"
                             >
                               <FiEye size={16} />
-                            </button>
+                            </Link>
                             {!customer.isBanned && !customer.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'suspend', label: 'Suspend' })}
