@@ -7,7 +7,6 @@ import {
   FiActivity, FiArrowUp, FiArrowDown, FiRefreshCw, FiX, FiPlus,
   FiWifi, FiServer, FiEye, FiUserX
 } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface SecurityData {
   summary: {
@@ -162,7 +161,7 @@ export default function SecurityMonitorPage() {
     : 1
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -447,6 +446,6 @@ export default function SecurityMonitorPage() {
           </>
         ) : null}
       </div>
-    </AdminLayout>
+    </>
   )
 }

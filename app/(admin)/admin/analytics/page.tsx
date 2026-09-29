@@ -6,7 +6,6 @@ import {
   FiUsers, FiUserCheck, FiBriefcase, FiTool, FiDollarSign,
   FiTrendingUp, FiActivity, FiClock, FiArrowUpRight, FiArrowDownRight
 } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface AnalyticsData {
   summary: {
@@ -85,7 +84,7 @@ export default function AnalyticsOverview() {
   const totalJobsForPercent = data ? Math.max(data.summary.totalJobs, 1) : 1
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Analytics Overview</h1>
@@ -200,6 +199,6 @@ export default function AnalyticsOverview() {
           </>
         ) : null}
       </div>
-    </AdminLayout>
+    </>
   )
 }
