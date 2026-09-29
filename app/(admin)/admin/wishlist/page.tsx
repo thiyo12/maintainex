@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface WishlistItem {
   id: string
@@ -198,7 +197,7 @@ export default function WishlistPage() {
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Website & App Wishlist</h1>
@@ -552,6 +551,6 @@ export default function WishlistPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </>
   )
 }

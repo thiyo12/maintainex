@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
@@ -631,8 +630,8 @@ function TaskerPageContent() {
 
 export default function TaskersPage() {
   return (
-    <AdminLayout>
+    <>
       <TaskerPageContent />
-    </AdminLayout>
+    </>
   )
 }

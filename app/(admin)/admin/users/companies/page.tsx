@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import AdminLayout from '@/components/admin/AdminLayout'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
@@ -653,8 +652,8 @@ function CompanyPageContent() {
 
 export default function CompaniesPage() {
   return (
-    <AdminLayout>
+    <>
       <CompanyPageContent />
-    </AdminLayout>
+    </>
   )
 }
