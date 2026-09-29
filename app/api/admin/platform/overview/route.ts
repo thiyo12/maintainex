@@ -195,6 +195,8 @@ export async function GET(request: NextRequest) {
         mobile: {
           marketConfigs: marketConfigs.map(config => ({
             ...config,
+            currency: config.defaultCurrency,
+            commissionBps: config.commissionRateBps,
             minJobAmountCents: config.minJobAmountCents.toString(),
             maxJobAmountCents: config.maxJobAmountCents.toString(),
           })),
