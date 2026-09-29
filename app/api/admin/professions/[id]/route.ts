@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { guardCrmRequest } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { updateProfession, deactivateProfession } from '@/lib/profession'
+import type { ProfessionUpdateInput } from '@/lib/profession/types'
 
 function cleanSlug(value: unknown): string | undefined {
   if (value === undefined) return undefined
@@ -73,7 +74,7 @@ export async function PATCH(
     if (!existing) return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
 
     const body = await request.json().catch(() => ({}))
-    const data: Record<string, unknown> = {}
+    const data: ProfessionUpdateInput = {}
     const slug = cleanSlug(body?.slug)
     if (slug !== undefined) {
       if (!slug) return NextResponse.json({ error: 'Invalid slug' }, { status: 400 })
