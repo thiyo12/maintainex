@@ -1,33 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { createAuditLog } from '@/lib/crm/audit'
 import { updateProfession, deactivateProfession } from '@/lib/profession'
 
-// GET: Get single profession with full details
+function cleanSlug(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string') return ''
+  return value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 120)
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'professions:read',
+      level: 'read',
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
+    if (!guard.ok) return guard.response
 
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('professions:read')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const { id } = await params
+    if (!id || id.length > 128) return NextResponse.json({ error: 'Invalid profession ID' }, { status: 400 })
 
     const profession = await prisma.profession.findUnique({
       where: { id },
@@ -36,7 +31,9 @@ export async function GET(
         serviceRequirements: {
           include: {
             skillRequirements: {
-              include: { professionSkill: { select: { id: true, slug: true, i18nKey: true } } },
+              include: {
+                professionSkill: { select: { id: true, slug: true, i18nKey: true } },
+              },
             },
           },
         },
@@ -45,85 +42,132 @@ export async function GET(
         },
       },
     })
-    if (!profession) {
-      return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
-    }
+    if (!profession) return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
 
-    return NextResponse.json({ profession })
+    return NextResponse.json(
+      { profession },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Admin profession get error:', error)
+    console.error('CRM profession get error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
-// PATCH: Update profession
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'professions:write',
+      level: 'sensitive',
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
+    if (!guard.ok) return guard.response
+    const security = guard.context
+
+    const { id } = await params
+    if (!id || id.length > 128) return NextResponse.json({ error: 'Invalid profession ID' }, { status: 400 })
+
+    const existing = await prisma.profession.findUnique({ where: { id } })
+    if (!existing) return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
+
+    const body = await request.json().catch(() => ({}))
+    const data: Record<string, unknown> = {}
+    const slug = cleanSlug(body?.slug)
+    if (slug !== undefined) {
+      if (!slug) return NextResponse.json({ error: 'Invalid slug' }, { status: 400 })
+      data.slug = slug
     }
-
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('professions:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (body?.i18nKey !== undefined) {
+      const key = typeof body.i18nKey === 'string' ? body.i18nKey.trim().slice(0, 200) : ''
+      if (!key) return NextResponse.json({ error: 'Invalid i18nKey' }, { status: 400 })
+      data.i18nKey = key
     }
+    if (body?.description !== undefined) {
+      data.description = typeof body.description === 'string' && body.description.trim()
+        ? body.description.trim().slice(0, 2000)
+        : null
+    }
+    if (body?.isActive !== undefined) {
+      if (typeof body.isActive !== 'boolean') return NextResponse.json({ error: 'isActive must be boolean' }, { status: 400 })
+      data.isActive = body.isActive
+    }
+    if (body?.sortOrder !== undefined) {
+      const sortOrder = Number(body.sortOrder)
+      if (!Number.isInteger(sortOrder) || sortOrder < -100000 || sortOrder > 100000) {
+        return NextResponse.json({ error: 'Invalid sortOrder' }, { status: 400 })
+      }
+      data.sortOrder = sortOrder
+    }
+    if (!Object.keys(data).length) return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
 
-    const body = await request.json()
-    const { slug, i18nKey, description, isActive, sortOrder } = body
+    const profession = await updateProfession(prisma, id, data)
 
-    const profession = await updateProfession(prisma, id, {
-      slug, i18nKey, description, isActive, sortOrder,
+    await createAuditLog({
+      action: 'UPDATE',
+      category: 'SYSTEM',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'Profession',
+      entityId: id,
+      entityName: existing.slug,
+      description: 'CRM profession updated',
+      oldValue: existing,
+      newValue: profession,
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent || undefined,
+      riskLevel: 'MEDIUM',
     })
 
     return NextResponse.json({ profession })
   } catch (error) {
-    console.error('Admin profession update error:', error)
+    const message = error instanceof Error ? error.message : 'Server error'
+    if (message.includes('Unique constraint')) return NextResponse.json({ error: 'Profession slug or i18nKey already exists' }, { status: 409 })
+    console.error('CRM profession update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
 
-// DELETE: Deactivate profession (soft delete)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'professions:write',
+      level: 'sensitive',
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('professions:write')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-    }
+    const { id } = await params
+    const existing = await prisma.profession.findUnique({ where: { id } })
+    if (!existing) return NextResponse.json({ error: 'Profession not found' }, { status: 404 })
 
-    await deactivateProfession(prisma, id)
-    return NextResponse.json({ message: 'Profession deactivated' })
+    const profession = await deactivateProfession(prisma, id)
+
+    await createAuditLog({
+      action: 'UPDATE',
+      category: 'SYSTEM',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'Profession',
+      entityId: id,
+      entityName: existing.slug,
+      description: 'CRM profession deactivated',
+      oldValue: { isActive: existing.isActive },
+      newValue: { isActive: profession.isActive },
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent || undefined,
+      riskLevel: 'MEDIUM',
+    })
+
+    return NextResponse.json({ message: 'Profession deactivated', profession })
   } catch (error) {
-    console.error('Admin profession deactivate error:', error)
+    console.error('CRM profession deactivate error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
