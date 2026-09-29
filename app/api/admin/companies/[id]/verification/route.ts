@@ -7,6 +7,11 @@ import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 
 const VALID_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'SUSPEND'] as const
 
+function parseCountries(val: string): string[] {
+  if (!val) return []
+  try { const p = JSON.parse(val); return Array.isArray(p) ? p : [] } catch { return val.split(',').map(c => c.trim()).filter(Boolean) }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -20,7 +25,7 @@ export async function PATCH(
 
     const adminUser = await prisma.adminUser.findUnique({
       where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true },
+      select: { id: true, role: true, isActive: true, deletedAt: true, assignedCountries: true },
     })
     if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
       return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
@@ -52,7 +57,7 @@ export async function PATCH(
     }
 
     if (adminUser.role !== 'SUPER_ADMIN') {
-      const adminSession = { role: adminUser.role, assignedCountries: (principal as any).assignedCountries || [] }
+      const adminSession = { role: adminUser.role, assignedCountries: parseCountries(adminUser.assignedCountries) }
       const countryFilter = getCountryFilter(adminSession as any)
       if (countryFilter.id === '__NONE__') {
         return NextResponse.json({ error: 'No country assigned' }, { status: 403 })

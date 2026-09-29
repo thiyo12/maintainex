@@ -58,7 +58,7 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
     superAdminToken = signToken(superAdminId, superAdminSessionId)
 
     const manager = await prisma.adminUser.create({
-      data: { email: `mgr-route-${ts}@test.com`, passwordHash: 'x', role: 'MANAGER', firstName: 'Mgr', lastName: 'Test', isActive: true },
+      data: { email: `mgr-route-${ts}@test.com`, passwordHash: 'x', role: 'MANAGER', firstName: 'Mgr', lastName: 'Test', isActive: true, assignedCountries: '["LK"]' },
     })
     managerId = manager.id
     const mgrSession = await prisma.adminSession.create({
@@ -68,7 +68,7 @@ describe.skipIf(!requiresPostgres())('Phase 6.6 — Route-Level Staff Auth (Comp
     managerToken = signToken(managerId, managerSessionId)
 
     const userMgmt = await prisma.adminUser.create({
-      data: { email: `um-route-${ts}@test.com`, passwordHash: 'x', role: 'USER_MANAGEMENT', firstName: 'UM', lastName: 'Test', isActive: true },
+      data: { email: `um-route-${ts}@test.com`, passwordHash: 'x', role: 'USER_MANAGEMENT', firstName: 'UM', lastName: 'Test', isActive: true, assignedCountries: '["LK"]' },
     })
     userMgmtId = userMgmt.id
     const umSession = await prisma.adminSession.create({
