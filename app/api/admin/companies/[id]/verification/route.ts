@@ -1,79 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateStaffRequest } from '@/lib/auth/staff-sessions'
-import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
+import { guardCrmRequest, assertCrmCountryAllowed } from '@/lib/crm/security'
 import { transitionCompanyVerification } from '@/lib/phase6/kyc-writer'
-import { ROLE_PERMISSIONS } from '@/lib/admin-types'
 
 const VALID_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'SUSPEND'] as const
-
-function parseCountries(val: string): string[] {
-  if (!val) return []
-  try { const p = JSON.parse(val); return Array.isArray(p) ? p : [] } catch { return val.split(',').map(c => c.trim()).filter(Boolean) }
-}
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const principal = await authenticateStaffRequest(request)
-    if (!principal) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
-    }
-
-    const adminUser = await prisma.adminUser.findUnique({
-      where: { id: principal.adminUserId },
-      select: { id: true, role: true, isActive: true, deletedAt: true, assignedCountries: true },
+    const guard = await guardCrmRequest(request, {
+      permission: 'companies:verify',
+      level: 'sensitive',
+      requireCountryScope: true,
     })
-    if (!adminUser || !adminUser.isActive || adminUser.deletedAt) {
-      return NextResponse.json({ error: 'Invalid or revoked staff session' }, { status: 401 })
+    if (!guard.ok) return guard.response
+    const security = guard.context
+
+    const { id } = await params
+    if (!id || id.length > 128) {
+      return NextResponse.json({ error: 'Invalid company ID' }, { status: 400 })
     }
 
-    const permissions = ROLE_PERMISSIONS[adminUser.role as keyof typeof ROLE_PERMISSIONS]
-    if (!permissions?.includes('companies:verify')) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    const body = await request.json().catch(() => ({}))
+    const action = typeof body?.action === 'string' ? body.action.toUpperCase() : ''
+    const reviewNote = typeof body?.reviewNote === 'string'
+      ? body.reviewNote.trim().slice(0, 2000)
+      : undefined
+
+    if (!VALID_ACTIONS.includes(action as (typeof VALID_ACTIONS)[number])) {
+      return NextResponse.json(
+        { error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` },
+        { status: 400 }
+      )
     }
 
-    const companyId = id
-    if (!companyId) {
-      return NextResponse.json({ error: 'companyId required' }, { status: 400 })
-    }
-
-    const body = await request.json()
-    const { action, reviewNote } = body
-
-    if (!action || !VALID_ACTIONS.includes(action)) {
-      return NextResponse.json({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` }, { status: 400 })
+    if (action === 'REJECT' && !reviewNote) {
+      return NextResponse.json({ error: 'reviewNote is required when rejecting a company' }, { status: 400 })
     }
 
     const company = await prisma.companyProfile.findUnique({
-      where: { id: companyId },
-      select: { id: true, companyName: true, verificationStatus: true, countryCode: true },
+      where: { id },
+      select: {
+        id: true,
+        companyName: true,
+        verificationStatus: true,
+        countryCode: true,
+      },
     })
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
 
-    if (adminUser.role !== 'SUPER_ADMIN') {
-      const adminSession = { role: adminUser.role, assignedCountries: parseCountries(adminUser.assignedCountries) }
-      const countryFilter = getCountryFilter(adminSession as any)
-      if (countryFilter.id === '__NONE__') {
-        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
-      }
-      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(company.countryCode || 'LK')) {
-        return NextResponse.json({ error: 'Forbidden: company belongs to a different country' }, { status: 403 })
-      }
+    if (!assertCrmCountryAllowed(security, company.countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const result = await transitionCompanyVerification(prisma, {
-      companyId,
-      action,
-      reviewNote: reviewNote || undefined,
-      reviewedBy: principal.adminUserId,
-      actorId: principal.adminUserId,
-      actorRole: adminUser.role,
+      companyId: id,
+      action: action as (typeof VALID_ACTIONS)[number],
+      reviewNote,
+      reviewedBy: security.adminId,
+      actorId: security.adminId,
+      actorRole: security.role,
     })
 
     if (!result.success) {
@@ -81,16 +71,22 @@ export async function PATCH(
     }
 
     const updated = await prisma.companyProfile.findUnique({
-      where: { id: companyId },
-      select: { id: true, companyName: true, verificationStatus: true, isVerified: true, verifiedAt: true },
+      where: { id },
+      select: {
+        id: true,
+        companyName: true,
+        verificationStatus: true,
+        isVerified: true,
+        verifiedAt: true,
+      },
     })
 
     return NextResponse.json({
       company: updated,
-      message: `Company verification ${action.toLowerCase()}ed successfully`,
+      message: `Company verification ${action.toLowerCase()} completed successfully`,
     })
   } catch (error) {
-    console.error('Company verification error:', error)
+    console.error('CRM company verification error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
