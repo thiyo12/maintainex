@@ -134,6 +134,7 @@ const NAVIGATION: NavItem[] = [
     icon: FiUserCheck,
     children: [
       { name: 'Admins & Staff', href: '/admin/admins', icon: FiUserCheck, permission: 'admins:view' },
+      { name: 'Staff Activity', href: '/admin/admins/activity', icon: FiActivity, permission: 'admins:view' },
       { name: 'Settings', href: '/admin/settings', icon: FiSettings, permission: 'settings:view' },
     ],
   },
