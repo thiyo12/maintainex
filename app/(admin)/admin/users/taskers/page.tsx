@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   FiSearch, FiEye, FiUsers, FiRefreshCw, FiChevronLeft, FiChevronRight,
   FiChevronsLeft, FiChevronsRight, FiX, FiUserX, FiUserCheck, FiClock,
@@ -335,13 +336,13 @@ function TaskerPageContent() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => setViewUser(tasker)}
+                            <Link
+                              href={`/admin/users/${tasker.id}`}
                               className="p-1.5 text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors"
-                              title="View Details"
+                              title="Open 360"
                             >
                               <FiEye size={16} />
-                            </button>
+                            </Link>
                             {tasker.taskerProfile?.verificationStatus === 'PENDING' && (
                               <>
                                 <button
