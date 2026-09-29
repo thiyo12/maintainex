@@ -1,31 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
-import { getCountryFilter } from '@/lib/auth/authorization/admin-rbac'
-import { createAuditLog, getIp } from '@/lib/auth/authorization/admin-rbac'
+import { createAuditLog } from '@/lib/auth/authorization/admin-rbac'
+import {
+  assertCrmCountryAllowed,
+  getCrmCountryFilter,
+  guardCrmRequest,
+} from '@/lib/crm/security'
+import type { AdminSession } from '@/lib/admin-types'
 
-const ALLOWED_ROLES = ['SUPER_ADMIN', 'FINANCE']
-
-function getAdminId(session: any): string {
-  return session.id || session.sub || ''
+function sessionFromGuard(context: {
+  adminId: string
+  email: string
+  role: AdminSession['role']
+  assignedCountries: string[]
+}): AdminSession {
+  return {
+    id: context.adminId,
+    email: context.email,
+    role: context.role,
+    firstName: '',
+    lastName: '',
+    assignedCountries: context.assignedCountries,
+    authType: 'adminUser',
+  }
 }
 
-// GET: Search commission payments by reference number or list all pending
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
-    const referenceNumber = searchParams.get('referenceNumber')
-    const status = searchParams.get('status') || 'PENDING'
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const referenceNumber = (searchParams.get('referenceNumber') || '').trim().slice(0, 120)
+    const status = (searchParams.get('status') || 'PENDING').toUpperCase()
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')))
     const skip = (page - 1) * limit
-
-    const countryFilter = getCountryFilter(session)
+    const countryFilter = getCrmCountryFilter(security)
 
     if (referenceNumber) {
       const payment = await prisma.commissionPayment.findUnique({
@@ -41,73 +57,76 @@ export async function GET(request: NextRequest) {
               commissionOwed: true,
               status: true,
               countryCode: true,
-            }
-          }
-        }
+            },
+          },
+        },
       })
-
       if (!payment) {
         return NextResponse.json({ error: 'Reference not found' }, { status: 404 })
       }
-
-      if (session.role !== 'SUPER_ADMIN' && countryFilter.countryCode) {
-        if (!countryFilter.countryCode.in?.includes(payment.weeklySettlement?.countryCode || 'LK')) {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
+      if (!assertCrmCountryAllowed(security, payment.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
-
-      return NextResponse.json({ payment })
+      return NextResponse.json({ payment }, { headers: { 'Cache-Control': 'no-store' } })
     }
 
     const where: any = { ...countryFilter }
-    if (status) where.status = status
+    if (status && status !== 'ALL') where.status = status
 
-    const payments = await prisma.commissionPayment.findMany({
-      where,
-      include: {
-        weeklySettlement: {
-          select: {
-            id: true,
-            weekStart: true,
-            weekEnd: true,
-            totalEarnings: true,
-            commissionRate: true,
-            commissionOwed: true,
-          }
-        }
+    const [payments, total] = await Promise.all([
+      prisma.commissionPayment.findMany({
+        where,
+        include: {
+          weeklySettlement: {
+            select: {
+              id: true,
+              weekStart: true,
+              weekEnd: true,
+              totalEarnings: true,
+              commissionRate: true,
+              commissionOwed: true,
+              countryCode: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.commissionPayment.count({ where }),
+    ])
+
+    return NextResponse.json(
+      {
+        payments,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.max(1, Math.ceil(total / limit)),
+        },
       },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    })
-
-    const total = await prisma.commissionPayment.count({ where })
-
-    return NextResponse.json({
-      payments,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      }
-    })
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Commission payments GET error:', error)
+    console.error('CRM commission payments GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch commission payments' }, { status: 500 })
   }
 }
 
-// PATCH: Mark a commission payment as CONFIRMED
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !ALLOWED_ROLES.includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:manage',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
-    const body = await request.json()
-    const { paymentId, action } = body
+    const body = await request.json().catch(() => ({}))
+    const paymentId = typeof body?.paymentId === 'string' ? body.paymentId : ''
+    const action = typeof body?.action === 'string' ? body.action.toUpperCase() : ''
 
     if (!paymentId || action !== 'CONFIRM') {
       return NextResponse.json({ error: 'Missing paymentId or invalid action' }, { status: 400 })
@@ -123,27 +142,18 @@ export async function PATCH(request: NextRequest) {
             commissionPaid: true,
             status: true,
             countryCode: true,
-          }
-        }
-      }
+          },
+        },
+      },
     })
-
     if (!payment) {
       return NextResponse.json({ error: 'Commission payment not found' }, { status: 404 })
     }
-
-    if (session.role !== 'SUPER_ADMIN') {
-      const countryFilter = getCountryFilter(session)
-      if (countryFilter.id === '__NONE__') {
-        return NextResponse.json({ error: 'No country assigned' }, { status: 403 })
-      }
-      if (countryFilter.countryCode && !countryFilter.countryCode.in?.includes(payment.weeklySettlement?.countryCode || 'LK')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+    if (!assertCrmCountryAllowed(security, payment.countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
-
     if (payment.status === 'CONFIRMED') {
-      return NextResponse.json({ error: 'Payment already confirmed' }, { status: 400 })
+      return NextResponse.json({ error: 'Payment already confirmed' }, { status: 409 })
     }
 
     const oldPaymentStatus = payment.status
@@ -155,9 +165,9 @@ export async function PATCH(request: NextRequest) {
         where: { id: paymentId },
         data: {
           status: 'CONFIRMED',
-          confirmedById: getAdminId(session),
+          confirmedById: security.adminId,
           confirmedAt: new Date(),
-        }
+        },
       }),
       prisma.weeklySettlement.update({
         where: { id: payment.weeklySettlementId },
@@ -165,12 +175,12 @@ export async function PATCH(request: NextRequest) {
           commissionPaid: true,
           paidAt: new Date(),
           status: 'PAID',
-        }
-      })
+        },
+      }),
     ])
 
     await createAuditLog({
-      session: { ...session, id: getAdminId(session) } as any,
+      session: sessionFromGuard(security),
       action: 'COMMISSION_PAYMENT_CONFIRM',
       targetTable: 'CommissionPayment',
       targetId: payment.id,
@@ -184,19 +194,19 @@ export async function PATCH(request: NextRequest) {
         paymentStatus: 'CONFIRMED',
         settlementCommissionPaid: true,
         settlementStatus: 'PAID',
-        confirmedBy: session.email,
+        confirmedBy: security.email,
       },
-      ipAddress: getIp(request),
-      userAgent: request.headers.get('user-agent'),
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent,
     })
 
     return NextResponse.json({
       payment: result[0],
       settlement: result[1],
-      message: 'Payment confirmed and settlement updated'
+      message: 'Payment confirmed and settlement updated',
     })
   } catch (error) {
-    console.error('Commission payment PATCH error:', error)
+    console.error('CRM commission payment PATCH error:', error)
     return NextResponse.json({ error: 'Failed to confirm payment' }, { status: 500 })
   }
 }
