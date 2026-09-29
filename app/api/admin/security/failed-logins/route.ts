@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
+import { guardCrmRequest } from '@/lib/crm/security'
+import { createAuditLog } from '@/lib/crm/audit'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || !['SUPER_ADMIN', 'TECHNICAL', 'SUPPORT'].includes(session.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'security:view',
+      level: 'read',
+    })
+    if (!guard.ok) return guard.response
 
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100)
-    const emailFilter = searchParams.get('email') || undefined
-    const ipFilter = searchParams.get('ip') || undefined
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')))
+    const emailFilter = (searchParams.get('email') || '').trim().slice(0, 200)
+    const ipFilter = (searchParams.get('ip') || '').trim().slice(0, 80)
     const blockedOnly = searchParams.get('blocked') === 'true'
 
     const where: any = {}
@@ -21,7 +23,8 @@ export async function GET(request: NextRequest) {
     if (ipFilter) where.ipAddress = ipFilter
     if (blockedOnly) where.blocked = true
 
-    const [records, total, uniqueIPs, blockedCount, recentCredentialStuffs] = await Promise.all([
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+    const [records, total, uniqueIPs, blockedCount, recentPairs] = await Promise.all([
       prisma.failedLogin.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -43,83 +46,109 @@ export async function GET(request: NextRequest) {
       prisma.failedLogin.count({ where: { ...where, blocked: true } }),
       prisma.failedLogin.groupBy({
         by: ['ipAddress', 'email'],
-        where: {
-          createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
-        },
+        where: { createdAt: { gte: oneHourAgo } },
         _count: { email: true },
         orderBy: { _count: { email: 'desc' } },
-        take: 10,
+        take: 100,
       }),
     ])
 
-    const ipGroups = recentCredentialStuffs.reduce<Record<string, string[]>>((acc, r) => {
-      if (!acc[r.ipAddress]) acc[r.ipAddress] = []
-      acc[r.ipAddress].push(r.email)
+    const ipGroups = recentPairs.reduce<Record<string, Set<string>>>((acc, row) => {
+      if (!acc[row.ipAddress]) acc[row.ipAddress] = new Set<string>()
+      acc[row.ipAddress].add(row.email)
       return acc
     }, {})
     const credentialStuffs = Object.entries(ipGroups)
-      .filter(([, emails]) => emails.length >= 3)
-      .map(([ip, emails]) => ({ ip, emailCount: emails.length, emails }))
+      .map(([ip, emails]) => ({ ip, emailCount: emails.size, emails: [...emails].slice(0, 20) }))
+      .filter(item => item.emailCount >= 3)
+      .slice(0, 10)
 
-    return NextResponse.json({
-      records: records.map((r) => ({
-        id: r.id,
-        email: r.email,
-        ipAddress: r.ipAddress,
-        attemptCount: r.attemptCount,
-        blocked: r.blocked,
-        blockUntil: r.blockUntil?.toISOString() || null,
-        userAgent: r.userAgent,
-        createdAt: r.createdAt.toISOString(),
-      })),
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        records: records.map(record => ({
+          ...record,
+          blockUntil: record.blockUntil?.toISOString() || null,
+          createdAt: record.createdAt.toISOString(),
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
+        },
+        summary: {
+          uniqueIPs: uniqueIPs.length,
+          blockedCount,
+          credentialStuffs,
+        },
       },
-      summary: {
-        uniqueIPs: uniqueIPs.length,
-        blockedCount,
-        credentialStuffs,
-      },
-    })
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
-    console.error('Failed logins GET error:', error)
+    console.error('CRM failed logins GET error:', error)
     return NextResponse.json({ error: 'Failed to fetch failed logins' }, { status: 500 })
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getAdminSession(request)
-    if (!session || session.role !== 'SUPER_ADMIN') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'security:audit',
+      allowedRoles: ['SUPER_ADMIN'],
+      level: 'sensitive',
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-    const email = searchParams.get('email')
+    const id = (searchParams.get('id') || '').trim().slice(0, 128)
+    const email = (searchParams.get('email') || '').trim().slice(0, 200)
     const all = searchParams.get('all') === 'true'
+    const confirm = searchParams.get('confirm') || ''
 
+    if (all && confirm !== 'PURGE_FAILED_LOGINS') {
+      return NextResponse.json({ error: 'Explicit purge confirmation is required' }, { status: 400 })
+    }
+    if (!all && !email && !id) {
+      return NextResponse.json({ error: 'Provide id, email, or all=true' }, { status: 400 })
+    }
+
+    let deleted = 0
+    let target = ''
     if (all) {
-      const deleted = await prisma.failedLogin.deleteMany({})
-      return NextResponse.json({ success: true, deleted: deleted.count })
-    }
-
-    if (email) {
-      const deleted = await prisma.failedLogin.deleteMany({ where: { email } })
-      return NextResponse.json({ success: true, deleted: deleted.count })
-    }
-
-    if (id) {
+      const result = await prisma.failedLogin.deleteMany({})
+      deleted = result.count
+      target = 'ALL'
+    } else if (email) {
+      const result = await prisma.failedLogin.deleteMany({ where: { email } })
+      deleted = result.count
+      target = email
+    } else {
+      const existing = await prisma.failedLogin.findUnique({ where: { id } })
+      if (!existing) return NextResponse.json({ error: 'Record not found' }, { status: 404 })
       await prisma.failedLogin.delete({ where: { id } })
-      return NextResponse.json({ success: true, deleted: 1 })
+      deleted = 1
+      target = id
     }
 
-    return NextResponse.json({ error: 'Provide id, email, or all=true' }, { status: 400 })
+    await createAuditLog({
+      action: 'DELETE',
+      category: 'SECURITY',
+      userId: security.adminId,
+      userEmail: security.email,
+      userRole: security.role,
+      entityType: 'FailedLogin',
+      entityName: target,
+      description: `CRM failed-login evidence deleted (${deleted} records)`,
+      newValue: { deletedCount: deleted, scope: all ? 'ALL' : email ? 'EMAIL' : 'ID' },
+      ipAddress: security.ipAddress,
+      userAgent: security.userAgent || undefined,
+      riskLevel: all ? 'CRITICAL' : 'HIGH',
+    })
+
+    return NextResponse.json({ success: true, deleted })
   } catch (error) {
-    console.error('Failed logins DELETE error:', error)
+    console.error('CRM failed logins DELETE error:', error)
     return NextResponse.json({ error: 'Failed to delete records' }, { status: 500 })
   }
 }
