@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiCheck, FiX, FiArrowUp, FiRefreshCw, FiMinus } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface RiskEvent {
   id: string
@@ -34,7 +33,7 @@ const RESOLUTION_COLORS: Record<string, string> = {
 }
 
 export default function RiskEventsPage() {
-  return <AdminLayout><RiskEventsContent /></AdminLayout>
+  return <><RiskEventsContent /></>
 }
 
 function RiskEventsContent() {

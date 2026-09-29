@@ -7,7 +7,6 @@ import {
   FiGlobe, FiMail, FiClock, FiUsers, FiLock, FiAlertTriangle,
   FiToggleLeft, FiToggleRight
 } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface PlatformSettings {
   platformName: string
@@ -92,16 +91,16 @@ export default function AdminSettings() {
 
   if (loading) {
     return (
-      <AdminLayout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      </AdminLayout>
+      </>
     )
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -370,6 +369,6 @@ export default function AdminSettings() {
           )}
         </div>
       </div>
-    </AdminLayout>
+    </>
   )
 }

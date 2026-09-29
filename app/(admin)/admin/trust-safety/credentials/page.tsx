@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiRefreshCw, FiUser, FiSearch } from 'react-icons/fi'
-import AdminLayout from '@/components/admin/AdminLayout'
 
 interface Credential {
   id: string
@@ -27,7 +26,7 @@ const STATUS_TABS = [
 ] as const
 
 export default function CredentialsPage() {
-  return <AdminLayout><CredentialsContent /></AdminLayout>
+  return <><CredentialsContent /></>
 }
 
 function CredentialsContent() {
