@@ -631,7 +631,12 @@ export async function processPaymentFailure(notification: PayHereNotification): 
     return { success: true }
   }
 
-  if (paymentIntent.status === 'SUCCESS' || paymentIntent.status === 'REFUND_REQUIRED') {
+  if (
+    paymentIntent.status === 'SUCCESS' ||
+    paymentIntent.status === 'REFUND_REQUIRED' ||
+    paymentIntent.status === 'REFUND_PROCESSING' ||
+    paymentIntent.status === 'REFUNDED'
+  ) {
     return { success: true }
   }
 
@@ -684,7 +689,7 @@ function normalizePayHereStatus(value: string | undefined): string {
 
 export interface PayHereRefundProcessingResult {
   success: boolean
-  status: 'REFUND_REQUIRED' | 'REFUND_PROCESSING' | 'REFUNDED'
+  status: 'REFUND_REQUIRED' | 'REFUND_PROCESSING' | 'REFUNDED' | 'CHARGEDBACK'
   error?: string
   code?: string
   refundReference?: string | null
@@ -784,7 +789,7 @@ export async function requestRequiredPayHereRefund(
     })
     return {
       success: false,
-      status: 'REFUND_REQUIRED',
+      status: 'CHARGEDBACK',
       error: 'Payment was chargebacked before refund completion',
       code: 'PAYHERE_CHARGEBACKED',
     }
