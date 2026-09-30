@@ -8,6 +8,10 @@ const routePath = resolve(process.cwd(), 'app/api/mobile/v2/jobs/[id]/select-quo
 const lifecycleSource = readFileSync(lifecyclePath, 'utf-8')
 const providerAvailabilitySource = readFileSync(providerAvailabilityPath, 'utf-8')
 const routeSource = readFileSync(routePath, 'utf-8')
+const escrowServiceSource = readFileSync(
+  resolve(process.cwd(), 'lib/finance/escrow/escrow-service.ts'),
+  'utf-8'
+)
 
 describe('quote acceptance security and commercial invariants', () => {
   it('revalidates canonical provider eligibility before acceptance', () => {
@@ -57,6 +61,18 @@ describe('quote acceptance security and commercial invariants', () => {
     const escrowIndex = lifecycleSource.indexOf('const existingEscrow = await tx.jobEscrow.findFirst', transactionIndex)
     expect(transactionIndex).toBeGreaterThan(acceptStart)
     expect(escrowIndex).toBeGreaterThan(transactionIndex)
+  })
+
+  it('preserves the accepted authorized amount during wallet funding', () => {
+    const fundStart = escrowServiceSource.indexOf('export async function fundEscrow')
+    const releaseStart = escrowServiceSource.indexOf('export async function releaseEscrow')
+    const fundSource = escrowServiceSource.slice(fundStart, releaseStart)
+
+    expect(fundSource).toContain('job.finalAuthorizedAmountCents ?? quote.totalCents ?? quote.price')
+    expect(fundSource).toContain('escrow.amount !== authorizedAmount')
+    expect(fundSource).toContain("throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')")
+    expect(fundSource).toContain('amount: authorizedAmount')
+    expect(fundSource).not.toContain('amount: quote.price')
   })
 
   it('serializes bigint quote money fields in the select-quote response', () => {
