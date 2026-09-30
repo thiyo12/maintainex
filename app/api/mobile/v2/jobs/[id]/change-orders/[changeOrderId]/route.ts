@@ -26,7 +26,11 @@ export async function PATCH(
 
     const { id: jobId, changeOrderId } = await params
     const body = await request.json()
-    const { action, idempotencyKey } = body
+    const action = typeof body?.action === 'string' ? body.action.trim().toLowerCase() : ''
+    const idempotencyKey =
+      typeof body?.idempotencyKey === 'string'
+        ? body.idempotencyKey.trim().slice(0, 200)
+        : undefined
 
     if (!['submit', 'approve', 'reject', 'cancel'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -67,10 +71,28 @@ export async function PATCH(
     if (action === 'approve') {
       const result = await approveChangeOrder(prisma, changeOrderId, user.id, idempotencyKey)
       if (!result.success) {
-        return NextResponse.json({ error: result.error }, { status: 400 })
+        const conflictErrors = new Set([
+          'CONCURRENT_APPROVAL',
+          'INVALID_STATUS',
+          'JOB_NOT_ACTIVE',
+          'CHANGE_ORDER_ESCROW_NOT_FOUND',
+          'CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING',
+          'CHANGE_ORDER_CURRENCY_MISMATCH',
+          'CHANGE_ORDER_ESCROW_STATE_CHANGED',
+          'IDEMPOTENCY_CONFLICT',
+        ])
+        const status = result.error === 'NOT_CUSTOMER'
+          ? 403
+          : conflictErrors.has(result.error || '')
+            ? 409
+            : 400
+        return NextResponse.json({ error: result.error }, { status })
       }
       await notifyChangeOrderApproved(jobId, providerUserId, co.job.title, co.revisionNumber)
-      return NextResponse.json({ success: true })
+      return NextResponse.json({
+        success: true,
+        finalAuthorizedAmountCents: result.finalAuthorizedAmountCents?.toString() ?? null,
+      })
     }
 
     if (action === 'reject') {
