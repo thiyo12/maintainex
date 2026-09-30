@@ -451,7 +451,7 @@ export async function calculateFinalAuthorizedAmount(
   const approvedQuote = await client.jobQuote.findUnique({ where: { id: job.approvedQuoteId } })
   if (!approvedQuote) return { success: false, error: 'Approved quote not found' }
 
-  const baseAmountCents = approvedQuote.price
+  const baseAmountCents = approvedQuote.totalCents ?? approvedQuote.price
 
   // Sum APPROVED change order deltas
   const approvedOrders = await client.jobChangeOrder.findMany({
