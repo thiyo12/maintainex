@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
+import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
 
 /**
  * Create a new revision of an existing quote.
@@ -22,6 +23,7 @@ export async function createQuoteRevision(
     totalCents?: bigint
     benchmarkClassification?: string
     benchmarkId?: string
+    lineItems?: Array<QuoteLineItemInput & { totalAmountCents: bigint; sortOrder: number }>
   },
 ): Promise<{ success: boolean; newQuoteId?: string; error?: string }> {
   try {
@@ -95,6 +97,25 @@ export async function createQuoteRevision(
           revisionReason: params.revisionReason,
         },
       })
+
+      if (params.lineItems?.length) {
+        for (const item of params.lineItems) {
+          await tx.quoteLineItem.create({
+            data: {
+              quoteId: newQuote.id,
+              type: item.type,
+              description: item.description,
+              quantity: item.quantity,
+              unit: item.unit ?? null,
+              unitAmountCents: item.unitAmountCents,
+              totalAmountCents: item.totalAmountCents,
+              currency: item.currency,
+              sortOrder: item.sortOrder,
+              metadata: item.metadata ?? null,
+            },
+          })
+        }
+      }
 
       return { success: true, newQuoteId: newQuote.id }
     })
