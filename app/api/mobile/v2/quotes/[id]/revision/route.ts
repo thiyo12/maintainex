@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { createQuoteRevision } from '@/lib/pricing/quote-revision'
-import { validateLineItems, calculateQuoteTotal, persistLineItems } from '@/lib/pricing/line-items'
+import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items'
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import type { QuoteLineItemInput } from '@/lib/pricing/benchmark-types'
@@ -263,15 +263,13 @@ export async function POST(
       totalCents: serverTotalCents,
       benchmarkClassification: classification,
       benchmarkId: benchmarkId ?? undefined,
+      lineItems: validatedLineItems,
     })
 
     if (!result.success || !result.newQuoteId) {
       return NextResponse.json({ error: result.error || 'Quote revision failed' }, { status: 409 })
     }
 
-    if (validatedLineItems.length > 0) {
-      await persistLineItems(prisma, result.newQuoteId, validatedLineItems)
-    }
 
     await notifyQuoteSubmitted(job.id, job.customerId, user.name || 'A provider')
 
