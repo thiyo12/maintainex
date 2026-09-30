@@ -687,6 +687,21 @@ function normalizePayHereStatus(value: string | undefined): string {
   return (value || '').trim().toUpperCase()
 }
 
+const PAYHERE_REFUNDABLE_CARD_METHODS = new Set([
+  'VISA',
+  'MASTERCARD',
+  'MASTER',
+  'AMEX',
+  'AMERICAN EXPRESS',
+  'DISCOVER',
+  'DINERS CLUB',
+  'DINERS',
+])
+
+function isPayHereRefundableMethod(method: string | undefined): boolean {
+  return PAYHERE_REFUNDABLE_CARD_METHODS.has((method || '').trim().toUpperCase())
+}
+
 export interface PayHereRefundProcessingResult {
   success: boolean
   status: 'REFUND_REQUIRED' | 'REFUND_PROCESSING' | 'REFUNDED' | 'CHARGEDBACK'
@@ -803,6 +818,20 @@ export async function requestRequiredPayHereRefund(
     }
   }
 
+  const paymentMethod = payment.payment_method?.method
+  if (!isPayHereRefundableMethod(paymentMethod)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: paymentMethod
+        ? `PayHere method ${paymentMethod} requires a manual customer refund`
+        : 'PayHere payment method could not be verified for automated refund',
+      code: paymentMethod
+        ? 'PAYHERE_MANUAL_REFUND_REQUIRED'
+        : 'PAYHERE_PAYMENT_METHOD_UNKNOWN',
+    }
+  }
+
   const refund = await requestPayHereRefund(
     String(intent.paymentId),
     `MaintainEX refund for order ${intent.merchantOrderId}`
@@ -834,7 +863,7 @@ export async function requestRequiredPayHereRefund(
 
     await recordJobLifecycleEvent(tx, {
       jobId: intent.jobId,
-      actorId: 'system:payhere-refund',
+      actorId: details.actorId || 'system:payhere-refund',
       actorType: 'SYSTEM',
       action: 'PAYMENT_REFUND_SUBMITTED',
       metadata: {
@@ -949,6 +978,8 @@ async function finalizePayHereRefund(
     gatewayStatus: string
     refundReference: string | null
     message: string
+    actorId?: string
+    source?: 'PAYHERE' | 'MANUAL'
   }
 ): Promise<PayHereRefundProcessingResult> {
   const intent = await prisma.paymentIntent.findUnique({
@@ -1037,18 +1068,19 @@ async function finalizePayHereRefund(
       referenceId: escrow.id,
       idempotencyKey: `payhere-refund:${escrow.id}:${intent.paymentId || intent.merchantOrderId}`,
       description: `PayHere refund reconciliation for escrow ${escrow.id}`,
-      createdBy: 'system:payhere-refund',
+      createdBy: details.actorId || 'system:payhere-refund',
       metadata: JSON.stringify({
         paymentIntentId: intent.id,
         paymentId: intent.paymentId,
         merchantOrderId: intent.merchantOrderId,
         refundReference: details.refundReference,
+        refundSource: details.source || 'PAYHERE',
       }),
     }, tx)
 
     await recordJobLifecycleEvent(tx, {
       jobId: intent.jobId,
-      actorId: 'system:payhere-refund',
+      actorId: details.actorId || 'system:payhere-refund',
       actorType: 'SYSTEM',
       action: 'PAYMENT_REFUNDED',
       metadata: {
@@ -1056,6 +1088,7 @@ async function finalizePayHereRefund(
         paymentId: intent.paymentId,
         escrowId: escrow.id,
         refundReference: details.refundReference,
+        refundSource: details.source || 'PAYHERE',
         refundMinor: escrow.totalAmount,
         currency: escrow.currency,
       },
@@ -1067,5 +1100,56 @@ async function finalizePayHereRefund(
     status: 'REFUNDED',
     refundReference: details.refundReference,
   }
+}
+
+export async function confirmManualExternalRefund(
+  paymentIntentId: string,
+  input: {
+    actorId: string
+    reference: string
+    note?: string
+  }
+): Promise<PayHereRefundProcessingResult> {
+  const reference = input.reference.trim()
+  if (reference.length < 4 || reference.length > 200) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'A manual refund reference is required',
+      code: 'MANUAL_REFUND_REFERENCE_REQUIRED',
+    }
+  }
+
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+    select: { id: true, status: true },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.status === 'REFUNDED') {
+    return { success: true, status: 'REFUNDED', refundReference: reference }
+  }
+  if (!['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(intent.status)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Payment is not awaiting refund (status=${intent.status})`,
+      code: 'PAYMENT_NOT_IN_REFUND_QUEUE',
+    }
+  }
+
+  return finalizePayHereRefund(paymentIntentId, {
+    gatewayStatus: 'MANUAL_REFUND_CONFIRMED',
+    refundReference: reference,
+    message: input.note?.trim().slice(0, 500) || 'Manual external refund confirmed by finance',
+    actorId: input.actorId,
+    source: 'MANUAL',
+  })
 }
 
