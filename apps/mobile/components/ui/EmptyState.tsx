@@ -45,7 +45,7 @@ export default function EmptyState({
         ) : null}
         {lottieUrl && !failed ? (
           <LottieView
-            source={{ uri: lottieUrl }}
+            source={{ uri: lottieUrl } as any}
             style={styles.lottie}
             autoPlay
             loop
@@ -70,7 +70,7 @@ export default function EmptyState({
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center', paddingVertical: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.sm },
   animBox: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
-  fallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  fallback: { ...(StyleSheet.absoluteFill as any), alignItems: 'center', justifyContent: 'center' },
   lottie: { width: 140, height: 140 },
   title: { ...typography.h3, textAlign: 'center' },
   subtitle: { ...typography.bodyMuted, textAlign: 'center' },
