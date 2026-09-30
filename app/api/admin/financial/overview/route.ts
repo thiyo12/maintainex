@@ -5,6 +5,7 @@ import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 
 type MoneyGroup = {
   status: string
+  currency: string
   count: bigint
   total: bigint | null
 }
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       recentPayouts,
     ] = await Promise.all([
       prisma.commissionSettlement.groupBy({
-        by: ['status'],
+        by: ['status', 'currency'],
         where: countryFilter,
         _count: true,
         _sum: {
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.payout.groupBy({
-        by: ['status'],
+        by: ['status', 'currency'],
         where: countryFilter,
         _count: true,
         _sum: { amount: true },
@@ -50,24 +51,26 @@ export async function GET(request: NextRequest) {
       prisma.$queryRaw<MoneyGroup[]>(Prisma.sql`
         SELECT
           e.status,
+          e.currency,
           COUNT(*)::bigint AS count,
           COALESCE(SUM(e."totalAmount"), 0)::bigint AS total
         FROM "JobEscrow" e
         JOIN "MarketplaceJob" j ON j.id = e."jobId"
         ${countryWhere}
-        GROUP BY e.status
-        ORDER BY e.status
+        GROUP BY e.status, e.currency
+        ORDER BY e.status, e.currency
       `),
       prisma.$queryRaw<MoneyGroup[]>(Prisma.sql`
         SELECT
           p.status,
+          p.currency,
           COUNT(*)::bigint AS count,
           COALESCE(SUM(p.amount), 0)::bigint AS total
         FROM "PaymentIntent" p
         JOIN "MarketplaceJob" j ON j.id = p."jobId"
         ${countryWhere}
-        GROUP BY p.status
-        ORDER BY p.status
+        GROUP BY p.status, p.currency
+        ORDER BY p.status, p.currency
       `),
       prisma.commissionSettlement.findMany({
         where: countryFilter,
@@ -107,6 +110,7 @@ export async function GET(request: NextRequest) {
     function serialiseGroup(rows: MoneyGroup[]) {
       return rows.map(row => ({
         status: row.status,
+        currency: row.currency,
         count: Number(row.count),
         total: (row.total || BigInt(0)).toString(),
       }))
@@ -116,12 +120,14 @@ export async function GET(request: NextRequest) {
       {
         commission: settlementsByStatus.map(row => ({
           status: row.status,
+          currency: row.currency,
           count: row._count,
           jobAmount: (row._sum.jobAmount || BigInt(0)).toString(),
           commissionAmount: (row._sum.commissionAmount || BigInt(0)).toString(),
         })),
         payouts: payoutsByStatus.map(row => ({
           status: row.status,
+          currency: row.currency,
           count: row._count,
           amount: (row._sum.amount || BigInt(0)).toString(),
         })),
