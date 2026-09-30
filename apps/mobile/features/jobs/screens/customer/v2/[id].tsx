@@ -362,7 +362,7 @@ export default function V2JobDetailScreen() {
                     style={[styles.messageRow, { borderTopColor: colors.border }]}
                     onPress={() => {
                       setMsgPrefill(`Hi ${q.provider?.name || ''}, I'm interested in your service for "${job?.title || 'this job'}".`)
-                      setMsgRecipient({ id: q.provider.id, name: q.provider.name || 'Provider' })
+                      setMsgRecipient({ id: q.provider!.id, name: q.provider?.name || 'Provider' })
                     }}
                   >
                     <ChatCircle size={16} color={colors.amber} weight="fill" />
