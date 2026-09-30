@@ -17,6 +17,7 @@ import {
   FiUsers,
 } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface DashboardStats {
   stats: {
@@ -123,6 +124,9 @@ function ProgressRow({
 
 export default function AdminDashboard() {
   const { user } = useAdminSession()
+  const role = (user?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const can = (permission: string) => permissions.includes(permission)
   const [data, setData] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -167,31 +171,31 @@ export default function AdminDashboard() {
   }, [stats])
 
   const attentionItems = [
-    {
+    can('kyc:view') && {
       label: 'KYC waiting for review',
       value: number(stats?.pendingKYC),
       href: '/admin/kyc',
       severity: number(stats?.pendingKYC) > 0 ? 'amber' : 'green',
     },
-    {
+    can('commission:view') && {
       label: 'Overdue settlements',
       value: number(stats?.overdueSettlements),
       href: '/admin/financial/settlements',
       severity: number(stats?.overdueSettlements) > 0 ? 'red' : 'green',
     },
-    {
+    can('cheating:view') && {
       label: 'Cheating reports',
       value: number(stats?.pendingCheatingReports),
       href: '/admin/cheating',
       severity: number(stats?.pendingCheatingReports) > 0 ? 'red' : 'green',
     },
-    {
+    can('users:view') && {
       label: 'Banned users',
       value: number(stats?.bannedUsers),
       href: '/admin/users/customers',
       severity: 'slate',
     },
-  ] as const
+  ].filter(Boolean) as Array<{ label: string; value: number; href: string; severity: 'red' | 'amber' | 'green' | 'slate' }>
 
   if (loading) {
     return (
@@ -229,12 +233,14 @@ export default function AdminDashboard() {
             Open job queue
             <FiArrowUpRight size={15} />
           </Link>
-          <Link
-            href="/admin/platform"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
-          >
-            Platform management
-          </Link>
+          {can('settings:view') && (
+            <Link
+              href="/admin/platform"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50"
+            >
+              Platform management
+            </Link>
+          )}
         </div>
       </section>
 
@@ -381,9 +387,11 @@ export default function AdminDashboard() {
               <div className="text-xs text-slate-400 mt-1">Companies</div>
             </div>
           </div>
-          <Link href="/admin/users/customers" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
-            Open people management <FiArrowUpRight size={14} />
-          </Link>
+          {can('users:view') && (
+            <Link href="/admin/users/customers" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
+              Open people management <FiArrowUpRight size={14} />
+            </Link>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -408,9 +416,11 @@ export default function AdminDashboard() {
               <span className="text-sm font-semibold text-slate-900">{formatCurrency(number(stats?.totalWalletBalance))}</span>
             </div>
           </div>
-          <Link href="/admin/financial/wallets" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
-            Open finance operations <FiArrowUpRight size={14} />
-          </Link>
+          {can('wallets:view') && (
+            <Link href="/admin/financial/wallets" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
+              Open finance operations <FiArrowUpRight size={14} />
+            </Link>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-[#10151d] text-white p-5">
@@ -427,7 +437,7 @@ export default function AdminDashboard() {
               ['Admin session', true],
               ['Marketplace data API', Boolean(data)],
               ['Role-aware navigation', true],
-              ['Job 360 workspace', false],
+              ['Job 360 workspace', true],
             ].map(([label, ready]) => (
               <div key={String(label)} className="flex items-center justify-between">
                 <span className="text-sm text-slate-300">{String(label)}</span>
@@ -439,12 +449,14 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          <Link
-            href="/admin/platform"
-            className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:text-amber-200"
-          >
-            Open platform controls <FiArrowUpRight size={14} />
-          </Link>
+          {can('settings:view') && (
+            <Link
+              href="/admin/platform"
+              className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-300 hover:text-amber-200"
+            >
+              Open platform controls <FiArrowUpRight size={14} />
+            </Link>
+          )}
         </div>
       </section>
     </div>
