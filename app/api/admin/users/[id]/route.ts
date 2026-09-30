@@ -181,6 +181,10 @@ export async function GET(
       crmHasPermission(security.role, 'security:view')
     const canAudit = crmHasPermission(security.role, 'audit:read')
     const canSecurity = crmHasPermission(security.role, 'security:view')
+    const canCustomerCrm =
+      security.isSuperAdmin ||
+      crmHasPermission(security.role, 'users:edit') ||
+      crmHasPermission(security.role, 'support:view')
 
     const companyId = user.companyProfile?.id
     const taskerId = user.taskerProfile?.id
@@ -366,6 +370,14 @@ export async function GET(
 
     const userView = {
       ...user,
+      customerProfile: user.customerProfile
+        ? {
+            ...user.customerProfile,
+            notes: canCustomerCrm ? user.customerProfile.notes : [],
+            activities: canCustomerCrm ? user.customerProfile.activities : [],
+            communications: canCustomerCrm ? user.customerProfile.communications : [],
+          }
+        : null,
       identityDocs: canTrust ? user.identityDocs : [],
       fraudEvents: canTrust ? user.fraudEvents : [],
       adminFlags: canTrust ? user.adminFlags : [],
@@ -380,6 +392,7 @@ export async function GET(
           trust: canTrust,
           audit: canAudit,
           security: canSecurity,
+          customerCrm: canCustomerCrm,
         },
         user: userView,
         jobs: {
