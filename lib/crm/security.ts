@@ -252,23 +252,45 @@ export async function guardCrmRequest(
     return deny(401, 'CRM_UNAUTHENTICATED', 'Admin authentication required.', request)
   }
 
-  // Layer 2B — live canonical staff state.
+  const sessionId =
+    typeof session?.sid === 'string'
+      ? session.sid
+      : typeof session?.sessionId === 'string'
+        ? session.sessionId
+        : null
+
+  if (!sessionId) {
+    return deny(401, 'CRM_SESSION_REQUIRED', 'A current admin session is required.', request)
+  }
+
+  // Layer 2B — live canonical staff + session state.
   //
-  // Never authorize CRM access only from JWT claims. Role/country changes and
-  // deactivation must take effect immediately instead of waiting for access-token
-  // expiry.
-  const liveAdmin = await prisma.adminUser.findUnique({
-    where: { id: adminId },
-    select: {
-      id: true,
-      email: true,
-      role: true,
-      isActive: true,
-      deletedAt: true,
-      lockedUntil: true,
-      assignedCountries: true,
-    },
-  })
+  // Never authorize CRM access only from JWT claims. Role/country changes,
+  // deactivation, logout and explicit session revocation must take effect
+  // immediately instead of waiting for access-token expiry.
+  const [liveAdmin, liveSession] = await Promise.all([
+    prisma.adminUser.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        deletedAt: true,
+        lockedUntil: true,
+        assignedCountries: true,
+      },
+    }),
+    prisma.adminSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        adminUserId: true,
+        isRevoked: true,
+        expiresAt: true,
+      },
+    }),
+  ])
 
   if (
     !liveAdmin ||
@@ -277,6 +299,15 @@ export async function guardCrmRequest(
     (liveAdmin.lockedUntil && liveAdmin.lockedUntil > new Date())
   ) {
     return deny(401, 'CRM_ACCOUNT_INACTIVE', 'Admin account is not active.', request)
+  }
+
+  if (
+    !liveSession ||
+    liveSession.adminUserId !== adminId ||
+    liveSession.isRevoked ||
+    liveSession.expiresAt <= new Date()
+  ) {
+    return deny(401, 'CRM_SESSION_REVOKED', 'Admin session is expired or revoked.', request)
   }
 
   const role = liveAdmin.role as AdminRole
