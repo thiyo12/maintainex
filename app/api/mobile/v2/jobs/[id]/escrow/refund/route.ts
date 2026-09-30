@@ -28,14 +28,33 @@ export async function POST(
       where: { jobId: id, status: 'ACCEPTED' },
       select: { providerId: true, providerType: true },
     })
-    const providerUserId = accepted
-      ? accepted.providerType === 'INDIVIDUAL'
-        ? accepted.providerId
-        : (await prisma.companyProfile.findUnique({
-            where: { id: accepted.providerId },
-            select: { userId: true },
-          }))?.userId ?? null
-      : null
+
+    let providerRecipientIds: string[] = []
+    if (accepted?.providerType === 'INDIVIDUAL') {
+      providerRecipientIds = [accepted.providerId]
+    } else if (accepted?.providerType === 'COMPANY') {
+      const [company, assignments] = await Promise.all([
+        prisma.companyProfile.findUnique({
+          where: { id: accepted.providerId },
+          select: { userId: true },
+        }),
+        prisma.companyJobAssignment.findMany({
+          where: {
+            jobId: id,
+            companyId: accepted.providerId,
+            workerUserId: { not: null },
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+          },
+          select: { workerUserId: true },
+        }),
+      ])
+      providerRecipientIds = [...new Set(
+        [
+          company?.userId ?? null,
+          ...assignments.map(assignment => assignment.workerUserId),
+        ].filter((value): value is string => Boolean(value))
+      )]
+    }
 
     const result = await refundEscrow(
       {
@@ -49,15 +68,17 @@ export async function POST(
 
     const pendingExternal = result.refundPendingExternal === true
 
-    if (providerUserId) {
-      await notifyJobCancelled(
-        id,
-        providerUserId,
-        job.title,
-        'customer',
-        pendingExternal ? 'External payment refund requested' : 'Escrow refunded'
+    await Promise.all(
+      providerRecipientIds.map(recipientId =>
+        notifyJobCancelled(
+          id,
+          recipientId,
+          job.title,
+          'customer',
+          pendingExternal ? 'External payment refund requested' : 'Escrow refunded'
+        )
       )
-    }
+    )
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
     if (!pendingExternal) {
