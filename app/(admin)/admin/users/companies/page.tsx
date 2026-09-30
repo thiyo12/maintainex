@@ -9,6 +9,8 @@ import {
   FiExternalLink, FiBriefcase, FiAlertTriangle
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface CompanyUser {
   id: string
@@ -55,6 +57,12 @@ type SortField = 'name' | 'email' | 'createdAt' | 'mxId' | 'rating'
 type SortDir = 'asc' | 'desc'
 
 function CompanyPageContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canVerify = permissions.includes('companies:verify')
+  const canSuspend = permissions.includes('users:suspend')
+  const canBan = permissions.includes('users:ban')
   const [companies, setCompanies] = useState<CompanyUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -112,6 +120,14 @@ function CompanyPageContent() {
 
   const handleAction = async () => {
     if (!confirmAction) return
+    const isVerifyAction = confirmAction.action === 'verify_company' || confirmAction.action === 'reject_company'
+    const isSuspendAction = confirmAction.action === 'suspend' || confirmAction.action === 'unsuspend'
+    const isBanAction = confirmAction.action === 'ban' || confirmAction.action === 'unban'
+    if (
+      (isVerifyAction && !canVerify) ||
+      (isSuspendAction && !canSuspend) ||
+      (isBanAction && !canBan)
+    ) return
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -358,7 +374,7 @@ function CompanyPageContent() {
                             >
                               <FiEye size={16} />
                             </Link>
-                            {company.companyProfile?.verificationStatus === 'PENDING' && (
+                            {canVerify && company.companyProfile?.verificationStatus === 'PENDING' && (
                               <>
                                 <button
                                   onClick={() => setConfirmAction({ userId: company.id, action: 'verify_company', label: 'Verify' })}
@@ -376,7 +392,7 @@ function CompanyPageContent() {
                                 </button>
                               </>
                             )}
-                            {!company.isBanned && !company.isSuspended && (
+                            {canSuspend && !company.isBanned && !company.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'suspend', label: 'Suspend' })}
                                 className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -385,7 +401,7 @@ function CompanyPageContent() {
                                 <FiClock size={16} />
                               </button>
                             )}
-                            {company.isSuspended && (
+                            {canSuspend && company.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'unsuspend', label: 'Unsuspend' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -394,7 +410,7 @@ function CompanyPageContent() {
                                 <FiUserCheck size={16} />
                               </button>
                             )}
-                            {!company.isSuspended && (
+                            {canBan && !company.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'ban', label: 'Ban' })}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -403,7 +419,7 @@ function CompanyPageContent() {
                                 <FiUserX size={16} />
                               </button>
                             )}
-                            {company.isBanned && (
+                            {canBan && company.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'unban', label: 'Unban' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
