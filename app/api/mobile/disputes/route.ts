@@ -31,26 +31,38 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
       }
 
-      await raiseJobDispute(
-        { jobId, actorId: user.id, actorType, reason },
+      const marketplaceDispute = await raiseJobDispute(
+        {
+          jobId,
+          actorId: user.id,
+          actorType,
+          reason,
+          metadata: { description: String(description).slice(0, 5000) },
+        },
         jobId
       )
 
-      await notifyAllAdmins('dispute_raised', `New Dispute: ${reason}`, `Dispute raised by ${user.name || user.email} on job "${marketplaceJob.title}"`, `/admin/marketplace/escrow`)
+      await notifyAllAdmins(
+        'dispute_raised',
+        `New Dispute: ${reason}`,
+        `Dispute raised by ${user.name || user.email} on job "${marketplaceJob.title}"`,
+        '/admin/jobs/disputes',
+      )
 
       await createWorkItem({
         category: 'dispute',
         title: `Dispute: ${reason}`,
         description: `${user.name || user.email} raised a dispute on job "${marketplaceJob.title}". ${description}`,
-        targetTable: 'MarketplaceJob',
-        targetId: jobId,
+        targetTable: 'MarketplaceDispute',
+        targetId: marketplaceDispute.disputeId,
+        priority: 'high',
       })
 
       return NextResponse.json({
-        id: jobId,
+        id: marketplaceDispute.disputeId,
         jobId,
         reason,
-        status: 'DISPUTED',
+        status: 'OPEN',
         createdAt: new Date().toISOString(),
       })
     }
