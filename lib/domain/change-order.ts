@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
+import { resolvePricingConfig } from '@/lib/pricing/rules'
 
 function serializeBigInt(obj: unknown): string {
   return JSON.stringify(obj, (_key, value) =>
@@ -237,6 +238,8 @@ export async function approveChangeOrder(
         select: {
           customerId: true,
           finalAuthorizedAmountCents: true,
+          countryCode: true,
+          status: true,
         },
       },
     },
@@ -245,6 +248,9 @@ export async function approveChangeOrder(
   if (!co) return { success: false, error: 'Change order not found' }
   if (co.job.customerId !== customerId) return { success: false, error: 'NOT_CUSTOMER' }
   if (co.status !== 'SUBMITTED') return { success: false, error: 'INVALID_STATUS' }
+  if (!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(co.job.status)) {
+    return { success: false, error: 'JOB_NOT_ACTIVE' }
+  }
 
   const requestFingerprint = `APPROVE:${changeOrderId}:${customerId}:${co.amountDeltaCents}:${co.baseQuoteId}`
 
@@ -267,6 +273,23 @@ export async function approveChangeOrder(
   try {
     const result = await client.$transaction(async (tx) => {
       const now = new Date()
+
+      const activeEscrow = await tx.jobEscrow.findFirst({
+        where: {
+          jobId: co.jobId,
+          status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      if (co.amountDeltaCents !== 0n) {
+        if (!activeEscrow) {
+          throw new Error('CHANGE_ORDER_ESCROW_NOT_FOUND')
+        }
+        if (activeEscrow.status !== 'PENDING_PAYMENT') {
+          throw new Error('CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING')
+        }
+      }
 
       const transition = await tx.jobChangeOrder.updateMany({
         where: { id: changeOrderId, status: 'SUBMITTED' },
@@ -292,6 +315,40 @@ export async function approveChangeOrder(
       const newFinalAmount = finalResult.finalAmountCents!
       if (newFinalAmount <= 0n) {
         throw new Error('FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE')
+      }
+
+      if (activeEscrow?.status === 'PENDING_PAYMENT' && co.amountDeltaCents !== 0n) {
+        const pricingConfig = await resolvePricingConfig(tx, co.job.countryCode || 'GLOBAL')
+        if (activeEscrow.currency !== pricingConfig.defaultCurrency) {
+          throw new Error('CHANGE_ORDER_CURRENCY_MISMATCH')
+        }
+
+        const serviceFee =
+          (newFinalAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
+        const totalAmount = newFinalAmount + serviceFee
+
+        const escrowClaim = await tx.jobEscrow.updateMany({
+          where: { id: activeEscrow.id, status: 'PENDING_PAYMENT' },
+          data: {
+            amount: newFinalAmount,
+            serviceFee,
+            totalAmount,
+          },
+        })
+        if (escrowClaim.count !== 1) {
+          throw new Error('CHANGE_ORDER_ESCROW_STATE_CHANGED')
+        }
+
+        // Existing hosted checkout sessions carry the previous amount.
+        // Invalidate them so the next payment intent is created from the
+        // newly authorized escrow total.
+        await tx.paymentIntent.updateMany({
+          where: {
+            jobId: co.jobId,
+            status: { in: ['CREATED', 'PENDING'] },
+          },
+          data: { status: 'CANCELLED' },
+        })
       }
 
       await tx.marketplaceJob.update({
@@ -350,7 +407,11 @@ export async function approveChangeOrder(
     if (
       message === 'CONCURRENT_APPROVAL' ||
       message === 'FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE' ||
-      message === 'Change order not found'
+      message === 'Change order not found' ||
+      message === 'CHANGE_ORDER_ESCROW_NOT_FOUND' ||
+      message === 'CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING' ||
+      message === 'CHANGE_ORDER_CURRENCY_MISMATCH' ||
+      message === 'CHANGE_ORDER_ESCROW_STATE_CHANGED'
     ) {
       return { success: false, error: message }
     }
