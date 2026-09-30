@@ -46,19 +46,20 @@ export default function ConfirmCompleteScreen() {
   const completionReady = job.workspace?.progressStatus === 'COMPLETION_REQUESTED'
   const isCash = escrow?.status === 'CASH_CONFIRMED' || escrow?.paymentMethod === 'CASH'
 
-  const handleRelease = async () => {
-    if (!completionReady) {
-      Alert.alert('Not ready', 'The provider has not requested completion for this job.')
-      return
-    }
+  const submitCompletion = async (cashPaidConfirmed: boolean) => {
     setReleasing(true)
     try {
-      const result = await v2JobActions.complete(bookingId, 'APPROVE_COMPLETION')
+      const result = await v2JobActions.complete(
+        bookingId,
+        'APPROVE_COMPLETION',
+        undefined,
+        cashPaidConfirmed,
+      )
       const released = Number(result.netAmount ?? 0)
       Alert.alert(
         'Job completed',
         result.paymentMethod === 'CASH' || isCash
-          ? 'Completion is recorded. Pay cash directly to the provider as agreed; MaintainEX has not held or released this cash.'
+          ? 'Completion is recorded. Your cash payment confirmation was recorded; MaintainEX did not hold or release this cash.'
           : released > 0
             ? `${currency} ${released.toLocaleString()} was released to ${taskerName || 'the provider'}.`
             : 'The job was completed and the protected payment was released.',
@@ -74,6 +75,30 @@ export default function ConfirmCompleteScreen() {
     } finally {
       setReleasing(false)
     }
+  }
+
+  const handleRelease = () => {
+    if (!completionReady) {
+      Alert.alert('Not ready', 'The provider has not requested completion for this job.')
+      return
+    }
+
+    if (isCash) {
+      Alert.alert(
+        'Confirm Cash Paid',
+        `Confirm only after you paid ${currency} ${totalAmount.toLocaleString()} directly to ${taskerName || 'the provider'}.`,
+        [
+          { text: 'Not yet', style: 'cancel' },
+          {
+            text: 'Cash Paid · Complete Job',
+            onPress: () => { void submitCompletion(true) },
+          },
+        ],
+      )
+      return
+    }
+
+    void submitCompletion(false)
   }
 
   const handleDispute = () => {
@@ -139,7 +164,7 @@ export default function ConfirmCompleteScreen() {
           <Text style={styles.btnTxt}>
             {releasing
               ? (isCash ? 'Completing...' : 'Releasing...')
-              : (isCash ? 'Confirm Work Complete' : 'Confirm Work & Release Payment')}
+              : (isCash ? 'Confirm Work + Cash Paid' : 'Confirm Work & Release Payment')}
           </Text>
         </TouchableOpacity>
 
