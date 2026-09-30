@@ -120,6 +120,106 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   return { success: true, totalAmount, escrowId: escrow.id }
 }
 
+export async function confirmCashPayment(ctx: TransitionContext, jobId: string) {
+  const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
+  if (!job) throw new Error('Job not found')
+  if (job.customerId !== ctx.actorId) throw new Error('Only the customer can select cash payment')
+  if (job.status !== 'QUOTE_ACCEPTED') throw new Error('Job is not ready for cash payment')
+
+  const [quote, escrow] = await Promise.all([
+    prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' } }),
+    prisma.jobEscrow.findFirst({ where: { jobId }, orderBy: { createdAt: 'desc' } }),
+  ])
+  if (!quote) throw new Error('No accepted quote found')
+  if (!escrow) throw new Error('Escrow not initialized')
+
+  const authorizedAmount = job.finalAuthorizedAmountCents ?? quote.totalCents ?? quote.price
+  const serviceFee = escrow.serviceFee ?? 0n
+  const totalAmount = authorizedAmount + serviceFee
+  if (
+    authorizedAmount <= 0n ||
+    escrow.amount !== authorizedAmount ||
+    escrow.totalAmount !== totalAmount ||
+    quote.currency !== escrow.currency
+  ) {
+    throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+  }
+
+  if (escrow.paymentMethod === 'CASH' && escrow.status === 'CASH_CONFIRMED') {
+    return {
+      success: true,
+      amountDue: escrow.totalAmount,
+      currency: escrow.currency,
+      escrowId: escrow.id,
+      alreadyConfirmed: true,
+    }
+  }
+  if (escrow.status !== 'PENDING_PAYMENT') {
+    throw new Error('Payment method can no longer be changed')
+  }
+
+  const confirmedAt = new Date()
+  await prisma.$transaction(async tx => {
+    const lockedJobs = await tx.$queryRaw<Array<{ id: string; customerId: string; status: string }>>`
+      SELECT id, "customerId", status
+      FROM "MarketplaceJob"
+      WHERE id = ${jobId}
+      FOR UPDATE
+    `
+    const lockedJob = lockedJobs[0]
+    if (!lockedJob) throw new Error('Job not found')
+    if (lockedJob.customerId !== ctx.actorId) throw new Error('Only the customer can select cash payment')
+    if (lockedJob.status !== 'QUOTE_ACCEPTED') throw new Error('Job is not ready for cash payment')
+
+    const claimed = await tx.jobEscrow.updateMany({
+      where: {
+        id: escrow.id,
+        jobId,
+        status: 'PENDING_PAYMENT',
+        paymentMethod: { not: 'CASH' },
+        amount: authorizedAmount,
+        totalAmount,
+      },
+      data: {
+        paymentMethod: 'CASH',
+        status: 'CASH_CONFIRMED',
+        cashConfirmedAt: confirmedAt,
+        heldAt: null,
+      },
+    })
+    if (claimed.count !== 1) throw new Error('Payment state changed concurrently')
+
+    await tx.paymentIntent.updateMany({
+      where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
+      data: { status: 'CANCELLED' },
+    })
+
+    await recordJobLifecycleEvent(tx, {
+      jobId,
+      actorId: ctx.actorId,
+      actorType: ctx.actorType,
+      action: 'CASH_PAYMENT_SELECTED',
+      fromState: 'PENDING_PAYMENT',
+      toState: 'CASH_CONFIRMED',
+      metadata: {
+        escrowId: escrow.id,
+        cashDueMinor: totalAmount,
+        providerAmountMinor: authorizedAmount,
+        serviceFeeMinor: serviceFee,
+        currency: escrow.currency,
+      },
+    })
+  })
+
+  return {
+    success: true,
+    amountDue: totalAmount,
+    currency: escrow.currency,
+    escrowId: escrow.id,
+    alreadyConfirmed: false,
+  }
+}
+
 export async function releaseEscrow(
   ctx: TransitionContext,
   jobId: string,
@@ -264,15 +364,6 @@ export async function releaseEscrow(
       })
     }
 
-    await recordWeeklySettlement(tx, {
-      providerId: identity.payoutUserId,
-      providerType: quote.providerType,
-      jobAmountCents: escrow.amount,
-      commissionRate: rate,
-      commissionCents,
-      currency: escrowCurrency,
-      countryCode: job.countryCode || 'LK',
-    })
   })
 
   return {
@@ -586,33 +677,78 @@ export async function completeAndReleaseEscrow(
   ctx: TransitionContext,
   jobId: string,
   options?: { releaseMode?: ReleaseMode; autoReleaseHours?: number }
-): Promise<{ commission: number; netAmount: number; commissionCents: bigint; netCents: bigint; providerId: string; providerEntityId: string; providerType: string }> {
+): Promise<{
+  commission: number
+  netAmount: number
+  commissionCents: bigint
+  netCents: bigint
+  platformDue: number
+  platformDueCents: bigint
+  providerId: string
+  providerEntityId: string
+  providerType: string
+  paymentMethod: 'CASH' | 'FUNDED'
+}> {
   const releaseMode = options?.releaseMode ?? 'CUSTOMER_APPROVAL'
 
   return prisma.$transaction(async (tx) => {
     const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) throw new Error('Job not found')
 
-    if (releaseMode === 'CUSTOMER_APPROVAL') {
-      if (job.customerId !== ctx.actorId) throw new Error('Only the customer can approve')
+    if (releaseMode === 'CUSTOMER_APPROVAL' && job.customerId !== ctx.actorId) {
+      throw new Error('Only the customer can approve')
     }
 
     if (job.status !== 'IN_PROGRESS') {
       if (job.status === 'COMPLETED') {
         const releasedEscrow = await tx.jobEscrow.findFirst({ where: { jobId, status: 'RELEASED' } })
         if (releasedEscrow) {
+          const quote = await tx.jobQuote.findUnique({
+            where: { id: releasedEscrow.quoteId },
+            select: { providerId: true, providerType: true },
+          })
+          if (!quote) throw new Error('Accepted quote not found')
+          const identity = await resolvePayoutIdentity(quote.providerId, quote.providerType)
+
+          if (releasedEscrow.paymentMethod === 'CASH') {
+            const defaultRate = await getCommissionRate()
+            const rate = Math.max(0, Math.min(100, identity.commissionRate ?? defaultRate))
+            const commissionCents =
+              (releasedEscrow.amount * BigInt(Math.round(rate * 100))) / 10000n
+            const platformDueCents = commissionCents + releasedEscrow.serviceFee
+            const netCents = releasedEscrow.amount - commissionCents
+            return {
+              commission: bigIntToSafeNumber(commissionCents) / 100,
+              netAmount: bigIntToSafeNumber(netCents) / 100,
+              commissionCents,
+              netCents,
+              platformDue: bigIntToSafeNumber(platformDueCents) / 100,
+              platformDueCents,
+              providerId: identity.payoutUserId,
+              providerEntityId: identity.providerEntityId,
+              providerType: quote.providerType,
+              paymentMethod: 'CASH' as const,
+            }
+          }
+
           const releaseLedger = await tx.financialLedger.findFirst({
             where: { referenceType: 'ESCROW_RELEASE', referenceId: releasedEscrow.id },
           })
           const meta = releaseLedger?.metadata ? JSON.parse(releaseLedger.metadata as string) : {}
+          const commissionCents = BigInt(meta.commissionCents ?? '0')
+          const netCents = releasedEscrow.amount - commissionCents
+          const platformDueCents = commissionCents + releasedEscrow.serviceFee
           return {
-            commission: bigIntToSafeNumber(BigInt(meta.commissionCents ?? '0')) / 100,
-            netAmount: bigIntToSafeNumber(releasedEscrow.amount - BigInt(meta.commissionCents ?? '0')) / 100,
-            commissionCents: BigInt(meta.commissionCents ?? '0'),
-            netCents: releasedEscrow.amount - BigInt(meta.commissionCents ?? '0'),
-            providerId: meta.payoutUserId ?? releasedEscrow.providerId,
-            providerEntityId: meta.providerEntityId ?? releasedEscrow.providerId,
-            providerType: meta.providerType ?? 'INDIVIDUAL',
+            commission: bigIntToSafeNumber(commissionCents) / 100,
+            netAmount: bigIntToSafeNumber(netCents) / 100,
+            commissionCents,
+            netCents,
+            platformDue: bigIntToSafeNumber(platformDueCents) / 100,
+            platformDueCents,
+            providerId: meta.payoutUserId ?? identity.payoutUserId,
+            providerEntityId: meta.providerEntityId ?? identity.providerEntityId,
+            providerType: meta.providerType ?? quote.providerType,
+            paymentMethod: 'FUNDED' as const,
           }
         }
       }
@@ -626,22 +762,34 @@ export async function completeAndReleaseEscrow(
       if (workspace.progressStatus !== 'COMPLETION_REQUESTED') throw new Error('Job not awaiting completion')
       if (workspace.completionRequestedAt == null) throw new Error('No completion request timestamp')
       const autoReleaseHours = options?.autoReleaseHours ?? 48
-      const hoursSinceRequest = (Date.now() - workspace.completionRequestedAt.getTime()) / (1000 * 60 * 60)
+      const hoursSinceRequest =
+        (Date.now() - workspace.completionRequestedAt.getTime()) / (1000 * 60 * 60)
       if (hoursSinceRequest < autoReleaseHours) throw new Error('Auto-release deadline not reached')
     } else if (releaseMode === 'ADMIN_RESOLUTION') {
-      if (workspace.progressStatus !== 'COMPLETION_REQUESTED' && workspace.progressStatus !== 'DISPUTED') {
+      if (
+        workspace.progressStatus !== 'COMPLETION_REQUESTED' &&
+        workspace.progressStatus !== 'DISPUTED'
+      ) {
         throw new Error('Admin resolution requires COMPLETION_REQUESTED or DISPUTED workspace')
       }
-    } else {
-      if (workspace.progressStatus !== 'COMPLETION_REQUESTED') throw new Error('Provider must request completion first')
+    } else if (workspace.progressStatus !== 'COMPLETION_REQUESTED') {
+      throw new Error('Provider must request completion first')
     }
 
-    const allowedEscrowStatuses = releaseMode === 'AUTO_RELEASE' ? ['PROTECTED'] : releaseMode === 'ADMIN_RESOLUTION' ? ['PROTECTED', 'ON_HOLD'] : ['PROTECTED']
+    const allowedEscrowStatuses =
+      releaseMode === 'AUTO_RELEASE'
+        ? ['PROTECTED']
+        : releaseMode === 'ADMIN_RESOLUTION'
+          ? ['PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED']
+          : ['PROTECTED', 'CASH_CONFIRMED']
+
     const escrow = await tx.jobEscrow.findFirst({
       where: { jobId, status: { in: allowedEscrowStatuses as any } },
     })
     if (!escrow) throw new Error('No releasable escrow found')
-    if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+    if (releaseMode === 'AUTO_RELEASE' && escrow.paymentMethod === 'CASH') {
+      throw new Error('Cash jobs require explicit customer approval or admin resolution')
+    }
     if (
       job.finalAuthorizedAmountCents != null &&
       job.finalAuthorizedAmountCents !== escrow.amount
@@ -663,12 +811,101 @@ export async function completeAndReleaseEscrow(
     const rateBps = BigInt(Math.round(rate * 100))
     const commissionCents = (escrow.amount * rateBps) / 10000n
     const netCents = escrow.amount - commissionCents
-    const platformCents = commissionCents + escrow.serviceFee
+    const platformDueCents = commissionCents + escrow.serviceFee
     const commissionMajor = bigIntToSafeNumber(commissionCents) / 100
     const netMajor = bigIntToSafeNumber(netCents) / 100
+    const platformDueMajor = bigIntToSafeNumber(platformDueCents) / 100
+    const escrowCurrency = escrow.currency as Currency
+
+    if (escrow.paymentMethod === 'CASH') {
+      const cashAllowedStatuses =
+        releaseMode === 'ADMIN_RESOLUTION'
+          ? ['CASH_CONFIRMED', 'ON_HOLD']
+          : ['CASH_CONFIRMED']
+      const claimed = await tx.jobEscrow.updateMany({
+        where: {
+          id: escrow.id,
+          paymentMethod: 'CASH',
+          status: { in: cashAllowedStatuses as any },
+        },
+        data: { status: 'RELEASED', releasedAt: new Date() },
+      })
+      if (claimed.count !== 1) throw new Error('Cash settlement already completed or state changed')
+
+      await tx.jobWorkspace.updateMany({
+        where: { jobId, progressStatus: { not: 'COMPLETED' } },
+        data: { progressStatus: 'COMPLETED', updatedAt: new Date() },
+      })
+      await tx.marketplaceJob.updateMany({
+        where: { id: jobId, status: 'IN_PROGRESS' },
+        data: { status: 'COMPLETED', updatedAt: new Date() },
+      })
+      if (quote.providerType === 'COMPANY') {
+        await tx.companyJobAssignment.updateMany({
+          where: { jobId, companyId: quote.providerId, status: 'IN_PROGRESS' },
+          data: { status: 'COMPLETED', completedAt: new Date() },
+        })
+      }
+
+      const effectivePlatformRate =
+        escrow.amount > 0n
+          ? (bigIntToSafeNumber(platformDueCents) * 100) / bigIntToSafeNumber(escrow.amount)
+          : 0
+
+      if (platformDueCents > 0n) {
+        await recordWeeklySettlement(tx, {
+          providerId: identity.payoutUserId,
+          providerType: quote.providerType,
+          jobAmountCents: escrow.amount,
+          commissionRate: effectivePlatformRate,
+          commissionCents: platformDueCents,
+          currency: escrowCurrency,
+          countryCode: job.countryCode || 'LK',
+        })
+      }
+
+      await recordJobLifecycleEvent(tx, {
+        jobId,
+        actorId: ctx.actorId,
+        actorType: ctx.actorType,
+        action: 'JOB_COMPLETED',
+        fromState: job.status,
+        toState: 'COMPLETED',
+        metadata: {
+          releaseMode,
+          paymentMethod: 'CASH',
+          escrowId: escrow.id,
+          workspaceFromState: workspace.progressStatus,
+          workspaceToState: 'COMPLETED',
+          cashCollectedMinor: escrow.totalAmount,
+          providerCommissionMinor: commissionCents,
+          serviceFeeMinor: escrow.serviceFee,
+          platformDueMinor: platformDueCents,
+          providerNetMinor: netCents,
+          currency: escrowCurrency,
+        },
+      })
+
+      return {
+        commission: commissionMajor,
+        netAmount: netMajor,
+        commissionCents,
+        netCents,
+        platformDue: platformDueMajor,
+        platformDueCents,
+        providerId: identity.payoutUserId,
+        providerEntityId: identity.providerEntityId,
+        providerType: quote.providerType,
+        paymentMethod: 'CASH' as const,
+      }
+    }
 
     const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: allowedEscrowStatuses as any }, paymentMethod: { not: 'CASH' } },
+      where: {
+        id: escrow.id,
+        status: { in: allowedEscrowStatuses as any },
+        paymentMethod: { not: 'CASH' },
+      },
       data: { status: 'RELEASED', releasedAt: new Date() },
     })
     if (claimed.count !== 1) throw new Error('Escrow already released or state changed')
@@ -686,16 +923,31 @@ export async function completeAndReleaseEscrow(
       entryType: 'CREDIT' | 'DEBIT'
       amount: bigint
     }> = [
-      { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: escrow.totalAmount },
-      { accountId: providerWalletSeed.id, accountType: 'PROVIDER_WALLET', entryType: 'CREDIT', amount: netCents },
+      {
+        accountId: `escrow:${escrow.id}`,
+        accountType: 'ESCROW',
+        entryType: 'DEBIT',
+        amount: escrow.totalAmount,
+      },
+      {
+        accountId: providerWalletSeed.id,
+        accountType: 'PROVIDER_WALLET',
+        entryType: 'CREDIT',
+        amount: netCents,
+      },
     ]
-    if (platformCents > 0n) {
-      ledgerEntries.push({ accountId: 'platform', accountType: 'PLATFORM', entryType: 'CREDIT', amount: platformCents })
+    if (platformDueCents > 0n) {
+      ledgerEntries.push({
+        accountId: 'platform',
+        accountType: 'PLATFORM',
+        entryType: 'CREDIT',
+        amount: platformDueCents,
+      })
     }
 
     await postLedgerTransaction({
       entries: ledgerEntries,
-      currency: escrow.currency as Currency,
+      currency: escrowCurrency,
       referenceType: 'ESCROW_RELEASE',
       referenceId: escrow.id,
       idempotencyKey: `escrow-release:${escrow.id}`,
@@ -711,7 +963,6 @@ export async function completeAndReleaseEscrow(
       }),
     }, tx)
 
-    const escrowCurrency = escrow.currency as Currency
     if (escrowCurrency === 'LKR') {
       const providerWallet = await tx.providerWallet.update({
         where: { userId: identity.payoutUserId },
@@ -727,9 +978,10 @@ export async function completeAndReleaseEscrow(
           amount: netMajor,
           balanceBefore: providerWallet.availableBalance - netMajor,
           balanceAfter: providerWallet.availableBalance,
-          reference: commissionCents > 0n
-            ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
-            : `Escrow release for job ${jobId}`,
+          reference:
+            commissionCents > 0n
+              ? `Escrow release for job ${jobId} (${rate}% commission: LKR ${commissionMajor})`
+              : `Escrow release for job ${jobId}`,
           referenceType: 'ESCROW_RELEASE',
           referenceId: escrow.id,
         },
@@ -740,23 +992,14 @@ export async function completeAndReleaseEscrow(
       where: { jobId, progressStatus: { not: 'COMPLETED' } },
       data: { progressStatus: 'COMPLETED', updatedAt: new Date() },
     })
-
     await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: 'IN_PROGRESS' },
       data: { status: 'COMPLETED', updatedAt: new Date() },
     })
-
     if (quote.providerType === 'COMPANY') {
       await tx.companyJobAssignment.updateMany({
-        where: {
-          jobId,
-          companyId: quote.providerId,
-          status: 'IN_PROGRESS',
-        },
-        data: {
-          status: 'COMPLETED',
-          completedAt: new Date(),
-        },
+        where: { jobId, companyId: quote.providerId, status: 'IN_PROGRESS' },
+        data: { status: 'COMPLETED', completedAt: new Date() },
       })
     }
 
@@ -777,16 +1020,6 @@ export async function completeAndReleaseEscrow(
       })
     }
 
-    await recordWeeklySettlement(tx, {
-      providerId: identity.payoutUserId,
-      providerType: quote.providerType,
-      jobAmountCents: escrow.amount,
-      commissionRate: rate,
-      commissionCents,
-      currency: escrowCurrency,
-      countryCode: job.countryCode || 'LK',
-    })
-
     await recordJobLifecycleEvent(tx, {
       jobId,
       actorId: ctx.actorId,
@@ -796,11 +1029,14 @@ export async function completeAndReleaseEscrow(
       toState: 'COMPLETED',
       metadata: {
         releaseMode,
+        paymentMethod: 'FUNDED',
         escrowId: escrow.id,
         workspaceFromState: workspace.progressStatus,
         workspaceToState: 'COMPLETED',
         commissionMinor: commissionCents,
         providerNetMinor: netCents,
+        serviceFeeMinor: escrow.serviceFee,
+        platformCollectedMinor: platformDueCents,
         currency: escrowCurrency,
       },
     })
@@ -810,9 +1046,12 @@ export async function completeAndReleaseEscrow(
       netAmount: netMajor,
       commissionCents,
       netCents,
+      platformDue: platformDueMajor,
+      platformDueCents,
       providerId: identity.payoutUserId,
       providerEntityId: identity.providerEntityId,
       providerType: quote.providerType,
+      paymentMethod: 'FUNDED' as const,
     }
   })
 }
