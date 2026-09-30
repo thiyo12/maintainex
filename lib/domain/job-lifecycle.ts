@@ -80,7 +80,7 @@ const WORKSPACE_TRANSITIONS: Record<WorkspaceStatus, WorkspaceStatus[]> = {
   DISPUTED: [],
 }
 
-const PROVIDER_ONLY_WORKSPACE: WorkspaceStatus[] = ['COMPLETION_REQUESTED']
+const PROVIDER_ONLY_WORKSPACE: WorkspaceStatus[] = ['WAITING_CUSTOMER', 'COMPLETION_REQUESTED']
 const CUSTOMER_ONLY_WORKSPACE: WorkspaceStatus[] = ['IN_PROGRESS']
 
 export function isValidJobTransition(from: JobStatus, to: JobStatus): boolean {
@@ -157,6 +157,21 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
 
     const workspace = await tx.jobWorkspace.findUnique({ where: { jobId: ctx.jobId } })
     if (!workspace) throw new Error('Workspace not found')
+
+    // Security boundary: work start is exclusively performed by verifyJobPin(),
+    // completion is coupled to escrow release, and disputes must atomically hold
+    // escrow. The generic workspace transition helper must never bypass those
+    // canonical money/PIN state machines.
+    if (targetStatus === 'IN_PROGRESS' && workspace.progressStatus === 'ACCEPTED') {
+      throw new Error('Work start requires PIN verification')
+    }
+    if (targetStatus === 'COMPLETED') {
+      throw new Error('Completion must use the escrow release flow')
+    }
+    if (targetStatus === 'DISPUTED') {
+      throw new Error('Disputes must use the canonical dispute flow')
+    }
+
     if (!isValidWorkspaceTransition(workspace.progressStatus as WorkspaceStatus, targetStatus)) {
       throw new Error(`Cannot transition workspace from ${workspace.progressStatus} to ${targetStatus}`)
     }
@@ -169,13 +184,6 @@ export async function transitionJobWorkspace(ctx: TransitionContext, targetStatu
       },
     })
     if (changed.count !== 1) throw new Error('Workspace state changed concurrently')
-
-    if (targetStatus === 'COMPLETED') {
-      await tx.marketplaceJob.updateMany({
-        where: { id: ctx.jobId, status: 'IN_PROGRESS' },
-        data: { status: 'COMPLETED' },
-      })
-    }
 
     await recordJobLifecycleEvent(tx, {
       jobId: ctx.jobId,
