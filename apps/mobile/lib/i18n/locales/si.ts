@@ -675,6 +675,7 @@ const si: Record<string, any> = {
       confirmReject: 'මෙම පවරීම ප්රතික්ෂේප කිරීමට ඔබට අවශ්යද?',
       confirmDeactivate: 'මෙම කම්කරුවා අක්‍රීය කිරීමට ඔබට අවශ්යද? සක්‍රීය පවරීම් අවලංගු කරනු ලැබේ.',
     },
+  },
   postJob: {
     header: 'රැකියාවක් පළ කරන්න',
     step1: {
