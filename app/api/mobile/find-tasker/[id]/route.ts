@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const tasker = await prisma.taskerProfile.findFirst({
       where: { id },
       include: {
-        user: { select: { id: true, name: true, phone: true, email: true } },
+        user: { select: { id: true, name: true } },
         reviews: {
           include: { reviewer: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
@@ -37,13 +37,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       isVerified: tasker.isVerified,
       isOnline: tasker.isOnline,
       profileImage: tasker.profileImage,
-      latitude: tasker.latitude,
-      longitude: tasker.longitude,
       skills: safeParseJsonArr(tasker.skills),
       hourlyRate: tasker.hourlyRate,
       serviceAreas: safeParseJsonArr(tasker.serviceAreas),
-      phone: tasker.user.phone,
-      email: tasker.user.email,
       reviews: tasker.reviews.map(r => ({
         id: r.id,
         rating: r.rating,
