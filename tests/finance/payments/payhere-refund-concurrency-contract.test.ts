@@ -35,11 +35,11 @@ describe('PayHere refund concurrency contract', () => {
   })
 
   it('does not place the external refund call before the database claim', () => {
-    const legacyPattern =
-      "const refund = await requestPayHereRefund(\n    String(intent.paymentId)"
-    const claimPattern =
-      'const requestClaimed = await prisma.paymentIntent.updateMany'
+    const externalCall = 'const refund = await requestPayHereRefund'
+    const claimPattern = 'const requestClaimed = await prisma.paymentIntent.updateMany'
 
-    expect(source.indexOf(claimPattern)).toBeLessThan(source.indexOf(legacyPattern))
+    expect(source.indexOf(claimPattern)).toBeGreaterThan(-1)
+    expect(source.indexOf(externalCall)).toBeGreaterThan(-1)
+    expect(source.indexOf(claimPattern)).toBeLessThan(source.indexOf(externalCall))
   })
 })
