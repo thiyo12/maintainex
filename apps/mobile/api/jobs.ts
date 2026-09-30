@@ -21,7 +21,7 @@ export const jobs = {
   bid: (jobId: string, data: { amount: number; message: string }) =>
     request<Bid>(`/api/mobile/jobs/${jobId}/bid`, { method: 'POST', body: JSON.stringify(data) }),
   assign: (jobId: string, taskerId: string) =>
-    request<JobPosting>(`/api/mobile/jobs/${jobId}`, { method: 'PUT', body: JSON.stringify({ status: 'ASSIGNED' }) }),
+    request<JobPosting>(`/api/mobile/jobs/${jobId}`, { method: 'PUT', body: JSON.stringify({ status: 'ASSIGNED', taskerId }) }),
   start: (jobId: string) =>
     request<JobPosting>(`/api/mobile/jobs/${jobId}`, { method: 'PUT', body: JSON.stringify({ status: 'IN_PROGRESS' }) }),
   complete: (jobId: string) =>
