@@ -6,6 +6,7 @@ import {
   guardCrmRequest,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
+import { getWeeklySettlementAdminUpdate } from '@/lib/finance/commission/settlement-actions'
 
 const VALID_ACTIONS = new Set(['MARK_PAID', 'SEND_REMINDER', 'SUSPEND', 'UNSUSPEND'])
 
@@ -207,27 +208,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const now = new Date()
-    let updateData: Record<string, unknown> = {}
-    if (action === 'MARK_PAID') {
-      updateData = {
-        commissionPaid: true,
-        paidAt: now,
-        status: 'PAID',
-        suspendedAt: null,
-      }
-    } else if (action === 'SUSPEND') {
-      updateData = {
-        status: 'SUSPENDED',
-        suspendedAt: now,
-      }
-    } else {
-      updateData = {
-        status: settlement.dueAt < now ? 'OVERDUE' : 'PENDING',
-        commissionPaid: false,
-        paidAt: null,
-        suspendedAt: null,
-      }
-    }
+    const updateData = getWeeklySettlementAdminUpdate({
+      action: action as 'MARK_PAID' | 'SUSPEND' | 'UNSUSPEND',
+      dueAt: settlement.dueAt,
+      now,
+    })
 
     const updated = await prisma.$transaction(async tx => {
       const next = await tx.weeklySettlement.update({
