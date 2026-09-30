@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiEye, FiCheck, FiX, FiSearch } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Dispute {
   id: string
@@ -45,6 +47,8 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function DisputesPage() {
+  const { user: admin } = useAdminSession()
+  const canResolveDisputes = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('disputes:resolve')
   const [disputes, setDisputes] = useState<Dispute[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('ALL')
@@ -74,6 +78,10 @@ export default function DisputesPage() {
   }
 
   const handleResolve = async (disputeId: string) => {
+    if (!canResolveDisputes) {
+      toast.error('You do not have permission to resolve disputes')
+      return
+    }
     if (!resolveNotes.trim()) {
       toast.error('Please provide resolution notes')
       return
@@ -98,6 +106,10 @@ export default function DisputesPage() {
   }
 
   const handleDismiss = async (disputeId: string) => {
+    if (!canResolveDisputes) {
+      toast.error('You do not have permission to resolve disputes')
+      return
+    }
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/disputes', {
@@ -117,6 +129,10 @@ export default function DisputesPage() {
   }
 
   const handleUnderReview = async (disputeId: string) => {
+    if (!canResolveDisputes) {
+      toast.error('You do not have permission to resolve disputes')
+      return
+    }
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/disputes', {
@@ -277,7 +293,7 @@ export default function DisputesPage() {
                   </div>
                 )}
 
-                {detailModal.status !== 'RESOLVED' && detailModal.status !== 'DISMISSED' && (
+                {canResolveDisputes && detailModal.status !== 'RESOLVED' && detailModal.status !== 'DISMISSED' && (
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Resolution Notes</div>
                     <textarea
@@ -292,7 +308,8 @@ export default function DisputesPage() {
               </div>
 
               <div className="p-6 border-t border-white/5 flex flex-wrap gap-2">
-                {detailModal.status === 'OPEN' && (
+                {!canResolveDisputes && <span className="text-xs text-gray-500 self-center mr-auto">Read-only access</span>}
+                {canResolveDisputes && detailModal.status === 'OPEN' && (
                   <>
                     <button
                       onClick={() => handleUnderReview(detailModal.id)}
@@ -310,7 +327,7 @@ export default function DisputesPage() {
                     </button>
                   </>
                 )}
-                {detailModal.status === 'UNDER_REVIEW' && (
+                {canResolveDisputes && detailModal.status === 'UNDER_REVIEW' && (
                   <>
                     <button
                       onClick={() => handleResolve(detailModal.id)}
