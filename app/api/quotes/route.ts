@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
-import { validateLineItems, calculateQuoteTotal, persistLineItems } from '@/lib/pricing/line-items'
+import { validateLineItems, calculateQuoteTotal } from '@/lib/pricing/line-items'
 import { resolveBenchmark } from '@/lib/pricing/benchmark'
 import { classifyQuoteAmount } from '@/lib/pricing/classification'
 import { createQuoteRevision } from '@/lib/pricing/quote-revision'
@@ -298,12 +298,12 @@ export async function POST(request: NextRequest) {
         totalCents: totals.serverTotalCents,
         benchmarkClassification: classification,
         benchmarkId: benchmark?.benchmarkId || undefined,
+        lineItems: validated.validatedItems,
       })
       if (!revision.success || !revision.newQuoteId) {
         return NextResponse.json({ error: revision.error || 'Quote revision failed' }, { status: 409 })
       }
 
-      await persistLineItems(prisma, revision.newQuoteId, validated.validatedItems)
 
       const revisedQuote = await prisma.jobQuote.findUnique({ where: { id: revision.newQuoteId } })
       if (!revisedQuote) {
