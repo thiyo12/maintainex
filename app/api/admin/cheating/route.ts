@@ -192,6 +192,9 @@ export async function PUT(request: NextRequest) {
     if (!assertCrmCountryAllowed(security, existing.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    if (existing.status !== 'PENDING' || existing.reviewedAt) {
+      return NextResponse.json({ error: 'Report has already been reviewed' }, { status: 409 })
+    }
 
     const target = await prisma.user.findUnique({
       where: { id: existing.againstUserId },
@@ -207,8 +210,12 @@ export async function PUT(request: NextRequest) {
     const resolvedAction = status === 'CONFIRMED' ? action : 'NO_ACTION'
 
     const report = await prisma.$transaction(async tx => {
-      const updated = await tx.offPlatformDeal.update({
-        where: { id: reportId },
+      const claimed = await tx.offPlatformDeal.updateMany({
+        where: {
+          id: reportId,
+          status: 'PENDING',
+          reviewedAt: null,
+        },
         data: {
           status,
           action: resolvedAction,
@@ -217,6 +224,13 @@ export async function PUT(request: NextRequest) {
           reviewedAt: new Date(),
         },
       })
+      if (claimed.count !== 1) {
+        throw new Error('REPORT_ALREADY_REVIEWED')
+      }
+
+      const updated = await tx.offPlatformDeal.findUniqueOrThrow({
+        where: { id: reportId },
+      })
 
       if (status === 'CONFIRMED' && resolvedAction === 'BAN') {
         await tx.user.update({
@@ -224,7 +238,9 @@ export async function PUT(request: NextRequest) {
           data: {
             isBanned: true,
             isActive: false,
-            banReason: `Off-platform deal confirmed: ${actionNote}`,
+            banReason: target.isBanned && target.banReason
+              ? target.banReason
+              : `Off-platform deal confirmed: ${actionNote}`,
           },
         })
       }
@@ -233,6 +249,7 @@ export async function PUT(request: NextRequest) {
     })
 
     await createAuditLog({
+
       action: 'UPDATE',
       category: 'TRUST',
       userId: security.adminId,
@@ -262,6 +279,10 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ report })
   } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'REPORT_ALREADY_REVIEWED') {
+      return NextResponse.json({ error: 'Report has already been reviewed' }, { status: 409 })
+    }
     console.error('CRM cheating PUT error:', error)
     return NextResponse.json({ error: 'Failed to review report' }, { status: 500 })
   }
