@@ -187,7 +187,7 @@ export async function createBookNowJob(input: BookNowInput) {
     dayEnd.setDate(dayEnd.getDate() + 1)
 
     const conflicts = resolvedProviderType === 'INDIVIDUAL'
-      ? await tx.$queryRaw<Array<{ id: string }>>\`
+      ? await tx.$queryRaw<Array<{ id: string }>>`
           SELECT mj.id
           FROM "MarketplaceJob" mj
           JOIN "JobQuote" jq ON jq."jobId" = mj.id
@@ -204,8 +204,8 @@ export async function createBookNowJob(input: BookNowInput) {
               OR mj."preferredTimeSlot" = ${input.timeSlot}
             )
           LIMIT 1
-        \`
-      : await tx.$queryRaw<Array<{ id: string }>>\`
+        `
+      : await tx.$queryRaw<Array<{ id: string }>>`
           SELECT mj.id
           FROM "MarketplaceJob" mj
           JOIN "JobQuote" jq ON jq."jobId" = mj.id
@@ -222,7 +222,7 @@ export async function createBookNowJob(input: BookNowInput) {
               OR mj."preferredTimeSlot" = ${input.timeSlot}
             )
           LIMIT 1
-        \`
+        `
 
     if (conflicts.length > 0) {
       throw new Error('Provider already has an overlapping active booking')
