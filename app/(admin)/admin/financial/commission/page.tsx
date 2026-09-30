@@ -336,13 +336,24 @@ export default function CommissionPage() {
                             </>
                           )}
                           {s.status === 'SUSPENDED' && (
-                            <button
-                              onClick={() => handleAction(s.id, 'UNSUSPEND')}
-                              disabled={actionLoading === s.id}
-                              className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
-                            >
-                              {actionLoading === s.id ? '...' : 'Unsuspend'}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleAction(s.id, 'MARK_PAID')}
+                                disabled={actionLoading === s.id}
+                                className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
+                                title="Record commission payment and reactivate the provider if this settlement caused the suspension"
+                              >
+                                {actionLoading === s.id ? '...' : 'Mark Paid'}
+                              </button>
+                              <button
+                                onClick={() => handleAction(s.id, 'UNSUSPEND')}
+                                disabled={actionLoading === s.id}
+                                className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
+                                title="Reactivate the provider without clearing the unpaid commission debt"
+                              >
+                                {actionLoading === s.id ? '...' : 'Reactivate · debt stays'}
+                              </button>
+                            </>
                           )}
                           {s.status === 'PAID' && (
                             <span className="text-xs text-gray-500">
