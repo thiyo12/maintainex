@@ -47,20 +47,41 @@ export async function POST(
       id
     )
 
+    const pendingExternal = result.refundPendingExternal === true
+
     if (providerUserId) {
-      await notifyJobCancelled(id, providerUserId, job.title, 'customer', 'Escrow refunded')
+      await notifyJobCancelled(
+        id,
+        providerUserId,
+        job.title,
+        'customer',
+        pendingExternal ? 'External payment refund requested' : 'Escrow refunded'
+      )
     }
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
-    auditEscrowRefund({
-      jobId: id,
-      escrowId: escrow?.id ?? id,
-      actorId: user.id,
-      refundAmount: result.refundAmount,
-      currency: escrow?.currency ?? 'LKR',
-    })
+    if (!pendingExternal) {
+      auditEscrowRefund({
+        jobId: id,
+        escrowId: escrow?.id ?? id,
+        actorId: user.id,
+        refundAmount: result.refundAmount,
+        currency: escrow?.currency ?? 'LKR',
+      })
+    }
 
-    return NextResponse.json({ success: true, message: 'Escrow refunded', refundAmount: result.refundAmount })
+    return NextResponse.json(
+      {
+        success: true,
+        message: pendingExternal
+          ? 'Refund requested. PayHere confirmation is pending.'
+          : 'Escrow refunded',
+        refundAmount: result.refundAmount,
+        refundStatus: pendingExternal ? 'REFUND_REQUIRED' : 'REFUNDED',
+        fundingSource: result.fundingSource,
+      },
+      { status: pendingExternal ? 202 : 200 }
+    )
   } catch (error: any) {
     console.error('Refund escrow error:', error)
     const message = error?.message || 'Failed to process refund'
@@ -73,6 +94,15 @@ export async function POST(
     }
     if (message.includes('already refunded') || message.includes('state changed')) {
       return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (
+      message.includes('PAYHERE_REFUND_PAYMENT_NOT_FOUND') ||
+      message.includes('REFUND_FUNDING_SOURCE_UNKNOWN')
+    ) {
+      return NextResponse.json(
+        { error: 'Refund requires finance review before funds can be moved.' },
+        { status: 409 }
+      )
     }
     return NextResponse.json({ error: message }, { status: 500 })
   }
