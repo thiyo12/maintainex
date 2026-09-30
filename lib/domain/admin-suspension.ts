@@ -260,6 +260,10 @@ export async function reactivateCompany(
         })
       : null
 
+    if (owner?.isBanned) {
+      throw new Error('Company owner is banned — unban before reactivating company')
+    }
+
     const companySuspensionPrefix = `Company suspended [${companyProfileId}]:`
     const isCompanySuspensionReason = (value: string | null) =>
       Boolean(
