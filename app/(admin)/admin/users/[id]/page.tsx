@@ -159,12 +159,17 @@ export default function User360Page() {
     ? permissions.includes('taskers:edit')
     : account?.role === 'COMPANY'
       ? permissions.includes('companies:edit')
-      : canSuspendAccount
+      : permissions.includes('users:suspend')
   const canBanAccount = account?.role === 'TASKER'
     ? permissions.includes('taskers:ban')
     : account?.role === 'COMPANY'
       ? permissions.includes('companies:ban')
-      : canBanAccount
+      : permissions.includes('users:ban')
+  const companyIsSuspended = account?.role === 'COMPANY' &&
+    account?.companyProfile?.verificationStatus === 'SUSPENDED'
+  const companyHasSeparateOwnerSuspension = account?.role === 'COMPANY' &&
+    account?.isSuspended &&
+    !companyIsSuspended
   const visibleTabs = TABS.filter(item =>
     item.key === 'overview' ||
     (item.key === 'work' && data?.permissions.work) ||
@@ -318,14 +323,27 @@ export default function User360Page() {
         <aside className="space-y-4 xl:sticky xl:top-[92px]">
           <Card title="Account controls" subtitle="Role-gated and audited actions">
             <div className="space-y-2">
-              {permissions.includes('users:suspend') && (
+              {canSuspendAccount && account.role === 'COMPANY' && (
+                companyIsSuspended ? (
+                  !account.isBanned && (
+                    <ActionButton disabled={actionLoading} icon={FiUnlock} label="Reactivate company" onClick={() => accountAction('unsuspend')} />
+                  )
+                ) : companyHasSeparateOwnerSuspension ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                    Owner account is suspended by another workflow. Resolve that suspension before suspending or reactivating the company.
+                  </div>
+                ) : !account.isBanned ? (
+                  <ActionButton disabled={actionLoading} icon={FiLock} label="Suspend company" tone="amber" onClick={() => accountAction('suspend', true)} />
+                ) : null
+              )}
+              {canSuspendAccount && account.role !== 'COMPANY' && (
                 account.isSuspended ? (
                   <ActionButton disabled={actionLoading} icon={FiUnlock} label="Unsuspend account" onClick={() => accountAction('unsuspend')} />
                 ) : (
                   <ActionButton disabled={actionLoading} icon={FiLock} label="Suspend account" tone="amber" onClick={() => accountAction('suspend', true)} />
                 )
               )}
-              {permissions.includes('users:ban') && (
+              {canBanAccount && (
                 account.isBanned ? (
                   <ActionButton disabled={actionLoading} icon={FiUserCheck} label="Remove ban" onClick={() => accountAction('unban')} />
                 ) : (
