@@ -61,6 +61,12 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   })
   if (!acceptedQuote) return { success: false, error: 'No accepted quote from this company on this job' }
 
+  const companyIdentity = await prisma.companyProfile.findUnique({
+    where: { id: companyId },
+    select: { userId: true },
+  })
+  if (!companyIdentity) return { success: false, error: 'Company not found' }
+
   const existingAssignment = await prisma.companyJobAssignment.findFirst({
     where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
   })
@@ -80,7 +86,15 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
 
   const assignment = await prisma.$transaction(async (tx) => {
     const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED', targetTaskerId: null },
+      where: {
+        id: jobId,
+        status: 'QUOTE_ACCEPTED',
+        OR: [
+          { targetTaskerId: null },
+          { targetTaskerId: companyId },
+          { targetTaskerId: companyIdentity.userId },
+        ],
+      },
       data: { targetTaskerId: workerUserId },
     })
     if (claimed.count !== 1) throw new Error('Job state changed concurrently')
@@ -329,8 +343,12 @@ export async function workerRejectAssignment(
     if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
     await tx.marketplaceJob.updateMany({
-      where: { id: assignment.jobId, targetTaskerId: workerUserId },
-      data: { targetTaskerId: null },
+      where: {
+        id: assignment.jobId,
+        status: 'QUOTE_ACCEPTED',
+        targetTaskerId: workerUserId,
+      },
+      data: { targetTaskerId: assignment.companyId },
     })
 
     await writeCompanyAuditLog({
@@ -384,10 +402,17 @@ export async function revokeAssignment(
       data: { status: 'REVOKED', revokedAt: new Date(), revokedReason: reason || undefined },
     })
 
-    await tx.marketplaceJob.update({
-      where: { id: assignment.jobId },
-      data: { targetTaskerId: null },
+    const targetRestored = await tx.marketplaceJob.updateMany({
+      where: {
+        id: assignment.jobId,
+        status: 'QUOTE_ACCEPTED',
+        targetTaskerId: assignment.workerUserId,
+      },
+      data: { targetTaskerId: companyId },
     })
+    if (targetRestored.count !== 1) {
+      throw new Error('Job target changed before assignment revocation')
+    }
 
     await writeCompanyAuditLog({
       companyId,
