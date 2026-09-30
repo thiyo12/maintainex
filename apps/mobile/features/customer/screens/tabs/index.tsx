@@ -51,7 +51,7 @@ function CatVisual({ visual, size = 42 }: { visual: CategoryVisual; size?: numbe
       <Icon size={size} color="rgba(255,255,255,0.94)" weight="fill" />
       {visual.lottie && !failed ? (
         <LottieView
-          source={{ uri: visual.lottie }}
+          source={{ uri: visual.lottie } as any}
           style={StyleSheet.absoluteFill}
           autoPlay
           loop
