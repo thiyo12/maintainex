@@ -37,8 +37,15 @@ export async function POST(
       quoteId,
     )
 
-    const notificationUserId = await resolveNotificationUser(result.quote.providerId, result.quote.providerType)
-    await notifyQuoteAccepted(result.job.id, notificationUserId, result.job.title)
+    try {
+      const notificationUserId = await resolveNotificationUser(
+        result.quote.providerId,
+        result.quote.providerType,
+      )
+      await notifyQuoteAccepted(result.job.id, notificationUserId, result.job.title)
+    } catch (notificationError) {
+      console.error('Quote accepted notification failed after successful acceptance:', notificationError)
+    }
 
     const currency = getCurrencyForCountry(result.job.countryCode)
     return NextResponse.json({
