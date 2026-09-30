@@ -101,6 +101,9 @@ export async function POST(
     }
 
     if (action === 'APPROVE_COMPLETION') {
+      if (job.customerId !== user.id) {
+        return NextResponse.json({ error: 'Only the customer can approve completion' }, { status: 403 })
+      }
       if (job.status === 'COMPLETED') {
         return NextResponse.json({
           success: true,
