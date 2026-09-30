@@ -30,7 +30,6 @@ async function getAcceptedProviderRecipientIds(jobId: string): Promise<string[]>
       where: {
         jobId,
         companyId: accepted.providerId,
-        workerUserId: { not: null },
         status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
       },
       select: { workerUserId: true },
