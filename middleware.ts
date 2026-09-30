@@ -250,7 +250,15 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const requestId = parseIncomingRequestId(request) || generateRequestId()
 
-  if (isAiCrawler(request)) {
+  // AI crawler hints are only for public document routes. Never let a
+  // spoofable User-Agent bypass authentication, IP blocking, rate limiting,
+  // setup protection, or any API security boundary.
+  const isPublicDocumentRoute =
+    !pathname.startsWith('/api/') &&
+    !pathname.startsWith('/admin') &&
+    !pathname.startsWith('/setup')
+
+  if (isPublicDocumentRoute && isAiCrawler(request)) {
     const response = NextResponse.next()
     response.headers.set('X-Robots-Tag', 'all')
     response.headers.set('Cache-Control', 'public, max-age=3600')
