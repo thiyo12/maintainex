@@ -19,6 +19,8 @@ interface Settlement {
   paidAt?: string
   dueAt: string
   status: string
+  currency: string
+  countryCode: string
   suspendedAt?: string
   notes?: string
   provider?: {
@@ -28,11 +30,13 @@ interface Settlement {
   }
 }
 
-interface Summary {
+interface CurrencySummary {
+  currency: string
   totalCommissionOwed: number
   totalCommissionPaid: number
   pendingThisWeek: number
   overdueCount: number
+  suspendedCount: number
   pendingCount: number
   paidCount: number
 }
@@ -44,14 +48,7 @@ export default function CommissionPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('ALL')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [summary, setSummary] = useState<Summary>({
-    totalCommissionOwed: 0,
-    totalCommissionPaid: 0,
-    pendingThisWeek: 0,
-    overdueCount: 0,
-    pendingCount: 0,
-    paidCount: 0
-  })
+  const [summaryByCurrency, setSummaryByCurrency] = useState<CurrencySummary[]>([])
 
   useEffect(() => {
     fetchSettlements()
@@ -73,14 +70,13 @@ export default function CommissionPage() {
         return
       }
       setSettlements(data.settlements || [])
-      setSummary(data.summary || {
-        totalCommissionOwed: 0,
-        totalCommissionPaid: 0,
-        pendingThisWeek: 0,
-        overdueCount: 0,
-        pendingCount: 0,
-        paidCount: 0
-      })
+      setSummaryByCurrency(
+        Array.isArray(data.summaryByCurrency)
+          ? data.summaryByCurrency
+          : data.summary
+            ? [data.summary]
+            : []
+      )
     } catch (error) {
       console.error('Failed to fetch settlements:', error)
       toast.error('Failed to load commission data')
@@ -116,11 +112,12 @@ export default function CommissionPage() {
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-LK', {
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-LK', {
       style: 'currency',
-      currency: 'LKR',
-      minimumFractionDigits: 0
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(amount)
   }
 
@@ -144,40 +141,44 @@ export default function CommissionPage() {
     }
   }
 
-  const stats = [
+  const stats = summaryByCurrency.flatMap((summary) => [
     {
-      label: 'Total Commission Owed',
-      value: formatCurrency(summary.totalCommissionOwed),
+      key: `${summary.currency}-owed`,
+      label: `Commission Owed · ${summary.currency}`,
+      value: formatCurrency(summary.totalCommissionOwed, summary.currency),
       icon: FiDollarSign,
       color: 'bg-amber-500/20',
       iconColor: 'text-amber-400',
-      sub: `${summary.pendingCount} pending settlements`
+      sub: `${summary.pendingCount} pending · ${summary.overdueCount} overdue · ${summary.suspendedCount} suspended`,
     },
     {
-      label: 'Total Commission Paid',
-      value: formatCurrency(summary.totalCommissionPaid),
+      key: `${summary.currency}-paid`,
+      label: `Commission Paid · ${summary.currency}`,
+      value: formatCurrency(summary.totalCommissionPaid, summary.currency),
       icon: FiCheckCircle,
       color: 'bg-emerald-500/20',
       iconColor: 'text-emerald-400',
-      sub: `${summary.paidCount} settled`
+      sub: `${summary.paidCount} settled`,
     },
     {
-      label: 'Pending This Week',
-      value: formatCurrency(summary.pendingThisWeek),
+      key: `${summary.currency}-pending`,
+      label: `Pending This Week · ${summary.currency}`,
+      value: formatCurrency(summary.pendingThisWeek, summary.currency),
       icon: FiClock,
       color: 'bg-blue-500/20',
       iconColor: 'text-blue-400',
-      sub: 'Due this cycle'
+      sub: 'Due this cycle',
     },
     {
-      label: 'Overdue',
+      key: `${summary.currency}-overdue`,
+      label: `Overdue · ${summary.currency}`,
       value: summary.overdueCount.toString(),
       icon: FiAlertTriangle,
       color: 'bg-red-500/20',
       iconColor: 'text-red-400',
-      sub: 'Requires action'
-    }
-  ]
+      sub: 'Requires finance action',
+    },
+  ])
 
   return (
     <>
@@ -199,7 +200,7 @@ export default function CommissionPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat) => (
-            <div key={stat.label} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
+            <div key={stat.key} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
               <div className="flex items-center justify-between mb-3">
                 <div className={`w-10 h-10 ${stat.color} rounded-lg flex items-center justify-center`}>
                   <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
@@ -229,8 +230,8 @@ export default function CommissionPage() {
               </button>
             ))}
             <div className="ml-auto flex items-center gap-2 px-3">
-              <span className="text-xs text-gray-500">Rate:</span>
-              <span className="text-sm font-semibold text-amber-400">10%</span>
+              <span className="text-xs text-gray-500">Rates:</span>
+              <span className="text-sm font-semibold text-amber-400">Provider / market configured</span>
             </div>
           </div>
         </div>
@@ -281,9 +282,9 @@ export default function CommissionPage() {
                         <div className="text-sm text-gray-300">{formatDate(s.weekStart)}</div>
                         <div className="text-xs text-gray-500">to {formatDate(s.weekEnd)}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings, s.currency)}</td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-white">{formatCurrency(s.commissionOwed)}</div>
+                        <div className="text-sm font-medium text-white">{formatCurrency(s.commissionOwed, s.currency)}</div>
                         <div className="text-xs text-gray-500">{s.commissionRate}%</div>
                       </td>
                       <td className="px-4 py-3">
