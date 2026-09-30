@@ -22,7 +22,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               select: {
                 id: true,
                 name: true,
-                email: true,
                 taskerProfile: { select: { profileImage: true } },
               },
             },
@@ -99,7 +98,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       participants: conversation.participants.map(p => ({
         id: p.user.id,
         name: p.user.name,
-        email: p.user.email,
         profileImage: p.user.taskerProfile?.profileImage,
       })),
       messages,
