@@ -38,15 +38,30 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
     throw new Error(`WALLET_CURRENCY_NOT_FOUND: canonical ${escrowCurrency} balance does not exist for customer`)
   }
 
+  const authorizedAmount = job.finalAuthorizedAmountCents ?? quote.totalCents ?? quote.price
   const serviceFee = escrow.serviceFee ?? 0n
-  const totalAmount = escrow.totalAmount ?? (quote.price + serviceFee)
-  if (totalAmount <= 0n) throw new Error('Escrow total must be positive')
+  const totalAmount = escrow.totalAmount ?? (authorizedAmount + serviceFee)
+  if (authorizedAmount <= 0n || totalAmount <= 0n) {
+    throw new Error('Escrow total must be positive')
+  }
+  if (
+    escrow.amount !== authorizedAmount ||
+    totalAmount !== authorizedAmount + serviceFee
+  ) {
+    throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+  }
   const totalMajor = bigIntToSafeNumber(totalAmount) / 100
 
   await prisma.$transaction(async (tx) => {
     const claimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: { in: ['PENDING_PAYMENT', 'CANCELLED'] }, paymentMethod: { not: 'CASH' } },
-      data: { status: 'PROTECTED', heldAt: new Date(), amount: quote.price, serviceFee, totalAmount },
+      where: {
+        id: escrow.id,
+        status: { in: ['PENDING_PAYMENT', 'CANCELLED'] },
+        paymentMethod: { not: 'CASH' },
+        amount: authorizedAmount,
+        totalAmount,
+      },
+      data: { status: 'PROTECTED', heldAt: new Date(), amount: authorizedAmount, serviceFee, totalAmount },
     })
     if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
 
@@ -94,6 +109,7 @@ export async function fundEscrow(ctx: TransitionContext, jobId: string) {
       toState: 'PROTECTED',
       metadata: {
         escrowId: escrow.id,
+        authorizedAmountMinor: authorizedAmount,
         totalAmountMinor: totalAmount,
         currency: escrowCurrency,
         fundingMethod: 'WALLET',
