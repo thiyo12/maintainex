@@ -108,8 +108,25 @@ export default function RefundQueuePage() {
     load()
   }, [load])
 
-  async function act(item: RefundItem, action: 'RETRY' | 'RECONCILE') {
+  async function act(item: RefundItem, action: 'RETRY' | 'RECONCILE' | 'CONFIRM_MANUAL') {
     if (!canManage) return
+
+    let manualReference = ''
+    let note = ''
+    if (action === 'CONFIRM_MANUAL') {
+      manualReference = window.prompt(
+        'Enter the bank transfer / PayHere dashboard refund reference. This permanently marks the external refund complete.'
+      )?.trim() || ''
+      if (manualReference.length < 4) {
+        toast.error('A manual refund reference is required')
+        return
+      }
+      note = window.prompt('Optional finance note:')?.trim() || ''
+      if (!window.confirm('Confirm the customer has actually received or been issued this external refund?')) {
+        return
+      }
+    }
+
     setActing(item.id)
     try {
       const response = await fetch('/api/admin/financial/refunds', {
@@ -119,6 +136,7 @@ export default function RefundQueuePage() {
         body: JSON.stringify({
           paymentIntentId: item.id,
           action,
+          ...(manualReference ? { manualReference, note } : {}),
         }),
       })
       const body = await response.json().catch(() => ({}))
@@ -261,6 +279,18 @@ export default function RefundQueuePage() {
                       className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold disabled:opacity-50"
                     >
                       <FiRefreshCw size={13} /> Reconcile
+                    </button>
+                  )}
+
+                  {canManage && ['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(item.status) && (
+                    <button
+                      type="button"
+                      disabled={acting === item.id}
+                      onClick={() => act(item, 'CONFIRM_MANUAL')}
+                      className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-semibold disabled:opacity-50"
+                      title="Use only after the external refund has actually been issued"
+                    >
+                      <FiAlertTriangle size={13} /> Confirm manual
                     </button>
                   )}
                 </div>
