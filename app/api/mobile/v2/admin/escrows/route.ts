@@ -117,11 +117,19 @@ export async function PATCH(request: NextRequest) {
       { jobId: escrow.jobId, actorId: security.adminId, actorType: 'STAFF', reason: 'Admin refund' },
       escrow.jobId,
     )
-    return NextResponse.json({
-      success: true,
-      message: 'Escrow refunded by admin through canonical ledger',
-      refundAmount: result.refundAmount,
-    })
+    const pendingExternal = result.refundPendingExternal === true
+    return NextResponse.json(
+      {
+        success: true,
+        message: pendingExternal
+          ? 'External PayHere refund queued for reconciliation'
+          : 'Escrow refunded by admin through canonical ledger',
+        refundAmount: result.refundAmount,
+        refundStatus: pendingExternal ? 'REFUND_REQUIRED' : 'REFUNDED',
+        fundingSource: result.fundingSource,
+      },
+      { status: pendingExternal ? 202 : 200 }
+    )
   } catch (error) {
     console.error('Admin escrow action error:', error)
     const message = error instanceof Error ? error.message : 'Server error'
