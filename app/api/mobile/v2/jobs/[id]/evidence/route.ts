@@ -24,34 +24,53 @@ export async function POST(
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-    // Determine uploader type
     const isCustomer = job.customerId === user.id
     const uploaderType = isCustomer ? 'CUSTOMER' : 'PROVIDER'
 
-    // When no inspectionId, verify the user is a party to the job
-    if (!inspectionId && !isCustomer) {
-      const hasAcceptedQuote = await prisma.jobQuote.findFirst({
-        where: { jobId, providerId: user.id, status: 'ACCEPTED' },
+    const acceptedQuote = !isCustomer
+      ? await prisma.jobQuote.findFirst({
+          where: { jobId, status: 'ACCEPTED' },
+          select: { providerId: true, providerType: true },
+        })
+      : null
+
+    let authorizedProvider = false
+    if (!isCustomer && acceptedQuote?.providerType === 'INDIVIDUAL') {
+      authorizedProvider = acceptedQuote.providerId === user.id
+    } else if (!isCustomer && acceptedQuote?.providerType === 'COMPANY') {
+      const assignment = await prisma.companyJobAssignment.findFirst({
+        where: {
+          jobId,
+          companyId: acceptedQuote.providerId,
+          workerUserId: user.id,
+          status: { in: ['ACCEPTED', 'IN_PROGRESS'] },
+        },
+        select: { id: true },
       })
-      if (!hasAcceptedQuote) {
-        return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 })
-      }
+      authorizedProvider = Boolean(assignment)
     }
 
-    // If uploading to an inspection, verify the user is the assigned provider or customer
+    if (!isCustomer && !authorizedProvider) {
+      return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 })
+    }
+
     if (inspectionId) {
       const inspection = await prisma.jobInspection.findUnique({ where: { id: inspectionId } })
-      if (!inspection) return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
-      if (inspection.jobId !== jobId) {
-        return NextResponse.json({ error: 'Inspection does not belong to this job' }, { status: 400 })
+      if (!inspection || inspection.jobId !== jobId) {
+        return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
       }
 
-      // Verify provider ownership
-      if (uploaderType === 'PROVIDER') {
+      if (!isCustomer) {
         if (inspection.taskerId && inspection.taskerId !== user.id) {
           return NextResponse.json({ error: 'Not the assigned provider' }, { status: 403 })
         }
-        if (inspection.companyId && inspection.companyId !== user.id) {
+        if (
+          inspection.companyId &&
+          (
+            acceptedQuote?.providerType !== 'COMPANY' ||
+            inspection.companyId !== acceptedQuote.providerId
+          )
+        ) {
           return NextResponse.json({ error: 'Not the assigned company' }, { status: 403 })
         }
       }
