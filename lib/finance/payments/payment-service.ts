@@ -1228,6 +1228,40 @@ async function finalizePayHereRefund(
       }, tx)
     }
 
+    const resolvingDispute = await tx.marketplaceDispute.findFirst({
+      where: {
+        jobId: intent.jobId,
+        escrowId: intent.escrowId,
+        status: 'RESOLVING',
+        resolutionAction: 'REFUND_CUSTOMER',
+      },
+      select: { id: true, resolution: true, resolvedBy: true },
+    })
+
+    if (resolvingDispute) {
+      await tx.marketplaceDispute.update({
+        where: { id: resolvingDispute.id },
+        data: {
+          status: 'RESOLVED',
+          resolvedAt: new Date(),
+        },
+      })
+
+      await tx.adminAlert.updateMany({
+        where: {
+          targetTable: 'MarketplaceDispute',
+          targetId: resolvingDispute.id,
+          status: { in: ['open', 'in_progress'] },
+        },
+        data: {
+          status: 'resolved',
+          resolvedAt: new Date(),
+          resolvedBy: resolvingDispute.resolvedBy,
+          notes: resolvingDispute.resolution || 'Customer refund completed',
+        },
+      })
+    }
+
     await recordJobLifecycleEvent(tx, {
       jobId: intent.jobId,
       actorId,
