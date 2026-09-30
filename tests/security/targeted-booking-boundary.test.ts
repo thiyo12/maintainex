@@ -51,6 +51,18 @@ describe('targeted booking provider boundary', () => {
     expect(quotes).toContain('if (lockedJob.targetTaskerId && !allowedTargetIds.has(lockedJob.targetTaskerId))')
   })
 
+  it('preserves accepted company access after target moves to an assigned worker', () => {
+    const detail = read('app/api/mobile/v2/jobs/[id]/route.ts')
+
+    expect(detail).toContain('const participantCompanyIds = [...new Set([')
+    expect(detail).toContain("providerType: 'COMPANY'")
+    expect(detail).toContain("status: 'ACCEPTED'")
+    expect(detail).toContain('hasAcceptedCompanyParticipation = Boolean(acceptedCompanyQuote)')
+    expect(detail).toContain(
+      '!readableTargetIds.has(job.targetTaskerId) && !hasAcceptedCompanyParticipation'
+    )
+  })
+
   it('protects targeted job detail reads from unrelated authenticated users', () => {
     const detail = read('app/api/mobile/v2/jobs/[id]/route.ts')
     expect(detail).toContain('if (!isOwner && job.targetTaskerId)')
