@@ -343,9 +343,8 @@ export async function reassignWorker(
         description: `Revoked assignment (worker ${currentAssignment.workerUserId}) from job ${jobId}`,
         metadata: { previousWorkerUserId: currentAssignment.workerUserId, reason },
       }, tx)
-    }
 
-    const newRecord = reusableAssignment
+      const newRecord = reusableAssignment
       ? await tx.companyJobAssignment.update({
           where: { id: reusableAssignment.id },
           data: {
@@ -371,16 +370,16 @@ export async function reassignWorker(
           },
         })
 
-    await writeCompanyAuditLog({
-      companyId,
-      actorId: actorUserId,
-      actorRole,
-      action: 'WORKER_ASSIGN',
-      targetType: 'CompanyJobAssignment',
-      targetId: newRecord.id,
-      description: `Reassigned worker to job ${jobId}`,
-      metadata: { workerUserId: newWorkerUserId, jobId, assignmentId: newRecord.id },
-    }, tx)
+      await writeCompanyAuditLog({
+        companyId,
+        actorId: actorUserId,
+        actorRole,
+        action: 'WORKER_ASSIGN',
+        targetType: 'CompanyJobAssignment',
+        targetId: newRecord.id,
+        description: `Reassigned worker to job ${jobId}`,
+        metadata: { workerUserId: newWorkerUserId, jobId, assignmentId: newRecord.id },
+      }, tx)
 
       return newRecord
     })
