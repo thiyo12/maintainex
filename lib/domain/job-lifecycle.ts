@@ -7,6 +7,7 @@ import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { fundEscrow, releaseEscrow, refundEscrow, expirePendingEscrow, completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
 import { evaluateEligibility } from '@/lib/matching/eligibility'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
@@ -52,108 +53,6 @@ async function isAssignedCompanyWorker(
     select: { id: true },
   })
   return !!member
-}
-
-async function lockAndAssertProviderAvailableForAcceptance(
-  tx: Prisma.TransactionClient,
-  providerType: 'INDIVIDUAL' | 'COMPANY',
-  providerId: string,
-) {
-  if (providerType === 'INDIVIDUAL') {
-    const users = await tx.$queryRaw<Array<{
-      id: string
-      isActive: boolean
-      isSuspended: boolean
-      isBanned: boolean
-      identityStatus: string | null
-    }>>`
-      SELECT id, "isActive", "isSuspended", "isBanned", "identityStatus"
-      FROM "User"
-      WHERE id = ${providerId}
-      FOR UPDATE
-    `
-    const user = users[0]
-    if (
-      !user ||
-      !user.isActive ||
-      user.isSuspended ||
-      user.isBanned ||
-      user.identityStatus !== 'VERIFIED'
-    ) {
-      throw new Error('Quote provider is no longer available')
-    }
-
-    const profiles = await tx.$queryRaw<Array<{
-      id: string
-      verificationStatus: string
-      isVerified: boolean
-    }>>`
-      SELECT id, "verificationStatus", "isVerified"
-      FROM "TaskerProfile"
-      WHERE "userId" = ${providerId}
-      FOR UPDATE
-    `
-    const profile = profiles[0]
-    if (
-      !profile ||
-      profile.verificationStatus !== 'VERIFIED' ||
-      !profile.isVerified
-    ) {
-      throw new Error('Quote provider is no longer available')
-    }
-    return
-  }
-
-  const companies = await tx.$queryRaw<Array<{
-    id: string
-    userId: string
-    verificationStatus: string
-    isVerified: boolean
-    subscriptionStatus: string
-  }>>`
-    SELECT id, "userId", "verificationStatus", "isVerified", "subscriptionStatus"
-    FROM "CompanyProfile"
-    WHERE id = ${providerId}
-    FOR UPDATE
-  `
-  const company = companies[0]
-  if (
-    !company ||
-    company.verificationStatus !== 'VERIFIED' ||
-    !company.isVerified ||
-    company.subscriptionStatus === 'CANCELLED'
-  ) {
-    throw new Error('Quote provider is no longer available')
-  }
-
-  const owners = await tx.$queryRaw<Array<{
-    id: string
-    isActive: boolean
-    isSuspended: boolean
-    isBanned: boolean
-  }>>`
-    SELECT id, "isActive", "isSuspended", "isBanned"
-    FROM "User"
-    WHERE id = ${company.userId}
-    FOR UPDATE
-  `
-  const owner = owners[0]
-  if (!owner || !owner.isActive || owner.isSuspended || owner.isBanned) {
-    throw new Error('Quote provider is no longer available')
-  }
-
-  const activeOwners = await tx.$queryRaw<Array<{ id: string }>>`
-    SELECT id
-    FROM "TeamMember"
-    WHERE "companyId" = ${providerId}
-      AND role = 'COMPANY_OWNER'
-      AND status = 'ACTIVE'
-    LIMIT 1
-    FOR UPDATE
-  `
-  if (activeOwners.length === 0) {
-    throw new Error('Quote provider is no longer available')
-  }
 }
 
 export interface TransitionContext {
@@ -463,10 +362,11 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   const totalAmount = acceptedAmount + serviceFee
 
   await prisma.$transaction(async (tx) => {
-    await lockAndAssertProviderAvailableForAcceptance(
+    await lockAndAssertProviderAvailable(
       tx,
       quote.providerType,
       quote.providerId,
+      'Quote provider is no longer available',
     )
 
     const existingEscrow = await tx.jobEscrow.findFirst({
