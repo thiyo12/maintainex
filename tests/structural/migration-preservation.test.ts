@@ -92,11 +92,17 @@ describe.skipIf(!isDB)('Phase 8 — Migration Preservation', () => {
   })
 
   it('WalletBalance unique constraint enforces (walletType, walletId, currency)', async () => {
+    const first = await prisma.walletBalance.create({
+      data: { walletId, walletType: 'CUSTOMER', balance: 0n, availableBalance: 0n, pendingBalance: 0n, currency: 'LKR' },
+    })
+
     await expect(
       prisma.walletBalance.create({
         data: { walletId, walletType: 'CUSTOMER', balance: 0n, availableBalance: 0n, pendingBalance: 0n, currency: 'LKR' },
       })
     ).rejects.toThrow()
+
+    await prisma.walletBalance.delete({ where: { id: first.id } })
   })
 
   it('FinancialLedger.currency defaults to LKR for new entries', async () => {
