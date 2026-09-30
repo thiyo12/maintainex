@@ -27,7 +27,7 @@ export async function POST(
 ) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'users:suspend',
+      permission: 'taskers:edit',
       level: 'sensitive',
       requireCountryScope: true,
     })
@@ -44,9 +44,17 @@ export async function POST(
 
     const target = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, countryCode: true },
+      select: {
+        id: true,
+        role: true,
+        countryCode: true,
+        taskerProfile: { select: { id: true } },
+      },
     })
     if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    if (target.role !== 'TASKER' || !target.taskerProfile) {
+      return NextResponse.json({ error: 'Tasker profile not found' }, { status: 404 })
+    }
     if (!assertCrmCountryAllowed(security, target.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
