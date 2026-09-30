@@ -14,7 +14,7 @@ A comprehensive 5-part backup producing a single timestamped `.tar.gz` archive:
 | **Environment files** | `.env.example`, `mobile/.env` | Direct copy |
 | **Docker config** | `Dockerfile`, `nixpacks.toml`, `.dockerignore` | Direct copy |
 
-**Archive**: `/Users/thiyoth/maintainex-backup/maintainex-full-backup-YYYY-MM-DD.tar.gz`
+**Archive**: `$HOME/maintainex-backup/maintainex-full-backup-YYYY-MM-DD.tar.gz`
 
 ### Database Backup Module (`lib/backup/index.ts`)
 
