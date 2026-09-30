@@ -36,6 +36,38 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const isOwner = user.id === job.customerId
+    let viewerTaskerId: string | null = null
+
+    if (!isOwner) {
+      const tasker = await prisma.taskerProfile.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      })
+      viewerTaskerId = tasker?.id ?? null
+
+      if (job.status !== 'OPEN') {
+        if (!viewerTaskerId) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+        const assignment = await prisma.assignment.findFirst({
+          where: {
+            jobId: job.id,
+            taskerId: viewerTaskerId,
+            status: { in: ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] },
+          },
+          select: { id: true },
+        })
+        if (!assignment) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+      }
+    }
+
+    const visibleBids = isOwner
+      ? job.bids
+      : viewerTaskerId
+        ? job.bids.filter(bid => bid.taskerId === viewerTaskerId)
+        : []
 
     return NextResponse.json({
       id: job.id,
@@ -50,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       scheduledDate: job.scheduledDate?.toISOString(),
       createdAt: job.createdAt.toISOString(),
       customer: isOwner ? job.customer : { ...job.customer, phone: null },
-      bids: job.bids.map(b => ({
+      bids: visibleBids.map(b => ({
         id: b.id,
         jobId: b.jobId,
         taskerId: b.taskerId,
