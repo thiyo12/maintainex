@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiCreditCard, FiUser, FiDollarSign, FiRefreshCw, FiLock, FiUnlock, FiArrowUp, FiArrowDown, FiSearch } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface ProviderWallet {
   id: string
@@ -37,6 +39,8 @@ interface Transaction {
 }
 
 export default function WalletsPage() {
+  const { user: admin } = useAdminSession()
+  const canManageWallets = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('wallets:manage')
   const [activeTab, setActiveTab] = useState<'providers' | 'customers' | 'transactions'>('providers')
   const [providerWallets, setProviderWallets] = useState<ProviderWallet[]>([])
   const [customerWallets, setCustomerWallets] = useState<CustomerWallet[]>([])
@@ -76,6 +80,10 @@ export default function WalletsPage() {
   }
 
   const handleFreezeToggle = async (walletId: string, currentlyFrozen: boolean) => {
+    if (!canManageWallets) {
+      toast.error('You do not have permission to manage wallets')
+      return
+    }
     setFreezeLoading(walletId)
     try {
       const res = await fetch('/api/admin/financial/wallets', {
@@ -226,7 +234,7 @@ export default function WalletsPage() {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Available Balance</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Pending Balance</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{canManageWallets ? 'Actions' : 'Access'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -248,7 +256,7 @@ export default function WalletsPage() {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleFreezeToggle(w.id, w.isFrozen)}
-                            disabled={freezeLoading === w.id}
+                            disabled={!canManageWallets || freezeLoading === w.id}
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors disabled:opacity-50 ${
                               w.isFrozen
                                 ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
@@ -280,7 +288,7 @@ export default function WalletsPage() {
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">User</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Balance</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{canManageWallets ? 'Actions' : 'Access'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
@@ -301,7 +309,7 @@ export default function WalletsPage() {
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleFreezeToggle(w.id, w.isFrozen)}
-                            disabled={freezeLoading === w.id}
+                            disabled={!canManageWallets || freezeLoading === w.id}
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium transition-colors disabled:opacity-50 ${
                               w.isFrozen
                                 ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
