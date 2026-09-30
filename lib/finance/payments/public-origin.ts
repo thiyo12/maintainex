@@ -2,7 +2,11 @@ export function resolvePaymentPublicOrigin(requestUrl: string): string | null {
   const configured = process.env.NEXTAUTH_URL?.trim()
   if (configured) {
     try {
-      return new URL(configured).origin
+      const url = new URL(configured)
+      if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+        return null
+      }
+      return url.origin
     } catch {
       return null
     }
