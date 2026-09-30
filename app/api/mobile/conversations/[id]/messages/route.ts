@@ -41,6 +41,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
+    if (conversation.jobId) {
+      const job = await prisma.marketplaceJob.findUnique({
+        where: { id: conversation.jobId },
+        select: { status: true },
+      })
+      if (job && ['COMPLETED', 'CANCELLED'].includes(job.status)) {
+        return NextResponse.json(
+          { error: 'This conversation is closed because the job is no longer active' },
+          { status: 409 }
+        )
+      }
+    }
+
     // Rate limit: max 50 messages per conversation per day per user
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
     const sentToday = await prisma.message.count({
