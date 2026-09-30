@@ -503,15 +503,37 @@ function Jobs({ data }: { data: Payload }) {
 
 function Finance({ data }: { data: Payload }) {
   const f = data.finance
-  const pendingCommission = f.settlements.filter(item => item.status === 'PENDING').reduce((sum, item) => sum + Number(item.commissionAmount || 0), 0)
-  const totalEscrow = f.escrows.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)
+  const currencyTotals = new Map<string, { escrow: number; commission: number }>()
+
+  for (const escrow of f.escrows) {
+    const currency = escrow.currency || 'LKR'
+    const current = currencyTotals.get(currency) || { escrow: 0, commission: 0 }
+    current.escrow += Number(escrow.totalAmount || 0)
+    currencyTotals.set(currency, current)
+  }
+
+  for (const settlement of f.settlements) {
+    if (settlement.status !== 'PENDING') continue
+    const currency = settlement.currency || 'LKR'
+    const current = currencyTotals.get(currency) || { escrow: 0, commission: 0 }
+    current.commission += Number(settlement.commissionAmount || 0)
+    currencyTotals.set(currency, current)
+  }
+
+  const financeRows = [...currencyTotals.entries()].sort(([a], [b]) => a.localeCompare(b))
 
   return (
     <>
-      <div className="grid md:grid-cols-3 gap-4">
-        <Metric label="Escrow linked" value={fmtMoneyMinor(totalEscrow)} />
-        <Metric label="Pending commission" value={fmtMoneyMinor(pendingCommission)} />
-        <Metric label="Provider wallet" value={f.wallet ? fmtMoneyMajor(f.wallet.availableBalance, f.wallet.currency) : '—'} />
+      <div className="space-y-3">
+        {financeRows.map(([currency, totals]) => (
+          <div key={currency} className="grid md:grid-cols-2 gap-4">
+            <Metric label={`Escrow linked · ${currency}`} value={fmtMoneyMinor(totals.escrow, currency)} />
+            <Metric label={`Pending commission · ${currency}`} value={fmtMoneyMinor(totals.commission, currency)} />
+          </div>
+        ))}
+        <div className="grid md:grid-cols-1 gap-4">
+          <Metric label="Provider wallet" value={f.wallet ? fmtMoneyMajor(f.wallet.availableBalance, f.wallet.currency) : '—'} />
+        </div>
       </div>
 
       <Card title="Commission settlements" subtitle="Per-job MaintainEX commission records">
