@@ -17,7 +17,7 @@
 
 ```bash
 # SSH to VPS
-ssh -i ~/.ssh/id_ed25519_ssaaxcy root@147.93.106.54
+ssh -i ~/.ssh/id_ed25519 root@YOUR_VPS_IP
 
 # Find DB container
 docker ps --filter name=maintainex-db --format "{{.Names}}"
