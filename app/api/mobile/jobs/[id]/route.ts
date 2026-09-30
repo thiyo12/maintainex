@@ -362,8 +362,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
-    if (job.customerId !== user.id && !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
+    if (job.customerId !== user.id) {
       return NextResponse.json({ error: 'Not your job' }, { status: 403 })
+    }
+    if (job.status !== 'OPEN') {
+      return NextResponse.json(
+        { error: 'Active or historical jobs cannot be hard-deleted. Cancel the job instead.' },
+        { status: 409 }
+      )
     }
 
     await prisma.jobPosting.delete({ where: { id } })
