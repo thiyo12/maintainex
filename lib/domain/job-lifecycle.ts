@@ -254,11 +254,11 @@ export async function cancelJob(
     }
 
     if (lockedJob.status === 'QUOTE_ACCEPTED') {
-      const protectedEscrow = await tx.jobEscrow.findFirst({
-        where: { jobId: ctx.jobId, status: 'PROTECTED' },
+      const paymentCommitment = await tx.jobEscrow.findFirst({
+        where: { jobId: ctx.jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
         select: { id: true },
       })
-      if (protectedEscrow) {
+      if (paymentCommitment) {
         return { needsRefund: true, previousStatus: lockedJob.status }
       }
     }
