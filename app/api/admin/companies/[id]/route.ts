@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   guardCrmRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
+import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
 function safeJson(value: unknown) {
   return redactCrmSensitiveData(
@@ -98,15 +98,12 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const canWork = crmHasPermission(security.role, 'jobs:view')
-    const canFinance =
-      crmHasPermission(security.role, 'wallets:view') ||
-      crmHasPermission(security.role, 'commission:view')
-    const canTrust =
-      crmHasPermission(security.role, 'kyc:view') ||
-      crmHasPermission(security.role, 'risk_events:read') ||
-      crmHasPermission(security.role, 'credentials:read')
-    const canAudit = crmHasPermission(security.role, 'audit:read')
+    const {
+      work: canWork,
+      finance: canFinance,
+      trust: canTrust,
+      audit: canAudit,
+    } = getCrmSectionAccess(security.role, security.isSuperAdmin)
 
     const [
       documents,
