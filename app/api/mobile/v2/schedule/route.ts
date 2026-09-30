@@ -6,10 +6,14 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action')
 
-    if (action === 'recommend' && user) {
+    if (action === 'recommend') {
       const recs = await getProviderScheduleRecommendations(user.id)
       return NextResponse.json(recs)
     }
