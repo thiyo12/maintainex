@@ -393,6 +393,19 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
       }
     }
 
+    if (
+      paymentIntent.status === 'REFUND_REQUIRED' ||
+      paymentIntent.status === 'REFUND_PROCESSING'
+    ) {
+      return {
+        refundAmount: refundMajor,
+        refundCents,
+        refundPendingExternal: true,
+        fundingSource,
+        paymentIntentId: paymentIntent.id,
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.jobEscrow.updateMany({
         where: {
