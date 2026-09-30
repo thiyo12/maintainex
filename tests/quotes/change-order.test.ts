@@ -28,6 +28,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         status: 'ACCEPTED',
         providerId: 'provider-1',
         price: 50000n,
+        totalCents: null,
         revisionNumber: 1,
         createdAt: new Date('2026-09-10'),
       }),
@@ -449,6 +450,26 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
       expect(result.baseAmountCents).toBe(50000n)
       expect(result.changeOrderDeltaCents).toBe(20000n)
       expect(result.finalAmountCents).toBe(70000n)
+    })
+
+    it('uses totalCents from the accepted quote when itemized pricing is present', async () => {
+      const client = mockPrisma({
+        quote: {
+          id: 'quote-accepted',
+          jobId: 'job-1',
+          status: 'ACCEPTED',
+          providerId: 'provider-1',
+          price: 50000n,
+          totalCents: 57500n,
+          revisionNumber: 1,
+          createdAt: new Date('2026-09-10'),
+        },
+        approvedOrders: [],
+      })
+      const result = await calculateFinalAuthorizedAmount(client, 'job-1')
+      expect(result.success).toBe(true)
+      expect(result.baseAmountCents).toBe(57500n)
+      expect(result.finalAmountCents).toBe(57500n)
     })
 
     it('excludes non-approved change orders', async () => {
