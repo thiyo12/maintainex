@@ -19,7 +19,7 @@ export async function POST(
 
     const { id: jobId } = await params
     const body = await request.json()
-    const { inspectionFeeCents, currency } = body
+    const { inspectionFeeCents } = body
 
     const [acceptedQuote, job] = await Promise.all([
       prisma.jobQuote.findFirst({
