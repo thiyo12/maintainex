@@ -50,8 +50,11 @@ export const v2JobActions = {
       method: 'POST',
       body: JSON.stringify({ action, reason, cashPaidConfirmed }),
     }),
-  releaseEscrow: (jobId: string) =>
-    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
+  releaseEscrow: (jobId: string, cashPaidConfirmed?: boolean) =>
+    v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, {
+      method: 'POST',
+      body: JSON.stringify({ cashPaidConfirmed }),
+    }),
   confirmCashPayment: (jobId: string) =>
     v2Request<{
       success: boolean
