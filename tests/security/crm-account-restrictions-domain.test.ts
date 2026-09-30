@@ -28,6 +28,9 @@ function mockClient(initial: Record<string, any>) {
       findUnique: vi.fn().mockImplementation(() => Promise.resolve({ ...state })),
       update,
     },
+    userSession: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     auditLog: { create: auditCreate },
   }
   const client: any = {
@@ -64,6 +67,13 @@ describe('CRM account restriction domain', () => {
     expect(client._state()).toMatchObject({
       isSuspended: true,
       suspensionReason: 'Repeated abuse',
+    })
+    expect(client._db.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'customer-1', isValid: true },
+      data: expect.objectContaining({
+        isValid: false,
+        revokeReason: 'ACCOUNT_SUSPENDED',
+      }),
     })
     expect(client._db.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -156,6 +166,13 @@ describe('CRM account restriction domain', () => {
       isActive: false,
       isBanned: true,
       banReason: 'Confirmed fraud',
+    })
+    expect(client._db.userSession.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'tasker-1', isValid: true },
+      data: expect.objectContaining({
+        isValid: false,
+        revokeReason: 'ACCOUNT_BANNED',
+      }),
     })
     expect(client._db.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
