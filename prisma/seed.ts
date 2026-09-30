@@ -195,8 +195,8 @@ async function main() {
     {
       name: 'Western Province Branch',
       location: 'Colombo, Sri Lanka',
-      phone: '0770867601',
-      email: 'western@maintainex.com',
+      phone: '0000000000',
+      email: 'western@example.invalid',
       address: 'Colombo, Sri Lanka',
       province: 'Western Province',
       districts: ['Colombo', 'Gampaha', 'Kalutara']
@@ -204,8 +204,8 @@ async function main() {
     {
       name: 'Central Province Branch',
       location: 'Kandy, Sri Lanka',
-      phone: '0770867602',
-      email: 'central@maintainex.com',
+      phone: '0000000000',
+      email: 'central@example.invalid',
       address: 'Kandy, Sri Lanka',
       province: 'Central Province',
       districts: ['Kandy', 'Matale', 'Nuwara Eliya']
@@ -213,8 +213,8 @@ async function main() {
     {
       name: 'Southern Province Branch',
       location: 'Galle, Sri Lanka',
-      phone: '0770867603',
-      email: 'southern@maintainex.com',
+      phone: '0000000000',
+      email: 'southern@example.invalid',
       address: 'Galle, Sri Lanka',
       province: 'Southern Province',
       districts: ['Galle', 'Matara', 'Hambantota']
@@ -222,17 +222,17 @@ async function main() {
     {
       name: 'Northern Province Branch',
       location: 'Jaffna, Sri Lanka',
-      phone: '0770867609',
-      email: 'northern@maintainex.com',
-      address: '57/1 New Senguntha Road, Thirunelvaly, Jaffna, Sri Lanka',
+      phone: '0000000000',
+      email: 'northern@example.invalid',
+      address: 'Jaffna, Sri Lanka',
       province: 'Northern Province',
       districts: ['Jaffna', 'Kilinochchi', 'Mannar', 'Mullaitivu', 'Vavuniya']
     },
     {
       name: 'Eastern Province Branch',
       location: 'Trincomalee, Sri Lanka',
-      phone: '0770867604',
-      email: 'eastern@maintainex.com',
+      phone: '0000000000',
+      email: 'eastern@example.invalid',
       address: 'Trincomalee, Sri Lanka',
       province: 'Eastern Province',
       districts: ['Trincomalee', 'Batticaloa', 'Ampara']
@@ -240,8 +240,8 @@ async function main() {
     {
       name: 'North Western Province Branch',
       location: 'Kurunegala, Sri Lanka',
-      phone: '0770867605',
-      email: 'northwest@maintainex.com',
+      phone: '0000000000',
+      email: 'northwest@example.invalid',
       address: 'Kurunegala, Sri Lanka',
       province: 'North Western Province',
       districts: ['Kurunegala', 'Puttalam']
@@ -249,8 +249,8 @@ async function main() {
     {
       name: 'North Central Province Branch',
       location: 'Anuradhapura, Sri Lanka',
-      phone: '0770867606',
-      email: 'northcentral@maintainex.com',
+      phone: '0000000000',
+      email: 'northcentral@example.invalid',
       address: 'Anuradhapura, Sri Lanka',
       province: 'North Central Province',
       districts: ['Anuradhapura', 'Polonnaruwa']
@@ -258,8 +258,8 @@ async function main() {
     {
       name: 'Uva Province Branch',
       location: 'Badulla, Sri Lanka',
-      phone: '0770867608',
-      email: 'uva@maintainex.com',
+      phone: '0000000000',
+      email: 'uva@example.invalid',
       address: 'Badulla, Sri Lanka',
       province: 'Uva Province',
       districts: ['Badulla', 'Monaragala']
@@ -267,8 +267,8 @@ async function main() {
     {
       name: 'Sabaragamuwa Province Branch',
       location: 'Ratnapura, Sri Lanka',
-      phone: '0770867607',
-      email: 'sabaragamuwa@maintainex.com',
+      phone: '0000000000',
+      email: 'sabaragamuwa@example.invalid',
       address: 'Ratnapura, Sri Lanka',
       province: 'Sabaragamuwa Province',
       districts: ['Ratnapura', 'Kegalle']
@@ -304,8 +304,11 @@ async function main() {
     where: { id: 'branch-northern-province-branch' }
   })
 
-  const superAdminEmail = process.env.ADMIN_EMAIL || 'maintainex.lk@gmail.com'
-  const superAdminPasswordPlain = 'M@int@in2024!'
+  const superAdminEmail = process.env.ADMIN_EMAIL || 'admin@example.invalid'
+  const superAdminPasswordPlain = process.env.ADMIN_PASSWORD
+  if (!superAdminPasswordPlain) {
+    throw new Error('ADMIN_PASSWORD is required when running the seed script')
+  }
   const superAdminPassword = await bcrypt.hash(superAdminPasswordPlain, 12)
 
   const existingSuper = await prisma.admin.findUnique({ where: { email: superAdminEmail } })
@@ -326,8 +329,11 @@ async function main() {
   console.log('Super Admin:', superAdminEmail)
 
   if (northernBranch) {
-    const adminEmail = 'admin.maintainex.lk@gmail.com'
-    const adminPasswordPlain = 'Adm1n@M4int@in!'
+    const adminEmail = process.env.BRANCH_ADMIN_EMAIL || 'branch-admin@example.invalid'
+    const adminPasswordPlain = process.env.BRANCH_ADMIN_PASSWORD
+    if (!adminPasswordPlain) {
+      throw new Error('BRANCH_ADMIN_PASSWORD is required when running the seed script')
+    }
     const adminPassword = await bcrypt.hash(adminPasswordPlain, 12)
     const branchAdmin = await prisma.admin.upsert({
       where: { email: adminEmail },
@@ -350,7 +356,11 @@ async function main() {
   console.log('')
   console.log('Seeding marketplace data...')
 
-  const passwordHash = await bcrypt.hash('password123', 12)
+  const demoPasswordPlain = process.env.SEED_DEMO_PASSWORD
+  if (!demoPasswordPlain) {
+    throw new Error('SEED_DEMO_PASSWORD is required when running the seed script')
+  }
+  const passwordHash = await bcrypt.hash(demoPasswordPlain, 12)
 
   // ────────────────────────────────────────
   // USERS (25 total: 10 CUSTOMER, 10 TASKER, 5 COMPANY)
@@ -373,37 +383,37 @@ async function main() {
   }
 
   const customerNames = [
-    { name: 'Kavinda Perera', email: 'kavinda.perera@gmail.com' },
-    { name: 'Nadeesha Fernando', email: 'nadeesha.f@gmail.com' },
-    { name: 'Chamara Wickramasinghe', email: 'chamara.w@outlook.com' },
-    { name: 'Dilhani Silva', email: 'dilhani.silva@yahoo.com' },
-    { name: 'Ruwan Jayawardena', email: 'ruwan.jay@gmail.com' },
-    { name: 'Sanduni Herath', email: 'sanduni.herath@gmail.com' },
-    { name: 'Kasun Bandara', email: 'kasun.bandara@hotmail.com' },
-    { name: 'Madhavi Tennakoon', email: 'madhavi.t@outlook.com' },
-    { name: 'Tharaka Mendis', email: 'tharaka.mendis@gmail.com' },
-    { name: 'Yoshitha Rajapaksa', email: 'yoshitha.r@gmail.com' },
+    { name: 'Demo Customer 01', email: 'customer01@example.invalid' },
+    { name: 'Demo Customer 02', email: 'customer02@example.invalid' },
+    { name: 'Demo Customer 03', email: 'customer03@example.invalid' },
+    { name: 'Demo Customer 04', email: 'customer04@example.invalid' },
+    { name: 'Demo Customer 05', email: 'customer05@example.invalid' },
+    { name: 'Demo Customer 06', email: 'customer06@example.invalid' },
+    { name: 'Demo Customer 07', email: 'customer07@example.invalid' },
+    { name: 'Demo Customer 08', email: 'customer08@example.invalid' },
+    { name: 'Demo Customer 09', email: 'customer09@example.invalid' },
+    { name: 'Demo Customer 10', email: 'customer10@example.invalid' },
   ]
 
   const taskerNames = [
-    { name: 'Dinesh Kumara', email: 'dinesh.kumara@gmail.com' },
-    { name: 'Anoma De Silva', email: 'anoma.desilva@gmail.com' },
-    { name: 'Prasanna Jayasuriya', email: 'prasanna.j@outlook.com' },
-    { name: 'Lakmini Rajapaksa', email: 'lakmini.raj@gmail.com' },
-    { name: 'Niroshan Fernando', email: 'niroshan.f@gmail.com' },
-    { name: 'Chamindri Weerasinghe', email: 'chamindri.w@yahoo.com' },
-    { name: 'Buddhika Perera', email: 'buddhika.perera@gmail.com' },
-    { name: 'Malsha Liyanage', email: 'malsha.liyanage@gmail.com' },
-    { name: 'Harsha Bandaranayake', email: 'harsha.b@outlook.com' },
-    { name: 'Thilini Gunasekara', email: 'thilini.g@gmail.com' },
+    { name: 'Demo Tasker 01', email: 'tasker01@example.invalid' },
+    { name: 'Demo Tasker 02', email: 'tasker02@example.invalid' },
+    { name: 'Demo Tasker 03', email: 'tasker03@example.invalid' },
+    { name: 'Demo Tasker 04', email: 'tasker04@example.invalid' },
+    { name: 'Demo Tasker 05', email: 'tasker05@example.invalid' },
+    { name: 'Demo Tasker 06', email: 'tasker06@example.invalid' },
+    { name: 'Demo Tasker 07', email: 'tasker07@example.invalid' },
+    { name: 'Demo Tasker 08', email: 'tasker08@example.invalid' },
+    { name: 'Demo Tasker 09', email: 'tasker09@example.invalid' },
+    { name: 'Demo Tasker 10', email: 'tasker10@example.invalid' },
   ]
 
   const companyNames = [
-    { name: 'Roshan Manage', email: 'roshan@ceylonservices.lk', company: 'Ceylon Home Services' },
-    { name: 'Jagath Tennakoon', email: 'jagath@lankatech.lk', company: 'Lanka Tech Solutions' },
-    { name: 'Sumithra Jayawardena', email: 'sumithra@pearlhome.lk', company: 'Pearl Home Services' },
-    { name: 'Lakmal Fernando', email: 'lakmal@islandmaintenance.lk', company: 'Island Maintenance Co.' },
-    { name: 'Priya Wickramasinghe', email: 'priya@serendibfacilities.lk', company: 'Serendib Facilities' },
+    { name: 'Demo Company User 01', email: 'company01@example.invalid', company: 'Demo Company 01' },
+    { name: 'Demo Company User 02', email: 'company02@example.invalid', company: 'Demo Company 02' },
+    { name: 'Demo Company User 03', email: 'company03@example.invalid', company: 'Demo Company 03' },
+    { name: 'Demo Company User 04', email: 'company04@example.invalid', company: 'Demo Company 04' },
+    { name: 'Demo Company User 05', email: 'company05@example.invalid', company: 'Demo Company 05' },
   ]
 
   const users: UserData[] = []
@@ -955,18 +965,9 @@ async function main() {
   console.log('')
   console.log('✅ Seed completed successfully!')
   console.log('')
-  console.log('Login Credentials:')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('Super Admin:  maintainex.lk@gmail.com / M@int@in2024!')
-  console.log('Branch Admin: admin.maintainex.lk@gmail.com / Adm1n@M4int@in!')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('⚠️  Change these passwords immediately in production!')
-  console.log('⚠️  Use environment variables: ADMIN_EMAIL, ADMIN_PASSWORD')
-  console.log('')
-  console.log('Test User Credentials:')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('All test users use password: password123')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('Seed credentials were loaded from environment variables.')
+  console.log('Passwords are intentionally never printed.')
+  console.log('Required: ADMIN_PASSWORD, BRANCH_ADMIN_PASSWORD, SEED_DEMO_PASSWORD')
   console.log('')
   console.log('Seed Summary:')
   console.log(`  • Categories: ${categoriesData.length} (${categoriesData.reduce((a, c) => a + c.services.length, 0)} services)`)
