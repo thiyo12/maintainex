@@ -7,6 +7,41 @@ import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
 
+async function getAcceptedProviderRecipientIds(jobId: string): Promise<string[]> {
+  const accepted = await prisma.jobQuote.findFirst({
+    where: { jobId, status: 'ACCEPTED' },
+    select: { providerId: true, providerType: true },
+  })
+  if (!accepted) return []
+
+  if (accepted.providerType === 'INDIVIDUAL') {
+    return [accepted.providerId]
+  }
+
+  const [company, assignments] = await Promise.all([
+    prisma.companyProfile.findUnique({
+      where: { id: accepted.providerId },
+      select: { userId: true },
+    }),
+    prisma.companyJobAssignment.findMany({
+      where: {
+        jobId,
+        companyId: accepted.providerId,
+        workerUserId: { not: null },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      },
+      select: { workerUserId: true },
+    }),
+  ])
+
+  return [...new Set(
+    [
+      company?.userId ?? null,
+      ...assignments.map(assignment => assignment.workerUserId),
+    ].filter((value): value is string => Boolean(value))
+  )]
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -100,32 +135,20 @@ export async function POST(
           ? body.reason.trim().slice(0, 1000)
           : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
-      let disputeRecipientId: string | null = isCustomer ? null : job.customerId
-
-      if (isCustomer) {
-        const accepted = await prisma.jobQuote.findFirst({
-          where: { jobId: job.id, status: 'ACCEPTED' },
-          select: { providerId: true, providerType: true },
-        })
-        if (accepted) {
-          disputeRecipientId =
-            accepted.providerType === 'INDIVIDUAL'
-              ? accepted.providerId
-              : (await prisma.companyProfile.findUnique({
-                  where: { id: accepted.providerId },
-                  select: { userId: true },
-                }))?.userId ?? null
-        }
-      }
+      const disputeRecipientIds = isCustomer
+        ? await getAcceptedProviderRecipientIds(job.id)
+        : [job.customerId]
 
       await raiseJobDispute(
         { jobId: job.id, actorId: user.id, actorType, reason: reason || undefined },
         job.id
       )
 
-      if (disputeRecipientId) {
-        await notifyDisputeRaised(job.id, disputeRecipientId, job.title)
-      }
+      await Promise.all(
+        disputeRecipientIds.map(recipientId =>
+          notifyDisputeRaised(job.id, recipientId, job.title)
+        )
+      )
 
       return NextResponse.json({ success: true, message: 'Dispute raised' })
     }
@@ -150,29 +173,18 @@ export async function POST(
         typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 300) : null
       const actorType: ActorType = isCustomer ? 'CUSTOMER' : providerActor!
 
-      let providerUserId: string | null = null
-      if (isCustomer) {
-        const accepted = await prisma.jobQuote.findFirst({
-          where: { jobId: job.id, status: 'ACCEPTED' },
-          select: { providerId: true, providerType: true },
-        })
-        if (accepted) {
-          providerUserId =
-            accepted.providerType === 'INDIVIDUAL'
-              ? accepted.providerId
-              : (await prisma.companyProfile.findUnique({
-                  where: { id: accepted.providerId },
-                  select: { userId: true },
-                }))?.userId ?? null
-        }
-      }
+      const providerRecipientIds = isCustomer
+        ? await getAcceptedProviderRecipientIds(job.id)
+        : []
 
       await cancelJob({ jobId: job.id, actorId: user.id, actorType, reason: reason || undefined })
 
       if (isCustomer) {
-        if (providerUserId) {
-          await notifyJobCancelled(job.id, providerUserId, job.title, 'customer', reason)
-        }
+        await Promise.all(
+          providerRecipientIds.map(recipientId =>
+            notifyJobCancelled(job.id, recipientId, job.title, 'customer', reason)
+          )
+        )
       } else {
         await notifyJobCancelled(job.id, job.customerId, job.title, 'provider', reason)
       }
