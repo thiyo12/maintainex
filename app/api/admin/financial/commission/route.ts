@@ -193,23 +193,39 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: 'Reminder sent', settlement })
     }
 
+    if (action === 'SUSPEND' && settlement.commissionPaid) {
+      return NextResponse.json({ error: 'Paid settlements cannot be suspended' }, { status: 409 })
+    }
+    if (action === 'SUSPEND' && settlement.status === 'SUSPENDED') {
+      return NextResponse.json({ settlement, message: 'Settlement already suspended' })
+    }
+    if (action === 'UNSUSPEND' && settlement.status !== 'SUSPENDED') {
+      return NextResponse.json({ error: 'Only suspended settlements can be unsuspended' }, { status: 409 })
+    }
+    if (action === 'MARK_PAID' && settlement.commissionPaid) {
+      return NextResponse.json({ settlement, message: 'Settlement already paid' })
+    }
+
+    const now = new Date()
     let updateData: Record<string, unknown> = {}
     if (action === 'MARK_PAID') {
       updateData = {
         commissionPaid: true,
-        paidAt: new Date(),
+        paidAt: now,
         status: 'PAID',
+        suspendedAt: null,
       }
     } else if (action === 'SUSPEND') {
       updateData = {
         status: 'SUSPENDED',
-        suspendedAt: new Date(),
+        suspendedAt: now,
       }
     } else {
       updateData = {
-        status: 'PAID',
-        commissionPaid: true,
-        paidAt: new Date(),
+        status: settlement.dueAt < now ? 'OVERDUE' : 'PENDING',
+        commissionPaid: false,
+        paidAt: null,
+        suspendedAt: null,
       }
     }
 
@@ -228,15 +244,21 @@ export async function PATCH(request: NextRequest) {
             suspendedUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           },
         })
-      } else if (action === 'UNSUSPEND') {
-        await tx.user.update({
+      } else if (action === 'UNSUSPEND' || action === 'MARK_PAID') {
+        const providerUser = await tx.user.findUnique({
           where: { id: settlement.providerId },
-          data: {
-            isSuspended: false,
-            suspensionReason: null,
-            suspendedUntil: null,
-          },
+          select: { suspensionReason: true },
         })
+        if (providerUser?.suspensionReason === 'Weekly commission not paid') {
+          await tx.user.update({
+            where: { id: settlement.providerId },
+            data: {
+              isSuspended: false,
+              suspensionReason: null,
+              suspendedUntil: null,
+            },
+          })
+        }
       }
 
       return next
