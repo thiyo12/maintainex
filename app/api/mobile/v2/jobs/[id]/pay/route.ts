@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { createPaymentIntent } from '@/lib/payment/payment-service'
+import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
 
 export async function POST(
   request: NextRequest,
@@ -17,10 +18,13 @@ export async function POST(
     const rateLimitResponse = await requireFinancialRateLimit(request, 'payment-create')
     if (rateLimitResponse) return rateLimitResponse
 
-    // Keep the legacy /pay compatibility route on the same trusted origin
-    // contract as the canonical /payment endpoint. Never build payment URLs
-    // from forwarded host headers supplied by the client.
-    const baseUrl = process.env.NEXTAUTH_URL || new URL(request.url).origin
+    const baseUrl = resolvePaymentPublicOrigin(request.url)
+    if (!baseUrl) {
+      return NextResponse.json(
+        { error: 'Payment public URL is not configured', code: 'PAYMENT_ORIGIN_NOT_CONFIGURED' },
+        { status: 503 }
+      )
+    }
 
     const result = await createPaymentIntent({
       jobId: id,
