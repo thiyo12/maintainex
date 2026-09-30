@@ -10,6 +10,11 @@ import { createAuditLog } from '@/lib/crm/audit'
 import { transitionCompanyVerification, transitionUserKyc } from '@/lib/phase6/kyc-writer'
 import { reactivateCompany, reactivateUser, suspendCompany, suspendUser } from '@/lib/domain/admin-suspension'
 import type { AdminSession } from '@/lib/admin-types'
+import {
+  crmAccountActionRequiresReason,
+  getCrmAccountActionPermission,
+  type CrmAccountAction,
+} from '@/lib/crm/account-action-permissions'
 
 const USER_ACTIONS = new Set([
   'suspend',
@@ -26,22 +31,6 @@ function viewPermission(type: string) {
   if (type === 'tasker') return 'taskers:view'
   if (type === 'company') return 'companies:view'
   return 'users:view'
-}
-
-function actionPermission(action: string, targetRole: string) {
-  if (action === 'suspend' || action === 'unsuspend') {
-    if (targetRole === 'TASKER') return 'taskers:edit'
-    if (targetRole === 'COMPANY') return 'companies:edit'
-    return 'users:suspend'
-  }
-  if (action === 'ban' || action === 'unban') {
-    if (targetRole === 'TASKER') return 'taskers:ban'
-    if (targetRole === 'COMPANY') return 'companies:ban'
-    return 'users:ban'
-  }
-  if (action === 'verify_tasker' || action === 'reject_tasker') return 'taskers:verify'
-  if (action === 'verify_company' || action === 'reject_company') return 'companies:verify'
-  return null
 }
 
 export async function GET(request: NextRequest) {
@@ -206,7 +195,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json()
     const userId = typeof body?.userId === 'string' ? body.userId : ''
-    const action = typeof body?.action === 'string' ? body.action : ''
+    const action = typeof body?.action === 'string' ? body.action as CrmAccountAction : '' as CrmAccountAction
     const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 1000) : null
 
     if (!userId || userId.length > 128 || !USER_ACTIONS.has(action)) {
@@ -243,13 +232,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const permission = actionPermission(action, targetUser.role)
+    const permission = getCrmAccountActionPermission(action, targetUser.role)
     if (!permission || !crmHasPermission(security.role, permission)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     if (
-      ['suspend', 'ban', 'reject_tasker', 'reject_company'].includes(action) &&
+      crmAccountActionRequiresReason(action) &&
       (!reason || reason.length < 3)
     ) {
       return NextResponse.json(
