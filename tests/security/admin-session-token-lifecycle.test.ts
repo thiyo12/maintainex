@@ -100,6 +100,15 @@ describe('admin session-bound token lifecycle', () => {
     expect(refresh).toContain("response.cookies.set('admin_token', accessToken")
   })
 
+  it('clears both access and refresh cookies during logout', () => {
+    const logout = read('app/api/admin/auth/logout/route.ts')
+    expect(logout).toContain("response.cookies.set('admin_token', ''")
+    expect(logout).toContain("path: '/'")
+    expect(logout).toContain("response.cookies.set('refresh_token', ''")
+    expect(logout).toContain('adminUserId: payload.sub')
+    expect(logout).toContain('clearAdminCookies(response)')
+  })
+
   it('requires the live CRM session guard before mutating 2FA setup', () => {
     const setup = read('app/api/admin/auth/2fa/setup/route.ts')
     expect(setup).toContain("guardCrmRequest(request, { level: 'sensitive' })")
