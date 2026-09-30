@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiAlertTriangle, FiCheck, FiX, FiArrowUp, FiRefreshCw, FiMinus } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface RiskEvent {
   id: string
@@ -37,6 +39,10 @@ export default function RiskEventsPage() {
 }
 
 function RiskEventsContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canResolve = permissions.includes('risk_events:resolve')
   const [events, setEvents] = useState<RiskEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
@@ -62,6 +68,7 @@ function RiskEventsContent() {
   useEffect(() => { fetchEvents() }, [fetchEvents])
 
   const handleReview = async (eventId: string, resolution: string, reason?: string) => {
+    if (!canResolve) return
     setActionLoading(eventId)
     try {
       const body: Record<string, string> = { resolution }
@@ -137,7 +144,7 @@ function RiskEventsContent() {
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(e.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
-                  {!e.reviewedAt && (
+                  {!e.reviewedAt && canResolve && (
                     <div className="flex items-center space-x-1">
                       <button onClick={() => handleReview(e.id, 'CONFIRMED', 'Confirmed by admin')} disabled={actionLoading === e.id}
                         className="flex items-center space-x-1 px-2 py-1 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 disabled:opacity-50 text-xs" title="Confirm">
@@ -153,6 +160,7 @@ function RiskEventsContent() {
                       </button>
                     </div>
                   )}
+                  {!e.reviewedAt && !canResolve && <span className="text-xs text-gray-600">Read only</span>}
                 </td>
               </tr>
             ))}
