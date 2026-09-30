@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 /**
  * Create a new revision of an existing quote.
@@ -36,6 +37,16 @@ export async function createQuoteRevision(
       if (original.status === 'WITHDRAWN') return { success: false, error: 'Cannot revise a withdrawn quote' }
       if (original.status === 'SUPERSEDED') return { success: false, error: 'Cannot revise a superseded quote' }
       if (original.status !== 'PENDING') return { success: false, error: `Cannot revise quote in ${original.status} state` }
+      if (original.providerType !== 'INDIVIDUAL' && original.providerType !== 'COMPANY') {
+        return { success: false, error: 'Provider is no longer available' }
+      }
+
+      await lockAndAssertProviderAvailable(
+        tx,
+        original.providerType,
+        original.providerId,
+        'Provider is no longer available',
+      )
 
       const claimed = await tx.jobQuote.updateMany({
         where: {
