@@ -8,7 +8,7 @@ import {
 import { createAuditLog } from '@/lib/crm/audit'
 import { completeAndReleaseEscrow, refundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
-import { notifyDisputeResolved, notifyPaymentReleased } from '@/lib/notifications'
+import { notifyDisputeResolved, notifyPaymentReleased, notifyCashJobCompleted, notifyCashDisputeResolved } from '@/lib/notifications'
 
 const VALID_STATUSES = new Set(['OPEN', 'UNDER_REVIEW', 'RESOLVING', 'RESOLVED', 'DISMISSED'])
 const MARKETPLACE_RESOLUTION_ACTIONS = new Set(['RELEASE_PROVIDER', 'REFUND_CUSTOMER'])
@@ -468,7 +468,10 @@ export async function PATCH(request: NextRequest) {
             entityType: 'MarketplaceDispute',
             entityId: disputeId,
             entityName: marketplaceDispute.reason,
-            description: 'Marketplace dispute resolved by releasing escrow to provider',
+            description:
+              release.paymentMethod === 'CASH'
+                ? 'Marketplace cash dispute resolved for provider; weekly platform amount recorded'
+                : 'Marketplace dispute resolved by releasing escrow to provider',
             oldValue: { status: marketplaceDispute.status },
             newValue: { status: 'RESOLVED', resolutionAction: canonicalAction, resolution },
             ipAddress: security.ipAddress,
@@ -477,21 +480,36 @@ export async function PATCH(request: NextRequest) {
           })
 
           await Promise.all([
-            notifyPaymentReleased(
-              marketplaceDispute.jobId,
-              release.providerId,
-              marketplaceDispute.job.title,
-              release.netAmount,
-              getCurrencyForCountry(marketplaceDispute.job.countryCode),
-              marketplaceDispute.job.countryCode,
-            ),
+            release.paymentMethod === 'CASH'
+              ? notifyCashJobCompleted(
+                  marketplaceDispute.jobId,
+                  release.providerId,
+                  marketplaceDispute.job.title,
+                  release.platformDue,
+                  getCurrencyForCountry(marketplaceDispute.job.countryCode),
+                )
+              : notifyPaymentReleased(
+                  marketplaceDispute.jobId,
+                  release.providerId,
+                  marketplaceDispute.job.title,
+                  release.netAmount,
+                  getCurrencyForCountry(marketplaceDispute.job.countryCode),
+                  marketplaceDispute.job.countryCode,
+                ),
             ...participantIds.map(recipientId =>
-              notifyDisputeResolved(
-                marketplaceDispute.jobId,
-                recipientId,
-                marketplaceDispute.job.title,
-                'RELEASE_PROVIDER',
-              )
+              release.paymentMethod === 'CASH'
+                ? notifyCashDisputeResolved(
+                    marketplaceDispute.jobId,
+                    recipientId,
+                    marketplaceDispute.job.title,
+                    'PROVIDER_CONFIRMED',
+                  )
+                : notifyDisputeResolved(
+                    marketplaceDispute.jobId,
+                    recipientId,
+                    marketplaceDispute.job.title,
+                    'RELEASE_PROVIDER',
+                  )
             ),
           ])
 
@@ -523,7 +541,9 @@ export async function PATCH(request: NextRequest) {
           entityName: marketplaceDispute.reason,
           description: refund.refundPendingExternal
             ? 'Marketplace dispute customer refund queued for external reconciliation'
-            : 'Marketplace dispute resolved by refunding customer',
+            : ('cashCancelled' in refund && refund.cashCancelled === true)
+              ? 'Marketplace cash dispute resolved for customer; no MaintainEX-held cash required a refund'
+              : 'Marketplace dispute resolved by refunding customer',
           oldValue: { status: marketplaceDispute.status },
           newValue: {
             status: refund.refundPendingExternal ? 'RESOLVING' : 'RESOLVED',
@@ -580,14 +600,24 @@ export async function PATCH(request: NextRequest) {
           resolutionAction: canonicalAction,
         })
 
+        const cashRefundResolution =
+          'cashCancelled' in refund && refund.cashCancelled === true
+
         await Promise.all(
           participantIds.map(recipientId =>
-            notifyDisputeResolved(
-              marketplaceDispute.jobId,
-              recipientId,
-              marketplaceDispute.job.title,
-              'REFUND_CUSTOMER',
-            )
+            cashRefundResolution
+              ? notifyCashDisputeResolved(
+                  marketplaceDispute.jobId,
+                  recipientId,
+                  marketplaceDispute.job.title,
+                  'CUSTOMER_NO_PLATFORM_REFUND',
+                )
+              : notifyDisputeResolved(
+                  marketplaceDispute.jobId,
+                  recipientId,
+                  marketplaceDispute.job.title,
+                  'REFUND_CUSTOMER',
+                )
           )
         )
 
@@ -657,12 +687,6 @@ export async function PATCH(request: NextRequest) {
       message.includes('Admin resolution requires')
     ) {
       return NextResponse.json({ error: message }, { status: 409 })
-    }
-    if (message === 'CASH_PAYMENT_DISABLED') {
-      return NextResponse.json(
-        { error: 'Cash settlement is disabled until its accounting flow is implemented.' },
-        { status: 503 }
-      )
     }
     return NextResponse.json({ error: 'Failed to update dispute' }, { status: 500 })
   }
