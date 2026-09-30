@@ -11,6 +11,41 @@ function mockPrisma(overrides: Record<string, any> = {}) {
   }
 
   const prisma: any = {
+    $queryRaw: vi.fn().mockImplementation((strings: TemplateStringsArray) => {
+      const sql = strings.join(' ')
+      if (sql.includes('FROM "User"')) {
+        return Promise.resolve(overrides.userRows ?? [{
+          id: overrides.originalQuote?.providerId || 'provider-1',
+          isActive: true,
+          isSuspended: false,
+          isBanned: false,
+          identityStatus: 'VERIFIED',
+        }])
+      }
+      if (sql.includes('FROM "TaskerProfile"')) {
+        return Promise.resolve(overrides.taskerRows ?? [{
+          id: 'tasker-1',
+          verificationStatus: 'VERIFIED',
+          isVerified: true,
+        }])
+      }
+      if (sql.includes('FROM "CompanyProfile"')) {
+        return Promise.resolve(overrides.companyRows ?? [])
+      }
+      if (sql.includes('FROM "TeamMember"')) {
+        return Promise.resolve(overrides.teamMemberRows ?? [])
+      }
+      if (sql.includes('FROM "MarketplaceJob"')) {
+        return Promise.resolve(overrides.jobRows ?? [{
+          id: overrides.originalQuote?.jobId || 'job-1',
+          status: 'OPEN',
+        }])
+      }
+      return Promise.resolve([])
+    }),
+    quoteLineItem: {
+      create: vi.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: 'line-item-1', ...data })),
+    },
     jobQuote: {
       findUnique: vi.fn().mockImplementation(({ where }: any) => {
         return Promise.resolve(quoteStore.get(where.id) ?? overrides.findUnique ?? null)
@@ -41,7 +76,8 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     },
     _quoteStore: quoteStore,
   }
-  prisma.$transaction = vi.fn(async (fn: any) => fn(prisma))
+  const queryRaw = prisma.$queryRaw
+  prisma.$transaction = vi.fn(async (fn: any) => fn({ ...prisma, $queryRaw: queryRaw }))
   return prisma as any
 }
 
@@ -97,7 +133,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
     it('original amount unchanged after revision', async () => {
       const prisma = mockPrisma({
         originalQuote: {
-          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1', providerType: 'INDIVIDUAL',
           status: 'PENDING', price: 10000n, currency: 'LKR',
           revisionNumber: 1, parentQuoteId: null,
           estimatedCompletionTime: '2h', message: null, attachments: '[]',
@@ -123,7 +159,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
     it('revisionNumber increments correctly', async () => {
       const prisma = mockPrisma({
         originalQuote: {
-          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1', providerType: 'INDIVIDUAL',
           status: 'PENDING', price: 10000n, currency: 'LKR',
           revisionNumber: 3, parentQuoteId: 'orig-0',
           estimatedCompletionTime: '2h', message: null, attachments: '[]',
@@ -145,7 +181,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
     it('provider cannot revise another provider\'s quote', async () => {
       const prisma = mockPrisma({
         originalQuote: {
-          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1', providerType: 'INDIVIDUAL',
           status: 'PENDING', price: 10000n, currency: 'LKR',
           revisionNumber: 1, parentQuoteId: null,
           estimatedCompletionTime: '2h', message: null, attachments: '[]',
@@ -164,10 +200,70 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
       expect(result.error).toBe('Not your quote')
     })
 
-    it('cannot revise ACCEPTED quote', async () => {
+    it('fails closed when provider becomes unavailable before revision commit', async () => {
       const prisma = mockPrisma({
         originalQuote: {
           id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          providerType: 'INDIVIDUAL',
+          status: 'PENDING', price: 10000n, currency: 'LKR',
+          revisionNumber: 1, parentQuoteId: null,
+          estimatedCompletionTime: '2h', message: null, attachments: '[]',
+        },
+        userRows: [{
+          id: 'provider-1',
+          isActive: true,
+          isSuspended: true,
+          isBanned: false,
+          identityStatus: 'VERIFIED',
+        }],
+      })
+
+      await expect(
+        createQuoteRevision(prisma, {
+          originalQuoteId: 'orig-1',
+          providerId: 'provider-1',
+          price: 11000n,
+          estimatedCompletionTime: '2h',
+          revisionReason: 'Scope change',
+        })
+      ).rejects.toThrow('Provider is no longer available')
+
+      expect(prisma.jobQuote.updateMany).not.toHaveBeenCalled()
+      expect(prisma.jobQuote.create).not.toHaveBeenCalled()
+    })
+
+    it('refuses revision when the job closes before transaction commit', async () => {
+      const prisma = mockPrisma({
+        originalQuote: {
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          providerType: 'INDIVIDUAL',
+          status: 'PENDING', price: 10000n, currency: 'LKR',
+          revisionNumber: 1, parentQuoteId: null,
+          estimatedCompletionTime: '2h', message: null, attachments: '[]',
+        },
+        jobRows: [{ id: 'job-1', status: 'QUOTE_ACCEPTED' }],
+      })
+
+      const result = await createQuoteRevision(prisma, {
+        originalQuoteId: 'orig-1',
+        providerId: 'provider-1',
+        price: 11000n,
+        estimatedCompletionTime: '2h',
+        revisionReason: 'Scope change',
+      })
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Quote revisions are only allowed while the job is open',
+      })
+      expect(prisma.jobQuote.updateMany).not.toHaveBeenCalled()
+      expect(prisma.jobQuote.create).not.toHaveBeenCalled()
+    })
+
+    it('cannot revise ACCEPTED quote', async () => {
+      const prisma = mockPrisma({
+        originalQuote: {
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1', providerType: 'INDIVIDUAL',
           status: 'ACCEPTED', price: 10000n, currency: 'LKR',
           revisionNumber: 1, parentQuoteId: null,
           estimatedCompletionTime: '2h', message: null, attachments: '[]',
@@ -189,7 +285,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
     it('cannot revise REJECTED quote', async () => {
       const prisma = mockPrisma({
         originalQuote: {
-          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1', providerType: 'INDIVIDUAL',
           status: 'REJECTED', price: 10000n, currency: 'LKR',
           revisionNumber: 1, parentQuoteId: null,
           estimatedCompletionTime: '2h', message: null, attachments: '[]',
@@ -210,7 +306,7 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
     it('cannot revise SUPERSEDED quote', async () => {
       const prisma = mockPrisma({
         originalQuote: {
-          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1',
+          id: 'orig-1', jobId: 'job-1', providerId: 'provider-1', providerType: 'INDIVIDUAL',
           status: 'SUPERSEDED', price: 10000n, currency: 'LKR',
           revisionNumber: 1, parentQuoteId: null,
           estimatedCompletionTime: '2h', message: null, attachments: '[]',
