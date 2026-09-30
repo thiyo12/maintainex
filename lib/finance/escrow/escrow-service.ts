@@ -401,7 +401,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   }
 
   const escrow = await prisma.jobEscrow.findFirst({
-    where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD'] } },
+    where: { jobId, status: { in: ['PROTECTED', 'PENDING_PAYMENT', 'ON_HOLD', 'CASH_CONFIRMED'] } },
   })
   if (!escrow) throw new Error('No refundable escrow found')
 
@@ -469,7 +469,51 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
     }
   }
 
-  if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+  if (
+    escrow.paymentMethod === 'CASH' &&
+    ['CASH_CONFIRMED', 'ON_HOLD'].includes(escrow.status)
+  ) {
+    const cashResolutionStatus = escrow.status === 'ON_HOLD' ? 'REFUNDED' : 'CANCELLED'
+
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.jobEscrow.updateMany({
+        where: {
+          id: escrow.id,
+          paymentMethod: 'CASH',
+          status: escrow.status,
+        },
+        data: {
+          status: cashResolutionStatus,
+          ...(cashResolutionStatus === 'REFUNDED' ? { refundedAt: new Date() } : {}),
+        },
+      })
+      if (claimed.count !== 1) throw new Error('Cash payment state changed concurrently')
+
+      await tx.paymentIntent.updateMany({
+        where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
+        data: { status: 'CANCELLED' },
+      })
+
+      await closeBooking(
+        tx,
+        escrow.status === 'ON_HOLD' ? 'CASH_DISPUTE_REFUND_RESOLVED' : 'CASH_BOOKING_CANCELLED',
+        {
+          escrowFromState: escrow.status,
+          escrowToState: cashResolutionStatus,
+          refundMinor: 0,
+          cashNoPlatformFunds: true,
+        },
+      )
+    })
+
+    return {
+      refundAmount: 0,
+      refundCents: 0n,
+      refundPendingExternal: false,
+      fundingSource: 'NONE' as const,
+      cashCancelled: true,
+    }
+  }
 
   const refundCents = escrow.totalAmount
   const refundMajor = bigIntToSafeNumber(refundCents) / 100
