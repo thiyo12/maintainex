@@ -7,6 +7,26 @@ function read(path: string) {
 }
 
 describe('targeted booking provider boundary', () => {
+  it('validates targeted providers before generic job creation', () => {
+    const jobs = read('app/api/mobile/v2/jobs/route.ts')
+
+    expect(jobs).toContain('checkIndividualProviderEligibility(tasker.userId)')
+    expect(jobs).toContain('checkCompanyEligibility(company.id)')
+    expect(jobs).toContain('Cannot target yourself as the provider')
+    expect(jobs).toContain('Cannot target your own company')
+    expect(jobs).toContain('TARGET_PROVIDER_COUNTRY_MISMATCH')
+    expect(jobs).toContain('Target provider lacks the required capability for this job')
+    expect(jobs).toContain('Target company lacks the required capability for this job')
+    expect(jobs).toContain("return NextResponse.json({ error: 'Target provider not found' }, { status: 404 })")
+  })
+
+  it('canonicalizes targeted IDs before storing the job', () => {
+    const jobs = read('app/api/mobile/v2/jobs/route.ts')
+
+    expect(jobs).toContain('targetTaskerId = tasker.userId')
+    expect(jobs).toContain('targetTaskerId = company.id')
+  })
+
   it('stores the selected provider entity as the BOOK_NOW target', () => {
     const bookNow = read('lib/domain/book-now.ts')
     expect(bookNow).toContain('targetTaskerId: resolvedProviderEntityId')
