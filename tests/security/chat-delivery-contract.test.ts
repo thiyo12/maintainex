@@ -39,6 +39,16 @@ describe('chat delivery contract', () => {
     expect(chat).toContain('fetchMessages()')
   })
 
+  it('enforces closed-job messaging rules on the backend', () => {
+    const createRoute = read('app/api/mobile/conversations/route.ts')
+    const messageRoute = read('app/api/mobile/conversations/[id]/messages/route.ts')
+
+    expect(createRoute).toContain("if (['COMPLETED', 'CANCELLED'].includes(job.status)) return false")
+    expect(messageRoute).toContain("if (job && ['COMPLETED', 'CANCELLED'].includes(job.status))")
+    expect(messageRoute).toContain('This conversation is closed because the job is no longer active')
+    expect(messageRoute).toContain('{ status: 409 }')
+  })
+
   it('routes tapped CHAT notifications to the conversation', () => {
     const root = read('apps/mobile/app/_layout.tsx')
     expect(root).toContain("if (referenceType === 'CHAT')")
