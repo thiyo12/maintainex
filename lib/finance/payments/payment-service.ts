@@ -4,9 +4,32 @@ import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { notifyEscrowDeposited } from '@/lib/notifications'
 import { bigIntToSafeNumber, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
-import { getPayHereConfig, generateCheckoutHash, getPayHereCheckoutUrl, getPayHereReturnUrl, getPayHereCancelUrl, getPayHereNotifyUrl, generateMerchantOrderId, formatPayHereAmount, parsePayHereAmount, type PayHereNotification } from '@/lib/payment/payhere-adapter'
+import {
+  getPayHereConfig,
+  generateCheckoutHash,
+  getPayHereCheckoutUrl,
+  getPayHereReturnUrl,
+  getPayHereCancelUrl,
+  getPayHereNotifyUrl,
+  generateMerchantOrderId,
+  formatPayHereAmount,
+  parsePayHereAmount,
+  requestPayHereRefund,
+  retrievePayHerePayment,
+  type PayHereNotification,
+} from '@/lib/payment/payhere-adapter'
 
-export type PaymentStatus = 'CREATED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'EXPIRED' | 'REFUND_REQUIRED' | 'CHARGEDBACK'
+export type PaymentStatus =
+  | 'CREATED'
+  | 'PENDING'
+  | 'SUCCESS'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'REFUND_REQUIRED'
+  | 'REFUND_PROCESSING'
+  | 'REFUNDED'
+  | 'CHARGEDBACK'
 
 export interface CreatePaymentParams {
   jobId: string
@@ -361,7 +384,12 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
     return { success: false, error: 'Payment job reference mismatch' }
   }
 
-  if (paymentIntent.status === 'SUCCESS' || paymentIntent.status === 'REFUND_REQUIRED') {
+  if (
+    paymentIntent.status === 'SUCCESS' ||
+    paymentIntent.status === 'REFUND_REQUIRED' ||
+    paymentIntent.status === 'REFUND_PROCESSING' ||
+    paymentIntent.status === 'REFUNDED'
+  ) {
     return { success: true }
   }
 
@@ -619,3 +647,409 @@ export async function expireOldPayments(): Promise<number> {
   })
   return result.count
 }
+
+function mergeGatewayResponse(
+  raw: string | null,
+  key: string,
+  value: Record<string, unknown>
+): string {
+  let current: Record<string, unknown> = {}
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      current = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : { original: parsed }
+    } catch {
+      current = { originalRaw: raw.slice(0, 5000) }
+    }
+  }
+  return JSON.stringify({ ...current, [key]: value })
+}
+
+function normalizePayHereStatus(value: string | undefined): string {
+  return (value || '').trim().toUpperCase()
+}
+
+export interface PayHereRefundProcessingResult {
+  success: boolean
+  status: 'REFUND_REQUIRED' | 'REFUND_PROCESSING' | 'REFUNDED'
+  error?: string
+  code?: string
+  refundReference?: string | null
+}
+
+export async function requestRequiredPayHereRefund(
+  paymentIntentId: string
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+
+  if (intent.status === 'REFUNDED') {
+    return { success: true, status: 'REFUNDED' }
+  }
+  if (intent.status === 'REFUND_PROCESSING') {
+    return reconcilePayHereRefund(paymentIntentId)
+  }
+  if (intent.status !== 'REFUND_REQUIRED') {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Payment is not awaiting refund (status=${intent.status})`,
+      code: 'PAYMENT_NOT_REFUNDABLE',
+    }
+  }
+  if (!intent.paymentId) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'PayHere payment ID is missing',
+      code: 'PAYHERE_PAYMENT_ID_MISSING',
+    }
+  }
+
+  const existing = await retrievePayHerePayment(intent.merchantOrderId)
+  if (existing.status !== 1) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: existing.message,
+      code: 'PAYHERE_RETRIEVAL_FAILED',
+    }
+  }
+
+  const payment = existing.payments.find(
+    item => String(item.payment_id) === String(intent.paymentId)
+  )
+  if (!payment) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Captured PayHere payment was not found during refund reconciliation',
+      code: 'PAYHERE_PAYMENT_NOT_FOUND',
+    }
+  }
+
+  const gatewayStatus = normalizePayHereStatus(payment.status)
+  if (gatewayStatus === 'REFUNDED') {
+    return finalizePayHereRefund(paymentIntentId, {
+      gatewayStatus,
+      refundReference: null,
+      message: existing.message,
+    })
+  }
+  if (gatewayStatus === 'REFUND REQUESTED' || gatewayStatus === 'REFUND PROCESSING') {
+    await prisma.paymentIntent.updateMany({
+      where: { id: intent.id, status: 'REFUND_REQUIRED' },
+      data: {
+        status: 'REFUND_PROCESSING',
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          gatewayStatus,
+          reconciledAt: new Date().toISOString(),
+        }),
+      },
+    })
+    return { success: true, status: 'REFUND_PROCESSING' }
+  }
+  if (gatewayStatus === 'CHARGEBACKED') {
+    await prisma.paymentIntent.updateMany({
+      where: { id: intent.id, status: { in: ['REFUND_REQUIRED', 'REFUND_PROCESSING'] } },
+      data: {
+        status: 'CHARGEDBACK',
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          gatewayStatus,
+          reconciledAt: new Date().toISOString(),
+        }),
+      },
+    })
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment was chargebacked before refund completion',
+      code: 'PAYHERE_CHARGEBACKED',
+    }
+  }
+  if (gatewayStatus !== 'RECEIVED') {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `PayHere payment cannot be refunded from status ${gatewayStatus || 'UNKNOWN'}`,
+      code: 'PAYHERE_REFUND_INVALID_STATUS',
+    }
+  }
+
+  const refund = await requestPayHereRefund(
+    String(intent.paymentId),
+    `MaintainEX refund for order ${intent.merchantOrderId}`
+  )
+  if (refund.status !== 1) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: refund.message,
+      code: 'PAYHERE_REFUND_REQUEST_FAILED',
+      refundReference: refund.refundReference,
+    }
+  }
+
+  await prisma.$transaction(async tx => {
+    const claimed = await tx.paymentIntent.updateMany({
+      where: { id: intent.id, status: 'REFUND_REQUIRED' },
+      data: {
+        status: 'REFUND_PROCESSING',
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          gatewayStatus: 'REFUND REQUESTED',
+          refundReference: refund.refundReference,
+          message: refund.message,
+          requestedAt: new Date().toISOString(),
+        }),
+      },
+    })
+    if (claimed.count !== 1) return
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: intent.jobId,
+      actorId: 'system:payhere-refund',
+      actorType: 'SYSTEM',
+      action: 'PAYMENT_REFUND_SUBMITTED',
+      metadata: {
+        paymentIntentId: intent.id,
+        paymentId: intent.paymentId,
+        refundReference: refund.refundReference,
+      },
+    })
+  })
+
+  return {
+    success: true,
+    status: 'REFUND_PROCESSING',
+    refundReference: refund.refundReference,
+  }
+}
+
+export async function reconcilePayHereRefund(
+  paymentIntentId: string
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.status === 'REFUNDED') {
+    return { success: true, status: 'REFUNDED' }
+  }
+  if (!['REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(intent.status)) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: `Payment is not in the refund queue (status=${intent.status})`,
+      code: 'PAYMENT_NOT_IN_REFUND_QUEUE',
+    }
+  }
+  if (!intent.paymentId) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'PayHere payment ID is missing',
+      code: 'PAYHERE_PAYMENT_ID_MISSING',
+    }
+  }
+
+  const retrieval = await retrievePayHerePayment(intent.merchantOrderId)
+  if (retrieval.status !== 1) {
+    return {
+      success: false,
+      status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+      error: retrieval.message,
+      code: 'PAYHERE_RETRIEVAL_FAILED',
+    }
+  }
+
+  const payment = retrieval.payments.find(
+    item => String(item.payment_id) === String(intent.paymentId)
+  )
+  if (!payment) {
+    return {
+      success: false,
+      status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+      error: 'PayHere payment not found',
+      code: 'PAYHERE_PAYMENT_NOT_FOUND',
+    }
+  }
+
+  const gatewayStatus = normalizePayHereStatus(payment.status)
+  if (gatewayStatus === 'REFUNDED') {
+    return finalizePayHereRefund(paymentIntentId, {
+      gatewayStatus,
+      refundReference: null,
+      message: retrieval.message,
+    })
+  }
+
+  if (gatewayStatus === 'REFUND REQUESTED' || gatewayStatus === 'REFUND PROCESSING') {
+    await prisma.paymentIntent.updateMany({
+      where: { id: intent.id, status: { in: ['REFUND_REQUIRED', 'REFUND_PROCESSING'] } },
+      data: {
+        status: 'REFUND_PROCESSING',
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          gatewayStatus,
+          reconciledAt: new Date().toISOString(),
+        }),
+      },
+    })
+    return { success: true, status: 'REFUND_PROCESSING' }
+  }
+
+  if (gatewayStatus === 'RECEIVED' && intent.status === 'REFUND_REQUIRED') {
+    return requestRequiredPayHereRefund(paymentIntentId)
+  }
+
+  return {
+    success: false,
+    status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+    error: `Unexpected PayHere refund status: ${gatewayStatus || 'UNKNOWN'}`,
+    code: 'PAYHERE_REFUND_UNEXPECTED_STATUS',
+  }
+}
+
+async function finalizePayHereRefund(
+  paymentIntentId: string,
+  details: {
+    gatewayStatus: string
+    refundReference: string | null
+    message: string
+  }
+): Promise<PayHereRefundProcessingResult> {
+  const intent = await prisma.paymentIntent.findUnique({
+    where: { id: paymentIntentId },
+  })
+  if (!intent) {
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Payment intent not found',
+      code: 'PAYMENT_INTENT_NOT_FOUND',
+    }
+  }
+  if (intent.status === 'REFUNDED') {
+    return { success: true, status: 'REFUNDED' }
+  }
+
+  const escrow = await prisma.jobEscrow.findUnique({
+    where: { id: intent.escrowId },
+  })
+  if (!escrow) {
+    return {
+      success: false,
+      status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+      error: 'Escrow not found',
+      code: 'ESCROW_NOT_FOUND',
+    }
+  }
+
+  await prisma.$transaction(async tx => {
+    const claimed = await tx.paymentIntent.updateMany({
+      where: {
+        id: intent.id,
+        status: { in: ['REFUND_REQUIRED', 'REFUND_PROCESSING'] },
+      },
+      data: {
+        status: 'REFUNDED',
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          gatewayStatus: details.gatewayStatus,
+          refundReference: details.refundReference,
+          message: details.message,
+          completedAt: new Date().toISOString(),
+        }),
+      },
+    })
+    if (claimed.count !== 1) {
+      const current = await tx.paymentIntent.findUnique({
+        where: { id: intent.id },
+        select: { status: true },
+      })
+      if (current?.status === 'REFUNDED') return
+      throw new Error('Payment refund state changed concurrently')
+    }
+
+    const escrowClaimed = await tx.jobEscrow.updateMany({
+      where: {
+        id: escrow.id,
+        status: { in: ['ON_HOLD', 'PROTECTED'] },
+      },
+      data: {
+        status: 'REFUNDED',
+        refundedAt: new Date(),
+      },
+    })
+    if (escrowClaimed.count !== 1) {
+      throw new Error('Escrow is not awaiting external refund reconciliation')
+    }
+
+    await postLedgerTransaction({
+      entries: [
+        {
+          accountId: `escrow:${escrow.id}`,
+          accountType: 'ESCROW',
+          entryType: 'DEBIT',
+          amount: escrow.totalAmount,
+        },
+        {
+          accountId: 'external:payhere',
+          accountType: 'EXTERNAL_PAYOUT',
+          entryType: 'CREDIT',
+          amount: escrow.totalAmount,
+        },
+      ],
+      currency: escrow.currency as Currency,
+      referenceType: 'ESCROW_EXTERNAL_REFUND',
+      referenceId: escrow.id,
+      idempotencyKey: `payhere-refund:${escrow.id}:${intent.paymentId || intent.merchantOrderId}`,
+      description: `PayHere refund reconciliation for escrow ${escrow.id}`,
+      createdBy: 'system:payhere-refund',
+      metadata: JSON.stringify({
+        paymentIntentId: intent.id,
+        paymentId: intent.paymentId,
+        merchantOrderId: intent.merchantOrderId,
+        refundReference: details.refundReference,
+      }),
+    }, tx)
+
+    await recordJobLifecycleEvent(tx, {
+      jobId: intent.jobId,
+      actorId: 'system:payhere-refund',
+      actorType: 'SYSTEM',
+      action: 'PAYMENT_REFUNDED',
+      metadata: {
+        paymentIntentId: intent.id,
+        paymentId: intent.paymentId,
+        escrowId: escrow.id,
+        refundReference: details.refundReference,
+        refundMinor: escrow.totalAmount,
+        currency: escrow.currency,
+      },
+    })
+  })
+
+  return {
+    success: true,
+    status: 'REFUNDED',
+    refundReference: details.refundReference,
+  }
+}
+
