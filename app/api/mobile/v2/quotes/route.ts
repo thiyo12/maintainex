@@ -126,6 +126,16 @@ export async function POST(request: NextRequest) {
         'Provider is no longer available to submit this quote',
       )
 
+      const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+        SELECT id, status
+        FROM "MarketplaceJob"
+        WHERE id = ${jobId}
+        FOR UPDATE
+      `
+      const lockedJob = lockedJobs[0]
+      if (!lockedJob) throw new Error('JOB_NOT_FOUND')
+      if (lockedJob.status !== 'OPEN') throw new Error('JOB_NO_LONGER_OPEN')
+
       const existing = await tx.jobQuote.findFirst({
         where: {
           jobId,
@@ -170,6 +180,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof Error && error.message === 'ACTIVE_QUOTE_EXISTS') {
       return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'JOB_NOT_FOUND') {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+    if (error instanceof Error && error.message === 'JOB_NO_LONGER_OPEN') {
+      return NextResponse.json({ error: 'Job is no longer accepting quotes' }, { status: 409 })
     }
     if (error instanceof Error && error.message.includes('Provider is no longer available')) {
       return NextResponse.json({ error: error.message }, { status: 409 })
