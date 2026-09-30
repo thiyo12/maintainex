@@ -10,8 +10,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const booking = await prisma.booking.findUnique({
-      where: { id },
+    const booking = await prisma.booking.findFirst({
+      where: { id, userId: user.id },
       include: { service: { include: { category: true } } },
     })
 
