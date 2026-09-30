@@ -48,7 +48,16 @@ export const v2JobActions = {
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
   confirmCashPayment: (jobId: string) =>
-    v2Request<{ success: boolean; commission: number; netAmount: number }>(`/api/mobile/v2/jobs/${jobId}/cash-payment`, { method: 'POST' }),
+    v2Request<{
+      success: boolean
+      escrowId: string
+      paymentMethod: 'CASH'
+      status: 'CASH_CONFIRMED'
+      amountDueMinor: string
+      amountDue: number
+      currency: string
+      alreadyConfirmed: boolean
+    }>(`/api/mobile/v2/jobs/${jobId}/cash-payment`, { method: 'POST' }),
   createReview: (jobId: string, data: any) =>
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
