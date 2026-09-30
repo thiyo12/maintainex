@@ -59,6 +59,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
   try {
     const payload = jwt.verify(token, getJwtSecret()) as AccessTokenPayload
     if (payload.type !== 'access') return null
+    if (typeof payload.sid !== 'string' || !payload.sid) return null
     return payload
   } catch {
     return null
@@ -82,6 +83,8 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
   try {
     const payload = jwt.verify(token, getJwtRefreshSecret()) as RefreshTokenPayload
     if (payload.type !== 'refresh') return null
+    if (typeof payload.jti !== 'string' || !payload.jti) return null
+    if (typeof payload.nonce !== 'string' || !payload.nonce) return null
     return payload
   } catch {
     return null
