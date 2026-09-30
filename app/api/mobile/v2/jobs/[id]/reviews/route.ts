@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { recalculateReputation } from '@/lib/reputation-engine'
-import { recoverPenaltyPoints } from '@/lib/reputation-engine'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 function isValidRating(value: unknown): value is number {
@@ -20,8 +19,12 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const body = await request.json()
-    const { reviewType, quality, communication, timeliness, cooperation, overallExperience, comment } = body
+    const body = await request.json().catch(() => ({}))
+    const reviewType = typeof body?.reviewType === 'string' ? body.reviewType.trim().toUpperCase() : ''
+    const { quality, communication, timeliness, cooperation, overallExperience } = body
+    const comment = typeof body?.comment === 'string'
+      ? body.comment.trim().slice(0, 2000)
+      : ''
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -58,21 +61,17 @@ export async function POST(
         where: { providerId: quote.providerId },
       })
       const avgRating = allReviews.reduce((sum, r) => sum + (r.quality + r.communication + r.timeliness) / 3, 0) / allReviews.length
-      const completedCount = await prisma.jobReview.count({
-        where: { providerId: quote.providerId },
-      })
-
       if (quote.providerType === 'INDIVIDUAL') {
         await prisma.taskerProfile.updateMany({
           where: { userId: quote.providerId },
-          data: { rating: Math.round(avgRating * 10) / 10, completedJobs: completedCount },
+          data: { rating: Math.round(avgRating * 10) / 10 },
         })
         // Trigger reputation recalculation (fire-and-forget)
         recalculateReputation(quote.providerId).catch(err => console.error('Reputation recalc error:', err))
       } else {
         await prisma.companyProfile.updateMany({
           where: { id: quote.providerId },
-          data: { rating: Math.round(avgRating * 10) / 10, completedProjects: completedCount },
+          data: { rating: Math.round(avgRating * 10) / 10 },
         })
       }
 
@@ -135,8 +134,11 @@ export async function POST(
     }
 
     return NextResponse.json({ error: 'Invalid reviewType' }, { status: 400 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create review error:', error)
+    if (error?.code === 'P2002') {
+      return NextResponse.json({ error: 'Already reviewed' }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
