@@ -264,65 +264,98 @@ export async function approveChangeOrder(
     }
   }
 
-  const result = await client.$transaction(async (tx) => {
-    const now = new Date()
+  try {
+    const result = await client.$transaction(async (tx) => {
+      const now = new Date()
 
-    const updatedCo = await tx.jobChangeOrder.update({
-      where: { id: changeOrderId },
-      data: {
-        status: 'APPROVED',
-        customerDecisionAt: now,
-        approvedByCustomerId: customerId,
-      },
-    })
+      const transition = await tx.jobChangeOrder.updateMany({
+        where: { id: changeOrderId, status: 'SUBMITTED' },
+        data: {
+          status: 'APPROVED',
+          customerDecisionAt: now,
+          approvedByCustomerId: customerId,
+        },
+      })
+      if (transition.count !== 1) {
+        throw new Error('CONCURRENT_APPROVAL')
+      }
 
-    const finalResult = await calculateFinalAuthorizedAmount(tx, co.jobId)
-    if (!finalResult.success) throw new Error(finalResult.error)
-    const newFinalAmount = finalResult.finalAmountCents!
-    if (newFinalAmount <= 0n) {
-      throw new Error('FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE')
-    }
+      const updatedCo = await tx.jobChangeOrder.findUnique({
+        where: { id: changeOrderId },
+      })
+      if (!updatedCo) {
+        throw new Error('Change order not found')
+      }
 
-    await tx.marketplaceJob.update({
-      where: { id: co.jobId },
-      data: { finalAuthorizedAmountCents: newFinalAmount },
-    })
+      const finalResult = await calculateFinalAuthorizedAmount(tx, co.jobId)
+      if (!finalResult.success) throw new Error(finalResult.error)
+      const newFinalAmount = finalResult.finalAmountCents!
+      if (newFinalAmount <= 0n) {
+        throw new Error('FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE')
+      }
 
-    if (idempotencyKey) {
-      const expiresAt = new Date()
-      expiresAt.setHours(expiresAt.getHours() + 24)
-
-      const existingRecord = await tx.idempotencyRecord.findFirst({
-        where: { idempotencyKey, userId: customerId, operation: 'APPROVE_CHANGE_ORDER' },
+      await tx.marketplaceJob.update({
+        where: { id: co.jobId },
+        data: { finalAuthorizedAmountCents: newFinalAmount },
       })
 
-      if (existingRecord) {
-        await tx.idempotencyRecord.update({
-          where: { id: existingRecord.id },
-          data: {
-            status: 'COMPLETED',
-            resultPayload: serializeBigInt({ changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }),
-          },
+      if (idempotencyKey) {
+        const expiresAt = new Date()
+        expiresAt.setHours(expiresAt.getHours() + 24)
+
+        const existingRecord = await tx.idempotencyRecord.findFirst({
+          where: { idempotencyKey, userId: customerId, operation: 'APPROVE_CHANGE_ORDER' },
         })
-      } else {
-        await tx.idempotencyRecord.create({
-          data: {
-            idempotencyKey,
-            userId: customerId,
-            operation: 'APPROVE_CHANGE_ORDER',
-            status: 'COMPLETED',
-            resultPayload: serializeBigInt({ changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }),
-            requestFingerprint,
-            expiresAt,
-          },
-        })
+
+        if (existingRecord) {
+          await tx.idempotencyRecord.update({
+            where: { id: existingRecord.id },
+            data: {
+              status: 'COMPLETED',
+              requestFingerprint,
+              resultPayload: serializeBigInt({
+                changeOrder: updatedCo,
+                finalAuthorizedAmountCents: newFinalAmount,
+              }),
+            },
+          })
+        } else {
+          await tx.idempotencyRecord.create({
+            data: {
+              idempotencyKey,
+              userId: customerId,
+              operation: 'APPROVE_CHANGE_ORDER',
+              status: 'COMPLETED',
+              resultPayload: serializeBigInt({
+                changeOrder: updatedCo,
+                finalAuthorizedAmountCents: newFinalAmount,
+              }),
+              requestFingerprint,
+              expiresAt,
+            },
+          })
+        }
       }
+
+      return { changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }
+    })
+
+    return {
+      success: true,
+      changeOrder: result.changeOrder,
+      finalAuthorizedAmountCents: result.finalAuthorizedAmountCents,
     }
-
-    return { changeOrder: updatedCo, finalAuthorizedAmountCents: newFinalAmount }
-  })
-
-  return { success: true, changeOrder: result.changeOrder, finalAuthorizedAmountCents: result.finalAuthorizedAmountCents }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : ''
+    if (
+      message === 'CONCURRENT_APPROVAL' ||
+      message === 'FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE' ||
+      message === 'Change order not found'
+    ) {
+      return { success: false, error: message }
+    }
+    throw error
+  }
 }
 
 export async function rejectChangeOrder(
