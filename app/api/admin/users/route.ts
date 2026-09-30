@@ -8,7 +8,7 @@ import {
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { transitionCompanyVerification, transitionUserKyc } from '@/lib/phase6/kyc-writer'
-import { reactivateCompany, reactivateUser, suspendCompany, suspendUser } from '@/lib/domain/admin-suspension'
+import { banUser, reactivateCompany, reactivateUser, suspendCompany, suspendUser, unbanUser } from '@/lib/domain/admin-suspension'
 import type { AdminSession } from '@/lib/admin-types'
 import {
   crmAccountActionRequiresReason,
@@ -356,7 +356,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    if ((action === 'suspend' || action === 'unsuspend') && targetUser.role === 'TASKER') {
+    if ((action === 'suspend' || action === 'unsuspend') && targetUser.role !== 'COMPANY') {
       if (action === 'suspend') {
         await suspendUser(prisma, {
           userId: targetUser.id,
@@ -377,54 +377,27 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
-    const updateData: Record<string, unknown> = { updatedAt: new Date() }
+    if (action === 'ban' || action === 'unban') {
+      if (action === 'ban') {
+        await banUser(prisma, {
+          userId: targetUser.id,
+          reason: reason!,
+          session: adminSession,
+          ipAddress: security.ipAddress,
+        })
+      } else {
+        await unbanUser(prisma, {
+          userId: targetUser.id,
+          reason: reason || 'Unbanned by admin',
+          session: adminSession,
+          ipAddress: security.ipAddress,
+        })
+      }
 
-    if (action === 'suspend') {
-      updateData.isSuspended = true
-      updateData.suspensionReason = reason
-    } else if (action === 'unsuspend') {
-      updateData.isSuspended = false
-      updateData.suspensionReason = null
-      updateData.suspendedUntil = null
-    } else if (action === 'ban') {
-      updateData.isBanned = true
-      updateData.banReason = reason
-      updateData.isActive = false
-    } else if (action === 'unban') {
-      updateData.isBanned = false
-      updateData.banReason = null
-      updateData.isActive = true
+      return NextResponse.json({ success: true })
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-    })
-
-    await createAuditLog({
-      action: 'UPDATE',
-      category: 'USER',
-      userId: security.adminId,
-      userEmail: security.email,
-      userRole: security.role,
-      entityType: 'User',
-      entityId: targetUser.id,
-      entityName: targetUser.name,
-      description: `CRM account action: ${action}`,
-      oldValue: {
-        isActive: targetUser.isActive,
-        isSuspended: targetUser.isSuspended,
-        isBanned: targetUser.isBanned,
-        suspensionReason: targetUser.suspensionReason,
-        banReason: targetUser.banReason,
-      },
-      newValue: { action, reason },
-      ipAddress: security.ipAddress,
-      userAgent: security.userAgent || undefined,
-      riskLevel: action === 'ban' || action === 'suspend' ? 'HIGH' : 'MEDIUM',
-    })
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ error: 'Unsupported account action' }, { status: 400 })
   } catch (error) {
     console.error('CRM admin user PATCH error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
