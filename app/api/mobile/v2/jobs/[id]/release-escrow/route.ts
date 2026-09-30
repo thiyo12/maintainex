@@ -24,6 +24,26 @@ export async function POST(
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
+    const paymentState = await prisma.jobEscrow.findFirst({
+      where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+      select: { paymentMethod: true, status: true },
+    })
+    if (
+      paymentState?.paymentMethod === 'CASH' &&
+      paymentState.status === 'CASH_CONFIRMED'
+    ) {
+      const body = await request.json().catch(() => ({}))
+      if (body.cashPaidConfirmed !== true) {
+        return NextResponse.json(
+          {
+            error: 'Confirm that cash was paid to the provider before approving completion.',
+            code: 'CASH_PAYMENT_CONFIRMATION_REQUIRED',
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     const result = await completeAndReleaseEscrow(
       { jobId: job.id, actorId: user.id, actorType: 'CUSTOMER' },
       job.id,
