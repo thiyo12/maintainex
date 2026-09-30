@@ -33,6 +33,12 @@ describe('trusted payment public origin', () => {
     expect(resolvePaymentPublicOrigin('http://localhost:3000/api/pay')).toBe('http://localhost:3000')
   })
 
+  it('requires HTTPS for the configured production payment origin', () => {
+    process.env.NODE_ENV = 'production'
+    process.env.NEXTAUTH_URL = 'http://maintainex.lk'
+    expect(resolvePaymentPublicOrigin('https://maintainex.lk/api/pay')).toBeNull()
+  })
+
   it('fails closed for an invalid configured URL', () => {
     process.env.NODE_ENV = 'production'
     process.env.NEXTAUTH_URL = 'not-a-url'
