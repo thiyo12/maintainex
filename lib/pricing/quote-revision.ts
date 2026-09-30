@@ -123,6 +123,9 @@ export async function createQuoteRevision(
     if (error?.code === 'P2002') {
       return { success: false, error: 'A quote revision is already active for this job' }
     }
+    if (error instanceof Error && error.message === 'Provider is no longer available') {
+      return { success: false, error: 'Provider is no longer available' }
+    }
     throw error
   }
 }
