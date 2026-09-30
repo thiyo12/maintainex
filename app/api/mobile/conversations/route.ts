@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
+import { scanChatMessage } from '@/lib/fraud-detection'
 
 async function companyIdsForMessaging(userId: string): Promise<string[]> {
   const [ownedCompany, memberships] = await Promise.all([
@@ -138,6 +139,15 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const { participantId, jobId, initialMessage } = await request.json()
+    if (initialMessage != null && typeof initialMessage !== 'string') {
+      return NextResponse.json({ error: 'initialMessage must be text' }, { status: 400 })
+    }
+    const rawInitialMessage =
+      typeof initialMessage === 'string' ? initialMessage.trim().slice(0, 4000) : ''
+    if (initialMessage != null && !rawInitialMessage) {
+      return NextResponse.json({ error: 'initialMessage cannot be empty' }, { status: 400 })
+    }
+
     if (!participantId) {
       return NextResponse.json({ error: 'participantId required' }, { status: 400 })
     }
@@ -169,6 +179,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ id: existingConversation.id, existing: true })
     }
 
+    const scannedInitialMessage = rawInitialMessage
+      ? await scanChatMessage(rawInitialMessage, user.id, `new:${jobId}:${participantId}`)
+      : null
+    const safeInitialMessage = scannedInitialMessage
+      ? (scannedInitialMessage.sanitizedText || rawInitialMessage)
+      : ''
+
     const conversation = await prisma.conversation.create({
       data: {
         jobId,
@@ -178,11 +195,11 @@ export async function POST(request: NextRequest) {
             { userId: participantId },
           ],
         },
-        ...(initialMessage ? {
+        ...(safeInitialMessage ? {
           messages: {
             create: {
               senderId: user.id,
-              text: initialMessage,
+              text: safeInitialMessage,
             },
           },
         } : {}),
