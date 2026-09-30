@@ -6,6 +6,7 @@ import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { resolvePayoutIdentity, recordWeeklySettlement } from '@/lib/finance/commissions/settlement-service'
 import type { TransitionContext } from '@/lib/domain/job-lifecycle'
+import { resolveEscrowFundingSource } from '@/lib/finance/payments/funding-source'
 
 export async function fundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -271,6 +272,7 @@ export async function releaseEscrow(
 export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
   if (!job) throw new Error('Job not found')
+
   const isCustomer = job.customerId === ctx.actorId
   const isStaff = ctx.actorType === 'STAFF'
   let isAcceptedProvider = false
@@ -295,114 +297,14 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   })
   if (!escrow) throw new Error('No refundable escrow found')
 
-  if (escrow.status === 'PENDING_PAYMENT') {
-    await prisma.$transaction(async (tx) => {
-      const claimed = await tx.jobEscrow.updateMany({
-        where: { id: escrow.id, status: 'PENDING_PAYMENT' },
-        data: { status: 'CANCELLED' },
-      })
-      if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
-      await tx.marketplaceJob.updateMany({
-        where: { id: jobId, status: { not: 'COMPLETED' } },
-        data: { status: 'CANCELLED', isActive: false, responseState: 'resolved' },
-      })
-      await tx.paymentIntent.updateMany({
-        where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
-        data: { status: 'CANCELLED' },
-      })
-      await tx.jobQuote.updateMany({
-        where: { id: escrow.quoteId, status: 'ACCEPTED' },
-        data: { status: 'WITHDRAWN' },
-      })
-      await tx.companyJobAssignment.updateMany({
-        where: { jobId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
-        data: {
-          status: 'REVOKED',
-          revokedAt: new Date(),
-          revokedReason: ctx.reason ?? 'Booking cancelled/refunded',
-        },
-      })
-
-      await recordJobLifecycleEvent(tx, {
-        jobId,
-        actorId: ctx.actorId,
-        actorType: ctx.actorType,
-        action: 'JOB_CANCELLED',
-        fromState: job.status,
-        toState: 'CANCELLED',
-        metadata: {
-          reason: ctx.reason ?? null,
-          escrowId: escrow.id,
-          escrowFromState: 'PENDING_PAYMENT',
-          escrowToState: 'CANCELLED',
-          refundMinor: 0,
-        },
-      })
-    })
-    return { refundAmount: 0, refundCents: 0n }
-  }
-
-  if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
-
-  const customerWallet = await prisma.customerWallet.upsert({
-    where: { userId: job.customerId },
-    update: {},
-    create: { userId: job.customerId },
-  })
-
-    const refundCents = escrow.totalAmount
-    const refundMajor = bigIntToSafeNumber(refundCents) / 100
-
-    await prisma.$transaction(async (tx) => {
-      const claimed = await tx.jobEscrow.updateMany({
-        where: { id: escrow.id, status: { in: ['PROTECTED', 'ON_HOLD'] }, paymentMethod: { not: 'CASH' } },
-        data: { status: 'REFUNDED', refundedAt: new Date() },
-      })
-      if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
-
-      await postLedgerTransaction({
-        entries: [
-          { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: refundCents },
-          { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'CREDIT', amount: refundCents },
-        ],
-        currency: escrow.currency as Currency,
-        referenceType: 'ESCROW_REFUND',
-        referenceId: escrow.id,
-        idempotencyKey: `escrow-refund:${escrow.id}`,
-        description: `Escrow refund for job ${jobId}`,
-        createdBy: ctx.actorId,
-      }, tx)
-
-      const escrowCurrency = escrow.currency as Currency
-      if (escrowCurrency === 'LKR') {
-        const legacyCustomerWallet = await tx.customerWallet.update({
-          where: { userId: job.customerId },
-          data: { balance: { increment: refundMajor } },
-          select: { balance: true },
-        })
-
-        await tx.walletTransaction.create({
-          data: {
-            userId: job.customerId,
-            walletType: 'CUSTOMER',
-            type: 'CREDIT',
-            amount: refundMajor,
-            balanceBefore: legacyCustomerWallet.balance - refundMajor,
-            balanceAfter: legacyCustomerWallet.balance,
-            reference: `Escrow refund for job ${jobId}`,
-            referenceType: 'ESCROW_REFUND',
-            referenceId: escrow.id,
-          },
-        })
-      }
-
-      await tx.marketplaceJob.updateMany({
+  const closeBooking = async (
+    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    lifecycleAction: string,
+    lifecycleMetadata: Record<string, unknown>
+  ) => {
+    await tx.marketplaceJob.updateMany({
       where: { id: jobId, status: { not: 'COMPLETED' } },
       data: { status: 'CANCELLED', isActive: false, responseState: 'resolved' },
-    })
-    await tx.paymentIntent.updateMany({
-      where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
-      data: { status: 'CANCELLED' },
     })
     await tx.jobQuote.updateMany({
       where: { id: escrow.quoteId, status: 'ACCEPTED' },
@@ -413,29 +315,195 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
       data: {
         status: 'REVOKED',
         revokedAt: new Date(),
-        revokedReason: ctx.reason ?? 'Booking refunded',
+        revokedReason: ctx.reason ?? 'Booking cancelled/refunded',
       },
     })
-
     await recordJobLifecycleEvent(tx, {
       jobId,
       actorId: ctx.actorId,
       actorType: ctx.actorType,
-      action: 'ESCROW_REFUNDED',
+      action: lifecycleAction,
       fromState: job.status,
       toState: 'CANCELLED',
       metadata: {
         reason: ctx.reason ?? null,
         escrowId: escrow.id,
+        ...lifecycleMetadata,
+      },
+    })
+  }
+
+  if (escrow.status === 'PENDING_PAYMENT') {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.jobEscrow.updateMany({
+        where: { id: escrow.id, status: 'PENDING_PAYMENT' },
+        data: { status: 'CANCELLED' },
+      })
+      if (claimed.count !== 1) throw new Error('Escrow state changed concurrently')
+
+      await tx.paymentIntent.updateMany({
+        where: { jobId, status: { in: ['CREATED', 'PENDING'] } },
+        data: { status: 'CANCELLED' },
+      })
+
+      await closeBooking(tx, 'JOB_CANCELLED', {
+        escrowFromState: 'PENDING_PAYMENT',
+        escrowToState: 'CANCELLED',
+        refundMinor: 0,
+      })
+    })
+
+    return {
+      refundAmount: 0,
+      refundCents: 0n,
+      refundPendingExternal: false,
+      fundingSource: 'NONE' as const,
+    }
+  }
+
+  if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+
+  const refundCents = escrow.totalAmount
+  const refundMajor = bigIntToSafeNumber(refundCents) / 100
+  const fundingSource = await resolveEscrowFundingSource(prisma, escrow.id)
+
+  if (fundingSource === 'PAYHERE') {
+    const paymentIntent = await prisma.paymentIntent.findFirst({
+      where: {
+        escrowId: escrow.id,
+        status: {
+          in: ['SUCCESS', 'REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    if (!paymentIntent || !paymentIntent.paymentId) {
+      throw new Error('PAYHERE_REFUND_PAYMENT_NOT_FOUND')
+    }
+
+    if (paymentIntent.status === 'REFUNDED') {
+      return {
+        refundAmount: refundMajor,
+        refundCents,
+        refundPendingExternal: false,
+        fundingSource,
+        paymentIntentId: paymentIntent.id,
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.jobEscrow.updateMany({
+        where: {
+          id: escrow.id,
+          status: { in: ['PROTECTED', 'ON_HOLD'] },
+          paymentMethod: { not: 'CASH' },
+        },
+        data: { status: 'ON_HOLD' },
+      })
+      if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
+
+      await tx.paymentIntent.updateMany({
+        where: {
+          id: paymentIntent.id,
+          status: 'SUCCESS',
+        },
+        data: { status: 'REFUND_REQUIRED' },
+      })
+
+      await closeBooking(tx, 'PAYMENT_REFUND_REQUIRED', {
         escrowFromState: escrow.status,
-        escrowToState: 'REFUNDED',
+        escrowToState: 'ON_HOLD',
+        paymentIntentId: paymentIntent.id,
+        paymentId: paymentIntent.paymentId,
         refundMinor: refundCents,
         currency: escrow.currency,
+        fundingSource,
+      })
+    })
+
+    return {
+      refundAmount: refundMajor,
+      refundCents,
+      refundPendingExternal: true,
+      fundingSource,
+      paymentIntentId: paymentIntent.id,
+    }
+  }
+
+  if (fundingSource !== 'WALLET') {
+    throw new Error('REFUND_FUNDING_SOURCE_UNKNOWN')
+  }
+
+  const customerWallet = await prisma.customerWallet.upsert({
+    where: { userId: job.customerId },
+    update: {},
+    create: { userId: job.customerId },
+  })
+
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.jobEscrow.updateMany({
+      where: {
+        id: escrow.id,
+        status: { in: ['PROTECTED', 'ON_HOLD'] },
+        paymentMethod: { not: 'CASH' },
       },
+      data: { status: 'REFUNDED', refundedAt: new Date() },
+    })
+    if (claimed.count !== 1) throw new Error('Escrow already refunded or state changed')
+
+    await postLedgerTransaction({
+      entries: [
+        { accountId: `escrow:${escrow.id}`, accountType: 'ESCROW', entryType: 'DEBIT', amount: refundCents },
+        { accountId: customerWallet.id, accountType: 'CUSTOMER_WALLET', entryType: 'CREDIT', amount: refundCents },
+      ],
+      currency: escrow.currency as Currency,
+      referenceType: 'ESCROW_REFUND',
+      referenceId: escrow.id,
+      idempotencyKey: `escrow-refund:${escrow.id}`,
+      description: `Escrow wallet refund for job ${jobId}`,
+      createdBy: ctx.actorId,
+    }, tx)
+
+    const escrowCurrency = escrow.currency as Currency
+    if (escrowCurrency === 'LKR') {
+      const legacyCustomerWallet = await tx.customerWallet.update({
+        where: { userId: job.customerId },
+        data: { balance: { increment: refundMajor } },
+        select: { balance: true },
+      })
+
+      await tx.walletTransaction.create({
+        data: {
+          userId: job.customerId,
+          walletType: 'CUSTOMER',
+          type: 'CREDIT',
+          amount: refundMajor,
+          balanceBefore: legacyCustomerWallet.balance - refundMajor,
+          balanceAfter: legacyCustomerWallet.balance,
+          reference: `Escrow wallet refund for job ${jobId}`,
+          referenceType: 'ESCROW_REFUND',
+          referenceId: escrow.id,
+          currency: escrow.currency,
+        },
+      })
+    }
+
+    await closeBooking(tx, 'ESCROW_REFUNDED', {
+      escrowFromState: escrow.status,
+      escrowToState: 'REFUNDED',
+      refundMinor: refundCents,
+      currency: escrow.currency,
+      fundingSource,
     })
   })
 
-  return { refundAmount: refundMajor, refundCents }
+  return {
+    refundAmount: refundMajor,
+    refundCents,
+    refundPendingExternal: false,
+    fundingSource,
+  }
 }
 
 export async function expirePendingEscrow(
