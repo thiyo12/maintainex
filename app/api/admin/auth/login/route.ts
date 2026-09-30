@@ -162,6 +162,10 @@ export async function POST(request: NextRequest) {
     })
 
     const refreshToken = signRefreshToken(adminUser.id, session.id)
+    await prisma.adminSession.update({
+      where: { id: session.id },
+      data: { refreshTokenHash: hashRefreshToken(refreshToken) },
+    })
 
     const response = NextResponse.json({
       accessToken,
