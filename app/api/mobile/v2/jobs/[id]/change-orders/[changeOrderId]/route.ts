@@ -12,6 +12,7 @@ import {
   notifyChangeOrderRejected,
   notifyChangeOrderSubmitted,
 } from '@/lib/notifications'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function PATCH(
   request: NextRequest,
@@ -46,21 +47,29 @@ export async function PATCH(
       },
     })
 
-    if (!co) return NextResponse.json({ error: 'Change order not found' }, { status: 404 })
+    if (!co || co.jobId !== jobId) {
+      return NextResponse.json({ error: 'Change order not found for this job' }, { status: 404 })
+    }
 
     // Get provider from the accepted quote
     const acceptedQuote = await prisma.jobQuote.findFirst({
       where: { jobId: co.jobId, status: 'ACCEPTED' },
-      select: { providerId: true },
+      select: { providerId: true, providerType: true },
     })
-    const providerId = acceptedQuote?.providerId ?? ''
+    let providerUserId = acceptedQuote?.providerId ?? ''
+    if (acceptedQuote?.providerType === 'COMPANY') {
+      providerUserId = (await prisma.companyProfile.findUnique({
+        where: { id: acceptedQuote.providerId },
+        select: { userId: true },
+      }))?.userId ?? ''
+    }
 
     if (action === 'approve') {
       const result = await approveChangeOrder(prisma, changeOrderId, user.id, idempotencyKey)
       if (!result.success) {
         return NextResponse.json({ error: result.error }, { status: 400 })
       }
-      await notifyChangeOrderApproved(jobId, providerId, co.job.title, co.revisionNumber)
+      await notifyChangeOrderApproved(jobId, providerUserId, co.job.title, co.revisionNumber)
       return NextResponse.json({ success: true })
     }
 
@@ -69,7 +78,7 @@ export async function PATCH(
       if (!result.success) {
         return NextResponse.json({ error: result.error }, { status: 400 })
       }
-      await notifyChangeOrderRejected(jobId, providerId, co.job.title, co.revisionNumber)
+      await notifyChangeOrderRejected(jobId, providerUserId, co.job.title, co.revisionNumber)
       return NextResponse.json({ success: true })
     }
 
@@ -119,11 +128,6 @@ export async function GET(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { customerId: true } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-    const acceptedQuote = await prisma.jobQuote.findFirst({ where: { jobId, status: 'ACCEPTED' }, select: { providerId: true } })
-    const isProvider = acceptedQuote?.providerId === user.id
-    if (job.customerId !== user.id && !isProvider) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
 
     const changeOrder = await prisma.jobChangeOrder.findUnique({
       where: { id: changeOrderId },
@@ -131,8 +135,22 @@ export async function GET(
         lineItems: { orderBy: { sortOrder: 'asc' } },
       },
     })
+    if (!changeOrder || changeOrder.jobId !== jobId) {
+      return NextResponse.json({ error: 'Change order not found for this job' }, { status: 404 })
+    }
 
-    if (!changeOrder) return NextResponse.json({ error: 'Change order not found' }, { status: 404 })
+    const acceptedQuote = await prisma.jobQuote.findFirst({
+      where: { jobId, status: 'ACCEPTED' },
+      select: { providerId: true, providerType: true },
+    })
+    let isProvider = acceptedQuote?.providerType === 'INDIVIDUAL' && acceptedQuote.providerId === user.id
+    if (!isProvider && acceptedQuote?.providerType === 'COMPANY') {
+      const { context } = await resolveCompanyContext(user.id, acceptedQuote.providerId, 'quotes:read')
+      isProvider = Boolean(context)
+    }
+    if (job.customerId !== user.id && !isProvider) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     return NextResponse.json({ changeOrder })
   } catch (error) {
