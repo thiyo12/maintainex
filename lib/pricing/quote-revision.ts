@@ -48,6 +48,18 @@ export async function createQuoteRevision(
         'Provider is no longer available',
       )
 
+      const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+        SELECT id, status
+        FROM "MarketplaceJob"
+        WHERE id = ${original.jobId}
+        FOR UPDATE
+      `
+      const lockedJob = lockedJobs[0]
+      if (!lockedJob) return { success: false, error: 'Job not found' }
+      if (lockedJob.status !== 'OPEN') {
+        return { success: false, error: 'Quote revisions are only allowed while the job is open' }
+      }
+
       const claimed = await tx.jobQuote.updateMany({
         where: {
           id: params.originalQuoteId,
