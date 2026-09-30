@@ -72,6 +72,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or inactive plan' }, { status: 400 })
     }
 
+    if (Number(plan.price) > 0) {
+      return NextResponse.json(
+        {
+          error: 'Paid company subscriptions require verified billing before activation.',
+          code: 'SUBSCRIPTION_BILLING_REQUIRED',
+        },
+        { status: 503 }
+      )
+    }
+
     const profile = await prisma.companyProfile.findUnique({
       where: { userId: user.id },
       select: { id: true },
