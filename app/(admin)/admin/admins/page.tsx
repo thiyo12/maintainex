@@ -64,6 +64,10 @@ export default function AdminManagement() {
   })
 
   const fetchAdmins = useCallback(async () => {
+    if (!canView) {
+      setLoading(false)
+      return
+    }
     try {
       const res = await fetch('/api/admin/admins', { headers: { } })
       if (res.status === 401) { window.location.href = '/admin/login'; return }
@@ -74,7 +78,7 @@ export default function AdminManagement() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [canView])
 
   useEffect(() => { fetchAdmins() }, [fetchAdmins])
 
