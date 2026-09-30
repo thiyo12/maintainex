@@ -87,6 +87,36 @@ export async function notifyDisputeRaised(
   })
 }
 
+export async function notifyDisputeResolved(
+  jobId: string,
+  recipientUserId: string,
+  jobTitle: string,
+  outcome: 'RELEASE_PROVIDER' | 'REFUND_CUSTOMER' | 'REFUND_PROCESSING',
+) {
+  const copy = outcome === 'RELEASE_PROVIDER'
+    ? {
+        title: 'Dispute Resolved',
+        body: `The dispute for "${jobTitle}" was resolved and payment was released to the provider.`,
+      }
+    : outcome === 'REFUND_CUSTOMER'
+      ? {
+          title: 'Dispute Resolved',
+          body: `The dispute for "${jobTitle}" was resolved with a customer refund.`,
+        }
+      : {
+          title: 'Dispute Refund Processing',
+          body: `A customer refund was approved for "${jobTitle}" and is being reconciled with the payment gateway.`,
+        }
+
+  return createNotification({
+    userId: recipientUserId,
+    title: copy.title,
+    body: copy.body,
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
 export async function notifyCompletionRequested(jobId: string, customerId: string, jobTitle: string) {
   return createNotification({
     userId: customerId,
