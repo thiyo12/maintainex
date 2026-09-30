@@ -163,13 +163,22 @@ export async function PUT(request: NextRequest) {
     if (phone !== undefined && phone !== user.phone) {
       return NextResponse.json({ error: 'Mobile number changes require OTP verification.' }, { status: 400 })
     }
-    if (nickname !== undefined) userUpdate.nickname = nickname?.trim() || null
+    if (nickname !== undefined) {
+      if (nickname !== null && typeof nickname !== 'string') {
+        return NextResponse.json({ error: 'nickname must be text' }, { status: 400 })
+      }
+      userUpdate.nickname = typeof nickname === 'string' ? nickname.trim().slice(0, 80) || null : null
+    }
 
     if (name !== undefined) {
-      if (user.identityStatus === 'VERIFIED' && name.trim() !== user.name) {
+      if (typeof name !== 'string' || !name.trim()) {
+        return NextResponse.json({ error: 'name must be non-empty text' }, { status: 400 })
+      }
+      const normalizedName = name.trim().slice(0, 150)
+      if (user.identityStatus === 'VERIFIED' && normalizedName !== user.name) {
         return NextResponse.json({ error: 'Name is locked after identity verification. Use your verified name.' }, { status: 400 })
       }
-      userUpdate.name = name
+      userUpdate.name = normalizedName
     }
 
     if (Object.keys(userUpdate).length > 0) {
