@@ -468,6 +468,38 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
       })
     })
 
+    it('reprices a customer-approved cash change order without creating a funded top-up', async () => {
+      const client = approvalClient()
+      client.jobEscrow.findFirst.mockResolvedValue({
+        id: 'escrow-1',
+        jobId: 'job-1',
+        amount: 50000n,
+        serviceFee: 5000n,
+        totalAmount: 55000n,
+        currency: 'LKR',
+        paymentMethod: 'CASH',
+        status: 'CASH_CONFIRMED',
+        createdAt: new Date('2026-09-10'),
+      })
+
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+
+      expect(result.success).toBe(true)
+      expect(client.jobEscrow.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'escrow-1',
+          status: 'CASH_CONFIRMED',
+          paymentMethod: 'CASH',
+        },
+        data: {
+          amount: 55000n,
+          serviceFee: 5500n,
+          totalAmount: 60500n,
+        },
+      })
+      expect(client.paymentIntent.updateMany).not.toHaveBeenCalled()
+    })
+
     it('rejects a price-changing approval after escrow is already funded', async () => {
       const client = approvalClient()
       client.jobEscrow.findFirst.mockResolvedValue({
