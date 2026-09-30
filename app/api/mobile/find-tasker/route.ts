@@ -49,8 +49,6 @@ export async function GET(request: NextRequest) {
         isVerified: c.profile.isVerified,
         isOnline: c.profile.isOnline,
         profileImage: c.profile.profileImage,
-        latitude: c.profile.latitude,
-        longitude: c.profile.longitude,
         distance: c.distanceKm,
         score: Math.round(c.score * 100),
         skills: c.skills,
