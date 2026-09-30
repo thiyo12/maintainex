@@ -9,6 +9,7 @@ import {
   verifyAccessToken,
   verifyRefreshToken,
 } from '@/lib/auth/authentication/admin-jwt'
+import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
 
 function read(path: string) {
   return readFileSync(resolve(process.cwd(), path), 'utf-8')
@@ -35,6 +36,31 @@ describe('admin session-bound token lifecycle', () => {
     expect(verifyAccessToken(token)).toMatchObject({
       sub: 'admin-1',
       sid: 'session-1',
+      type: 'access',
+    })
+  })
+
+  it('decodes a session-bound JWT from the admin_token cookie', async () => {
+    const token = signAccessToken({
+      id: 'admin-cookie',
+      email: 'cookie@example.test',
+      role: 'SUPER_ADMIN',
+      firstName: 'Cookie',
+      lastName: 'Admin',
+      assignedCountries: ['LK'],
+      sessionId: 'session-cookie',
+    })
+
+    const session = await getAdminSession({
+      headers: { get: () => null },
+      cookies: {
+        get: (name: string) => name === 'admin_token' ? { value: token } : undefined,
+      },
+    })
+
+    expect(session).toMatchObject({
+      sub: 'admin-cookie',
+      sid: 'session-cookie',
       type: 'access',
     })
   })
