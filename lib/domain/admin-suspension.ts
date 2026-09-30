@@ -261,10 +261,19 @@ export async function reactivateCompany(
       : null
 
     const companySuspensionPrefix = `Company suspended [${companyProfileId}]:`
+    const isCompanySuspensionReason = (value: string | null) =>
+      Boolean(
+        value &&
+        (
+          value.startsWith(companySuspensionPrefix) ||
+          value.startsWith('Company suspended:')
+        )
+      )
+
     if (
       owner?.isSuspended &&
       owner.suspensionReason &&
-      !owner.suspensionReason.startsWith(companySuspensionPrefix)
+      !isCompanySuspensionReason(owner.suspensionReason)
     ) {
       throw new Error('Company owner has a separate account suspension that must be resolved independently')
     }
@@ -277,7 +286,7 @@ export async function reactivateCompany(
       data: { verificationStatus: 'VERIFIED' },
     })
 
-    if (owner?.isSuspended && owner.suspensionReason?.startsWith(companySuspensionPrefix)) {
+    if (owner?.isSuspended && isCompanySuspensionReason(owner.suspensionReason)) {
       await db.user.update({
         where: { id: company.userId },
         data: {
