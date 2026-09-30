@@ -6,6 +6,7 @@ import { recordJobLifecycleEvent } from '@/lib/domain/job-lifecycle-audit'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { fundEscrow, releaseEscrow, refundEscrow, expirePendingEscrow, completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { hasCompanyPermission, isValidCompanyRole } from '@/lib/phase6/rbac'
+import { evaluateEligibility } from '@/lib/matching/eligibility'
 
 
 export type JobStatus = 'OPEN' | 'QUOTE_ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
@@ -316,6 +317,30 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   if (!quote || quote.jobId !== ctx.jobId) throw new Error('Quote not found for this job')
   if (quote.status !== 'PENDING') throw new Error('Quote is not in PENDING status')
   if (quote.price <= 0n) throw new Error('Quote price must be positive')
+  if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+    throw new Error('Quote provider is no longer available')
+  }
+
+  const eligibility = await evaluateEligibility({
+    providerType: quote.providerType,
+    providerId: quote.providerId,
+    job: {
+      jobId: job.id,
+      userId: job.customerId,
+      jobMode: job.budgetType === 'REQUEST_QUOTES' ? 'QUOTE' : 'BOOK_NOW',
+      urgency: (job.urgency?.toUpperCase() || 'NORMAL') as 'NORMAL' | 'URGENT' | 'EMERGENCY',
+      categoryId: job.categoryId,
+      serviceTemplateId: job.serviceTemplateId || undefined,
+      latitude: job.latitude,
+      longitude: job.longitude,
+      countryCode: job.countryCode || 'GLOBAL',
+      preferredDate: job.preferredDate,
+    },
+    client: prisma,
+  })
+  if (!eligibility.eligible) {
+    throw new Error('Quote provider is no longer available')
+  }
 
   const jobCountry = job.countryCode || 'GLOBAL'
   const pricingConfig = await resolvePricingConfig(prisma, jobCountry)
@@ -325,9 +350,15 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
       `PRICING_COUNTRY_MISMATCH: job country=${jobCountry} but resolved pricing config country=${pricingConfig.countryCode}. Refusing to proceed.`
     )
   }
+  if (quote.currency !== pricingConfig.defaultCurrency) {
+    throw new Error('Quote is no longer available because its currency does not match the job market')
+  }
 
-  const serviceFee = (quote.price * BigInt(pricingConfig.commissionRateBps)) / 10000n
-  const totalAmount = quote.price + serviceFee
+  const acceptedAmount = quote.totalCents ?? quote.price
+  if (acceptedAmount <= 0n) throw new Error('Quote total must be positive')
+
+  const serviceFee = (acceptedAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
+  const totalAmount = acceptedAmount + serviceFee
   const existingEscrow = await prisma.jobEscrow.findFirst({
     where: { jobId: ctx.jobId, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
   })
@@ -335,7 +366,12 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   await prisma.$transaction(async (tx) => {
     const jobClaim = await tx.marketplaceJob.updateMany({
       where: { id: ctx.jobId, status: 'OPEN' },
-      data: { status: 'QUOTE_ACCEPTED', approvedQuoteId: quoteId },
+      data: {
+        status: 'QUOTE_ACCEPTED',
+        approvedQuoteId: quoteId,
+        approvedQuoteVersion: quote.revisionNumber,
+        finalAuthorizedAmountCents: acceptedAmount,
+      },
     })
     if (jobClaim.count !== 1) throw new Error('Job already has an accepted quote')
 
@@ -362,7 +398,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         data: {
           quoteId: quote.id,
           providerId: quote.providerId,
-          amount: quote.price,
+          amount: acceptedAmount,
           serviceFee,
           totalAmount,
           currency: pricingConfig.defaultCurrency as Currency,
@@ -381,7 +417,7 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
           quoteId: quote.id,
           customerId: job.customerId,
           providerId: quote.providerId,
-          amount: quote.price,
+          amount: acceptedAmount,
           serviceFee,
           totalAmount,
           currency: pricingConfig.defaultCurrency as Currency,
