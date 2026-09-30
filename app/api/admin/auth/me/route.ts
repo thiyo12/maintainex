@@ -15,10 +15,6 @@ export async function GET(request: NextRequest) {
         role: true,
         firstName: true,
         lastName: true,
-        branchId: true,
-        province: true,
-        region: true,
-        canEditServices: true,
       },
     })
     if (!adminUser) {
@@ -40,10 +36,10 @@ export async function GET(request: NextRequest) {
           assignedCountries,
           region: guard.context.isSuperAdmin
             ? 'All markets'
-            : adminUser.region || assignedCountries.join(', ') || null,
-          branchId: adminUser.branchId || null,
-          province: adminUser.province || null,
-          canEditServices: Boolean(adminUser.canEditServices),
+            : assignedCountries.join(', ') || null,
+          branchId: null,
+          province: null,
+          canEditServices: false,
         },
       },
       { headers: { 'Cache-Control': 'no-store' } }
