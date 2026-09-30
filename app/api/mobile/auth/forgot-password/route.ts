@@ -4,8 +4,7 @@ import bcrypt from 'bcryptjs'
 import { randomInt } from 'crypto'
 import { checkRateLimit, ipKey } from '@/lib/rate-limit/middleware'
 import { isSyntheticCertAccount } from '@/lib/test-cert'
-
-// TESTING ONLY — replace with real OTP provider before production launch
+import { sendOtpEmail } from '@/lib/email'
 export async function POST(request: NextRequest) {
   try {
     const ipLimit = await checkRateLimit(request, {
@@ -33,7 +32,12 @@ export async function POST(request: NextRequest) {
       : randomInt(0, 1000000).toString().padStart(6, '0')
     const codeHash = await bcrypt.hash(code, 10)
 
-    await prisma.oTP.create({
+    await prisma.oTP.updateMany({
+      where: { userId: user.id, purpose: 'PASSWORD_RESET', isUsed: false },
+      data: { isUsed: true },
+    })
+
+    const otpRecord = await prisma.oTP.create({
       data: {
         userId: user.id,
         codeHash,
@@ -41,6 +45,18 @@ export async function POST(request: NextRequest) {
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       },
     })
+
+    if (!isSyntheticCertAccount(user)) {
+      try {
+        await sendOtpEmail(user.email, code)
+      } catch (error) {
+        console.error('Password reset OTP delivery failed:', error)
+        await prisma.oTP.updateMany({
+          where: { id: otpRecord.id, isUsed: false },
+          data: { isUsed: true },
+        })
+      }
+    }
 
     return NextResponse.json({
       success: true,
