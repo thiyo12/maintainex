@@ -3,6 +3,7 @@ import { checkIndividualProviderEligibility, checkCompanyEligibility, checkWorke
 import { resolveJobRequirements, hasCapabilityMatch, hasRelationalCapability } from '@/lib/matching'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { createNotification } from '@/lib/notifications'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 export interface BookNowInput {
   customerId: string
@@ -46,7 +47,8 @@ export async function createBookNowJob(input: BookNowInput) {
 
   const finalCountryCode = typeof input.countryCode === 'string' && /^[A-Za-z]{2,3}$/.test(input.countryCode)
     ? input.countryCode.toUpperCase()
-    : 'LK'
+    : ''
+  if (!finalCountryCode) throw new Error('Booking country is required')
 
   const linkedServiceTemplate = await prisma.serviceTemplate.findFirst({
     where: {
@@ -72,9 +74,20 @@ export async function createBookNowJob(input: BookNowInput) {
   if (resolvedProviderType === 'COMPANY') {
     const company = await prisma.companyProfile.findUnique({
       where: { id: input.providerId },
-      select: { id: true, userId: true, companyName: true },
+      select: {
+        id: true,
+        userId: true,
+        companyName: true,
+        countryCode: true,
+        user: { select: { countryCode: true } },
+      },
     })
     if (!company) throw new Error('Company not found')
+    if (company.userId === input.customerId) throw new Error('Cannot book your own company')
+    const companyCountry = company.countryCode || company.user?.countryCode
+    if (companyCountry !== finalCountryCode) {
+      throw new Error('Provider country does not match booking country')
+    }
 
     const eligibility = await checkCompanyEligibility(company.id)
     if (!eligibility.eligible) {
@@ -112,11 +125,16 @@ export async function createBookNowJob(input: BookNowInput) {
         userId: true,
         skills: true,
         taskerSkills: { select: { jobId: true } },
-        user: { select: { name: true } },
+        countryCode: true,
+        user: { select: { name: true, countryCode: true } },
       },
     })
     if (!provider) throw new Error('Provider not found')
     if (provider.userId === input.customerId) throw new Error('Cannot book yourself')
+    const providerCountry = provider.countryCode || provider.user?.countryCode
+    if (providerCountry !== finalCountryCode) {
+      throw new Error('Provider country does not match booking country')
+    }
 
     const eligibility = await checkIndividualProviderEligibility(provider.userId)
     if (!eligibility.eligible) {
@@ -156,6 +174,60 @@ export async function createBookNowJob(input: BookNowInput) {
   })
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockAndAssertProviderAvailable(
+      tx,
+      resolvedProviderType,
+      resolvedProviderEntityId,
+      'Provider is no longer available for direct booking',
+    )
+
+    const dayStart = new Date(input.scheduledDate)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    const conflicts = resolvedProviderType === 'INDIVIDUAL'
+      ? await tx.$queryRaw<Array<{ id: string }>>\`
+          SELECT mj.id
+          FROM "MarketplaceJob" mj
+          JOIN "JobQuote" jq ON jq."jobId" = mj.id
+          WHERE jq."providerId" = ${resolvedProviderEntityId}
+            AND jq."providerType" = 'INDIVIDUAL'
+            AND jq.status = 'ACCEPTED'
+            AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+            AND mj."preferredDate" >= ${dayStart}
+            AND mj."preferredDate" < ${dayEnd}
+            AND (
+              ${input.timeSlot} = 'anytime'
+              OR mj."preferredTimeSlot" IS NULL
+              OR mj."preferredTimeSlot" = 'anytime'
+              OR mj."preferredTimeSlot" = ${input.timeSlot}
+            )
+          LIMIT 1
+        \`
+      : await tx.$queryRaw<Array<{ id: string }>>\`
+          SELECT mj.id
+          FROM "MarketplaceJob" mj
+          JOIN "JobQuote" jq ON jq."jobId" = mj.id
+          WHERE jq."providerId" = ${resolvedProviderEntityId}
+            AND jq."providerType" = 'COMPANY'
+            AND jq.status = 'ACCEPTED'
+            AND mj.status IN ('QUOTE_ACCEPTED', 'IN_PROGRESS')
+            AND mj."preferredDate" >= ${dayStart}
+            AND mj."preferredDate" < ${dayEnd}
+            AND (
+              ${input.timeSlot} = 'anytime'
+              OR mj."preferredTimeSlot" IS NULL
+              OR mj."preferredTimeSlot" = 'anytime'
+              OR mj."preferredTimeSlot" = ${input.timeSlot}
+            )
+          LIMIT 1
+        \`
+
+    if (conflicts.length > 0) {
+      throw new Error('Provider already has an overlapping active booking')
+    }
+
     const job = await tx.marketplaceJob.create({
       data: {
         customerId: input.customerId,
@@ -200,6 +272,8 @@ export async function createBookNowJob(input: BookNowInput) {
         providerId: resolvedProviderEntityId,
         providerType: resolvedProviderType,
         price: pricing.providerGross,
+        currency: pricing.currency,
+        totalCents: pricing.providerGross,
         estimatedCompletionTime: '1-2 hours',
         message: input.notes || 'BOOK_NOW instant booking',
         attachments: '[]',
