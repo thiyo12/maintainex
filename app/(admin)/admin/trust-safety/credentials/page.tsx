@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiRefreshCw, FiUser, FiSearch } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Credential {
   id: string
@@ -30,6 +32,8 @@ export default function CredentialsPage() {
 }
 
 function CredentialsContent() {
+  const { user: admin } = useAdminSession()
+  const canReviewCredentials = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('credentials:write')
   const [credentials, setCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<string>('PENDING')
@@ -56,6 +60,10 @@ function CredentialsContent() {
   useEffect(() => { fetchCredentials() }, [fetchCredentials])
 
   const handleReview = async (id: string, status: string, reason?: string) => {
+    if (!canReviewCredentials) {
+      toast.error('You do not have permission to review credentials')
+      return
+    }
     setActionLoading(id)
     try {
       const body: Record<string, string> = { status }
@@ -129,7 +137,7 @@ function CredentialsContent() {
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-400">{new Date(c.createdAt).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
-                  {c.verificationStatus === 'PENDING' && (
+                  {canReviewCredentials && c.verificationStatus === 'PENDING' && (
                     <div className="flex items-center space-x-2">
                       <button onClick={() => handleReview(c.id, 'VERIFIED')} disabled={actionLoading === c.id}
                         className="flex items-center space-x-1 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 disabled:opacity-50 text-xs">
@@ -140,6 +148,9 @@ function CredentialsContent() {
                         <FiX className="w-3 h-3" /><span>Reject</span>
                       </button>
                     </div>
+                  )}
+                  {!canReviewCredentials && c.verificationStatus === 'PENDING' && (
+                    <span className="text-xs text-gray-600">Read only</span>
                   )}
                 </td>
               </tr>
@@ -161,7 +172,7 @@ function CredentialsContent() {
         </div>
       )}
 
-      {rejectModal && (
+      {canReviewCredentials && rejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-[#15161E] rounded-xl p-6 w-full max-w-md border border-gray-800">
             <h3 className="text-lg font-semibold text-white mb-4">Reject Credential</h3>
