@@ -41,6 +41,16 @@ export async function PATCH(
       return NextResponse.json({ success: true })
     }
 
+    if (action === 'en_route') {
+      const result = await transitionInspection(prisma, {
+        inspectionId,
+        userId: user.id,
+        toStatus: 'EN_ROUTE',
+      })
+      if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
+      return NextResponse.json({ success: true })
+    }
+
     if (action === 'arrive') {
       const result = await transitionInspection(prisma, {
         inspectionId,
