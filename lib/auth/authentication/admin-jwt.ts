@@ -26,6 +26,7 @@ export interface AccessTokenPayload {
 export interface RefreshTokenPayload {
   sub: string
   jti: string
+  nonce: string
   type: 'refresh'
 }
 
@@ -69,6 +70,7 @@ export function signRefreshToken(adminUserId: string, jti: string): string {
     {
       sub: adminUserId,
       jti,
+      nonce: crypto.randomBytes(16).toString('hex'),
       type: 'refresh',
     } satisfies RefreshTokenPayload,
     getJwtRefreshSecret(),
@@ -92,4 +94,17 @@ export function generateRefreshTokenValue(): string {
 
 export function hashRefreshToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+export function matchesRefreshTokenHash(token: string, expectedHash: string): boolean {
+  const actualHash = hashRefreshToken(token)
+  if (!/^[a-f0-9]{64}$/i.test(expectedHash)) return false
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(actualHash, 'hex'),
+      Buffer.from(expectedHash, 'hex'),
+    )
+  } catch {
+    return false
+  }
 }
