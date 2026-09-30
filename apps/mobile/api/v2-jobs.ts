@@ -38,7 +38,7 @@ export const v2JobActions = {
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`),
   updateProgress: (jobId: string, progressStatus: string) =>
     v2Request<{ workspace: any }>(`/api/mobile/v2/jobs/${jobId}/workspace`, { method: 'PATCH', body: JSON.stringify({ progressStatus }) }),
-  complete: (jobId: string, action: string, reason?: string) =>
+  complete: (jobId: string, action: string, reason?: string, cashPaidConfirmed?: boolean) =>
     v2Request<{
       success: boolean
       message: string
@@ -46,7 +46,10 @@ export const v2JobActions = {
       commission?: number
       netAmount?: number
       platformDue?: number
-    }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
+    }>(`/api/mobile/v2/jobs/${jobId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ action, reason, cashPaidConfirmed }),
+    }),
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
   confirmCashPayment: (jobId: string) =>
