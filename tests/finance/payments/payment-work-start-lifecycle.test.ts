@@ -197,7 +197,27 @@ describe('PayHere payment-to-work lifecycle', () => {
         }),
       })
     )
-    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: [
+          expect.objectContaining({
+            accountId: 'external:payhere',
+            accountType: 'EXTERNAL_PAYOUT',
+            entryType: 'DEBIT',
+            amount: 10000n,
+          }),
+          expect.objectContaining({
+            accountId: 'refund-suspense:pi-1',
+            accountType: 'REFUND_SUSPENSE',
+            entryType: 'CREDIT',
+            amount: 10000n,
+          }),
+        ],
+        referenceType: 'PAYMENT_REFUND_SUSPENSE',
+        referenceId: 'pi-1',
+      }),
+      mocks.tx,
+    )
   })
 
   it('records a captured payment as REFUND_REQUIRED when escrow binding drifts', async () => {
@@ -236,7 +256,21 @@ describe('PayHere payment-to-work lifecycle', () => {
         }),
       })
     )
-    expect(mocks.postLedgerTransaction).not.toHaveBeenCalled()
+    expect(mocks.postLedgerTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: expect.arrayContaining([
+          expect.objectContaining({
+            accountId: 'refund-suspense:pi-1',
+            accountType: 'REFUND_SUSPENSE',
+            entryType: 'CREDIT',
+            amount: 10000n,
+          }),
+        ]),
+        referenceType: 'PAYMENT_REFUND_SUSPENSE',
+        referenceId: 'pi-1',
+      }),
+      mocks.tx,
+    )
     expect(mocks.notifyEscrowDeposited).not.toHaveBeenCalled()
   })
 
