@@ -42,8 +42,10 @@ export const v2JobActions = {
     v2Request<{
       success: boolean
       message: string
+      paymentMethod?: 'CARD' | 'CASH'
       commission?: number
       netAmount?: number
+      platformDue?: number
     }>(`/api/mobile/v2/jobs/${jobId}/complete`, { method: 'POST', body: JSON.stringify({ action, reason }) }),
   releaseEscrow: (jobId: string) =>
     v2Request<{ success: boolean }>(`/api/mobile/v2/jobs/${jobId}/release-escrow`, { method: 'POST' }),
