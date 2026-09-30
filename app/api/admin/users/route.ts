@@ -8,6 +8,8 @@ import {
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { transitionCompanyVerification, transitionUserKyc } from '@/lib/phase6/kyc-writer'
+import { reactivateCompany, reactivateUser, suspendCompany, suspendUser } from '@/lib/domain/admin-suspension'
+import type { AdminSession } from '@/lib/admin-types'
 
 const USER_ACTIONS = new Set([
   'suspend',
@@ -26,9 +28,17 @@ function viewPermission(type: string) {
   return 'users:view'
 }
 
-function actionPermission(action: string) {
-  if (action === 'suspend' || action === 'unsuspend') return 'users:suspend'
-  if (action === 'ban' || action === 'unban') return 'users:ban'
+function actionPermission(action: string, targetRole: string) {
+  if (action === 'suspend' || action === 'unsuspend') {
+    if (targetRole === 'TASKER') return 'taskers:edit'
+    if (targetRole === 'COMPANY') return 'companies:edit'
+    return 'users:suspend'
+  }
+  if (action === 'ban' || action === 'unban') {
+    if (targetRole === 'TASKER') return 'taskers:ban'
+    if (targetRole === 'COMPANY') return 'companies:ban'
+    return 'users:ban'
+  }
   if (action === 'verify_tasker' || action === 'reject_tasker') return 'taskers:verify'
   if (action === 'verify_company' || action === 'reject_company') return 'companies:verify'
   return null
@@ -203,11 +213,6 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid user action payload' }, { status: 400 })
     }
 
-    const permission = actionPermission(action)
-    if (!permission || !crmHasPermission(security.role, permission)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -236,6 +241,21 @@ export async function PATCH(request: NextRequest) {
 
     if (!assertCrmCountryAllowed(security, targetUser.countryCode)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    const permission = actionPermission(action, targetUser.role)
+    if (!permission || !crmHasPermission(security.role, permission)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (
+      ['suspend', 'ban', 'reject_tasker', 'reject_company'].includes(action) &&
+      (!reason || reason.length < 3)
+    ) {
+      return NextResponse.json(
+        { error: 'A reason of at least 3 characters is required for this action' },
+        { status: 400 }
+      )
     }
 
     if (action === 'verify_tasker' || action === 'reject_tasker') {
@@ -308,6 +328,62 @@ export async function PATCH(request: NextRequest) {
         userAgent: security.userAgent || undefined,
         riskLevel: action === 'reject_company' ? 'MEDIUM' : 'LOW',
       })
+
+      return NextResponse.json({ success: true })
+    }
+
+    const adminSession: AdminSession = {
+      id: security.adminId,
+      email: security.email,
+      role: security.role,
+      firstName: '',
+      lastName: '',
+      assignedCountries: security.assignedCountries,
+      authType: 'adminUser',
+    }
+
+    if ((action === 'suspend' || action === 'unsuspend') && targetUser.role === 'COMPANY') {
+      if (!targetUser.companyProfile) {
+        return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+      }
+
+      if (action === 'suspend') {
+        await suspendCompany(prisma, {
+          companyProfileId: targetUser.companyProfile.id,
+          reason: reason!,
+          scope: 'ALL',
+          session: adminSession,
+          ipAddress: security.ipAddress,
+        })
+      } else {
+        await reactivateCompany(prisma, {
+          companyProfileId: targetUser.companyProfile.id,
+          reason: reason || 'Reactivated by admin',
+          session: adminSession,
+          ipAddress: security.ipAddress,
+        })
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    if ((action === 'suspend' || action === 'unsuspend') && targetUser.role === 'TASKER') {
+      if (action === 'suspend') {
+        await suspendUser(prisma, {
+          userId: targetUser.id,
+          reason: reason!,
+          scope: 'ALL',
+          session: adminSession,
+          ipAddress: security.ipAddress,
+        })
+      } else {
+        await reactivateUser(prisma, {
+          userId: targetUser.id,
+          reason: reason || 'Reactivated by admin',
+          session: adminSession,
+          ipAddress: security.ipAddress,
+        })
+      }
 
       return NextResponse.json({ success: true })
     }
