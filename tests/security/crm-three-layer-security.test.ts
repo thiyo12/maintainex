@@ -1,8 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
+const prismaMocks = vi.hoisted(() => ({
+  adminFindUnique: vi.fn(),
+}))
+
 vi.mock('@/lib/auth/authentication/admin-auth', () => ({
   getAdminSession: vi.fn(),
+}))
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    adminUser: {
+      findUnique: prismaMocks.adminFindUnique,
+    },
+  },
 }))
 
 vi.mock('@/lib/shared/rate-limit/middleware', () => ({
@@ -30,6 +42,19 @@ import {
 
 const mockedSession = vi.mocked(getAdminSession)
 const mockedRateLimit = vi.mocked(checkRateLimit)
+
+function liveAdmin(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'admin-1',
+    email: 'manager@example.com',
+    role: 'MANAGER',
+    isActive: true,
+    deletedAt: null,
+    lockedUntil: null,
+    assignedCountries: JSON.stringify(['LK']),
+    ...overrides,
+  }
+}
 
 function request(
   method = 'GET',
@@ -106,11 +131,14 @@ describe('CRM three-layer security', () => {
       sub: 'admin-1',
       email: 'manager@example.com',
       role: 'MANAGER',
-      assignedCountries: [],
+      assignedCountries: ['CA'],
       type: 'access',
       firstName: 'Ops',
       lastName: 'Manager',
     } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({ assignedCountries: '[]' })
+    )
 
     const result = await guardCrmRequest(request('GET'), {
       permission: 'jobs:view',
@@ -125,13 +153,20 @@ describe('CRM three-layer security', () => {
     mockedRateLimit.mockResolvedValueOnce({ allowed: true })
     mockedSession.mockResolvedValueOnce({
       sub: 'admin-2',
-      email: 'manager@example.com',
-      role: 'MANAGER',
-      assignedCountries: ['lk'],
+      email: 'old-role@example.com',
+      role: 'SUPER_ADMIN',
+      assignedCountries: ['CA'],
       type: 'access',
-      firstName: 'Ops',
-      lastName: 'Manager',
+      firstName: 'Old',
+      lastName: 'Claims',
     } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({
+        id: 'admin-2',
+        email: 'manager@example.com',
+        assignedCountries: '["lk"]',
+      })
+    )
 
     const result = await guardCrmRequest(request('GET'), {
       permission: 'jobs:view',
@@ -147,17 +182,51 @@ describe('CRM three-layer security', () => {
     }
   })
 
+  it('rejects a deactivated live admin even when the JWT is still valid', async () => {
+    mockedRateLimit.mockResolvedValueOnce({ allowed: true })
+    mockedSession.mockResolvedValueOnce({
+      sub: 'admin-disabled',
+      email: 'manager@example.com',
+      role: 'MANAGER',
+      assignedCountries: ['LK'],
+      type: 'access',
+      firstName: 'Old',
+      lastName: 'Session',
+    } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({
+        id: 'admin-disabled',
+        isActive: false,
+      })
+    )
+
+    const result = await guardCrmRequest(request('GET'), {
+      permission: 'jobs:view',
+      requireCountryScope: true,
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.response.status).toBe(401)
+  })
+
   it('blocks a role that lacks the requested CRM permission', async () => {
     mockedRateLimit.mockResolvedValueOnce({ allowed: true })
     mockedSession.mockResolvedValueOnce({
       sub: 'admin-3',
-      email: 'support@example.com',
-      role: 'SUPPORT',
+      email: 'manager@example.com',
+      role: 'MANAGER',
       assignedCountries: ['LK'],
       type: 'access',
-      firstName: 'Support',
-      lastName: 'Agent',
+      firstName: 'Old',
+      lastName: 'Role',
     } as any)
+    prismaMocks.adminFindUnique.mockResolvedValueOnce(
+      liveAdmin({
+        id: 'admin-3',
+        email: 'support@example.com',
+        role: 'SUPPORT',
+      })
+    )
 
     const result = await guardCrmRequest(request('GET'), {
       permission: 'jobs:manage',
