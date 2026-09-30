@@ -162,7 +162,7 @@ jobs:
           npx tsc --noEmit
 
       - name: Schema integrity tests
-        run: npx vitest run tests/phase0 --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
+        run: npx vitest run tests/structural/schema-integrity.test.ts tests/structural/migration-validation.test.ts --reporter=verbose 2>&1 | tee /tmp/schema-tests.txt
         if: always()
 
       - name: Upload schema test diagnostics
@@ -175,7 +175,7 @@ jobs:
           retention-days: 3
 
       - name: Migration preservation tests
-        run: npx vitest run tests/phase8/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
+        run: npx vitest run tests/structural/migration-preservation.test.ts --reporter=verbose 2>&1 | tee /tmp/migration-tests.txt
         if: always()
 
       - name: Upload migration test diagnostics
@@ -188,7 +188,7 @@ jobs:
           retention-days: 3
 
       - name: Country engine invariant tests
-        run: npx vitest run tests/phase8/country-engine-invariants.test.ts tests/phase8/matching-isolation.test.ts tests/phase8/admin-country-rbac.test.ts tests/phase8/quote-country-eligibility.test.ts --reporter=verbose 2>&1 | tee /tmp/invariant-tests.txt
+        run: npx vitest run tests/finance/country-engine-invariants.test.ts tests/security/matching-isolation.test.ts tests/rbac/admin-country-rbac.test.ts tests/security/quote-country-eligibility.test.ts --reporter=verbose 2>&1 | tee /tmp/invariant-tests.txt
         if: always()
 
       - name: Upload invariant test diagnostics
@@ -201,11 +201,11 @@ jobs:
           retention-days: 3
 
       - name: Negative security tests (Part W)
-        run: npx vitest run tests/phase8/negative-security.test.ts --reporter=verbose 2>&1 | tee /tmp/security-tests.txt
+        run: npx vitest run tests/security/negative-security.test.ts --reporter=verbose 2>&1 | tee /tmp/security-tests.txt
         if: always()
 
       - name: Phase 9 security tests
-        run: npx vitest run tests/phase9/ --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
+        run: npx vitest run tests/security/phase10-6-security.test.ts tests/security/phase10-6-security-duplicate.test.ts --reporter=verbose 2>&1 | tee /tmp/phase9-security-tests.txt
         if: always()
 
       - name: Upload Phase 9 security test diagnostics
@@ -227,7 +227,7 @@ jobs:
           retention-days: 3
 
       - name: Canonical financial flow integration tests (PostgreSQL)
-        run: npx vitest run tests/phase8/postgresql-integration.test.ts --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
+        run: npx vitest run tests/integration/postgresql-integration.test.ts --reporter=verbose 2>&1 | tee /tmp/financial-flow-tests.txt
         if: always()
 
       - name: Upload financial flow test diagnostics

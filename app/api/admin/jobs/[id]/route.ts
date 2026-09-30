@@ -8,9 +8,16 @@ import {
 import { getCurrencyForCountry, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
-function money(value: bigint | number | null | undefined, currency: Currency): number | null {
+function money(
+  value: bigint | number | null | undefined,
+  currency: string | null | undefined,
+  fallbackCurrency: Currency = 'LKR'
+): number | null {
   if (value === null || value === undefined) return null
-  return minorUnitsToMajorUnits(BigInt(value), currency)
+  const normalizedCurrency: Currency = currency === 'CAD' || currency === 'LKR'
+    ? currency
+    : fallbackCurrency
+  return minorUnitsToMajorUnits(BigInt(value), normalizedCurrency)
 }
 
 function safeJson(value: unknown) {
@@ -342,10 +349,10 @@ async function getV2Job(id: string, request: NextRequest) {
 
     return {
       ...quote,
-      price: money(quote.price, quote.currency || currency),
-      subtotal: money(quote.subtotalCents, quote.currency || currency),
-      tax: money(quote.taxCents, quote.currency || currency),
-      total: money(quote.totalCents, quote.currency || currency),
+      price: money(quote.price, quote.currency, currency),
+      subtotal: money(quote.subtotalCents, quote.currency, currency),
+      tax: money(quote.taxCents, quote.currency, currency),
+      total: money(quote.totalCents, quote.currency, currency),
       lineItems: quote.lineItems.map(line => ({
         ...line,
         unitAmount: money(line.unitAmountCents, line.currency),
