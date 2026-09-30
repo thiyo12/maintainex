@@ -88,6 +88,7 @@ const NAVIGATION: NavItem[] = [
       { name: 'Finance Overview', href: '/admin/financial', icon: FiDollarSign, permission: 'commission:view' },
       { name: 'Commission', href: '/admin/financial/commission', icon: FiDollarSign, permission: 'commission:view' },
       { name: 'Wallets & Payouts', href: '/admin/financial/wallets', icon: FiCreditCard, permission: 'wallets:view' },
+      { name: 'Refund Queue', href: '/admin/financial/refunds', icon: FiRefreshCw, permission: 'wallets:view' },
       { name: 'Settlements', href: '/admin/financial/settlements', icon: FiFileText, permission: 'commission:view' },
     ],
   },
