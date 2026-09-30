@@ -42,6 +42,31 @@ export async function GET(
 
     const isOwner = job.customerId === user.id
     const requestedContext = new URL(_request.url).searchParams.get('context')
+
+    if (!isOwner && job.targetTaskerId) {
+      const [targetTasker, targetCompanies] = await Promise.all([
+        prisma.taskerProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        }),
+        getReadableCompanyIds(user.id),
+      ])
+      const readableTargetIds = new Set(
+        [
+          user.id,
+          targetTasker?.id ?? null,
+          ...targetCompanies,
+        ].filter((value): value is string => Boolean(value))
+      )
+
+      if (!readableTargetIds.has(job.targetTaskerId)) {
+        return NextResponse.json(
+          { error: 'This direct booking is reserved for another provider' },
+          { status: 403 }
+        )
+      }
+    }
+
     let isQuoter = isOwner
     let providerContextId: string | null = null
     let providerContextType: 'INDIVIDUAL' | 'COMPANY' | null = null
