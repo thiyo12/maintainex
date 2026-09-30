@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
+import { crmHasPermission, getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +12,15 @@ export async function GET(request: NextRequest) {
     if (!guard.ok) return guard.response
     const security = guard.context
     const countryFilter = getCrmCountryFilter(security)
+    const canUsers = crmHasPermission(security.role, 'users:view')
+    const canTaskers = crmHasPermission(security.role, 'taskers:view')
+    const canCompanies = crmHasPermission(security.role, 'companies:view')
+    const canKyc = crmHasPermission(security.role, 'kyc:view')
+    const canJobs = crmHasPermission(security.role, 'jobs:view')
+    const canFinance =
+      crmHasPermission(security.role, 'commission:view') ||
+      crmHasPermission(security.role, 'wallets:view')
+    const canCheating = crmHasPermission(security.role, 'cheating:view')
 
     const scopedUserIds = security.isSuperAdmin
       ? null
@@ -156,36 +165,43 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         stats: {
-          totalUsers,
-          totalTaskers,
-          totalCompanies,
-          pendingKYC,
-          verifiedKYC,
-          rejectedKYC,
-          bannedUsers,
-          pendingSettlements,
-          overdueSettlements,
-          totalCommissionOwed: totalCommissionOwed._sum.commissionOwed || 0,
-          totalCommissionPaid: totalCommissionPaid._sum.commissionOwed || 0,
-          pendingCheatingReports,
-          totalJobPostings: classicTotal + marketplaceTotal,
-          openJobs: classicOpen + marketplaceOpen,
-          completedJobs: classicCompleted + marketplaceCompleted,
-          totalWalletBalance: totalWalletBalance._sum.availableBalance || 0,
-          commissionRate: Number.isFinite(commissionRate) ? commissionRate : 10,
+          totalUsers: canUsers ? totalUsers : 0,
+          totalTaskers: canTaskers ? totalTaskers : 0,
+          totalCompanies: canCompanies ? totalCompanies : 0,
+          pendingKYC: canKyc ? pendingKYC : 0,
+          verifiedKYC: canKyc ? verifiedKYC : 0,
+          rejectedKYC: canKyc ? rejectedKYC : 0,
+          bannedUsers: canUsers ? bannedUsers : 0,
+          pendingSettlements: canFinance ? pendingSettlements : 0,
+          overdueSettlements: canFinance ? overdueSettlements : 0,
+          totalCommissionOwed: canFinance ? totalCommissionOwed._sum.commissionOwed || 0 : 0,
+          totalCommissionPaid: canFinance ? totalCommissionPaid._sum.commissionOwed || 0 : 0,
+          pendingCheatingReports: canCheating ? pendingCheatingReports : 0,
+          totalJobPostings: canJobs ? classicTotal + marketplaceTotal : 0,
+          openJobs: canJobs ? classicOpen + marketplaceOpen : 0,
+          completedJobs: canJobs ? classicCompleted + marketplaceCompleted : 0,
+          totalWalletBalance: canFinance ? totalWalletBalance._sum.availableBalance || 0 : 0,
+          commissionRate: canFinance && Number.isFinite(commissionRate) ? commissionRate : 0,
         },
-        financeByCurrency,
-        weeklySummary: {
-          pendingCommission: weeklySettlementsPending._sum.commissionOwed || 0,
-          pendingCount: weeklySettlementsPending._count,
-          overdueCommission: weeklySettlementsOverdue._sum.commissionOwed || 0,
-          overdueCount: weeklySettlementsOverdue._count,
-        },
+        financeByCurrency: canFinance ? financeByCurrency : [],
+        weeklySummary: canFinance
+          ? {
+              pendingCommission: weeklySettlementsPending._sum.commissionOwed || 0,
+              pendingCount: weeklySettlementsPending._count,
+              overdueCommission: weeklySettlementsOverdue._sum.commissionOwed || 0,
+              overdueCount: weeklySettlementsOverdue._count,
+            }
+          : {
+              pendingCommission: 0,
+              pendingCount: 0,
+              overdueCommission: 0,
+              overdueCount: 0,
+            },
         isSuperAdmin: security.isSuperAdmin,
         scope: {
           countries: security.isSuperAdmin ? [] : security.assignedCountries,
-          classicJobs: classicTotal,
-          marketplaceJobs: marketplaceTotal,
+          classicJobs: canJobs ? classicTotal : 0,
+          marketplaceJobs: canJobs ? marketplaceTotal : 0,
         },
       },
       { headers: { 'Cache-Control': 'no-store' } }
