@@ -31,6 +31,57 @@ export interface AssignmentResult {
   reasons?: string[]
 }
 
+async function lockAndAssertWorkerScheduleAvailable(
+  tx: PrismaClientOrTx,
+  workerUserId: string,
+  jobId: string,
+  preferredDate: Date | null,
+  preferredTimeSlot: string | null,
+): Promise<void> {
+  const lockedWorker = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM "User"
+    WHERE id = ${workerUserId}
+    FOR UPDATE
+  `
+  if (lockedWorker.length !== 1) {
+    throw new Error('Worker account not found')
+  }
+  if (!preferredDate) return
+
+  const dayStart = new Date(preferredDate)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+
+  const slotFilter =
+    preferredTimeSlot && preferredTimeSlot !== 'anytime'
+      ? {
+          OR: [
+            { preferredTimeSlot },
+            { preferredTimeSlot: 'anytime' },
+            { preferredTimeSlot: null },
+          ],
+        }
+      : {}
+
+  const conflict = await tx.companyJobAssignment.findFirst({
+    where: {
+      workerUserId,
+      jobId: { not: jobId },
+      status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
+      job: {
+        preferredDate: { gte: dayStart, lt: dayEnd },
+        ...slotFilter,
+      },
+    },
+    select: { id: true, jobId: true },
+  })
+  if (conflict) {
+    throw new Error('Worker scheduling conflict changed concurrently')
+  }
+}
+
 export async function createAssignment(params: AssignmentCreateParams): Promise<AssignmentResult> {
   const { companyId, jobId, workerUserId, assignedByUserId, actorRole } = params
 
@@ -84,8 +135,18 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
     return { success: false, error: 'This worker is already assigned to this job' }
   }
 
-  const assignment = await prisma.$transaction(async (tx) => {
-    const claimed = await tx.marketplaceJob.updateMany({
+  let assignment: { id: string }
+  try {
+    assignment = await prisma.$transaction(async (tx) => {
+      await lockAndAssertWorkerScheduleAvailable(
+        tx,
+        workerUserId,
+        jobId,
+        job.preferredDate,
+        job.preferredTimeSlot,
+      )
+
+      const claimed = await tx.marketplaceJob.updateMany({
       where: {
         id: jobId,
         status: 'QUOTE_ACCEPTED',
@@ -142,8 +203,21 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       metadata: { workerUserId, jobId, assignmentId: record.id },
     }, tx)
 
-    return record
-  })
+      return record
+    })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (
+        error.message.includes('concurrently') ||
+        error.message.includes('scheduling conflict') ||
+        error.message === 'Worker account not found'
+      )
+    ) {
+      return { success: false, error: error.message }
+    }
+    throw error
+  }
 
   const company = await prisma.companyProfile.findUnique({
     where: { id: companyId },
@@ -203,7 +277,13 @@ export async function reassignWorker(
   const currentAssignment = await prisma.companyJobAssignment.findFirst({
     where: { jobId, companyId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
   })
-  if (currentAssignment?.workerUserId === newWorkerUserId) {
+  if (!currentAssignment) {
+    return { success: false, error: 'No active worker assignment exists to reassign' }
+  }
+  if (currentAssignment.status === 'IN_PROGRESS') {
+    return { success: false, error: 'Cannot reassign after the worker has started work' }
+  }
+  if (currentAssignment.workerUserId === newWorkerUserId) {
     return { success: false, error: 'This worker is already the active assignee for this job' }
   }
 
@@ -217,16 +297,41 @@ export async function reassignWorker(
     return { success: false, error: 'This worker already has a non-terminal assignment for this job' }
   }
 
-  const assignment = await prisma.$transaction(async (tx) => {
-    if (currentAssignment) {
-      await tx.companyJobAssignment.update({
-        where: { id: currentAssignment.id },
+  let assignment: { id: string }
+  try {
+    assignment = await prisma.$transaction(async (tx) => {
+      await lockAndAssertWorkerScheduleAvailable(
+        tx,
+        newWorkerUserId,
+        jobId,
+        job.preferredDate,
+        job.preferredTimeSlot,
+      )
+
+      const claimed = await tx.marketplaceJob.updateMany({
+        where: {
+          id: jobId,
+          status: 'QUOTE_ACCEPTED',
+          targetTaskerId: currentAssignment.workerUserId,
+        },
+        data: { targetTaskerId: newWorkerUserId },
+      })
+      if (claimed.count !== 1) throw new Error('Job target changed before reassignment')
+
+      const revoked = await tx.companyJobAssignment.updateMany({
+        where: {
+          id: currentAssignment.id,
+          companyId,
+          workerUserId: currentAssignment.workerUserId,
+          status: { in: ['ASSIGNED', 'ACCEPTED'] },
+        },
         data: {
           status: 'REVOKED',
           revokedAt: new Date(),
           revokedReason: reason || 'Reassigned to another worker',
         },
       })
+      if (revoked.count !== 1) throw new Error('Assignment changed before reassignment')
 
       await writeCompanyAuditLog({
         companyId,
@@ -239,12 +344,6 @@ export async function reassignWorker(
         metadata: { previousWorkerUserId: currentAssignment.workerUserId, reason },
       }, tx)
     }
-
-    const claimed = await tx.marketplaceJob.updateMany({
-      where: { id: jobId, status: 'QUOTE_ACCEPTED' },
-      data: { targetTaskerId: newWorkerUserId },
-    })
-    if (claimed.count !== 1) throw new Error('Job state changed before reassignment')
 
     const newRecord = reusableAssignment
       ? await tx.companyJobAssignment.update({
@@ -283,8 +382,21 @@ export async function reassignWorker(
       metadata: { workerUserId: newWorkerUserId, jobId, assignmentId: newRecord.id },
     }, tx)
 
-    return newRecord
-  })
+      return newRecord
+    })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (
+        error.message.includes('reassignment') ||
+        error.message.includes('scheduling conflict') ||
+        error.message === 'Worker account not found'
+      )
+    ) {
+      return { success: false, error: error.message }
+    }
+    throw error
+  }
 
   const company = await prisma.companyProfile.findUnique({
     where: { id: companyId },
