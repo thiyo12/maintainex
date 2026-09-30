@@ -527,12 +527,17 @@ export async function raiseJobDispute(
       throw new Error(`Cannot dispute from workspace state ${workspace.progressStatus}`)
     }
 
-    const escrow = await tx.jobEscrow.findFirst({ where: { jobId, status: 'PROTECTED' } })
-    if (!escrow) throw new Error('No protected escrow found')
-    if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+    const escrow = await tx.jobEscrow.findFirst({
+      where: { jobId, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+    })
+    if (!escrow) throw new Error('No payment commitment available for dispute')
 
     const escrowClaimed = await tx.jobEscrow.updateMany({
-      where: { id: escrow.id, status: 'PROTECTED' },
+      where: {
+        id: escrow.id,
+        status: escrow.status,
+        paymentMethod: escrow.paymentMethod,
+      },
       data: { status: 'ON_HOLD' },
     })
     if (escrowClaimed.count !== 1) throw new Error('Escrow state changed concurrently')
@@ -573,8 +578,10 @@ export async function raiseJobDispute(
         description: metadataDescription,
         disputeId: dispute.id,
         escrowId: escrow.id,
-        escrowFromState: 'PROTECTED',
+        escrowFromState: escrow.status,
         escrowToState: 'ON_HOLD',
+        paymentMethod: escrow.paymentMethod,
+        cashNoPlatformFunds: escrow.paymentMethod === 'CASH',
       },
     })
 
