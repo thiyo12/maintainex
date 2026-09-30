@@ -898,7 +898,7 @@ export async function requestRequiredPayHereRefund(
 
     await recordJobLifecycleEvent(tx, {
       jobId: intent.jobId,
-      actorId: details.actorId || 'system:payhere-refund',
+      actorId: 'system:payhere-refund',
       actorType: 'SYSTEM',
       action: 'PAYMENT_REFUND_SUBMITTED',
       metadata: {
@@ -1029,20 +1029,36 @@ async function finalizePayHereRefund(
     }
   }
   if (intent.status === 'REFUNDED') {
-    return { success: true, status: 'REFUNDED' }
+    return { success: true, status: 'REFUNDED', refundReference: details.refundReference }
   }
 
-  const escrow = await prisma.jobEscrow.findUnique({
-    where: { id: intent.escrowId },
+  const suspenseAccountId = `refund-suspense:${intent.id}`
+  const suspenseFunding = await prisma.financialLedger.findFirst({
+    where: {
+      referenceType: 'PAYMENT_REFUND_SUSPENSE',
+      referenceId: intent.id,
+      accountId: suspenseAccountId,
+      accountType: 'REFUND_SUSPENSE',
+      entryType: 'CREDIT',
+    },
+    select: { id: true, amount: true, currency: true },
   })
-  if (!escrow) {
+
+  const escrow = suspenseFunding
+    ? null
+    : await prisma.jobEscrow.findUnique({ where: { id: intent.escrowId } })
+
+  if (!suspenseFunding && !escrow) {
     return {
       success: false,
       status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
-      error: 'Escrow not found',
-      code: 'ESCROW_NOT_FOUND',
+      error: 'Refund funding source could not be resolved',
+      code: 'REFUND_FUNDING_SOURCE_NOT_FOUND',
     }
   }
+
+  const actorId = details.actorId || 'system:payhere-refund'
+  const actorType = details.source === 'MANUAL' ? 'STAFF' : 'SYSTEM'
 
   await prisma.$transaction(async tx => {
     const claimed = await tx.paymentIntent.updateMany({
@@ -1057,6 +1073,7 @@ async function finalizePayHereRefund(
           refundReference: details.refundReference,
           message: details.message,
           completedAt: new Date().toISOString(),
+          fundingSource: suspenseFunding ? 'REFUND_SUSPENSE' : 'ESCROW',
         }),
       },
     })
@@ -1069,63 +1086,103 @@ async function finalizePayHereRefund(
       throw new Error('Payment refund state changed concurrently')
     }
 
-    const escrowClaimed = await tx.jobEscrow.updateMany({
-      where: {
-        id: escrow.id,
-        status: { in: ['ON_HOLD', 'PROTECTED'] },
-      },
-      data: {
-        status: 'REFUNDED',
-        refundedAt: new Date(),
-      },
-    })
-    if (escrowClaimed.count !== 1) {
-      throw new Error('Escrow is not awaiting external refund reconciliation')
-    }
+    if (suspenseFunding) {
+      if (suspenseFunding.amount !== intent.amount || suspenseFunding.currency !== intent.currency) {
+        throw new Error('Refund suspense ledger amount or currency does not match payment intent')
+      }
 
-    await postLedgerTransaction({
-      entries: [
-        {
-          accountId: `escrow:${escrow.id}`,
-          accountType: 'ESCROW',
-          entryType: 'DEBIT',
-          amount: escrow.totalAmount,
+      await postLedgerTransaction({
+        entries: [
+          {
+            accountId: suspenseAccountId,
+            accountType: 'REFUND_SUSPENSE',
+            entryType: 'DEBIT',
+            amount: intent.amount,
+          },
+          {
+            accountId: 'external:payhere',
+            accountType: 'EXTERNAL_PAYOUT',
+            entryType: 'CREDIT',
+            amount: intent.amount,
+          },
+        ],
+        currency: intent.currency as Currency,
+        referenceType: 'PAYMENT_EXTERNAL_REFUND',
+        referenceId: intent.id,
+        idempotencyKey: `payhere-refund-suspense-release:${intent.id}:${intent.paymentId || intent.merchantOrderId}`,
+        description: `External refund of late PayHere capture ${intent.id}`,
+        createdBy: actorId,
+        metadata: JSON.stringify({
+          paymentIntentId: intent.id,
+          paymentId: intent.paymentId,
+          merchantOrderId: intent.merchantOrderId,
+          refundReference: details.refundReference,
+          refundSource: details.source || 'PAYHERE',
+          fundingSource: 'REFUND_SUSPENSE',
+        }),
+      }, tx)
+    } else {
+      const activeEscrow = escrow!
+      const escrowClaimed = await tx.jobEscrow.updateMany({
+        where: {
+          id: activeEscrow.id,
+          status: { in: ['ON_HOLD', 'PROTECTED'] },
         },
-        {
-          accountId: 'external:payhere',
-          accountType: 'EXTERNAL_PAYOUT',
-          entryType: 'CREDIT',
-          amount: escrow.totalAmount,
+        data: {
+          status: 'REFUNDED',
+          refundedAt: new Date(),
         },
-      ],
-      currency: escrow.currency as Currency,
-      referenceType: 'ESCROW_EXTERNAL_REFUND',
-      referenceId: escrow.id,
-      idempotencyKey: `payhere-refund:${escrow.id}:${intent.paymentId || intent.merchantOrderId}`,
-      description: `PayHere refund reconciliation for escrow ${escrow.id}`,
-      createdBy: details.actorId || 'system:payhere-refund',
-      metadata: JSON.stringify({
-        paymentIntentId: intent.id,
-        paymentId: intent.paymentId,
-        merchantOrderId: intent.merchantOrderId,
-        refundReference: details.refundReference,
-        refundSource: details.source || 'PAYHERE',
-      }),
-    }, tx)
+      })
+      if (escrowClaimed.count !== 1) {
+        throw new Error('Escrow is not awaiting external refund reconciliation')
+      }
+
+      await postLedgerTransaction({
+        entries: [
+          {
+            accountId: `escrow:${activeEscrow.id}`,
+            accountType: 'ESCROW',
+            entryType: 'DEBIT',
+            amount: activeEscrow.totalAmount,
+          },
+          {
+            accountId: 'external:payhere',
+            accountType: 'EXTERNAL_PAYOUT',
+            entryType: 'CREDIT',
+            amount: activeEscrow.totalAmount,
+          },
+        ],
+        currency: activeEscrow.currency as Currency,
+        referenceType: 'ESCROW_EXTERNAL_REFUND',
+        referenceId: activeEscrow.id,
+        idempotencyKey: `payhere-refund:${activeEscrow.id}:${intent.paymentId || intent.merchantOrderId}`,
+        description: `PayHere refund reconciliation for escrow ${activeEscrow.id}`,
+        createdBy: actorId,
+        metadata: JSON.stringify({
+          paymentIntentId: intent.id,
+          paymentId: intent.paymentId,
+          merchantOrderId: intent.merchantOrderId,
+          refundReference: details.refundReference,
+          refundSource: details.source || 'PAYHERE',
+          fundingSource: 'ESCROW',
+        }),
+      }, tx)
+    }
 
     await recordJobLifecycleEvent(tx, {
       jobId: intent.jobId,
-      actorId: details.actorId || 'system:payhere-refund',
-      actorType: 'SYSTEM',
+      actorId,
+      actorType,
       action: 'PAYMENT_REFUNDED',
       metadata: {
         paymentIntentId: intent.id,
         paymentId: intent.paymentId,
-        escrowId: escrow.id,
+        escrowId: intent.escrowId,
         refundReference: details.refundReference,
         refundSource: details.source || 'PAYHERE',
-        refundMinor: escrow.totalAmount,
-        currency: escrow.currency,
+        fundingSource: suspenseFunding ? 'REFUND_SUSPENSE' : 'ESCROW',
+        refundMinor: suspenseFunding ? intent.amount : escrow!.totalAmount,
+        currency: suspenseFunding ? intent.currency : escrow!.currency,
       },
     })
   })
