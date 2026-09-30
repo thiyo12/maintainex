@@ -270,6 +270,8 @@ const makeStyles = (colors: any) => StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 20 },
 
   sectionLabel: { fontSize: 12, fontFamily: fonts.bodyMedium, color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  rowL: { fontSize: 12, fontFamily: fonts.body, color: colors.muted, marginBottom: 4 },
+  rowV: { fontSize: 14, fontFamily: fonts.bodyMedium, color: colors.ink },
   providerSection: { marginTop: 16 },
   providerRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 14, padding: 16, shadowColor: colors.ink, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   providerInfo: { flex: 1, marginLeft: 12 },
