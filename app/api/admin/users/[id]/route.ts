@@ -170,6 +170,18 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    const canWork = crmHasPermission(security.role, 'jobs:view')
+    const canFinance =
+      crmHasPermission(security.role, 'wallets:view') ||
+      crmHasPermission(security.role, 'commission:view')
+    const canTrust =
+      crmHasPermission(security.role, 'kyc:view') ||
+      crmHasPermission(security.role, 'risk_events:read') ||
+      crmHasPermission(security.role, 'credentials:read') ||
+      crmHasPermission(security.role, 'security:view')
+    const canAudit = crmHasPermission(security.role, 'audit:read')
+    const canSecurity = crmHasPermission(security.role, 'security:view')
+
     const companyId = user.companyProfile?.id
     const taskerId = user.taskerProfile?.id
 
@@ -189,7 +201,7 @@ export async function GET(
       activityAudit,
       securityAudit,
     ] = await Promise.all([
-      prisma.marketplaceJob.findMany({
+      canWork ? prisma.marketplaceJob.findMany({
         where: { customerId: user.id },
         select: {
           id: true,
@@ -203,8 +215,8 @@ export async function GET(
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.jobPosting.findMany({
+      }) : Promise.resolve([]),
+      canWork ? prisma.jobPosting.findMany({
         where: { customerId: user.id },
         select: {
           id: true,
@@ -218,8 +230,8 @@ export async function GET(
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.jobQuote.findMany({
+      }) : Promise.resolve([]),
+      canWork ? prisma.jobQuote.findMany({
         where: {
           OR: [
             { providerType: 'INDIVIDUAL', providerId: user.id },
@@ -239,8 +251,8 @@ export async function GET(
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      taskerId
+      }) : Promise.resolve([]),
+      canWork && taskerId
         ? prisma.assignment.findMany({
             where: { taskerId },
             include: {
@@ -258,7 +270,7 @@ export async function GET(
             take: 100,
           })
         : Promise.resolve([]),
-      prisma.companyJobAssignment.findMany({
+      canWork ? prisma.companyJobAssignment.findMany({
         where: {
           OR: [
             { workerUserId: user.id },
@@ -286,8 +298,8 @@ export async function GET(
         },
         orderBy: { assignedAt: 'desc' },
         take: 100,
-      }),
-      prisma.payout.findMany({
+      }) : Promise.resolve([]),
+      canFinance ? prisma.payout.findMany({
         where: { userId: user.id },
         select: {
           id: true,
@@ -306,8 +318,8 @@ export async function GET(
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.payoutRequest.findMany({
+      }) : Promise.resolve([]),
+      canFinance ? prisma.payoutRequest.findMany({
         where: { userId: user.id },
         select: {
           id: true,
@@ -322,39 +334,54 @@ export async function GET(
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.providerWallet.findUnique({ where: { userId: user.id } }),
-      prisma.customerWallet.findUnique({ where: { userId: user.id } }),
-      prisma.jobReview.findMany({
+      }) : Promise.resolve([]),
+      canFinance ? prisma.providerWallet.findUnique({ where: { userId: user.id } }) : Promise.resolve(null),
+      canFinance ? prisma.customerWallet.findUnique({ where: { userId: user.id } }) : Promise.resolve(null),
+      canWork ? prisma.jobReview.findMany({
         where: { OR: [{ customerId: user.id }, { providerId: user.id }] },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.providerReview.findMany({
+      }) : Promise.resolve([]),
+      canWork ? prisma.providerReview.findMany({
         where: { OR: [{ customerId: user.id }, { providerId: user.id }] },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.auditLog.findMany({
+      }) : Promise.resolve([]),
+      canAudit ? prisma.auditLog.findMany({
         where: { targetId: user.id },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.activityLog.findMany({
+      }) : Promise.resolve([]),
+      canAudit ? prisma.activityLog.findMany({
         where: { entityId: user.id },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
-      prisma.securityAudit.findMany({
+      }) : Promise.resolve([]),
+      canSecurity ? prisma.securityAudit.findMany({
         where: { entityId: user.id },
         orderBy: { createdAt: 'desc' },
         take: 100,
-      }),
+      }) : Promise.resolve([]),
     ])
+
+    const userView = {
+      ...user,
+      identityDocs: canTrust ? user.identityDocs : [],
+      fraudEvents: canTrust ? user.fraudEvents : [],
+      adminFlags: canTrust ? user.adminFlags : [],
+      loginActivities: canSecurity ? user.loginActivities : [],
+    }
 
     return NextResponse.json(
       safeJson({
-        user,
+        permissions: {
+          work: canWork,
+          finance: canFinance,
+          trust: canTrust,
+          audit: canAudit,
+          security: canSecurity,
+        },
+        user: userView,
         jobs: {
           marketplace: marketplaceJobs,
           classic: classicJobs,
