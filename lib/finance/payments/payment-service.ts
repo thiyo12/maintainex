@@ -556,6 +556,17 @@ export async function processPaymentFailure(notification: PayHereNotification): 
   })
   if (!paymentIntent) return { success: false, error: 'Payment intent not found' }
 
+  const notifiedAmount = parsePayHereAmount(notification.payhere_amount)
+  if (notifiedAmount === null || notifiedAmount !== paymentIntent.amount) {
+    return { success: false, error: 'Payment amount mismatch' }
+  }
+  if (notification.payhere_currency !== paymentIntent.currency) {
+    return { success: false, error: 'Payment currency mismatch' }
+  }
+  if (notification.custom_1 && notification.custom_1 !== paymentIntent.jobId) {
+    return { success: false, error: 'Payment job reference mismatch' }
+  }
+
   const statusCode = Number.parseInt(notification.status_code, 10)
 
   if (statusCode === 0) {
