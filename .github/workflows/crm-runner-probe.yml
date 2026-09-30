@@ -1,0 +1,1 @@
+name: CRM Runner Probe\n\non:\n  push:\n    branches:\n      - feature/crm-job360\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\njobs:\n  probe:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 5\n    steps:\n      - name: Runner allocated\n        run: |\n          echo "runner=$RUNNER_NAME"\n          echo "os=$RUNNER_OS"\n          echo "arch=$RUNNER_ARCH"\n
