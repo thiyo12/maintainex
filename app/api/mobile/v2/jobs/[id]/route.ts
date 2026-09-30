@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { getLocationName } from '@/lib/locations'
 import { hasCompanyPermission, type CompanyRole } from '@/lib/phase6/rbac'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
@@ -314,6 +314,8 @@ export async function PATCH(
     const { id } = await params
     const user = await authenticateRequest(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
