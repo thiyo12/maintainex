@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
-import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
+import { notifyPaymentReleased, notifyCashJobCompleted, notifyJobCompleted } from '@/lib/notifications'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditEscrowRelease } from '@/lib/financial-audit'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
@@ -31,30 +31,48 @@ export async function POST(
     )
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: job.id } })
-    auditEscrowRelease({
-      jobId: job.id,
-      escrowId: escrow?.id ?? job.id,
-      actorId: user.id,
-      amount: escrow?.totalAmount ?? escrow?.amount ?? 0n,
-      commission: result.commission,
-      netAmount: result.netAmount,
-      currency: escrow?.currency ?? 'LKR',
-    })
+    if (result.paymentMethod !== 'CASH') {
+      auditEscrowRelease({
+        jobId: job.id,
+        escrowId: escrow?.id ?? job.id,
+        actorId: user.id,
+        amount: escrow?.totalAmount ?? escrow?.amount ?? 0n,
+        commission: result.commission,
+        netAmount: result.netAmount,
+        currency: escrow?.currency ?? 'LKR',
+      })
+    }
 
-    await notifyPaymentReleased(
-      job.id,
-      result.providerId,
-      job.title,
-      result.netAmount,
-      getCurrencyForCountry(job.countryCode),
-      job.countryCode,
-    )
+    if (result.paymentMethod === 'CASH') {
+      await notifyCashJobCompleted(
+        job.id,
+        result.providerId,
+        job.title,
+        result.platformDue,
+        getCurrencyForCountry(job.countryCode),
+      )
+    } else {
+      await notifyPaymentReleased(
+        job.id,
+        result.providerId,
+        job.title,
+        result.netAmount,
+        getCurrencyForCountry(job.countryCode),
+        job.countryCode,
+      )
+    }
     await notifyJobCompleted(job.id, job.customerId, job.title)
 
     return NextResponse.json({
       success: true,
+      paymentMethod: result.paymentMethod,
       commission: result.commission,
       netAmount: result.netAmount,
+      platformDue: result.platformDue,
+      message:
+        result.paymentMethod === 'CASH'
+          ? 'Cash job completed and weekly platform amount recorded.'
+          : 'Escrow released.',
     })
   } catch (error: any) {
     console.error('Release escrow error:', error)
