@@ -32,6 +32,16 @@ describe('targeted booking provider boundary', () => {
     expect(bookNow).toContain('targetTaskerId: resolvedProviderEntityId')
   })
 
+  it('keeps retry blasts restricted to targeted taskers or companies', () => {
+    const blast = read('lib/job-blast.ts')
+
+    expect(blast).toContain('const [targetTasker, targetCompany] = await Promise.all([')
+    expect(blast).toContain('candidate.userId === targetTasker.userId')
+    expect(blast).toContain('candidate.companyId === targetCompany.id')
+    expect(blast).toContain('candidate.providerId === targetCompany.id')
+    expect(blast).toContain('companyCandidates = []')
+  })
+
   it('does not blast targeted jobs to unrelated providers', () => {
     const jobs = read('app/api/mobile/v2/jobs/route.ts')
     expect(jobs).toContain('if (!job.targetTaskerId)')
