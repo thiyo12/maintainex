@@ -384,7 +384,11 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
     escrow.totalAmount !== paymentIntent.amount ||
     escrow.currency !== paymentIntent.currency
   ) {
-    return { success: false, error: 'Payment intent and escrow mismatch' }
+    return markCapturedPaymentForRefund(
+      paymentIntent,
+      notification,
+      'Captured payment no longer matches escrow amount, currency, customer, or job'
+    )
   }
 
   const escrowCurrency = escrow.currency as Currency
