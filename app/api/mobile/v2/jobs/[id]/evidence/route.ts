@@ -27,8 +27,21 @@ export async function POST(
     if (!url && !description) {
       return NextResponse.json({ error: 'Evidence must include a URL or description' }, { status: 400 })
     }
-    if (url && !/^https?:\/\//i.test(url)) {
-      return NextResponse.json({ error: 'Evidence URL must use http or https' }, { status: 400 })
+    if (url) {
+      const isAbsoluteHttp = /^https?:\/\//i.test(url)
+      const isTrustedLocalPath =
+        !url.includes('..') &&
+        (
+          url.startsWith('/api/mobile/files/') ||
+          url.startsWith('/uploads/')
+        )
+
+      if (!isAbsoluteHttp && !isTrustedLocalPath) {
+        return NextResponse.json(
+          { error: 'Evidence URL must be an uploaded MaintainEX path or http(s) URL' },
+          { status: 400 }
+        )
+      }
     }
 
     // Verify job exists
