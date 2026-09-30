@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-SSH_KEY="$HOME/.ssh/id_ed25519_ssaaxcy"
-VPS="root@147.93.106.54"
-SRC="/Users/thiyoth/Documents/NEWM/maintainex"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
+VPS="${VPS:?Set VPS, for example root@your-vps-host}"
+SRC="${SRC:-$(pwd)}"
 REMOTE_STAGING="/root/maintainex-src"
 
 echo "========================================"
