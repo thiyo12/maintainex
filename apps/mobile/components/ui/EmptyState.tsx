@@ -5,6 +5,8 @@ import { Icon } from 'phosphor-react-native'
 import PressableScale from './PressableScale'
 import { colors, radius, spacing, typography } from '../../lib/design'
 
+const LottieAnimation = LottieView as any
+
 interface Props {
   lottieUrl?: string | null
   title: string
@@ -44,7 +46,7 @@ export default function EmptyState({
           </View>
         ) : null}
         {lottieUrl && !failed ? (
-          <LottieView
+          <LottieAnimation
             source={{ uri: lottieUrl } as any}
             style={styles.lottie}
             autoPlay
