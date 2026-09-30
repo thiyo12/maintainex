@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { scanChatMessage } from '@/lib/fraud-detection'
-import { sendExpoPush } from '@/lib/push'
+import { createNotification } from '@/lib/notifications'
 
 const DAILY_MESSAGE_LIMIT = 50
 
@@ -73,16 +73,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       data: { updatedAt: new Date() },
     })
 
-    // Push notification to the other participant
-    const recipient = conversation.participants.find(p => p.userId !== user.id)
-    if (recipient?.user.pushToken) {
-      void sendExpoPush(
-        recipient.user.pushToken,
-        user.name || 'New message',
-        messageText.substring(0, 120),
-        { screen: '/(chat)/[id]', id }
+    // Persist an in-app notification and let the notification service
+    // deliver Expo push for offline/background/foreground recipients.
+    const recipients = conversation.participants.filter(p => p.userId !== user.id)
+    await Promise.all(
+      recipients.map(recipient =>
+        createNotification({
+          userId: recipient.userId,
+          title: user.name || 'New message',
+          body: messageText.substring(0, 120),
+          referenceType: 'CHAT',
+          referenceId: id,
+        })
       )
-    }
+    )
 
     return NextResponse.json({
       id: message.id,
