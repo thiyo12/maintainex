@@ -78,10 +78,16 @@ export async function getAdminSession(request: { headers: { get: (name: string) 
     const payload = verifySimpleToken(rawToken)
     if (payload) return payload
   }
-  // Fallback to cookie
+  // Fallback to cookie. Current CRM logins store the signed JWT access
+  // token in admin_token; keep simple-token verification only as a temporary
+  // compatibility fallback for older sessions.
   const token = request.cookies.get('admin_token')?.value
   if (!token) return null
-  const payload = verifySimpleToken(token)
-  if (!payload) return null
-  return payload
+
+  const jwtPayload = verifyAccessToken(token)
+  if (jwtPayload) return jwtPayload
+
+  const legacyPayload = verifySimpleToken(token)
+  if (!legacyPayload) return null
+  return legacyPayload
 }
