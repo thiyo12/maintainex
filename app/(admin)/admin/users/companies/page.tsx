@@ -61,8 +61,8 @@ function CompanyPageContent() {
   const role = (admin?.role || 'SUPPORT') as AdminRole
   const permissions = ROLE_PERMISSIONS[role] || []
   const canVerify = permissions.includes('companies:verify')
-  const canSuspend = permissions.includes('users:suspend')
-  const canBan = permissions.includes('users:ban')
+  const canSuspend = permissions.includes('companies:edit')
+  const canBan = permissions.includes('companies:ban')
   const [companies, setCompanies] = useState<CompanyUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -128,6 +128,13 @@ function CompanyPageContent() {
       (isSuspendAction && !canSuspend) ||
       (isBanAction && !canBan)
     ) return
+    if (
+      ['suspend', 'ban', 'reject_company'].includes(confirmAction.action) &&
+      reason.trim().length < 3
+    ) {
+      toast.error('Please enter a reason of at least 3 characters')
+      return
+    }
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -392,7 +399,7 @@ function CompanyPageContent() {
                                 </button>
                               </>
                             )}
-                            {canSuspend && !company.isBanned && !company.isSuspended && (
+                            {canSuspend && !company.isBanned && !company.isSuspended && company.companyProfile?.verificationStatus !== 'SUSPENDED' && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'suspend', label: 'Suspend' })}
                                 className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -401,7 +408,7 @@ function CompanyPageContent() {
                                 <FiClock size={16} />
                               </button>
                             )}
-                            {canSuspend && company.isSuspended && (
+                            {canSuspend && company.companyProfile?.verificationStatus === 'SUSPENDED' && (
                               <button
                                 onClick={() => setConfirmAction({ userId: company.id, action: 'unsuspend', label: 'Unsuspend' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -623,7 +630,7 @@ function CompanyPageContent() {
               </p>
               {(confirmAction.action === 'ban' || confirmAction.action === 'reject_company' || confirmAction.action === 'suspend') && (
                 <div className="mb-4">
-                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (optional)</label>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (required)</label>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -642,7 +649,7 @@ function CompanyPageContent() {
                 </button>
                 <button
                   onClick={handleAction}
-                  disabled={actionLoading === confirmAction.userId}
+                  disabled={actionLoading === confirmAction.userId || (['suspend', 'ban', 'reject_company'].includes(confirmAction.action) && reason.trim().length < 3)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     confirmAction.action === 'ban' || confirmAction.action === 'reject_company' || confirmAction.action === 'suspend'
                       ? 'bg-red-500 hover:bg-red-600 text-white'
