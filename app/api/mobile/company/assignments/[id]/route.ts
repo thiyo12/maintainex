@@ -44,7 +44,12 @@ export async function GET(
           select: { role: true },
         })
 
-    if (!isWorker && !isOwner && !membership) {
+    const canReadAssignment =
+      isWorker ||
+      isOwner ||
+      (!!membership && hasCompanyPermission(membership.role as CompanyRole, 'workers:read'))
+
+    if (!canReadAssignment) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -71,6 +76,7 @@ export async function GET(
       company: assignment.company,
       capabilities: {
         isAssignedWorker: isWorker,
+        canReadAssignment,
         canManageAssignment,
       },
     })
