@@ -12,7 +12,7 @@
 This runbook provides step-by-step instructions for deploying MaintainEX to production via Docker Swarm. Each step includes copy-pasteable commands with explanations.
 
 **Prerequisites**:
-- SSH access to VPS (`~/.ssh/id_ed25519_ssaaxcy`)
+- SSH access to VPS (`~/.ssh/id_ed25519`)
 - Docker access on VPS
 - Local build environment with Node.js 20
 
@@ -50,7 +50,7 @@ SSH into the VPS and back up the running state before deploying.
 
 ```bash
 # 2.1 SSH into VPS
-ssh -i ~/.ssh/id_ed25519_ssaaxcy root@147.93.106.54
+ssh -i ~/.ssh/id_ed25519 root@<VPS_IP>
 
 # 2.2 Identify current container
 docker ps --filter name=maintainex --format "{{.Names}}"
@@ -81,7 +81,7 @@ tar czf /tmp/maintainex-build.tar.gz .next package.json package-lock.json prisma
 tar tzf /tmp/maintainex-build.tar.gz | head -20
 
 # 3.3 SCP tarball to VPS
-scp -i ~/.ssh/id_ed25519_ssaaxcy /tmp/maintainex-build.tar.gz root@147.93.106.54:/tmp/
+scp -i ~/.ssh/id_ed25519 /tmp/maintainex-build.tar.gz root@<VPS_IP>:/tmp/
 ```
 
 **Checkpoint**: Tarball uploaded to VPS `/tmp/maintainex-build.tar.gz`.
@@ -92,7 +92,7 @@ scp -i ~/.ssh/id_ed25519_ssaaxcy /tmp/maintainex-build.tar.gz root@147.93.106.54
 
 ```bash
 # 4.1 SSH into VPS
-ssh -i ~/.ssh/id_ed25519_ssaaxcy root@147.93.106.54
+ssh -i ~/.ssh/id_ed25519 root@<VPS_IP>
 
 # 4.2 Get container name
 CONTAINER=$(docker ps --filter name=maintainex --format "{{.Names}}")
@@ -178,7 +178,7 @@ for i in $(seq 1 30); do curl -s -o /dev/null -w "%{http_code}\n" https://mainta
 # 6.6 Test account login (if needed)
 curl -s -X POST https://maintainex.lk/api/mobile/v2/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"test123"}' | jq '.token'
+  -d '{"email":"<TEST_ACCOUNT_EMAIL>","password":"<TEST_ACCOUNT_PASSWORD>"}' | jq '.token'
 # Expected: JWT token
 ```
 
@@ -278,7 +278,7 @@ sed -i '' 's/provider = "postgresql"/provider = "sqlite"/' prisma/schema.prisma
 rm /tmp/maintainex-build.tar.gz
 
 # Clean up VPS tarball
-ssh -i ~/.ssh/id_ed25519_ssaaxcy root@147.93.106.54 "rm /tmp/maintainex-build.tar.gz"
+ssh -i ~/.ssh/id_ed25519 root@<VPS_IP> "rm /tmp/maintainex-build.tar.gz"
 ```
 
 ---
@@ -287,8 +287,8 @@ ssh -i ~/.ssh/id_ed25519_ssaaxcy root@147.93.106.54 "rm /tmp/maintainex-build.ta
 
 | Role | Contact |
 |------|---------|
-| Platform owner | thiyooo@gmail.com |
-| VPS | 147.93.106.54 |
+| Platform owner | owner@example.invalid |
+| VPS | <VPS_IP> |
 | Database | dokploy-postgres container |
 
 ---
