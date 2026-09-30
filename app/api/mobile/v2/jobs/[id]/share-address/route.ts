@@ -13,8 +13,15 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const body = await request.json()
-    const { street, building, apartment, landmark } = body
+    const body = await request.json().catch(() => ({}))
+    const street = typeof body?.street === 'string' ? body.street.trim().slice(0, 300) : ''
+    const building = typeof body?.building === 'string' ? body.building.trim().slice(0, 200) : ''
+    const apartment = typeof body?.apartment === 'string' ? body.apartment.trim().slice(0, 100) : ''
+    const landmark = typeof body?.landmark === 'string' ? body.landmark.trim().slice(0, 300) : ''
+
+    if (!street && !building && !apartment && !landmark) {
+      return NextResponse.json({ error: 'At least one address field is required' }, { status: 400 })
+    }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
