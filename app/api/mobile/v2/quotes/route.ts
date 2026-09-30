@@ -39,6 +39,8 @@ export async function POST(request: NextRequest) {
     let resolvedProviderType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
     let actorUserId: string | null = null
     let actorRole: string | null = null
+    let providerProfileId: string | null = null
+    let companyOwnerUserId: string | null = null
 
     if (providerType === 'COMPANY') {
       if (!companyId) {
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
       if (!profile) {
         return NextResponse.json({ error: 'You must have a provider profile to submit quotes' }, { status: 403 })
       }
+      providerProfileId = profile.id
     }
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId } })
@@ -74,9 +77,10 @@ export async function POST(request: NextRequest) {
     if (resolvedProviderType === 'COMPANY') {
       const companyProfile = await prisma.companyProfile.findUnique({
         where: { id: resolvedProviderId },
-        select: { countryCode: true },
+        select: { countryCode: true, userId: true },
       })
       providerCountry = companyProfile?.countryCode || 'LK'
+      companyOwnerUserId = companyProfile?.userId ?? null
     } else {
       providerCountry = user.countryCode || 'LK'
     }
@@ -86,6 +90,23 @@ export async function POST(request: NextRequest) {
         error: 'Provider country does not match job country',
         code: 'PROVIDER_COUNTRY_MISMATCH',
       }, { status: 403 })
+    }
+
+    const allowedTargetIds = new Set(
+      [
+        resolvedProviderId,
+        providerProfileId,
+        companyOwnerUserId,
+      ].filter((value): value is string => Boolean(value))
+    )
+    if (job.targetTaskerId && !allowedTargetIds.has(job.targetTaskerId)) {
+      return NextResponse.json(
+        {
+          error: 'This direct booking is reserved for another provider',
+          code: 'TARGET_PROVIDER_MISMATCH',
+        },
+        { status: 403 }
+      )
     }
 
     const matching = await findCandidates(prisma, {
@@ -126,8 +147,8 @@ export async function POST(request: NextRequest) {
         'Provider is no longer available to submit this quote',
       )
 
-      const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string }>>`
-        SELECT id, status
+      const lockedJobs = await tx.$queryRaw<Array<{ id: string; status: string; targetTaskerId: string | null }>>`
+        SELECT id, status, "targetTaskerId"
         FROM "MarketplaceJob"
         WHERE id = ${jobId}
         FOR UPDATE
@@ -135,6 +156,9 @@ export async function POST(request: NextRequest) {
       const lockedJob = lockedJobs[0]
       if (!lockedJob) throw new Error('JOB_NOT_FOUND')
       if (lockedJob.status !== 'OPEN') throw new Error('JOB_NO_LONGER_OPEN')
+      if (lockedJob.targetTaskerId && !allowedTargetIds.has(lockedJob.targetTaskerId)) {
+        throw new Error('TARGET_PROVIDER_MISMATCH')
+      }
 
       const existing = await tx.jobQuote.findFirst({
         where: {
@@ -186,6 +210,12 @@ export async function POST(request: NextRequest) {
     }
     if (error instanceof Error && error.message === 'JOB_NO_LONGER_OPEN') {
       return NextResponse.json({ error: 'Job is no longer accepting quotes' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'TARGET_PROVIDER_MISMATCH') {
+      return NextResponse.json(
+        { error: 'This direct booking is reserved for another provider', code: 'TARGET_PROVIDER_MISMATCH' },
+        { status: 403 }
+      )
     }
     if (error instanceof Error && error.message.includes('Provider is no longer available')) {
       return NextResponse.json({ error: error.message }, { status: 409 })
