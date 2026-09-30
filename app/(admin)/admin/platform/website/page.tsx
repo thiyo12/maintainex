@@ -36,10 +36,12 @@ export default function WebsiteManagementPage() {
     maintenanceMode: false,
   })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const [overviewResponse, settingsResponse] = await Promise.all([
         fetch('/api/admin/platform/overview', { credentials: 'include', cache: 'no-store' }),
@@ -56,7 +58,10 @@ export default function WebsiteManagementPage() {
         maintenanceMode: Boolean(settingsBody.settings?.maintenanceMode),
       })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load website management')
+      const message = error instanceof Error ? error.message : 'Failed to load website management'
+      setOverview(null)
+      setLoadError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -65,7 +70,7 @@ export default function WebsiteManagementPage() {
   useEffect(() => { load() }, [load])
 
   async function save() {
-    if (!canEdit) return
+    if (!canEdit || loadError || !overview) return
     if (!window.confirm('Save these website/platform settings? The change will be audited.')) return
     setSaving(true)
     try {
@@ -87,6 +92,27 @@ export default function WebsiteManagementPage() {
   }
 
   if (loading) return <div className="h-[500px] rounded-2xl border border-slate-200 bg-white animate-pulse" />
+
+  if (loadError || !overview) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
+        <div className="flex items-start gap-3">
+          <FiAlertTriangle className="text-red-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <h1 className="font-semibold text-red-900">Website management could not be loaded</h1>
+            <p className="mt-1 text-sm text-red-700">{loadError || 'Canonical website settings are unavailable.'}</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="mt-4 h-10 rounded-xl bg-red-700 px-4 text-sm font-semibold text-white"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
