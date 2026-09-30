@@ -26,6 +26,8 @@ import Skeleton from '@/components/ui/Skeleton'
 import EmptyState from '@/components/ui/EmptyState'
 import StatusBadge from '@/components/ui/StatusBadge'
 
+const LottieAnimation = LottieView as any
+
 const TRACKABLE = ['QUOTE_ACCEPTED', 'PENDING_PAYMENT', 'ESCROW_DEPOSITED', 'IN_PROGRESS']
 
 const MOCK_PROVIDERS = [
@@ -50,7 +52,7 @@ function CatVisual({ visual, size = 42 }: { visual: CategoryVisual; size?: numbe
     <View style={styles.catAnimBox}>
       <Icon size={size} color="rgba(255,255,255,0.94)" weight="fill" />
       {visual.lottie && !failed ? (
-        <LottieView
+        <LottieAnimation
           source={{ uri: visual.lottie } as any}
           style={StyleSheet.absoluteFill}
           autoPlay
