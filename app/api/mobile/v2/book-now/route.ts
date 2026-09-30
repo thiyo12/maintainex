@@ -22,8 +22,12 @@ export async function POST(request: NextRequest) {
     if (Number.isNaN(scheduledDate.getTime())) {
       return NextResponse.json({ error: 'Invalid booking date' }, { status: 400 })
     }
-    if (scheduledDate.getTime() < Date.now() - 5 * 60 * 1000) {
-      return NextResponse.json({ error: 'Booking date must be in the future' }, { status: 400 })
+    const bookingDay = new Date(scheduledDate)
+    bookingDay.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (bookingDay < today) {
+      return NextResponse.json({ error: 'Booking date cannot be in the past' }, { status: 400 })
     }
 
     const normalizedTimeSlot = String(timeSlot).trim().toLowerCase()
