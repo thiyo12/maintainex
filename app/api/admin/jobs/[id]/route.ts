@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   guardCrmRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
+import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
 function money(value: bigint | number | null | undefined, currency: string): number | null {
   if (value === null || value === undefined) return null
@@ -42,14 +42,8 @@ async function getV2Job(id: string, request: NextRequest) {
   }
 
   const currency = getCurrencyForCountry(job.countryCode)
-  const canFinance =
-    crmHasPermission(security.role, 'wallets:view') ||
-    crmHasPermission(security.role, 'commission:view')
-  const canTrust =
-    crmHasPermission(security.role, 'disputes:view') ||
-    crmHasPermission(security.role, 'risk_events:read') ||
-    crmHasPermission(security.role, 'trust:view')
-  const canAudit = crmHasPermission(security.role, 'audit:read')
+  const { finance: canFinance, trust: canTrust, audit: canAudit } =
+    getCrmSectionAccess(security.role, security.isSuperAdmin)
 
   const [
     customer,
@@ -473,14 +467,8 @@ async function getV1Job(id: string, request: NextRequest) {
   })
   if (!guard.ok) return { response: guard.response }
   const security = guard.context
-  const canFinance =
-    crmHasPermission(security.role, 'wallets:view') ||
-    crmHasPermission(security.role, 'commission:view')
-  const canTrust =
-    crmHasPermission(security.role, 'disputes:view') ||
-    crmHasPermission(security.role, 'risk_events:read') ||
-    crmHasPermission(security.role, 'trust:view')
-  const canAudit = crmHasPermission(security.role, 'audit:read')
+  const { finance: canFinance, trust: canTrust, audit: canAudit } =
+    getCrmSectionAccess(security.role, security.isSuperAdmin)
 
   const job = await prisma.jobPosting.findUnique({
     where: { id },
