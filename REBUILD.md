@@ -62,7 +62,7 @@ docker run -d -p 3000:3000 \
 #### Option B: Dokploy Deployment
 1. Create new project in Dokploy
 2. Set env vars from `envs/production.env`
-3. Point to GitHub repo: `git@github.com:thiyo12/maintainex.git`
+3. Point to GitHub repo: `git@github.com:YOUR_GITHUB_USER/maintainex.git`
 4. Dockerfile builds automatically
 5. Add volume mount: `/app/public/uploads` → persistent storage
 6. Deploy
@@ -91,8 +91,8 @@ curl http://localhost:3000
 | Database User | postgres |
 | Database Password | *** (stored in VPS environment variables) |
 | Database Name | postgres |
-| Server IP | 147.93.106.54 |
-| Dokploy URL | http://147.93.106.54:3000 |
+| Server IP | YOUR_VPS_IP |
+| Dokploy URL | http://YOUR_VPS_IP:3000 |
 | Dokploy Login | *** (stored in VPS environment variables) |
 | Domain | maintainex.lk |
 | Cloudflare SSL | Full (not Full Strict) |
