@@ -348,7 +348,7 @@ export async function createBookNowJob(input: BookNowInput) {
         workersCount: 1,
         materialHandling: 'tasker_brings',
         countryCode: finalCountryCode,
-        targetTaskerId: resolvedProviderUserId,
+        targetTaskerId: resolvedProviderEntityId,
       },
     })
 
