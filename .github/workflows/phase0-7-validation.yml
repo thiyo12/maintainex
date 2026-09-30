@@ -1,9 +1,11 @@
 name: Phase 0-9 Validation
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
+      - feature/crm-job360
       - phase0-7-integration-fix
       - phase8-country-engine
       - phase9-production-readiness
