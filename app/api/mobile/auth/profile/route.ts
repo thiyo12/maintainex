@@ -25,6 +25,25 @@ export async function PUT(request: NextRequest) {
       emergencyContact,
     } = await request.json()
 
+    if (phone !== undefined && phone !== user.phone) {
+      return NextResponse.json(
+        { error: 'Mobile number changes require OTP verification.' },
+        { status: 400 }
+      )
+    }
+
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) {
+        return NextResponse.json({ error: 'Name must be non-empty text' }, { status: 400 })
+      }
+      if (user.identityStatus === 'VERIFIED' && name.trim() !== user.name) {
+        return NextResponse.json(
+          { error: 'Name is locked after identity verification. Use your verified name.' },
+          { status: 400 }
+        )
+      }
+    }
+
     if (name !== undefined && name !== user.name) {
       if (user.lastNameChangedAt) {
         const daysSinceChange = Math.floor(
@@ -49,8 +68,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (phone !== undefined) updateData.phone = phone
+    if (name !== undefined) updateData.name = name.trim().slice(0, 150)
     if (name !== undefined && name !== user.name) updateData.lastNameChangedAt = new Date()
 
     const updated = await prisma.user.update({
