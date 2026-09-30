@@ -5,6 +5,7 @@ import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { notifyPaymentReleased, notifyJobCompleted } from '@/lib/notifications'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditEscrowRelease } from '@/lib/financial-audit'
+import { getCurrencyForCountry } from '@/lib/shared/money/money'
 
 export async function POST(
   request: NextRequest,
@@ -40,7 +41,14 @@ export async function POST(
       currency: escrow?.currency ?? 'LKR',
     })
 
-    await notifyPaymentReleased(job.id, result.providerId, job.title, result.netAmount)
+    await notifyPaymentReleased(
+      job.id,
+      result.providerId,
+      job.title,
+      result.netAmount,
+      getCurrencyForCountry(job.countryCode),
+      job.countryCode,
+    )
     await notifyJobCompleted(job.id, job.customerId, job.title)
 
     return NextResponse.json({
