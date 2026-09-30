@@ -128,7 +128,7 @@ export async function POST(
           job.id,
           result.providerId,
           job.title,
-          result.platformDue,
+          result.platformDueCents,
           getCurrencyForCountry(job.countryCode),
         )
       } else {
@@ -151,7 +151,7 @@ export async function POST(
         paymentMethod: result.paymentMethod,
         commission: result.commission,
         netAmount: result.netAmount,
-        platformDue: result.platformDue,
+        platformDue: result.platformDueCents,
       })
     }
 
