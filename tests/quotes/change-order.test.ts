@@ -20,7 +20,6 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         finalAuthorizedAmountCents: null,
       }),
       update: vi.fn().mockResolvedValue({}),
-      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     jobQuote: {
       findUnique: vi.fn().mockResolvedValue(overrides.quote ?? {
@@ -49,6 +48,7 @@ function mockPrisma(overrides: Record<string, any> = {}) {
         return Promise.resolve(allChangeOrders)
       }),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     jobChangeOrderLineItem: {
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
