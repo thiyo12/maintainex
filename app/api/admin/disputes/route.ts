@@ -440,7 +440,7 @@ export async function PATCH(request: NextRequest) {
       let moneyApplied = false
       try {
         if (canonicalAction === 'RELEASE_PROVIDER') {
-          await completeAndReleaseEscrow(
+          const release = await completeAndReleaseEscrow(
             {
               jobId: marketplaceDispute.jobId,
               actorId: security.adminId,
@@ -479,12 +479,9 @@ export async function PATCH(request: NextRequest) {
           await Promise.all([
             notifyPaymentReleased(
               marketplaceDispute.jobId,
-              (await prisma.jobEscrow.findUniqueOrThrow({
-                where: { id: marketplaceDispute.escrowId },
-                select: { providerId: true },
-              })).providerId,
+              release.providerId,
               marketplaceDispute.job.title,
-              0,
+              release.netAmount,
               getCurrencyForCountry(marketplaceDispute.job.countryCode),
               marketplaceDispute.job.countryCode,
             ),
