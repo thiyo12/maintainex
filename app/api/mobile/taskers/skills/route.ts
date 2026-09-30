@@ -151,8 +151,8 @@ export async function PUT(request: NextRequest) {
     })
     const allowedIds = new Set(jobs.filter(j => !j.isCompanyOnly).map(j => j.id))
 
-    const toSave = skills.filter(s => allowedIds.has(s.jobId))
-    const saveIds = toSave.map(s => s.jobId)
+    const toSave = skills.filter(s => allowedIds.has(s.jobId.trim()))
+    const saveIds = toSave.map(s => s.jobId.trim())
 
     // Remove selections the tasker removed
     await prisma.taskerSkill.deleteMany({
@@ -163,13 +163,14 @@ export async function PUT(request: NextRequest) {
     for (const s of toSave) {
       await prisma.taskerSkill.upsert({
         where: {
-          taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId },
+          taskerId_jobId: { taskerId: tasker.id, jobId: s.jobId.trim() },
         },
         update: {
           hourlyRate: s.hourlyRate != null ? Number(s.hourlyRate) : undefined,
           fixedRate: s.fixedRate != null ? Number(s.fixedRate) : undefined,
           experienceYears: s.experienceYears != null ? Number(s.experienceYears) : undefined,
           experienceLevel: s.experienceLevel != null ? Number(s.experienceLevel) : undefined,
+          currency: getCurrencyForCountry(user.countryCode),
         },
         create: {
           taskerId: tasker.id,
