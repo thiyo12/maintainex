@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_DB: maintainex
       POSTGRES_USER: maintainex
-      POSTGRES_PASSWORD: maintainex_dev_2025
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
