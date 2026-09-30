@@ -30,6 +30,12 @@ import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 type TabKey = 'overview' | 'workforce' | 'jobs' | 'finance' | 'trust' | 'audit'
 
 interface Payload {
+  permissions: {
+    work: boolean
+    finance: boolean
+    trust: boolean
+    audit: boolean
+  }
   company: any
   documents: any[]
   ownerIdentityDocs: any[]
@@ -154,6 +160,14 @@ export default function Company360Page() {
   const company = data?.company
   const role = (admin?.role || 'SUPPORT') as AdminRole
   const permissions = ROLE_PERMISSIONS[role] || []
+  const visibleTabs = TABS.filter(item =>
+    item.key === 'overview' ||
+    item.key === 'workforce' ||
+    (item.key === 'jobs' && data?.permissions.work) ||
+    (item.key === 'finance' && data?.permissions.finance) ||
+    (item.key === 'trust' && data?.permissions.trust) ||
+    (item.key === 'audit' && data?.permissions.audit)
+  )
 
   const jobCount = useMemo(() => data?.jobs?.length || 0, [data])
   const activeWorkers = useMemo(
@@ -270,7 +284,7 @@ export default function Company360Page() {
 
           <div className="mt-6 grid grid-cols-2 xl:grid-cols-4 gap-3">
             <Summary icon={FiUsers} label="Active staff" value={String(activeWorkers)} />
-            <Summary icon={FiBriefcase} label="Marketplace jobs" value={String(jobCount)} />
+            <Summary icon={FiBriefcase} label="Marketplace jobs" value={data.permissions.work ? String(jobCount) : 'Restricted'} />
             <Summary icon={FiCheckCircle} label="Completed projects" value={String(company.completedProjects || 0)} />
             <Summary icon={FiShield} label="Rating" value={String(company.rating || 0)} />
           </div>
@@ -278,7 +292,7 @@ export default function Company360Page() {
 
         <div className="border-t border-slate-100 px-3 md:px-5 overflow-x-auto">
           <div className="flex min-w-max">
-            {TABS.map(item => (
+            {visibleTabs.map(item => (
               <button
                 key={item.key}
                 type="button"
@@ -298,10 +312,10 @@ export default function Company360Page() {
         <div className="space-y-5">
           {tab === 'overview' && <Overview data={data} />}
           {tab === 'workforce' && <Workforce data={data} />}
-          {tab === 'jobs' && <Jobs data={data} />}
-          {tab === 'finance' && <Finance data={data} />}
-          {tab === 'trust' && <Trust data={data} />}
-          {tab === 'audit' && <Audit data={data} />}
+          {tab === 'jobs' && data.permissions.work && <Jobs data={data} />}
+          {tab === 'finance' && data.permissions.finance && <Finance data={data} />}
+          {tab === 'trust' && data.permissions.trust && <Trust data={data} />}
+          {tab === 'audit' && data.permissions.audit && <Audit data={data} />}
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-[92px]">
