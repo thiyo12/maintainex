@@ -15,6 +15,7 @@ import {
 
 interface Group {
   status: string
+  currency: string
   count: number
   total?: string
   amount?: string
@@ -80,20 +81,31 @@ export default function FinanceControlCentrePage() {
   }, [load])
 
   const metrics = useMemo(() => {
-    const sum = (rows: Group[], statuses: string[], field: keyof Group) =>
+    const sources = [
+      ...(data?.escrow || []),
+      ...(data?.commission || []),
+      ...(data?.payouts || []),
+      ...(data?.payments || []),
+    ]
+    const currencies = [...new Set(sources.map(row => row.currency || 'LKR'))].sort()
+
+    const sum = (rows: Group[], statuses: string[], field: keyof Group, currency: string) =>
       rows
-        .filter(row => statuses.includes(row.status))
+        .filter(row => statuses.includes(row.status) && (row.currency || 'LKR') === currency)
         .reduce((total, row) => total + Number(row[field] || 0), 0)
 
-    const count = (rows: Group[], statuses: string[]) =>
-      rows.filter(row => statuses.includes(row.status)).reduce((total, row) => total + Number(row.count || 0), 0)
+    const count = (rows: Group[], statuses: string[], currency: string) =>
+      rows
+        .filter(row => statuses.includes(row.status) && (row.currency || 'LKR') === currency)
+        .reduce((total, row) => total + Number(row.count || 0), 0)
 
-    return {
-      protectedEscrow: sum(data?.escrow || [], ['PROTECTED', 'ON_HOLD'], 'total'),
-      pendingCommission: sum(data?.commission || [], ['PENDING'], 'commissionAmount'),
-      pendingPayouts: sum(data?.payouts || [], ['PENDING', 'PROCESSING'], 'amount'),
-      paymentFailures: count(data?.payments || [], ['FAILED', 'CHARGEDBACK', 'REFUND_REQUIRED', 'REFUND_PROCESSING']),
-    }
+    return currencies.map(currency => ({
+      currency,
+      protectedEscrow: sum(data?.escrow || [], ['PROTECTED', 'ON_HOLD'], 'total', currency),
+      pendingCommission: sum(data?.commission || [], ['PENDING'], 'commissionAmount', currency),
+      pendingPayouts: sum(data?.payouts || [], ['PENDING', 'PROCESSING'], 'amount', currency),
+      paymentFailures: count(data?.payments || [], ['FAILED', 'CHARGEDBACK', 'REFUND_REQUIRED', 'REFUND_PROCESSING'], currency),
+    }))
   }, [data])
 
   if (loading) {
@@ -121,11 +133,19 @@ export default function FinanceControlCentrePage() {
         </button>
       </section>
 
-      <section className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Metric icon={FiShield} label="Protected / held escrow" value={minor(metrics.protectedEscrow)} detail="Customer funds protected" />
-        <Metric icon={FiDollarSign} label="Pending commission" value={minor(metrics.pendingCommission)} detail="MaintainEX receivable" />
-        <Metric icon={FiCreditCard} label="Pending payouts" value={minor(metrics.pendingPayouts)} detail="Provider payouts awaiting clearing" />
-        <Metric icon={FiAlertTriangle} label="Payment exceptions" value={String(metrics.paymentFailures)} detail="Failed / chargeback / refund queue" danger={metrics.paymentFailures > 0} />
+      <section className="space-y-4">
+        {metrics.length ? metrics.map(row => (
+          <div key={row.currency} className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <Metric icon={FiShield} label={`Protected / held escrow · ${row.currency}`} value={minor(row.protectedEscrow, row.currency)} detail="Customer funds protected" />
+            <Metric icon={FiDollarSign} label={`Pending commission · ${row.currency}`} value={minor(row.pendingCommission, row.currency)} detail="MaintainEX receivable" />
+            <Metric icon={FiCreditCard} label={`Pending payouts · ${row.currency}`} value={minor(row.pendingPayouts, row.currency)} detail="Provider payouts awaiting clearing" />
+            <Metric icon={FiAlertTriangle} label={`Payment exceptions · ${row.currency}`} value={String(row.paymentFailures)} detail="Failed / chargeback / refund queue" danger={row.paymentFailures > 0} />
+          </div>
+        )) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-400">
+            No financial records are available for the assigned markets.
+          </div>
+        )}
       </section>
 
       <section className="grid xl:grid-cols-2 gap-5">
@@ -236,13 +256,13 @@ function StatusRows({ rows, amountField }: { rows: Group[]; amountField: keyof G
   return (
     <div className="space-y-2">
       {rows.map(row => (
-        <div key={row.status} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+        <div key={`${row.status}-${row.currency}`} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
           <div className="flex items-center gap-2">
             {['FAILED', 'REJECTED', 'CHARGEDBACK'].includes(row.status) ? <FiAlertTriangle className="text-red-500" size={14} /> : <FiCheckCircle className="text-slate-400" size={14} />}
-            <span className="text-sm text-slate-700">{row.status.replaceAll('_', ' ')}</span>
+            <span className="text-sm text-slate-700">{row.status.replaceAll('_', ' ')} · {row.currency}</span>
             <span className="text-xs text-slate-400">({row.count})</span>
           </div>
-          <span className="text-sm font-semibold text-slate-900">{minor(row[amountField])}</span>
+          <span className="text-sm font-semibold text-slate-900">{minor(row[amountField], row.currency)}</span>
         </div>
       ))}
     </div>
