@@ -13,11 +13,22 @@ export async function POST(
     if (blocked) return blocked
 
     const { id: jobId } = await params
-    const body = await request.json()
-    const { inspectionId, evidenceType, url, description, mimeType } = body
+    const body = await request.json().catch(() => ({}))
+    const inspectionId = typeof body?.inspectionId === 'string' ? body.inspectionId.trim().slice(0, 128) : ''
+    const evidenceType = typeof body?.evidenceType === 'string' ? body.evidenceType.trim().toUpperCase() : ''
+    const url = typeof body?.url === 'string' ? body.url.trim().slice(0, 2000) : ''
+    const description = typeof body?.description === 'string' ? body.description.trim().slice(0, 5000) : ''
+    const mimeType = typeof body?.mimeType === 'string' ? body.mimeType.trim().slice(0, 200) : ''
+    const validEvidenceTypes = new Set(['PHOTO', 'VIDEO', 'NOTE', 'MEASUREMENT', 'DIAGNOSTIC'])
 
-    if (!evidenceType) {
-      return NextResponse.json({ error: 'evidenceType required' }, { status: 400 })
+    if (!validEvidenceTypes.has(evidenceType)) {
+      return NextResponse.json({ error: 'Invalid evidenceType' }, { status: 400 })
+    }
+    if (!url && !description) {
+      return NextResponse.json({ error: 'Evidence must include a URL or description' }, { status: 400 })
+    }
+    if (url && !/^https?:\/\//i.test(url)) {
+      return NextResponse.json({ error: 'Evidence URL must use http or https' }, { status: 400 })
     }
 
     // Verify job exists
@@ -79,13 +90,13 @@ export async function POST(
     const evidence = await prisma.jobEvidence.create({
       data: {
         jobId,
-        inspectionId: inspectionId ?? null,
+        inspectionId: inspectionId || null,
         uploaderId: user.id,
         uploaderType,
         evidenceType,
-        url: url ?? null,
-        description: description ?? null,
-        mimeType: mimeType ?? null,
+        url: url || null,
+        description: description || null,
+        mimeType: mimeType || null,
       },
     })
 
