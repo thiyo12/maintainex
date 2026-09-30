@@ -8,6 +8,8 @@ import {
   FiFilter, FiArrowDown, FiArrowUp
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface CustomerUser {
   id: string
@@ -45,6 +47,11 @@ type SortField = 'name' | 'email' | 'createdAt' | 'mxId'
 type SortDir = 'asc' | 'desc'
 
 function CustomerPageContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canSuspend = permissions.includes('users:suspend')
+  const canBan = permissions.includes('users:ban')
   const [customers, setCustomers] = useState<CustomerUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -102,6 +109,9 @@ function CustomerPageContent() {
 
   const handleAction = async () => {
     if (!confirmAction) return
+    const isSuspendAction = confirmAction.action === 'suspend' || confirmAction.action === 'unsuspend'
+    const isBanAction = confirmAction.action === 'ban' || confirmAction.action === 'unban'
+    if ((isSuspendAction && !canSuspend) || (isBanAction && !canBan)) return
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -320,7 +330,7 @@ function CustomerPageContent() {
                             >
                               <FiEye size={16} />
                             </Link>
-                            {!customer.isBanned && !customer.isSuspended && (
+                            {canSuspend && !customer.isBanned && !customer.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'suspend', label: 'Suspend' })}
                                 className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -329,7 +339,7 @@ function CustomerPageContent() {
                                 <FiClock size={16} />
                               </button>
                             )}
-                            {customer.isSuspended && (
+                            {canSuspend && customer.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'unsuspend', label: 'Unsuspend' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -338,7 +348,7 @@ function CustomerPageContent() {
                                 <FiUserCheck size={16} />
                               </button>
                             )}
-                            {!customer.isBanned && (
+                            {canBan && !customer.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'ban', label: 'Ban' })}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -347,7 +357,7 @@ function CustomerPageContent() {
                                 <FiUserX size={16} />
                               </button>
                             )}
-                            {customer.isBanned && (
+                            {canBan && customer.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: customer.id, action: 'unban', label: 'Unban' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
