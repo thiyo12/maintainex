@@ -178,6 +178,10 @@ export default function AdminDashboard() {
     return { jobs, completed, open, otherJobs }
   }, [stats])
 
+  const canPeople = can('users:view') || can('taskers:view') || can('companies:view')
+  const canFinance = can('commission:view') || can('wallets:view')
+  const canOperations = can('jobs:view') || can('kyc:view')
+
   const attentionItems = [
     can('kyc:view') && {
       label: 'KYC waiting for review',
@@ -255,48 +259,52 @@ export default function AdminDashboard() {
       </section>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard
-          label="Open jobs"
-          value={number(stats?.openJobs).toLocaleString()}
-          detail={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
-          icon={FiTool}
-          tone="green"
-        />
-        <StatCard
-          label="Pending commission"
-          value={primaryFinance
-            ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
-            : financeRows.length > 1
-              ? `${financeRows.length} currencies`
-              : formatCurrency(0)}
-          detail={financeRows.length > 1
-            ? financeRows.map(row => `${row.currency} ${formatCurrency(row.pendingCommission, row.currency)}`).join(' · ')
-            : `${number(data?.weeklySummary?.pendingCount)} settlement items`}
-          icon={FiDollarSign}
-          tone="amber"
-        />
-        <StatCard
-          label="Active taskers"
-          value={number(stats?.totalTaskers).toLocaleString()}
-          detail={`${number(stats?.totalCompanies).toLocaleString()} companies onboarded`}
-          icon={FiUserCheck}
-          tone="blue"
-        />
-        <StatCard
-          label="Items needing attention"
-          value={(
-            number(stats?.pendingKYC) +
-            number(stats?.overdueSettlements) +
-            number(stats?.pendingCheatingReports)
-          ).toLocaleString()}
-          detail="KYC, settlement and trust queues"
-          icon={FiAlertTriangle}
-          tone="red"
-        />
+        {can('jobs:view') && (
+          <StatCard
+            label="Open jobs"
+            value={number(stats?.openJobs).toLocaleString()}
+            detail={`${number(stats?.totalJobPostings).toLocaleString()} jobs recorded`}
+            icon={FiTool}
+            tone="green"
+          />
+        )}
+        {canFinance && (
+          <StatCard
+            label="Pending commission"
+            value={primaryFinance
+              ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
+              : financeRows.length > 1
+                ? `${financeRows.length} currencies`
+                : formatCurrency(0)}
+            detail={financeRows.length > 1
+              ? financeRows.map(row => `${row.currency} ${formatCurrency(row.pendingCommission, row.currency)}`).join(' · ')
+              : `${number(data?.weeklySummary?.pendingCount)} settlement items`}
+            icon={FiDollarSign}
+            tone="amber"
+          />
+        )}
+        {(can('taskers:view') || can('companies:view')) && (
+          <StatCard
+            label="Provider network"
+            value={number(stats?.totalTaskers).toLocaleString()}
+            detail={`${number(stats?.totalCompanies).toLocaleString()} companies onboarded`}
+            icon={FiUserCheck}
+            tone="blue"
+          />
+        )}
+        {attentionItems.length > 0 && (
+          <StatCard
+            label="Items needing attention"
+            value={attentionItems.reduce((sum, item) => sum + item.value, 0).toLocaleString()}
+            detail="Authorized operator queues"
+            icon={FiAlertTriangle}
+            tone="red"
+          />
+        )}
       </section>
 
       <section className="grid xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        {canOperations && <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-slate-900">Marketplace operations</h2>
@@ -308,7 +316,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="p-5 grid md:grid-cols-2 gap-7">
-            <div className="space-y-5">
+            {can('jobs:view') && <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm text-slate-500">Jobs recorded</div>
@@ -321,9 +329,9 @@ export default function AdminDashboard() {
               <ProgressRow label="Open" value={totals.open} total={Math.max(1, totals.jobs)} tone="bg-amber-400" />
               <ProgressRow label="Completed" value={totals.completed} total={Math.max(1, totals.jobs)} tone="bg-emerald-500" />
               <ProgressRow label="Other states" value={totals.otherJobs} total={Math.max(1, totals.jobs)} tone="bg-blue-500" />
-            </div>
+            </div>}
 
-            <div className="space-y-5">
+            {can('kyc:view') && <div className="space-y-5">
               <div>
                 <div className="text-sm font-medium text-slate-800">Verification pipeline</div>
                 <div className="text-xs text-slate-400 mt-1">Identity document status across the marketplace</div>
@@ -346,11 +354,11 @@ export default function AdminDashboard() {
                 total={Math.max(1, number(stats?.verifiedKYC) + number(stats?.pendingKYC) + number(stats?.rejectedKYC))}
                 tone="bg-red-500"
               />
-            </div>
+            </div>}
           </div>
-        </div>
+        </div>}
 
-        <div className="rounded-2xl border border-slate-200 bg-white">
+        {attentionItems.length > 0 && <div className="rounded-2xl border border-slate-200 bg-white">
           <div className="px-5 py-4 border-b border-slate-100">
             <h2 className="font-semibold text-slate-900">Pending actions</h2>
             <p className="text-xs text-slate-400 mt-1">Queues that need an operator</p>
@@ -377,11 +385,11 @@ export default function AdminDashboard() {
               )
             })}
           </div>
-        </div>
+        </div>}
       </section>
 
       <section className="grid lg:grid-cols-3 gap-5">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        {canPeople && <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="font-semibold text-slate-900">People</h2>
@@ -408,9 +416,9 @@ export default function AdminDashboard() {
               Open people management <FiArrowUpRight size={14} />
             </Link>
           )}
-        </div>
+        </div>}
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        {canFinance && <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="font-semibold text-slate-900">Finance</h2>
@@ -444,7 +452,7 @@ export default function AdminDashboard() {
               Open finance operations <FiArrowUpRight size={14} />
             </Link>
           )}
-        </div>
+        </div>}
 
         <div className="rounded-2xl border border-slate-200 bg-[#10151d] text-white p-5">
           <div className="flex items-start justify-between">
