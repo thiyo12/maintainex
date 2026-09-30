@@ -22,6 +22,18 @@ describe('company job notification recipient routing', () => {
     expect(source).toContain('notifyDisputeRaised(job.id, recipientId, job.title)')
   })
 
+  it('notifies assigned company participants on the direct refund path', () => {
+    const refundRoute = readFileSync(
+      resolve(process.cwd(), 'app/api/mobile/v2/jobs/[id]/escrow/refund/route.ts'),
+      'utf-8',
+    )
+
+    expect(refundRoute).toContain("status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] }")
+    expect(refundRoute).toContain('providerRecipientIds = [...new Set(')
+    expect(refundRoute).toContain('providerRecipientIds.map(recipientId =>')
+    expect(refundRoute).toContain('notifyJobCancelled(')
+  })
+
   it('notifies all provider participants when the customer cancels before start', () => {
     expect(source).toContain('const providerRecipientIds = isCustomer')
     expect(source).toContain('providerRecipientIds.map(recipientId =>')
