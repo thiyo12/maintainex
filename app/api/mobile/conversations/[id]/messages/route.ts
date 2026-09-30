@@ -17,8 +17,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (blocked) return blocked
 
     const { text } = await request.json()
-    if (!text?.trim()) {
+    if (typeof text !== 'string' || !text.trim()) {
       return NextResponse.json({ error: 'Message text required' }, { status: 400 })
+    }
+    const rawMessage = text.trim()
+    if (rawMessage.length > 4000) {
+      return NextResponse.json({ error: 'Message is too long' }, { status: 400 })
     }
 
     const conversation = await prisma.conversation.findFirst({
@@ -28,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
       include: {
         participants: {
-          include: { user: { select: { id: true, name: true, pushToken: true, email: true } } },
+          include: { user: { select: { id: true, name: true, pushToken: true } } },
         },
       },
     })
@@ -53,8 +57,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Fraud scan: always runs, never blocks — sanitizes + flags
-    const scan = await scanChatMessage(text.trim(), user.id, id)
-    const messageText = scan.sanitizedText || text.trim()
+    const scan = await scanChatMessage(rawMessage, user.id, id)
+    const messageText = scan.sanitizedText || rawMessage
 
     const message = await prisma.message.create({
       data: {
