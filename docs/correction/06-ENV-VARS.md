@@ -23,21 +23,21 @@
 | `EXPO_PUBLIC_API_URL` | Yes | None | API base URL | MEDIUM |
 | `EXPO_PUBLIC_SOCKET_URL` | Yes | None | WebSocket URL | LOW |
 
-## VPS Production Values
+## Production Configuration
 
-| Variable | Value | Status |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://postgres:maintainex_db_2025@dokploy-postgres...` | Known-good |
-| `NEXTAUTH_SECRET` | `11c0f0358d35bf00cf0494186a158abeb4b9997afc53ca352cffcf086c54fd8a` | Known-good |
-| `NEXTAUTH_URL` | `https://maintainex.lk` | Known-good |
-| `JWT_SECRET` | `2142a1e2f0b63c6464cd5cb4b3a2d3d3` | Known-good |
-| `JWT_REFRESH_SECRET` | `3e1e16d37c150c5e9347cd0e4748ee80` | Known-good |
-| `PASSWORD_PEPPER` | `3f076c47424a3b2c7d61b058f6942c4f` | Known-good |
-| `CRON_SECRET` | `maintainex-cron-secure-key-2025` | Known-good |
-| `NODE_ENV` | `production` | Set |
-| `CLOUDINARY_*` | Set | Set |
-| `EXPO_PUBLIC_API_URL` | `https://maintainex.lk` | Set |
-| `EXPO_PUBLIC_SOCKET_URL` | `wss://maintainex.lk` | Set |
+Production values must be stored only in the deployment platform / secret manager and must never be committed to Git.
+
+| Variable | Repository value |
+|---|---|
+| `DATABASE_URL` | `postgresql://USER:PASSWORD@HOST:5432/DATABASE` (placeholder only) |
+| `NEXTAUTH_SECRET` | `<generate-and-store-outside-git>` |
+| `JWT_SECRET` | `<generate-and-store-outside-git>` |
+| `JWT_REFRESH_SECRET` | `<generate-and-store-outside-git>` |
+| `PASSWORD_PEPPER` | `<generate-and-store-outside-git>` |
+| `CRON_SECRET` | `<generate-and-store-outside-git>` |
+| `CLOUDINARY_API_SECRET` | `<store-outside-git>` |
+| `SMTP_APP_PASSWORD` | `<store-outside-git>` |
+| `PAYHERE_MERCHANT_SECRET` | `<store-outside-git>` |
 
 ## Security Concerns
 
