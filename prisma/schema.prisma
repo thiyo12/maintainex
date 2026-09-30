@@ -2243,7 +2243,7 @@ model JobEscrow {
   totalAmount     BigInt // amount + fee in cents
   paymentMethod   String    @default("CARD") // CARD, CASH
   currency        String    @default("LKR")
-  status          String    @default("PENDING") // PENDING, PROTECTED, ON_HOLD, RELEASED, REFUNDED
+  status          String    @default("PENDING") // PENDING, PENDING_PAYMENT, PROTECTED, ON_HOLD, RELEASED, REFUNDED, CANCELLED
   heldAt          DateTime?
   releasedAt      DateTime?
   refundedAt      DateTime?
@@ -3404,7 +3404,7 @@ model PaymentIntent {
   paymentId       String?
   amount          BigInt
   currency        String    @default("LKR")
-  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, CHARGEDBACK
+  status          String    @default("CREATED") // CREATED, PENDING, SUCCESS, FAILED, CANCELLED, EXPIRED, REFUND_REQUIRED, REFUND_PROCESSING, REFUNDED, CHARGEDBACK
   gatewayResponse String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
