@@ -511,7 +511,7 @@ export async function holdEscrowForDispute(ctx: TransitionContext, jobId: string
 export async function raiseJobDispute(
   ctx: TransitionContext,
   jobId: string
-): Promise<{ escrowId: string; workspaceStatus: string }> {
+): Promise<{ escrowId: string; workspaceStatus: string; disputeId: string }> {
   return prisma.$transaction(async (tx) => {
     const job = await tx.marketplaceJob.findUnique({ where: { id: jobId } })
     if (!job) throw new Error('Job not found')
@@ -543,6 +543,24 @@ export async function raiseJobDispute(
     })
     if (wsClaimed.count !== 1) throw new Error('Workspace state changed concurrently')
 
+    const metadataDescription =
+      typeof ctx.metadata?.description === 'string'
+        ? ctx.metadata.description.trim().slice(0, 5000)
+        : null
+    const reason = ctx.reason?.trim().slice(0, 1000) || 'Dispute raised'
+
+    const dispute = await tx.marketplaceDispute.create({
+      data: {
+        jobId,
+        escrowId: escrow.id,
+        raisedById: ctx.actorId,
+        actorType: ctx.actorType,
+        reason,
+        description: metadataDescription || null,
+        countryCode: job.countryCode || 'LK',
+      },
+    })
+
     await recordJobLifecycleEvent(tx, {
       jobId,
       actorId: ctx.actorId,
@@ -551,13 +569,15 @@ export async function raiseJobDispute(
       fromState: workspace.progressStatus,
       toState: 'DISPUTED',
       metadata: {
-        reason: ctx.reason ?? null,
+        reason,
+        description: metadataDescription,
+        disputeId: dispute.id,
         escrowId: escrow.id,
         escrowFromState: 'PROTECTED',
         escrowToState: 'ON_HOLD',
       },
     })
 
-    return { escrowId: escrow.id, workspaceStatus: 'DISPUTED' }
+    return { escrowId: escrow.id, workspaceStatus: 'DISPUTED', disputeId: dispute.id }
   })
 }
