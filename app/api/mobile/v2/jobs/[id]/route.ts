@@ -44,13 +44,22 @@ export async function GET(
     const requestedContext = new URL(_request.url).searchParams.get('context')
 
     if (!isOwner && job.targetTaskerId) {
-      const [targetTasker, targetCompanies] = await Promise.all([
+      const [targetTasker, targetCompanies, workerAssignment] = await Promise.all([
         prisma.taskerProfile.findUnique({
           where: { userId: user.id },
           select: { id: true },
         }),
         getReadableCompanyIds(user.id),
+        prisma.companyJobAssignment.findFirst({
+          where: {
+            jobId: job.id,
+            workerUserId: user.id,
+            status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'] },
+          },
+          select: { companyId: true },
+        }),
       ])
+
       const readableTargetIds = new Set(
         [
           user.id,
@@ -59,7 +68,26 @@ export async function GET(
         ].filter((value): value is string => Boolean(value))
       )
 
-      if (!readableTargetIds.has(job.targetTaskerId)) {
+      let hasAcceptedCompanyParticipation = false
+      const participantCompanyIds = [...new Set([
+        ...targetCompanies,
+        ...(workerAssignment?.companyId ? [workerAssignment.companyId] : []),
+      ])]
+
+      if (participantCompanyIds.length > 0) {
+        const acceptedCompanyQuote = await prisma.jobQuote.findFirst({
+          where: {
+            jobId: job.id,
+            providerType: 'COMPANY',
+            providerId: { in: participantCompanyIds },
+            status: 'ACCEPTED',
+          },
+          select: { id: true },
+        })
+        hasAcceptedCompanyParticipation = Boolean(acceptedCompanyQuote)
+      }
+
+      if (!readableTargetIds.has(job.targetTaskerId) && !hasAcceptedCompanyParticipation) {
         return NextResponse.json(
           { error: 'This direct booking is reserved for another provider' },
           { status: 403 }
