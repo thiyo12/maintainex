@@ -79,4 +79,18 @@ describe('admin session-bound token lifecycle', () => {
     expect(setup).toContain("guardCrmRequest(request, { level: 'sensitive' })")
     expect(setup).not.toContain('verifyAccessToken(authHeader.slice(7))')
   })
+
+  it('resolves the CRM shell identity from live session state instead of stale JWT claims', () => {
+    const me = read('app/api/admin/auth/me/route.ts')
+    expect(me).toContain("guardCrmRequest(request, { level: 'read' })")
+    expect(me).toContain('where: { id: guard.context.adminId }')
+    expect(me).not.toContain("getAdminSession(request)")
+  })
+
+  it('requires a session-bound claim before rendering protected admin pages', () => {
+    const middleware = read('middleware.ts')
+    expect(middleware).toContain('sessionId: payload.sid || payload.sessionId || null')
+    expect(middleware).toContain('if (!session.sessionId)')
+    expect(middleware).toContain("'/admin/login?error=session_required'")
+  })
 })
