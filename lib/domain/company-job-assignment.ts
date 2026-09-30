@@ -71,7 +71,10 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
   const existingWorkerAssignment = await prisma.companyJobAssignment.findUnique({
     where: { jobId_workerUserId: { jobId, workerUserId } },
   })
-  if (existingWorkerAssignment) {
+  if (
+    existingWorkerAssignment &&
+    !['REJECTED', 'REVOKED'].includes(existingWorkerAssignment.status)
+  ) {
     return { success: false, error: 'This worker is already assigned to this job' }
   }
 
@@ -88,15 +91,31 @@ export async function createAssignment(params: AssignmentCreateParams): Promise<
       update: { progressStatus: 'ACCEPTED', updatedAt: new Date() },
     })
 
-    const record = await tx.companyJobAssignment.create({
-      data: {
-        companyId,
-        jobId,
-        workerUserId,
-        assignedBy: assignedByUserId,
-        status: 'ASSIGNED',
-      },
-    })
+    const record = existingWorkerAssignment
+      ? await tx.companyJobAssignment.update({
+          where: { id: existingWorkerAssignment.id },
+          data: {
+            assignedBy: assignedByUserId,
+            status: 'ASSIGNED',
+            assignedAt: new Date(),
+            acceptedAt: null,
+            startedAt: null,
+            completedAt: null,
+            rejectedAt: null,
+            revokedAt: null,
+            revokedReason: null,
+            rejectReason: null,
+          },
+        })
+      : await tx.companyJobAssignment.create({
+          data: {
+            companyId,
+            jobId,
+            workerUserId,
+            assignedBy: assignedByUserId,
+            status: 'ASSIGNED',
+          },
+        })
 
     await writeCompanyAuditLog({
       companyId,
@@ -170,6 +189,19 @@ export async function reassignWorker(
   const currentAssignment = await prisma.companyJobAssignment.findFirst({
     where: { jobId, companyId, status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } },
   })
+  if (currentAssignment?.workerUserId === newWorkerUserId) {
+    return { success: false, error: 'This worker is already the active assignee for this job' }
+  }
+
+  const reusableAssignment = await prisma.companyJobAssignment.findUnique({
+    where: { jobId_workerUserId: { jobId, workerUserId: newWorkerUserId } },
+  })
+  if (
+    reusableAssignment &&
+    !['REJECTED', 'REVOKED'].includes(reusableAssignment.status)
+  ) {
+    return { success: false, error: 'This worker already has a non-terminal assignment for this job' }
+  }
 
   const assignment = await prisma.$transaction(async (tx) => {
     if (currentAssignment) {
@@ -200,15 +232,31 @@ export async function reassignWorker(
     })
     if (claimed.count !== 1) throw new Error('Job state changed before reassignment')
 
-    const newRecord = await tx.companyJobAssignment.create({
-      data: {
-        companyId,
-        jobId,
-        workerUserId: newWorkerUserId,
-        assignedBy: actorUserId,
-        status: 'ASSIGNED',
-      },
-    })
+    const newRecord = reusableAssignment
+      ? await tx.companyJobAssignment.update({
+          where: { id: reusableAssignment.id },
+          data: {
+            assignedBy: actorUserId,
+            status: 'ASSIGNED',
+            assignedAt: new Date(),
+            acceptedAt: null,
+            startedAt: null,
+            completedAt: null,
+            rejectedAt: null,
+            revokedAt: null,
+            revokedReason: null,
+            rejectReason: null,
+          },
+        })
+      : await tx.companyJobAssignment.create({
+          data: {
+            companyId,
+            jobId,
+            workerUserId: newWorkerUserId,
+            assignedBy: actorUserId,
+            status: 'ASSIGNED',
+          },
+        })
 
     await writeCompanyAuditLog({
       companyId,
