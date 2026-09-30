@@ -541,7 +541,7 @@ export async function PATCH(request: NextRequest) {
                   marketplaceDispute.jobId,
                   release.providerId,
                   marketplaceDispute.job.title,
-                  release.platformDue,
+                  release.platformDueCents,
                   getCurrencyForCountry(marketplaceDispute.job.countryCode),
                 )
               : notifyPaymentReleased(
