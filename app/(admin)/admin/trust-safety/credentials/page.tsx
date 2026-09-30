@@ -85,7 +85,7 @@ function CredentialsContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center space-x-3">
           <FiShield className="w-6 h-6 text-amber-500" />
           <h1 className="text-2xl font-bold text-white">Credential Review</h1>
@@ -96,7 +96,7 @@ function CredentialsContent() {
         </button>
       </div>
 
-      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1">
+      <div className="flex space-x-1 bg-[#15161E] rounded-lg p-1 overflow-x-auto">
         {STATUS_TABS.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setPage(1) }}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${tab === t.key ? 'bg-amber-500 text-[#0B0C12]' : 'text-gray-400 hover:text-white'}`}>
@@ -105,8 +105,8 @@ function CredentialsContent() {
         ))}
       </div>
 
-      <div className="bg-[#15161E] rounded-xl overflow-hidden">
-        <table className="w-full">
+      <div className="bg-[#15161E] rounded-xl overflow-x-auto">
+        <table className="w-full min-w-[760px]">
           <thead><tr className="border-b border-gray-800">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Name</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Type</th>
@@ -160,7 +160,7 @@ function CredentialsContent() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-gray-400">{total} total</span>
           <div className="flex items-center space-x-2">
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
