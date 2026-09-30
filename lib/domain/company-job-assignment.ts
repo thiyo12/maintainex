@@ -342,7 +342,7 @@ export async function workerRejectAssignment(
     })
     if (claimed.count !== 1) throw new Error('Assignment changed before it could be rejected')
 
-    await tx.marketplaceJob.updateMany({
+    const targetRestored = await tx.marketplaceJob.updateMany({
       where: {
         id: assignment.jobId,
         status: 'QUOTE_ACCEPTED',
@@ -350,6 +350,9 @@ export async function workerRejectAssignment(
       },
       data: { targetTaskerId: assignment.companyId },
     })
+    if (targetRestored.count !== 1) {
+      throw new Error('Job target changed before assignment rejection')
+    }
 
     await writeCompanyAuditLog({
       companyId: assignment.companyId,
