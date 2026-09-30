@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
-import { createChangeOrder } from '@/lib/domain/change-order'
+import { createChangeOrder, transitionChangeOrder } from '@/lib/domain/change-order'
 import { notifyChangeOrderSubmitted } from '@/lib/notifications'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 function parseBigInt(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value
   if (typeof value === 'number' && Number.isSafeInteger(value)) return BigInt(value)
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) return BigInt(value.trim())
+  if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) return BigInt(value.trim())
   return null
 }
 
@@ -23,12 +23,19 @@ export async function POST(
     if (blocked) return blocked
 
     const { id: jobId } = await params
-    const body = await request.json()
-    const { baseQuoteId, reason, scopeDelta, lineItems } = body
-    const amountDeltaCents = parseBigInt(body.amountDeltaCents)
+    const body = await request.json().catch(() => ({}))
+    const baseQuoteId = typeof body?.baseQuoteId === 'string' ? body.baseQuoteId.trim().slice(0, 128) : ''
+    const reason = typeof body?.reason === 'string' ? body.reason.trim().slice(0, 2000) : ''
+    const scopeDelta = typeof body?.scopeDelta === 'string' ? body.scopeDelta.trim().slice(0, 5000) : undefined
+    const lineItems = Array.isArray(body?.lineItems) ? body.lineItems.slice(0, 100) : undefined
+    const requestedStatus = typeof body?.status === 'string' ? body.status.toUpperCase() : 'DRAFT'
+    const amountDeltaCents = parseBigInt(body?.amountDeltaCents)
 
-    if (!baseQuoteId || !reason || amountDeltaCents === null) {
-      return NextResponse.json({ error: 'Missing required fields: baseQuoteId, reason, amountDeltaCents' }, { status: 400 })
+    if (!baseQuoteId || reason.length < 3 || amountDeltaCents === null) {
+      return NextResponse.json({ error: 'Valid baseQuoteId, reason, and amountDeltaCents are required' }, { status: 400 })
+    }
+    if (!['DRAFT', 'SUBMITTED'].includes(requestedStatus)) {
+      return NextResponse.json({ error: 'status must be DRAFT or SUBMITTED' }, { status: 400 })
     }
 
     const baseQuote = await prisma.jobQuote.findUnique({
@@ -99,20 +106,47 @@ export async function POST(
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    if (body.status === 'SUBMITTED') {
-      const job = await prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { title: true, customerId: true } })
-      const providerName = user.name ?? 'Provider'
-      const latestCo = await prisma.jobChangeOrder.findFirst({
-        where: { jobId },
-        orderBy: { revisionNumber: 'desc' },
-        select: { revisionNumber: true },
+    let status: 'DRAFT' | 'SUBMITTED' = 'DRAFT'
+    let revisionNumber: number | null = null
+
+    if (requestedStatus === 'SUBMITTED' && result.changeOrderId) {
+      const transition = await transitionChangeOrder(prisma, {
+        changeOrderId: result.changeOrderId,
+        userId: user.id,
+        toStatus: 'SUBMITTED',
       })
-      if (job && latestCo) {
-        await notifyChangeOrderSubmitted(jobId, job.customerId, providerName, job.title, latestCo.revisionNumber)
+      if (!transition.success) {
+        return NextResponse.json({ error: transition.error || 'Failed to submit change order' }, { status: 409 })
+      }
+      status = 'SUBMITTED'
+
+      const [job, submitted] = await Promise.all([
+        prisma.marketplaceJob.findUnique({
+          where: { id: jobId },
+          select: { title: true, customerId: true },
+        }),
+        prisma.jobChangeOrder.findUnique({
+          where: { id: result.changeOrderId },
+          select: { revisionNumber: true },
+        }),
+      ])
+
+      revisionNumber = submitted?.revisionNumber ?? null
+      if (job && revisionNumber !== null) {
+        await notifyChangeOrderSubmitted(
+          jobId,
+          job.customerId,
+          user.name ?? 'Provider',
+          job.title,
+          revisionNumber,
+        )
       }
     }
 
-    return NextResponse.json({ success: true, changeOrderId: result.changeOrderId }, { status: 201 })
+    return NextResponse.json(
+      { success: true, changeOrderId: result.changeOrderId, status, revisionNumber },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Create change order error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
