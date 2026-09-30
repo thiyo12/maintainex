@@ -44,6 +44,7 @@ export default function ConfirmCompleteScreen() {
   const serviceFee = Number(escrow?.serviceFee || 0)
   const totalAmount = Number(escrow?.totalAmount || providerAmount + serviceFee)
   const completionReady = job.workspace?.progressStatus === 'COMPLETION_REQUESTED'
+  const isCash = escrow?.status === 'CASH_CONFIRMED' || escrow?.paymentMethod === 'CASH'
 
   const handleRelease = async () => {
     if (!completionReady) {
@@ -56,9 +57,11 @@ export default function ConfirmCompleteScreen() {
       const released = Number(result.netAmount ?? 0)
       Alert.alert(
         'Job completed',
-        released > 0
-          ? `${currency} ${released.toLocaleString()} was released to ${taskerName || 'the provider'}.`
-          : 'The job was completed and the protected payment was released.',
+        result.paymentMethod === 'CASH' || isCash
+          ? 'Completion is recorded. Pay cash directly to the provider as agreed; MaintainEX has not held or released this cash.'
+          : released > 0
+            ? `${currency} ${released.toLocaleString()} was released to ${taskerName || 'the provider'}.`
+            : 'The job was completed and the protected payment was released.',
         [
           {
             text: 'Leave a review',
@@ -110,7 +113,7 @@ export default function ConfirmCompleteScreen() {
             <Text style={styles.rowV}>{currency} {serviceFee.toLocaleString()}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalL}>Protected total</Text>
+            <Text style={styles.totalL}>{isCash ? 'Cash amount due' : 'Protected total'}</Text>
             <Text style={styles.totalV}>{currency} {totalAmount.toLocaleString()}</Text>
           </View>
         </View>
@@ -118,7 +121,9 @@ export default function ConfirmCompleteScreen() {
         <View style={styles.infoCard}>
           <Ionicons name="shield-checkmark-outline" size={22} color={colors.amberDark} />
           <Text style={styles.infoText}>
-            Confirm only after you have checked the completed work. MaintainEX will calculate the provider payout and commission on the server.
+            {isCash
+              ? 'Confirm only after you have checked the completed work. Cash is paid directly to the provider; MaintainEX will record the provider platform amount separately.'
+              : 'Confirm only after you have checked the completed work. MaintainEX will calculate the provider payout and commission on the server.'}
           </Text>
         </View>
 
@@ -132,7 +137,9 @@ export default function ConfirmCompleteScreen() {
             ? <ActivityIndicator color="#FFFFFF" />
             : <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />}
           <Text style={styles.btnTxt}>
-            {releasing ? 'Releasing...' : 'Confirm Work & Release Payment'}
+            {releasing
+              ? (isCash ? 'Completing...' : 'Releasing...')
+              : (isCash ? 'Confirm Work Complete' : 'Confirm Work & Release Payment')}
           </Text>
         </TouchableOpacity>
 
