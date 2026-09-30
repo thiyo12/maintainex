@@ -67,6 +67,28 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid language' }, { status: 400 })
     }
 
+    if (profileImage !== undefined && profileImage !== null && typeof profileImage !== 'string') {
+      return NextResponse.json({ error: 'profileImage must be a URL string' }, { status: 400 })
+    }
+    if (emergencyContact !== undefined && emergencyContact !== null && typeof emergencyContact !== 'string') {
+      return NextResponse.json({ error: 'emergencyContact must be text' }, { status: 400 })
+    }
+
+    let normalizedBirthday: Date | null | undefined
+    if (birthday !== undefined) {
+      if (birthday === null || birthday === '') {
+        normalizedBirthday = null
+      } else if (typeof birthday !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
+        return NextResponse.json({ error: 'birthday must use YYYY-MM-DD' }, { status: 400 })
+      } else {
+        const parsedBirthday = new Date(`${birthday}T00:00:00.000Z`)
+        if (Number.isNaN(parsedBirthday.getTime()) || parsedBirthday >= new Date()) {
+          return NextResponse.json({ error: 'Enter a valid birthday' }, { status: 400 })
+        }
+        normalizedBirthday = parsedBirthday
+      }
+    }
+
     const updateData: any = {}
     if (name !== undefined) updateData.name = name.trim().slice(0, 150)
     if (name !== undefined && name !== user.name) updateData.lastNameChangedAt = new Date()
@@ -83,11 +105,19 @@ export async function PUT(request: NextRequest) {
     let profileFields: Record<string, any> | null = null
     if (user.role === 'CUSTOMER') {
       const customerData: any = {}
-      if (profileImage !== undefined) customerData.profileImage = profileImage
-      if (birthday !== undefined) customerData.birthday = birthday ? new Date(birthday) : null
+      if (profileImage !== undefined) {
+        customerData.profileImage = typeof profileImage === 'string'
+          ? profileImage.trim().slice(0, 2000)
+          : null
+      }
+      if (birthday !== undefined) customerData.birthday = normalizedBirthday
       if (gender !== undefined) customerData.gender = gender
       if (language !== undefined) customerData.language = language
-      if (emergencyContact !== undefined) customerData.emergencyContact = emergencyContact
+      if (emergencyContact !== undefined) {
+        customerData.emergencyContact = typeof emergencyContact === 'string'
+          ? emergencyContact.trim().slice(0, 300)
+          : null
+      }
 
       if (Object.keys(customerData).length > 0) {
         const existing = await prisma.customerProfile.findUnique({ where: { userId: user.id } })
