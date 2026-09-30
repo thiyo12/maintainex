@@ -14,6 +14,16 @@ describe('legacy company finance boundary', () => {
     expect(route).toContain('{ status: 503 }')
   })
 
+  it('serializes free subscription activation and exposes only an active subscription', () => {
+    const route = read('app/api/mobile/company/subscription/route.ts')
+    expect(route).toContain("subscriptions: {\n          where: { status: 'ACTIVE' }")
+    expect(route).toContain('FOR UPDATE')
+    expect(route).toContain("where: { companyId: profile.id, status: 'ACTIVE' }")
+    expect(route).toContain("throw new Error('ACTIVE_SUBSCRIPTION_EXISTS')")
+    expect(route).toContain("subscriptionStatus: 'CANCELLED'")
+    expect(route).toContain('subscriptionExpiresAt: null')
+  })
+
   it('uses the company payout identity for commission payment reads', () => {
     const route = read('app/api/mobile/company/earnings/route.ts')
     expect(route).toContain('select: { userId: true }')
