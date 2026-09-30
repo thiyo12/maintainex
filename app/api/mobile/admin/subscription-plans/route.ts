@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     const features = Array.isArray(body.features)
       ? body.features
           .filter((item: unknown): item is string => typeof item === 'string')
-          .map(item => item.trim().slice(0, 240))
+          .map((item: string) => item.trim().slice(0, 240))
           .filter(Boolean)
           .slice(0, 50)
       : []
