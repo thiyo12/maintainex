@@ -20,6 +20,7 @@ import {
   FiLogOut,
   FiMenu,
   FiMonitor,
+  FiRefreshCw,
   FiSmartphone,
   FiTag,
   FiBell,
