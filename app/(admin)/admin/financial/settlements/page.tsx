@@ -17,6 +17,8 @@ interface Settlement {
   paidAt?: string
   dueAt: string
   status: string
+  currency: string
+  countryCode: string
   provider?: {
     name: string
     email: string
@@ -29,11 +31,17 @@ export default function SettlementsPage() {
   const [loading, setLoading] = useState(true)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
-  const [summary, setSummary] = useState({
-    totalPaid: 0,
-    totalCommission: 0,
-    totalNet: 0,
-    count: 0
+  const [summary, setSummary] = useState<{
+    count: number
+    byCurrency: Array<{
+      currency: string
+      totalPaid: number
+      totalCommission: number
+      totalNet: number
+    }>
+  }>({
+    count: 0,
+    byCurrency: [],
   })
 
   useEffect(() => {
@@ -58,15 +66,26 @@ export default function SettlementsPage() {
         toast.error(data.error)
         return
       }
-      const items = data.settlements || []
+      const items: Settlement[] = data.settlements || []
       setSettlements(items)
-      const totalPaid = items.reduce((sum: number, s: Settlement) => sum + s.totalEarnings, 0)
-      const totalCommission = items.reduce((sum: number, s: Settlement) => sum + s.commissionOwed, 0)
+
+      const byCurrency = new Map<string, { totalPaid: number; totalCommission: number }>()
+      for (const item of items) {
+        const currency = item.currency || 'LKR'
+        const current = byCurrency.get(currency) || { totalPaid: 0, totalCommission: 0 }
+        current.totalPaid += Number(item.totalEarnings || 0)
+        current.totalCommission += Number(item.commissionOwed || 0)
+        byCurrency.set(currency, current)
+      }
+
       setSummary({
-        totalPaid,
-        totalCommission,
-        totalNet: totalPaid - totalCommission,
-        count: items.length
+        count: items.length,
+        byCurrency: [...byCurrency.entries()].map(([currency, values]) => ({
+          currency,
+          totalPaid: values.totalPaid,
+          totalCommission: values.totalCommission,
+          totalNet: values.totalPaid - values.totalCommission,
+        })),
       })
     } catch (error) {
       console.error('Failed to fetch settlements:', error)
@@ -77,15 +96,53 @@ export default function SettlementsPage() {
   }
 
   const handleExport = () => {
-    toast.success('Export feature coming soon')
+    if (!settlements.length) {
+      toast.error('No settlements to export')
+      return
+    }
+
+    const escapeCsv = (value: unknown) => {
+      const text = String(value ?? '')
+      return `"${text.replaceAll('"', '""')}"`
+    }
+
+    const rows = [
+      ['Settlement ID', 'Week Start', 'Week End', 'Provider', 'MX ID', 'Provider Type', 'Country', 'Currency', 'Total Earnings', 'Commission', 'Net Payout', 'Paid At'],
+      ...settlements.map((s) => [
+        s.id,
+        s.weekStart,
+        s.weekEnd,
+        s.provider?.name || '',
+        s.provider?.mxId || '',
+        s.providerType,
+        s.countryCode,
+        s.currency,
+        s.totalEarnings,
+        s.commissionOwed,
+        Number(s.totalEarnings || 0) - Number(s.commissionOwed || 0),
+        s.paidAt || '',
+      ]),
+    ]
+
+    const csv = rows.map(row => row.map(escapeCsv).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `maintainex-settlements-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+    toast.success('Settlement CSV exported')
   }
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: string) => {
     return new Intl.NumberFormat('en-LK', {
       style: 'currency',
-      currency: 'LKR',
+      currency: currency || 'LKR',
       minimumFractionDigits: 0
-    }).format(amount)
+    }).format(Number(amount || 0))
   }
 
   const formatDate = (dateStr: string) => {
@@ -121,27 +178,24 @@ export default function SettlementsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="bg-[#15161E] border border-white/5 rounded-xl p-5">
             <div className="text-sm text-gray-400 mb-1">Total Settled</div>
             <div className="text-2xl font-bold text-white">{summary.count}</div>
-            <div className="text-xs text-gray-500">settlements</div>
+            <div className="text-xs text-gray-500">settlements in current filter</div>
           </div>
-          <div className="bg-[#15161E] border border-white/5 rounded-xl p-5">
-            <div className="text-sm text-gray-400 mb-1">Total Earnings</div>
-            <div className="text-2xl font-bold text-white">{formatCurrency(summary.totalPaid)}</div>
-            <div className="text-xs text-gray-500">gross provider earnings</div>
-          </div>
-          <div className="bg-[#15161E] border border-white/5 rounded-xl p-5">
-            <div className="text-sm text-gray-400 mb-1">Commission Collected</div>
-            <div className="text-2xl font-bold text-amber-400">{formatCurrency(summary.totalCommission)}</div>
-            <div className="text-xs text-gray-500">platform revenue</div>
-          </div>
-          <div className="bg-[#15161E] border border-white/5 rounded-xl p-5">
-            <div className="text-sm text-gray-400 mb-1">Net Provider Payout</div>
-            <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.totalNet)}</div>
-            <div className="text-xs text-gray-500">after commission</div>
-          </div>
+          {summary.byCurrency.map((row) => (
+            <div key={row.currency} className="bg-[#15161E] border border-white/5 rounded-xl p-5">
+              <div className="text-sm text-gray-400 mb-1">{row.currency} settlement totals</div>
+              <div className="text-xl font-bold text-white">{formatCurrency(row.totalPaid, row.currency)}</div>
+              <div className="mt-2 text-xs text-amber-400">
+                Commission {formatCurrency(row.totalCommission, row.currency)}
+              </div>
+              <div className="text-xs text-emerald-400">
+                Net {formatCurrency(row.totalNet, row.currency)}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="bg-[#15161E] border border-white/5 rounded-xl p-4">
@@ -222,9 +276,9 @@ export default function SettlementsPage() {
                           {s.providerType === 'COMPANY' ? 'Company' : 'Tasker'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings)}</td>
-                      <td className="px-4 py-3 text-sm text-amber-400">{formatCurrency(s.commissionOwed)}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-emerald-400">{formatCurrency(s.totalEarnings - s.commissionOwed)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-300">{formatCurrency(s.totalEarnings, s.currency)}</td>
+                      <td className="px-4 py-3 text-sm text-amber-400">{formatCurrency(s.commissionOwed, s.currency)}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-emerald-400">{formatCurrency(s.totalEarnings - s.commissionOwed, s.currency)}</td>
                       <td className="px-4 py-3">
                         <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">
                           {s.paidAt ? `Paid ${formatDate(s.paidAt)}` : 'Paid'}
