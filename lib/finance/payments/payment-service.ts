@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
@@ -298,69 +299,122 @@ export async function getPaymentStatus(jobId: string, customerId: string) {
   }
 }
 
+type RefundRequiredPaymentIntent = {
+  id: string
+  jobId: string
+  customerId: string
+  escrowId: string
+  status: string
+  amount: bigint
+  currency: string
+}
+
+async function recordCapturedPaymentForRefund(
+  tx: Prisma.TransactionClient,
+  paymentIntent: RefundRequiredPaymentIntent,
+  notification: PayHereNotification,
+  reason: string
+): Promise<boolean> {
+  const claimed = await tx.paymentIntent.updateMany({
+    where: {
+      id: paymentIntent.id,
+      status: { in: ['CREATED', 'PENDING', 'FAILED', 'CANCELLED', 'EXPIRED'] },
+    },
+    data: {
+      status: 'REFUND_REQUIRED',
+      paymentId: notification.payment_id || null,
+      gatewayResponse: JSON.stringify(notification),
+      paidAt: new Date(),
+    },
+  })
+
+  if (claimed.count === 0) {
+    const current = await tx.paymentIntent.findUnique({
+      where: { id: paymentIntent.id },
+      select: { status: true },
+    })
+    if (
+      current?.status === 'REFUND_REQUIRED' ||
+      current?.status === 'REFUND_PROCESSING' ||
+      current?.status === 'REFUNDED' ||
+      current?.status === 'SUCCESS'
+    ) {
+      return false
+    }
+    throw new Error('Payment intent state changed while recording late payment')
+  }
+
+  await postLedgerTransaction({
+    entries: [
+      {
+        accountId: 'external:payhere',
+        accountType: 'EXTERNAL_PAYOUT',
+        entryType: 'DEBIT',
+        amount: paymentIntent.amount,
+      },
+      {
+        accountId: `refund-suspense:${paymentIntent.id}`,
+        accountType: 'REFUND_SUSPENSE',
+        entryType: 'CREDIT',
+        amount: paymentIntent.amount,
+      },
+    ],
+    currency: paymentIntent.currency as Currency,
+    referenceType: 'PAYMENT_REFUND_SUSPENSE',
+    referenceId: paymentIntent.id,
+    idempotencyKey: `payhere-refund-suspense:${paymentIntent.id}:${notification.payment_id || notification.order_id}`,
+    description: `Late PayHere capture awaiting refund for payment intent ${paymentIntent.id}`,
+    createdBy: paymentIntent.customerId,
+    metadata: JSON.stringify({
+      jobId: paymentIntent.jobId,
+      escrowId: paymentIntent.escrowId,
+      paymentId: notification.payment_id || null,
+      orderId: notification.order_id,
+      reason,
+    }),
+  }, tx)
+
+  await tx.marketplaceRiskEvent.create({
+    data: {
+      jobId: paymentIntent.jobId,
+      actorUserId: paymentIntent.customerId,
+      eventType: 'LATE_PAYMENT_REFUND_REQUIRED',
+      severity: 'CRITICAL',
+      metadata: JSON.stringify({
+        paymentIntentId: paymentIntent.id,
+        paymentId: notification.payment_id || null,
+        orderId: notification.order_id,
+        amount: notification.payhere_amount,
+        currency: notification.payhere_currency,
+        reason,
+      }),
+    },
+  })
+
+  await recordJobLifecycleEvent(tx, {
+    jobId: paymentIntent.jobId,
+    actorId: paymentIntent.customerId,
+    actorType: 'CUSTOMER',
+    action: 'PAYMENT_REFUND_REQUIRED',
+    metadata: {
+      paymentIntentId: paymentIntent.id,
+      paymentId: notification.payment_id || null,
+      suspenseAccountId: `refund-suspense:${paymentIntent.id}`,
+      reason,
+    },
+  })
+
+  return true
+}
+
 async function markCapturedPaymentForRefund(
-  paymentIntent: {
-    id: string
-    jobId: string
-    customerId: string
-    status: string
-  },
+  paymentIntent: RefundRequiredPaymentIntent,
   notification: PayHereNotification,
   reason: string
 ): Promise<{ success: boolean; error?: string }> {
-  await prisma.$transaction(async (tx) => {
-    const claimed = await tx.paymentIntent.updateMany({
-      where: {
-        id: paymentIntent.id,
-        status: { in: ['CREATED', 'PENDING', 'FAILED', 'CANCELLED', 'EXPIRED'] },
-      },
-      data: {
-        status: 'REFUND_REQUIRED',
-        paymentId: notification.payment_id || null,
-        gatewayResponse: JSON.stringify(notification),
-        paidAt: new Date(),
-      },
-    })
-
-    if (claimed.count === 0) {
-      const current = await tx.paymentIntent.findUnique({
-        where: { id: paymentIntent.id },
-        select: { status: true },
-      })
-      if (current?.status === 'REFUND_REQUIRED' || current?.status === 'SUCCESS') return
-      throw new Error('Payment intent state changed while recording late payment')
-    }
-
-    await tx.marketplaceRiskEvent.create({
-      data: {
-        jobId: paymentIntent.jobId,
-        actorUserId: paymentIntent.customerId,
-        eventType: 'LATE_PAYMENT_REFUND_REQUIRED',
-        severity: 'CRITICAL',
-        metadata: JSON.stringify({
-          paymentIntentId: paymentIntent.id,
-          paymentId: notification.payment_id || null,
-          orderId: notification.order_id,
-          amount: notification.payhere_amount,
-          currency: notification.payhere_currency,
-          reason,
-        }),
-      },
-    })
-
-    await recordJobLifecycleEvent(tx, {
-      jobId: paymentIntent.jobId,
-      actorId: paymentIntent.customerId,
-      actorType: 'CUSTOMER',
-      action: 'PAYMENT_REFUND_REQUIRED',
-      metadata: {
-        paymentIntentId: paymentIntent.id,
-        paymentId: notification.payment_id || null,
-        reason,
-      },
-    })
+  await prisma.$transaction(async tx => {
+    await recordCapturedPaymentForRefund(tx, paymentIntent, notification, reason)
   })
-
   return { success: true }
 }
 
@@ -436,31 +490,12 @@ export async function processPaymentSuccess(notification: PayHereNotification): 
       lockedJob.customerId !== paymentIntent.customerId ||
       lockedJob.status !== 'QUOTE_ACCEPTED'
     ) {
-      const lateClaim = await tx.paymentIntent.updateMany({
-        where: { id: paymentIntent.id, status: { in: ['CREATED', 'PENDING'] } },
-        data: {
-          status: 'REFUND_REQUIRED',
-          paymentId: notification.payment_id || null,
-          gatewayResponse: JSON.stringify(notification),
-          paidAt: new Date(),
-        },
-      })
-      if (lateClaim.count === 1) {
-        await tx.marketplaceRiskEvent.create({
-          data: {
-            jobId: paymentIntent.jobId,
-            actorUserId: paymentIntent.customerId,
-            eventType: 'LATE_PAYMENT_REFUND_REQUIRED',
-            severity: 'CRITICAL',
-            metadata: JSON.stringify({
-              paymentIntentId: paymentIntent.id,
-              paymentId: notification.payment_id || null,
-              orderId: notification.order_id,
-              reason: 'Booking was no longer QUOTE_ACCEPTED when successful payment arrived',
-            }),
-          },
-        })
-      }
+      await recordCapturedPaymentForRefund(
+        tx,
+        paymentIntent,
+        notification,
+        'Booking was no longer QUOTE_ACCEPTED when successful payment arrived'
+      )
       return { success: true, newlyProtected: false }
     }
 
