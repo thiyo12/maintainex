@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import { readCanonicalProviderBalance } from '@/lib/financial-read'
+import { bigIntToSafeNumber } from '@/lib/shared/money/money'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,26 +11,59 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payouts = await prisma.payout.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [payouts, canonicalBalance] = await Promise.all([
+      prisma.payout.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+      }),
+      readCanonicalProviderBalance(user.id, 'LKR'),
+    ])
 
-    const totalEarned = payouts
-      .filter(p => p.status === 'CLEARED')
-      .reduce((sum, p) => sum + Number(p.amount), 0) / 100
-    const pendingAmount = payouts
-      .filter(p => p.status === 'PENDING')
-      .reduce((sum, p) => sum + Number(p.amount), 0) / 100
+    const walletId = canonicalBalance?.walletId ?? null
+    const earnedAggregate = walletId
+      ? await prisma.financialLedger.aggregate({
+          where: {
+            accountId: walletId,
+            accountType: 'PROVIDER_WALLET',
+            entryType: 'CREDIT',
+            referenceType: 'ESCROW_RELEASE',
+            currency: 'LKR',
+          },
+          _sum: { amount: true },
+        })
+      : null
 
-    const completedJobs = await prisma.jobPosting.count({
+    const totalEarnedMinor = earnedAggregate?._sum.amount ?? 0n
+    const pendingPayoutMinor = payouts
+      .filter(p => ['REQUESTED', 'RESERVED', 'PROCESSING', 'PENDING'].includes(p.status))
+      .reduce((sum, p) => sum + p.amount, 0n)
+
+    const v1CompletedJobs = await prisma.jobPosting.count({
       where: {
         status: 'COMPLETED',
-        ...(user.role === 'TASKER'
-          ? { assignments: { some: { tasker: { userId: user.id } } } }
-          : { customerId: user.id }),
+        assignments: { some: { tasker: { userId: user.id } } },
       },
     })
+
+    const v2CompletedRows = await prisma.$queryRaw<Array<{ count: bigint }>>\`
+      SELECT COUNT(DISTINCT mj.id)::bigint AS count
+      FROM "MarketplaceJob" mj
+      JOIN "JobQuote" jq ON jq."jobId" = mj.id
+      WHERE mj.status = 'COMPLETED'
+        AND jq."providerType" = 'INDIVIDUAL'
+        AND jq."providerId" = ${user.id}
+        AND jq.status = 'ACCEPTED'
+    \`
+    const completedJobs = v1CompletedJobs + Number(v2CompletedRows[0]?.count ?? 0n)
+
+    const totalEarned = bigIntToSafeNumber(totalEarnedMinor) / 100
+    const pendingAmount = bigIntToSafeNumber(pendingPayoutMinor) / 100
+    const availableBalance = canonicalBalance
+      ? bigIntToSafeNumber(canonicalBalance.availableBalance) / 100
+      : 0
+    const pendingBalance = canonicalBalance
+      ? bigIntToSafeNumber(canonicalBalance.pendingBalance) / 100
+      : 0
 
     const pendingCommissionPayments = await prisma.commissionPayment.findMany({
       where: {
@@ -50,7 +85,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       totalEarned,
       pendingAmount,
-      availableBalance: totalEarned - pendingAmount,
+      availableBalance,
+      pendingBalance,
       completedJobs,
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
