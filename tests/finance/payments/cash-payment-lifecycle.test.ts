@@ -75,6 +75,23 @@ describe('cash payment lifecycle contract', () => {
     expect(refundRoute).toContain("refundStatus: pendingExternal ? 'REFUND_REQUIRED' : cashCancelled ? 'CANCELLED' : 'REFUNDED'")
   })
 
+  it('requires explicit customer confirmation that cash was paid before completion', () => {
+    expect(completeRoute).toContain('CASH_PAYMENT_CONFIRMATION_REQUIRED')
+    expect(completeRoute).toContain('body.cashPaidConfirmed !== true')
+    expect(completeRoute).toContain("requireFinancialRateLimit(request, 'complete-job')")
+
+    const releaseRoute = read('app/api/mobile/v2/jobs/[id]/release-escrow/route.ts')
+    expect(releaseRoute).toContain('CASH_PAYMENT_CONFIRMATION_REQUIRED')
+    expect(releaseRoute).toContain('body.cashPaidConfirmed !== true')
+
+    const completionScreen = read(
+      'apps/mobile/features/payments/screens/customer/payment/confirm-complete.tsx',
+    )
+    expect(completionScreen).toContain('Cash Paid · Complete Job')
+    expect(completionScreen).toContain("v2JobActions.complete(")
+    expect(completionScreen).toContain('cashPaidConfirmed')
+  })
+
   it('does not auto-release cash jobs without explicit customer/admin approval', () => {
     expect(escrow).toContain("releaseMode === 'AUTO_RELEASE' && escrow.paymentMethod === 'CASH'")
     expect(escrow).toContain('Cash jobs require explicit customer approval or admin resolution')
