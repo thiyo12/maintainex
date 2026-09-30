@@ -9,6 +9,8 @@ export interface ReviewCredentialInput {
   ipAddress: string
 }
 
+export type CredentialReviewStatus = ReviewCredentialInput['status']
+
 export async function reviewCredential(
   tx: PrismaClient,
   input: ReviewCredentialInput
