@@ -348,7 +348,7 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.waitingText}>This is a company assignment. Accept it before verifying arrival.</Text>
                   <TouchableOpacity
                     style={styles.verifyPinBtn}
-                    onPress={() => router.push(`/(company)/workforce/assignment/${job.companyAssignment.id}` as any)}
+                    onPress={() => router.push(`/(company)/workforce/assignment/${job.companyAssignment?.id || ''}` as any)}
                   >
                     <Text style={styles.verifyPinText}>Review & Accept Assignment</Text>
                   </TouchableOpacity>
