@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiDollarSign, FiClock, FiAlertTriangle, FiCheckCircle, FiFilter, FiRefreshCw } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface Settlement {
   id: string
@@ -36,6 +38,8 @@ interface Summary {
 }
 
 export default function CommissionPage() {
+  const { user: admin } = useAdminSession()
+  const canManageCommission = !!admin && (ROLE_PERMISSIONS[admin.role as AdminRole] || []).includes('commission:manage')
   const [settlements, setSettlements] = useState<Settlement[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<string>('ALL')
@@ -86,6 +90,10 @@ export default function CommissionPage() {
   }
 
   const handleAction = async (settlementId: string, action: string) => {
+    if (!canManageCommission) {
+      toast.error('You do not have permission to manage commission settlements')
+      return
+    }
     setActionLoading(settlementId)
     try {
       const res = await fetch('/api/admin/financial/commission', {
@@ -250,7 +258,7 @@ export default function CommissionPage() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Commission</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">Due Date</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">{canManageCommission ? 'Actions' : 'Access'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -290,18 +298,19 @@ export default function CommissionPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          {s.status === 'PENDING' && (
+                          {!canManageCommission && <span className="text-xs text-gray-500">Read only</span>}
+                          {canManageCommission && s.status === 'PENDING' && (
                             <>
                               <button
                                 onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Mark Paid'}
                               </button>
                               <button
                                 onClick={() => handleAction(s.id, 'SEND_REMINDER')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-lg hover:bg-blue-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Remind'}
@@ -309,7 +318,7 @@ export default function CommissionPage() {
                               {isOverdue(s.dueAt) && (
                                 <button
                                   onClick={() => handleAction(s.id, 'SUSPEND')}
-                                  disabled={actionLoading === s.id}
+                                  disabled={!canManageCommission || actionLoading === s.id}
                                   className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
                                 >
                                   {actionLoading === s.id ? '...' : 'Suspend'}
@@ -317,29 +326,29 @@ export default function CommissionPage() {
                               )}
                             </>
                           )}
-                          {s.status === 'OVERDUE' && (
+                          {canManageCommission && s.status === 'OVERDUE' && (
                             <>
                               <button
                                 onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Mark Paid'}
                               </button>
                               <button
                                 onClick={() => handleAction(s.id, 'SUSPEND')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50 font-medium"
                               >
                                 {actionLoading === s.id ? '...' : 'Suspend'}
                               </button>
                             </>
                           )}
-                          {s.status === 'SUSPENDED' && (
+                          {canManageCommission && s.status === 'SUSPENDED' && (
                             <>
                               <button
                                 onClick={() => handleAction(s.id, 'MARK_PAID')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg hover:bg-emerald-500/30 transition-colors disabled:opacity-50 font-medium"
                                 title="Record commission payment and reactivate the provider if this settlement caused the suspension"
                               >
@@ -347,7 +356,7 @@ export default function CommissionPage() {
                               </button>
                               <button
                                 onClick={() => handleAction(s.id, 'UNSUSPEND')}
-                                disabled={actionLoading === s.id}
+                                disabled={!canManageCommission || actionLoading === s.id}
                                 className="px-3 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50 font-medium"
                                 title="Reactivate the provider without clearing the unpaid commission debt"
                               >
