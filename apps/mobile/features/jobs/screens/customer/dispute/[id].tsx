@@ -5,10 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useColors } from '@/lib/ThemeContext'
 import { useTranslation } from 'react-i18next'
-import { jobs } from '@/api/jobs'
-import { disputes } from '@/api/disputes'
-import { useAuth } from '@/features/auth/context/auth'
-import { JobPosting } from '@/lib/types'
+import { v2JobActions, v2Jobs } from '@/api/v2-jobs'
+import type { V2Job } from '@/api/v2-types'
 
 export default function DisputeScreen() {
   const { t } = useTranslation()
@@ -16,8 +14,7 @@ export default function DisputeScreen() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
-  const { user } = useAuth()
-  const [job, setJob] = useState<JobPosting | null>(null)
+  const [job, setJob] = useState<V2Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(0)
@@ -31,8 +28,8 @@ export default function DisputeScreen() {
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    jobs.get(id as string)
-      .then(setJob)
+    v2Jobs.get(id as string)
+      .then((res) => setJob(res.job))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [id])
@@ -52,8 +49,11 @@ export default function DisputeScreen() {
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
-      const res = await disputes.create({ jobId: id as string, reason, description })
-      setDisputeId(res.id)
+      const resolutionContext = expectation.trim()
+        ? `${description.trim()}\n\nRequested resolution: ${expectation.trim()}`
+        : description.trim()
+      const res = await v2JobActions.dispute(id as string, reason, resolutionContext)
+      setDisputeId(res.disputeId || id as string)
       setSubmitted(true)
     } catch (e: any) {
       Alert.alert(t('common.error'), e.message || t('common.error'))
@@ -65,9 +65,10 @@ export default function DisputeScreen() {
   const reasonLabels = t('dispute.reasons', { returnObjects: true }) as string[]
   const disputeReasons = reasonLabels.map((label, i) => ({ key: ['incomplete', 'quality', 'damage', 'price', 'behavior', 'other'][i], label }))
 
-  const taskerName = job?.assignedTasker?.user?.name || t('dispute.tasker')
+  const taskerName = job?.acceptedQuote?.provider?.name || t('dispute.tasker')
   const jobTitle = job?.title || t('dispute.job')
-  const escrowAmount = ((job?.budget || 0) * 1.05)
+  const escrowAmount = job?.escrow?.totalAmount ?? job?.budgetAmount ?? 0
+  const escrowCurrency = job?.escrow?.currency || (job?.countryCode === 'CA' ? 'CAD' : 'LKR')
 
   if (loading) {
     return (
@@ -193,7 +194,7 @@ export default function DisputeScreen() {
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{t('dispute.escrowAmount')}</Text>
-                <Text style={styles.summaryPrice}>LKR {escrowAmount.toLocaleString()}</Text>
+                <Text style={styles.summaryPrice}>{escrowCurrency} {escrowAmount.toLocaleString()}</Text>
               </View>
             </View>
             <View style={styles.descriptionBox}>
