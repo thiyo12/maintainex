@@ -382,7 +382,7 @@ export async function POST(request: NextRequest) {
             totalAmountCents: item.totalAmountCents,
             currency: item.currency,
             sortOrder: item.sortOrder,
-            metadata: item.metadata ? JSON.stringify(item.metadata) : null,
+            metadata: item.metadata ?? null,
           },
         })
       }
