@@ -2,11 +2,11 @@
 set -e
 
 DATE=$(date +%Y-%m-%d)
-BACKUP_DIR="/Users/thiyoth/maintainex-backup"
+BACKUP_DIR="${BACKUP_DIR:-$HOME/maintainex-backup}"
 ARCHIVE_NAME="maintainex-full-backup-${DATE}.tar.gz"
 WORK_DIR=$(mktemp -d)
-PROJECT_DIR="/Users/thiyoth/Documents/NEWM/maintainex"
-SERVER="root@147.93.106.54"
+PROJECT_DIR="${PROJECT_DIR:-$(pwd)}"
+SERVER="${SERVER:?Set SERVER, for example root@your-vps-host}"
 
 echo "=== Maintainex Full Backup ==="
 echo "Date: $DATE"
@@ -26,7 +26,7 @@ echo "  ✓ Source code ($(du -sh "$WORK_DIR/code" | cut -f1))"
 echo "[2/5] Backing up live database..."
 mkdir -p "$WORK_DIR/database"
 
-SSH_KEY="$HOME/.ssh/id_ed25519_ssaaxcy"
+SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_ed25519}"
 SSH_OPTS="-i $SSH_KEY -o BatchMode=yes -o ConnectTimeout=10"
 
 DB_CONTAINER=$(ssh $SSH_OPTS "$SERVER" "docker ps --format '{{.Names}}' | grep maintainex-db | head -1")
