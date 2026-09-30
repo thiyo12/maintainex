@@ -35,6 +35,7 @@ export async function authenticateMarketplaceUser(request: NextRequest): Promise
   })
   if (!session) return null
   if (session.userId !== claims.sub) return null
+  if (!session.isValid) return null
   if (session.revokedAt) return null
   if (session.expiresAt < new Date()) return null
 
