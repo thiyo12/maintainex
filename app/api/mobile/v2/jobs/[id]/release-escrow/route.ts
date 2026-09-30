@@ -98,7 +98,8 @@ export async function POST(
       paymentMethod: result.paymentMethod,
       commission: result.commission,
       netAmount: result.netAmount,
-      platformDue: result.platformDueCents,
+      platformDue: result.platformDue,
+      platformDueMinor: result.platformDueCents.toString(),
       message:
         result.paymentMethod === 'CASH'
           ? 'Cash job completed and weekly platform amount recorded.'
