@@ -277,7 +277,7 @@ export async function approveChangeOrder(
       const activeEscrow = await tx.jobEscrow.findFirst({
         where: {
           jobId: co.jobId,
-          status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD'] },
+          status: { in: ['PENDING_PAYMENT', 'PROTECTED', 'ON_HOLD', 'CASH_CONFIRMED'] },
         },
         orderBy: { createdAt: 'desc' },
       })
@@ -286,7 +286,10 @@ export async function approveChangeOrder(
         if (!activeEscrow) {
           throw new Error('CHANGE_ORDER_ESCROW_NOT_FOUND')
         }
-        if (activeEscrow.status !== 'PENDING_PAYMENT') {
+        if (
+          activeEscrow.status !== 'PENDING_PAYMENT' &&
+          !(activeEscrow.status === 'CASH_CONFIRMED' && activeEscrow.paymentMethod === 'CASH')
+        ) {
           throw new Error('CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING')
         }
       }
@@ -317,7 +320,7 @@ export async function approveChangeOrder(
         throw new Error('FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE')
       }
 
-      if (activeEscrow?.status === 'PENDING_PAYMENT' && co.amountDeltaCents !== 0n) {
+      if (activeEscrow && co.amountDeltaCents !== 0n) {
         const pricingConfig = await resolvePricingConfig(tx, co.job.countryCode || 'GLOBAL')
         if (activeEscrow.currency !== pricingConfig.defaultCurrency) {
           throw new Error('CHANGE_ORDER_CURRENCY_MISMATCH')
@@ -327,28 +330,49 @@ export async function approveChangeOrder(
           (newFinalAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
         const totalAmount = newFinalAmount + serviceFee
 
-        const escrowClaim = await tx.jobEscrow.updateMany({
-          where: { id: activeEscrow.id, status: 'PENDING_PAYMENT' },
-          data: {
-            amount: newFinalAmount,
-            serviceFee,
-            totalAmount,
-          },
-        })
-        if (escrowClaim.count !== 1) {
-          throw new Error('CHANGE_ORDER_ESCROW_STATE_CHANGED')
-        }
+        if (activeEscrow.status === 'PENDING_PAYMENT') {
+          const escrowClaim = await tx.jobEscrow.updateMany({
+            where: { id: activeEscrow.id, status: 'PENDING_PAYMENT' },
+            data: {
+              amount: newFinalAmount,
+              serviceFee,
+              totalAmount,
+            },
+          })
+          if (escrowClaim.count !== 1) {
+            throw new Error('CHANGE_ORDER_ESCROW_STATE_CHANGED')
+          }
 
-        // Existing hosted checkout sessions carry the previous amount.
-        // Invalidate them so the next payment intent is created from the
-        // newly authorized escrow total.
-        await tx.paymentIntent.updateMany({
-          where: {
-            jobId: co.jobId,
-            status: { in: ['CREATED', 'PENDING'] },
-          },
-          data: { status: 'CANCELLED' },
-        })
+          // Existing hosted checkout sessions carry the previous amount.
+          // Invalidate them so the next payment intent is created from the
+          // newly authorized escrow total.
+          await tx.paymentIntent.updateMany({
+            where: {
+              jobId: co.jobId,
+              status: { in: ['CREATED', 'PENDING'] },
+            },
+            data: { status: 'CANCELLED' },
+          })
+        } else if (
+          activeEscrow.status === 'CASH_CONFIRMED' &&
+          activeEscrow.paymentMethod === 'CASH'
+        ) {
+          const escrowClaim = await tx.jobEscrow.updateMany({
+            where: {
+              id: activeEscrow.id,
+              status: 'CASH_CONFIRMED',
+              paymentMethod: 'CASH',
+            },
+            data: {
+              amount: newFinalAmount,
+              serviceFee,
+              totalAmount,
+            },
+          })
+          if (escrowClaim.count !== 1) {
+            throw new Error('CHANGE_ORDER_ESCROW_STATE_CHANGED')
+          }
+        }
       }
 
       await tx.marketplaceJob.update({
