@@ -240,7 +240,7 @@ export default function RefundQueuePage() {
                     </span>
                   </div>
                   <div className="mt-2 text-xs text-slate-500">
-                    {item.customer?.name || item.customer?.mxId || item.customer?.email || item.customerId}
+                    {item.customer?.name || item.customer?.mxId || item.customer?.email || item.customer?.id || 'Unknown customer'}
                     {' · '}
                     {item.job?.countryCode || '—'}
                     {' · '}
