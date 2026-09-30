@@ -164,6 +164,48 @@ export async function notifyPaymentReleased(
   })
 }
 
+export async function notifyCashJobCompleted(
+  jobId: string,
+  providerId: string,
+  jobTitle: string,
+  platformDue: number,
+  currency: Currency = 'LKR',
+) {
+  const formattedDue = formatCurrency(BigInt(Math.round(platformDue * 100)), currency)
+  return createNotification({
+    userId: providerId,
+    title: 'Cash Job Completed',
+    body: `Cash payment for "${jobTitle}" is handled directly with the customer. MaintainEX platform amount due: ${formattedDue}.`,
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
+export async function notifyCashDisputeResolved(
+  jobId: string,
+  recipientUserId: string,
+  jobTitle: string,
+  outcome: 'PROVIDER_CONFIRMED' | 'CUSTOMER_NO_PLATFORM_REFUND',
+) {
+  const copy = outcome === 'PROVIDER_CONFIRMED'
+    ? {
+        title: 'Cash Dispute Resolved',
+        body: `The dispute for "${jobTitle}" was resolved for the provider. No MaintainEX-held cash was released; platform commission accounting was recorded separately.`,
+      }
+    : {
+        title: 'Cash Dispute Resolved',
+        body: `The dispute for "${jobTitle}" was resolved for the customer. No MaintainEX-held cash required a refund.`,
+      }
+
+  return createNotification({
+    userId: recipientUserId,
+    title: copy.title,
+    body: copy.body,
+    referenceType: 'JOB',
+    referenceId: jobId,
+  })
+}
+
 export async function notifyEscrowTimeout(jobId: string, providerId: string) {
   return createNotification({
     userId: providerId,
