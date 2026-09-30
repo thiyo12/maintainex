@@ -67,7 +67,13 @@ export async function POST(
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found')) return NextResponse.json({ error: message }, { status: 404 })
-    if (message.includes('already active') || message.includes('state changed')) return NextResponse.json({ error: message }, { status: 409 })
+    if (
+      message.includes('already active') ||
+      message.includes('state changed') ||
+      message.includes('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+    ) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
     if (message.includes('INSUFFICIENT_FUNDS') || message.includes('Insufficient') || message.includes('not ready') || message.includes('accepted quote')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
