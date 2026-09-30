@@ -253,9 +253,11 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const validStatuses = ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
+    const v2Statuses = ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+    const v1Statuses = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+    const allowedStatuses = source === 'V2' ? v2Statuses : v1Statuses
+    if (!allowedStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Invalid status for job source' }, { status: 400 })
     }
 
     if (source === 'V2') {
@@ -321,9 +323,41 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const updated = await prisma.jobPosting.update({
-      where: { id: jobId },
-      data: { status },
+    if (job.status === status) {
+      return NextResponse.json({ job: { ...job, source: 'V1' } })
+    }
+
+    const allowedV1Transitions: Record<string, string[]> = {
+      OPEN: ['ASSIGNED', 'CANCELLED'],
+      ASSIGNED: ['IN_PROGRESS', 'CANCELLED'],
+      IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+      COMPLETED: [],
+      CANCELLED: [],
+    }
+    if (!allowedV1Transitions[job.status]?.includes(status)) {
+      return NextResponse.json(
+        { error: `Invalid classic job transition: ${job.status} → ${status}` },
+        { status: 409 }
+      )
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      const nextJob = await tx.jobPosting.update({
+        where: { id: jobId },
+        data: { status },
+      })
+
+      if (status === 'CANCELLED') {
+        await tx.assignment.updateMany({
+          where: {
+            jobId,
+            status: { notIn: ['COMPLETED', 'CANCELLED'] },
+          },
+          data: { status: 'CANCELLED' },
+        })
+      }
+
+      return nextJob
     })
     await createAuditLog({
       action: 'UPDATE',
