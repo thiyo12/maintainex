@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPaymentCheckoutForm } from '@/lib/payment/payment-service'
+import { resolvePaymentPublicOrigin } from '@/lib/finance/payments/public-origin'
 
 function escapeHtml(value: string): string {
   return value
@@ -16,7 +17,13 @@ export async function GET(
 ) {
   const { intentId } = await params
   const token = request.nextUrl.searchParams.get('token') || ''
-  const baseUrl = process.env.NEXTAUTH_URL || new URL(request.url).origin
+  const baseUrl = resolvePaymentPublicOrigin(request.url)
+  if (!baseUrl) {
+    return new NextResponse('Payment public URL is not configured.', {
+      status: 503,
+      headers: { 'Cache-Control': 'no-store' },
+    })
+  }
 
   const checkout = await getPaymentCheckoutForm(intentId, token, baseUrl)
   if (!checkout) {
