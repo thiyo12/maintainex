@@ -31,6 +31,8 @@ export function verifySimpleToken(token: string): any {
           firstName: decoded.firstName || '',
           lastName: decoded.lastName || '',
           assignedCountries: Array.isArray(decoded.assignedCountries) ? decoded.assignedCountries : [],
+          sid: decoded.sid || decoded.sessionId || null,
+          sessionId: decoded.sid || decoded.sessionId || null,
           type: decoded.type || undefined,
           name: [decoded.firstName, decoded.lastName].filter(Boolean).join(' ') || decoded.name || null,
           branchId: decoded.branchId || null,
