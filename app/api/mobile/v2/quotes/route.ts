@@ -9,6 +9,7 @@ import { findCandidates } from '@/lib/matching'
 import { validateQuotePrice } from '@/lib/pricing/engine'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
+import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
 export async function POST(request: NextRequest) {
   try {
@@ -117,37 +118,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: priceCheck.error }, { status: 400 })
     }
 
-    const existing = await prisma.jobQuote.findFirst({
-      where: { jobId, providerId: resolvedProviderId },
-    })
-    if (existing) return NextResponse.json({ error: 'You already submitted a quote' }, { status: 409 })
+    const quote = await prisma.$transaction(async tx => {
+      await lockAndAssertProviderAvailable(
+        tx,
+        resolvedProviderType,
+        resolvedProviderId,
+        'Provider is no longer available to submit this quote',
+      )
 
-    const quote = await prisma.jobQuote.create({
-      data: {
-        jobId,
-        providerId: resolvedProviderId,
-        providerType: resolvedProviderType,
-        price: priceMinor,
-        currency,
-        actorUserId,
-        actorRole,
-        estimatedCompletionTime: typeof estimatedCompletionTime === 'string' ? estimatedCompletionTime.slice(0, 200) : '',
-        message: typeof message === 'string' ? message.slice(0, 5000) : '',
-        attachments: JSON.stringify(Array.isArray(attachments) ? attachments : []),
-      },
-    })
-
-    if (job.responseState === 'awaiting') {
-      await prisma.marketplaceJob.updateMany({
-        where: { id: jobId, responseState: 'awaiting' },
-        data: { responseState: 'responded' },
+      const existing = await tx.jobQuote.findFirst({
+        where: {
+          jobId,
+          providerId: resolvedProviderId,
+          providerType: resolvedProviderType,
+          status: { in: ['PENDING', 'ACCEPTED'] },
+        },
+        select: { id: true },
       })
-    }
+      if (existing) {
+        throw new Error('ACTIVE_QUOTE_EXISTS')
+      }
+
+      const created = await tx.jobQuote.create({
+        data: {
+          jobId,
+          providerId: resolvedProviderId,
+          providerType: resolvedProviderType,
+          price: priceMinor,
+          currency,
+          actorUserId,
+          actorRole,
+          estimatedCompletionTime: typeof estimatedCompletionTime === 'string' ? estimatedCompletionTime.slice(0, 200) : '',
+          message: typeof message === 'string' ? message.slice(0, 5000) : '',
+          attachments: JSON.stringify(Array.isArray(attachments) ? attachments : []),
+        },
+      })
+
+      if (job.responseState === 'awaiting') {
+        await tx.marketplaceJob.updateMany({
+          where: { id: jobId, responseState: 'awaiting' },
+          data: { responseState: 'responded' },
+        })
+      }
+
+      return created
+    })
 
     await notifyQuoteSubmitted(jobId, job.customerId, user.name || 'A provider')
 
     return NextResponse.json({ quote: { ...quote, price: minorUnitsToMajorUnits(quote.price, currency) } }, { status: 201 })
   } catch (error) {
+    if (error instanceof Error && error.message === 'ACTIVE_QUOTE_EXISTS') {
+      return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message.includes('Provider is no longer available')) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       return NextResponse.json({ error: 'You already have an active quote for this job' }, { status: 409 })
     }
