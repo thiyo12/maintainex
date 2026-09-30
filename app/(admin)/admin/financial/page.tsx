@@ -48,9 +48,9 @@ function date(value?: string | null) {
 
 function badge(status: string) {
   const s = status.toUpperCase()
-  if (['CLEARED', 'SETTLED', 'SUCCESS', 'RELEASED', 'PROTECTED'].includes(s)) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (['FAILED', 'REJECTED', 'CHARGEDBACK', 'REFUNDED'].includes(s)) return 'bg-red-50 text-red-700 border-red-200'
-  if (['PENDING', 'PROCESSING', 'ON_HOLD', 'CREATED'].includes(s)) return 'bg-amber-50 text-amber-700 border-amber-200'
+  if (['CLEARED', 'SETTLED', 'SUCCESS', 'RELEASED', 'PROTECTED', 'REFUNDED'].includes(s)) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (['FAILED', 'REJECTED', 'CHARGEDBACK'].includes(s)) return 'bg-red-50 text-red-700 border-red-200'
+  if (['PENDING', 'PROCESSING', 'ON_HOLD', 'CREATED', 'REFUND_REQUIRED', 'REFUND_PROCESSING'].includes(s)) return 'bg-amber-50 text-amber-700 border-amber-200'
   return 'bg-slate-50 text-slate-600 border-slate-200'
 }
 
@@ -92,7 +92,7 @@ export default function FinanceControlCentrePage() {
       protectedEscrow: sum(data?.escrow || [], ['PROTECTED', 'ON_HOLD'], 'total'),
       pendingCommission: sum(data?.commission || [], ['PENDING'], 'commissionAmount'),
       pendingPayouts: sum(data?.payouts || [], ['PENDING', 'PROCESSING'], 'amount'),
-      paymentFailures: count(data?.payments || [], ['FAILED', 'CHARGEDBACK', 'REFUND_REQUIRED']),
+      paymentFailures: count(data?.payments || [], ['FAILED', 'CHARGEDBACK', 'REFUND_REQUIRED', 'REFUND_PROCESSING']),
     }
   }, [data])
 
@@ -125,7 +125,7 @@ export default function FinanceControlCentrePage() {
         <Metric icon={FiShield} label="Protected / held escrow" value={minor(metrics.protectedEscrow)} detail="Customer funds protected" />
         <Metric icon={FiDollarSign} label="Pending commission" value={minor(metrics.pendingCommission)} detail="MaintainEX receivable" />
         <Metric icon={FiCreditCard} label="Pending payouts" value={minor(metrics.pendingPayouts)} detail="Provider payouts awaiting clearing" />
-        <Metric icon={FiAlertTriangle} label="Payment exceptions" value={String(metrics.paymentFailures)} detail="Failed / chargeback / refund-required" danger={metrics.paymentFailures > 0} />
+        <Metric icon={FiAlertTriangle} label="Payment exceptions" value={String(metrics.paymentFailures)} detail="Failed / chargeback / refund queue" danger={metrics.paymentFailures > 0} />
       </section>
 
       <section className="grid xl:grid-cols-2 gap-5">
@@ -138,7 +138,12 @@ export default function FinanceControlCentrePage() {
 
         <Panel title="Payment state" subtitle="PaymentIntent status distribution">
           <StatusRows rows={data?.payments || []} amountField="total" />
-          <div className="mt-4 text-xs text-slate-400">Gateway payloads and secrets are intentionally excluded from CRM responses.</div>
+          <div className="mt-4 flex flex-col gap-2">
+            <Link href="/admin/financial/refunds" className="inline-flex items-center gap-1 text-sm font-medium text-amber-700">
+              Open PayHere refund queue <FiArrowUpRight size={14} />
+            </Link>
+            <div className="text-xs text-slate-400">Gateway payloads and secrets are intentionally excluded from CRM responses.</div>
+          </div>
         </Panel>
 
         <Panel title="Commission state" subtitle="Commission settlements by state">
