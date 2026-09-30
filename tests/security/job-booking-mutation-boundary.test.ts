@@ -16,12 +16,12 @@ describe('accepted booking mutation boundary', () => {
     expect(route).not.toContain("!['OPEN', 'QUOTE_ACCEPTED'].includes(current.status)")
   })
 
-  it('shares exact address only inside an active payment-protected transaction', () => {
+  it('shares exact address only inside an active booking with a confirmed payment method', () => {
     const route = read('app/api/mobile/v2/jobs/[id]/share-address/route.ts')
 
     expect(route).toContain('FOR UPDATE')
     expect(route).toContain("!['QUOTE_ACCEPTED', 'IN_PROGRESS'].includes(job.status)")
-    expect(route).toContain("where: { jobId: id, status: 'PROTECTED' }")
+    expect(route).toContain("status: { in: ['PROTECTED', 'CASH_CONFIRMED'] }")
     expect(route).toContain('addressSharedAt: null')
     expect(route).toContain("if (claimed.count !== 1) throw new Error('SHARE_ADDRESS_STATE_CHANGED')")
   })
