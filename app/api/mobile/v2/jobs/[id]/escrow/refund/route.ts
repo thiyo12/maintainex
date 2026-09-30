@@ -67,6 +67,7 @@ export async function POST(
     )
 
     const pendingExternal = result.refundPendingExternal === true
+    const cashCancelled = 'cashCancelled' in result && result.cashCancelled === true
 
     await Promise.all(
       providerRecipientIds.map(recipientId =>
@@ -75,13 +76,17 @@ export async function POST(
           recipientId,
           job.title,
           'customer',
-          pendingExternal ? 'External payment refund requested' : 'Escrow refunded'
+          pendingExternal
+            ? 'External payment refund requested'
+            : cashCancelled
+              ? 'Cash booking cancelled; MaintainEX held no cash to refund'
+              : 'Escrow refunded'
         )
       )
     )
 
     const escrow = await prisma.jobEscrow.findFirst({ where: { jobId: id } })
-    if (!pendingExternal) {
+    if (!pendingExternal && !cashCancelled) {
       auditEscrowRefund({
         jobId: id,
         escrowId: escrow?.id ?? id,
@@ -96,9 +101,11 @@ export async function POST(
         success: true,
         message: pendingExternal
           ? 'Refund requested. PayHere confirmation is pending.'
-          : 'Escrow refunded',
+          : cashCancelled
+            ? 'Cash booking cancelled. MaintainEX held no cash, so no platform refund was created.'
+            : 'Escrow refunded',
         refundAmount: result.refundAmount,
-        refundStatus: pendingExternal ? 'REFUND_REQUIRED' : 'REFUNDED',
+        refundStatus: pendingExternal ? 'REFUND_REQUIRED' : cashCancelled ? 'CANCELLED' : 'REFUNDED',
         fundingSource: result.fundingSource,
       },
       { status: pendingExternal ? 202 : 200 }
