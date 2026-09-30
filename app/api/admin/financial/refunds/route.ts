@@ -9,6 +9,7 @@ import {
 import { createAuditLog } from '@/lib/crm/audit'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import {
+  confirmManualExternalRefund,
   reconcilePayHereRefund,
   requestRequiredPayHereRefund,
 } from '@/lib/finance/payments/payment-service'
@@ -131,10 +132,20 @@ export async function PATCH(request: NextRequest) {
       ? body.paymentIntentId.trim().slice(0, 128)
       : ''
     const action = typeof body?.action === 'string' ? body.action.trim().toUpperCase() : ''
+    const manualReference = typeof body?.manualReference === 'string'
+      ? body.manualReference.trim().slice(0, 200)
+      : ''
+    const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : ''
 
-    if (!paymentIntentId || !['RETRY', 'RECONCILE'].includes(action)) {
+    if (!paymentIntentId || !['RETRY', 'RECONCILE', 'CONFIRM_MANUAL'].includes(action)) {
       return NextResponse.json(
-        { error: 'paymentIntentId and action RETRY or RECONCILE are required' },
+        { error: 'paymentIntentId and a valid refund action are required' },
+        { status: 400 }
+      )
+    }
+    if (action === 'CONFIRM_MANUAL' && manualReference.length < 4) {
+      return NextResponse.json(
+        { error: 'manualReference is required to confirm an external refund' },
         { status: 400 }
       )
     }
@@ -162,7 +173,13 @@ export async function PATCH(request: NextRequest) {
 
     const result = action === 'RETRY'
       ? await requestRequiredPayHereRefund(intent.id)
-      : await reconcilePayHereRefund(intent.id)
+      : action === 'RECONCILE'
+        ? await reconcilePayHereRefund(intent.id)
+        : await confirmManualExternalRefund(intent.id, {
+            actorId: security.adminId,
+            reference: manualReference,
+            note,
+          })
 
     await createAuditLog({
       action: 'UPDATE',
@@ -180,6 +197,7 @@ export async function PATCH(request: NextRequest) {
         success: result.success,
         code: result.code || null,
         paymentIdPresent: Boolean(intent.paymentId),
+        manualReferencePresent: action === 'CONFIRM_MANUAL' ? true : undefined,
       },
       ipAddress: security.ipAddress,
       userAgent: security.userAgent || undefined,
