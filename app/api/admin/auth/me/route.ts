@@ -1,38 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminSession } from '@/lib/auth/authentication/admin-auth'
+import { prisma } from '@/lib/prisma'
+import { guardCrmRequest } from '@/lib/crm/security'
 
 export async function GET(request: NextRequest) {
   try {
-    const session: any = await getAdminSession(request)
-    const id = session?.adminUserId || session?.id || session?.sub
-    if (!session || !id || !session.email || !session.role) {
+    const guard = await guardCrmRequest(request, { level: 'read' })
+    if (!guard.ok) return guard.response
+
+    const adminUser = await prisma.adminUser.findUnique({
+      where: { id: guard.context.adminId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        firstName: true,
+        lastName: true,
+        branchId: true,
+        province: true,
+        region: true,
+        canEditServices: true,
+      },
+    })
+    if (!adminUser) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const assignedCountries = Array.isArray(session.assignedCountries)
-      ? session.assignedCountries
-          .filter((value: unknown): value is string => typeof value === 'string')
-          .map((value: string) => value.trim().toUpperCase())
-          .filter(Boolean)
-      : []
-
-    const firstName = typeof session.firstName === 'string' ? session.firstName : ''
-    const lastName = typeof session.lastName === 'string' ? session.lastName : ''
+    const assignedCountries = guard.context.assignedCountries
+    const name = [adminUser.firstName, adminUser.lastName].filter(Boolean).join(' ') || null
 
     return NextResponse.json(
       {
         user: {
-          id,
-          email: session.email,
-          role: session.role,
-          firstName,
-          lastName,
-          name: [firstName, lastName].filter(Boolean).join(' ') || session.name || null,
+          id: adminUser.id,
+          email: adminUser.email,
+          role: guard.context.role,
+          firstName: adminUser.firstName || '',
+          lastName: adminUser.lastName || '',
+          name,
           assignedCountries,
-          region: session.role === 'SUPER_ADMIN' ? 'All markets' : assignedCountries.join(', ') || null,
-          branchId: session.branchId || null,
-          province: session.province || null,
-          canEditServices: Boolean(session.canEditServices),
+          region: guard.context.isSuperAdmin
+            ? 'All markets'
+            : adminUser.region || assignedCountries.join(', ') || null,
+          branchId: adminUser.branchId || null,
+          province: adminUser.province || null,
+          canEditServices: Boolean(adminUser.canEditServices),
         },
       },
       { headers: { 'Cache-Control': 'no-store' } }
