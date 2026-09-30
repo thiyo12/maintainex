@@ -58,3 +58,17 @@ uploads/
 # Agent reference (contains infra details, never commit)
 AGENTS.md
 prisma/schema.prisma.local.bak
+
+# Security-sensitive files
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.dump
+*.sql.gz
+*.tar.gz
+*.tgz
+*.bak
+maintainex-backup/
+envs/
