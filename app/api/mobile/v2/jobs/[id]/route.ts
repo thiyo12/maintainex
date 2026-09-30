@@ -325,24 +325,11 @@ export async function PATCH(
       return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
     }
 
-    if (!['OPEN', 'QUOTE_ACCEPTED'].includes(job.status)) {
+    if (job.status !== 'OPEN') {
       return NextResponse.json(
-        { error: 'Job details are locked after work starts' },
+        { error: 'Job details are locked after quote acceptance. Use the change-order flow for post-acceptance scope changes.' },
         { status: 409 }
       )
-    }
-
-    if (job.status === 'QUOTE_ACCEPTED') {
-      const protectedEscrow = await prisma.jobEscrow.findFirst({
-        where: { jobId: id, status: 'PROTECTED' },
-        select: { id: true },
-      })
-      if (protectedEscrow) {
-        return NextResponse.json(
-          { error: 'Booking details are locked after payment is secured' },
-          { status: 409 }
-        )
-      }
     }
 
     const body = await request.json()
@@ -383,16 +370,8 @@ export async function PATCH(
       const current = locked[0]
       if (!current) throw new Error('EDIT_JOB_NOT_FOUND')
       if (current.customerId !== user.id) throw new Error('EDIT_FORBIDDEN')
-      if (!['OPEN', 'QUOTE_ACCEPTED'].includes(current.status)) {
-        throw new Error('EDIT_WORK_STARTED')
-      }
-
-      if (current.status === 'QUOTE_ACCEPTED') {
-        const protectedEscrow = await tx.jobEscrow.findFirst({
-          where: { jobId: id, status: 'PROTECTED' },
-          select: { id: true },
-        })
-        if (protectedEscrow) throw new Error('EDIT_PAYMENT_SECURED')
+      if (current.status !== 'OPEN') {
+        throw new Error('EDIT_BOOKING_LOCKED')
       }
 
       return tx.marketplaceJob.update({
@@ -415,11 +394,11 @@ export async function PATCH(
       if (error.message === 'EDIT_FORBIDDEN') {
         return NextResponse.json({ error: 'Only the customer can edit job details' }, { status: 403 })
       }
-      if (error.message === 'EDIT_WORK_STARTED') {
-        return NextResponse.json({ error: 'Job details are locked after work starts' }, { status: 409 })
-      }
-      if (error.message === 'EDIT_PAYMENT_SECURED') {
-        return NextResponse.json({ error: 'Booking details are locked after payment is secured' }, { status: 409 })
+      if (error.message === 'EDIT_BOOKING_LOCKED') {
+        return NextResponse.json(
+          { error: 'Job details are locked after quote acceptance. Use the change-order flow for post-acceptance scope changes.' },
+          { status: 409 }
+        )
       }
     }
     console.error('PATCH job error:', error)
