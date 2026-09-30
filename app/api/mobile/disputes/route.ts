@@ -133,23 +133,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const disputes = await prisma.dispute.findMany({
-      where: { raisedById: user.id },
-      include: {
-        job: { select: { id: true, title: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    const [legacyDisputes, marketplaceDisputes] = await Promise.all([
+      prisma.dispute.findMany({
+        where: { raisedById: user.id },
+        include: {
+          job: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.marketplaceDispute.findMany({
+        where: { raisedById: user.id },
+        include: {
+          job: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ])
 
     return NextResponse.json(
-      disputes.map(d => ({
-        id: d.id,
-        jobId: d.jobId,
-        jobTitle: d.job.title,
-        reason: d.reason,
-        status: d.status,
-        createdAt: d.createdAt.toISOString(),
-      }))
+      [
+        ...legacyDisputes.map(d => ({
+          id: d.id,
+          source: 'LEGACY',
+          jobId: d.jobId,
+          jobTitle: d.job.title,
+          reason: d.reason,
+          status: d.status,
+          createdAt: d.createdAt.toISOString(),
+        })),
+        ...marketplaceDisputes.map(d => ({
+          id: d.id,
+          source: 'MARKETPLACE',
+          jobId: d.jobId,
+          jobTitle: d.job.title,
+          reason: d.reason,
+          status: d.status,
+          createdAt: d.createdAt.toISOString(),
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     )
   } catch (error) {
     console.error('Disputes list error:', error)
