@@ -218,16 +218,18 @@ describe('Phase 10.3 — Quote Revision Lifecycle', () => {
         }],
       })
 
-      await expect(
-        createQuoteRevision(prisma, {
-          originalQuoteId: 'orig-1',
-          providerId: 'provider-1',
-          price: 11000n,
-          estimatedCompletionTime: '2h',
-          revisionReason: 'Scope change',
-        })
-      ).rejects.toThrow('Provider is no longer available')
+      const result = await createQuoteRevision(prisma, {
+        originalQuoteId: 'orig-1',
+        providerId: 'provider-1',
+        price: 11000n,
+        estimatedCompletionTime: '2h',
+        revisionReason: 'Scope change',
+      })
 
+      expect(result).toEqual({
+        success: false,
+        error: 'Provider is no longer available',
+      })
       expect(prisma.jobQuote.updateMany).not.toHaveBeenCalled()
       expect(prisma.jobQuote.create).not.toHaveBeenCalled()
     })
