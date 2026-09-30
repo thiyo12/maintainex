@@ -17,6 +17,14 @@ export async function GET(request: NextRequest) {
     const { context, error } = await resolveCompanyContext(user.id, companyId, 'finance:read')
     if (error) return error
 
+    const company = await prisma.companyProfile.findUnique({
+      where: { id: context!.companyId },
+      select: { userId: true },
+    })
+    if (!company) {
+      return NextResponse.json({ error: 'Company profile not found' }, { status: 404 })
+    }
+
     const contracts = await prisma.contract.findMany({
       where: { companyId: context!.companyId },
       include: { milestones: true },
@@ -31,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     const pendingCommissionPayments = await prisma.commissionPayment.findMany({
       where: {
-        providerId: user.id,
+        providerId: company.userId,
         status: 'PENDING',
       },
       include: {
