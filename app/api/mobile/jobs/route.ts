@@ -14,18 +14,37 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const location = searchParams.get('location')
 
-    const where: any = {}
+    const tasker = user.role === 'TASKER'
+      ? await prisma.taskerProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        })
+      : null
 
+    const conditions: any[] = []
     if (user.role === 'CUSTOMER') {
-      where.customerId = user.id
+      conditions.push({ customerId: user.id })
+    } else if (tasker) {
+      conditions.push({
+        OR: [
+          { status: 'OPEN' },
+          { assignments: { some: { taskerId: tasker.id } } },
+        ],
+      })
+    } else {
+      // Legacy V1 has no company assignment model. Non-customer/non-tasker
+      // accounts may browse open postings only.
+      conditions.push({ status: 'OPEN' })
     }
 
     if (status) {
-      const statuses = status.split(',')
-      where.status = { in: statuses }
+      const statuses = status.split(',').map(value => value.trim()).filter(Boolean)
+      if (statuses.length > 0) conditions.push({ status: { in: statuses } })
     }
-    if (category) where.category = category
-    if (location) where.location = { contains: location }
+    if (category) conditions.push({ category })
+    if (location) conditions.push({ location: { contains: location } })
+
+    const where: any = conditions.length > 0 ? { AND: conditions } : {}
 
     const jobs = await prisma.jobPosting.findMany({
       where,
@@ -45,8 +64,16 @@ export async function GET(request: NextRequest) {
     })
 
     const isCustomer = user.role === 'CUSTOMER'
+    const viewerTaskerId = tasker?.id ?? null
 
-    const mapped = jobs.map(j => ({
+    const mapped = jobs.map(j => {
+      const visibleBids = isCustomer
+        ? j.bids
+        : viewerTaskerId
+          ? j.bids.filter(bid => bid.taskerId === viewerTaskerId)
+          : []
+
+      return ({
       id: j.id,
       title: j.title,
       description: j.description,
@@ -59,7 +86,7 @@ export async function GET(request: NextRequest) {
       scheduledDate: j.scheduledDate?.toISOString(),
       createdAt: j.createdAt.toISOString(),
       customer: isCustomer ? j.customer : { ...j.customer, phone: null },
-      bids: j.bids.map(b => ({
+      bids: visibleBids.map(b => ({
         id: b.id,
         jobId: b.jobId,
         taskerId: b.taskerId,
@@ -84,7 +111,8 @@ export async function GET(request: NextRequest) {
         hourlyRate: j.assignments[0].tasker.hourlyRate,
         user: j.assignments[0].tasker.user,
       } : null,
-    }))
+      })
+    })
 
     return NextResponse.json(mapped)
   } catch (error) {
