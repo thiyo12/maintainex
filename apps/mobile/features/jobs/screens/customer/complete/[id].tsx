@@ -51,7 +51,7 @@ export default function JobCompleteScreen() {
             hourlyRate: 0,
             user: v2.acceptedQuote.provider,
           } : null,
-        } as JobPosting)
+        } as unknown as JobPosting)
       })
       .catch(() => {
         jobs.get(id as string)
