@@ -39,16 +39,16 @@ export default function EscrowConfirmScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.ink} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Secure Payment</Text>
+        <Text style={styles.headerTitle}>Accept Quote</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.lockBox}>
         <Ionicons name="lock-closed-outline" size={32} color={colors.amberDark} />
       </View>
-      <Text style={styles.htitle}>Secure Your Booking</Text>
+      <Text style={styles.htitle}>Accept This Quote</Text>
       <Text style={styles.hsub}>
-        Your money is held safely until you confirm the job is done. {taskerName} cannot receive it until you approve.
+        Accept the provider quote first. On the next screen you can choose protected online payment or cash.
       </Text>
 
       <View style={styles.card}>
@@ -74,12 +74,12 @@ export default function EscrowConfirmScreen() {
       <View style={styles.trustRow}>
         <Ionicons name="shield-checkmark-outline" size={18} color="#22C55E" />
         <Text style={styles.trustTxt}>
-          Money is held securely by MΛINTΛINEX. It is only released to {taskerName} after you confirm the work is done. You are protected.
+          Accepting the quote does not charge you. Your payment method is selected on the next step.
         </Text>
       </View>
 
       <TouchableOpacity style={styles.btn} onPress={handleConfirm} disabled={loading} activeOpacity={0.8}>
-        <Ionicons name="lock-closed-outline" size={18} color="#111827" />
+        <Ionicons name="checkmark-circle-outline" size={18} color="#111827" />
         <Text style={styles.btnTxt}>
           {loading ? 'Accepting...' : 'Accept Quote & Continue'}
         </Text>
