@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { transitionInspection, completeInspection, scheduleInspection, verifyInspectionArrival } from '@/lib/domain/inspection'
 import { notifyInspectionArrived, notifyInspectionCompleted } from '@/lib/notifications'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 export async function PATCH(
   request: NextRequest,
@@ -14,7 +15,14 @@ export async function PATCH(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const { inspectionId } = await params
+    const { id: jobId, inspectionId } = await params
+    const boundInspection = await prisma.jobInspection.findUnique({
+      where: { id: inspectionId },
+      select: { jobId: true },
+    })
+    if (!boundInspection || boundInspection.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
     const body = await request.json()
     const { action } = body
 
@@ -56,8 +64,11 @@ export async function PATCH(
           const tasker = await prisma.user.findUnique({ where: { id: inspection.taskerId }, select: { name: true } })
           providerName = tasker?.name || providerName
         } else if (inspection.companyId) {
-          const company = await prisma.user.findUnique({ where: { id: inspection.companyId }, select: { companyProfile: { select: { companyName: true } } } })
-          providerName = company?.companyProfile?.companyName || providerName
+          const company = await prisma.companyProfile.findUnique({
+            where: { id: inspection.companyId },
+            select: { companyName: true },
+          })
+          providerName = company?.companyName || providerName
         }
         await notifyInspectionArrived(job.id, job.customerId, providerName, job.title)
       }
@@ -105,8 +116,11 @@ export async function PATCH(
           const tasker = await prisma.user.findUnique({ where: { id: inspection.taskerId }, select: { name: true } })
           providerName = tasker?.name || providerName
         } else if (inspection.companyId) {
-          const company = await prisma.user.findUnique({ where: { id: inspection.companyId }, select: { companyProfile: { select: { companyName: true } } } })
-          providerName = company?.companyProfile?.companyName || providerName
+          const company = await prisma.companyProfile.findUnique({
+            where: { id: inspection.companyId },
+            select: { companyName: true },
+          })
+          providerName = company?.companyName || providerName
         }
         await notifyInspectionCompleted(job.id, job.customerId, providerName, job.title)
       }
@@ -150,16 +164,28 @@ export async function GET(
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { inspectionId } = await params
+    const { id: jobId, inspectionId } = await params
 
     const inspection = await prisma.jobInspection.findUnique({
       where: { id: inspectionId },
       include: {
         evidence: true,
+        job: { select: { customerId: true } },
       },
     })
 
-    if (!inspection) return NextResponse.json({ error: 'Inspection not found' }, { status: 404 })
+    if (!inspection || inspection.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
+
+    let authorized = inspection.job.customerId === user.id || inspection.taskerId === user.id
+    if (!authorized && inspection.companyId) {
+      const { context } = await resolveCompanyContext(user.id, inspection.companyId, 'jobs:read')
+      authorized = Boolean(context)
+    }
+    if (!authorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     return NextResponse.json({ inspection })
   } catch (error) {
@@ -178,7 +204,14 @@ export async function POST(
     const blocked = assertNotSuspended(user)
     if (blocked) return blocked
 
-    const { inspectionId } = await params
+    const { id: jobId, inspectionId } = await params
+    const inspection = await prisma.jobInspection.findUnique({
+      where: { id: inspectionId },
+      select: { jobId: true },
+    })
+    if (!inspection || inspection.jobId !== jobId) {
+      return NextResponse.json({ error: 'Inspection not found for this job' }, { status: 404 })
+    }
     const body = await request.json()
 
     if (body.action === 'verify') {
