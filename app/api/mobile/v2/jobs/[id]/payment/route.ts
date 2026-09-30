@@ -38,6 +38,7 @@ export async function POST(
         result.code === 'UNAUTHORIZED' ? 403 :
         result.code === 'JOB_NOT_FOUND' ? 404 :
         result.code === 'PAYHERE_NOT_CONFIGURED' ? 503 :
+        result.code === 'CUSTOMER_PAYMENT_DETAILS_REQUIRED' ? 400 :
         409
       return NextResponse.json(result, { status })
     }
