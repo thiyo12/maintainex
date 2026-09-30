@@ -37,8 +37,14 @@ export async function POST(request: NextRequest) {
     }
 
     const adminUser = await prisma.adminUser.findUnique({ where: { id: tempPayload.sub } })
-    if (!adminUser || !adminUser.isActive || !adminUser.totpSecret) {
-      return NextResponse.json({ error: 'Account not found or 2FA not configured' }, { status: 404 })
+    if (
+      !adminUser ||
+      !adminUser.isActive ||
+      adminUser.deletedAt ||
+      (adminUser.lockedUntil && adminUser.lockedUntil > new Date()) ||
+      !adminUser.totpSecret
+    ) {
+      return NextResponse.json({ error: 'Account not active or 2FA not configured' }, { status: 401 })
     }
 
     if (!verifyTotp(totpCode, adminUser.totpSecret)) {
@@ -53,20 +59,12 @@ export async function POST(request: NextRequest) {
     const ip = getIp(request)
     const userAgent = request.headers.get('user-agent')
     const refreshTokenValue = generateRefreshTokenValue()
-    const refreshTokenHash = hashRefreshToken(refreshTokenValue)
-    const accessToken = signAccessToken({
-      id: adminUser.id,
-      email: adminUser.email,
-      role: adminUser.role as AdminRole,
-      firstName: adminUser.firstName,
-      lastName: adminUser.lastName,
-      assignedCountries: parseCountries(adminUser.assignedCountries),
-    })
+    const provisionalRefreshTokenHash = hashRefreshToken(refreshTokenValue)
 
     const session = await prisma.adminSession.create({
       data: {
         adminUserId: adminUser.id,
-        refreshTokenHash,
+        refreshTokenHash: provisionalRefreshTokenHash,
         ipAddress: ip,
         userAgent,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -74,6 +72,20 @@ export async function POST(request: NextRequest) {
     })
 
     const refreshToken = signRefreshToken(adminUser.id, session.id)
+    await prisma.adminSession.update({
+      where: { id: session.id },
+      data: { refreshTokenHash: hashRefreshToken(refreshToken) },
+    })
+
+    const accessToken = signAccessToken({
+      id: adminUser.id,
+      email: adminUser.email,
+      role: adminUser.role as AdminRole,
+      firstName: adminUser.firstName,
+      lastName: adminUser.lastName,
+      assignedCountries: parseCountries(adminUser.assignedCountries),
+      sessionId: session.id,
+    })
 
     const response = NextResponse.json({
       accessToken,
@@ -85,6 +97,14 @@ export async function POST(request: NextRequest) {
         lastName: adminUser.lastName,
         assignedCountries: parseCountries(adminUser.assignedCountries),
       },
+    })
+
+    response.cookies.set('admin_token', accessToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60,
     })
 
     response.cookies.set('refresh_token', refreshToken, {
