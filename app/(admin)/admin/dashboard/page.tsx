@@ -39,6 +39,12 @@ interface DashboardStats {
     totalWalletBalance: number
     commissionRate: number
   }
+  financeByCurrency?: Array<{
+    currency: string
+    pendingCommission: number
+    paidCommission: number
+    providerWalletBalance: number
+  }>
   weeklySummary: {
     pendingCommission: number
     pendingCount: number
@@ -48,10 +54,10 @@ interface DashboardStats {
   isSuperAdmin?: boolean
 }
 
-function formatCurrency(amount: number) {
+function formatCurrency(amount: number, currency = 'LKR') {
   return new Intl.NumberFormat('en-LK', {
     style: 'currency',
-    currency: 'LKR',
+    currency,
     maximumFractionDigits: 0,
   }).format(Number(amount || 0))
 }
@@ -160,6 +166,8 @@ export default function AdminDashboard() {
   }, [])
 
   const stats = data?.stats
+  const financeRows = data?.financeByCurrency || []
+  const primaryFinance = financeRows.length === 1 ? financeRows[0] : null
 
   const totals = useMemo(() => {
     const jobs = number(stats?.totalJobPostings)
@@ -254,8 +262,14 @@ export default function AdminDashboard() {
         />
         <StatCard
           label="Pending commission"
-          value={formatCurrency(number(stats?.totalCommissionOwed))}
-          detail={`${number(data?.weeklySummary?.pendingCount)} settlement items`}
+          value={primaryFinance
+            ? formatCurrency(primaryFinance.pendingCommission, primaryFinance.currency)
+            : financeRows.length > 1
+              ? `${financeRows.length} currencies`
+              : formatCurrency(0)}
+          detail={financeRows.length > 1
+            ? financeRows.map(row => `${row.currency} ${formatCurrency(row.pendingCommission, row.currency)}`).join(' · ')
+            : `${number(data?.weeklySummary?.pendingCount)} settlement items`}
           icon={FiDollarSign}
           tone="amber"
         />
@@ -403,18 +417,25 @@ export default function AdminDashboard() {
             <FiCreditCard className="text-slate-400" size={19} />
           </div>
           <div className="mt-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Commission collected</span>
-              <span className="text-sm font-semibold text-slate-900">{formatCurrency(number(stats?.totalCommissionPaid))}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Commission pending</span>
-              <span className="text-sm font-semibold text-slate-900">{formatCurrency(number(stats?.totalCommissionOwed))}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Provider wallet balance</span>
-              <span className="text-sm font-semibold text-slate-900">{formatCurrency(number(stats?.totalWalletBalance))}</span>
-            </div>
+            {financeRows.length ? financeRows.map(row => (
+              <div key={row.currency} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                <div className="text-[11px] font-semibold tracking-[0.12em] text-slate-400">{row.currency}</div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Commission collected</span>
+                  <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.paidCommission, row.currency)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Commission pending</span>
+                  <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.pendingCommission, row.currency)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Provider wallet balance</span>
+                  <span className="text-sm font-semibold text-slate-900">{formatCurrency(row.providerWalletBalance, row.currency)}</span>
+                </div>
+              </div>
+            )) : (
+              <div className="text-sm text-slate-400">No finance balances are available for this market.</div>
+            )}
           </div>
           {can('wallets:view') && (
             <Link href="/admin/financial/wallets" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-amber-700 hover:text-amber-800">
@@ -443,7 +464,7 @@ export default function AdminDashboard() {
                 <span className="text-sm text-slate-300">{String(label)}</span>
                 <span className={`inline-flex items-center gap-1.5 text-xs ${ready ? 'text-emerald-300' : 'text-slate-500'}`}>
                   {ready ? <FiCheckCircle size={13} /> : <FiClock size={13} />}
-                  {ready ? 'Ready' : 'Next phase'}
+                  {ready ? 'Ready' : 'Pending'}
                 </span>
               </div>
             ))}
