@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import {
+  assertCrmCountryAllowed,
+  getCrmCountryFilter,
+  guardCrmRequest,
+} from '@/lib/crm/security'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import { auditCommissionSettlement } from '@/lib/financial-audit'
 
@@ -14,14 +18,17 @@ function serializeSettlement<T extends { jobAmount: bigint; commissionAmount: bi
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const where: { status?: string } = {}
+    const where: any = { ...getCrmCountryFilter(security) }
     if (status) where.status = status
 
     const settlements = await prisma.commissionSettlement.findMany({
@@ -30,7 +37,10 @@ export async function GET(request: NextRequest) {
       take: 50,
     })
 
-    return NextResponse.json({ settlements: settlements.map(serializeSettlement) })
+    return NextResponse.json(
+      { settlements: settlements.map(serializeSettlement) },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     console.error('List commission settlements error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -45,15 +55,18 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:manage',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const rateLimitResponse = await requireFinancialRateLimit(request, 'commission-settle')
     if (rateLimitResponse) return rateLimitResponse
 
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const settlementId = typeof body.settlementId === 'string' ? body.settlementId.trim() : ''
     if (!settlementId) {
       return NextResponse.json({ error: 'settlementId required' }, { status: 400 })
@@ -62,6 +75,9 @@ export async function POST(request: NextRequest) {
     const settlement = await prisma.commissionSettlement.findUnique({ where: { id: settlementId } })
     if (!settlement) {
       return NextResponse.json({ error: 'Settlement not found' }, { status: 404 })
+    }
+    if (!assertCrmCountryAllowed(security, settlement.countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     if (settlement.status !== 'PENDING') {
       return NextResponse.json({ error: 'Settlement already processed' }, { status: 409 })
@@ -79,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     auditCommissionSettlement({
       settlementId: updated.id,
-      actorId: user.id,
+      actorId: security.adminId,
       amount: updated.commissionAmount,
       currency: updated.currency,
     })
