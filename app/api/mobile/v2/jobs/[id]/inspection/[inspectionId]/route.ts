@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { transitionInspection, completeInspection, scheduleInspection, verifyInspectionArrival } from '@/lib/domain/inspection'
 import { notifyInspectionArrived, notifyInspectionCompleted } from '@/lib/notifications'
 
@@ -11,6 +11,8 @@ export async function PATCH(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { inspectionId } = await params
     const body = await request.json()
@@ -173,6 +175,8 @@ export async function POST(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { inspectionId } = await params
     const body = await request.json()
