@@ -8,6 +8,7 @@ import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, n
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
 import { notifyAllAdmins } from '@/lib/admin-notifications'
 import { createWorkItem } from '@/lib/work-queue'
+import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 
 async function getAcceptedProviderRecipientIds(jobId: string): Promise<string[]> {
   const accepted = await prisma.jobQuote.findFirst({
@@ -100,6 +101,17 @@ export async function POST(
     }
 
     if (action === 'APPROVE_COMPLETION') {
+      if (job.status === 'COMPLETED') {
+        return NextResponse.json({
+          success: true,
+          replayed: true,
+          message: 'Job was already completed.',
+        })
+      }
+
+      const rateLimitResponse = await requireFinancialRateLimit(request, 'complete-job')
+      if (rateLimitResponse) return rateLimitResponse
+
       const paymentState = await prisma.jobEscrow.findFirst({
         where: { jobId: job.id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
         select: { paymentMethod: true, status: true },
