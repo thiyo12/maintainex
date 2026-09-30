@@ -89,9 +89,28 @@ export async function PUT(request: NextRequest) {
     })
 
     const { bio, experienceSummary, dateOfBirth, address, hourlyRate, skills, serviceAreas, profileImage, name, phone, nickname } = await request.json()
+    if (skills !== undefined) {
+      return NextResponse.json(
+        { error: 'Service skills must be updated through the validated job-selection endpoint.' },
+        { status: 400 }
+      )
+    }
+
     const updateData: any = {}
-    if (bio !== undefined) updateData.bio = bio
-    if (experienceSummary !== undefined) updateData.experienceSummary = typeof experienceSummary === 'string' ? experienceSummary.trim() : null
+    if (bio !== undefined) {
+      if (bio !== null && typeof bio !== 'string') {
+        return NextResponse.json({ error: 'bio must be text' }, { status: 400 })
+      }
+      updateData.bio = typeof bio === 'string' ? bio.trim().slice(0, 2000) : null
+    }
+    if (experienceSummary !== undefined) {
+      if (experienceSummary !== null && typeof experienceSummary !== 'string') {
+        return NextResponse.json({ error: 'experienceSummary must be text' }, { status: 400 })
+      }
+      updateData.experienceSummary = typeof experienceSummary === 'string'
+        ? experienceSummary.trim().slice(0, 3000)
+        : null
+    }
     if (dateOfBirth !== undefined) {
       if (!dateOfBirth) {
         updateData.dateOfBirth = null
@@ -107,11 +126,38 @@ export async function PUT(request: NextRequest) {
         updateData.dateOfBirth = parsedDate
       }
     }
-    if (address !== undefined) updateData.address = typeof address === 'string' ? address.trim() : null
-    if (hourlyRate !== undefined) updateData.hourlyRate = parseFloat(hourlyRate)
-    if (skills !== undefined) updateData.skills = JSON.stringify(skills)
-    if (serviceAreas !== undefined) updateData.serviceAreas = JSON.stringify(serviceAreas)
-    if (profileImage !== undefined) updateData.profileImage = profileImage
+    if (address !== undefined) {
+      if (address !== null && typeof address !== 'string') {
+        return NextResponse.json({ error: 'address must be text' }, { status: 400 })
+      }
+      updateData.address = typeof address === 'string' ? address.trim().slice(0, 500) : null
+    }
+    if (hourlyRate !== undefined) {
+      const rate = Number(hourlyRate)
+      if (!Number.isFinite(rate) || rate < 0) {
+        return NextResponse.json({ error: 'hourlyRate must be a non-negative number' }, { status: 400 })
+      }
+      updateData.hourlyRate = rate
+    }
+    if (serviceAreas !== undefined) {
+      if (!Array.isArray(serviceAreas) || serviceAreas.length > 100) {
+        return NextResponse.json({ error: 'serviceAreas must be an array with at most 100 items' }, { status: 400 })
+      }
+      const normalizedAreas = serviceAreas
+        .filter((value: unknown): value is string => typeof value === 'string')
+        .map(value => value.trim().slice(0, 120))
+        .filter(Boolean)
+      if (normalizedAreas.length !== serviceAreas.length) {
+        return NextResponse.json({ error: 'serviceAreas must contain non-empty text values' }, { status: 400 })
+      }
+      updateData.serviceAreas = JSON.stringify([...new Set(normalizedAreas)])
+    }
+    if (profileImage !== undefined) {
+      if (profileImage !== null && typeof profileImage !== 'string') {
+        return NextResponse.json({ error: 'profileImage must be a URL string' }, { status: 400 })
+      }
+      updateData.profileImage = typeof profileImage === 'string' ? profileImage.trim().slice(0, 2000) : null
+    }
 
     const userUpdate: any = {}
     if (phone !== undefined && phone !== user.phone) {
