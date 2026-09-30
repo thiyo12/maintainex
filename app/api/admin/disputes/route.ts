@@ -8,12 +8,49 @@ import {
 import { createAuditLog } from '@/lib/crm/audit'
 import { completeAndReleaseEscrow, refundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
+import { notifyDisputeResolved, notifyPaymentReleased } from '@/lib/notifications'
 
 const VALID_STATUSES = new Set(['OPEN', 'UNDER_REVIEW', 'RESOLVING', 'RESOLVED', 'DISMISSED'])
 const MARKETPLACE_RESOLUTION_ACTIONS = new Set(['RELEASE_PROVIDER', 'REFUND_CUSTOMER'])
 
 function toTimestamp(value: Date | string) {
   return new Date(value).getTime()
+}
+
+async function getMarketplaceParticipantIds(jobId: string, customerId: string): Promise<string[]> {
+  const accepted = await prisma.jobQuote.findFirst({
+    where: { jobId, status: 'ACCEPTED' },
+    select: { providerId: true, providerType: true },
+  })
+  if (!accepted) return [customerId]
+
+  if (accepted.providerType === 'INDIVIDUAL') {
+    return [...new Set([customerId, accepted.providerId])]
+  }
+
+  const [company, assignments] = await Promise.all([
+    prisma.companyProfile.findUnique({
+      where: { id: accepted.providerId },
+      select: { userId: true },
+    }),
+    prisma.companyJobAssignment.findMany({
+      where: {
+        jobId,
+        companyId: accepted.providerId,
+        workerUserId: { not: null },
+        status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'REVOKED'] },
+      },
+      select: { workerUserId: true },
+    }),
+  ])
+
+  return [...new Set(
+    [
+      customerId,
+      company?.userId ?? null,
+      ...assignments.map(assignment => assignment.workerUserId),
+    ].filter((value): value is string => Boolean(value))
+  )]
 }
 
 async function finalizeMarketplaceDisputeRecord(params: {
@@ -228,7 +265,7 @@ export async function PATCH(request: NextRequest) {
       where: { id: disputeId },
       include: {
         job: {
-          select: { id: true, title: true, status: true, countryCode: true },
+          select: { id: true, title: true, status: true, countryCode: true, customerId: true },
         },
       },
     })
@@ -314,6 +351,10 @@ export async function PATCH(request: NextRequest) {
       }
 
       const canonicalAction = resolutionAction as 'RELEASE_PROVIDER' | 'REFUND_CUSTOMER'
+      const participantIds = await getMarketplaceParticipantIds(
+        marketplaceDispute.jobId,
+        marketplaceDispute.job.customerId,
+      )
 
       if (marketplaceDispute.status === 'RESOLVED') {
         if (marketplaceDispute.resolutionAction !== canonicalAction) {
@@ -435,6 +476,28 @@ export async function PATCH(request: NextRequest) {
             riskLevel: 'HIGH',
           })
 
+          await Promise.all([
+            notifyPaymentReleased(
+              marketplaceDispute.jobId,
+              (await prisma.jobEscrow.findUniqueOrThrow({
+                where: { id: marketplaceDispute.escrowId },
+                select: { providerId: true },
+              })).providerId,
+              marketplaceDispute.job.title,
+              0,
+              getCurrencyForCountry(marketplaceDispute.job.countryCode),
+              marketplaceDispute.job.countryCode,
+            ),
+            ...participantIds.map(recipientId =>
+              notifyDisputeResolved(
+                marketplaceDispute.jobId,
+                recipientId,
+                marketplaceDispute.job.title,
+                'RELEASE_PROVIDER',
+              )
+            ),
+          ])
+
           return NextResponse.json({
             dispute: updated,
             financialAction: canonicalAction,
@@ -490,6 +553,17 @@ export async function PATCH(request: NextRequest) {
             },
           })
 
+          await Promise.all(
+            participantIds.map(recipientId =>
+              notifyDisputeResolved(
+                marketplaceDispute.jobId,
+                recipientId,
+                marketplaceDispute.job.title,
+                'REFUND_PROCESSING',
+              )
+            )
+          )
+
           const resolving = await prisma.marketplaceDispute.findUniqueOrThrow({ where: { id: disputeId } })
           return NextResponse.json(
             {
@@ -508,6 +582,18 @@ export async function PATCH(request: NextRequest) {
           resolution,
           resolutionAction: canonicalAction,
         })
+
+        await Promise.all(
+          participantIds.map(recipientId =>
+            notifyDisputeResolved(
+              marketplaceDispute.jobId,
+              recipientId,
+              marketplaceDispute.job.title,
+              'REFUND_CUSTOMER',
+            )
+          )
+        )
+
         return NextResponse.json({
           dispute: updated,
           financialAction: canonicalAction,
