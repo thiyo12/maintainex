@@ -6,6 +6,7 @@ import {
   guardCrmRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
+import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
 function safeJson(value: unknown) {
   return redactCrmSensitiveData(
@@ -170,21 +171,14 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const canWork = crmHasPermission(security.role, 'jobs:view')
-    const canFinance =
-      crmHasPermission(security.role, 'wallets:view') ||
-      crmHasPermission(security.role, 'commission:view')
-    const canTrust =
-      crmHasPermission(security.role, 'kyc:view') ||
-      crmHasPermission(security.role, 'risk_events:read') ||
-      crmHasPermission(security.role, 'credentials:read') ||
-      crmHasPermission(security.role, 'security:view')
-    const canAudit = crmHasPermission(security.role, 'audit:read')
-    const canSecurity = crmHasPermission(security.role, 'security:view')
-    const canCustomerCrm =
-      security.isSuperAdmin ||
-      crmHasPermission(security.role, 'users:edit') ||
-      crmHasPermission(security.role, 'support:view')
+    const {
+      work: canWork,
+      finance: canFinance,
+      trust: canTrust,
+      audit: canAudit,
+      security: canSecurity,
+      customerCrm: canCustomerCrm,
+    } = getCrmSectionAccess(security.role, security.isSuperAdmin)
 
     const companyId = user.companyProfile?.id
     const taskerId = user.taskerProfile?.id
