@@ -251,7 +251,7 @@ export default function CompanyProfile() {
               <Ionicons name="briefcase-outline" size={14} color={colors.indigo} />
               <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('tasker.activeJobs')}</Text>
             </View>
-            {activeJobs.map((job, i) => {
+            {activeJobs.map((job: { icon: string; title: string; sub: string; status: string }, i: number) => {
               const st = statusStyles[job.status]
               return (
                 <View key={i} style={[styles.jobRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
