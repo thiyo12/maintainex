@@ -61,7 +61,12 @@ export async function POST(
     const message = error?.message || 'Server error'
     if (message.includes('Only the customer')) return NextResponse.json({ error: message }, { status: 403 })
     if (message.includes('not found') || message.includes('No protected') || message.includes('No releasable')) return NextResponse.json({ error: message }, { status: 404 })
-    if (message.includes('IDEMPOTENCY') || message.includes('already') || message.includes('state changed')) return NextResponse.json({ error: message }, { status: 409 })
+    if (
+      message.includes('IDEMPOTENCY') ||
+      message.includes('already') ||
+      message.includes('state changed') ||
+      message.includes('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+    ) return NextResponse.json({ error: message }, { status: 409 })
     if (message.includes('not in progress') || message.includes('Workspace not found')) return NextResponse.json({ error: message }, { status: 409 })
     if (message.includes('Provider must request completion first')) return NextResponse.json({ error: message }, { status: 400 })
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
