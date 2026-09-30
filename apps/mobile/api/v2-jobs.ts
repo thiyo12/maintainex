@@ -53,10 +53,10 @@ export const v2JobActions = {
     v2Request<{ review: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`, { method: 'POST', body: JSON.stringify(data) }),
   getReviews: (jobId: string) =>
     v2Request<{ reviews: any }>(`/api/mobile/v2/jobs/${jobId}/reviews`),
-  dispute: (jobId: string, reason?: string) =>
-    v2Request<{ success: boolean; message: string }>(
+  dispute: (jobId: string, reason?: string, description?: string) =>
+    v2Request<{ success: boolean; message: string; disputeId?: string }>(
       `/api/mobile/v2/jobs/${jobId}/complete`,
-      { method: 'POST', body: JSON.stringify({ action: 'DISPUTE', reason }) },
+      { method: 'POST', body: JSON.stringify({ action: 'DISPUTE', reason, description }) },
     ),
   getPinState: (jobId: string) =>
     v2Request<{
