@@ -4,6 +4,7 @@ import { resolveJobRequirements, hasCapabilityMatch, hasRelationalCapability } f
 import { calculatePrice } from '@/lib/pricing/engine'
 import { createNotification } from '@/lib/notifications'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
+import { readStoredList } from '@/lib/db-utils'
 
 export interface BookNowInput {
   customerId: string
@@ -29,6 +30,48 @@ function parseLegacyCapabilities(value: string | null): string[] {
     return [value]
   }
 }
+
+function normalizeToken(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function serviceAreaAllows(serviceAreas: string | null | undefined, district: string): boolean {
+  const configured = readStoredList(serviceAreas)
+    .map(normalizeToken)
+    .filter(Boolean)
+  if (configured.length === 0) return true
+
+  const target = normalizeToken(district)
+  return configured.some(area => area === target || target.includes(area) || area.includes(target))
+}
+
+function parseClockMinutes(value: string): number | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null
+  return hour * 60 + minute
+}
+
+function slotWindow(slot: string): { start: number; end: number } | null {
+  if (slot === 'morning') return { start: 8 * 60, end: 12 * 60 }
+  if (slot === 'afternoon') return { start: 12 * 60, end: 17 * 60 }
+  if (slot === 'evening') return { start: 17 * 60, end: 21 * 60 }
+  return null
+}
+
+function isDateInsideVacation(date: Date, start: Date | null, end: Date | null): boolean {
+  if (!start || !end) return false
+  const check = new Date(date)
+  check.setHours(12, 0, 0, 0)
+  const from = new Date(start)
+  const to = new Date(end)
+  from.setHours(0, 0, 0, 0)
+  to.setHours(23, 59, 59, 999)
+  return check >= from && check <= to
+}
+
 
 export async function createBookNowJob(input: BookNowInput) {
   const templateJob = await prisma.templateJob.findUnique({
@@ -70,6 +113,7 @@ export async function createBookNowJob(input: BookNowInput) {
   let resolvedProviderUserId: string
   let resolvedProviderEntityId: string
   let resolvedNotificationUserId: string
+  let resolvedServiceAreas: string | null = null
 
   if (resolvedProviderType === 'COMPANY') {
     const company = await prisma.companyProfile.findUnique({
@@ -79,6 +123,7 @@ export async function createBookNowJob(input: BookNowInput) {
         userId: true,
         companyName: true,
         countryCode: true,
+        serviceAreas: true,
         user: { select: { countryCode: true } },
       },
     })
@@ -104,8 +149,13 @@ export async function createBookNowJob(input: BookNowInput) {
       if (!catSpecialty) throw new Error('Company lacks required capability for this booking')
     }
 
+    if (!serviceAreaAllows(company.serviceAreas, input.district)) {
+      throw new Error('Provider does not serve the requested district')
+    }
+
     resolvedProviderUserId = company.userId
     resolvedProviderEntityId = company.id
+    resolvedServiceAreas = company.serviceAreas
 
     const owner = await prisma.teamMember.findFirst({
       where: { companyId: company.id, role: 'COMPANY_OWNER', status: 'ACTIVE' },
@@ -124,6 +174,7 @@ export async function createBookNowJob(input: BookNowInput) {
         id: true,
         userId: true,
         skills: true,
+        serviceAreas: true,
         taskerSkills: { select: { jobId: true } },
         countryCode: true,
         user: { select: { name: true, countryCode: true } },
@@ -150,9 +201,43 @@ export async function createBookNowJob(input: BookNowInput) {
       throw new Error('Provider lacks required capability for this booking')
     }
 
+    if (!serviceAreaAllows(provider.serviceAreas, input.district)) {
+      throw new Error('Provider does not serve the requested district')
+    }
+
     resolvedProviderUserId = provider.userId
     resolvedProviderEntityId = provider.userId
     resolvedNotificationUserId = provider.userId
+    resolvedServiceAreas = provider.serviceAreas
+  }
+
+  const availability = await prisma.providerAvailability.findUnique({
+    where: { providerId: resolvedProviderEntityId },
+  })
+  if (availability) {
+    if (!availability.isAvailable) {
+      throw new Error('Provider is currently unavailable')
+    }
+    if (isDateInsideVacation(input.scheduledDate, availability.vacationStart, availability.vacationEnd)) {
+      throw new Error('Provider is unavailable on the requested date')
+    }
+
+    const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+    const dayKey = dayKeys[input.scheduledDate.getDay()]
+    if (!availability[dayKey]) {
+      throw new Error('Provider is unavailable on the requested day')
+    }
+
+    const workStart = parseClockMinutes(availability.startTime)
+    const workEnd = parseClockMinutes(availability.endTime)
+    if (workStart === null || workEnd === null || workEnd <= workStart) {
+      throw new Error('Provider availability configuration is invalid')
+    }
+
+    const requestedWindow = slotWindow(input.timeSlot)
+    if (requestedWindow && !(requestedWindow.start < workEnd && workStart < requestedWindow.end)) {
+      throw new Error('Requested time slot is outside provider working hours')
+    }
   }
 
   const pricing = await calculatePrice(prisma, {
@@ -169,6 +254,7 @@ export async function createBookNowJob(input: BookNowInput) {
 
   const smartBooking = JSON.stringify({
     district: input.district,
+    serviceAreasChecked: Boolean(resolvedServiceAreas),
     timeSlot: input.timeSlot,
     countryCode: finalCountryCode,
   })
