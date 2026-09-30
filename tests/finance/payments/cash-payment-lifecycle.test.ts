@@ -48,10 +48,15 @@ describe('cash payment lifecycle contract', () => {
   })
 
   it('records weekly platform debt on cash completion without crediting a provider wallet', () => {
-    const cashStart = escrow.indexOf("if (escrow.paymentMethod === 'CASH')")
-    const fundedStart = escrow.indexOf('const claimed = await tx.jobEscrow.updateMany({', cashStart + 1)
-    const cashCompletion = escrow.slice(cashStart, fundedStart)
+    const completeStart = escrow.indexOf('export async function completeAndReleaseEscrow')
+    const completeSource = escrow.slice(completeStart)
+    const cashStart = completeSource.indexOf("if (escrow.paymentMethod === 'CASH')")
+    const fundedWalletStart = completeSource.indexOf('const providerWalletSeed = await tx.providerWallet.upsert', cashStart)
+    const cashCompletion = completeSource.slice(cashStart, fundedWalletStart)
 
+    expect(completeStart).toBeGreaterThan(-1)
+    expect(cashStart).toBeGreaterThan(-1)
+    expect(fundedWalletStart).toBeGreaterThan(cashStart)
     expect(cashCompletion).toContain('recordWeeklySettlement')
     expect(cashCompletion).toContain('platformDueCents')
     expect(cashCompletion).not.toContain('providerWallet.upsert')
