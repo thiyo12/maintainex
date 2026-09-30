@@ -54,6 +54,108 @@ async function isAssignedCompanyWorker(
   return !!member
 }
 
+async function lockAndAssertProviderAvailableForAcceptance(
+  tx: Prisma.TransactionClient,
+  providerType: 'INDIVIDUAL' | 'COMPANY',
+  providerId: string,
+) {
+  if (providerType === 'INDIVIDUAL') {
+    const users = await tx.$queryRaw<Array<{
+      id: string
+      isActive: boolean
+      isSuspended: boolean
+      isBanned: boolean
+      identityStatus: string | null
+    }>>`
+      SELECT id, "isActive", "isSuspended", "isBanned", "identityStatus"
+      FROM "User"
+      WHERE id = ${providerId}
+      FOR UPDATE
+    `
+    const user = users[0]
+    if (
+      !user ||
+      !user.isActive ||
+      user.isSuspended ||
+      user.isBanned ||
+      user.identityStatus !== 'VERIFIED'
+    ) {
+      throw new Error('Quote provider is no longer available')
+    }
+
+    const profiles = await tx.$queryRaw<Array<{
+      id: string
+      verificationStatus: string
+      isVerified: boolean
+    }>>`
+      SELECT id, "verificationStatus", "isVerified"
+      FROM "TaskerProfile"
+      WHERE "userId" = ${providerId}
+      FOR UPDATE
+    `
+    const profile = profiles[0]
+    if (
+      !profile ||
+      profile.verificationStatus !== 'VERIFIED' ||
+      !profile.isVerified
+    ) {
+      throw new Error('Quote provider is no longer available')
+    }
+    return
+  }
+
+  const companies = await tx.$queryRaw<Array<{
+    id: string
+    userId: string
+    verificationStatus: string
+    isVerified: boolean
+    subscriptionStatus: string
+  }>>`
+    SELECT id, "userId", "verificationStatus", "isVerified", "subscriptionStatus"
+    FROM "CompanyProfile"
+    WHERE id = ${providerId}
+    FOR UPDATE
+  `
+  const company = companies[0]
+  if (
+    !company ||
+    company.verificationStatus !== 'VERIFIED' ||
+    !company.isVerified ||
+    company.subscriptionStatus === 'CANCELLED'
+  ) {
+    throw new Error('Quote provider is no longer available')
+  }
+
+  const owners = await tx.$queryRaw<Array<{
+    id: string
+    isActive: boolean
+    isSuspended: boolean
+    isBanned: boolean
+  }>>`
+    SELECT id, "isActive", "isSuspended", "isBanned"
+    FROM "User"
+    WHERE id = ${company.userId}
+    FOR UPDATE
+  `
+  const owner = owners[0]
+  if (!owner || !owner.isActive || owner.isSuspended || owner.isBanned) {
+    throw new Error('Quote provider is no longer available')
+  }
+
+  const activeOwners = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM "TeamMember"
+    WHERE "companyId" = ${providerId}
+      AND role = 'COMPANY_OWNER'
+      AND status = 'ACTIVE'
+    LIMIT 1
+    FOR UPDATE
+  `
+  if (activeOwners.length === 0) {
+    throw new Error('Quote provider is no longer available')
+  }
+}
+
 export interface TransitionContext {
   jobId: string
   actorId: string
@@ -359,11 +461,19 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
 
   const serviceFee = (acceptedAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
   const totalAmount = acceptedAmount + serviceFee
-  const existingEscrow = await prisma.jobEscrow.findFirst({
-    where: { jobId: ctx.jobId, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
-  })
 
   await prisma.$transaction(async (tx) => {
+    await lockAndAssertProviderAvailableForAcceptance(
+      tx,
+      quote.providerType,
+      quote.providerId,
+    )
+
+    const existingEscrow = await tx.jobEscrow.findFirst({
+      where: { jobId: ctx.jobId, status: { in: ['CANCELLED', 'PENDING_PAYMENT'] } },
+      orderBy: { createdAt: 'desc' },
+    })
+
     const jobClaim = await tx.marketplaceJob.updateMany({
       where: { id: ctx.jobId, status: 'OPEN' },
       data: {
@@ -438,7 +548,8 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
         quoteId,
         providerId: quote.providerId,
         providerType: quote.providerType,
-        quoteAmountMinor: quote.price,
+        quoteAmountMinor: acceptedAmount,
+        quoteRevisionNumber: quote.revisionNumber,
         serviceFeeMinor: serviceFee,
         totalAmountMinor: totalAmount,
         currency: pricingConfig.defaultCurrency,
