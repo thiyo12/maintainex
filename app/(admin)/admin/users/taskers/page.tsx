@@ -59,8 +59,8 @@ function TaskerPageContent() {
   const role = (admin?.role || 'SUPPORT') as AdminRole
   const permissions = ROLE_PERMISSIONS[role] || []
   const canVerify = permissions.includes('taskers:verify')
-  const canSuspend = permissions.includes('users:suspend')
-  const canBan = permissions.includes('users:ban')
+  const canSuspend = permissions.includes('taskers:edit')
+  const canBan = permissions.includes('taskers:ban')
   const [taskers, setTaskers] = useState<TaskerUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -126,6 +126,13 @@ function TaskerPageContent() {
       (isSuspendAction && !canSuspend) ||
       (isBanAction && !canBan)
     ) return
+    if (
+      ['suspend', 'ban', 'reject_tasker'].includes(confirmAction.action) &&
+      reason.trim().length < 3
+    ) {
+      toast.error('Please enter a reason of at least 3 characters')
+      return
+    }
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -599,7 +606,7 @@ function TaskerPageContent() {
               </p>
               {(confirmAction.action === 'suspend' || confirmAction.action === 'ban' || confirmAction.action === 'reject_tasker') && (
                 <div className="mb-4">
-                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (optional)</label>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (required)</label>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -618,7 +625,7 @@ function TaskerPageContent() {
                 </button>
                 <button
                   onClick={handleAction}
-                  disabled={actionLoading === confirmAction.userId}
+                  disabled={actionLoading === confirmAction.userId || (['suspend', 'ban', 'reject_tasker'].includes(confirmAction.action) && reason.trim().length < 3)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     confirmAction.action === 'ban' || confirmAction.action === 'reject_tasker'
                       ? 'bg-red-500 hover:bg-red-600 text-white'
