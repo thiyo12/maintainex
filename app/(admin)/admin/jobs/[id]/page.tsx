@@ -34,6 +34,11 @@ type TabKey = 'overview' | 'lifecycle' | 'quotes' | 'workspace' | 'finance' | 'd
 
 interface Job360Payload {
   source: 'V1' | 'V2'
+  permissions: {
+    finance: boolean
+    trust: boolean
+    audit: boolean
+  }
   job: any
   quotes?: any[]
   workspace?: any
@@ -163,7 +168,8 @@ export default function Job360Page() {
   const jobId = params?.id
   const { user: admin } = useAdminSession()
   const adminRole = (admin?.role || 'SUPPORT') as AdminRole
-  const canManageJob = (ROLE_PERMISSIONS[adminRole] || []).includes('jobs:manage')
+  const rolePermissions = ROLE_PERMISSIONS[adminRole] || []
+  const canManageJob = rolePermissions.includes('jobs:manage')
   const [payload, setPayload] = useState<Job360Payload | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -219,6 +225,13 @@ export default function Job360Page() {
   const finance = payload?.finance || {}
   const operations = payload?.operations || {}
   const lifecycle = payload?.lifecycle || []
+  const visibleTabs = TABS.filter(tab =>
+    tab.key !== 'finance' || payload?.permissions.finance
+  ).filter(tab =>
+    tab.key !== 'dispute' || payload?.permissions.trust
+  ).filter(tab =>
+    tab.key !== 'audit' || payload?.permissions.audit
+  )
   const auditRows = [
     ...(payload?.audit?.canonical || []).map(row => ({
       id: `audit-${row.id}`,
@@ -357,7 +370,7 @@ export default function Job360Page() {
 
         <div className="border-t border-slate-100 px-3 md:px-5 overflow-x-auto">
           <div className="flex min-w-max">
-            {TABS.map(tab => (
+            {visibleTabs.map(tab => (
               <button
                 key={tab.key}
                 type="button"
@@ -384,9 +397,9 @@ export default function Job360Page() {
           {activeTab === 'lifecycle' && <LifecycleTab payload={payload} />}
           {activeTab === 'quotes' && <QuotesTab payload={payload} currency={currency} />}
           {activeTab === 'workspace' && <WorkspaceTab payload={payload} />}
-          {activeTab === 'finance' && <FinanceTab payload={payload} currency={currency} />}
-          {activeTab === 'dispute' && <RiskTab payload={payload} />}
-          {activeTab === 'audit' && <AuditTab rows={auditRows} />}
+          {activeTab === 'finance' && payload.permissions.finance && <FinanceTab payload={payload} currency={currency} />}
+          {activeTab === 'dispute' && payload.permissions.trust && <RiskTab payload={payload} />}
+          {activeTab === 'audit' && payload.permissions.audit && <AuditTab rows={auditRows} />}
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-[92px]">
@@ -396,24 +409,32 @@ export default function Job360Page() {
                 <RailLink href={`/admin/users/${customer.id}`} icon={FiUser} label="Open customer 360" />
               )}
               {providerLink && <RailLink href={providerLink} icon={FiTool} label="Open provider 360" />}
-              <RailLink href="/admin/financial/wallets" icon={FiCreditCard} label="Finance operations" />
-              <RailLink href="/admin/jobs/disputes" icon={FiFlag} label="Dispute queue" />
-              <RailLink href="/admin/trust-safety/risk-events" icon={FiShield} label="Trust & safety" />
+              {payload.permissions.finance && (
+                <RailLink href="/admin/financial/wallets" icon={FiCreditCard} label="Finance operations" />
+              )}
+              {payload.permissions.trust && (
+                <>
+                  <RailLink href="/admin/jobs/disputes" icon={FiFlag} label="Dispute queue" />
+                  <RailLink href="/admin/trust-safety/risk-events" icon={FiShield} label="Trust & safety" />
+                </>
+              )}
             </div>
           </Card>
 
-          <Card title="Payment / escrow" subtitle="Canonical financial state">
-            <div className="space-y-3">
-              <KeyValue label="Escrow" value={finance.escrow?.status || 'Not funded'} />
-              <KeyValue label="Payment" value={finance.paymentIntents?.[0]?.status || 'No payment intent'} />
-              <KeyValue label="Commission" value={finance.settlements?.[0]?.status || 'Not created'} />
-              <KeyValue label="Payout" value={finance.payouts?.[0]?.status || 'Not created'} />
-            </div>
-          </Card>
+          {payload.permissions.finance && (
+            <Card title="Payment / escrow" subtitle="Canonical financial state">
+              <div className="space-y-3">
+                <KeyValue label="Escrow" value={finance.escrow?.status || 'Not funded'} />
+                <KeyValue label="Payment" value={finance.paymentIntents?.[0]?.status || 'No payment intent'} />
+                <KeyValue label="Commission" value={finance.settlements?.[0]?.status || 'Not created'} />
+                <KeyValue label="Payout" value={finance.payouts?.[0]?.status || 'Not created'} />
+              </div>
+            </Card>
+          )}
 
-          <Card title="Risk & verification" subtitle="Operator safety signals">
+          <Card title="Verification" subtitle="Operator safety signals">
             <div className="space-y-3">
-              <KeyValue label="Risk events" value={String(riskEvents.length)} />
+              {payload.permissions.trust && <KeyValue label="Risk events" value={String(riskEvents.length)} />}
               <KeyValue label="PIN status" value={operations.verificationPin?.status || 'Not generated'} />
               <KeyValue label="Arrival verified" value={operations.verificationPin?.arrivalVerifiedAt ? 'Yes' : 'No'} />
               <KeyValue label="Work start verified" value={operations.verificationPin?.workStartVerifiedAt ? 'Yes' : 'No'} />
@@ -901,7 +922,7 @@ function RiskTab({ payload }: { payload: Job360Payload }) {
         ) : (
           <div className="grid md:grid-cols-3 gap-4">
             <Field label="Workspace" value={label(payload.workspace?.progressStatus)} />
-            <Field label="Escrow" value={label(payload.finance?.escrow?.status)} />
+            {payload.permissions.finance && <Field label="Escrow" value={label(payload.finance?.escrow?.status)} />}
             <Field label="Risk events" value={String(risks.length)} />
           </div>
         )}
