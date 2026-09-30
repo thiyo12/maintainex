@@ -168,10 +168,10 @@ export async function notifyCashJobCompleted(
   jobId: string,
   providerId: string,
   jobTitle: string,
-  platformDue: number,
+  platformDueCents: bigint,
   currency: Currency = 'LKR',
 ) {
-  const formattedDue = formatCurrency(BigInt(Math.round(platformDue * 100)), currency)
+  const formattedDue = formatCurrency(platformDueCents, currency)
   return createNotification({
     userId: providerId,
     title: 'Cash Job Completed',
