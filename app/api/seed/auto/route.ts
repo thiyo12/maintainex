@@ -66,6 +66,10 @@ const services = [
 ]
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
+  }
+
   try {
     // Auto-seed if no categories exist
     const existingCategories = await prisma.category.count()
