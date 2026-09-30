@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 import {
   FiActivity,
   FiAlertTriangle,
@@ -159,6 +161,9 @@ function Field({ label: fieldLabel, value, mono = false }: { label: string; valu
 export default function Job360Page() {
   const params = useParams<{ id: string }>()
   const jobId = params?.id
+  const { user: admin } = useAdminSession()
+  const adminRole = (admin?.role || 'SUPPORT') as AdminRole
+  const canManageJob = (ROLE_PERMISSIONS[adminRole] || []).includes('jobs:manage')
   const [payload, setPayload] = useState<Job360Payload | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -328,7 +333,7 @@ export default function Job360Page() {
                 <FiRefreshCw size={15} />
                 Refresh
               </button>
-              {!['COMPLETED', 'CANCELLED'].includes(job.status) && (
+              {canManageJob && !['COMPLETED', 'CANCELLED'].includes(job.status) && (
                 <button
                   type="button"
                   disabled={actionLoading}
