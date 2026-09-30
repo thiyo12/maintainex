@@ -79,9 +79,27 @@ export async function POST(request: NextRequest) {
       message.includes('not eligible') ||
       message.includes('lacks required capability') ||
       message.includes('Cannot book yourself') ||
-      message.includes('Invalid template/category')
+      message.includes('Cannot book your own company') ||
+      message.includes('Invalid template/category') ||
+      message.includes('does not match booking country') ||
+      message.includes('does not serve the requested district')
     ) {
       return NextResponse.json({ error: message }, { status: 403 })
+    }
+    if (
+      message.includes('overlapping active booking') ||
+      message.includes('no longer available for direct booking') ||
+      message.includes('currently unavailable') ||
+      message.includes('unavailable on the requested') ||
+      message.includes('outside provider working hours')
+    ) {
+      return NextResponse.json({ error: message }, { status: 409 })
+    }
+    if (
+      message.includes('Booking country is required') ||
+      message.includes('availability configuration is invalid')
+    ) {
+      return NextResponse.json({ error: message }, { status: 400 })
     }
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
