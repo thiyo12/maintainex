@@ -6,6 +6,7 @@ import { checkRateLimit, ipKey } from '@/lib/shared/rate-limit/middleware'
 import type { RateLimitPolicy } from '@/lib/shared/rate-limit/store'
 import { emitSecurityEvent } from '@/lib/security/events'
 import { getIp } from '@/lib/auth/authorization/admin-rbac'
+import { prisma } from '@/lib/prisma'
 
 export type CrmSecurityLevel = 'read' | 'mutation' | 'sensitive'
 
@@ -81,12 +82,30 @@ function normalizedActorId(session: any): string | null {
   return session?.adminUserId || session?.id || session?.sub || null
 }
 
+function normalizeCountryValues(value: unknown): string[] {
+  let raw: unknown[] = []
+
+  if (Array.isArray(value)) {
+    raw = value
+  } else if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value)
+      raw = Array.isArray(parsed) ? parsed : value.split(',')
+    } catch {
+      raw = value.split(',')
+    }
+  }
+
+  return [...new Set(
+    raw
+      .filter((item): item is string => typeof item === 'string')
+      .map(item => item.trim().toUpperCase())
+      .filter(item => /^[A-Z]{2}$/.test(item))
+  )]
+}
+
 function normalizedCountries(session: any): string[] {
-  if (!Array.isArray(session?.assignedCountries)) return []
-  return session.assignedCountries
-    .filter((value: unknown): value is string => typeof value === 'string')
-    .map(value => value.trim().toUpperCase())
-    .filter(Boolean)
+  return normalizeCountryValues(session?.assignedCountries)
 }
 
 export function crmHasPermission(role: AdminRole, permission?: string): boolean {
@@ -225,16 +244,46 @@ export async function guardCrmRequest(
     return deny(403, 'CRM_ORIGIN_REJECTED', 'Cross-origin CRM mutation rejected.', request)
   }
 
-  // Layer 2A — canonical staff identity.
+  // Layer 2A — cryptographically valid staff identity.
   const session: any = await getAdminSession(request)
   const adminId = normalizedActorId(session)
-  const role = session?.role as AdminRole | undefined
 
-  if (!session || !adminId || !session.email || !role || !(role in ROLE_PERMISSIONS)) {
+  if (!session || !adminId) {
     return deny(401, 'CRM_UNAUTHENTICATED', 'Admin authentication required.', request)
   }
 
-  // Layer 2B — role/permission enforcement.
+  // Layer 2B — live canonical staff state.
+  //
+  // Never authorize CRM access only from JWT claims. Role/country changes and
+  // deactivation must take effect immediately instead of waiting for access-token
+  // expiry.
+  const liveAdmin = await prisma.adminUser.findUnique({
+    where: { id: adminId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      isActive: true,
+      deletedAt: true,
+      lockedUntil: true,
+      assignedCountries: true,
+    },
+  })
+
+  if (
+    !liveAdmin ||
+    !liveAdmin.isActive ||
+    liveAdmin.deletedAt ||
+    (liveAdmin.lockedUntil && liveAdmin.lockedUntil > new Date())
+  ) {
+    return deny(401, 'CRM_ACCOUNT_INACTIVE', 'Admin account is not active.', request)
+  }
+
+  const role = liveAdmin.role as AdminRole
+  if (!(role in ROLE_PERMISSIONS)) {
+    return deny(403, 'CRM_ROLE_INVALID', 'Admin role is not recognized.', request)
+  }
+
   if (options.allowedRoles && !options.allowedRoles.includes(role)) {
     return deny(403, 'CRM_ROLE_FORBIDDEN', 'Admin role is not permitted for this action.', request, {
       role,
@@ -248,8 +297,8 @@ export async function guardCrmRequest(
     })
   }
 
-  // Layer 2C — fail closed on country-scoped operations.
-  const assignedCountries = normalizedCountries(session)
+  // Layer 2C — fail closed on the live assigned-country scope.
+  const assignedCountries = normalizeCountryValues(liveAdmin.assignedCountries)
   const isSuperAdmin = role === 'SUPER_ADMIN'
   if (options.requireCountryScope && !isSuperAdmin && assignedCountries.length === 0) {
     return deny(
@@ -265,7 +314,7 @@ export async function guardCrmRequest(
     ok: true,
     context: {
       adminId,
-      email: session.email,
+      email: liveAdmin.email,
       role,
       assignedCountries,
       isSuperAdmin,
