@@ -140,14 +140,6 @@ export async function POST(request: NextRequest) {
 
     const refreshTokenValue = generateRefreshTokenValue()
     const refreshTokenHash = hashRefreshToken(refreshTokenValue)
-    const accessToken = signAccessToken({
-      id: adminUser.id,
-      email: adminUser.email,
-      role: adminUser.role as AdminRole,
-      firstName: adminUser.firstName,
-      lastName: adminUser.lastName,
-      assignedCountries: parseCountries(adminUser.assignedCountries),
-    })
 
     const session = await prisma.adminSession.create({
       data: {
@@ -157,6 +149,16 @@ export async function POST(request: NextRequest) {
         userAgent,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
+    })
+
+    const accessToken = signAccessToken({
+      id: adminUser.id,
+      email: adminUser.email,
+      role: adminUser.role as AdminRole,
+      firstName: adminUser.firstName,
+      lastName: adminUser.lastName,
+      assignedCountries: parseCountries(adminUser.assignedCountries),
+      sessionId: session.id,
     })
 
     const refreshToken = signRefreshToken(adminUser.id, session.id)
@@ -178,7 +180,7 @@ export async function POST(request: NextRequest) {
       secure: true,
       sameSite: 'lax',
       path: '/',
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 24 * 60 * 60,
     })
 
     response.cookies.set('refresh_token', refreshToken, {
