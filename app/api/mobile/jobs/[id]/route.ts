@@ -93,50 +93,224 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (blocked) return blocked
 
     const body = await request.json()
-    const job = await prisma.jobPosting.findUnique({ where: { id } })
-    if (!job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    const targetStatus = typeof body.status === 'string' ? body.status.toUpperCase() : ''
+    if (!targetStatus) {
+      return NextResponse.json({ error: 'No updates provided' }, { status: 400 })
     }
 
-    // Allow status updates from authorized users
-    if (body.status) {
-      const validTransitions: Record<string, string[]> = {
-        OPEN: ['ASSIGNED', 'CANCELLED'],
-        ASSIGNED: ['IN_PROGRESS', 'CANCELLED'],
-        IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+    const validTransitions: Record<string, string[]> = {
+      OPEN: ['ASSIGNED', 'CANCELLED'],
+      ASSIGNED: ['IN_PROGRESS', 'CANCELLED'],
+      IN_PROGRESS: ['COMPLETED', 'CANCELLED'],
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<Array<{ id: string; customerId: string; status: string }>>`
+        SELECT id, "customerId", status
+        FROM "JobPosting"
+        WHERE id = ${id}
+        FOR UPDATE
+      `
+      const job = rows[0]
+      if (!job) throw new Error('V1_JOB_NOT_FOUND')
+
+      if (!validTransitions[job.status]?.includes(targetStatus)) {
+        throw new Error(`V1_INVALID_TRANSITION:${job.status}:${targetStatus}`)
       }
 
-      // Customer can cancel anytime, tasker can progress
-      if (user.role === 'CUSTOMER' && job.customerId !== user.id) {
-        return NextResponse.json({ error: 'Not your job' }, { status: 403 })
-      }
+      const isCustomerOwner = user.role === 'CUSTOMER' && job.customerId === user.id
+      const viewerTasker = user.role === 'TASKER'
+        ? await tx.taskerProfile.findUnique({
+            where: { userId: user.id },
+            select: { id: true },
+          })
+        : null
 
-      if (!validTransitions[job.status]?.includes(body.status)) {
-        return NextResponse.json({ error: `Cannot transition from ${job.status} to ${body.status}` }, { status: 400 })
-      }
+      if (targetStatus === 'ASSIGNED') {
+        if (!isCustomerOwner) throw new Error('V1_ASSIGN_FORBIDDEN')
 
-      const updateData: any = { status: body.status }
-      if (body.status === 'IN_PROGRESS') updateData.startedAt = new Date()
-      if (body.status === 'COMPLETED') updateData.completedAt = new Date()
+        const taskerId = typeof body.taskerId === 'string' ? body.taskerId.trim() : ''
+        if (!taskerId) throw new Error('V1_TASKER_REQUIRED')
 
-      await prisma.jobPosting.update({
-        where: { id },
-        data: { status: body.status },
-      })
-
-      // Update assignment status
-      if (['IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(body.status)) {
-        await prisma.assignment.updateMany({
-          where: { jobId: id, status: body.status === 'IN_PROGRESS' ? 'ASSIGNED' : undefined },
-          data: { status: body.status, ...(body.status === 'IN_PROGRESS' ? { startedAt: new Date() } : {}), ...(body.status === 'COMPLETED' ? { completedAt: new Date() } : {}) },
+        const bid = await tx.bid.findUnique({
+          where: { jobId_taskerId: { jobId: id, taskerId } },
+          select: { id: true, status: true },
         })
+        if (!bid || bid.status !== 'PENDING') throw new Error('V1_BID_NOT_AVAILABLE')
+
+        const tasker = await tx.taskerProfile.findUnique({
+          where: { id: taskerId },
+          select: {
+            id: true,
+            verificationStatus: true,
+            isVerified: true,
+            user: {
+              select: {
+                isActive: true,
+                isSuspended: true,
+                isBanned: true,
+                identityStatus: true,
+              },
+            },
+          },
+        })
+        if (
+          !tasker ||
+          !tasker.user.isActive ||
+          tasker.user.isSuspended ||
+          tasker.user.isBanned ||
+          tasker.user.identityStatus !== 'VERIFIED' ||
+          tasker.verificationStatus !== 'VERIFIED' ||
+          !tasker.isVerified
+        ) {
+          throw new Error('V1_TASKER_RESTRICTED')
+        }
+
+        const existingAssignment = await tx.assignment.findFirst({
+          where: { jobId: id, status: { in: ['ASSIGNED', 'IN_PROGRESS'] } },
+          select: { id: true },
+        })
+        if (existingAssignment) throw new Error('V1_ASSIGNMENT_EXISTS')
+
+        const claimed = await tx.jobPosting.updateMany({
+          where: { id, status: 'OPEN', customerId: user.id },
+          data: { status: 'ASSIGNED' },
+        })
+        if (claimed.count !== 1) throw new Error('V1_STATE_CHANGED')
+
+        await tx.bid.update({
+          where: { id: bid.id },
+          data: { status: 'ACCEPTED' },
+        })
+        await tx.bid.updateMany({
+          where: { jobId: id, id: { not: bid.id }, status: 'PENDING' },
+          data: { status: 'REJECTED' },
+        })
+        await tx.assignment.create({
+          data: { jobId: id, taskerId, status: 'ASSIGNED' },
+        })
+
+        return { status: 'ASSIGNED' }
       }
 
-      return NextResponse.json({ success: true, status: body.status })
-    }
+      const activeAssignment = await tx.assignment.findFirst({
+        where: {
+          jobId: id,
+          status: { in: ['ASSIGNED', 'IN_PROGRESS'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, taskerId: true, status: true },
+      })
+      const isAssignedTasker =
+        !!viewerTasker &&
+        !!activeAssignment &&
+        activeAssignment.taskerId === viewerTasker.id
 
-    return NextResponse.json({ error: 'No updates provided' }, { status: 400 })
+      if (targetStatus === 'IN_PROGRESS') {
+        if (!isAssignedTasker || activeAssignment?.status !== 'ASSIGNED') {
+          throw new Error('V1_START_FORBIDDEN')
+        }
+
+        const claimed = await tx.jobPosting.updateMany({
+          where: { id, status: 'ASSIGNED' },
+          data: { status: 'IN_PROGRESS' },
+        })
+        if (claimed.count !== 1) throw new Error('V1_STATE_CHANGED')
+
+        const assignmentClaimed = await tx.assignment.updateMany({
+          where: { id: activeAssignment.id, status: 'ASSIGNED', taskerId: viewerTasker!.id },
+          data: { status: 'IN_PROGRESS', startedAt: new Date() },
+        })
+        if (assignmentClaimed.count !== 1) throw new Error('V1_ASSIGNMENT_STATE_CHANGED')
+
+        return { status: 'IN_PROGRESS' }
+      }
+
+      if (targetStatus === 'COMPLETED') {
+        if (!activeAssignment || activeAssignment.status !== 'IN_PROGRESS') {
+          throw new Error('V1_ACTIVE_ASSIGNMENT_REQUIRED')
+        }
+        if (!isCustomerOwner && !isAssignedTasker) {
+          throw new Error('V1_COMPLETE_FORBIDDEN')
+        }
+
+        const claimed = await tx.jobPosting.updateMany({
+          where: { id, status: 'IN_PROGRESS' },
+          data: { status: 'COMPLETED' },
+        })
+        if (claimed.count !== 1) throw new Error('V1_STATE_CHANGED')
+
+        const assignmentClaimed = await tx.assignment.updateMany({
+          where: { id: activeAssignment.id, status: 'IN_PROGRESS' },
+          data: { status: 'COMPLETED', completedAt: new Date() },
+        })
+        if (assignmentClaimed.count !== 1) throw new Error('V1_ASSIGNMENT_STATE_CHANGED')
+
+        return { status: 'COMPLETED' }
+      }
+
+      // Cancellation is allowed for the owning customer. Once assigned, the
+      // assigned tasker may also cancel their own work. No unrelated account
+      // can mutate this job, and linked active assignments close atomically.
+      if (targetStatus === 'CANCELLED') {
+        const canCancel = isCustomerOwner || (job.status !== 'OPEN' && isAssignedTasker)
+        if (!canCancel) throw new Error('V1_CANCEL_FORBIDDEN')
+
+        const claimed = await tx.jobPosting.updateMany({
+          where: { id, status: job.status },
+          data: { status: 'CANCELLED' },
+        })
+        if (claimed.count !== 1) throw new Error('V1_STATE_CHANGED')
+
+        await tx.assignment.updateMany({
+          where: { jobId: id, status: { in: ['ASSIGNED', 'IN_PROGRESS'] } },
+          data: { status: 'CANCELLED' },
+        })
+        await tx.bid.updateMany({
+          where: { jobId: id, status: 'PENDING' },
+          data: { status: 'REJECTED' },
+        })
+
+        return { status: 'CANCELLED' }
+      }
+
+      throw new Error('V1_INVALID_ACTION')
+    })
+
+    return NextResponse.json({ success: true, status: result.status })
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === 'V1_JOB_NOT_FOUND') {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+      if (error.message.startsWith('V1_INVALID_TRANSITION:')) {
+        const [, from, to] = error.message.split(':')
+        return NextResponse.json({ error: `Cannot transition from ${from} to ${to}` }, { status: 409 })
+      }
+      if (error.message === 'V1_TASKER_REQUIRED') {
+        return NextResponse.json({ error: 'taskerId is required when accepting a bid' }, { status: 400 })
+      }
+      if (error.message === 'V1_BID_NOT_AVAILABLE') {
+        return NextResponse.json({ error: 'Selected bid is no longer available' }, { status: 409 })
+      }
+      if (error.message === 'V1_TASKER_RESTRICTED') {
+        return NextResponse.json({ error: 'Selected tasker is not eligible for assignment' }, { status: 409 })
+      }
+      if (error.message === 'V1_ASSIGNMENT_EXISTS' || error.message === 'V1_STATE_CHANGED' || error.message === 'V1_ASSIGNMENT_STATE_CHANGED') {
+        return NextResponse.json({ error: 'Job state changed before the action completed' }, { status: 409 })
+      }
+      if (
+        error.message === 'V1_ASSIGN_FORBIDDEN' ||
+        error.message === 'V1_START_FORBIDDEN' ||
+        error.message === 'V1_COMPLETE_FORBIDDEN' ||
+        error.message === 'V1_CANCEL_FORBIDDEN'
+      ) {
+        return NextResponse.json({ error: 'You are not authorized to perform this job transition' }, { status: 403 })
+      }
+      if (error.message === 'V1_ACTIVE_ASSIGNMENT_REQUIRED') {
+        return NextResponse.json({ error: 'An active in-progress assignment is required' }, { status: 409 })
+      }
+    }
     console.error('Job update error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
