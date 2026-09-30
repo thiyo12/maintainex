@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 import {
   FiShield, FiLock, FiUnlock, FiAlertTriangle, FiClock, FiGlobe,
   FiActivity, FiArrowUp, FiArrowDown, FiRefreshCw, FiX, FiPlus,
@@ -74,7 +75,7 @@ const DURATION_OPTIONS = [
 
 export default function SecurityMonitorPage() {
   const { user } = useAdminSession()
-  const canManageBlocks = user?.role === 'SUPER_ADMIN'
+  const canManageBlocks = !!user && (ROLE_PERMISSIONS[user.role as AdminRole] || []).includes('security:audit')
   const [data, setData] = useState<SecurityData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showBlockModal, setShowBlockModal] = useState(false)
@@ -104,6 +105,10 @@ export default function SecurityMonitorPage() {
   }, [fetchData])
 
   const handleBlockIP = async () => {
+    if (!canManageBlocks) {
+      toast.error('You do not have permission to manage blocked IPs')
+      return
+    }
     if (!blockIP.trim() || !blockReason.trim()) {
       toast.error('IP and reason are required')
       return
@@ -133,6 +138,10 @@ export default function SecurityMonitorPage() {
   }
 
   const handleUnblockIP = async (ip: string) => {
+    if (!canManageBlocks) {
+      toast.error('You do not have permission to manage blocked IPs')
+      return
+    }
     try {
       const res = await fetch('/api/admin/security/blocked-ips', {
         method: 'DELETE',
