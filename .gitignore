@@ -72,3 +72,49 @@ prisma/schema.prisma.local.bak
 *.bak
 maintainex-backup/
 envs/
+
+# All environment files at any depth (examples remain tracked)
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+
+# Local package/auth credentials
+**/.npmrc
+**/.netrc
+**/.pypirc
+
+# Secret/key material
+id_rsa*
+id_ed25519*
+*.ppk
+*.p8
+*.mobileprovision
+*service-account*.json
+*firebase-adminsdk*.json
+credentials.json
+credentials.*.json
+secrets/
+**/secrets/
+credentials/
+**/credentials/
+
+# Local databases / data copies
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Infrastructure state can contain secrets
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Extra backup/export artifacts
+backups/
+backup/
+*.backup
+*.backup.sql
+*backup*.dump
+*.zip
