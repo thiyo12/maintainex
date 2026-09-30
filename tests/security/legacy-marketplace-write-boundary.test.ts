@@ -32,9 +32,11 @@ describe('legacy marketplace write boundary', () => {
     const detail = read('app/api/mobile/jobs/[id]/route.ts')
     const bid = read('app/api/mobile/jobs/[id]/bid/route.ts')
 
-    expect(collection.indexOf('legacyMarketplaceWriteDisabled()')).toBeLessThan(
-      collection.indexOf("const user = await authenticateRequest(request)", collection.indexOf('export async function POST')),
-    )
+    const postStart = collection.indexOf('export async function POST')
+    const postGuard = collection.indexOf('legacyMarketplaceWriteDisabled()', postStart)
+    const postAuth = collection.indexOf('const user = await authenticateRequest(request)', postStart)
+    expect(postGuard).toBeGreaterThan(postStart)
+    expect(postAuth).toBeGreaterThan(postGuard)
     expect(detail.indexOf('legacyMarketplaceWriteDisabled()', detail.indexOf('export async function PUT'))).toBeGreaterThan(-1)
     expect(detail.indexOf('legacyMarketplaceWriteDisabled()', detail.indexOf('export async function DELETE'))).toBeGreaterThan(-1)
     expect(bid.indexOf('legacyMarketplaceWriteDisabled()', bid.indexOf('export async function POST'))).toBeGreaterThan(-1)
