@@ -187,7 +187,11 @@ export async function POST(
     if (message.includes('Cannot transition') || message.includes('cannot transition') || message.includes('Actor type')) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
-    if (message.includes('already released') || message.includes('concurrently')) {
+    if (
+      message.includes('already released') ||
+      message.includes('concurrently') ||
+      message.includes('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+    ) {
       return NextResponse.json({ error: message }, { status: 409 })
     }
     if (
