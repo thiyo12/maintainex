@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 
 const prismaMocks = vi.hoisted(() => ({
   adminFindUnique: vi.fn(),
+  adminSessionFindUnique: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/authentication/admin-auth', () => ({
@@ -13,6 +14,9 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     adminUser: {
       findUnique: prismaMocks.adminFindUnique,
+    },
+    adminSession: {
+      findUnique: prismaMocks.adminSessionFindUnique,
     },
   },
 }))
@@ -53,6 +57,15 @@ function liveAdmin(overrides: Record<string, unknown> = {}) {
     lockedUntil: null,
     assignedCountries: JSON.stringify(['LK']),
     ...overrides,
+  }
+}
+
+function liveSession(adminUserId: string, id: string) {
+  return {
+    id,
+    adminUserId,
+    isRevoked: false,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   }
 }
 
@@ -129,6 +142,7 @@ describe('CRM three-layer security', () => {
     mockedRateLimit.mockResolvedValueOnce({ allowed: true })
     mockedSession.mockResolvedValueOnce({
       sub: 'admin-1',
+      sid: 'session-admin-1',
       email: 'manager@example.com',
       role: 'MANAGER',
       assignedCountries: ['CA'],
@@ -138,6 +152,9 @@ describe('CRM three-layer security', () => {
     } as any)
     prismaMocks.adminFindUnique.mockResolvedValueOnce(
       liveAdmin({ assignedCountries: '[]' })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-1', 'session-admin-1')
     )
 
     const result = await guardCrmRequest(request('GET'), {
@@ -153,6 +170,7 @@ describe('CRM three-layer security', () => {
     mockedRateLimit.mockResolvedValueOnce({ allowed: true })
     mockedSession.mockResolvedValueOnce({
       sub: 'admin-2',
+      sid: 'session-admin-2',
       email: 'old-role@example.com',
       role: 'SUPER_ADMIN',
       assignedCountries: ['CA'],
@@ -166,6 +184,9 @@ describe('CRM three-layer security', () => {
         email: 'manager@example.com',
         assignedCountries: '["lk"]',
       })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-2', 'session-admin-2')
     )
 
     const result = await guardCrmRequest(request('GET'), {
@@ -186,6 +207,7 @@ describe('CRM three-layer security', () => {
     mockedRateLimit.mockResolvedValueOnce({ allowed: true })
     mockedSession.mockResolvedValueOnce({
       sub: 'admin-disabled',
+      sid: 'session-admin-disabled',
       email: 'manager@example.com',
       role: 'MANAGER',
       assignedCountries: ['LK'],
@@ -198,6 +220,9 @@ describe('CRM three-layer security', () => {
         id: 'admin-disabled',
         isActive: false,
       })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-disabled', 'session-admin-disabled')
     )
 
     const result = await guardCrmRequest(request('GET'), {
@@ -213,6 +238,7 @@ describe('CRM three-layer security', () => {
     mockedRateLimit.mockResolvedValueOnce({ allowed: true })
     mockedSession.mockResolvedValueOnce({
       sub: 'admin-3',
+      sid: 'session-admin-3',
       email: 'manager@example.com',
       role: 'MANAGER',
       assignedCountries: ['LK'],
@@ -226,6 +252,9 @@ describe('CRM three-layer security', () => {
         email: 'support@example.com',
         role: 'SUPPORT',
       })
+    )
+    prismaMocks.adminSessionFindUnique.mockResolvedValueOnce(
+      liveSession('admin-3', 'session-admin-3')
     )
 
     const result = await guardCrmRequest(request('GET'), {
