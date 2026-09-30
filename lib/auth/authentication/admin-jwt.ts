@@ -19,6 +19,7 @@ export interface AccessTokenPayload {
   firstName: string
   lastName: string
   assignedCountries: string[]
+  sid: string
   type: 'access'
 }
 
@@ -35,6 +36,7 @@ export function signAccessToken(user: {
   firstName: string
   lastName: string
   assignedCountries: string[]
+  sessionId: string
 }): string {
   return jwt.sign(
     {
@@ -44,6 +46,7 @@ export function signAccessToken(user: {
       firstName: user.firstName,
       lastName: user.lastName,
       assignedCountries: user.assignedCountries,
+      sid: user.sessionId,
       type: 'access',
     } satisfies AccessTokenPayload,
     getJwtSecret(),
