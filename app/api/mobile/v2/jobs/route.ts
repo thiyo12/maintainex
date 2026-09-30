@@ -6,7 +6,7 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibilit
 import { blastJobToTaskers } from '@/lib/job-blast'
 import { calculatePrice } from '@/lib/pricing/engine'
 import { getSetting } from '@/lib/settings'
-import { notifyTaskerAssigned } from '@/lib/notifications'
+import { notifyTaskerAssigned, createNotification } from '@/lib/notifications'
 import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
@@ -287,11 +287,13 @@ export async function POST(request: NextRequest) {
     }
 
     let notifiedCount = 0
-    try {
-      const blast = await blastJobToTaskers(job.id)
-      notifiedCount = blast.matched
-    } catch (error) {
-      console.error('Blast job error:', error)
+    if (!job.targetTaskerId) {
+      try {
+        const blast = await blastJobToTaskers(job.id)
+        notifiedCount = blast.matched
+      } catch (error) {
+        console.error('Blast job error:', error)
+      }
     }
 
     let conversationId: string | null = null
@@ -331,6 +333,59 @@ export async function POST(request: NextRequest) {
             `You've been selected for "${job.title}". Review the details and submit a quote.`,
             { type: 'JOB_ASSIGNED', jobId: job.id }
           )
+        }
+        notifiedCount = 1
+      } else {
+        const company = await prisma.companyProfile.findUnique({
+          where: { id: job.targetTaskerId },
+          select: {
+            id: true,
+            companyName: true,
+            userId: true,
+            user: { select: { pushToken: true } },
+          },
+        })
+        if (company) {
+          const existingConversation = await prisma.conversation.findFirst({
+            where: {
+              AND: [
+                { jobId: job.id },
+                { participants: { some: { userId: user.id } } },
+                { participants: { some: { userId: company.userId } } },
+              ],
+            },
+            select: { id: true },
+          })
+          if (existingConversation) {
+            conversationId = existingConversation.id
+          } else {
+            const conversation = await prisma.conversation.create({
+              data: {
+                jobId: job.id,
+                participants: {
+                  create: [{ userId: user.id }, { userId: company.userId }],
+                },
+              },
+            })
+            conversationId = conversation.id
+          }
+
+          await createNotification({
+            userId: company.userId,
+            title: 'New direct booking',
+            body: `Your company was selected for "${job.title}". Review the request and submit a quote.`,
+            referenceType: 'JOB_MATCH',
+            referenceId: job.id,
+          })
+          if (company.user.pushToken) {
+            await sendExpoPush(
+              company.user.pushToken,
+              'New Company Booking Request',
+              `Your company was selected for "${job.title}".`,
+              { type: 'JOB_ASSIGNED', jobId: job.id, providerType: 'COMPANY' }
+            )
+          }
+          notifiedCount = 1
         }
       }
     }
@@ -521,6 +576,42 @@ export async function GET(request: NextRequest) {
       }
 
       where.categoryId = { in: allowedCategoryIds }
+
+      let providerTargetIds: string[] = [user.id]
+      if (companyContextId) {
+        const targetCompany = await prisma.companyProfile.findUnique({
+          where: { id: companyContextId },
+          select: { id: true, userId: true },
+        })
+        providerTargetIds = targetCompany
+          ? [targetCompany.id, targetCompany.userId]
+          : [companyContextId]
+      } else if (user.role === 'COMPANY') {
+        const targetCompany = await prisma.companyProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true, userId: true },
+        })
+        providerTargetIds = targetCompany
+          ? [targetCompany.id, targetCompany.userId]
+          : [user.id]
+      } else {
+        const targetTasker = await prisma.taskerProfile.findUnique({
+          where: { userId: user.id },
+          select: { id: true },
+        })
+        if (targetTasker) providerTargetIds.push(targetTasker.id)
+      }
+
+      const uniqueTargetIds = [...new Set(providerTargetIds)]
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : []),
+        {
+          OR: [
+            { targetTaskerId: null },
+            { targetTaskerId: { in: uniqueTargetIds } },
+          ],
+        },
+      ]
     } else {
       where.customerId = user.id
     }
