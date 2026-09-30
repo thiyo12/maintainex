@@ -11,6 +11,8 @@ import { sendExpoPush } from '@/lib/push'
 import { checkRateLimit, userKey } from '@/lib/rate-limit/middleware'
 import { getCurrencyForCountry, minorUnitsToMajorUnits, parseMajorUnitsInput } from '@/lib/shared/money/money'
 import { resolveCompanyContext } from '@/lib/phase6/company-context'
+import { checkCompanyEligibility, checkIndividualProviderEligibility } from '@/lib/phase6/provider-eligibility'
+import { readStoredList } from '@/lib/db-utils'
 
 const sanitize = (s: string, maxLen = 2000) => s.replace(/<[^>]*>/g, '').trim().slice(0, maxLen)
 
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     const category = await prisma.jobCategory.findUnique({
       where: { id: categoryId },
-      select: { id: true, isActive: true },
+      select: { id: true, name: true, slug: true, isActive: true },
     })
     if (!category?.isActive) return NextResponse.json({ error: 'Invalid or inactive categoryId' }, { status: 400 })
 
@@ -154,6 +156,161 @@ export async function POST(request: NextRequest) {
         error: 'Country mismatch: you cannot create jobs in a different country',
         code: 'COUNTRY_MISMATCH',
       }, { status: 403 })
+    }
+
+    if (targetTaskerId) {
+      const [taskerByProfileId, companyById] = await Promise.all([
+        prisma.taskerProfile.findUnique({
+          where: { id: targetTaskerId },
+          select: {
+            id: true,
+            userId: true,
+            countryCode: true,
+            skills: true,
+            user: { select: { countryCode: true } },
+            taskerSkills: {
+              select: {
+                jobId: true,
+                job: { select: { categoryId: true } },
+              },
+            },
+          },
+        }),
+        prisma.companyProfile.findUnique({
+          where: { id: targetTaskerId },
+          select: {
+            id: true,
+            userId: true,
+            countryCode: true,
+            services: true,
+            specialties: { select: { categoryId: true, jobId: true } },
+            user: { select: { countryCode: true } },
+          },
+        }),
+      ])
+
+      let tasker = taskerByProfileId
+      let company = companyById
+
+      if (!tasker && !company) {
+        const [taskerByUserId, companyByUserId] = await Promise.all([
+          prisma.taskerProfile.findUnique({
+            where: { userId: targetTaskerId },
+            select: {
+              id: true,
+              userId: true,
+              countryCode: true,
+              skills: true,
+              user: { select: { countryCode: true } },
+              taskerSkills: {
+                select: {
+                  jobId: true,
+                  job: { select: { categoryId: true } },
+                },
+              },
+            },
+          }),
+          prisma.companyProfile.findUnique({
+            where: { userId: targetTaskerId },
+            select: {
+              id: true,
+              userId: true,
+              countryCode: true,
+              services: true,
+              specialties: { select: { categoryId: true, jobId: true } },
+              user: { select: { countryCode: true } },
+            },
+          }),
+        ])
+        // Historical targetTaskerId values were individual user IDs. Preserve
+        // that meaning if one account happens to own both a tasker and company.
+        tasker = taskerByUserId
+        company = taskerByUserId ? null : companyByUserId
+      }
+
+      if (tasker) {
+        if (tasker.userId === user.id) {
+          return NextResponse.json({ error: 'Cannot target yourself as the provider' }, { status: 400 })
+        }
+        const targetCountry = tasker.countryCode || tasker.user.countryCode
+        if (targetCountry !== finalCountryCode) {
+          return NextResponse.json(
+            { error: 'Target provider country does not match the job country', code: 'TARGET_PROVIDER_COUNTRY_MISMATCH' },
+            { status: 403 }
+          )
+        }
+
+        const eligibility = await checkIndividualProviderEligibility(tasker.userId)
+        if (!eligibility.eligible) {
+          return NextResponse.json(
+            { error: 'Target provider is not eligible', reasons: eligibility.reasons },
+            { status: 403 }
+          )
+        }
+
+        const relationalCapability = tasker.taskerSkills.some(skill =>
+          skill.job.categoryId === categoryId ||
+          (!!templateJobId && skill.jobId === templateJobId)
+        )
+        const legacyTokens = new Set(
+          readStoredList(tasker.skills).map(value => value.trim().toLowerCase()).filter(Boolean)
+        )
+        const categoryTokens = [category.id, category.name, category.slug, templateJobId]
+          .filter((value): value is string => Boolean(value))
+          .map(value => value.trim().toLowerCase())
+        const legacyCapability = categoryTokens.some(token => legacyTokens.has(token))
+
+        if (!relationalCapability && !legacyCapability) {
+          return NextResponse.json(
+            { error: 'Target provider lacks the required capability for this job' },
+            { status: 403 }
+          )
+        }
+
+        targetTaskerId = tasker.userId
+      } else if (company) {
+        if (company.userId === user.id) {
+          return NextResponse.json({ error: 'Cannot target your own company' }, { status: 400 })
+        }
+        const targetCountry = company.countryCode || company.user.countryCode
+        if (targetCountry !== finalCountryCode) {
+          return NextResponse.json(
+            { error: 'Target company country does not match the job country', code: 'TARGET_PROVIDER_COUNTRY_MISMATCH' },
+            { status: 403 }
+          )
+        }
+
+        const eligibility = await checkCompanyEligibility(company.id)
+        if (!eligibility.eligible) {
+          return NextResponse.json(
+            { error: 'Target company is not eligible', reasons: eligibility.reasons },
+            { status: 403 }
+          )
+        }
+
+        const relationalCapability = company.specialties.some(specialty =>
+          specialty.categoryId === categoryId ||
+          (!!templateJobId && specialty.jobId === templateJobId)
+        )
+        const serviceTokens = new Set(
+          readStoredList(company.services).map(value => value.trim().toLowerCase()).filter(Boolean)
+        )
+        const categoryTokens = [category.id, category.name, category.slug, templateJobId]
+          .filter((value): value is string => Boolean(value))
+          .map(value => value.trim().toLowerCase())
+        const legacyCapability = categoryTokens.some(token => serviceTokens.has(token))
+
+        if (!relationalCapability && !legacyCapability) {
+          return NextResponse.json(
+            { error: 'Target company lacks the required capability for this job' },
+            { status: 403 }
+          )
+        }
+
+        targetTaskerId = company.id
+      } else {
+        return NextResponse.json({ error: 'Target provider not found' }, { status: 404 })
+      }
     }
 
     const validMaterialHandling = ['tasker_brings', 'customer_provides', 'quote_both']
