@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 import { createChangeOrder } from '@/lib/domain/change-order'
 import { notifyChangeOrderSubmitted } from '@/lib/notifications'
+import { resolveCompanyContext } from '@/lib/phase6/company-context'
 
 function parseBigInt(value: unknown): bigint | null {
   if (typeof value === 'bigint') return value
@@ -30,21 +31,45 @@ export async function POST(
       return NextResponse.json({ error: 'Missing required fields: baseQuoteId, reason, amountDeltaCents' }, { status: 400 })
     }
 
-    let providerType: 'INDIVIDUAL' | 'COMPANY' = 'INDIVIDUAL'
+    const baseQuote = await prisma.jobQuote.findUnique({
+      where: { id: baseQuoteId },
+      select: {
+        id: true,
+        jobId: true,
+        providerId: true,
+        providerType: true,
+        status: true,
+        currency: true,
+      },
+    })
+    if (!baseQuote || baseQuote.jobId !== jobId || baseQuote.status !== 'ACCEPTED') {
+      return NextResponse.json({ error: 'Accepted base quote not found for this job' }, { status: 404 })
+    }
+
+    let providerType: 'INDIVIDUAL' | 'COMPANY'
     let taskerId: string | undefined
     let companyIdVal: string | undefined
 
-    // Derive company membership from auth, never from request body
-    const teamMember = await prisma.teamMember.findFirst({
-      where: { userId: user.id },
-      select: { companyId: true },
-    })
-
-    if (teamMember) {
-      providerType = 'COMPANY'
-      companyIdVal = teamMember.companyId
-    } else {
+    if (baseQuote.providerType === 'INDIVIDUAL') {
+      if (baseQuote.providerId !== user.id) {
+        return NextResponse.json({ error: 'Not authorized for this quote' }, { status: 403 })
+      }
+      providerType = 'INDIVIDUAL'
       taskerId = user.id
+    } else if (baseQuote.providerType === 'COMPANY') {
+      const { context, error } = await resolveCompanyContext(
+        user.id,
+        baseQuote.providerId,
+        'quotes:submit',
+      )
+      if (error) return error
+      if (!context) {
+        return NextResponse.json({ error: 'Not authorized for this company' }, { status: 403 })
+      }
+      providerType = 'COMPANY'
+      companyIdVal = baseQuote.providerId
+    } else {
+      return NextResponse.json({ error: 'Unsupported provider type' }, { status: 400 })
     }
 
     const result = await createChangeOrder(prisma, {
@@ -56,6 +81,7 @@ export async function POST(
       reason,
       scopeDelta,
       amountDeltaCents,
+      currency: baseQuote.currency,
       createdBy: user.id,
       lineItems: lineItems?.map((item: any, idx: number) => ({
         type: item.type,
@@ -64,7 +90,7 @@ export async function POST(
         unit: item.unit,
         unitAmountCents: parseBigInt(item.unitAmountCents) ?? 0n,
         totalAmountCents: parseBigInt(item.totalAmountCents) ?? 0n,
-        currency: item.currency,
+        currency: baseQuote.currency,
         sortOrder: idx,
       })),
     })
