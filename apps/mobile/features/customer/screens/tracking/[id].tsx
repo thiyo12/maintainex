@@ -84,8 +84,9 @@ export default function LiveTrackingScreen() {
       const res = await v2Jobs.get(id)
       setJob(res.job)
       setWorkspace(res.job.workspace || null)
-      if (res.job.acceptedQuote?.provider?.latitude) {
-        setProviderCoord({ latitude: res.job.acceptedQuote.provider.latitude, longitude: res.job.acceptedQuote.provider.longitude })
+      const initialProvider = res.job.acceptedQuote?.provider
+      if (typeof initialProvider?.latitude === 'number' && typeof initialProvider?.longitude === 'number') {
+        setProviderCoord({ latitude: initialProvider.latitude, longitude: initialProvider.longitude })
       }
     } catch {
       console.error('tracking load failed')
@@ -132,11 +133,9 @@ export default function LiveTrackingScreen() {
         const res = await v2Jobs.get(id)
         setJob(res.job)
         setWorkspace(res.job.workspace || null)
-        if (liveFailed.current && res.job.acceptedQuote?.provider?.latitude) {
-          setProviderCoord({
-            latitude: res.job.acceptedQuote.provider.latitude,
-            longitude: res.job.acceptedQuote.provider.longitude,
-          })
+        const fallbackProvider = res.job.acceptedQuote?.provider
+        if (liveFailed.current && typeof fallbackProvider?.latitude === 'number' && typeof fallbackProvider?.longitude === 'number') {
+          setProviderCoord({ latitude: fallbackProvider.latitude, longitude: fallbackProvider.longitude })
         }
       } catch {}
     }, 15000)
@@ -145,7 +144,7 @@ export default function LiveTrackingScreen() {
 
   useEffect(() => {
     if (!providerCoord) return
-    Animated.timing(animCoord, {
+    Animated.timing(animCoord as any, {
       toValue: { latitude: providerCoord.latitude, longitude: providerCoord.longitude },
       duration: 1500,
       useNativeDriver: false,
