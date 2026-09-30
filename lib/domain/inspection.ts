@@ -242,6 +242,17 @@ export async function transitionInspection(
     return { success: false, error: `Invalid transition from ${currentStatus} to ${input.toStatus}` }
   }
 
+  // The customer must verify the provider's arrival before inspection work can
+  // begin. Without this gate, the provider could move ARRIVED -> IN_PROGRESS and
+  // make the ARRIVED-only verification endpoint impossible to use.
+  if (
+    currentStatus === 'ARRIVED' &&
+    input.toStatus === 'IN_PROGRESS' &&
+    !inspection.verifiedByCustomer
+  ) {
+    return { success: false, error: 'Customer arrival verification is required before inspection starts' }
+  }
+
   // Execution transitions must be performed by the accepted individual
   // provider or the assigned company worker, never by an arbitrary company member.
   const isProviderTransition = ['EN_ROUTE', 'ARRIVED', 'IN_PROGRESS'].includes(input.toStatus)
@@ -293,7 +304,13 @@ export async function transitionInspection(
     }
   }
 
-  await client.jobInspection.update({ where: { id: input.inspectionId }, data: updateData })
+  const claimed = await client.jobInspection.updateMany({
+    where: { id: input.inspectionId, status: currentStatus },
+    data: updateData,
+  })
+  if (claimed.count !== 1) {
+    return { success: false, error: 'Inspection state changed concurrently' }
+  }
 
   return { success: true }
 }
