@@ -1057,6 +1057,19 @@ async function finalizePayHereRefund(
     }
   }
 
+  if (
+    !suspenseFunding &&
+    escrow &&
+    (escrow.totalAmount !== intent.amount || escrow.currency !== intent.currency)
+  ) {
+    return {
+      success: false,
+      status: intent.status as 'REFUND_REQUIRED' | 'REFUND_PROCESSING',
+      error: 'Escrow amount or currency no longer matches the captured payment',
+      code: 'REFUND_ESCROW_MISMATCH',
+    }
+  }
+
   const actorId = details.actorId || 'system:payhere-refund'
   const actorType = details.source === 'MANUAL' ? 'STAFF' : 'SYSTEM'
 
