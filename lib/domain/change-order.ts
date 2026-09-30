@@ -66,6 +66,9 @@ export async function createChangeOrder(
   if (job.status === 'COMPLETED' || job.status === 'CANCELLED') {
     return { success: false, error: 'Cannot create change order on completed/cancelled job' }
   }
+  if (input.amountDeltaCents === 0n && (!input.scopeDelta || input.scopeDelta.trim().length === 0)) {
+    return { success: false, error: 'Change order must modify price or scope' }
+  }
 
   // Verify base quote exists and is accepted
   const baseQuote = await client.jobQuote.findUnique({ where: { id: input.baseQuoteId } })
@@ -276,6 +279,9 @@ export async function approveChangeOrder(
     const finalResult = await calculateFinalAuthorizedAmount(tx, co.jobId)
     if (!finalResult.success) throw new Error(finalResult.error)
     const newFinalAmount = finalResult.finalAmountCents!
+    if (newFinalAmount <= 0n) {
+      throw new Error('FINAL_AUTHORIZED_AMOUNT_MUST_BE_POSITIVE')
+    }
 
     await tx.marketplaceJob.update({
       where: { id: co.jobId },
