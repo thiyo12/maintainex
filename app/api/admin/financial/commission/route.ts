@@ -53,11 +53,8 @@ export async function GET(request: NextRequest) {
     const [
       settlements,
       total,
-      allStats,
-      paidStats,
-      pendingStats,
-      overdueStats,
-      pendingThisWeek,
+      statusByCurrency,
+      pendingThisWeekByCurrency,
     ] = await Promise.all([
       prisma.weeklySettlement.findMany({
         where,
@@ -66,32 +63,76 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.weeklySettlement.count({ where }),
-      prisma.weeklySettlement.aggregate({
+      prisma.weeklySettlement.groupBy({
+        by: ['currency', 'status'],
         where: statsWhere,
         _sum: { commissionOwed: true, totalEarnings: true },
-        _count: true,
+        _count: { _all: true },
       }),
-      prisma.weeklySettlement.aggregate({
-        where: { ...statsWhere, status: 'PAID' },
-        _sum: { commissionOwed: true, totalEarnings: true },
-        _count: true,
-      }),
-      prisma.weeklySettlement.aggregate({
-        where: { ...statsWhere, status: 'PENDING' },
-        _sum: { commissionOwed: true, totalEarnings: true },
-        _count: true,
-      }),
-      prisma.weeklySettlement.aggregate({
-        where: { ...statsWhere, status: 'OVERDUE' },
+      prisma.weeklySettlement.groupBy({
+        by: ['currency'],
+        where: {
+          ...statsWhere,
+          status: 'PENDING',
+          weekStart: { gte: weekAgo },
+        },
         _sum: { commissionOwed: true },
-        _count: true,
-      }),
-      prisma.weeklySettlement.aggregate({
-        where: { ...statsWhere, status: 'PENDING', weekStart: { gte: weekAgo } },
-        _sum: { commissionOwed: true },
-        _count: true,
+        _count: { _all: true },
       }),
     ])
+
+    const summaryMap = new Map<string, {
+      currency: string
+      totalCommissionOwed: number
+      totalCommissionPaid: number
+      pendingThisWeek: number
+      overdueCount: number
+      suspendedCount: number
+      pendingCount: number
+      paidCount: number
+    }>()
+
+    const ensureSummary = (currency: string) => {
+      const existing = summaryMap.get(currency)
+      if (existing) return existing
+      const created = {
+        currency,
+        totalCommissionOwed: 0,
+        totalCommissionPaid: 0,
+        pendingThisWeek: 0,
+        overdueCount: 0,
+        suspendedCount: 0,
+        pendingCount: 0,
+        paidCount: 0,
+      }
+      summaryMap.set(currency, created)
+      return created
+    }
+
+    for (const row of statusByCurrency) {
+      const summary = ensureSummary(row.currency)
+      const amount = row._sum.commissionOwed || 0
+      const count = row._count._all
+
+      if (row.status === 'PAID') {
+        summary.totalCommissionPaid += amount
+        summary.paidCount += count
+      } else {
+        summary.totalCommissionOwed += amount
+      }
+
+      if (row.status === 'PENDING') summary.pendingCount += count
+      if (row.status === 'OVERDUE') summary.overdueCount += count
+      if (row.status === 'SUSPENDED') summary.suspendedCount += count
+    }
+
+    for (const row of pendingThisWeekByCurrency) {
+      ensureSummary(row.currency).pendingThisWeek = row._sum.commissionOwed || 0
+    }
+
+    const summaryByCurrency = [...summaryMap.values()].sort((a, b) =>
+      a.currency.localeCompare(b.currency)
+    )
 
     const providerIds = [...new Set(settlements.map(settlement => settlement.providerId))]
     const users = providerIds.length
@@ -108,14 +149,8 @@ export async function GET(request: NextRequest) {
           ...settlement,
           provider: userMap.get(settlement.providerId) || null,
         })),
-        summary: {
-          totalCommissionOwed: allStats._sum.commissionOwed || 0,
-          totalCommissionPaid: paidStats._sum.commissionOwed || 0,
-          pendingThisWeek: pendingThisWeek._sum.commissionOwed || 0,
-          overdueCount: overdueStats._count,
-          pendingCount: pendingStats._count,
-          paidCount: paidStats._count,
-        },
+        summaryByCurrency,
+        summary: summaryByCurrency.length === 1 ? summaryByCurrency[0] : null,
         pagination: {
           page,
           limit,
