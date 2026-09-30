@@ -66,7 +66,20 @@ export function verifyNotificationSignature(
   const secretHash = crypto.createHash('md5').update(merchantSecret).digest('hex').toUpperCase()
   const hashString = `${notification.merchant_id}${notification.order_id}${notification.payhere_amount}${notification.payhere_currency}${notification.status_code}${secretHash}`
   const expectedHash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase()
-  return notification.md5sig.toUpperCase() === expectedHash
+  const receivedHash = notification.md5sig.trim().toUpperCase()
+
+  if (!/^[A-F0-9]{32}$/.test(receivedHash) || receivedHash.length !== expectedHash.length) {
+    return false
+  }
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(receivedHash, 'ascii'),
+      Buffer.from(expectedHash, 'ascii'),
+    )
+  } catch {
+    return false
+  }
 }
 
 export function getPayHereCheckoutUrl(sandbox: boolean): string {
