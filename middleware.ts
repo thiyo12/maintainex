@@ -94,6 +94,7 @@ async function verifySimpleToken(token: string): Promise<any> {
         region: payload.region || null,
         canEditServices: payload.canEditServices || false,
         authType: payload.authType || 'admin',
+        sessionId: payload.sid || payload.sessionId || null,
       }
     }
     const [encoded, legacySig] = parts
@@ -125,6 +126,7 @@ async function getSession(request: NextRequest) {
         name: payload.name || null,
         canEditServices: payload.canEditServices || false,
         authType: payload.authType || 'admin',
+        sessionId: payload.sessionId || null,
       }
     }
   }
@@ -142,6 +144,7 @@ async function getSession(request: NextRequest) {
     name: payload.name,
     canEditServices: payload.canEditServices || false,
     authType: payload.authType || 'admin',
+    sessionId: payload.sessionId || payload.sid || null,
   }
 }
 
@@ -379,6 +382,12 @@ export async function middleware(request: NextRequest) {
 
     if (!validWebRoles.includes(session.role)) {
       response = NextResponse.redirect(new URL('/admin/login?error=unauthorized', request.url))
+      applyRequestId(response, requestId)
+      return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
+    }
+
+    if (!session.sessionId) {
+      response = NextResponse.redirect(new URL('/admin/login?error=session_required', request.url))
       applyRequestId(response, requestId)
       return applySecurityHeaders(applyRateLimitHeaders(response, rateLimit.remaining, rateLimit.resetAt))
     }
