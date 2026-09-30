@@ -167,7 +167,7 @@ sed -i '' 's/provider = "sqlite"/provider = "postgresql"/' prisma/schema.prisma
 tar czf /tmp/maintainex-build.tar.gz .next package.json package-lock.json prisma public/
 
 # 4. SCP to VPS
-scp /tmp/maintainex-build.tar.gz root@147.93.106.54:/tmp/
+scp /tmp/maintainex-build.tar.gz root@<VPS_IP>:/tmp/
 
 # 5. On VPS
 docker ps --filter name=maintainex --format "{{.Names}}"
