@@ -473,6 +473,14 @@ async function getV1Job(id: string, request: NextRequest) {
   })
   if (!guard.ok) return { response: guard.response }
   const security = guard.context
+  const canFinance =
+    crmHasPermission(security.role, 'wallets:view') ||
+    crmHasPermission(security.role, 'commission:view')
+  const canTrust =
+    crmHasPermission(security.role, 'disputes:view') ||
+    crmHasPermission(security.role, 'risk_events:read') ||
+    crmHasPermission(security.role, 'trust:view')
+  const canAudit = crmHasPermission(security.role, 'audit:read')
 
   const job = await prisma.jobPosting.findUnique({
     where: { id },
@@ -528,14 +536,16 @@ async function getV1Job(id: string, request: NextRequest) {
         },
         orderBy: { createdAt: 'desc' },
       },
-      disputes: {
-        include: {
-          raisedBy: {
-            select: { id: true, mxId: true, name: true, email: true },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      },
+      disputes: canTrust
+        ? {
+            include: {
+              raisedBy: {
+                select: { id: true, mxId: true, name: true, email: true },
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          }
+        : false,
     },
   })
 
@@ -546,15 +556,6 @@ async function getV1Job(id: string, request: NextRequest) {
       response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     }
   }
-
-  const canFinance =
-    crmHasPermission(security.role, 'wallets:view') ||
-    crmHasPermission(security.role, 'commission:view')
-  const canTrust =
-    crmHasPermission(security.role, 'disputes:view') ||
-    crmHasPermission(security.role, 'risk_events:read') ||
-    crmHasPermission(security.role, 'trust:view')
-  const canAudit = crmHasPermission(security.role, 'audit:read')
 
   const [auditLogs, activityLogs, ledger] = await Promise.all([
     canAudit ? prisma.auditLog.findMany({
