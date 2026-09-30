@@ -14,7 +14,7 @@ export default function ReceiptScreen() {
   const styles = makeStyles(colors)
   const router = useRouter()
   const { id } = useLocalSearchParams()
-  const [job, setJob] = useState<(V2Job & { quotes: any[]; escrow: any }) | null>(null)
+  const [job, setJob] = useState<V2Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const fadeAnim = useRef(new Animated.Value(0)).current
