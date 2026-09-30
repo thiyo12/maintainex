@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface CheatingReport {
   id: string
@@ -19,6 +22,10 @@ interface CheatingReport {
 }
 
 export default function CheatingPage() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canAction = permissions.includes('cheating:action')
   const [reports, setReports] = useState<CheatingReport[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('PENDING')
@@ -46,6 +53,7 @@ export default function CheatingPage() {
   }
 
   const handleReview = async (reportId: string, status: 'CONFIRMED' | 'DISMISSED', action?: string) => {
+    if (!canAction) return
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/cheating', {
@@ -55,18 +63,19 @@ export default function CheatingPage() {
           reportId,
           status,
           action,
-          actionNote,
-          reviewedBy: 'admin' // TODO: Get from session
+          actionNote
         })
       })
 
-      if (res.ok) {
-        setSelectedReport(null)
-        setActionNote('')
-        fetchReports()
-      }
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body?.error || 'Review failed')
+      setSelectedReport(null)
+      setActionNote('')
+      fetchReports()
+      toast.success(status === 'CONFIRMED' ? 'Report confirmed' : 'Report dismissed')
     } catch (error) {
       console.error('Failed to review report:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to review report')
     } finally {
       setActionLoading(false)
     }
@@ -189,13 +198,16 @@ export default function CheatingPage() {
                     )}
                   </div>
                   <div className="flex gap-2">
-                    {report.status === 'PENDING' && (
+                    {report.status === 'PENDING' && canAction && (
                       <button
                         onClick={() => setSelectedReport(report)}
                         className="px-3 py-1 bg-amber-500 text-white rounded hover:bg-amber-600"
                       >
                         Review
                       </button>
+                    )}
+                    {report.status === 'PENDING' && !canAction && (
+                      <span className="text-xs text-gray-400">Read only</span>
                     )}
                   </div>
                 </div>
@@ -205,7 +217,7 @@ export default function CheatingPage() {
         )}
 
         {/* Review Modal */}
-        {selectedReport && (
+        {selectedReport && canAction && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <h3 className="text-lg font-bold mb-4">Review Off-Platform Deal Report</h3>
