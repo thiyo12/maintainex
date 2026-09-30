@@ -50,3 +50,19 @@ describe('legacy mobile admin routes use canonical CRM security', () => {
     }
   })
 })
+
+
+describe('mixed legacy mobile admin routes', () => {
+  it('keeps subscription plans readable but protects plan creation with canonical CRM auth', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'app/api/mobile/admin/subscription-plans/route.ts'),
+      'utf-8'
+    )
+    expect(source).toContain('export async function GET')
+    expect(source).toContain('export async function POST')
+    expect(source).toContain('guardCrmRequest')
+    expect(source).toContain("permission: 'settings:edit'")
+    expect(source).toContain("allowedRoles: ['SUPER_ADMIN']")
+    expect(source).not.toContain("['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes")
+  })
+})
