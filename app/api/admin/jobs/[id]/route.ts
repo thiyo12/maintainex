@@ -10,6 +10,9 @@ import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
 function money(value: bigint | number | null | undefined, currency: string): number | null {
   if (value === null || value === undefined) return null
+  if (currency !== 'LKR' && currency !== 'CAD') {
+    throw new Error(`Unsupported currency: ${currency}`)
+  }
   return minorUnitsToMajorUnits(BigInt(value), currency)
 }
 
