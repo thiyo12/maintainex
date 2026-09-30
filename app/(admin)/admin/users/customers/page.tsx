@@ -112,6 +112,10 @@ function CustomerPageContent() {
     const isSuspendAction = confirmAction.action === 'suspend' || confirmAction.action === 'unsuspend'
     const isBanAction = confirmAction.action === 'ban' || confirmAction.action === 'unban'
     if ((isSuspendAction && !canSuspend) || (isBanAction && !canBan)) return
+    if ((confirmAction.action === 'suspend' || confirmAction.action === 'ban') && reason.trim().length < 3) {
+      toast.error('Please enter a reason of at least 3 characters')
+      return
+    }
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -499,7 +503,7 @@ function CustomerPageContent() {
               </p>
               {(confirmAction.action === 'suspend' || confirmAction.action === 'ban') && (
                 <div className="mb-4">
-                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (optional)</label>
+                  <label className="block text-gray-400 text-xs font-semibold mb-1.5">Reason (required)</label>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
@@ -518,7 +522,7 @@ function CustomerPageContent() {
                 </button>
                 <button
                   onClick={handleAction}
-                  disabled={actionLoading === confirmAction.userId}
+                  disabled={actionLoading === confirmAction.userId || ((confirmAction.action === 'suspend' || confirmAction.action === 'ban') && reason.trim().length < 3)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     confirmAction.action === 'ban'
                       ? 'bg-red-500 hover:bg-red-600 text-white'
