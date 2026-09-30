@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
@@ -13,6 +14,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const seedDemoPassword = process.env.SEED_DEMO_PASSWORD
+    if (!seedDemoPassword) {
+      return NextResponse.json({ error: 'SEED_DEMO_PASSWORD is required for dev seeding' }, { status: 500 })
+    }
+    const demoPasswordHash = await bcrypt.hash(seedDemoPassword, 12)
     const results: Record<string, number> = {}
 
     // 1. PlatformSettings — ensure it exists
@@ -38,16 +44,16 @@ export async function POST(request: NextRequest) {
     const userCount = await prisma.user.count()
     if (userCount < 10) {
       const testUsers = [
-        { email: 'john@example.com', name: 'John Silva', role: 'CUSTOMER', phone: '+94770000001' },
-        { email: 'sarah@example.com', name: 'Sarah Perera', role: 'CUSTOMER', phone: '+94770000002' },
-        { email: 'mike@example.com', name: 'Mike Fernando', role: 'TASKER', phone: '+94770000003' },
-        { email: 'anna@example.com', name: 'Anna De Silva', role: 'CUSTOMER', phone: '+94770000004' },
-        { email: 'david@example.com', name: 'David Rajan', role: 'TASKER', phone: '+94770000005' },
-        { email: 'priya@example.com', name: 'Priya Kumar', role: 'CUSTOMER', phone: '+94770000006' },
-        { email: 'tom@example.com', name: 'Tom Wickram', role: 'TASKER', phone: '+94770000007' },
-        { email: 'nina@example.com', name: 'Nina Jayawardena', role: 'CUSTOMER', phone: '+94770000008' },
-        { email: 'alex@example.com', name: 'Alex Guna', role: 'CUSTOMER', phone: '+94770000009' },
-        { email: 'lisa@example.com', name: 'Lisa Mendis', role: 'TASKER', phone: '+94770000010' },
+        { email: 'customer01@example.invalid', name: 'Demo Customer 01', role: 'CUSTOMER', phone: '0000000001' },
+        { email: 'customer02@example.invalid', name: 'Demo Customer 02', role: 'CUSTOMER', phone: '0000000002' },
+        { email: 'tasker01@example.invalid', name: 'Demo Tasker 01', role: 'TASKER', phone: '0000000003' },
+        { email: 'customer03@example.invalid', name: 'Demo Customer 03', role: 'CUSTOMER', phone: '0000000004' },
+        { email: 'tasker02@example.invalid', name: 'Demo Tasker 02', role: 'TASKER', phone: '0000000005' },
+        { email: 'customer04@example.invalid', name: 'Demo Customer 04', role: 'CUSTOMER', phone: '0000000006' },
+        { email: 'tasker03@example.invalid', name: 'Demo Tasker 03', role: 'TASKER', phone: '0000000007' },
+        { email: 'customer05@example.invalid', name: 'Demo Customer 05', role: 'CUSTOMER', phone: '0000000008' },
+        { email: 'customer06@example.invalid', name: 'Demo Customer 06', role: 'CUSTOMER', phone: '0000000009' },
+        { email: 'tasker04@example.invalid', name: 'Demo Tasker 04', role: 'TASKER', phone: '0000000010' },
       ]
       let created = 0
       for (const u of testUsers) {
@@ -56,7 +62,7 @@ export async function POST(request: NextRequest) {
           await prisma.user.create({
             data: {
               ...u,
-              passwordHash: '$2b$12$LJ3m4ys3Lg3YOCwKkYqOYe3Qj6sF5gHJkLmNpRqTsUvWxZ8yB7Ae', // Test123!
+              passwordHash: demoPasswordHash,
               isActive: true,
               identityStatus: u.role === 'TASKER' ? 'APPROVED' : 'NOT_SUBMITTED',
             },
@@ -103,7 +109,7 @@ export async function POST(request: NextRequest) {
           await prisma.adminUser.create({
             data: {
               ...s,
-              passwordHash: '$2b$12$LJ3m4ys3Lg3YOCwKkYqOYe3Qj6sF5gHJkLmNpRqTsUvWxZ8yB7Ae',
+              passwordHash: demoPasswordHash,
               isActive: true,
             },
           })
