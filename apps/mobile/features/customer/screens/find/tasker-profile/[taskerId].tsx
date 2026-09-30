@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
   btnPrimaryText: { fontSize: 14, fontFamily: 'Outfit_700Bold', color: '#0D0D0D' },
 
   modalWrap: { flex: 1, justifyContent: 'flex-end' },
-  modalBackdrop: { ...StyleSheet.absoluteFillObject as any, backgroundColor: 'rgba(0,0,0,0.6)' },
+  modalBackdrop: { ...(StyleSheet.absoluteFill as any), backgroundColor: 'rgba(0,0,0,0.6)' },
   modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.lg, paddingBottom: spacing.xl },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   modalTitle: { ...typography.h3, fontSize: 18 },
