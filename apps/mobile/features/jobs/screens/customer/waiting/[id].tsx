@@ -29,7 +29,7 @@ interface JobData {
   id: string
   title: string
   status: string
-  budgetAmount: number
+  budgetAmount: number | null
   notifiedCount: number
   smartBooking: any
   quotes: QuoteItem[]
@@ -144,6 +144,10 @@ export default function WaitingScreen() {
   }
 
   if (loading && !job) {
+    return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
+  }
+
+  if (!job) {
     return <SafeAreaView style={styles.container}><ActivityIndicator size="large" color={colors.amber} style={{ marginTop: 60 }} /></SafeAreaView>
   }
 
