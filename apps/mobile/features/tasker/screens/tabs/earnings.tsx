@@ -159,6 +159,7 @@ export default function TaskerEarnings() {
 
 const makeStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.cream },
+  topBar: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 16 },
   heading: { fontSize: 28, fontFamily: fonts.heading, color: colors.ink },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 100 },
   balanceCard: {
