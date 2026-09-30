@@ -29,10 +29,14 @@ async function canStartConversationForJob(userId: string, participantId: string,
   if (userId === participantId) return false
 
   const [job, participant] = await Promise.all([
-    prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { customerId: true } }),
+    prisma.marketplaceJob.findUnique({
+      where: { id: jobId },
+      select: { customerId: true, status: true },
+    }),
     prisma.user.findUnique({ where: { id: participantId }, select: { id: true } }),
   ])
   if (!job || !participant) return false
+  if (['COMPLETED', 'CANCELLED'].includes(job.status)) return false
 
   if (userId === job.customerId) {
     const individualQuote = await prisma.jobQuote.findFirst({
