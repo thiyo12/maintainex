@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 
+function legacyMarketplaceWriteDisabled() {
+  return process.env.ALLOW_LEGACY_MARKETPLACE_WRITES !== 'true'
+}
+
+function legacyMarketplaceWriteResponse() {
+  return NextResponse.json(
+    {
+      error: 'Legacy marketplace writes are disabled. Use the V2 marketplace flow.',
+      code: 'LEGACY_MARKETPLACE_WRITE_DISABLED',
+    },
+    { status: 410, headers: { 'Cache-Control': 'no-store' } },
+  )
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await authenticateRequest(request)
@@ -122,6 +136,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (legacyMarketplaceWriteDisabled()) return legacyMarketplaceWriteResponse()
+
   try {
     const user = await authenticateRequest(request)
     if (!user) {
