@@ -23,6 +23,16 @@ export async function POST(
 
     const job = await prisma.marketplaceJob.findUnique({ where: { id } })
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    if (job.customerId !== user.id) {
+      return NextResponse.json({ error: 'Only the customer can approve completion' }, { status: 403 })
+    }
+    if (job.status === 'COMPLETED') {
+      return NextResponse.json({
+        success: true,
+        replayed: true,
+        message: 'Job was already completed.',
+      })
+    }
 
     const paymentState = await prisma.jobEscrow.findFirst({
       where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
