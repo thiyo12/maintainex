@@ -3,7 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { notifyAllAdmins } from '@/lib/admin-notifications'
 import { createWorkItem } from '@/lib/work-queue'
-import { raiseJobDispute } from '@/lib/domain/job-lifecycle'
+import { raiseJobDispute, type ActorType } from '@/lib/domain/job-lifecycle'
+import { resolveProviderActor } from '@/lib/domain/job-actors'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,10 +20,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'jobId, reason, and description required' }, { status: 400 })
     }
 
-    const marketplaceJob = await prisma.marketplaceJob.findUnique({ where: { id: jobId }, select: { id: true, title: true } })
+    const marketplaceJob = await prisma.marketplaceJob.findUnique({
+      where: { id: jobId },
+      select: { id: true, title: true, customerId: true },
+    })
     if (marketplaceJob) {
+      let actorType: ActorType | null =
+        marketplaceJob.customerId === user.id ? 'CUSTOMER' : await resolveProviderActor(jobId, user.id)
+      if (!actorType) {
+        return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
+      }
+
       await raiseJobDispute(
-        { jobId, actorId: user.id, actorType: 'CUSTOMER', reason },
+        { jobId, actorId: user.id, actorType, reason },
         jobId
       )
 
@@ -48,6 +58,28 @@ export async function POST(request: NextRequest) {
     const job = await prisma.jobPosting.findUnique({ where: { id: jobId } })
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    let isParticipant = job.customerId === user.id
+    if (!isParticipant) {
+      const tasker = await prisma.taskerProfile.findUnique({
+        where: { userId: user.id },
+        select: { id: true },
+      })
+      if (tasker) {
+        const assignment = await prisma.assignment.findFirst({
+          where: {
+            jobId,
+            taskerId: tasker.id,
+            status: { in: ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] },
+          },
+          select: { id: true },
+        })
+        isParticipant = !!assignment
+      }
+    }
+    if (!isParticipant) {
+      return NextResponse.json({ error: 'You are not part of this job' }, { status: 403 })
     }
 
     const dispute = await prisma.dispute.create({
