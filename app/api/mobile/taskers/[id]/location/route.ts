@@ -34,7 +34,6 @@ export async function GET(
         where: {
           jobId: job.id,
           companyId: quote.providerId,
-          workerUserId: { not: null },
           status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
         },
         select: { workerUserId: true },
