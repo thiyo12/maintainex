@@ -366,7 +366,7 @@ export async function PATCH(request: NextRequest) {
       if (marketplaceDispute.status === 'RESOLVING') {
         const escrow = await prisma.jobEscrow.findUnique({
           where: { id: marketplaceDispute.escrowId },
-          select: { status: true },
+          select: { status: true, paymentMethod: true },
         })
 
         if (
@@ -402,15 +402,71 @@ export async function PATCH(request: NextRequest) {
             select: { status: true },
             orderBy: { updatedAt: 'desc' },
           })
-          if (refundIntent || escrow?.status === 'ON_HOLD') {
+          if (refundIntent) {
             return NextResponse.json(
               {
                 dispute: marketplaceDispute,
-                refundStatus: refundIntent?.status || 'REFUND_PROCESSING',
+                refundStatus: refundIntent.status,
                 message: 'Customer refund is still being reconciled.',
               },
               { status: 202 }
             )
+          }
+
+          if (escrow?.status === 'ON_HOLD') {
+            const recoveredRefund = await refundEscrow(
+              {
+                jobId: marketplaceDispute.jobId,
+                actorId: security.adminId,
+                actorType: 'STAFF',
+                reason: resolution || 'Recover interrupted dispute refund',
+              },
+              marketplaceDispute.jobId,
+            )
+
+            if (recoveredRefund.refundPendingExternal) {
+              return NextResponse.json(
+                {
+                  dispute: marketplaceDispute,
+                  refundStatus: 'REFUND_REQUIRED',
+                  message: 'Recovered the interrupted refund; external reconciliation is pending.',
+                },
+                { status: 202 }
+              )
+            }
+
+            const updated = await finalizeMarketplaceDisputeRecord({
+              disputeId,
+              adminId: security.adminId,
+              resolution: resolution || marketplaceDispute.resolution || 'Recovered dispute refund',
+              resolutionAction: canonicalAction,
+            })
+            const recoveredCash =
+              'cashCancelled' in recoveredRefund && recoveredRefund.cashCancelled === true
+
+            await Promise.all(
+              participantIds.map(recipientId =>
+                recoveredCash
+                  ? notifyCashDisputeResolved(
+                      marketplaceDispute.jobId,
+                      recipientId,
+                      marketplaceDispute.job.title,
+                      'CUSTOMER_NO_PLATFORM_REFUND',
+                    )
+                  : notifyDisputeResolved(
+                      marketplaceDispute.jobId,
+                      recipientId,
+                      marketplaceDispute.job.title,
+                      'REFUND_CUSTOMER',
+                    )
+              )
+            )
+
+            return NextResponse.json({
+              dispute: updated,
+              financialAction: canonicalAction,
+              recovered: true,
+            })
           }
         }
 
