@@ -27,6 +27,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'If an account exists with that email, a reset code has been sent.' })
     }
 
+    if (
+      !user.isActive ||
+      user.isBanned ||
+      (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > new Date()))
+    ) {
+      return NextResponse.json({
+        success: true,
+        message: 'If an account exists with that email, a reset code has been sent.',
+      })
+    }
+
     const code = isSyntheticCertAccount(user)
       ? '000000'
       : randomInt(0, 1000000).toString().padStart(6, '0')
