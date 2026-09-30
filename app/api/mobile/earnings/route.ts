@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
 import { readCanonicalProviderBalance } from '@/lib/financial-read'
-import { bigIntToSafeNumber } from '@/lib/shared/money/money'
+import { bigIntToSafeNumber, getCurrencyForCountry } from '@/lib/shared/money/money'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,12 +11,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const countryCode = user.countryCode || 'LK'
+    const currency = getCurrencyForCountry(countryCode)
+
     const [payouts, canonicalBalance] = await Promise.all([
       prisma.payout.findMany({
-        where: { userId: user.id },
+        where: { userId: user.id, countryCode, currency },
         orderBy: { createdAt: 'desc' },
       }),
-      readCanonicalProviderBalance(user.id, 'LKR'),
+      readCanonicalProviderBalance(user.id, currency),
     ])
 
     const walletId = canonicalBalance?.walletId ?? null
@@ -27,7 +30,7 @@ export async function GET(request: NextRequest) {
             accountType: 'PROVIDER_WALLET',
             entryType: 'CREDIT',
             referenceType: 'ESCROW_RELEASE',
-            currency: 'LKR',
+            currency,
           },
           _sum: { amount: true },
         })
@@ -69,6 +72,8 @@ export async function GET(request: NextRequest) {
       where: {
         providerId: user.id,
         status: 'PENDING',
+        countryCode,
+        currency,
       },
       include: {
         weeklySettlement: {
@@ -83,6 +88,8 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json({
+      countryCode,
+      currency,
       totalEarned,
       pendingAmount,
       availableBalance,
