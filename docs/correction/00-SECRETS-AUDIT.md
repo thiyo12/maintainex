@@ -1,57 +1,42 @@
 # MaintainEX Secrets Audit
 
+## Security notice
+
+Production secret values must never be stored in Git, documentation, source code, examples, issues, pull requests, build logs, or screenshots.
+
+This repository intentionally contains only variable names and risk classifications. Production values are stored only in the deployment environment / secret manager.
+
 ## Environment Variables (Server)
 
-| Variable | Required | Default | Risk |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | Local SQLite | HIGH — contains password |
-| `NEXTAUTH_SECRET` | Yes | None | HIGH — shared across mobile JWT + admin HMAC |
-| `NEXTAUTH_URL` | Yes | None | MEDIUM |
-| `JWT_SECRET` | No | Falls back to `NEXTAUTH_SECRET` | MEDIUM |
-| `JWT_REFRESH_SECRET` | No | Falls back to `NEXTAUTH_SECRET` | MEDIUM |
-| `PASSWORD_PEPPER` | Yes | None | HIGH — peppered hashes |
-| `CLOUDINARY_CLOUD_NAME` | Yes | None | LOW |
-| `CLOUDINARY_API_KEY` | Yes | None | LOW |
-| `CLOUDINARY_API_SECRET` | Yes | None | LOW |
-| `CRON_SECRET` | Yes | None | LOW — simple string |
-| `NODE_ENV` | No | `development` | LOW |
+| Variable | Required | Risk |
+|---|---|---|
+| `DATABASE_URL` | Yes | HIGH — contains database credentials |
+| `NEXTAUTH_SECRET` | Legacy/compatibility | HIGH — authentication secret |
+| `JWT_SECRET` | Legacy/compatibility | HIGH — authentication secret |
+| `JWT_REFRESH_SECRET` | Legacy/compatibility | HIGH — refresh-token secret |
+| `MARKETPLACE_JWT_SECRET` | Yes | HIGH — marketplace token signing |
+| `STAFF_JWT_SECRET` | Yes | HIGH — staff token signing |
+| `PASSWORD_PEPPER` | Yes | HIGH — password hashing pepper |
+| `CRON_SECRET` | Yes | HIGH — machine authentication |
+| `INTERNAL_SYNC_SECRET` | Yes | HIGH — internal machine authentication |
+| `CLOUDINARY_CLOUD_NAME` | As configured | LOW |
+| `CLOUDINARY_API_KEY` | As configured | MEDIUM |
+| `CLOUDINARY_API_SECRET` | As configured | HIGH |
+| `NEXTAUTH_URL` | Yes | LOW — public URL |
+| `NODE_ENV` | No | LOW |
 
 ## Environment Variables (Mobile)
 
 | Variable | Required | Risk |
 |---|---|---|
-| `EXPO_PUBLIC_API_URL` | Yes | MEDIUM — API base URL |
-| `EXPO_PUBLIC_SOCKET_URL` | Yes | LOW — WebSocket URL |
+| `EXPO_PUBLIC_API_URL` | Yes | LOW — public API base URL |
+| `EXPO_PUBLIC_SOCKET_URL` | As configured | LOW — public WebSocket URL |
 
-## Shared Secret Problem
+## Rules
 
-`NEXTAUTH_SECRET` is used by:
-1. Mobile JWT (`lib/mobile-auth.ts`) — 30-day tokens
-2. Admin legacy HMAC (`lib/auth-utils.ts`) — 30-day tokens
-3. Admin new JWT fallback (`lib/admin-auth.ts`) — when `JWT_SECRET` not set
-4. Middleware inline verifier (`middleware.ts`) — Web Crypto API
-
-**Impact:** Compromising `NEXTAUTH_SECRET` compromises all three auth systems.
-
-## VPS Production Values
-
-| Variable | Value |
-|---|---|
-| `DATABASE_URL` | `postgresql://postgres:maintainex_db_2025@dokploy-postgres...` |
-| `NEXTAUTH_SECRET` | `11c0f0358d35bf00cf0494186a158abeb4b9997afc53ca352cffcf086c54fd8a` |
-| `NEXTAUTH_URL` | `https://maintainex.lk` |
-| `JWT_SECRET` | `2142a1e2f0b63c6464cd5cb4b3a2d3d3` |
-| `JWT_REFRESH_SECRET` | `3e1e16d37c150c5e9347cd0e4748ee80` |
-| `PASSWORD_PEPPER` | `3f076c47424a3b2c7d61b058f6942c4f` |
-| `CRON_SECRET` | `maintainex-cron-secure-key-2025` |
-| `CLOUDINARY_*` | Set |
-| `EXPO_PUBLIC_API_URL` | `https://maintainex.lk` |
-| `EXPO_PUBLIC_SOCKET_URL` | `wss://maintainex.lk` |
-
-## Recommendations
-
-1. Separate `NEXTAUTH_SECRET` into dedicated secrets per system
-2. Strengthen `CRON_SECRET` (current value is weak)
-3. Add `.env.example` for developer onboarding
-4. Rotate secrets periodically
-5. Never commit secrets to repository
+1. Never commit real secret values.
+2. Use generated placeholders in `.env.example`.
+3. Store production secrets only in Dokploy/VPS environment configuration or an approved secret manager.
+4. Rotate any secret that is ever exposed publicly.
+5. Authentication secrets must be independent from one another.
+6. Keep production database credentials out of documentation and scripts.
