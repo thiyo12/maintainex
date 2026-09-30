@@ -205,8 +205,8 @@ export default function WishlistPage() {
 
   return (
     <>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
           <h1 className="text-2xl font-bold">Website & App Wishlist</h1>
           {activeTab === 'wishlist' && canManageWishlist && (
             <button
@@ -219,7 +219,7 @@ export default function WishlistPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-full sm:w-fit overflow-x-auto">
           <button
             onClick={() => setActiveTab('wishlist')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition ${
@@ -269,8 +269,8 @@ export default function WishlistPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex gap-4 mb-6">
-              <div className="flex gap-2">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center mb-6">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 {['NEW', 'PLANNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'].map((status) => (
                   <button
                     key={status}
@@ -364,8 +364,8 @@ export default function WishlistPage() {
               <div className="text-center py-8 text-gray-500">No waitlist signups yet</div>
             ) : (
               <>
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full">
+                <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
+                  <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th className="text-left px-4 py-3 text-sm font-semibold text-gray-700">Phone</th>
