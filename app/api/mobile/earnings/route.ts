@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const v2CompletedRows = await prisma.$queryRaw<Array<{ count: bigint }>>\`
+    const v2CompletedRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(DISTINCT mj.id)::bigint AS count
       FROM "MarketplaceJob" mj
       JOIN "JobQuote" jq ON jq."jobId" = mj.id
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         AND jq."providerType" = 'INDIVIDUAL'
         AND jq."providerId" = ${user.id}
         AND jq.status = 'ACCEPTED'
-    \`
+    `
     const completedJobs = v1CompletedJobs + Number(v2CompletedRows[0]?.count ?? 0n)
 
     const totalEarned = bigIntToSafeNumber(totalEarnedMinor) / 100
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       completedJobs,
       recentPayouts: payouts.slice(0, 20).map(p => ({
         id: p.id,
-        amount: Number(p.amount) / 100,
+        amount: bigIntToSafeNumber(p.amount) / 100,
         description: p.description,
         status: p.status,
         source: p.source,
