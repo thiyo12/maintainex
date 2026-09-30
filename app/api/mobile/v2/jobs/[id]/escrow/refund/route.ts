@@ -42,7 +42,6 @@ export async function POST(
           where: {
             jobId: id,
             companyId: accepted.providerId,
-            workerUserId: { not: null },
             status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] },
           },
           select: { workerUserId: true },
