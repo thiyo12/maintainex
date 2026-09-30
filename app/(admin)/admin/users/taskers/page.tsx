@@ -9,6 +9,8 @@ import {
   FiExternalLink, FiShield
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface TaskerUser {
   id: string
@@ -53,6 +55,12 @@ type SortField = 'name' | 'email' | 'createdAt' | 'mxId' | 'rating'
 type SortDir = 'asc' | 'desc'
 
 function TaskerPageContent() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canVerify = permissions.includes('taskers:verify')
+  const canSuspend = permissions.includes('users:suspend')
+  const canBan = permissions.includes('users:ban')
   const [taskers, setTaskers] = useState<TaskerUser[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -110,6 +118,14 @@ function TaskerPageContent() {
 
   const handleAction = async () => {
     if (!confirmAction) return
+    const isVerifyAction = confirmAction.action === 'verify_tasker' || confirmAction.action === 'reject_tasker'
+    const isSuspendAction = confirmAction.action === 'suspend' || confirmAction.action === 'unsuspend'
+    const isBanAction = confirmAction.action === 'ban' || confirmAction.action === 'unban'
+    if (
+      (isVerifyAction && !canVerify) ||
+      (isSuspendAction && !canSuspend) ||
+      (isBanAction && !canBan)
+    ) return
     setActionLoading(confirmAction.userId)
     try {
       const res = await fetch('/api/admin/users', {
@@ -343,7 +359,7 @@ function TaskerPageContent() {
                             >
                               <FiEye size={16} />
                             </Link>
-                            {tasker.taskerProfile?.verificationStatus === 'PENDING' && (
+                            {canVerify && tasker.taskerProfile?.verificationStatus === 'PENDING' && (
                               <>
                                 <button
                                   onClick={() => setConfirmAction({ userId: tasker.id, action: 'verify_tasker', label: 'Verify' })}
@@ -361,7 +377,7 @@ function TaskerPageContent() {
                                 </button>
                               </>
                             )}
-                            {!tasker.isBanned && !tasker.isSuspended && (
+                            {canSuspend && !tasker.isBanned && !tasker.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'suspend', label: 'Suspend' })}
                                 className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -370,7 +386,7 @@ function TaskerPageContent() {
                                 <FiClock size={16} />
                               </button>
                             )}
-                            {tasker.isSuspended && (
+                            {canSuspend && tasker.isSuspended && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'unsuspend', label: 'Unsuspend' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
@@ -379,7 +395,7 @@ function TaskerPageContent() {
                                 <FiUserCheck size={16} />
                               </button>
                             )}
-                            {!tasker.isBanned && (
+                            {canBan && !tasker.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'ban', label: 'Ban' })}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -388,7 +404,7 @@ function TaskerPageContent() {
                                 <FiUserX size={16} />
                               </button>
                             )}
-                            {tasker.isBanned && (
+                            {canBan && tasker.isBanned && (
                               <button
                                 onClick={() => setConfirmAction({ userId: tasker.id, action: 'unban', label: 'Unban' })}
                                 className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
