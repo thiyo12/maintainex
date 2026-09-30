@@ -6,6 +6,8 @@ import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
 import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
+import { notifyAllAdmins } from '@/lib/admin-notifications'
+import { createWorkItem } from '@/lib/work-queue'
 
 async function getAcceptedProviderRecipientIds(jobId: string): Promise<string[]> {
   const accepted = await prisma.jobQuote.findFirst({
@@ -139,18 +141,47 @@ export async function POST(
         ? await getAcceptedProviderRecipientIds(job.id)
         : [job.customerId]
 
-      await raiseJobDispute(
-        { jobId: job.id, actorId: user.id, actorType, reason: reason || undefined },
+      const dispute = await raiseJobDispute(
+        {
+          jobId: job.id,
+          actorId: user.id,
+          actorType,
+          reason: reason || undefined,
+          metadata: {
+            description:
+              typeof body.description === 'string'
+                ? body.description.trim().slice(0, 5000)
+                : reason || 'Dispute raised',
+          },
+        },
         job.id
       )
 
-      await Promise.all(
-        disputeRecipientIds.map(recipientId =>
+      await Promise.all([
+        ...disputeRecipientIds.map(recipientId =>
           notifyDisputeRaised(job.id, recipientId, job.title)
-        )
-      )
+        ),
+        notifyAllAdmins(
+          'dispute_raised',
+          `New Dispute: ${reason || 'Job dispute'}`,
+          `A marketplace dispute was raised on "${job.title}" and escrow is now on hold.`,
+          '/admin/jobs/disputes',
+        ),
+        createWorkItem({
+          category: 'dispute',
+          title: `Marketplace dispute: ${reason || job.title}`,
+          description: `Escrow is on hold for "${job.title}". Review the dispute and choose release-to-provider or refund-customer.`,
+          targetTable: 'MarketplaceDispute',
+          targetId: dispute.disputeId,
+          priority: 'high',
+        }),
+      ])
 
-      return NextResponse.json({ success: true, message: 'Dispute raised' })
+      return NextResponse.json({
+        success: true,
+        message: 'Dispute raised',
+        disputeId: dispute.disputeId,
+      })
     }
 
     if (action === 'CANCEL') {
