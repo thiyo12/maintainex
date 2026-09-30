@@ -20,6 +20,7 @@ describe('admin JWT country scope preservation', () => {
       firstName: 'Ops',
       lastName: 'Manager',
       assignedCountries: ['LK', 'CA'],
+      sessionId: 'session-country-test',
     })
 
     const decoded = verifySimpleToken(token)
@@ -31,6 +32,7 @@ describe('admin JWT country scope preservation', () => {
       firstName: 'Ops',
       lastName: 'Manager',
       assignedCountries: ['LK', 'CA'],
+      sessionId: 'session-country-test',
       type: 'access',
     })
   })
@@ -45,6 +47,7 @@ describe('admin JWT country scope preservation', () => {
       firstName: 'Finance',
       lastName: 'Operator',
       assignedCountries: ['LK'],
+      sessionId: 'session-cookie-test',
     })
 
     const session = await getAdminSession({
@@ -75,6 +78,7 @@ describe('admin JWT country scope preservation', () => {
       firstName: 'Support',
       lastName: 'Agent',
       assignedCountries: [],
+      sessionId: 'session-empty-scope',
     })
 
     const decoded = verifySimpleToken(token)
