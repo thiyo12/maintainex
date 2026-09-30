@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (blocked) return blocked
 
     const body = await request.json()
-    const { templateJobId, providerId, date, timeSlot, address, district, notes, latitude, longitude, countryCode } = body
+    const { templateJobId, providerId, providerType, date, timeSlot, address, district, notes, latitude, longitude, countryCode } = body
 
     if (!templateJobId || !providerId || !date || !timeSlot || !address || !district) {
       return NextResponse.json({
@@ -21,6 +21,22 @@ export async function POST(request: NextRequest) {
     const scheduledDate = new Date(date)
     if (Number.isNaN(scheduledDate.getTime())) {
       return NextResponse.json({ error: 'Invalid booking date' }, { status: 400 })
+    }
+    if (scheduledDate.getTime() < Date.now() - 5 * 60 * 1000) {
+      return NextResponse.json({ error: 'Booking date must be in the future' }, { status: 400 })
+    }
+
+    const normalizedTimeSlot = String(timeSlot).trim().toLowerCase()
+    if (!['morning', 'afternoon', 'evening', 'anytime'].includes(normalizedTimeSlot)) {
+      return NextResponse.json({ error: 'Invalid timeSlot' }, { status: 400 })
+    }
+
+    const normalizedProviderType =
+      providerType == null || providerType === ''
+        ? 'INDIVIDUAL'
+        : String(providerType).trim().toUpperCase()
+    if (!['INDIVIDUAL', 'COMPANY'].includes(normalizedProviderType)) {
+      return NextResponse.json({ error: 'providerType must be INDIVIDUAL or COMPANY' }, { status: 400 })
     }
 
     const requestedCountryCode = typeof countryCode === 'string' && countryCode.trim()
@@ -38,14 +54,15 @@ export async function POST(request: NextRequest) {
       customerId: user.id,
       templateJobId: String(templateJobId).trim(),
       providerId: String(providerId).trim(),
+      providerType: normalizedProviderType as 'INDIVIDUAL' | 'COMPANY',
       scheduledDate,
-      timeSlot: String(timeSlot).trim(),
+      timeSlot: normalizedTimeSlot,
       address: String(address).trim(),
       district: String(district).trim(),
       notes: typeof notes === 'string' ? notes.slice(0, 5000) : undefined,
       latitude: typeof latitude === 'number' ? latitude : undefined,
       longitude: typeof longitude === 'number' ? longitude : undefined,
-      countryCode: typeof countryCode === 'string' ? countryCode : undefined,
+      countryCode: requestedCountryCode,
     })
 
     return NextResponse.json({
