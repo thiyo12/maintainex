@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       overdueSettlements,
       totalCommissionOwed,
       totalCommissionPaid,
+      commissionByCurrency,
       pendingCheatingReports,
       classicTotal,
       classicOpen,
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
       marketplaceOpen,
       marketplaceCompleted,
       totalWalletBalance,
+      walletByCurrency,
       weeklySettlementsPending,
       weeklySettlementsOverdue,
       commissionSetting,
@@ -72,6 +74,12 @@ export async function GET(request: NextRequest) {
         where: { ...settlementWhere, status: 'PAID' },
         _sum: { commissionOwed: true },
       }),
+      prisma.weeklySettlement.groupBy({
+        by: ['currency', 'status'],
+        where: settlementWhere,
+        _sum: { commissionOwed: true },
+        _count: { _all: true },
+      }),
       prisma.offPlatformDeal.count({
         where: { ...countryFilter, status: 'PENDING' },
       }),
@@ -82,6 +90,11 @@ export async function GET(request: NextRequest) {
       prisma.marketplaceJob.count({ where: { ...marketplaceWhere, status: 'OPEN' } }),
       prisma.marketplaceJob.count({ where: { ...marketplaceWhere, status: 'COMPLETED' } }),
       prisma.providerWallet.aggregate({
+        where: walletWhere,
+        _sum: { availableBalance: true },
+      }),
+      prisma.providerWallet.groupBy({
+        by: ['currency'],
         where: walletWhere,
         _sum: { availableBalance: true },
       }),
@@ -102,6 +115,43 @@ export async function GET(request: NextRequest) {
     ])
 
     const commissionRate = Number(commissionSetting?.value ?? 10)
+
+    const commissionCurrencyMap = new Map<string, {
+      pendingCommission: number
+      paidCommission: number
+    }>()
+
+    for (const row of commissionByCurrency) {
+      const current = commissionCurrencyMap.get(row.currency) || {
+        pendingCommission: 0,
+        paidCommission: 0,
+      }
+      if (row.status === 'PAID') {
+        current.paidCommission += Number(row._sum.commissionOwed || 0)
+      } else if (row.status === 'PENDING' || row.status === 'OVERDUE' || row.status === 'SUSPENDED') {
+        current.pendingCommission += Number(row._sum.commissionOwed || 0)
+      }
+      commissionCurrencyMap.set(row.currency, current)
+    }
+
+    const walletCurrencyMap = new Map(
+      walletByCurrency.map(row => [
+        row.currency,
+        Number(row._sum.availableBalance || 0),
+      ])
+    )
+
+    const financeCurrencies = [...new Set([
+      ...commissionCurrencyMap.keys(),
+      ...walletCurrencyMap.keys(),
+    ])].sort()
+
+    const financeByCurrency = financeCurrencies.map(currency => ({
+      currency,
+      pendingCommission: commissionCurrencyMap.get(currency)?.pendingCommission || 0,
+      paidCommission: commissionCurrencyMap.get(currency)?.paidCommission || 0,
+      providerWalletBalance: walletCurrencyMap.get(currency) || 0,
+    }))
 
     return NextResponse.json(
       {
@@ -124,6 +174,7 @@ export async function GET(request: NextRequest) {
           totalWalletBalance: totalWalletBalance._sum.availableBalance || 0,
           commissionRate: Number.isFinite(commissionRate) ? commissionRate : 10,
         },
+        financeByCurrency,
         weeklySummary: {
           pendingCommission: weeklySettlementsPending._sum.commissionOwed || 0,
           pendingCount: weeklySettlementsPending._count,
