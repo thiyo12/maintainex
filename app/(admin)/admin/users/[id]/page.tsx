@@ -155,6 +155,16 @@ export default function User360Page() {
   const account = data?.user
   const role = (admin?.role || 'SUPPORT') as AdminRole
   const permissions = ROLE_PERMISSIONS[role] || []
+  const canSuspendAccount = account?.role === 'TASKER'
+    ? permissions.includes('taskers:edit')
+    : account?.role === 'COMPANY'
+      ? permissions.includes('companies:edit')
+      : canSuspendAccount
+  const canBanAccount = account?.role === 'TASKER'
+    ? permissions.includes('taskers:ban')
+    : account?.role === 'COMPANY'
+      ? permissions.includes('companies:ban')
+      : canBanAccount
   const visibleTabs = TABS.filter(item =>
     item.key === 'overview' ||
     (item.key === 'work' && data?.permissions.work) ||
@@ -185,7 +195,10 @@ export default function User360Page() {
     let reason: string | null = null
     if (needsReason) {
       reason = window.prompt(`Reason for ${action.replaceAll('_', ' ')}:`)?.trim() || null
-      if (!reason) return
+      if (!reason || reason.length < 3) {
+        toast.error('Please enter a reason of at least 3 characters')
+        return
+      }
     }
 
     if (!window.confirm(`Confirm ${action.replaceAll('_', ' ')} for ${account.name}?`)) return
