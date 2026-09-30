@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
 import { FiDollarSign, FiSave, FiRefreshCw, FiAlertTriangle } from 'react-icons/fi'
 import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface MarketConfig {
   id: string
@@ -71,6 +72,7 @@ export default function MarketConfigPage() {
 function MarketConfigContent() {
   const { user } = useAdminSession()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const canWriteMarketConfig = !!user && (ROLE_PERMISSIONS[user.role as AdminRole] || []).includes('market_config:write')
   const allowedCountries = isSuperAdmin
     ? ['LK', 'CA', 'GLOBAL']
     : (user?.assignedCountries || [])
@@ -104,6 +106,7 @@ function MarketConfigContent() {
   }, [fetchConfig, allowedCountries.join('|'), countryCode])
 
   const handleChange = (key: string, value: string) => {
+    if (!canWriteMarketConfig) return
     const num = parseFloat(value)
     if (isNaN(num)) return
     setChanges(prev => ({ ...prev, [key]: num }))
@@ -112,6 +115,10 @@ function MarketConfigContent() {
   const hasChanges = Object.keys(changes).length > 0 && reason.trim().length > 0
 
   const handleSave = async () => {
+    if (!canWriteMarketConfig) {
+      toast.error('You do not have permission to edit market configuration')
+      return
+    }
     if (!hasChanges || !config) return
     setSaving(true)
     try {
@@ -174,11 +181,15 @@ function MarketConfigContent() {
           <div className="bg-[#15161E] rounded-xl p-4 border border-gray-800">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">Last updated: {new Date(config.updatedAt).toLocaleString()}</span>
-              {Object.keys(changes).length > 0 && (
+              {canWriteMarketConfig && Object.keys(changes).length > 0 && (
                 <span className="text-amber-400">{Object.keys(changes).length} unsaved change(s)</span>
               )}
             </div>
           </div>
+
+          {!canWriteMarketConfig && (
+            <div className="bg-[#15161E] rounded-xl p-3 border border-gray-800 text-sm text-gray-500">Read-only access. Your role can view this market but cannot change pricing or matching configuration.</div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {EDITABLE_FIELDS.map(f => (
@@ -187,6 +198,7 @@ function MarketConfigContent() {
                 <input type="number" step="any"
                   value={changes[f.key] !== undefined ? changes[f.key] : (config as any)[f.key]}
                   onChange={e => handleChange(f.key, e.target.value)}
+                  disabled={!canWriteMarketConfig}
                   className={`w-full bg-[#0B0C12] border rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 ${
                     changes[f.key] !== undefined ? 'border-amber-500 bg-amber-500/10' : 'border-gray-700'
                   }`} />
