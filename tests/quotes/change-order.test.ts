@@ -54,6 +54,29 @@ function mockPrisma(overrides: Record<string, any> = {}) {
     jobChangeOrderLineItem: {
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    jobEscrow: {
+      findFirst: vi.fn().mockResolvedValue(overrides.escrow ?? {
+        id: 'escrow-1',
+        jobId: 'job-1',
+        amount: 50000n,
+        serviceFee: 5000n,
+        totalAmount: 55000n,
+        currency: 'LKR',
+        status: 'PENDING_PAYMENT',
+        createdAt: new Date('2026-09-10'),
+      }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    paymentIntent: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    marketConfig: {
+      findUnique: vi.fn().mockResolvedValue({
+        countryCode: 'LK',
+        defaultCurrency: 'LKR',
+        commissionRateBps: 1000,
+      }),
+    },
     idempotencyRecord: {
       findFirst: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue({}),
@@ -392,7 +415,12 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
           jobId: 'job-1',
           amountDeltaCents: overrides.delta ?? 5000n,
           baseQuoteId: 'quote-accepted',
-          job: { customerId: 'customer-1', finalAuthorizedAmountCents: 50000n },
+          job: {
+            customerId: 'customer-1',
+            finalAuthorizedAmountCents: 50000n,
+            countryCode: 'LK',
+            status: 'QUOTE_ACCEPTED',
+          },
         })
         .mockResolvedValue({
           id: 'co-1',
@@ -416,6 +444,50 @@ describe('Phase 10.4 — Change Order Lifecycle', () => {
         where: { id: 'co-1', status: 'SUBMITTED' },
         data: expect.objectContaining({ status: 'APPROVED' }),
       })
+    })
+
+    it('reprices pending escrow and invalidates stale payment intents', async () => {
+      const client = approvalClient()
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+
+      expect(result.success).toBe(true)
+      expect(client.jobEscrow.updateMany).toHaveBeenCalledWith({
+        where: { id: 'escrow-1', status: 'PENDING_PAYMENT' },
+        data: {
+          amount: 55000n,
+          serviceFee: 5500n,
+          totalAmount: 60500n,
+        },
+      })
+      expect(client.paymentIntent.updateMany).toHaveBeenCalledWith({
+        where: {
+          jobId: 'job-1',
+          status: { in: ['CREATED', 'PENDING'] },
+        },
+        data: { status: 'CANCELLED' },
+      })
+    })
+
+    it('rejects a price-changing approval after escrow is already funded', async () => {
+      const client = approvalClient()
+      client.jobEscrow.findFirst.mockResolvedValue({
+        id: 'escrow-1',
+        jobId: 'job-1',
+        amount: 50000n,
+        serviceFee: 5000n,
+        totalAmount: 55000n,
+        currency: 'LKR',
+        status: 'PROTECTED',
+        createdAt: new Date('2026-09-10'),
+      })
+
+      const result = await approveChangeOrder(client, 'co-1', 'customer-1')
+
+      expect(result).toEqual({
+        success: false,
+        error: 'CHANGE_ORDER_TOPUP_NOT_SUPPORTED_AFTER_FUNDING',
+      })
+      expect(client.marketplaceJob.update).not.toHaveBeenCalled()
     })
 
     it('rejects a concurrent second approval', async () => {
