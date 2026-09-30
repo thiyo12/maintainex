@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateRequest } from '@/lib/auth/compatibility/mobile-auth'
+import {
+  assertCrmCountryAllowed,
+  getCrmCountryFilter,
+  guardCrmRequest,
+} from '@/lib/crm/security'
 import { releaseEscrow, refundEscrow } from '@/lib/finance/escrow/escrow-service'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 
@@ -15,16 +19,29 @@ function serializeEscrow<T extends { amount: bigint; serviceFee: bigint; totalAm
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:view',
+      level: 'read',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10) || 20))
-    const where: { status?: string } = {}
+
+    let scopedJobIds: string[] | null = null
+    if (!security.isSuperAdmin) {
+      scopedJobIds = (await prisma.marketplaceJob.findMany({
+        where: getCrmCountryFilter(security),
+        select: { id: true },
+      })).map(job => job.id)
+    }
+
+    const where: any = {}
+    if (scopedJobIds) where.jobId = { in: scopedJobIds }
     if (status) where.status = status
 
     const [escrows, total] = await Promise.all([
@@ -37,7 +54,10 @@ export async function GET(request: NextRequest) {
       prisma.jobEscrow.count({ where }),
     ])
 
-    return NextResponse.json({ escrows: escrows.map(serializeEscrow), total, page, limit })
+    return NextResponse.json(
+      { escrows: escrows.map(serializeEscrow), total, page, limit },
+      { headers: { 'Cache-Control': 'no-store' } }
+    )
   } catch (error) {
     console.error('Admin escrows error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
@@ -46,15 +66,18 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await authenticateRequest(request)
-    if (!user || !['SUPER_ADMIN', 'MANAGER', 'FINANCE'].includes(user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const guard = await guardCrmRequest(request, {
+      permission: 'commission:manage',
+      level: 'sensitive',
+      requireCountryScope: true,
+    })
+    if (!guard.ok) return guard.response
+    const security = guard.context
 
     const rateLimitResponse = await requireFinancialRateLimit(request, 'admin-escrow')
     if (rateLimitResponse) return rateLimitResponse
 
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const escrowId = typeof body.escrowId === 'string' ? body.escrowId.trim() : ''
     const action = typeof body.action === 'string' ? body.action.trim().toUpperCase() : ''
     if (!escrowId || !['RELEASE', 'REFUND'].includes(action)) {
@@ -63,13 +86,23 @@ export async function PATCH(request: NextRequest) {
 
     const escrow = await prisma.jobEscrow.findUnique({ where: { id: escrowId } })
     if (!escrow) return NextResponse.json({ error: 'Escrow not found' }, { status: 404 })
+
+    const job = await prisma.marketplaceJob.findUnique({
+      where: { id: escrow.jobId },
+      select: { countryCode: true },
+    })
+    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    if (!assertCrmCountryAllowed(security, job.countryCode)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     if (escrow.status !== 'ON_HOLD') {
-      return NextResponse.json({ error: 'Escrow must be ON_HOLD for an admin resolution' }, { status: 400 })
+      return NextResponse.json({ error: 'Escrow must be ON_HOLD for an admin resolution' }, { status: 409 })
     }
 
     if (action === 'RELEASE') {
       const result = await releaseEscrow(
-        { jobId: escrow.jobId, actorId: user.id, actorType: 'STAFF', reason: 'Admin force-release' },
+        { jobId: escrow.jobId, actorId: security.adminId, actorType: 'STAFF', reason: 'Admin force-release' },
         escrow.jobId,
       )
       return NextResponse.json({
@@ -81,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const result = await refundEscrow(
-      { jobId: escrow.jobId, actorId: user.id, actorType: 'STAFF', reason: 'Admin refund' },
+      { jobId: escrow.jobId, actorId: security.adminId, actorType: 'STAFF', reason: 'Admin refund' },
       escrow.jobId,
     )
     return NextResponse.json({
