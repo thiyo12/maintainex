@@ -1,0 +1,110 @@
+name: Security Exposure Audit
+
+on:
+  push:
+    branches:
+      - feature/crm-job360
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan current tree and history without printing values
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess, json
+          from collections import Counter
+
+          patterns = [
+              ("private-key-material", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+              ("github-token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")),
+              ("aws-access-key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+              ("google-api-key", re.compile(r"\bAIza[0-9A-Za-z_-]{30,}\b")),
+              ("stripe-live-key", re.compile(r"\b(?:sk|rk)_live_[0-9A-Za-z]{16,}\b")),
+              ("slack-token", re.compile(r"\bxox[baprs]-[0-9A-Za-z-]{10,}\b")),
+              ("personal-local-path", re.compile(r"/Users/[A-Za-z0-9._-]+")),
+              ("ssh-key-filename", re.compile(r"\bid_(?:rsa|ed25519|ecdsa)[A-Za-z0-9._-]+\b")),
+          ]
+          literal_secret = re.compile(
+              r"""(?ix)
+              \b(?:password|passwd|secret|token|api[_-]?key|merchant[_-]?secret|private[_-]?key)
+              \s*[:=]\s*["']?
+              (?!\$\{|process\.env|<|your[-_ ]|change[-_ ]|generate[-_ ]|example|test\b|ci[-_ ]only)
+              [A-Za-z0-9+/_=.:-]{16,}
+              """
+          )
+
+          def classify(line):
+              hits = [name for name, rx in patterns if rx.search(line)]
+              if literal_secret.search(line):
+                  hits.append("possible-hardcoded-secret")
+              for m in re.finditer(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", line):
+                  ip=m.group(0)
+                  parts=[int(x) for x in ip.split(".")]
+                  if all(0 <= x <= 255 for x in parts):
+                      private = (
+                          parts[0] in (0,10,127) or
+                          (parts[0]==192 and parts[1]==168) or
+                          (parts[0]==172 and 16 <= parts[1] <= 31)
+                      )
+                      if not private:
+                          hits.append("public-ip")
+                          break
+              for m in re.finditer(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", line, re.I):
+                  e=m.group(0).lower()
+                  if not (e.endswith("@example.com") or e.endswith("@maintainex.com")):
+                      hits.append("non-example-email")
+                      break
+              return sorted(set(hits))
+
+          current=[]
+          tracked=subprocess.check_output(["git","ls-files","-z"]).split(b"\0")
+          for raw in tracked:
+              if not raw: continue
+              path=raw.decode("utf-8","replace")
+              try:
+                  data=open(path,"rb").read()
+              except OSError:
+                  continue
+              if b"\0" in data[:8192]:
+                  continue
+              text=data.decode("utf-8","ignore")
+              for n,line in enumerate(text.splitlines(),1):
+                  hits=classify(line)
+                  for h in hits:
+                      current.append({"category":h,"path":path,"line":n})
+
+          proc=subprocess.Popen(
+              ["git","log","--all","-p","--no-color","--format=commit:%H"],
+              stdout=subprocess.PIPE, text=True, errors="ignore"
+          )
+          hist=Counter()
+          first={}
+          commit=""
+          path=""
+          for line in proc.stdout:
+              if line.startswith("commit:"):
+                  commit=line.strip().split(":",1)[1]
+              elif line.startswith("+++ b/"):
+                  path=line[6:].strip()
+              elif line.startswith("+") and not line.startswith("+++"):
+                  for h in classify(line[1:]):
+                      hist[h]+=1
+                      first.setdefault(h,{"commit":commit,"path":path})
+          proc.wait()
+
+          print("CURRENT_FINDINGS_JSON="+json.dumps(current, separators=(",",":")))
+          print("HISTORY_COUNTS_JSON="+json.dumps(dict(hist), separators=(",",":")))
+          print("HISTORY_FIRST_LOCATION_JSON="+json.dumps(first, separators=(",",":")))
+          PY
