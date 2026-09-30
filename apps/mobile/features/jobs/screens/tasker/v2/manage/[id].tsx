@@ -287,8 +287,10 @@ export default function V2ProviderManageJobScreen() {
             <Text style={styles.sectionTitle}>{t('jobDetail.escrow')}</Text>
             <View style={styles.escrowCard}>
               <Text style={styles.escrowAmount}>{escrow.currency || 'LKR'} {(escrow.totalAmount || escrow.amount || 0).toLocaleString()}</Text>
-              <View style={[styles.escrowBadge, escrow.status === 'PROTECTED' ? styles.escrowActive : styles.escrowInactive]}>
-                <Text style={styles.escrowBadgeText}>{escrow.status}</Text>
+              <View style={[styles.escrowBadge, ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow.status) ? styles.escrowActive : styles.escrowInactive]}>
+                <Text style={styles.escrowBadgeText}>
+                  {escrow.status === 'CASH_CONFIRMED' ? 'CASH · DIRECT PAYMENT' : escrow.status}
+                </Text>
               </View>
             </View>
           </View>
@@ -352,7 +354,7 @@ export default function V2ProviderManageJobScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=ARRIVAL`)}
@@ -361,7 +363,7 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.verifyPinText}>Verify Arrival PIN</Text>
                 </TouchableOpacity>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && job.companyAssignment?.status !== 'ASSIGNED' && pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
                 <TouchableOpacity
                   style={[styles.verifyPinBtn]}
                   onPress={() => router.push(`/(tasker)/jobs/v2/manage/${id}/verify-pin?purpose=WORK_START`)}
@@ -370,22 +372,22 @@ export default function V2ProviderManageJobScreen() {
                   <Text style={styles.verifyPinText}>Start Work with PIN</Text>
                 </TouchableOpacity>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && !pinState?.hasActivePin && !pinState?.arrivalVerifiedAt && (
                 <View style={styles.waitingCard}>
                   <Ionicons name="time-outline" size={20} color={colors.amberDark} />
                   <Text style={styles.waitingText}>Waiting for the customer to generate the one-time arrival PIN.</Text>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status === 'PROTECTED' && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
+              {workspace.progressStatus === 'ACCEPTED' && ['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && !pinState?.hasActivePin && pinState?.arrivalVerifiedAt && !pinState?.workStartVerifiedAt && (
                 <View style={styles.waitingCard}>
                   <Ionicons name="time-outline" size={20} color={colors.amberDark} />
                   <Text style={styles.waitingText}>Arrival is confirmed. Waiting for the customer to generate a fresh Start Work PIN.</Text>
                 </View>
               )}
-              {workspace.progressStatus === 'ACCEPTED' && escrow?.status !== 'PROTECTED' && (
+              {workspace.progressStatus === 'ACCEPTED' && !['PROTECTED', 'CASH_CONFIRMED'].includes(escrow?.status) && (
                 <View style={styles.waitingCard}>
                   <Ionicons name="lock-closed-outline" size={20} color={colors.amberDark} />
-                  <Text style={styles.waitingText}>Waiting for the customer payment to be secured.</Text>
+                  <Text style={styles.waitingText}>Waiting for the customer to confirm a payment method.</Text>
                 </View>
               )}
               {workspace.progressStatus === 'COMPLETION_REQUESTED' && (
