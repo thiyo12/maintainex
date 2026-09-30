@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { postLedgerTransaction } from '@/lib/finance/ledger/ledger-service'
 import { bigIntToSafeNumber, type Currency } from '@/lib/shared/money/money'
@@ -298,7 +299,7 @@ export async function refundEscrow(ctx: TransitionContext, jobId: string) {
   if (!escrow) throw new Error('No refundable escrow found')
 
   const closeBooking = async (
-    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    tx: Prisma.TransactionClient,
     lifecycleAction: string,
     lifecycleMetadata: Record<string, unknown>
   ) => {
