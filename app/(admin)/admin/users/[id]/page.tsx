@@ -32,6 +32,13 @@ import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 type TabKey = 'overview' | 'work' | 'finance' | 'trust' | 'activity'
 
 interface Payload {
+  permissions: {
+    work: boolean
+    finance: boolean
+    trust: boolean
+    audit: boolean
+    security: boolean
+  }
   user: any
   jobs: {
     marketplace: any[]
@@ -148,6 +155,13 @@ export default function User360Page() {
   const account = data?.user
   const role = (admin?.role || 'SUPPORT') as AdminRole
   const permissions = ROLE_PERMISSIONS[role] || []
+  const visibleTabs = TABS.filter(item =>
+    item.key === 'overview' ||
+    (item.key === 'work' && data?.permissions.work) ||
+    (item.key === 'finance' && data?.permissions.finance) ||
+    (item.key === 'trust' && data?.permissions.trust) ||
+    (item.key === 'activity' && data?.permissions.audit)
+  )
 
   const accountState = account?.isBanned
     ? 'BANNED'
@@ -255,7 +269,7 @@ export default function User360Page() {
 
           <div className="mt-6 grid grid-cols-2 xl:grid-cols-4 gap-3">
             <Summary icon={FiShield} label="Identity" value={account.identityStatus || 'NOT SUBMITTED'} />
-            <Summary icon={FiBriefcase} label="Work records" value={String(workCount)} />
+            <Summary icon={FiBriefcase} label="Work records" value={data.permissions.work ? String(workCount) : 'Restricted'} />
             <Summary icon={FiMapPin} label="Market" value={account.countryCode || '—'} />
             <Summary icon={FiClock} label="Member since" value={new Date(account.createdAt).toLocaleDateString('en-LK')} />
           </div>
@@ -263,7 +277,7 @@ export default function User360Page() {
 
         <div className="border-t border-slate-100 px-3 md:px-5 overflow-x-auto">
           <div className="flex min-w-max">
-            {TABS.map(item => (
+            {visibleTabs.map(item => (
               <button
                 key={item.key}
                 type="button"
@@ -282,10 +296,10 @@ export default function User360Page() {
       <div className="grid xl:grid-cols-[minmax(0,1fr)_320px] gap-5 items-start">
         <div className="space-y-5">
           {tab === 'overview' && <Overview data={data} />}
-          {tab === 'work' && <Work data={data} />}
-          {tab === 'finance' && <Finance data={data} />}
-          {tab === 'trust' && <Trust data={data} />}
-          {tab === 'activity' && <Activity data={data} />}
+          {tab === 'work' && data.permissions.work && <Work data={data} />}
+          {tab === 'finance' && data.permissions.finance && <Finance data={data} />}
+          {tab === 'trust' && data.permissions.trust && <Trust data={data} />}
+          {tab === 'activity' && data.permissions.audit && <Activity data={data} />}
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-[92px]">
@@ -601,24 +615,26 @@ function Trust({ data }: { data: Payload }) {
         </Card>
       </div>
 
-      <Card title="Recent login security" subtitle="Device/IP changes and suspicious login signals">
-        {u.loginActivities?.length ? (
-          <div className="space-y-2">
-            {u.loginActivities.map((activity: any) => (
-              <div key={activity.id} className="rounded-xl border border-slate-200 p-3 flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-medium text-slate-800">{activity.location || activity.ipAddress}</div>
-                  <div className="text-xs text-slate-400 mt-1">{activity.userAgent || 'Unknown device'}</div>
-                </div>
-                <div className="text-right">
-                  <Badge value={activity.isSuspicious ? 'SUSPICIOUS' : 'NORMAL'} />
-                  <div className="text-xs text-slate-400 mt-1">{fmtDate(activity.createdAt)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : <Empty icon={FiShield} title="No login history" text="No recent login activity is available." />}
-      </Card>
+      {data.permissions.security && (
+              <Card title="Recent login security" subtitle="Device/IP changes and suspicious login signals">
+                {u.loginActivities?.length ? (
+                  <div className="space-y-2">
+                    {u.loginActivities.map((activity: any) => (
+                      <div key={activity.id} className="rounded-xl border border-slate-200 p-3 flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-medium text-slate-800">{activity.location || activity.ipAddress}</div>
+                          <div className="text-xs text-slate-400 mt-1">{activity.userAgent || 'Unknown device'}</div>
+                        </div>
+                        <div className="text-right">
+                          <Badge value={activity.isSuspicious ? 'SUSPICIOUS' : 'NORMAL'} />
+                          <div className="text-xs text-slate-400 mt-1">{fmtDate(activity.createdAt)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : <Empty icon={FiShield} title="No login history" text="No recent login activity is available." />}
+              </Card>
+      )}
     </>
   )
 }
