@@ -229,12 +229,44 @@ export async function PATCH(request: NextRequest) {
             suspendedUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           },
         })
-      } else if (action === 'UNSUSPEND' || action === 'MARK_PAID') {
+      } else if (action === 'UNSUSPEND') {
         const providerUser = await tx.user.findUnique({
           where: { id: settlement.providerId },
           select: { suspensionReason: true },
         })
         if (providerUser?.suspensionReason === 'Weekly commission not paid') {
+          await tx.user.update({
+            where: { id: settlement.providerId },
+            data: {
+              isSuspended: false,
+              suspensionReason: null,
+              suspendedUntil: null,
+            },
+          })
+        }
+      } else if (action === 'MARK_PAID') {
+        const [providerUser, otherBlockingDebt] = await Promise.all([
+          tx.user.findUnique({
+            where: { id: settlement.providerId },
+            select: { suspensionReason: true },
+          }),
+          tx.weeklySettlement.count({
+            where: {
+              providerId: settlement.providerId,
+              id: { not: settlement.id },
+              commissionPaid: false,
+              OR: [
+                { status: { in: ['OVERDUE', 'SUSPENDED'] } },
+                { dueAt: { lt: now } },
+              ],
+            },
+          }),
+        ])
+
+        if (
+          providerUser?.suspensionReason === 'Weekly commission not paid' &&
+          otherBlockingDebt === 0
+        ) {
           await tx.user.update({
             where: { id: settlement.providerId },
             data: {
