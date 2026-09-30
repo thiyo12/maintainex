@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { FiShield, FiCheck, FiX, FiEye, FiFileText, FiClock, FiUser, FiExternalLink } from 'react-icons/fi'
+import { useAdminSession } from '@/components/admin/AdminSessionProvider'
+import { ROLE_PERMISSIONS, type AdminRole } from '@/lib/admin-types'
 
 interface KYCDocument {
   id: string
@@ -70,6 +72,11 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 }
 
 export default function KYCPage() {
+  const { user: admin } = useAdminSession()
+  const role = (admin?.role || 'SUPPORT') as AdminRole
+  const permissions = ROLE_PERMISSIONS[role] || []
+  const canApprove = permissions.includes('kyc:approve')
+  const canReject = permissions.includes('kyc:reject')
   const [documents, setDocuments] = useState<KYCDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('PENDING')
@@ -102,6 +109,7 @@ export default function KYCPage() {
   }
 
   const handleApprove = async (docId: string) => {
+    if (!canApprove) return
     setActionLoading(true)
     try {
       const res = await fetch('/api/admin/kyc', {
@@ -121,6 +129,7 @@ export default function KYCPage() {
   }
 
   const handleReject = async (docId: string) => {
+    if (!canReject) return
     if (!rejectReason.trim()) {
       toast.error('Please provide a rejection reason')
       return
@@ -313,22 +322,27 @@ export default function KYCPage() {
                     </a>
                     {doc.status === 'PENDING' && (
                       <>
-                        <button
-                          onClick={() => handleApprove(doc.id)}
-                          disabled={actionLoading}
-                          className="p-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition disabled:opacity-50"
-                          title="Approve"
-                        >
-                          <FiCheck size={16} />
-                        </button>
-                        <button
-                          onClick={() => setReviewModal(doc)}
-                          disabled={actionLoading}
-                          className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition disabled:opacity-50"
-                          title="Reject"
-                        >
-                          <FiX size={16} />
-                        </button>
+                        {canApprove && (
+                          <button
+                            onClick={() => handleApprove(doc.id)}
+                            disabled={actionLoading}
+                            className="p-2 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition disabled:opacity-50"
+                            title="Approve"
+                          >
+                            <FiCheck size={16} />
+                          </button>
+                        )}
+                        {canReject && (
+                          <button
+                            onClick={() => setReviewModal(doc)}
+                            disabled={actionLoading}
+                            className="p-2 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition disabled:opacity-50"
+                            title="Reject"
+                          >
+                            <FiX size={16} />
+                          </button>
+                        )}
+                        {!canApprove && !canReject && <span className="text-xs text-gray-500">Read only</span>}
                       </>
                     )}
                   </div>
@@ -374,20 +388,25 @@ export default function KYCPage() {
                 <div className="p-4 border-t border-white/5 flex justify-end gap-2">
                   {lightboxDoc.status === 'PENDING' && (
                     <>
-                      <button
-                        onClick={() => { handleApprove(lightboxDoc.id); setLightboxDoc(null) }}
-                        disabled={actionLoading}
-                        className="px-4 py-2 bg-green-500 text-[#0B0C12] rounded-lg font-medium hover:bg-green-400 disabled:opacity-50 transition"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => { setReviewModal(lightboxDoc); setLightboxDoc(null) }}
-                        disabled={actionLoading}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-400 disabled:opacity-50 transition"
-                      >
-                        Reject
-                      </button>
+                      {canApprove && (
+                        <button
+                          onClick={() => { handleApprove(lightboxDoc.id); setLightboxDoc(null) }}
+                          disabled={actionLoading}
+                          className="px-4 py-2 bg-green-500 text-[#0B0C12] rounded-lg font-medium hover:bg-green-400 disabled:opacity-50 transition"
+                        >
+                          Approve
+                        </button>
+                      )}
+                      {canReject && (
+                        <button
+                          onClick={() => { setReviewModal(lightboxDoc); setLightboxDoc(null) }}
+                          disabled={actionLoading}
+                          className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-400 disabled:opacity-50 transition"
+                        >
+                          Reject
+                        </button>
+                      )}
+                      {!canApprove && !canReject && <span className="text-sm text-gray-500">Read-only review</span>}
                     </>
                   )}
                 </div>
@@ -397,7 +416,7 @@ export default function KYCPage() {
         )}
 
         {/* Reject Reason Modal */}
-        {reviewModal && (
+        {reviewModal && canReject && (
           <div
             className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
             onClick={() => { setReviewModal(null); setRejectReason('') }}
