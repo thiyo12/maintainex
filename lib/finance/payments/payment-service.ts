@@ -867,11 +867,59 @@ export async function requestRequiredPayHereRefund(
     }
   }
 
+  // Claim the refund before the external API call. Without this CAS, two
+  // cron workers can both observe REFUND_REQUIRED and submit the same PayHere
+  // refund concurrently.
+  const requestClaimed = await prisma.paymentIntent.updateMany({
+    where: {
+      id: intent.id,
+      status: 'REFUND_REQUIRED',
+    },
+    data: {
+      status: 'REFUND_PROCESSING',
+      gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+        gatewayStatus: 'REFUND REQUEST CLAIMED',
+        claimedAt: new Date().toISOString(),
+      }),
+    },
+  })
+
+  if (requestClaimed.count !== 1) {
+    const current = await prisma.paymentIntent.findUnique({
+      where: { id: intent.id },
+      select: { status: true },
+    })
+    if (current?.status === 'REFUNDED') {
+      return { success: true, status: 'REFUNDED' }
+    }
+    if (current?.status === 'REFUND_PROCESSING') {
+      return reconcilePayHereRefund(paymentIntentId)
+    }
+    return {
+      success: false,
+      status: 'REFUND_REQUIRED',
+      error: 'Refund request state changed concurrently',
+      code: 'PAYHERE_REFUND_STATE_CHANGED',
+    }
+  }
+
   const refund = await requestPayHereRefund(
     String(intent.paymentId),
     `MaintainEX refund for order ${intent.merchantOrderId}`
   )
   if (refund.status !== 1) {
+    await prisma.paymentIntent.updateMany({
+      where: { id: intent.id, status: 'REFUND_PROCESSING' },
+      data: {
+        status: 'REFUND_REQUIRED',
+        gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
+          gatewayStatus: 'REFUND REQUEST FAILED',
+          message: refund.message,
+          refundReference: refund.refundReference,
+          failedAt: new Date().toISOString(),
+        }),
+      },
+    })
     return {
       success: false,
       status: 'REFUND_REQUIRED',
@@ -882,10 +930,9 @@ export async function requestRequiredPayHereRefund(
   }
 
   await prisma.$transaction(async tx => {
-    const claimed = await tx.paymentIntent.updateMany({
-      where: { id: intent.id, status: 'REFUND_REQUIRED' },
+    await tx.paymentIntent.updateMany({
+      where: { id: intent.id, status: 'REFUND_PROCESSING' },
       data: {
-        status: 'REFUND_PROCESSING',
         gatewayResponse: mergeGatewayResponse(intent.gatewayResponse, 'refund', {
           gatewayStatus: 'REFUND REQUESTED',
           refundReference: refund.refundReference,
@@ -894,7 +941,6 @@ export async function requestRequiredPayHereRefund(
         }),
       },
     })
-    if (claimed.count !== 1) return
 
     await recordJobLifecycleEvent(tx, {
       jobId: intent.jobId,
