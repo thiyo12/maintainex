@@ -4,6 +4,7 @@ import {
   assertCrmCountryAllowed,
   getCrmCountryFilter,
   guardCrmRequest,
+  type CrmSecurityContext,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
@@ -14,13 +15,10 @@ import {
 
 const REFUND_STATUSES = ['REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'] as const
 
-async function scopedJobIds(security: {
-  isSuperAdmin: boolean
-  assignedCountries: string[]
-}) {
+async function scopedJobIds(security: CrmSecurityContext) {
   if (security.isSuperAdmin) return null
   return (await prisma.marketplaceJob.findMany({
-    where: getCrmCountryFilter(security as any),
+    where: getCrmCountryFilter(security),
     select: { id: true },
   })).map(job => job.id)
 }
