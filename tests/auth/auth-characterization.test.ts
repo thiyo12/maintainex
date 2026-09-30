@@ -42,6 +42,7 @@ const adminUser = {
   firstName: 'Ada',
   lastName: 'Lovelace',
   assignedCountries: ['LK', 'CA'],
+  sessionId: 'session-auth-characterization',
 }
 
 function user(overrides: Partial<AuthenticatedUser>): AuthenticatedUser {

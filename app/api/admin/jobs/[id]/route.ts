@@ -5,10 +5,10 @@ import {
   guardCrmRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
-import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
+import { getCurrencyForCountry, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import { getCrmSectionAccess } from '@/lib/crm/section-access'
 
-function money(value: bigint | number | null | undefined, currency: string): number | null {
+function money(value: bigint | number | null | undefined, currency: Currency): number | null {
   if (value === null || value === undefined) return null
   return minorUnitsToMajorUnits(BigInt(value), currency)
 }

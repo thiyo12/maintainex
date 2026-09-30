@@ -94,6 +94,7 @@ export async function suspendUser(
       select: {
         id: true, email: true, name: true, role: true,
         isSuspended: true, isBanned: true, countryCode: true,
+        suspendedUntil: true,
       },
     })
 

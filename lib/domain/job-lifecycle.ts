@@ -369,10 +369,15 @@ export async function acceptJobQuote(ctx: TransitionContext, quoteId: string) {
   const serviceFee = (acceptedAmount * BigInt(pricingConfig.commissionRateBps)) / 10000n
   const totalAmount = acceptedAmount + serviceFee
 
+  if (quote.providerType !== 'INDIVIDUAL' && quote.providerType !== 'COMPANY') {
+    throw new Error('Quote provider type is invalid')
+  }
+  const providerType = quote.providerType
+
   await prisma.$transaction(async (tx) => {
     await lockAndAssertProviderAvailable(
       tx,
-      quote.providerType,
+      providerType,
       quote.providerId,
       'Quote provider is no longer available',
     )

@@ -10,10 +10,10 @@ import { resolveCompanyContext } from '@/lib/phase6/company-context'
 import { findCandidates } from '@/lib/matching'
 import { notifyQuoteSubmitted } from '@/lib/notifications'
 import { checkRateLimit } from '@/lib/rate-limit/middleware'
-import { getCurrencyForCountry, minorUnitsToMajorUnits } from '@/lib/shared/money/money'
+import { getCurrencyForCountry, minorUnitsToMajorUnits, type Currency } from '@/lib/shared/money/money'
 import { lockAndAssertProviderAvailable } from '@/lib/domain/provider-availability'
 
-function serialiseQuote(quote: any, currency: string) {
+function serialiseQuote(quote: any, currency: Currency) {
   return {
     ...quote,
     price: minorUnitsToMajorUnits(quote.price, currency),

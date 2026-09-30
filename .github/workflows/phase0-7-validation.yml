@@ -17,6 +17,9 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
 
     services:
       postgres:

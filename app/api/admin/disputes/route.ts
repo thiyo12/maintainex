@@ -37,7 +37,6 @@ async function getMarketplaceParticipantIds(jobId: string, customerId: string): 
       where: {
         jobId,
         companyId: accepted.providerId,
-        workerUserId: { not: null },
         status: { in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'REVOKED'] },
       },
       select: { workerUserId: true },
