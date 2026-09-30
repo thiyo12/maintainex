@@ -4,7 +4,7 @@ import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibilit
 import { transitionJobWorkspace, raiseJobDispute, cancelJob, type ActorType } from '@/lib/domain/job-lifecycle'
 import { completeAndReleaseEscrow } from '@/lib/finance/escrow/escrow-service'
 import { resolveProviderActor } from '@/lib/domain/job-actors'
-import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
+import { notifyCompletionRequested, notifyJobCompleted, notifyPaymentReleased, notifyCashJobCompleted, notifyJobCancelled, notifyDisputeRaised } from '@/lib/notifications'
 import { getCurrencyForCountry } from '@/lib/shared/money/money'
 import { notifyAllAdmins } from '@/lib/admin-notifications'
 import { createWorkItem } from '@/lib/work-queue'
@@ -105,20 +105,35 @@ export async function POST(
         job.id
       )
 
-      await notifyPaymentReleased(
-        job.id,
-        result.providerId,
-        job.title,
-        result.netAmount,
-        getCurrencyForCountry(job.countryCode),
-        job.countryCode,
-      )
+      if (result.paymentMethod === 'CASH') {
+        await notifyCashJobCompleted(
+          job.id,
+          result.providerId,
+          job.title,
+          result.platformDue,
+          getCurrencyForCountry(job.countryCode),
+        )
+      } else {
+        await notifyPaymentReleased(
+          job.id,
+          result.providerId,
+          job.title,
+          result.netAmount,
+          getCurrencyForCountry(job.countryCode),
+          job.countryCode,
+        )
+      }
       await notifyJobCompleted(job.id, job.customerId, job.title)
       return NextResponse.json({
         success: true,
-        message: 'Job completed, funds released',
+        message:
+          result.paymentMethod === 'CASH'
+            ? 'Job completed. Cash settlement recorded and platform amount added to the provider weekly settlement.'
+            : 'Job completed, funds released',
+        paymentMethod: result.paymentMethod,
         commission: result.commission,
         netAmount: result.netAmount,
+        platformDue: result.platformDue,
       })
     }
 
