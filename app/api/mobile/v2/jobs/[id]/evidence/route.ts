@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { authenticateMarketplaceUser } from '@/lib/auth/marketplace-auth'
+import { authenticateMarketplaceUser, assertNotSuspended } from '@/lib/auth/marketplace-auth'
 
 export async function POST(
   request: NextRequest,
@@ -9,6 +9,8 @@ export async function POST(
   try {
     const user = await authenticateMarketplaceUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const blocked = assertNotSuspended(user)
+    if (blocked) return blocked
 
     const { id: jobId } = await params
     const body = await request.json()
