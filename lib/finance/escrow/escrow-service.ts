@@ -626,6 +626,12 @@ export async function completeAndReleaseEscrow(
     })
     if (!escrow) throw new Error('No releasable escrow found')
     if (escrow.paymentMethod === 'CASH') throw new Error('CASH_PAYMENT_DISABLED')
+    if (
+      job.finalAuthorizedAmountCents != null &&
+      job.finalAuthorizedAmountCents !== escrow.amount
+    ) {
+      throw new Error('ESCROW_AUTHORIZED_AMOUNT_MISMATCH')
+    }
 
     const quote = await tx.jobQuote.findUnique({
       where: { id: escrow.quoteId },
