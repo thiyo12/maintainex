@@ -234,13 +234,15 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/admin/jobs"
-            className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-medium hover:bg-slate-800"
-          >
-            Open job queue
-            <FiArrowUpRight size={15} />
-          </Link>
+          {can('jobs:view') && (
+            <Link
+              href="/admin/jobs"
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-xl bg-slate-950 text-white text-sm font-medium hover:bg-slate-800"
+            >
+              Open job queue
+              <FiArrowUpRight size={15} />
+            </Link>
+          )}
           {can('settings:view') && (
             <Link
               href="/admin/platform"
