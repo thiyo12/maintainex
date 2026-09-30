@@ -43,11 +43,11 @@ export async function POST(
       }
       if (job.addressSharedAt) throw new Error('SHARE_ADDRESS_ALREADY_SHARED')
 
-      const protectedEscrow = await tx.jobEscrow.findFirst({
-        where: { jobId: id, status: 'PROTECTED' },
-        select: { id: true },
+      const paymentReady = await tx.jobEscrow.findFirst({
+        where: { jobId: id, status: { in: ['PROTECTED', 'CASH_CONFIRMED'] } },
+        select: { id: true, paymentMethod: true },
       })
-      if (!protectedEscrow) throw new Error('SHARE_ADDRESS_PAYMENT_NOT_PROTECTED')
+      if (!paymentReady) throw new Error('SHARE_ADDRESS_PAYMENT_NOT_CONFIRMED')
 
       const claimed = await tx.marketplaceJob.updateMany({
         where: {
@@ -83,11 +83,11 @@ export async function POST(
       }
       if (
         error.message === 'SHARE_ADDRESS_BOOKING_INACTIVE' ||
-        error.message === 'SHARE_ADDRESS_PAYMENT_NOT_PROTECTED' ||
+        error.message === 'SHARE_ADDRESS_PAYMENT_NOT_CONFIRMED' ||
         error.message === 'SHARE_ADDRESS_STATE_CHANGED'
       ) {
         return NextResponse.json(
-          { error: 'Address can only be shared once for an active, payment-protected booking' },
+          { error: 'Address can only be shared once for an active booking with a confirmed payment method' },
           { status: 409 }
         )
       }
