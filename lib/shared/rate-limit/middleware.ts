@@ -60,7 +60,25 @@ export async function checkRateLimit(
     return { allowed: true }
   } catch {
     if (policy.failureMode === 'fail-closed') {
-      return { allowed: false }
+      const requestId = getRequestId()
+      return {
+        allowed: false,
+        response: NextResponse.json(
+          {
+            error: {
+              code: 'RATE_LIMIT_UNAVAILABLE',
+              message: 'This operation is temporarily unavailable. Please try again.',
+              requestId,
+            },
+          },
+          {
+            status: 503,
+            headers: {
+              'Retry-After': '5',
+            },
+          }
+        ),
+      }
     }
     return { allowed: true }
   }
