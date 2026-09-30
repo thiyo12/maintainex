@@ -16,10 +16,21 @@ export const colors = {
   amberSoft:    '#FDE8B3',
   amberTint:    '#F5A62315',
 
+  // Backward-compatible semantic aliases used by existing screens.
+  accent:       '#F5A623',
+  accentSoft:   '#F5A62318',
+  accentDim:    '#D48900',
+
   textPrimary:  '#FFFFFF',
   textSecond:   '#B3B3B3',
+  textSecondary:'#B3B3B3',
   textMuted:    '#6B6B6B',
   textAmber:    '#F5A623',
+  ink:          '#FFFFFF',
+  muted:        '#B3B3B3',
+  white:        '#FFFFFF',
+
+  surfaceHigh:  '#2E2E2E',
 
   borderSubtle: '#1F1F1F',
   border:       '#2E2E2E',
@@ -28,8 +39,10 @@ export const colors = {
 
   success:      '#22C55E',
   successBg:    '#0A2E1A',
+  successSoft:  '#0A2E1A',
   error:        '#EF4444',
   errorBg:      '#2E0A0A',
+  errorSoft:    '#2E0A0A',
   warning:      '#F5A623',
   warningBg:    '#2E1A00',
   info:         '#3B82F6',
@@ -67,13 +80,20 @@ export const radius = {
   full: 9999,
 } as const
 
-export const shadows: Record<'card', ViewStyle> = {
+export const shadows: Record<'card' | 'md', ViewStyle> = {
   card: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
 }
 
