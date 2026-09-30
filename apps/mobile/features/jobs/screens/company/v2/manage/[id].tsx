@@ -131,7 +131,7 @@ export default function CompanyManageJobScreen() {
     isAssignedWorker &&
     assignment?.status === 'ACCEPTED' &&
     job.workspace?.progressStatus === 'ACCEPTED' &&
-    job.escrow?.status === 'PROTECTED'
+    ['PROTECTED', 'CASH_CONFIRMED'].includes(job.escrow?.status)
   const canComplete =
     isAssignedWorker &&
     assignment?.status === 'IN_PROGRESS' &&
@@ -238,6 +238,11 @@ export default function CompanyManageJobScreen() {
               )}
               {job.escrow.status === 'PROTECTED' && (
                 <Text style={styles.escrowHint}>{t('booking.escrowInfo')}</Text>
+              )}
+              {job.escrow.status === 'CASH_CONFIRMED' && (
+                <Text style={styles.escrowHint}>
+                  Cash payment is direct between customer and provider. MaintainEX does not hold these funds; platform commission is recorded separately after completion.
+                </Text>
               )}
             </View>
           </View>
