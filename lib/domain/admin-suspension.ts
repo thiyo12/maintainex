@@ -97,6 +97,15 @@ export async function suspendUser(
       },
     })
 
+    await db.userSession.updateMany({
+      where: { userId, isValid: true },
+      data: {
+        isValid: false,
+        revokedAt: new Date(),
+        revokeReason: 'ACCOUNT_SUSPENDED',
+      },
+    })
+
     await db.auditLog.create({
       data: {
         adminUserId: session.id,
@@ -213,6 +222,15 @@ export async function banUser(
         id: true, email: true, name: true, role: true,
         isActive: true, isSuspended: true, isBanned: true,
         countryCode: true,
+      },
+    })
+
+    await db.userSession.updateMany({
+      where: { userId, isValid: true },
+      data: {
+        isValid: false,
+        revokedAt: new Date(),
+        revokeReason: 'ACCOUNT_BANNED',
       },
     })
 
@@ -355,6 +373,14 @@ export async function suspendCompany(
           isSuspended: true,
           suspensionReason: ownerSuspensionReason,
           suspendedUntil: null,
+        },
+      })
+      await db.userSession.updateMany({
+        where: { userId: company.userId, isValid: true },
+        data: {
+          isValid: false,
+          revokedAt: new Date(),
+          revokeReason: 'COMPANY_SUSPENDED',
         },
       })
     }
