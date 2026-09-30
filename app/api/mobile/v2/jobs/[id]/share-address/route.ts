@@ -29,12 +29,12 @@ export async function POST(
         customerId: string
         status: string
         addressSharedAt: Date | null
-      }[]>\`
+      }[]>`
         SELECT id, "customerId", status, "addressSharedAt"
         FROM "MarketplaceJob"
         WHERE id = ${id}
         FOR UPDATE
-      \`
+      `
       const job = lockedRows[0]
       if (!job) throw new Error('SHARE_ADDRESS_JOB_NOT_FOUND')
       if (job.customerId !== user.id) throw new Error('SHARE_ADDRESS_FORBIDDEN')
