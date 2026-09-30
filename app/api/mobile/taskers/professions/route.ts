@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { authenticateRequest, assertNotSuspended } from '@/lib/auth/compatibility/mobile-auth'
 import { assignTaskerProfession, getTaskerProfessions } from '@/lib/profession'
@@ -51,6 +52,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'professionId required' }, { status: 400 })
     }
 
+    const existing = await prisma.taskerProfession.findUnique({
+      where: {
+        taskerProfileId_professionId: {
+          taskerProfileId: tasker.id,
+          professionId,
+        },
+      },
+      select: { id: true, status: true },
+    })
+    if (existing) {
+      return NextResponse.json(
+        { error: 'Profession already assigned', status: existing.status },
+        { status: 409 }
+      )
+    }
+
     const result = await assignTaskerProfession(prisma, {
       taskerProfileId: tasker.id,
       professionId,
@@ -64,6 +81,9 @@ export async function POST(request: NextRequest) {
     }
     if (message.includes('inactive')) {
       return NextResponse.json({ error: message }, { status: 400 })
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ error: 'Profession already assigned' }, { status: 409 })
     }
     console.error('Tasker profession assign error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
