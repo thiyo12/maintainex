@@ -9,13 +9,13 @@
 ```bash
 # 1. Create test database with representative data
 docker compose exec postgres createdb -U maintainex maintainex_backup_test
-DATABASE_URL="postgresql://maintainex:maintainex_dev_2025@localhost:5432/maintainex_backup_test" \
+DATABASE_URL="postgresql://maintainex:change-me-local-only@localhost:5432/maintainex_backup_test" \
   npx prisma db push  # DEVELOPMENT/TEST ONLY
 
 # 2. Insert representative data
 docker compose exec postgres psql -U maintainex -d maintainex_backup_test -c "
 INSERT INTO \"User\" (id, email, \"passwordHash\", name, role, \"createdAt\", \"updatedAt\")
-VALUES ('backup-test-1', 'backup@test.com', 'hash', 'Backup User', 'CUSTOMER', NOW(), NOW());
+VALUES ('backup-test-1', 'backup-test@example.com', 'hash', 'Backup User', 'CUSTOMER', NOW(), NOW());
 INSERT INTO \"Category\" (id, name, slug, \"isActive\", \"createdAt\")
 VALUES ('backup-cat-1', 'Test Category', 'test-cat', true, NOW());
 "
@@ -54,7 +54,7 @@ docker compose exec postgres psql -U maintainex -d maintainex_backup_test -c "SE
 ## Production Backup Command
 
 ```bash
-ssh -i ~/.ssh/id_ed25519_ssaaxcy root@147.93.106.54 \
+ssh -i ~/.ssh/id_ed25519 root@YOUR_VPS_IP \
   "docker exec maintainex-db-maintainex-iwjbmo pg_dump -U postgres postgres > /tmp/backup_$(date +%Y%m%d_%H%M%S).sql"
 ```
 
