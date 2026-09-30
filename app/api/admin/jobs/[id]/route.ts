@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
+  crmHasPermission,
   guardCrmRequest,
   redactCrmSensitiveData,
 } from '@/lib/crm/security'
@@ -41,6 +42,14 @@ async function getV2Job(id: string, request: NextRequest) {
   }
 
   const currency = getCurrencyForCountry(job.countryCode)
+  const canFinance =
+    crmHasPermission(security.role, 'wallets:view') ||
+    crmHasPermission(security.role, 'commission:view')
+  const canTrust =
+    crmHasPermission(security.role, 'disputes:view') ||
+    crmHasPermission(security.role, 'risk_events:read') ||
+    crmHasPermission(security.role, 'trust:view')
+  const canAudit = crmHasPermission(security.role, 'audit:read')
 
   const [
     customer,
@@ -84,8 +93,6 @@ async function getV2Job(id: string, request: NextRequest) {
             customerType: true,
             status: true,
             totalBookings: true,
-            totalSpent: true,
-            lifetimeValue: true,
             lastBooking: true,
           },
         },
@@ -120,18 +127,24 @@ async function getV2Job(id: string, request: NextRequest) {
       include: { lineItems: { orderBy: { sortOrder: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.jobEscrow.findFirst({
-      where: { jobId: id },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.paymentIntent.findMany({
-      where: { jobId: id },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.commissionSettlement.findMany({
-      where: { jobId: id },
-      orderBy: { createdAt: 'desc' },
-    }),
+    canFinance
+      ? prisma.jobEscrow.findFirst({
+          where: { jobId: id },
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve(null),
+    canFinance
+      ? prisma.paymentIntent.findMany({
+          where: { jobId: id },
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve([]),
+    canFinance
+      ? prisma.commissionSettlement.findMany({
+          where: { jobId: id },
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve([]),
     prisma.jobWorkspace.findUnique({ where: { jobId: id } }),
     prisma.jobLifecycleEvent.findMany({
       where: { jobId: id },
@@ -151,10 +164,12 @@ async function getV2Job(id: string, request: NextRequest) {
       where: { jobId: id },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.marketplaceRiskEvent.findMany({
-      where: { jobId: id },
-      orderBy: { createdAt: 'desc' },
-    }),
+    canTrust
+      ? prisma.marketplaceRiskEvent.findMany({
+          where: { jobId: id },
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve([]),
     prisma.companyJobAssignment.findMany({
       where: { jobId: id },
       include: {
@@ -204,7 +219,7 @@ async function getV2Job(id: string, request: NextRequest) {
         completionVerifiedAt: true,
       },
     }),
-    prisma.payout.findMany({
+    canFinance ? prisma.payout.findMany({
       where: { source: 'JOB', sourceId: id },
       select: {
         id: true,
@@ -223,17 +238,17 @@ async function getV2Job(id: string, request: NextRequest) {
         clearedAt: true,
       },
       orderBy: { createdAt: 'desc' },
-    }),
-    prisma.auditLog.findMany({
+    }) : Promise.resolve([]),
+    canAudit ? prisma.auditLog.findMany({
       where: { targetId: id },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    }),
-    prisma.activityLog.findMany({
+    }) : Promise.resolve([]),
+    canAudit ? prisma.activityLog.findMany({
       where: { entityId: id },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    }),
+    }) : Promise.resolve([]),
     prisma.conversation.findFirst({
       where: { jobId: id },
       include: {
@@ -349,10 +364,12 @@ async function getV2Job(id: string, request: NextRequest) {
   const acceptedQuote = enrichedQuotes.find(quote => quote.status === 'ACCEPTED') || null
   const acceptedProvider = acceptedQuote?.provider || null
 
-  const ledgerReferenceIds = [id, escrow?.id, ...settlements.map(item => item.id)].filter(
-    (value): value is string => Boolean(value)
-  )
-  const ledger = ledgerReferenceIds.length
+  const ledgerReferenceIds = canFinance
+    ? [id, escrow?.id, ...settlements.map(item => item.id)].filter(
+        (value): value is string => Boolean(value)
+      )
+    : []
+  const ledger = canFinance && ledgerReferenceIds.length
     ? await prisma.financialLedger.findMany({
         where: { referenceId: { in: ledgerReferenceIds } },
         orderBy: { createdAt: 'desc' },
@@ -362,6 +379,11 @@ async function getV2Job(id: string, request: NextRequest) {
 
   const result = {
     source: 'V2' as const,
+    permissions: {
+      finance: canFinance,
+      trust: canTrust,
+      audit: canAudit,
+    },
     job: {
       ...job,
       budgetAmount: money(job.budgetAmount, currency),
@@ -525,27 +547,41 @@ async function getV1Job(id: string, request: NextRequest) {
     }
   }
 
+  const canFinance =
+    crmHasPermission(security.role, 'wallets:view') ||
+    crmHasPermission(security.role, 'commission:view')
+  const canTrust =
+    crmHasPermission(security.role, 'disputes:view') ||
+    crmHasPermission(security.role, 'risk_events:read') ||
+    crmHasPermission(security.role, 'trust:view')
+  const canAudit = crmHasPermission(security.role, 'audit:read')
+
   const [auditLogs, activityLogs, ledger] = await Promise.all([
-    prisma.auditLog.findMany({
+    canAudit ? prisma.auditLog.findMany({
       where: { targetId: id },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    }),
-    prisma.activityLog.findMany({
+    }) : Promise.resolve([]),
+    canAudit ? prisma.activityLog.findMany({
       where: { entityId: id },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    }),
-    prisma.financialLedger.findMany({
+    }) : Promise.resolve([]),
+    canFinance ? prisma.financialLedger.findMany({
       where: { referenceId: id },
       orderBy: { createdAt: 'desc' },
       take: 100,
-    }),
+    }) : Promise.resolve([]),
   ])
 
   return {
     data: safeJson({
       source: 'V1',
+      permissions: {
+        finance: canFinance,
+        trust: canTrust,
+        audit: canAudit,
+      },
       job,
       audit: { canonical: auditLogs, activity: activityLogs },
       finance: {
