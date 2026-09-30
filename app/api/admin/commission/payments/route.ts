@@ -160,24 +160,55 @@ export async function PATCH(request: NextRequest) {
     const oldSettlementPaid = payment.weeklySettlement.commissionPaid
     const oldSettlementStatus = payment.weeklySettlement.status
 
-    const result = await prisma.$transaction([
-      prisma.commissionPayment.update({
+    const result = await prisma.$transaction(async tx => {
+      const confirmedAt = new Date()
+      const confirmedPayment = await tx.commissionPayment.update({
         where: { id: paymentId },
         data: {
           status: 'CONFIRMED',
           confirmedById: security.adminId,
-          confirmedAt: new Date(),
+          confirmedAt,
         },
-      }),
-      prisma.weeklySettlement.update({
+      })
+      const confirmedSettlement = await tx.weeklySettlement.update({
         where: { id: payment.weeklySettlementId },
         data: {
           commissionPaid: true,
-          paidAt: new Date(),
+          paidAt: confirmedAt,
           status: 'PAID',
         },
-      }),
-    ])
+      })
+
+      const otherBlockingDebt = await tx.weeklySettlement.count({
+        where: {
+          providerId: payment.weeklySettlement.providerId,
+          id: { not: payment.weeklySettlement.id },
+          commissionPaid: false,
+          OR: [
+            { status: { in: ['OVERDUE', 'SUSPENDED'] } },
+            { dueAt: { lt: confirmedAt } },
+          ],
+        },
+      })
+      if (otherBlockingDebt === 0) {
+        const provider = await tx.user.findUnique({
+          where: { id: payment.weeklySettlement.providerId },
+          select: { suspensionReason: true },
+        })
+        if (provider?.suspensionReason === 'Weekly commission not paid') {
+          await tx.user.update({
+            where: { id: payment.weeklySettlement.providerId },
+            data: {
+              isSuspended: false,
+              suspensionReason: null,
+              suspendedUntil: null,
+            },
+          })
+        }
+      }
+
+      return [confirmedPayment, confirmedSettlement] as const
+    })
 
     await createAuditLog({
       session: sessionFromGuard(security),
