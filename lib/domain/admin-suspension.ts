@@ -168,57 +168,64 @@ export async function suspendCompany(
     throw new Error('Suspension reason is required (minimum 3 characters)')
   }
 
-  const company = await tx.companyProfile.findUnique({
-    where: { id: companyProfileId },
-    select: {
-      id: true, companyName: true, userId: true,
-      verificationStatus: true,
-    },
-  })
-
-  if (!company) throw new Error('Company not found')
-
-  const user = await tx.user.findUnique({
-    where: { id: company.userId },
-    select: { id: true, isSuspended: true },
-  })
-
-  if (user?.isSuspended) throw new Error('Company owner is already suspended')
-
-  const oldValue = { verificationStatus: company.verificationStatus }
-  const newValue = { verificationStatus: 'SUSPENDED', reason, scope }
-
-  await tx.companyProfile.update({
-    where: { id: companyProfileId },
-    data: { verificationStatus: 'SUSPENDED' },
-  })
-
-  if (user) {
-    await tx.user.update({
-      where: { id: company.userId },
-      data: {
-        isSuspended: true,
-        suspensionReason: `Company suspended: ${reason}`,
+  return tx.$transaction(async (db) => {
+    const company = await db.companyProfile.findUnique({
+      where: { id: companyProfileId },
+      select: {
+        id: true, companyName: true, userId: true,
+        verificationStatus: true,
       },
     })
-  }
 
-  await tx.auditLog.create({
-    data: {
-      adminUserId: session.id,
-      adminEmail: session.email,
-      adminRole: session.role,
-      action: 'COMPANY_SUSPEND' as AuditAction,
-      targetTable: 'CompanyProfile',
-      targetId: companyProfileId,
-      targetLabel: company.companyName,
-      oldValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
-      ipAddress,
-    },
+    if (!company) throw new Error('Company not found')
+    if (company.verificationStatus === 'SUSPENDED') {
+      throw new Error('Company is already suspended')
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: company.userId },
+      select: { id: true, isSuspended: true, suspensionReason: true },
+    })
+
+    if (user?.isSuspended) throw new Error('Company owner is already suspended')
+
+    const oldValue = { verificationStatus: company.verificationStatus }
+    const ownerSuspensionReason = `Company suspended [${companyProfileId}]: ${reason}`
+    const newValue = { verificationStatus: 'SUSPENDED', reason, scope }
+
+    await db.companyProfile.update({
+      where: { id: companyProfileId },
+      data: { verificationStatus: 'SUSPENDED' },
+    })
+
+    if (user) {
+      await db.user.update({
+        where: { id: company.userId },
+        data: {
+          isSuspended: true,
+          suspensionReason: ownerSuspensionReason,
+          suspendedUntil: null,
+        },
+      })
+    }
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: 'COMPANY_SUSPEND' as AuditAction,
+        targetTable: 'CompanyProfile',
+        targetId: companyProfileId,
+        targetLabel: company.companyName,
+        oldValue: JSON.stringify(oldValue),
+        newValue: JSON.stringify(newValue),
+        ipAddress,
+      },
+    })
+
+    return { success: true, companyProfileId, company }
   })
-
-  return { success: true, companyProfileId, company }
 }
 
 export async function reactivateCompany(
@@ -227,54 +234,77 @@ export async function reactivateCompany(
 ) {
   const { companyProfileId, reason, session, ipAddress } = input
 
-  const company = await tx.companyProfile.findUnique({
-    where: { id: companyProfileId },
-    select: {
-      id: true, companyName: true, userId: true,
-      verificationStatus: true,
-    },
-  })
-
-  if (!company) throw new Error('Company not found')
-  if (company.verificationStatus !== 'SUSPENDED') {
-    throw new Error('Company is not suspended')
-  }
-
-  const oldValue = { verificationStatus: 'SUSPENDED' }
-  const newValue = { verificationStatus: 'VERIFIED', reason }
-
-  await tx.companyProfile.update({
-    where: { id: companyProfileId },
-    data: { verificationStatus: 'VERIFIED' },
-  })
-
-  if (company.userId) {
-    await tx.user.update({
-      where: { id: company.userId },
-      data: {
-        isSuspended: false,
-        suspensionReason: null,
-        suspendedUntil: null,
+  return tx.$transaction(async (db) => {
+    const company = await db.companyProfile.findUnique({
+      where: { id: companyProfileId },
+      select: {
+        id: true, companyName: true, userId: true,
+        verificationStatus: true,
       },
     })
-  }
 
-  await tx.auditLog.create({
-    data: {
-      adminUserId: session.id,
-      adminEmail: session.email,
-      adminRole: session.role,
-      action: 'COMPANY_REACTIVATE' as AuditAction,
-      targetTable: 'CompanyProfile',
-      targetId: companyProfileId,
-      targetLabel: company.companyName,
-      oldValue: JSON.stringify(oldValue),
-      newValue: JSON.stringify(newValue),
-      ipAddress,
-    },
+    if (!company) throw new Error('Company not found')
+    if (company.verificationStatus !== 'SUSPENDED') {
+      throw new Error('Company is not suspended')
+    }
+
+    const owner = company.userId
+      ? await db.user.findUnique({
+          where: { id: company.userId },
+          select: {
+            id: true,
+            isSuspended: true,
+            isBanned: true,
+            suspensionReason: true,
+          },
+        })
+      : null
+
+    const companySuspensionPrefix = `Company suspended [${companyProfileId}]:`
+    if (
+      owner?.isSuspended &&
+      owner.suspensionReason &&
+      !owner.suspensionReason.startsWith(companySuspensionPrefix)
+    ) {
+      throw new Error('Company owner has a separate account suspension that must be resolved independently')
+    }
+
+    const oldValue = { verificationStatus: 'SUSPENDED' }
+    const newValue = { verificationStatus: 'VERIFIED', reason }
+
+    await db.companyProfile.update({
+      where: { id: companyProfileId },
+      data: { verificationStatus: 'VERIFIED' },
+    })
+
+    if (owner?.isSuspended && owner.suspensionReason?.startsWith(companySuspensionPrefix)) {
+      await db.user.update({
+        where: { id: company.userId },
+        data: {
+          isSuspended: false,
+          suspensionReason: null,
+          suspendedUntil: null,
+        },
+      })
+    }
+
+    await db.auditLog.create({
+      data: {
+        adminUserId: session.id,
+        adminEmail: session.email,
+        adminRole: session.role,
+        action: 'COMPANY_REACTIVATE' as AuditAction,
+        targetTable: 'CompanyProfile',
+        targetId: companyProfileId,
+        targetLabel: company.companyName,
+        oldValue: JSON.stringify(oldValue),
+        newValue: JSON.stringify(newValue),
+        ipAddress,
+      },
+    })
+
+    return { success: true, companyProfileId, company }
   })
-
-  return { success: true, companyProfileId, company }
 }
 
 export async function isUserSuspended(
