@@ -98,6 +98,55 @@ function isUniqueConflict(error: unknown): boolean {
   )
 }
 
+function approvalRequestMatchesInput(
+  existing: {
+    actionId: string
+    initiatorAdminId: string
+    market: string
+    targetType: string
+    targetId: string
+    amountMinor: bigint | null
+    currency: string | null
+  },
+  input: CreateCrmApprovalInput,
+  market: string
+): boolean {
+  const inputAmount = input.amountMinor ?? null
+  const inputCurrency = input.currency?.toUpperCase() ?? null
+
+  return (
+    existing.actionId === input.actionId &&
+    existing.initiatorAdminId === input.initiatorAdminId &&
+    existing.market === market &&
+    existing.targetType === input.targetType &&
+    existing.targetId === input.targetId &&
+    existing.amountMinor === inputAmount &&
+    existing.currency === inputCurrency
+  )
+}
+
+function assertApprovalIdempotencyMatch(
+  existing: {
+    actionId: string
+    initiatorAdminId: string
+    market: string
+    targetType: string
+    targetId: string
+    amountMinor: bigint | null
+    currency: string | null
+  },
+  input: CreateCrmApprovalInput,
+  market: string
+): void {
+  if (!approvalRequestMatchesInput(existing, input, market)) {
+    throw new CrmApprovalError(
+      'APPROVAL_IDEMPOTENCY_CONFLICT',
+      'Idempotency key was already used for a different approval request.',
+      409
+    )
+  }
+}
+
 export async function createCrmApprovalRequest(input: CreateCrmApprovalInput) {
   assertId(input.initiatorAdminId, 'Initiator')
   assertId(input.targetType, 'Target type')
@@ -133,7 +182,10 @@ export async function createCrmApprovalRequest(input: CreateCrmApprovalInput) {
     const existing = await prisma.crmApprovalRequest.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
     })
-    if (existing) return { request: existing, reused: true, plan }
+    if (existing) {
+      assertApprovalIdempotencyMatch(existing, input, market)
+      return { request: existing, reused: true, plan }
+    }
   }
 
   try {
@@ -212,7 +264,10 @@ export async function createCrmApprovalRequest(input: CreateCrmApprovalInput) {
       const existing = await prisma.crmApprovalRequest.findUnique({
         where: { idempotencyKey: input.idempotencyKey },
       })
-      if (existing) return { request: existing, reused: true, plan }
+      if (existing) {
+        assertApprovalIdempotencyMatch(existing, input, market)
+        return { request: existing, reused: true, plan }
+      }
     }
     throw error
   }
