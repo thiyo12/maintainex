@@ -3,6 +3,16 @@ import { prisma } from '@/lib/prisma'
 import { guardCrmAction, guardCrmRequest, getCrmCountryFilter, assertCrmCountryAllowed } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
 import { transitionMarketplaceJob, type JobStatus } from '@/lib/domain/job-lifecycle'
+import {
+  buildApprovalPlan,
+  createCrmApprovalRequest,
+  CrmApprovalError,
+} from '@/lib/crm/governance'
+import {
+  executeCrmJobCancellation,
+  inspectCrmJobCancellation,
+  type CrmJobSource,
+} from '@/lib/crm/jobs/cancellation'
 
 interface UnifiedJob {
   id: string
@@ -255,11 +265,151 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
+    if (source !== 'V1' && source !== 'V2') {
+      return NextResponse.json({ error: 'Invalid job source' }, { status: 400 })
+    }
+
     const v2Statuses = ['OPEN', 'QUOTE_ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
     const v1Statuses = ['OPEN', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
     const allowedStatuses = source === 'V2' ? v2Statuses : v1Statuses
     if (!allowedStatuses.includes(status)) {
       return NextResponse.json({ error: 'Invalid status for job source' }, { status: 400 })
+    }
+
+    if (status === 'CANCELLED') {
+      const context = await inspectCrmJobCancellation(jobId, source as CrmJobSource)
+      if (!context) {
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+      }
+
+      if (!assertCrmCountryAllowed(security, context.countryCode)) {
+        return NextResponse.json({ error: 'Forbidden: job belongs to a different country' }, { status: 403 })
+      }
+
+      const riskContext = {
+        actionId: 'jobs.cancel' as const,
+        market: context.countryCode,
+        currency: context.currency,
+        amountMinor: context.amountMinor,
+        jobStatus: context.status,
+        hasFinancialImpact: context.hasFinancialImpact,
+        financialAlreadyReleased: context.financialAlreadyReleased,
+        activeDispute: context.activeDispute,
+      }
+      const plan = buildApprovalPlan(riskContext)
+
+      if (plan.risk.decision === 'PROHIBIT') {
+        return NextResponse.json(
+          {
+            error: 'Job cancellation is prohibited in the current state.',
+            code: plan.risk.prohibitCodes[0] || 'JOB_CANCELLATION_PROHIBITED',
+          },
+          { status: 409 }
+        )
+      }
+
+      if (plan.tier === 'T0' && plan.status === 'APPROVED') {
+        const result = await executeCrmJobCancellation({
+          context,
+          actorId: security.adminId,
+          reason: 'CRM direct cancellation',
+        })
+
+        await createAuditLog({
+          action: 'UPDATE',
+          category: 'JOB',
+          userId: security.adminId,
+          userEmail: security.email,
+          userRole: security.role,
+          entityType: context.targetType,
+          entityId: context.jobId,
+          entityName: context.title,
+          description: `CRM job cancelled from ${result.previousStatus}`,
+          oldValue: { status: result.previousStatus },
+          newValue: { status: 'CANCELLED' },
+          ipAddress: security.ipAddress,
+          userAgent: security.userAgent || undefined,
+          riskLevel: 'MEDIUM',
+        })
+
+        return NextResponse.json({
+          job: { id: context.jobId, status: 'CANCELLED', source: context.source },
+          approvalRequired: false,
+        })
+      }
+
+      const existingApproval = await prisma.crmApprovalRequest.findFirst({
+        where: {
+          actionId: 'jobs.cancel',
+          targetType: context.targetType,
+          targetId: context.jobId,
+          status: { in: ['PENDING_APPROVAL', 'ON_HOLD', 'APPROVED', 'EXECUTING'] },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+
+      if (existingApproval) {
+        return NextResponse.json(
+          {
+            approvalRequired: true,
+            approval: {
+              id: existingApproval.id,
+              status: existingApproval.status,
+              tier: existingApproval.tier,
+            },
+          },
+          { status: 202 }
+        )
+      }
+
+      const idempotencyKey = request.headers.get('idempotency-key')?.trim()
+      if (!idempotencyKey) {
+        return NextResponse.json(
+          { error: 'Idempotency-Key header is required for governed cancellation.' },
+          { status: 400 }
+        )
+      }
+
+      try {
+        const approval = await createCrmApprovalRequest({
+          actionId: 'jobs.cancel',
+          initiatorAdminId: security.adminId,
+          market: context.countryCode,
+          targetType: context.targetType,
+          targetId: context.jobId,
+          amountMinor: context.amountMinor,
+          currency: context.currency,
+          reasonCode: 'JOB_CANCELLATION',
+          note: `Cancellation requested from ${context.status}`,
+          idempotencyKey,
+          risk: {
+            jobStatus: context.status,
+            hasFinancialImpact: context.hasFinancialImpact,
+            financialAlreadyReleased: context.financialAlreadyReleased,
+            activeDispute: context.activeDispute,
+          },
+        })
+
+        return NextResponse.json(
+          {
+            approvalRequired: true,
+            approval: {
+              id: approval.request.id,
+              status: approval.request.status,
+              tier: approval.request.tier,
+            },
+          },
+          { status: 202 }
+        )
+      } catch (error) {
+        if (error instanceof CrmApprovalError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code },
+            { status: error.status }
+          )
+        }
+        throw error
+      }
     }
 
     if (source === 'V2') {
