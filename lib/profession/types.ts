@@ -8,6 +8,7 @@ export interface ProfessionCreateInput {
   i18nKey: string
   description?: string
   sortOrder?: number
+  isActive?: boolean
 }
 
 export interface ProfessionUpdateInput {
@@ -24,6 +25,7 @@ export interface ProfessionSkillCreateInput {
   i18nKey: string
   description?: string
   sortOrder?: number
+  isActive?: boolean
 }
 
 export interface ServiceProfessionRequirementInput {
