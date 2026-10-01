@@ -139,7 +139,8 @@ function ServicesContent({ cityName }: { cityName?: string }) {
         category: category.name,
         categoryId: category.id
       }))
-      router.push('/waitlist')
+      const params = new URLSearchParams({ service: firstSvc.title, categoryId: category.id })
+      router.push(`/book?${params.toString()}`)
     }
   }
 
@@ -269,11 +270,15 @@ function ServicesContent({ cityName }: { cityName?: string }) {
                                     price: service.price,
                                     category: category.name
                                   }))
-                                  router.push('/waitlist')
+                                  const params = new URLSearchParams({
+                                    service: service.title,
+                                    categoryId: category.id,
+                                  })
+                                  router.push(`/book?${params.toString()}`)
                                 }}
                                 className={`${service.slug ? 'flex-1' : 'w-full'} bg-amber-500 hover:bg-amber-600 text-ink font-semibold py-2.5 rounded-full transition-colors text-sm`}
                               >
-                                Continue in app
+                                Book online
                               </button>
                             </div>
                           </div>
