@@ -83,6 +83,77 @@ export async function resolveCurrentApprovalRisk(request: {
     }
   }
 
+  if (request.actionId === 'finance.escrow.manual_release') {
+    if (request.targetType !== 'JobEscrow') {
+      throw new Error('APPROVAL_TARGET_TYPE_INVALID')
+    }
+
+    const escrow = await prisma.jobEscrow.findUnique({
+      where: { id: request.targetId },
+      select: {
+        id: true,
+        jobId: true,
+        status: true,
+        paymentMethod: true,
+        totalAmount: true,
+        currency: true,
+      },
+    })
+    if (!escrow) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+
+    const [job, dispute] = await Promise.all([
+      prisma.marketplaceJob.findUnique({
+        where: { id: escrow.jobId },
+        select: { id: true, countryCode: true, status: true },
+      }),
+      prisma.marketplaceDispute.findUnique({
+        where: { jobId: escrow.jobId },
+        select: { status: true, resolutionAction: true },
+      }),
+    ])
+    if (!job) throw new Error('APPROVAL_TARGET_NOT_FOUND')
+
+    if (job.countryCode.toUpperCase() !== request.market.toUpperCase()) {
+      throw new Error('APPROVAL_MARKET_CHANGED')
+    }
+    if (request.amountMinor !== null && request.amountMinor !== escrow.totalAmount) {
+      throw new Error('APPROVAL_AMOUNT_CHANGED')
+    }
+    if (request.currency && request.currency.toUpperCase() !== escrow.currency.toUpperCase()) {
+      throw new Error('APPROVAL_CURRENCY_CHANGED')
+    }
+    if (!['PROTECTED', 'ON_HOLD'].includes(escrow.status)) {
+      throw new Error(`APPROVAL_ESCROW_STATE_INVALID:${escrow.status}`)
+    }
+    if (escrow.paymentMethod === 'CASH') {
+      throw new Error('CASH_PAYMENT_DISABLED')
+    }
+
+    const disputeAllowsProviderRelease = Boolean(
+      dispute &&
+      ['RESOLVING', 'RESOLVED'].includes(dispute.status) &&
+      dispute.resolutionAction === 'RELEASE_PROVIDER'
+    )
+
+    if (job.status !== 'COMPLETED' && !disputeAllowsProviderRelease) {
+      throw new Error(`APPROVAL_ESCROW_JOB_NOT_READY:${job.status}`)
+    }
+
+    return {
+      actionId: 'finance.escrow.manual_release',
+      market: job.countryCode,
+      amountMinor: escrow.totalAmount,
+      currency: escrow.currency,
+      risk: {
+        activeDispute: Boolean(
+          dispute &&
+          dispute.status !== 'RESOLVED' &&
+          !disputeAllowsProviderRelease
+        ),
+      },
+    }
+  }
+
   if (request.actionId === 'finance.payout') {
     if (request.targetType !== 'Payout') {
       throw new Error('APPROVAL_TARGET_TYPE_INVALID')
