@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCrmCountryFilter, guardCrmRequest } from '@/lib/crm/security'
 import { evaluateActionInitiation } from '@/lib/crm/governance'
-import { getActiveEmergencyControl } from '@/lib/crm/emergency-controls'
 
 const VALID_STATUSES = new Set([
   'ALL',
@@ -39,7 +38,12 @@ export async function GET(request: NextRequest) {
     const where: any = { ...countryFilter }
     if (status !== 'ALL') where.status = status
 
-    const [payouts, total, stats, globalFreeze] = await Promise.all([
+    const now = new Date()
+    const freezeMarkets = security.isSuperAdmin
+      ? undefined
+      : ['GLOBAL', ...security.assignedCountries]
+
+    const [payouts, total, stats, activeFreezes] = await Promise.all([
       prisma.payout.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -53,7 +57,24 @@ export async function GET(request: NextRequest) {
         _count: { _all: true },
         _sum: { amount: true },
       }),
-      getActiveEmergencyControl('PAYOUTS_FROZEN', 'GLOBAL'),
+      prisma.crmEmergencyControl.findMany({
+        where: {
+          controlKey: 'PAYOUTS_FROZEN',
+          active: true,
+          ...(freezeMarkets ? { market: { in: freezeMarkets } } : {}),
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: now } },
+          ],
+        },
+        select: {
+          id: true,
+          market: true,
+          activatedAt: true,
+          expiresAt: true,
+        },
+        orderBy: { activatedAt: 'desc' },
+      }),
     ])
 
     const userIds = [...new Set(payouts.map(payout => payout.userId))]
@@ -87,16 +108,6 @@ export async function GET(request: NextRequest) {
       : []
 
     const userMap = new Map(users.map(user => [user.id, user]))
-
-    const marketFreezes = security.isSuperAdmin
-      ? []
-      : (
-          await Promise.all(
-            security.assignedCountries.map(market =>
-              getActiveEmergencyControl('PAYOUTS_FROZEN', market)
-            )
-          )
-        ).filter(Boolean)
 
     return NextResponse.json(
       {
@@ -147,15 +158,12 @@ export async function GET(request: NextRequest) {
           }).allowed,
         },
         emergency: {
-          globalFreeze: globalFreeze
-            ? {
-                id: globalFreeze.id,
-                market: globalFreeze.market,
-                activatedAt: globalFreeze.activatedAt,
-                expiresAt: globalFreeze.expiresAt,
-              }
-            : null,
-          scopedFreezeCount: marketFreezes.length,
+          freezes: activeFreezes.map(freeze => ({
+            id: freeze.id,
+            market: freeze.market,
+            activatedAt: freeze.activatedAt,
+            expiresAt: freeze.expiresAt,
+          })),
         },
       },
       { headers: { 'Cache-Control': 'no-store' } }
