@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   getCrmCountryFilter,
   guardCrmRequest,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
+import {
+  evaluateEffectivePermission,
+  getPermissionCatalogEntry,
+} from '@/lib/crm/governance'
 import { transitionCompanyVerification, transitionUserKyc } from '@/lib/phase6/kyc-writer'
 import { banUser, reactivateCompany, reactivateUser, suspendCompany, suspendUser, unbanUser } from '@/lib/domain/admin-suspension'
 import type { AdminSession } from '@/lib/admin-types'
@@ -30,7 +33,51 @@ const USER_ACTIONS = new Set([
 function viewPermission(type: string) {
   if (type === 'tasker') return 'taskers:view'
   if (type === 'company') return 'companies:view'
-  return 'users:view'
+  return 'customers:view'
+}
+
+function canLivePermission(
+  security: {
+    role: AdminSession['role']
+    permissionOverrides: Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>
+  },
+  permission: string
+): boolean {
+  const entry = getPermissionCatalogEntry(permission)
+  return evaluateEffectivePermission({
+    role: security.role,
+    permission,
+    permissionClass: entry?.class,
+    overrides: security.permissionOverrides,
+  }).allowed
+}
+
+function listActionCapabilities(
+  type: string,
+  security: {
+    role: AdminSession['role']
+    permissionOverrides: Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>
+  }
+) {
+  if (type === 'tasker') {
+    return {
+      suspend: canLivePermission(security, 'taskers:status:manage'),
+      ban: canLivePermission(security, 'taskers:ban'),
+      verify: canLivePermission(security, 'taskers:verify'),
+    }
+  }
+  if (type === 'company') {
+    return {
+      suspend: canLivePermission(security, 'companies:status:manage'),
+      ban: canLivePermission(security, 'companies:ban'),
+      verify: canLivePermission(security, 'companies:verify'),
+    }
+  }
+  return {
+    suspend: canLivePermission(security, 'customers:status:manage'),
+    ban: canLivePermission(security, 'users:ban'),
+    verify: false,
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -175,6 +222,7 @@ export async function GET(request: NextRequest) {
         page,
         pageSize,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        actions: listActionCapabilities(type, security),
       },
       { headers: { 'Cache-Control': 'no-store' } }
     )
@@ -233,7 +281,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     const permission = getCrmAccountActionPermission(action, targetUser.role)
-    if (!permission || !crmHasPermission(security.role, permission)) {
+    const canonicalPermission =
+      (action === 'suspend' || action === 'unsuspend')
+        ? targetUser.role === 'TASKER'
+          ? 'taskers:status:manage'
+          : targetUser.role === 'COMPANY'
+            ? 'companies:status:manage'
+            : 'customers:status:manage'
+        : permission
+
+    if (!canonicalPermission || !canLivePermission(security, canonicalPermission)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
