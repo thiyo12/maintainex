@@ -2454,6 +2454,24 @@ model AdminPermissionOverride {
   @@index([permission, effect])
 }
 
+model CrmEmergencyControl {
+  id            String   @id @default(cuid())
+  controlKey    String
+  market        String   @default("GLOBAL")
+  active        Boolean  @default(true)
+  reason        String
+  activatedBy   String
+  activatedAt   DateTime @default(now())
+  expiresAt     DateTime?
+  deactivatedBy String?
+  deactivatedAt DateTime?
+  updatedAt     DateTime @updatedAt
+
+  @@unique([controlKey, market])
+  @@index([active, expiresAt])
+  @@index([market, active])
+}
+
 model CrmStepUpGrant {
   id          String    @id @default(cuid())
   adminUserId String
