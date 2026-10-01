@@ -95,7 +95,12 @@ Understand the whole platform before building visual modules.
 - [ ] Inventory duplicate/legacy category systems
 - [ ] Inventory duplicate/legacy role systems
 - [ ] Create feature-to-source-of-truth map
-- [ ] Create control-capability matrix
+- [x] Create control-capability matrix
+- [x] Define finance approval thresholds
+- [x] Define role-by-action permission matrix
+- [x] Define approval + append-only audit workflow
+- [x] Define action reversibility classes
+- [x] Define high-risk exception rules
 
 ## Security foundation
 - [ ] canonical staff permission vocabulary
@@ -109,6 +114,12 @@ Understand the whole platform before building visual modules.
 - [ ] Cloudflare Access
 - [ ] MFA
 - [ ] direct-origin lock
+- [ ] implement canonical approval-request state machine
+- [ ] implement maker-checker separation of duties
+- [ ] implement step-up authentication gates
+- [ ] implement policy-versioned risk/exception evaluator
+- [ ] implement append-only approval audit events
+- [ ] implement break-glass safer-state-only controls
 
 ## Legacy removal
 - [ ] assign every old CRM component/helper/API to KEEP / REWRITE / TEMP / DELETE
@@ -439,6 +450,17 @@ Understand the whole platform before building visual modules.
 - [ ] overdue state
 - [ ] payment confirmation
 
+## Approval & exception engine
+- [ ] T0/T1/T2/T3/T4 market-aware policy
+- [ ] maker-checker approval enforcement
+- [ ] finance velocity / anti-splitting detection
+- [ ] recent payout-destination cooling rule
+- [ ] KYC/dispute/fraud automatic holds
+- [ ] stale approval invalidation
+- [ ] approval request expiry
+- [ ] append-only approval/execution audit chain
+- [ ] compensating-action model for R3/R4 operations
+
 ## Security
 - [ ] server-calculated money
 - [ ] immutable ledger
@@ -649,6 +671,7 @@ The current app includes a real-estate module and it must either be deliberately
 
 ## Staff
 - [ ] staff directory
+- [ ] canonical role-by-action permission matrix
 - [ ] role templates
 - [ ] granular permission matrix
 - [ ] explicit ALLOW
@@ -668,6 +691,9 @@ The current app includes a real-estate module and it must either be deliberately
 - [ ] prevent unauthorized SUPER_ADMIN creation
 - [ ] non-delegable owner permissions
 - [ ] immediate live-session impact
+- [ ] permission delegation classes: OWNER_ONLY / SENSITIVE / NORMAL / READ
+- [ ] prohibit self-escalation and self-approval
+- [ ] approval-role separation for sensitive actions
 - [ ] security changes audited
 - [ ] step-up auth for high-risk staff changes where required
 
@@ -745,6 +771,11 @@ The current app includes a real-estate module and it must either be deliberately
 - [ ] Web TypeScript
 - [ ] Mobile TypeScript
 - [ ] auth/RBAC
+- [ ] role-by-action permission matrix tests
+- [ ] maker-checker approval tests
+- [ ] approval expiry/stale-state tests
+- [ ] high-risk exception escalation/HOLD/PROHIBIT tests
+- [ ] break-glass restriction tests
 - [ ] country isolation
 - [ ] IDOR
 - [ ] security-negative tests
