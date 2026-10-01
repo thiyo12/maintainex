@@ -15,6 +15,9 @@ interface AdminUser {
   province: string | null
   region: string | null
   canEditServices: boolean
+  permissions: string[]
+  totpEnabled: boolean
+  sessionExpiresAt: string
 }
 
 interface SessionContextType {
