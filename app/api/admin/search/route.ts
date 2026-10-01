@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { crmHasPermission, guardCrmRequest, getCrmCountryFilter } from '@/lib/crm/security'
+import { assertCrmCountryAllowed, guardCrmRequest, getCrmCountryFilter } from '@/lib/crm/security'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 
 const VALID_TYPES = new Set(['all', 'users', 'companies', 'jobs'])
 
@@ -28,21 +29,49 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
     }
 
-    const countryFilter = getCrmCountryFilter(security)
+    const requestedMarket = (searchParams.get('market') || 'ALL').trim().toUpperCase()
+    if (requestedMarket !== 'ALL' && !/^[A-Z]{2}$/.test(requestedMarket)) {
+      return NextResponse.json({ error: 'Invalid market' }, { status: 400 })
+    }
+    if (requestedMarket !== 'ALL' && !assertCrmCountryAllowed(security, requestedMarket)) {
+      return NextResponse.json({ error: 'Forbidden market' }, { status: 403 })
+    }
+
+    const countryFilter =
+      requestedMarket === 'ALL'
+        ? getCrmCountryFilter(security)
+        : { countryCode: { in: [requestedMarket] } }
+
     const results: Record<string, unknown[]> = {}
     let total = 0
 
-    const canUsers = crmHasPermission(security.role, 'users:view') || crmHasPermission(security.role, 'taskers:view')
-    const canCompanies = crmHasPermission(security.role, 'companies:view')
-    const canJobs = crmHasPermission(security.role, 'jobs:view')
+    const allowed = (permission: string) => evaluateEffectivePermission({
+      role: security.role,
+      permission,
+      overrides: security.permissionOverrides,
+    }).allowed
+
+    const canCustomers = allowed('users:view')
+    const canTaskers = allowed('taskers:view')
+    const canUsers = canCustomers || canTaskers
+    const canCompanies = allowed('companies:view')
+    const canJobs = allowed('jobs:view')
 
     if (type === 'users' && !canUsers) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (type === 'companies' && !canCompanies) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (type === 'jobs' && !canJobs) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     if ((type === 'all' || type === 'users') && canUsers) {
+      const visibleUserRoles =
+        canCustomers && canTaskers
+          ? ['CUSTOMER', 'TASKER']
+          : canCustomers
+            ? ['CUSTOMER']
+            : ['TASKER']
+
       const userWhere: any = {
         ...countryFilter,
+        role: { in: visibleUserRoles },
         OR: [
           { id: { contains: query, mode: 'insensitive' } },
           { name: { contains: query, mode: 'insensitive' } },
@@ -146,6 +175,7 @@ export async function GET(request: NextRequest) {
         page,
         pageSize,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        market: requestedMarket,
       },
       {
         headers: {
