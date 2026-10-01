@@ -20,9 +20,11 @@ describe('commission CRM currency isolation', () => {
   it('never formats every settlement as hard-coded LKR in the CRM page', () => {
     const page = read('app/(admin)/admin/financial/commission/page.tsx')
 
-    expect(page).toContain('formatCurrency(s.totalEarnings, s.currency)')
-    expect(page).toContain('formatCurrency(s.commissionOwed, s.currency)')
-    expect(page).toContain('summaryByCurrency.flatMap')
+    expect(page).toContain('money(item.totalEarnings, item.currency)')
+    expect(page).toContain('money(item.commissionOwed, item.currency)')
+    expect(page).toContain('metrics.flatMap')
+    expect(page).toContain('money(summary.totalCommissionOwed, summary.currency)')
+    expect(page).toContain('money(summary.totalCommissionPaid, summary.currency)')
     expect(page).not.toContain("currency: 'LKR',")
   })
 })
