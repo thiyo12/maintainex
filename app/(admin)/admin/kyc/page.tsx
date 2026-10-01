@@ -10,7 +10,6 @@ interface KYCDocument {
   userId: string
   docType: string
   side: string
-  imageUrl: string
   status: string
   reviewNote?: string
   reviewedBy?: string
@@ -309,7 +308,7 @@ export default function KYCPage() {
                       <FiEye size={16} />
                     </button>
                     <a
-                      href={doc.imageUrl}
+                      href={`/api/admin/kyc/${doc.id}/file`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2 bg-white/5 text-gray-400 rounded-lg hover:bg-white/10 hover:text-white transition"
@@ -377,7 +376,7 @@ export default function KYCPage() {
                 <div className="p-4 flex justify-center bg-black/30">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={lightboxDoc.imageUrl}
+                    src={`/api/admin/kyc/${lightboxDoc.id}/file`}
                     alt="KYC Document"
                     className="max-h-[70vh] max-w-full object-contain rounded"
                   />
