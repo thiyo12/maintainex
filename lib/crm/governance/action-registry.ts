@@ -121,6 +121,27 @@ export const CRM_ACTIONS: Readonly<Record<CrmActionId, ActionDefinition>> = {
     baseTier: 'T1',
     breakGlass: 'NONE',
   },
+  'disputes.financial_resolution': {
+    id: 'disputes.financial_resolution',
+    label: 'Resolve marketplace dispute with financial effect',
+    permissionClass: 'SENSITIVE',
+    initiatePermission: 'disputes:finance:initiate',
+    approvePermission: 'disputes:finance:approve',
+    ownerRoles: ['MANAGER', 'FINANCE', 'SUPER_ADMIN'],
+    initiatorRoles: ['SUPPORT', 'MANAGER', 'SUPER_ADMIN'],
+    approverRoles: {
+      T2: ['FINANCE', 'MANAGER', 'SUPER_ADMIN'],
+      T3: ['MANAGER', 'FINANCE', 'SUPER_ADMIN'],
+      T4: ['SUPER_ADMIN'],
+    },
+    requiresMarketScope: true,
+    reversibility: 'R3',
+    riskLevel: 'CRITICAL',
+    baseTier: 'T2',
+    makerCheckerFromTier: 'T2',
+    stepUpFromTier: 'T2',
+    breakGlass: 'NONE',
+  },
   'finance.refund': {
     id: 'finance.refund',
     label: 'Refund payment',
@@ -506,6 +527,7 @@ export function getApprovalSlots(actionId: CrmActionId, tier: ApprovalTier): rea
   const fallback = action.approverRoles[tier] || []
 
   switch (actionId) {
+    case 'disputes.financial_resolution':
     case 'finance.refund':
     case 'finance.escrow.manual_release':
     case 'finance.wallet.adjust':
