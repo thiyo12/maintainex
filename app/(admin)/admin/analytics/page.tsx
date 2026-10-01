@@ -25,6 +25,11 @@ import {
 import { CrmActivityFeed } from '@/components/crm/v2/CrmOperational'
 
 interface AnalyticsData {
+  visibility: {
+    finance: boolean
+    realEstate: boolean
+    disputes: boolean
+  }
   summary: {
     totalUsers: number
     activeTaskers: number
@@ -33,9 +38,15 @@ interface AnalyticsData {
     openJobs: number
     completedJobs: number
     cancelledJobs: number
-    totalRevenue: number
-    totalCommission: number
-    commissionCount: number
+    staleJobs: number
+    completionRate: number
+    openDisputes: number
+    realEstateTotal: number
+    realEstatePending: number
+    avgTaskerResponseMin: number
+    totalRevenue: number | null
+    totalCommission: number | null
+    commissionCount: number | null
   }
   jobsByStatus: {
     open: number
@@ -59,7 +70,8 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US').format(Number(value || 0))
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number | null) {
+  if (value === null) return 'Restricted'
   return new Intl.NumberFormat('en-LK', {
     style: 'currency',
     currency: 'LKR',
@@ -168,13 +180,15 @@ export default function AnalyticsOverview() {
         }
       />
 
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4 2xl:grid-cols-8">
         <CrmMetricCard label="Total users" value={formatNumber(data.summary.totalUsers)} icon={<FiUsers size={16} />} tone="info" />
-        <CrmMetricCard label="Active taskers" value={formatNumber(data.summary.activeTaskers)} icon={<FiUserCheck size={16} />} tone="success" />
+        <CrmMetricCard label="Active taskers" value={formatNumber(data.summary.activeTaskers)} helper={`${data.summary.avgTaskerResponseMin}m avg response`} icon={<FiUserCheck size={16} />} tone="success" />
         <CrmMetricCard label="Active companies" value={formatNumber(data.summary.activeCompanies)} icon={<FiBriefcase size={16} />} tone="neutral" />
         <CrmMetricCard label="Total jobs" value={formatNumber(data.summary.totalJobs)} icon={<FiTool size={16} />} tone="amber" />
-        <CrmMetricCard label="Revenue" value={formatCurrency(data.summary.totalRevenue)} icon={<FiDollarSign size={16} />} tone="success" />
-        <CrmMetricCard label="Commission" value={formatCurrency(data.summary.totalCommission)} helper={`${formatNumber(data.summary.commissionCount)} entries`} icon={<FiTrendingUp size={16} />} tone="amber" />
+        <CrmMetricCard label="Completion" value={`${data.summary.completionRate.toFixed(1)}%`} helper={`${data.summary.staleJobs} SLA-risk jobs`} icon={<FiTrendingUp size={16} />} tone={data.summary.staleJobs>0?'warning':'success'} />
+        <CrmMetricCard label="Open disputes" value={data.visibility.disputes?formatNumber(data.summary.openDisputes):'Restricted'} helper="Unresolved cases" icon={<FiActivity size={16} />} tone="warning" />
+        <CrmMetricCard label="Revenue" value={formatCurrency(data.summary.totalRevenue)} helper={data.visibility.finance?'Authorized finance view':'Finance permission required'} icon={<FiDollarSign size={16} />} tone={data.visibility.finance?'success':'neutral'} />
+        <CrmMetricCard label="Real Estate" value={data.visibility.realEstate?formatNumber(data.summary.realEstateTotal):'Restricted'} helper={data.visibility.realEstate?`${data.summary.realEstatePending} pending review`:'Real-estate permission required'} icon={<FiBriefcase size={16} />} tone="info" />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-2">
