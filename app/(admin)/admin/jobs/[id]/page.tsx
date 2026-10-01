@@ -251,7 +251,10 @@ export default function Job360Page() {
       const response = await fetch('/api/admin/jobs', {
         method: 'PATCH',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
         body: JSON.stringify({
           jobId: job.id,
           source: payload?.source,
@@ -262,6 +265,14 @@ export default function Job360Page() {
       if (!response.ok) {
         throw new Error(body?.error?.message || body?.error || 'Unable to cancel job')
       }
+
+      if (response.status === 202 || body?.approvalRequired) {
+        toast.success(`Cancellation sent for ${body?.approval?.tier || 'approval'} review`)
+        setCancelConfirmOpen(false)
+        await load()
+        return
+      }
+
       toast.success('Job cancelled')
       setCancelConfirmOpen(false)
       await load()
