@@ -47,6 +47,39 @@ describe('CRM V2 approval service security', () => {
     expect(db.approvalFindUnique).not.toHaveBeenCalled()
   })
 
+  it('rejects the same idempotency key for a different approval payload', async () => {
+    db.approvalFindUnique.mockResolvedValueOnce({
+      id: 'approval-conflict',
+      idempotencyKey: 'refund:payment-1:v1',
+      actionId: 'finance.refund',
+      initiatorAdminId: 'finance-1',
+      market: 'LK',
+      targetType: 'PaymentIntent',
+      targetId: 'payment-1',
+      amountMinor: lkr(10_000),
+      currency: 'LKR',
+      status: 'PENDING_APPROVAL',
+    })
+
+    await expect(createCrmApprovalRequest({
+      actionId: 'finance.refund',
+      initiatorAdminId: 'finance-1',
+      market: 'LK',
+      targetType: 'PaymentIntent',
+      targetId: 'payment-2',
+      amountMinor: lkr(20_000),
+      currency: 'LKR',
+      idempotencyKey: 'refund:payment-1:v1',
+      risk: {
+        remainingRefundableMinor: lkr(20_000),
+      },
+    })).rejects.toMatchObject<Partial<CrmApprovalError>>({
+      code: 'APPROVAL_IDEMPOTENCY_CONFLICT',
+    })
+
+    expect(db.transaction).not.toHaveBeenCalled()
+  })
+
   it('reuses an existing approval request for the same idempotency key', async () => {
     const existing = {
       id: 'approval-1',
