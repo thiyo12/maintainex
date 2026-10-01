@@ -80,13 +80,12 @@ interface Payload {
     payout: boolean
   }
   emergency: {
-    globalFreeze?: {
+    freezes: Array<{
       id: string
       market: string
       activatedAt: string
       expiresAt?: string | null
-    } | null
-    scopedFreezeCount: number
+    }>
   }
 }
 
@@ -324,9 +323,10 @@ export default function PayoutQueuePage() {
     }
   }
 
-  const frozen =
-    Boolean(payload?.emergency?.globalFreeze) ||
-    Number(payload?.emergency?.scopedFreezeCount || 0) > 0
+  const freezes = payload?.emergency?.freezes || []
+  const hasAnyFreeze = freezes.length > 0
+  const isMarketFrozen = (market: string) =>
+    freezes.some(freeze => freeze.market === 'GLOBAL' || freeze.market === market)
 
   return (
     <div className="space-y-5">
@@ -360,7 +360,7 @@ export default function PayoutQueuePage() {
         </Link>
       </div>
 
-      {frozen && (
+      {hasAnyFreeze && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
           <div className="flex items-start gap-3">
             <FiShield className="mt-0.5 shrink-0 text-red-700" size={17} />
@@ -524,13 +524,18 @@ export default function PayoutQueuePage() {
                     </td>
                     <td className={`${crmTdClass} text-right`}>
                       <div className="flex items-center justify-end gap-2">
+                        {isMarketFrozen(item.countryCode) &&
+                          ['RESERVED', 'PROCESSING'].includes(item.status) && (
+                            <CrmBadge tone="danger">Market frozen</CrmBadge>
+                          )}
+
                         {payload?.actions?.payout &&
                           ['RESERVED', 'PROCESSING'].includes(item.status) && (
                             <>
                               <CrmButton
                                 size="sm"
                                 variant="primary"
-                                disabled={acting === item.id || frozen}
+                                disabled={acting === item.id || isMarketFrozen(item.countryCode)}
                                 onClick={() => {
                                   setConfirmTarget(item)
                                   setProviderRef('')
