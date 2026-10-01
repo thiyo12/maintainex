@@ -3,15 +3,16 @@ import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
   getCrmCountryFilter,
+  guardCrmAction,
   guardCrmRequest,
   type CrmSecurityContext,
 } from '@/lib/crm/security'
 import { createAuditLog } from '@/lib/crm/audit'
+import { createCrmApprovalRequest, evaluateActionInitiation } from '@/lib/crm/governance'
+import { resolveCurrentApprovalRisk } from '@/lib/crm/governance/current-risk'
 import { requireFinancialRateLimit } from '@/lib/rate-limit/financial-guard'
 import {
-  confirmManualExternalRefund,
   reconcilePayHereRefund,
-  requestRequiredPayHereRefund,
 } from '@/lib/finance/payments/payment-service'
 
 const REFUND_STATUSES = ['REFUND_REQUIRED', 'REFUND_PROCESSING', 'REFUNDED'] as const
@@ -105,6 +106,13 @@ export async function GET(request: NextRequest) {
           total,
           pages: Math.max(1, Math.ceil(total / limit)),
         },
+        actions: {
+          refund: evaluateActionInitiation({
+            role: security.role,
+            actionId: 'finance.refund',
+            overrides: security.permissionOverrides,
+          }).allowed,
+        },
       },
       { headers: { 'Cache-Control': 'no-store' } }
     )
@@ -116,11 +124,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const guard = await guardCrmRequest(request, {
-      permission: 'wallets:manage',
-      level: 'sensitive',
-      requireCountryScope: true,
-    })
+    const guard = await guardCrmAction(request, 'finance.refund')
     if (!guard.ok) return guard.response
     const security = guard.context
 
@@ -136,6 +140,9 @@ export async function PATCH(request: NextRequest) {
       ? body.manualReference.trim().slice(0, 200)
       : ''
     const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : ''
+    const idempotencyKey = typeof body?.idempotencyKey === 'string'
+      ? body.idempotencyKey.trim().slice(0, 200)
+      : ''
 
     if (!paymentIntentId || !['RETRY', 'RECONCILE', 'CONFIRM_MANUAL'].includes(action)) {
       return NextResponse.json(
@@ -155,9 +162,12 @@ export async function PATCH(request: NextRequest) {
       select: {
         id: true,
         jobId: true,
+        escrowId: true,
         status: true,
         merchantOrderId: true,
         paymentId: true,
+        amount: true,
+        currency: true,
       },
     })
     if (!intent) return NextResponse.json({ error: 'Payment intent not found' }, { status: 404 })
@@ -171,50 +181,104 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const result = action === 'RETRY'
-      ? await requestRequiredPayHereRefund(intent.id)
-      : action === 'RECONCILE'
-        ? await reconcilePayHereRefund(intent.id)
-        : await confirmManualExternalRefund(intent.id, {
-            actorId: security.adminId,
-            reference: manualReference,
-            note,
-          })
+    if (action === 'RECONCILE') {
+      const result = await reconcilePayHereRefund(intent.id)
 
-    await createAuditLog({
-      action: 'UPDATE',
-      category: 'FINANCE',
-      userId: security.adminId,
-      userEmail: security.email,
-      userRole: security.role,
-      entityType: 'PaymentIntent',
-      entityId: intent.id,
-      entityName: intent.merchantOrderId,
-      description: `CRM PayHere refund ${action.toLowerCase()}`,
-      oldValue: { status: intent.status },
-      newValue: {
-        status: result.status,
-        success: result.success,
-        code: result.code || null,
-        paymentIdPresent: Boolean(intent.paymentId),
-        manualReferencePresent: action === 'CONFIRM_MANUAL' ? true : undefined,
-      },
-      ipAddress: security.ipAddress,
-      userAgent: security.userAgent || undefined,
-      riskLevel: result.success ? 'MEDIUM' : 'HIGH',
+      await createAuditLog({
+        action: 'UPDATE',
+        category: 'FINANCE',
+        userId: security.adminId,
+        userEmail: security.email,
+        userRole: security.role,
+        entityType: 'PaymentIntent',
+        entityId: intent.id,
+        entityName: intent.merchantOrderId,
+        description: 'CRM PayHere refund reconciliation',
+        oldValue: { status: intent.status },
+        newValue: {
+          status: result.status,
+          success: result.success,
+          code: result.code || null,
+          paymentIdPresent: Boolean(intent.paymentId),
+        },
+        ipAddress: security.ipAddress,
+        userAgent: security.userAgent || undefined,
+        riskLevel: result.success ? 'LOW' : 'MEDIUM',
+      })
+
+      return NextResponse.json(
+        {
+          mode: 'RECONCILED',
+          result: {
+            success: result.success,
+            status: result.status,
+            code: result.code || null,
+            error: result.error || null,
+            refundReference: result.refundReference || null,
+          },
+        },
+        { status: result.success ? 200 : 409 }
+      )
+    }
+
+    if (idempotencyKey.length < 8) {
+      return NextResponse.json(
+        { error: 'A valid idempotencyKey is required for refund execution requests' },
+        { status: 400 }
+      )
+    }
+
+    const currentRisk = await resolveCurrentApprovalRisk({
+      actionId: 'finance.refund',
+      market: job.countryCode,
+      targetType: 'PaymentIntent',
+      targetId: intent.id,
+      amountMinor: intent.amount,
+      currency: intent.currency,
+    })
+
+    const approval = await createCrmApprovalRequest({
+      actionId: 'finance.refund',
+      initiatorAdminId: security.adminId,
+      market: job.countryCode,
+      targetType: 'PaymentIntent',
+      targetId: intent.id,
+      amountMinor: intent.amount,
+      currency: intent.currency,
+      reasonCode:
+        action === 'CONFIRM_MANUAL'
+          ? 'MANUAL_EXTERNAL_REFUND_CONFIRMATION'
+          : 'GATEWAY_REFUND_REQUEST',
+      note:
+        action === 'CONFIRM_MANUAL'
+          ? (note || 'Manual external refund confirmation requested')
+          : 'PayHere refund request submitted for approval',
+      idempotencyKey,
+      actionPayload:
+        action === 'CONFIRM_MANUAL'
+          ? {
+              mode: 'CONFIRM_MANUAL',
+              manualReference,
+              note,
+            }
+          : {
+              mode: 'REQUEST_GATEWAY_REFUND',
+            },
+      risk: currentRisk.risk,
     })
 
     return NextResponse.json(
       {
-        result: {
-          success: result.success,
-          status: result.status,
-          code: result.code || null,
-          error: result.error || null,
-          refundReference: result.refundReference || null,
+        mode: 'APPROVAL_REQUIRED',
+        approval: {
+          id: approval.request.id,
+          status: approval.request.status,
+          tier: approval.request.tier,
+          expiresAt: approval.request.expiresAt,
+          reused: approval.reused,
         },
       },
-      { status: result.success ? 200 : 409 }
+      { status: 202 }
     )
   } catch (error) {
     console.error('CRM refund queue PATCH error:', error)
