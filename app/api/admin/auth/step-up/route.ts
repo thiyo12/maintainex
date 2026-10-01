@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyTotp } from '@/lib/admin-2fa'
-import { guardCrmRequest } from '@/lib/crm/security'
+import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
 import { CRM_ACTIONS, type CrmActionId } from '@/lib/crm/governance'
 import { crmStepUpExpiresAt, signCrmStepUpToken } from '@/lib/crm/governance/step-up'
 
@@ -27,6 +27,17 @@ export async function POST(request: NextRequest) {
         { error: 'Valid actionId and 6-digit authenticator code are required.' },
         { status: 400 }
       )
+    }
+
+    // A step-up proof is only issued to a staff account that is itself
+    // currently authorized to initiate the exact action.
+    const actionGuard = await guardCrmAction(request, actionId)
+    if (!actionGuard.ok) return actionGuard.response
+    if (
+      actionGuard.context.adminId !== security.adminId ||
+      actionGuard.context.sessionId !== security.sessionId
+    ) {
+      return NextResponse.json({ error: 'Session changed during step-up.' }, { status: 401 })
     }
 
     const admin = await prisma.adminUser.findUnique({
