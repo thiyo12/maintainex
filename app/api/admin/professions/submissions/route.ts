@@ -5,7 +5,7 @@ import { guardCrmRequest } from '@/lib/crm/security'
 export async function GET(request: NextRequest) {
   try {
     const guard = await guardCrmRequest(request, {
-      permission: 'professions:read',
+      permission: 'catalog:view',
       level: 'read',
       requireCountryScope: true,
     })
