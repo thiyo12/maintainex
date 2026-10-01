@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth/authentication/auth-utils'
+import { getPlatformRuntimeConfig } from '@/lib/runtime/platform-runtime'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const runtime = await getPlatformRuntimeConfig(searchParams.get('country'))
+    if (!runtime.offers.visible || !runtime.market.available) {
+      return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } })
+    }
     const season = searchParams.get('season')
     const country = searchParams.get('country')
 
