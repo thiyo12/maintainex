@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import {
   assertCrmCountryAllowed,
-  crmHasPermission,
   getCrmCountryFilter,
   guardCrmRequest,
 } from '@/lib/crm/security'
 import { transitionUserKyc } from '@/lib/phase6/kyc-writer'
+import { evaluateEffectivePermission } from '@/lib/crm/governance'
 
 const VALID_STATUSES = new Set(['ALL', 'PENDING', 'APPROVED', 'REJECTED'])
 
@@ -37,25 +37,31 @@ export async function GET(request: NextRequest) {
     const [documents, total, pending, verified, rejected] = await Promise.all([
       prisma.identityDocument.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          userId: true,
+          docType: true,
+          side: true,
+          fullName: true,
+          status: true,
+          reviewNote: true,
+          reviewedBy: true,
+          reviewedAt: true,
+          countryCode: true,
+          createdAt: true,
           user: {
             select: {
               id: true,
               mxId: true,
               name: true,
               email: true,
-              phone: true,
               role: true,
               taskerProfile: {
                 select: {
                   id: true,
                   mxId: true,
                   verificationStatus: true,
-                  bio: true,
-                  skills: true,
-                  experienceProofUrl: true,
                   hasDrivingLicense: true,
-                  drivingLicenseUrl: true,
                   completedJobs: true,
                   rating: true,
                 },
@@ -66,12 +72,7 @@ export async function GET(request: NextRequest) {
                   mxId: true,
                   companyName: true,
                   verificationStatus: true,
-                  registrationNo: true,
-                  taxId: true,
-                  minStaffCount: true,
                   staffCount: true,
-                  staffProofUrl: true,
-                  businessRegDocUrl: true,
                   completedProjects: true,
                   rating: true,
                 },
@@ -130,7 +131,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const requiredPermission = status === 'APPROVED' ? 'kyc:approve' : 'kyc:reject'
-    if (!crmHasPermission(security.role, requiredPermission)) {
+    const permission = evaluateEffectivePermission({
+      role: security.role,
+      permission: requiredPermission,
+      permissionClass: 'SENSITIVE',
+      overrides: security.permissionOverrides,
+    })
+    if (!permission.allowed) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
