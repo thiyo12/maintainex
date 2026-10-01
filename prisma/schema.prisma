@@ -2051,8 +2051,21 @@ model FlashOffer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  claims FlashOfferClaim[]
+
   @@index([isActive])
   @@index([expiresAt])
+}
+
+model FlashOfferClaim {
+  id           String     @id @default(cuid())
+  flashOfferId String
+  flashOffer   FlashOffer @relation(fields: [flashOfferId], references: [id], onDelete: Cascade)
+  userId       String
+  claimedAt    DateTime   @default(now())
+
+  @@unique([flashOfferId, userId])
+  @@index([userId, claimedAt])
 }
 
 // ============================================
