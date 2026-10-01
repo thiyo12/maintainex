@@ -5,6 +5,7 @@ import { ADMIN_ROLES, type AdminRole } from '@/lib/admin-types'
 import { guardCrmAction, guardCrmRequest } from '@/lib/crm/security'
 import { consumeCrmStepUpFromHeader } from '@/lib/crm/governance/step-up'
 import { createAuditLog } from '@/lib/crm/audit'
+import { evaluateActionInitiation } from '@/lib/crm/governance'
 
 const VALID_ROLES = new Set(Object.keys(ADMIN_ROLES))
 
@@ -59,6 +60,25 @@ async function activeSuperAdminCount() {
       deletedAt: null,
     },
   })
+}
+
+function staffCapabilities(security: {
+  role: AdminRole
+  permissionOverrides: Array<{ permission: string; effect: 'ALLOW' | 'DENY' }>
+}) {
+  const allowed = (actionId: 'staff.create' | 'staff.account.update' | 'staff.delete' | 'staff.permission.change') =>
+    evaluateActionInitiation({
+      role: security.role,
+      actionId,
+      overrides: security.permissionOverrides,
+    }).allowed
+
+  return {
+    create: allowed('staff.create'),
+    edit: allowed('staff.account.update'),
+    delete: allowed('staff.delete'),
+    permissions: allowed('staff.permission.change'),
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -124,7 +144,10 @@ export async function GET(request: NextRequest) {
     })
 
     return NextResponse.json(
-      { admins: result },
+      {
+        admins: result,
+        actions: staffCapabilities(guard.context),
+      },
       { headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (error) {
